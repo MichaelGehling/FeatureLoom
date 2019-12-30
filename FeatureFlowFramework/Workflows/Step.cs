@@ -1,0 +1,112 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace FeatureFlowFramework.Workflows
+{
+    public class Step<CT> : PartialStep<CT>, IStepInfo where CT : IStateMachineContext
+    {
+        public StateMachine<CT> parentStateMachine;
+        public State<CT> parentState;
+        public string description = "";
+        public int stepIndex;
+
+        public bool hasCatchException = false;
+        public State onExceptionTargetState;
+        public Func<CT, Exception, Task> onExceptionAsync;
+        public Action<CT, Exception> onException;
+        public Func<CT, Exception, bool> onExceptionRepeatCondition;
+        public Func<CT, Exception, Task<bool>> onExceptionRepeatConditionAsync;
+
+        public List<Func<CT, object>> usingResourcesDelegates;
+
+        internal Step(StateMachine<CT> parentStateMachine, State<CT> parentState, int stepIndex)
+        {
+            this.parentStateMachine = parentStateMachine;
+            this.parentState = parentState;
+            this.stepIndex = stepIndex;
+        }
+
+        public string Description => description;
+
+        public IStateInfo[] TargetStates
+        {
+            get
+            {
+                List<IStateInfo> targetStates = null;
+                var nextElse = doElse;
+                while(nextElse != null)
+                {
+                    if(nextElse.targetState != null)
+                    {
+                        if(targetStates == null) targetStates = new List<IStateInfo>();
+                        targetStates.Add(nextElse.targetState);
+                    }
+                    nextElse = nextElse.doElse;
+                }
+
+                if(targetStates == null)
+                {
+                    if(targetState == null) return new IStateInfo[] { };
+                    else return new IStateInfo[] { targetState };
+                }
+                else
+                {
+                    if(targetState != null) targetStates.Add(targetState);
+                    return targetStates.ToArray();
+                }
+            }
+        }
+
+        public bool MayTerminate
+        {
+            get
+            {
+                if(finishStateMachine) return true;
+                var nextElse = doElse;
+                while(nextElse != null)
+                {
+                    if(nextElse.finishStateMachine) return true;
+                    nextElse = nextElse.doElse;
+                }
+                return false;
+            }
+        }
+
+        public int StepIndex => stepIndex;
+
+        public void AddUsingResource(Func<CT, object> resourceDelegate)
+        {
+            if(usingResourcesDelegates == null) usingResourcesDelegates = new List<Func<CT, object>>();
+            usingResourcesDelegates.Add(resourceDelegate);
+        }
+    }
+
+    public class PartialStep<CT> where CT : IStateMachineContext
+    {
+        public bool hasCondition = false;
+        public Func<CT, Task<bool>> conditionAsync;
+        public Func<CT, bool> condition;
+        public bool repeatWhileCondition = false;
+        public PartialStep<CT> doElse = null;
+
+        public bool hasAction = false;
+        public Func<CT, Task> actionAsync;
+        public Action<CT> action;
+
+        public bool hasWaiting = false;
+        public Func<CT, TimeSpan> timeoutDelegate;
+        public Func<CT, Task> waitingTaskDelegate;
+
+        public bool finishStateMachine = false;
+        public State targetState;
+    }
+
+    public interface IStepInfo
+    {
+        string Description { get; }
+        IStateInfo[] TargetStates { get; }
+        bool MayTerminate { get; }
+        int StepIndex { get; }
+    }
+}

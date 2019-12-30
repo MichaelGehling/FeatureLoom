@@ -1,0 +1,539 @@
+﻿using FeatureFlowFramework.Helper;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FeatureFlowFramework.Workflows
+{
+    public class StateBuilder<CT> : IAfterStartStateBuilder<CT>, INextStateBuilder<CT>, IInitialStateBuilder<CT>,
+                                    IAfterPreconditionStateBuilder<CT>, IAfterActionStateBuilder<CT>,
+                                    IAfterWhileStateBuilder<CT>, IAfterConditionedActionStateBuilder<CT>,
+                                    IAfterFinalPreconditionStateBuilder<CT>
+                                    where CT : IStateMachineContext
+    {
+        public State<CT> state;
+
+        public StateBuilder(State<CT> state)
+        {
+            this.state = state;
+        }
+
+        private Step<CT> CurrentStep => state.steps[state.steps.Count - 1];
+
+        private PartialStep<CT> CurrentPartialStep
+        {
+            get
+            {
+                PartialStep<CT> partial = CurrentStep;
+                while(partial.doElse != null) partial = partial.doElse;
+                return partial;
+            }
+        }
+
+        private Step<CT> NewStep
+        {
+            get
+            {
+                state.steps.Add(new Step<CT>(state.parentStateMachine, state, state.steps.Count));
+                return CurrentStep;
+            }
+        }
+
+        public INextStateBuilder<CT> Catch()
+        {
+            CurrentStep.hasCatchException = true;
+            return this;
+        }
+
+        public INextStateBuilder<CT> CatchAndDo(Func<CT, Exception, Task> action)
+        {
+            CurrentStep.hasCatchException = true;
+            CurrentStep.onExceptionAsync = action;
+            return this;
+        }
+
+        public INextStateBuilder<CT> CatchAndDo(Action<CT, Exception> action)
+        {
+            CurrentStep.hasCatchException = true;
+            CurrentStep.onException = action;
+            return this;
+        }
+
+        public INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, Task<bool>> predicate)
+        {
+            CurrentStep.hasCatchException = true;
+            CurrentStep.onExceptionRepeatConditionAsync = predicate;
+            return this;
+        }
+
+        public INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, bool> predicate)
+        {
+            CurrentStep.hasCatchException = true;
+            CurrentStep.onExceptionRepeatCondition = predicate;
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> Do(Func<CT, Task> action)
+        {
+            CurrentPartialStep.hasAction = true;
+            CurrentPartialStep.actionAsync = action;
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> Do(Action<CT> action)
+        {
+            CurrentPartialStep.hasAction = true;
+            CurrentPartialStep.action = action;
+            return this;
+        }
+
+        public State<CT> Finish()
+        {
+            CurrentPartialStep.finishStateMachine = true;
+            return state;
+        }
+
+        public State<CT> Goto(State targetState)
+        {
+            CurrentPartialStep.targetState = targetState;
+            return this.state;
+        }
+
+        public IAfterPreconditionStateBuilder<CT> If(Func<CT, Task<bool>> predicate)
+        {
+            CurrentPartialStep.hasCondition = true;
+            CurrentPartialStep.conditionAsync = predicate;
+            return this;
+        }
+
+        public IAfterPreconditionStateBuilder<CT> If(Func<CT, bool> predicate)
+        {
+            CurrentPartialStep.hasCondition = true;
+            CurrentPartialStep.condition = predicate;
+            return this;
+        }
+
+        public IAfterPreconditionStateBuilder<CT> ElseIf(Func<CT, Task<bool>> predicate)
+        {
+            CurrentPartialStep.doElse = new PartialStep<CT>();
+            CurrentPartialStep.hasCondition = true;
+            CurrentPartialStep.conditionAsync = predicate;
+            return this;
+        }
+
+        public IAfterPreconditionStateBuilder<CT> ElseIf(Func<CT, bool> predicate)
+        {
+            CurrentPartialStep.doElse = new PartialStep<CT>();
+            CurrentPartialStep.hasCondition = true;
+            CurrentPartialStep.condition = predicate;
+            return this;
+        }
+
+        public IAfterFinalPreconditionStateBuilder<CT> Else()
+        {
+            CurrentPartialStep.doElse = new PartialStep<CT>();
+            return this;
+        }
+
+        public State<CT> Loop()
+        {
+            CurrentPartialStep.targetState = state;
+            return state;
+        }
+
+        public IAfterStartStateBuilder<CT> Step(string description = "")
+        {
+            NewStep.description = description;
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> Using(Func<CT, object> resource)
+        {
+            CurrentStep.AddUsingResource(resource);
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> Wait(Func<CT, TimeSpan> waitingTime)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = waitingTime;
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> Wait(TimeSpan waitingTime)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = c => waitingTime;
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = timeout;
+            CurrentPartialStep.waitingTaskDelegate = c => waitHandle(c).WaitingTask;
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout = default)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = timeout;
+            CurrentPartialStep.waitingTaskDelegate = task;
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> WaitForAll(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = timeout;
+            CurrentPartialStep.waitingTaskDelegate = c => Task.WhenAll(waitHandles(c).GetWaitingTasks());
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = timeout;
+            CurrentPartialStep.waitingTaskDelegate = c => Task.WhenAny(waitHandles(c).GetWaitingTasks());
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> WaitForAll(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = timeout;
+            CurrentPartialStep.waitingTaskDelegate = c => Task.WhenAll(tasks(c));
+            return this;
+        }
+
+        public IAfterActionStateBuilder<CT> WaitForAny(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default)
+        {
+            CurrentPartialStep.hasWaiting = true;
+            CurrentPartialStep.timeoutDelegate = timeout;
+            CurrentPartialStep.waitingTaskDelegate = c => Task.WhenAny(tasks(c));
+            return this;
+        }
+
+        public IAfterWhileStateBuilder<CT> While(Func<CT, Task<bool>> predicate)
+        {
+            CurrentPartialStep.hasCondition = true;
+            CurrentPartialStep.repeatWhileCondition = true;
+            CurrentPartialStep.conditionAsync = predicate;
+            return this;
+        }
+
+        public IAfterWhileStateBuilder<CT> While(Func<CT, bool> predicate)
+        {
+            CurrentPartialStep.hasCondition = true;
+            CurrentPartialStep.repeatWhileCondition = true;
+            CurrentPartialStep.condition = predicate;
+            return this;
+        }
+
+        public INextStateBuilder<CT> CatchAndGoto(State targetState)
+        {
+            CurrentStep.hasCatchException = true;
+            CurrentStep.onExceptionTargetState = targetState;
+            return this;
+        }
+
+        IAfterPreconditionStateBuilder<CT> IAfterStartStateBuilder<CT>.If(Func<CT, Task<bool>> predicate)
+        {
+            this.If(predicate);
+            return this;
+        }
+
+        IAfterPreconditionStateBuilder<CT> IAfterStartStateBuilder<CT>.If(Func<CT, bool> predicate)
+        {
+            this.If(predicate);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Do(Func<CT, Task> action)
+        {
+            this.Do(action);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Do(Action<CT> action)
+        {
+            this.Do(action);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Wait(Func<CT, TimeSpan> waitingTime)
+        {
+            this.Wait(waitingTime);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Wait(TimeSpan waitingTime)
+        {
+            this.Wait(waitingTime);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAll(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout)
+        {
+            this.WaitForAll(waitHandles, timeout);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout)
+        {
+            this.WaitForAny(waitHandles, timeout);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout)
+        {
+            this.WaitFor(waitHandle, timeout);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAll(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout)
+        {
+            this.WaitForAll(tasks, timeout);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAny(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout)
+        {
+            this.WaitForAny(tasks, timeout);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout)
+        {
+            this.WaitFor(task, timeout);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Goto(State targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Loop()
+        {
+            this.Loop();
+            return this;
+        }
+
+        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Finish()
+        {
+            this.Finish();
+            return this;
+        }
+
+        IAfterActionStateBuilder<CT> IAfterFinalPreconditionStateBuilder<CT>.Goto(State targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterActionStateBuilder<CT> IAfterFinalPreconditionStateBuilder<CT>.Loop()
+        {
+            this.Loop();
+            return this;
+        }
+
+        IAfterActionStateBuilder<CT> IAfterFinalPreconditionStateBuilder<CT>.Finish()
+        {
+            this.Finish();
+            return this;
+        }
+    }
+
+    public interface IInitialStateBuilder<CT> where CT : IStateMachineContext
+    {
+        // Next Step
+        IAfterStartStateBuilder<CT> Step(string description = "");
+    }
+
+    public interface IAfterStartStateBuilder<CT> where CT : IStateMachineContext
+    {
+        //Preconditions
+        IAfterPreconditionStateBuilder<CT> If(Func<CT, Task<bool>> predicate);
+
+        IAfterPreconditionStateBuilder<CT> If(Func<CT, bool> predicate);
+
+        IAfterWhileStateBuilder<CT> While(Func<CT, Task<bool>> predicate);
+
+        IAfterWhileStateBuilder<CT> While(Func<CT, bool> predicate);
+
+        //Actions
+        IAfterActionStateBuilder<CT> Do(Func<CT, Task> action);
+
+        IAfterActionStateBuilder<CT> Do(Action<CT> action);
+
+        IAfterActionStateBuilder<CT> Wait(Func<CT, TimeSpan> waitingTime);
+
+        IAfterActionStateBuilder<CT> Wait(TimeSpan waitingTime);
+
+        IAfterActionStateBuilder<CT> WaitForAll(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAll(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAny(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout = default);
+
+        //Transitions
+        State<CT> Goto(State targetState);
+
+        State<CT> Loop();
+
+        State<CT> Finish();
+
+        IAfterStartStateBuilder<CT> Step(string description = "");
+    }
+
+    public interface IAfterPreconditionStateBuilder<CT> where CT : IStateMachineContext
+    {
+        //Actions
+        IAfterConditionedActionStateBuilder<CT> Do(Func<CT, Task> action);
+
+        IAfterConditionedActionStateBuilder<CT> Do(Action<CT> action);
+
+        IAfterConditionedActionStateBuilder<CT> Wait(Func<CT, TimeSpan> waitingTime);
+
+        IAfterConditionedActionStateBuilder<CT> Wait(TimeSpan waitingTime);
+
+        IAfterConditionedActionStateBuilder<CT> WaitForAll(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterConditionedActionStateBuilder<CT> WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterConditionedActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
+
+        IAfterConditionedActionStateBuilder<CT> WaitForAll(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterConditionedActionStateBuilder<CT> WaitForAny(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterConditionedActionStateBuilder<CT> WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout = default);
+
+        //Transitions
+        IAfterConditionedActionStateBuilder<CT> Goto(State targetState);
+
+        IAfterConditionedActionStateBuilder<CT> Loop();
+
+        IAfterConditionedActionStateBuilder<CT> Finish();
+    }
+
+    public interface IAfterWhileStateBuilder<CT> where CT : IStateMachineContext
+    {
+        //Actions
+        IAfterActionStateBuilder<CT> Do(Func<CT, Task> action);
+
+        IAfterActionStateBuilder<CT> Do(Action<CT> action);
+
+        IAfterActionStateBuilder<CT> Wait(Func<CT, TimeSpan> waitingTime);
+
+        IAfterActionStateBuilder<CT> Wait(TimeSpan waitingTime);
+
+        IAfterActionStateBuilder<CT> WaitForAll(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAll(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAny(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout = default);
+    }
+
+    public interface IAfterFinalPreconditionStateBuilder<CT> where CT : IStateMachineContext
+    {
+        //Actions
+        IAfterActionStateBuilder<CT> Do(Func<CT, Task> action);
+
+        IAfterActionStateBuilder<CT> Do(Action<CT> action);
+
+        IAfterActionStateBuilder<CT> Wait(Func<CT, TimeSpan> waitingTime);
+
+        IAfterActionStateBuilder<CT> Wait(TimeSpan waitingTime);
+
+        IAfterActionStateBuilder<CT> WaitForAll(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAll(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitForAny(Func<CT, Task[]> tasks, Func<CT, TimeSpan> timeout = default);
+
+        IAfterActionStateBuilder<CT> WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout = default);
+
+        //Transitions
+        IAfterActionStateBuilder<CT> Goto(State targetState);
+
+        IAfterActionStateBuilder<CT> Loop();
+
+        IAfterActionStateBuilder<CT> Finish();
+    }
+
+    public interface IAfterConditionedActionStateBuilder<CT> where CT : IStateMachineContext
+    {
+        IAfterFinalPreconditionStateBuilder<CT> Else();
+
+        IAfterPreconditionStateBuilder<CT> ElseIf(Func<CT, Task<bool>> predicate);
+
+        IAfterPreconditionStateBuilder<CT> ElseIf(Func<CT, bool> predicate);
+
+        //Descriptions
+        IAfterActionStateBuilder<CT> Using(Func<CT, object> resource);
+
+        //ExceptionHandling
+        INextStateBuilder<CT> Catch();
+
+        INextStateBuilder<CT> CatchAndDo(Func<CT, Exception, Task> action);
+
+        INextStateBuilder<CT> CatchAndDo(Action<CT, Exception> action);
+
+        INextStateBuilder<CT> CatchAndGoto(State state);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, Task<bool>> predicate);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, bool> predicate);
+
+        // Next Step
+        IAfterStartStateBuilder<CT> Step(string description = "");
+    }
+
+    public interface IAfterActionStateBuilder<CT> where CT : IStateMachineContext
+    {
+        //Descriptions
+        IAfterActionStateBuilder<CT> Using(Func<CT, object> resource);
+
+        //ExceptionHandling
+        INextStateBuilder<CT> Catch();
+
+        INextStateBuilder<CT> CatchAndDo(Func<CT, Exception, Task> action);
+
+        INextStateBuilder<CT> CatchAndDo(Action<CT, Exception> action);
+
+        INextStateBuilder<CT> CatchAndGoto(State state);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, Task<bool>> predicate);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, bool> predicate);
+
+        // Next Step
+        IAfterStartStateBuilder<CT> Step(string description = "");
+    }
+
+    public interface INextStateBuilder<CT> where CT : IStateMachineContext
+    {
+        // Next Step
+        IAfterStartStateBuilder<CT> Step(string description = "");
+    }
+}
