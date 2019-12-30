@@ -6,31 +6,13 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public class ThreadPoolRunner : IWorkflowRunner
-    {
-        private List<IWorkflowControls> runningWorkflows = new List<IWorkflowControls>();
-        private readonly IStepExecutionController executionController = new DefaultStepExecutionController();
-
-        public IEnumerable<IWorkflowControls> RunningWorkflows
-        {
-            get
-            {
-                lock(runningWorkflows)
-                {
-                    return runningWorkflows.ToArray();
-                }
-            }
-        }
-
-        public void Run(IWorkflowControls workflow)
-        {
-            lock(runningWorkflows)
-            {
-                runningWorkflows.Add(workflow);
-            }
-
+    public class ThreadPoolRunner : AbstractRunner
+    {  
+        public override void Run(IWorkflowControls workflow)
+        {            
             Task.Run(() =>
             {
+                AddToRunningWorkflows(workflow);
                 try
                 {
                     while(workflow.ExecuteNextStep(executionController)) ;
@@ -41,23 +23,9 @@ namespace FeatureFlowFramework.Workflows
                 }
                 finally
                 {
-                    lock(runningWorkflows)
-                    {
-                        runningWorkflows.Remove(workflow);
-                    }
+                    RemoveFromRunningWorkflows(workflow);
                 }
             });         
-        }
-
-        public Task PauseAllWorkflows()
-        {
-            List<Task> tasks = new List<Task>();
-            foreach (var wf in RunningWorkflows)
-            {
-                wf.RequestPause();
-                tasks.Add(wf.WaitUntilStopsRunningAsync());
-            }
-            return Task.WhenAll(tasks.ToArray());
         }
     }
 }
