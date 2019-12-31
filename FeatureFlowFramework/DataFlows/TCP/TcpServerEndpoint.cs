@@ -121,7 +121,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private X509Certificate2 serverCertificate = null;
 
         private ActiveForwarder sendingSink = new ActiveForwarder();
-        private readonly Converter<object> messageEncoder;
+        private readonly Converter<object, object> messageEncoder;
         private AsyncForwarder connectionForwarder = new AsyncForwarder();
 
         private Forwarder receivedMessageSource = new Forwarder();
@@ -143,7 +143,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             this.encoder = encoder;
             this.decoder = decoder;
 
-            messageEncoder = new Converter<object>(msg => EncodeMessage(msg));
+            messageEncoder = new Converter<object, object>(msg => EncodeMessage(msg));
             sendingSink.ConnectTo(messageEncoder).ConnectTo(connectionForwarder);
 
             this.Run();

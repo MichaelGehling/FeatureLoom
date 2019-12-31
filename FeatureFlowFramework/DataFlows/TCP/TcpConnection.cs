@@ -72,7 +72,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private readonly TcpClient client;
         private Stream stream;
         private bool addRoutingWrapper;
-        private Converter<object> routingFilter;
+        private Converter<object, object> routingFilter;
         private readonly ProcessingEndpoint<byte[]> tcpWriter;
 
         private Sender receivedMessageSender = new Sender();
@@ -105,7 +105,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             this.bufferSize = bufferSize;
             this.buffer = new byte[this.bufferSize];
 
-            routingFilter = new Converter<object>(msg => FilterOrUnwrapMessage(msg));
+            routingFilter = new Converter<object, object>(msg => FilterOrUnwrapMessage(msg));
             tcpWriter = new ProcessingEndpoint<byte[]>(async buffer => await WriteToTcpStream(buffer));
             routingFilter.ConnectTo(tcpWriter);
 
