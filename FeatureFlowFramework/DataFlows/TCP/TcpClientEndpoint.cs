@@ -124,7 +124,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private ActiveForwarder sendingSink = new ActiveForwarder();
         private readonly Forwarder receivedMessageSource = new Forwarder();
 
-        private Converter<object, byte[]> messageEncoder;
+        private MessageConverter<object, byte[]> messageEncoder;
         private TcpConnection connection;
         private IAsyncWaitHandle[] disconnectionAndConfigUpdateWaitHandles = new IAsyncWaitHandle[2];
 
@@ -144,7 +144,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 this.decoder = decoder;
             }
 
-            messageEncoder = new Converter<object, byte[]>(msg => encoder.Encode(msg));
+            messageEncoder = new MessageConverter<object, byte[]>(msg => encoder.Encode(msg));
             sendingSink.ConnectTo(messageEncoder);
 
             this.Run();

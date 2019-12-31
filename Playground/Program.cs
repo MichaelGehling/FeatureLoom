@@ -152,8 +152,8 @@ namespace Test
             RpcCaller caller = new RpcCaller(100.Seconds()).KeepAlive();
             RpcCallee callee = new RpcCallee().KeepAlive();
             Sender stringCaller = new Sender();
-            Converter<object> jsonConverter = new Converter<object>(msg => msg.ToJson());
-            Converter<object> senderJsonConverter = new Converter<object>(msg => msg.ToJson());
+            var jsonConverter = new MessageConverter<object, string>(msg => msg.ToJson());
+            var senderJsonConverter = new MessageConverter<object, string>(msg => msg.ToJson());
             ProcessingEndpoint<string> consoleWriter = new ProcessingEndpoint<string>(msg => Console.WriteLine(msg));
 
             caller.ConnectTo(tcpClient);
