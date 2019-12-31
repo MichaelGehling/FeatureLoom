@@ -5,8 +5,6 @@ VisualStudioVersion = 15.0.27130.2003
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework", "FeatureFlowFramework\FeatureFlowFramework.csproj", "{52D3F346-B06A-419C-87E9-11BD1C3155D9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Test\Playground.csproj", "{5020C47D-DD2B-4E77-BC8C-06DA01B7D24A}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework.Tests", "FeatureFlowFramework.Tests\FeatureFlowFramework.Tests.csproj", "{8AEACB46-3C74-4BC7-AF3E-B79DD8D2812B}"
 	ProjectSection(ProjectDependencies) = postProject
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
@@ -27,10 +25,6 @@ Global
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5020C47D-DD2B-4E77-BC8C-06DA01B7D24A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5020C47D-DD2B-4E77-BC8C-06DA01B7D24A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5020C47D-DD2B-4E77-BC8C-06DA01B7D24A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5020C47D-DD2B-4E77-BC8C-06DA01B7D24A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8AEACB46-3C74-4BC7-AF3E-B79DD8D2812B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8AEACB46-3C74-4BC7-AF3E-B79DD8D2812B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AEACB46-3C74-4BC7-AF3E-B79DD8D2812B}.Release|Any CPU.ActiveCfg = Release|Any CPU
