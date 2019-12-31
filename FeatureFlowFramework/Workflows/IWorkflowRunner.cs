@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using FeatureFlowFramework.DataFlows;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
@@ -8,5 +9,6 @@ namespace FeatureFlowFramework.Workflows
         void Run(IWorkflowControls workflow);
         IEnumerable<IWorkflowControls> RunningWorkflows { get; }
         Task PauseAllWorkflows();
+        IDataFlowSource ExecutionInfoSource { get; }
     }
 }

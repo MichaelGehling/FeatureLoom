@@ -54,7 +54,7 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        [Theory]
+        [Theory(Skip = "Unstable when run with other tests.")]
         [InlineData(true)]
         [InlineData(false)]
         public void QueueReceiverCanBlockOnFullQueue(bool sendAsync)

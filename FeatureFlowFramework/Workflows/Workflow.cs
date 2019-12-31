@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.Workflows
     {
         IStateMachineInfo StateMachineInfo { get; }
         WorkflowExecutionState ExecutionState { get; }
-        IDataFlowSource WorkflowExecutionInfoSource { get; }
+        IDataFlowSource ExecutionInfoSource { get; }
     }
 
     public abstract class Workflow : IWorkflowInfo, IStateMachineContext, IUpdateAppStructureAspect
@@ -38,7 +38,7 @@ namespace FeatureFlowFramework.Workflows
         }
 
         [JsonIgnore]
-        public IDataFlowSource WorkflowExecutionInfoSource => executionInfoSender.Obj;
+        public IDataFlowSource ExecutionInfoSource => executionInfoSender.Obj;
 
         [JsonIgnore]
         protected virtual IWorkflowRunner DefaultRunner => defaultRunner;
@@ -189,14 +189,14 @@ namespace FeatureFlowFramework.Workflows
 
         public struct ExecutionInfo
         {
-            public readonly long workflowId;
+            public readonly Workflow workflow;
             public readonly string executionEvent;      
             public readonly WorkflowExecutionState executionState;
             public readonly WorkflowExecutionPhase executionPhase;
 
-            public ExecutionInfo(long workflowId, string executionEvent, WorkflowExecutionState executionState, WorkflowExecutionPhase executionPhase)
+            public ExecutionInfo(Workflow workflow, string executionEvent, WorkflowExecutionState executionState, WorkflowExecutionPhase executionPhase)
             {
-                this.workflowId = workflowId;
+                this.workflow = workflow;
                 this.executionEvent = executionEvent;
                 this.executionState = executionState;
                 this.executionPhase = executionPhase;
@@ -204,7 +204,7 @@ namespace FeatureFlowFramework.Workflows
 
             public ExecutionInfo(IStateMachineContext context, string executionEvent)
             {
-                this.workflowId = context.ContextId;
+                this.workflow = context as Workflow;
                 this.executionEvent = executionEvent;
                 this.executionState = context.ExecutionState;
                 this.executionPhase = context.ExecutionPhase;

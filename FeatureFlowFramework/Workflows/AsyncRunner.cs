@@ -1,63 +1,36 @@
-﻿using FeatureFlowFramework.Logging;
+﻿using FeatureFlowFramework.Helper;
+using FeatureFlowFramework.Logging;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public class AsyncRunner : IWorkflowRunner
-    {
-        private List<IWorkflowControls> runningWorkflows = new List<IWorkflowControls>();
-        private readonly IStepExecutionController executionController = new DefaultStepExecutionController();
 
-        public IEnumerable<IWorkflowControls> RunningWorkflows
-        {
-            get
-            {
-                lock(runningWorkflows)
-                {
-                    return runningWorkflows.ToArray();
-                }
-            }
-        }
+    public class AsyncRunner : AbstractRunner
+    {
 
         public async Task RunAsync(IWorkflowControls workflow)
         {
-            lock(runningWorkflows)
-            {
-                runningWorkflows.Add(workflow);
-            }
+            AddToRunningWorkflows(workflow);
             try
             {
-                while(await workflow.ExecuteNextStepAsync(executionController)) ;
+                while (await workflow.ExecuteNextStepAsync(executionController)) ;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Workflow failed! ({workflow.Name})", e.ToString());
             }
             finally
             {
-                lock(runningWorkflows)
-                {
-                    runningWorkflows.Remove(workflow);
-                }
+                RemoveFromRunningWorkflows(workflow);
             }
         }
 
-        public void Run(IWorkflowControls workflow)
+        public override void Run(IWorkflowControls workflow)
         {
             _ = RunAsync(workflow);
         }
 
-        public Task PauseAllWorkflows()
-        {
-            List<Task> tasks = new List<Task>();
-            foreach (var wf in RunningWorkflows)
-            {
-                wf.RequestPause();
-                tasks.Add(wf.WaitUntilStopsRunningAsync());
-            }
-            return Task.WhenAll(tasks.ToArray());
-        }
+        
     }
 }

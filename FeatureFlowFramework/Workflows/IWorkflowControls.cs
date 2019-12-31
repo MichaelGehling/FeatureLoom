@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.DataFlows;
+using System;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
@@ -33,5 +34,7 @@ namespace FeatureFlowFramework.Workflows
         Task<bool> LockAndExecuteAsync(Action action, TimeSpan timeout = default);
 
         Task<bool> LockAndExecuteAsync(Func<Task> action, TimeSpan timeout = default);
+
+        IDataFlowSource ExecutionInfoSource { get; }
     }    
 }
