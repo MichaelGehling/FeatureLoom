@@ -38,8 +38,8 @@ namespace FeatureFlowFramework.DataFlows
 
             if(output.ready && output.msg != null)
             {
-                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(output);
-                else sender.Forward(output);
+                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(msg);
+                else sender.Forward(output.msg);
             }
             if(alternative) alternativeSender.Forward(message);
         }
@@ -59,8 +59,8 @@ namespace FeatureFlowFramework.DataFlows
 
             if(output.ready && output.msg != null)
             {
-                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(output);
-                else return sender.ForwardAsync(output);
+                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(msg);
+                else return sender.ForwardAsync(output.msg);
             }
             if(alternative) return alternativeSender.ForwardAsync(message);
             return Task.CompletedTask;
@@ -104,7 +104,7 @@ namespace FeatureFlowFramework.DataFlows
         /// </summary>
         /// <returns>
         ///     Returns a tuple consisting of:
-        ///     1. A bool indicating if the aggregation was redy to create the output message(s),
+        ///     1. A bool indicating if the aggregation is ready to create the output message(s),
         ///     2. The output message(s) (if there are multiple resulting messages it returns an
         ///        enumerable container)
         ///     3. A bool indicating if there are multiple messages in a container
