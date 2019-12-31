@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
-        public void ForwarderCanForwardObjectsAndValues<T>(T message)
+        public void CanForwardObjectsAndValues<T>(T message)
         {
             var sender = new Sender<T>();
             var forwarder = new Forwarder();

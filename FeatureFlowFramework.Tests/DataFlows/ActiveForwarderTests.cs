@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.DataFlows
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
-        public void ActiveForwarderCanForwardObjectsAndValues<T>(T message)
+        public void CanForwardObjectsAndValues<T>(T message)
         {
             var sender = new Sender<T>();
             var forwarder = new ActiveForwarder();
@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(10, 10000, 1, 3, 30, 3, 30)]
         [InlineData(2, 10000, 1, 4, 30, 2, 90)]
         [InlineData(3, 0, 1, 3, 30, 0, 30)]
-        public void ActiveForwarderCanUseMultipleThreads(int threadLimit, int maxIdleMilliseconds, int spawnThresholdFactor, 
+        public void CanUseMultipleThreads(int threadLimit, int maxIdleMilliseconds, int spawnThresholdFactor, 
                                                          int numMessages, int messageDelay, 
                                                          int expectedThreads, int expectedRuntime)
         {

@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.DataFlows
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
-        public void PriorityQueueReceiverCanReceiveObjectsAndValues<T>(T message)
+        public void CanReceiveObjectsAndValues<T>(T message)
         {
             var sender = new Sender<T>();
             var receiver = new PriorityQueueReceiver<T>(Comparer<T>.Default);
@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(5, 10, false)]
         [InlineData(10, 10, false)]
         [InlineData(20, 10, false)]
-        public void PriorityQueueReceiverCanLimitQueueSize(int numMessages, int limit, bool dropLatestMessageOnFullQueue)
+        public void CanLimitQueueSize(int numMessages, int limit, bool dropLatestMessageOnFullQueue)
         {
             var sender = new Sender();
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Create((a, b) => a == b ? 0 : a > b ? -1 : 1), limit, default, dropLatestMessageOnFullQueue);
@@ -57,7 +57,7 @@ namespace FeatureFlowFramework.DataFlows
         [Theory(Skip = "Unstable when run with other tests.")]
         [InlineData(true)]
         [InlineData(false)]
-        public void PriorityQueueReceiverCanBlockOnFullQueue(bool sendAsync)
+        public void CanBlockOnFullQueue(bool sendAsync)
         {
             TimeSpan blockTime = 100.Milliseconds();
             int limit = 5;
@@ -91,7 +91,7 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Fact]
-        public void PriorityQueueReceiverSignalsFilledQueue()
+        public void SignalsFilledQueue()
         {
             var sender = new Sender();
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);
@@ -107,7 +107,7 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(80, 0, false)]
         [InlineData(80, 40, false)]
         [InlineData(20, 100, true)]        
-        public void PriorityQueueReceiverAllowsBlockingReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
+        public void AllowsBlockingReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {
             TimeSpan tolerance = 20.Milliseconds();
             var sender = new Sender();
@@ -127,7 +127,7 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(80, 0, false)]
         [InlineData(80, 40, false)]
         [InlineData(20, 50, true)]
-        public void PriorityQueueReceiverAllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
+        public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {
             TimeSpan tolerance = 20.Milliseconds();
             var sender = new Sender();

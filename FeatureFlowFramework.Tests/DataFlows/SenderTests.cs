@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
-        public void SenderCanSendObjectsAndValues<T>(T message)
+        public void CanSendObjectsAndValues<T>(T message)
         {
             var sender = new Sender<T>();
             var sink = new SingleMessageTestSink<T>();
@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Fact]
-        public void SenderCanConnectToMultipleSinks()
+        public void CanConnectToMultipleSinks()
         {
             var sender = new Sender();
             var sinkInt1 = new SingleMessageTestSink<int>();
@@ -46,7 +46,7 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Fact]
-        public void SenderCanDisconnectSinks()
+        public void CanDisconnectSinks()
         {
             var sender = new Sender();
             var sinkInt1 = new SingleMessageTestSink<int>();
@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Fact]
-        public void SenderProvidesConnectedSinks()
+        public void ProvidesConnectedSinks()
         {
             var sender = new Sender();
             var sinkInt1 = new SingleMessageTestSink<int>();
