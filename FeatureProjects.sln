@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.27130.2003
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework", "FeatureFlowFramework\FeatureFlowFramework.csproj", "{52D3F346-B06A-419C-87E9-11BD1C3155D9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Test\Playground.csproj", "{5020C47D-DD2B-4E77-BC8C-06DA01B7D24A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Playground\Playground.csproj", "{5020C47D-DD2B-4E77-BC8C-06DA01B7D24A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework.Tests", "FeatureFlowFramework.Tests\FeatureFlowFramework.Tests.csproj", "{8AEACB46-3C74-4BC7-AF3E-B79DD8D2812B}"
 	ProjectSection(ProjectDependencies) = postProject
