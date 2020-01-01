@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
-    public partial class RpcCaller
+    public partial class StringRpcCaller
     {
         private interface IResponseHandler
         {
@@ -15,15 +15,15 @@ namespace FeatureFlowFramework.DataFlows.RPC
             void Cancel();
         }
 
-        private class ResponseHandler<R> : IResponseHandler
+        private class ResponseHandler : IResponseHandler
         {
             private readonly long requestId;
-            private readonly TaskCompletionSource<R> taskCompletionSource;
+            private readonly TaskCompletionSource<string> taskCompletionSource;
             public readonly TimeFrame lifeTime;
 
             public TimeFrame LifeTime => lifeTime;
 
-            public ResponseHandler(long requestId, TaskCompletionSource<R> taskCompletionSource, TimeSpan timeout)
+            public ResponseHandler(long requestId, TaskCompletionSource<string> taskCompletionSource, TimeSpan timeout)
             {
                 this.taskCompletionSource = taskCompletionSource;
                 lifeTime = new TimeFrame(timeout);
@@ -32,9 +32,9 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
             public bool Handle<M>(in M message)
             {
-                if (message is RpcResponse<R> myResponse && myResponse.RequestId == this.requestId)
+                if (message is IRpcResponse myResponse && myResponse.RequestId == this.requestId)
                 {
-                    taskCompletionSource.SetResult(myResponse.Result);
+                    taskCompletionSource.SetResult(myResponse.ResultToJson().Trim('"'.ToSingleEntryArray()));
                     return true;
                 }
                 else return false;

@@ -112,5 +112,24 @@ namespace FeatureFlowFramework.DataFlows.RPC
             Assert.Contains(42, resultReceiver.PeekAll());
             Assert.Contains(99, resultReceiver.PeekAll());
         }
+
+        [Fact]
+        public void CanCallMethodOnMultipleCalleesAndReceiveAllResultsFromString()
+        {
+            var caller = new StringRpcCaller(1.Seconds());
+            var calleeA = new RpcCallee();
+            var calleeB = new RpcCallee();
+            caller.ConnectToAndBack(calleeA);
+            caller.ConnectToAndBack(calleeB);
+
+            calleeA.RegisterMethod("GetValue", () => 42);
+            calleeB.RegisterMethod("GetValue", () => 99);
+
+            var resultReceiver = new QueueReceiver<string>();
+            caller.CallMultiResponse<int>("GetValue", resultReceiver);
+            Assert.Equal(2, resultReceiver.CountQueuedMessages);
+            Assert.Contains("42", resultReceiver.PeekAll());
+            Assert.Contains("99", resultReceiver.PeekAll());
+        }
     }
 }

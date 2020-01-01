@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
-    public class StringRpcCaller : IDataFlowSource, IDataFlowSink, IRequester
+    public partial class StringRpcCaller : IDataFlowSource, IDataFlowSink, IRequester
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
@@ -35,6 +35,28 @@ namespace FeatureFlowFramework.DataFlows.RPC
                     }
                 }
             }
+        }
+
+        public void CallMultiResponse<P, R>(string method, P parameterTuple, IDataFlowSink sink)
+        {
+            var requestId = RandomGenerator.Int64;
+            var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
+            lock (responseHandlers)
+            {
+                responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
+            }
+            sourceHelper.Forward(request);
+        }
+
+        public void CallMultiResponse<R>(string method, IDataFlowSink sink)
+        {
+            var requestId = RandomGenerator.Int64;
+            var request = new RpcRequest<bool, R>(requestId, method, true);
+            lock (responseHandlers)
+            {
+                responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
+            }
+            sourceHelper.Forward(request);
         }
 
         public Task<string> CallAsync(string methodCall)
@@ -174,46 +196,6 @@ namespace FeatureFlowFramework.DataFlows.RPC
         public IDataFlowSink[] GetConnectedSinks()
         {
             return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
-        }
-
-        private interface IResponseHandler
-        {
-            bool Handle<M>(in M message);
-
-            TimeFrame LifeTime { get; }
-
-            void Cancel();
-        }
-
-        private class ResponseHandler : IResponseHandler
-        {
-            private readonly long requestId;
-            private readonly TaskCompletionSource<string> taskCompletionSource;
-            public readonly TimeFrame lifeTime;
-
-            public TimeFrame LifeTime => lifeTime;
-
-            public ResponseHandler(long requestId, TaskCompletionSource<string> taskCompletionSource, TimeSpan timeout)
-            {
-                this.taskCompletionSource = taskCompletionSource;
-                lifeTime = new TimeFrame(timeout);
-                this.requestId = requestId;
-            }
-
-            public bool Handle<M>(in M message)
-            {
-                if (message is IRpcResponse myResponse && myResponse.RequestId == this.requestId)
-                {
-                    taskCompletionSource.SetResult(myResponse.ResultToJson().Trim('"'.ToSingleEntryArray()));
-                    return true;
-                }
-                else return false;
-            }
-
-            public void Cancel()
-            {
-                taskCompletionSource.SetCanceled();
-            }
         }
 
         public void ConnectToAndBack(IReplier replier)
