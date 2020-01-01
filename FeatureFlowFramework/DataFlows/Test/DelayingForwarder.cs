@@ -51,7 +51,7 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         public async Task PostAsync<M>(M message)
         {
-            Thread.Sleep(delay);
+            await Task.Delay(delay);
             await helper.ForwardAsync(message);
         }
     }

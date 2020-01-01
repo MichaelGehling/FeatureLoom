@@ -2,11 +2,11 @@
 {
     public interface IMessageWrapper
     {
-        object Message { get; set; }
+        object Message { get; }
     }
 
     public interface IMessageWrapper<T> : IMessageWrapper
     {
-        T TypedMessage { get; set; }
+        T TypedMessage { get; }
     }
 }
