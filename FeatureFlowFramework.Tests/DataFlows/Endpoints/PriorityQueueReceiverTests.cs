@@ -53,7 +53,7 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        [Theory(Skip = "Unstable when run with other tests.")]
+        [Theory]
         [InlineData(true)]
         [InlineData(false)]
         public void CanBlockOnFullQueue(bool sendAsync)
@@ -122,7 +122,7 @@ namespace FeatureFlowFramework.DataFlows
             Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
         }
 
-        [Theory(Skip = "Unstable when run with other tests.")]
+        [Theory]
         [InlineData(80, 0, false)]
         [InlineData(80, 40, false)]
         [InlineData(20, 50, true)]
