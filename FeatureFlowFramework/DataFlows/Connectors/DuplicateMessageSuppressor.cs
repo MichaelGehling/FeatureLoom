@@ -24,6 +24,7 @@ namespace FeatureFlowFramework.DataFlows
             if(cleanupPeriode != default) this.cleanupPeriode = cleanupPeriode;
             this.cleanupPeriode = this.cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
 
+            // TODO make it testable
             new Timer(_ => CleanUpSuppressors(AppTime.Now), null, this.cleanupPeriode, this.cleanupPeriode);
         }
 
