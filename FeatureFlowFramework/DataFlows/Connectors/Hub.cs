@@ -17,8 +17,7 @@ namespace FeatureFlowFramework.DataFlows
         ///     other sockets of this hub, but not looped back to the sending socket.
         /// </summary>
         /// <param name="owner">
-        ///     If given, socket will be disposed automatically after owner was garbage-collected,
-        ///     if given.
+        ///     If given, socket will be disposed automatically after owner was garbage-collected.
         /// </param>
         /// <returns> The new Socket </returns>
         public Socket CreateSocket(object owner = null)
