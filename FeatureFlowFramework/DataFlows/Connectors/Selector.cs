@@ -6,16 +6,23 @@ namespace FeatureFlowFramework.DataFlows
 {
     public class Selector<T> : IDataFlowSink, IAlternativeDataFlow
     {
-        private readonly bool multiMatch = false;
+        private volatile bool multiMatch = false;
         private List<(Func<T, bool> predicate, DataFlowSourceHelper sender)> options = null;
-        private readonly DataFlowSourceHelper alternativeSendingHelper = null;
+        private DataFlowSourceHelper alternativeSendingHelper = null;
 
         public Selector(bool multiMatch = false)
         {
             this.multiMatch = multiMatch;
         }
 
-        public IDataFlowSource Else => throw new NotImplementedException();
+        public IDataFlowSource Else
+        {
+            get
+            {
+                if (alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
+                return alternativeSendingHelper;
+            }
+        }
 
         public void Post<M>(in M message)
         {
@@ -89,6 +96,8 @@ namespace FeatureFlowFramework.DataFlows
                 else return 0;
             }
         }
+
+        public bool MultiMatch { get => multiMatch; set => multiMatch = value; }
 
         public IDataFlowSource GetOptionAt(int index)
         {
