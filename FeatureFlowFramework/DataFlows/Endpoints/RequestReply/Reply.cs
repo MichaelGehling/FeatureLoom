@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.DataFlows
+﻿namespace FeatureFlowFramework.DataFlows.RequestReply
 {
     public interface IReply
     {

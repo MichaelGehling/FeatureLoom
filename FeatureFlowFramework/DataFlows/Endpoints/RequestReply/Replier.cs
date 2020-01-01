@@ -4,10 +4,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureFlowFramework.DataFlows.RequestReply
 {
-    public interface IReplier : IDataFlowSource, IDataFlowSink { };
-
     /// <summary>
     ///     The counterpart of the Requester, receives request messages and sends back reply
     ///     messages. It is thread safe.

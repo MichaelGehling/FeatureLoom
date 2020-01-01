@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
-    public partial class RpcCallee : IDataFlowSink, IDataFlowSource
+    public partial class RpcCallee : IDataFlowSink, IDataFlowSource, IReplier
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();

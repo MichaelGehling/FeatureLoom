@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureFlowFramework.DataFlows.RequestReply
 {
     public class ReplyingEndpoint<REQ, REP> : IReplier, IAlternativeDataFlow
     {

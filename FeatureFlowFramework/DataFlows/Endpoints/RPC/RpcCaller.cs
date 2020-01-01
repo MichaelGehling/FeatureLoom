@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
-    public partial class RpcCaller : IDataFlowSource, IDataFlowSink
+    public partial class RpcCaller : IDataFlowSource, IDataFlowSink, IRequester
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
@@ -173,6 +173,12 @@ namespace FeatureFlowFramework.DataFlows.RPC
         public IDataFlowSink[] GetConnectedSinks()
         {
             return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
+        }
+
+        public void ConnectToAndBack(IReplier replier)
+        {
+            this.ConnectTo(replier);
+            replier.ConnectTo(this);
         }
     }
 }

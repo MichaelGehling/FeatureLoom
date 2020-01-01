@@ -4,12 +4,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureFlowFramework.DataFlows.RequestReply
 {
-    public interface IRequester : IDataFlowSource, IDataFlowSink
-    {
-        void ConnectToAndBack(IReplier replier);
-    };
+
 
     /// <summary>
     ///     Sends a request message and expects back one or multiple reply messages. When sending

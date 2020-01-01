@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
-    public class StringRpcCaller : IDataFlowSource, IDataFlowSink
+    public class StringRpcCaller : IDataFlowSource, IDataFlowSink, IRequester
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
@@ -63,17 +63,28 @@ namespace FeatureFlowFramework.DataFlows.RPC
             string methodName = parts[0];
             List<string> parameters = new List<string>();
             int openBraces = 0;
+            bool openQuotationMark = false;
             string param = "";
             if (parts.Length > 1)
             {
                 foreach (var c in parts[1])
                 {
-                    if (c == '{') openBraces++;
-                    else if (openBraces > 0)
+                    if (c == '"')
+                    {
+                        openQuotationMark = !openQuotationMark;
+                        param += c;
+                    }
+                    else if (c == '{' && !openQuotationMark)
+                    {
+                        openBraces++;
+                        param += c;
+                    }
+                    else if (openBraces > 0 && !openQuotationMark)
                     {
                         if (c == '}') openBraces--;
+                        param += c;
                     }
-                    else if (c == ' ')
+                    else if (c == ' ' && !openQuotationMark)
                     {
                         parameters.Add(param);
                         param = "";
@@ -203,6 +214,12 @@ namespace FeatureFlowFramework.DataFlows.RPC
             {
                 taskCompletionSource.SetCanceled();
             }
+        }
+
+        public void ConnectToAndBack(IReplier replier)
+        {
+            this.ConnectTo(replier);
+            replier.ConnectTo(this);
         }
     }
 }

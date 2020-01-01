@@ -41,4 +41,11 @@ namespace FeatureFlowFramework.DataFlows
     {
         IDataFlowSource Else { get; }
     }
+
+    public interface IReplier : IDataFlowSource, IDataFlowSink { };
+
+    public interface IRequester : IDataFlowSource, IDataFlowSink
+    {
+        void ConnectToAndBack(IReplier replier);
+    };
 }
