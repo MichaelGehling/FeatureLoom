@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.RequestReply
 {
-
-
     /// <summary>
     ///     Sends a request message and expects back one or multiple reply messages. When sending
     ///     the request a reply-future is produced that can be waited on immediatly for a

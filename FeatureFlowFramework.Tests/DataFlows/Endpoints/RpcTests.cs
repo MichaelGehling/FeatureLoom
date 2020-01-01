@@ -93,5 +93,24 @@ namespace FeatureFlowFramework.DataFlows.RPC
             string result2 = caller.CallAsync("RepeatString2 {str:\"Abc \", num:2}").Result;
             Assert.Equal("Abc Abc ", result2);
         }
+
+        [Fact]
+        public void CanCallMethodOnMultipleCalleesAndReceiveAllResults()
+        {            
+            var caller = new RpcCaller(1.Seconds());
+            var calleeA = new RpcCallee();
+            var calleeB = new RpcCallee();
+            caller.ConnectToAndBack(calleeA);
+            caller.ConnectToAndBack(calleeB);
+
+            calleeA.RegisterMethod("GetValue", () => 42);
+            calleeB.RegisterMethod("GetValue", () => 99);
+
+            var resultReceiver = new QueueReceiver<int>();
+            caller.CallMultiResponse<int>("GetValue", resultReceiver);
+            Assert.Equal(2, resultReceiver.CountQueuedMessages);
+            Assert.Contains(42, resultReceiver.PeekAll());
+            Assert.Contains(99, resultReceiver.PeekAll());
+        }
     }
 }
