@@ -4,7 +4,7 @@ using System;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class ToJsonConverter : Converter<object>
+    public class ToJsonConverter : MessageConverter<object, string>
     {
         public ToJsonConverter() : base(convert)
         {
@@ -25,7 +25,7 @@ namespace FeatureFlowFramework.DataFlows
           };
     }
 
-    public class FromJsonConverter : Converter<string>
+    public class FromJsonConverter : MessageConverter<string, object>
     {
         public FromJsonConverter() : base(convert)
         {

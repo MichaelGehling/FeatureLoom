@@ -11,8 +11,8 @@ namespace FeatureFlowFramework.DataFlows
 
     public class Reply<REP> : IReply
     {
-        public readonly REP message;
-        public readonly long requestId;
+        REP message;
+        long requestId;
 
         public Reply(REP replyMessage, long requestId)
         {

@@ -9,14 +9,15 @@ namespace FeatureFlowFramework.DataFlows
     ///     is thread-safe as long as the provided function is also thread-safe. Avoid long running
     ///     functions to avoid blocking the sender
     /// </summary>
-    /// <typeparam name="T"> The input type for the converter function </typeparam>
-    public class Converter<T> : IDataFlowConnection, IAlternativeDataFlow
+    /// <typeparam name="I"> The input type for the converter function </typeparam>
+    /// <typeparam name="O"> The output type for the converter function </typeparam>
+    public class MessageConverter<I, O> : IDataFlowConnection, IAlternativeDataFlow
     {
         private DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
-        private readonly Func<T, object> convertFunc;
+        private readonly Func<I, O> convertFunc;
         private DataFlowSourceHelper alternativeSendingHelper = null;
 
-        public Converter(Func<T, object> convertFunc)
+        public MessageConverter(Func<I, O> convertFunc)
         {
             this.convertFunc = convertFunc;
         }
@@ -60,7 +61,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is T msgT)
+            if(message is I msgT)
             {
                 sendingHelper.Forward(convertFunc(msgT));
             }
@@ -69,7 +70,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public Task PostAsync<M>(M message)
         {
-            if(message is T msgT)
+            if(message is I msgT)
             {
                 return sendingHelper.ForwardAsync(convertFunc(msgT));
             }

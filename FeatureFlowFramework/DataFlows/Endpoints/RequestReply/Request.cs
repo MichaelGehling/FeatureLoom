@@ -2,7 +2,7 @@
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public interface IRequest
+    public interface IRequest : IMessageWrapper
     {
         bool TryGetMessage<T>(out T requestMessage);
 
@@ -11,16 +11,19 @@ namespace FeatureFlowFramework.DataFlows
         long GetRequestId();
     }
 
-    public class Request<REQ> : IRequest
+    public class Request<REQ> : IRequest, IMessageWrapper<REQ>
     {
-        public readonly REQ message;
-        public readonly long requestId;
+        private REQ message;
+        private long requestId;
 
         public Request(REQ requestMessage, long requestId)
         {
             this.message = requestMessage;
             this.requestId = requestId;
         }
+
+        public REQ TypedMessage => message;
+        public object Message => message;
 
         public IReply CreateReply<T>(T replyMessage)
         {

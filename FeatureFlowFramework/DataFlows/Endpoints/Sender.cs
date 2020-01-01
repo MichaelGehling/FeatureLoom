@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.DataFlows
         Task SendAsync<T>(T message);
     }
 
-    /// <summary> Used to send object messages to all connected sinks. It is thread safe. <summary>
+    /// <summary> Used to send messages of any type to all connected sinks. It is thread safe. <summary>
     public class Sender : IDataFlowSource, ISender
     {
         protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
@@ -53,6 +53,7 @@ namespace FeatureFlowFramework.DataFlows
         }
     }
 
+    /// <summary> Used to send messages of a specific type to all connected sinks. It is thread safe. <summary>
     public class Sender<T> : IDataFlowSource, ISender
     {
         protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();

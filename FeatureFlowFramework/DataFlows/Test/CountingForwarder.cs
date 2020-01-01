@@ -5,8 +5,10 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.Test
 {
-    public class CountingSink : IDataFlowSink
+    public class CountingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
+        DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+
         volatile int counter;
         object locker = new object();
         List<(int expectedCount, TaskCompletionSource<int> tcs)> waitings = new List<(int, TaskCompletionSource<int>)>();
@@ -15,6 +17,8 @@ namespace FeatureFlowFramework.DataFlows.Test
         {
             get { lock (locker) return counter; }            
         }
+
+        public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
 
         public Task<int> WaitFor(int numMessages)
         {
@@ -33,10 +37,22 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         public void Post<M>(in M message)
         {
+            Count();
+            sourceHelper.Forward(message);
+        }
+
+        public Task PostAsync<M>(M message)
+        {
+            Count();
+            return sourceHelper.ForwardAsync(message);
+        }
+
+        private void Count()
+        {
             lock (locker)
             {
                 counter++;
-                for(int i = waitings.Count-1; i>=0; i--)
+                for (int i = waitings.Count - 1; i >= 0; i--)
                 {
                     if (waitings[i].expectedCount <= counter)
                     {
@@ -47,11 +63,29 @@ namespace FeatureFlowFramework.DataFlows.Test
             }
         }
 
-        public Task PostAsync<M>(M message)
+        public void ConnectTo(IDataFlowSink sink)
         {
-            Post(message);
-            return Task.CompletedTask;
+            ((IDataFlowSource)sourceHelper).ConnectTo(sink);
+        }
 
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
+        {
+            return ((IDataFlowSource)sourceHelper).ConnectTo(sink);
+        }
+
+        public void DisconnectFrom(IDataFlowSink sink)
+        {
+            ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
+        }
+
+        public void DisconnectAll()
+        {
+            ((IDataFlowSource)sourceHelper).DisconnectAll();
+        }
+
+        public IDataFlowSink[] GetConnectedSinks()
+        {
+            return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
         }
     }
 }

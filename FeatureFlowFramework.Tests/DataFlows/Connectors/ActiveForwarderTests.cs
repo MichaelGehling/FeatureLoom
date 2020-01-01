@@ -38,7 +38,7 @@ namespace FeatureFlowFramework.DataFlows
             var sender = new Sender();
             var forwarder = new ActiveForwarder(threadLimit, maxIdleMilliseconds, spawnThresholdFactor);
             var delayer = new DelayingForwarder(messageDelay.Milliseconds());
-            var sink = new CountingSink();
+            var sink = new CountingForwarder();
             sender.ConnectTo(forwarder).ConnectTo(delayer).ConnectTo(sink);
 
             for(int i= 0; i < numMessages; i++)

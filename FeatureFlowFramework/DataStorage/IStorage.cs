@@ -32,7 +32,7 @@ namespace FeatureFlowFramework.DataStorage
     {
         public static bool TrySubscribeForChangeUpdate<T>(this IStorageReader reader, string uriPattern, IDataFlowSink updateSink)
         {
-            var converter = new Converter<ChangeNotification>(note => new ChangeUpdate<T>(note, reader));
+            var converter = new MessageConverter<ChangeNotification, ChangeUpdate<T>>(note => new ChangeUpdate<T>(note, reader));
             if(reader.TrySubscribeForChangeNotifications(uriPattern, converter))
             {
                 converter.KeepAlive(updateSink);
