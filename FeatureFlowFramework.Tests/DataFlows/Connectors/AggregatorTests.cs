@@ -1,14 +1,12 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
-using System;
 using System.Collections.Generic;
-using System.Text;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
     public class AggregatorTests
     {
-        class FullNameAggrergationData : IAggregationData
+        private class FullNameAggrergationData : IAggregationData
         {
             public string firstName;
             public string lastName;
@@ -17,7 +15,6 @@ namespace FeatureFlowFramework.DataFlows
             {
                 if (firstName != null && lastName != null)
                 {
-
                     var result = (true, firstName + " " + lastName, false);
                     firstName = null;
                     lastName = null;
@@ -27,7 +24,7 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        class VariantNameAggrergationData : IAggregationData
+        private class VariantNameAggrergationData : IAggregationData
         {
             public string firstName;
             public string lastName;
@@ -52,7 +49,7 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanAggregateComplementMessagesToASingleMessage()
         {
-            var sender = new Sender();            
+            var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), FullNameAggrergationData>((msg, aggregation) =>
             {
                 if (msg.key == "firstName") aggregation.firstName = msg.val;
@@ -94,7 +91,7 @@ namespace FeatureFlowFramework.DataFlows
                 else return false;
 
                 return true;
-            });            
+            });
             var elseSink = new SingleMessageTestSink<object>();
             sender.ConnectTo(aggregator);
             aggregator.Else.ConnectTo(elseSink);
@@ -125,6 +122,5 @@ namespace FeatureFlowFramework.DataFlows
             Assert.Equal("John Doe", receiver.TryReceive(out string name1) ? name1 : null);
             Assert.Equal("John_Doe", receiver.TryReceive(out string name2) ? name2 : null);
         }
-
     }
 }

@@ -6,7 +6,6 @@ using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.TCP
@@ -32,17 +31,17 @@ namespace FeatureFlowFramework.DataFlows.TCP
                             .Goto(closing)
                     .Step("Await more data from stream if all data was processed or last message was incomplete")
                         .If(c => c.decodingResult == DecodingResult.Incomplete || c.bufferReadPosition == c.bufferFillState)
-                            .Do(async c => 
-                            {                                
+                            .Do(async c =>
+                            {
                                 var bytesRead = await c.stream.ReadAsync(c.buffer, c.bufferFillState, c.bufferSize - c.bufferFillState, c.CancellationToken);
-                                c.bufferFillState += bytesRead;                                
+                                c.bufferFillState += bytesRead;
                             })
                         .CatchAndGoto(closing)
                     .Step("Try to decode message from received data")
                         .Do(c =>
                         {
                             var oldBufferReadPosition = c.bufferReadPosition;
-                            c.decodingResult = c.decoder.Decode(c.buffer, c.bufferFillState, ref c.bufferReadPosition, out c.decodedMessage, ref c.decoderIntermediateData);                            
+                            c.decodingResult = c.decoder.Decode(c.buffer, c.bufferFillState, ref c.bufferReadPosition, out c.decodedMessage, ref c.decoderIntermediateData);
                         })
                         .CatchAndDo((c, e) =>
                         {
@@ -62,7 +61,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                         .Do(c =>
                         {
                             Log.INFO(c, $"Connection was closed! (id={c.id})");
-                            c.Stop(false);                            
+                            c.Stop(false);
                         })
                     .Step("Finish workflow")
                         .Finish();
@@ -85,7 +84,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private object decoderIntermediateData = null;
         private object decodedMessage = null;
         private DecodingResult decodingResult = DecodingResult.Invalid;
-        private AsyncManualResetEvent disconnectionEvent = new AsyncManualResetEvent(false);        
+        private AsyncManualResetEvent disconnectionEvent = new AsyncManualResetEvent(false);
 
         public TcpConnection(TcpClient client, ITcpMessageDecoder decoder, int bufferSize, bool addRoutingWrapper, IStreamUpgrader streamUpgrader = null)
         {
@@ -97,7 +96,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             {
                 stream = streamUpgrader?.Upgrade(client.GetStream()) ?? client.GetStream();
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Could not get stream from tcpClient or stream upgrade failed. (id={id})", e.ToString());
             }
@@ -114,9 +113,9 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         private object FilterOrUnwrapMessage(object msg)
         {
-            if(msg is ConnectionRoutingWrapper wrapper)
+            if (msg is ConnectionRoutingWrapper wrapper)
             {
-                if((wrapper.inverseConnectionFiltering && wrapper.connectionId != id) ||
+                if ((wrapper.inverseConnectionFiltering && wrapper.connectionId != id) ||
                     (!wrapper.inverseConnectionFiltering && wrapper.connectionId == id) ||
                     wrapper.connectionId == default)
                 {
@@ -129,7 +128,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         private async Task<bool> WriteToTcpStream(byte[] buffer)
         {
-            if(Disconnected)
+            if (Disconnected)
             {
                 Log.WARNING(this, $"Message was not set over connection because of disconnection! (id={id})");
                 return false;
@@ -140,7 +139,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 await stream.WriteAsync(buffer, 0, buffer.Length);
                 return true;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR(this, $"Failed when writing to stream, closing connection! (id={id})", e.ToString());
                 this.client.Close();
@@ -150,10 +149,10 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         private void ResetBuffer(bool preserveUnreadBytes)
         {
-            if(preserveUnreadBytes)
+            if (preserveUnreadBytes)
             {
                 int unreadBytes = bufferFillState - bufferReadPosition;
-                for(int i = 0; i < unreadBytes; i++)
+                for (int i = 0; i < unreadBytes; i++)
                 {
                     buffer[i] = buffer[bufferReadPosition + i];
                 }
@@ -243,9 +242,9 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         public bool ValidateServerCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            if(ignoreFailedAuthentication) return true;
+            if (ignoreFailedAuthentication) return true;
 
-            if(sslPolicyErrors == SslPolicyErrors.None) return true;
+            if (sslPolicyErrors == SslPolicyErrors.None) return true;
             Console.WriteLine("Certificate error: {0}", sslPolicyErrors);
             // refuse connection
             return false;

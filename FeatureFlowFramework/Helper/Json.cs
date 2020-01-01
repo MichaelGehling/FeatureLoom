@@ -5,7 +5,6 @@ using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 
 namespace FeatureFlowFramework.Helper
@@ -32,7 +31,7 @@ namespace FeatureFlowFramework.Helper
         {
             get
             {
-                if(Json.default_SerializerSettings == null)
+                if (Json.default_SerializerSettings == null)
                 {
                     default_SerializerSettings = new JsonSerializerSettings();
                     //convert Enums to Strings (instead of Integer) globally
@@ -59,7 +58,7 @@ namespace FeatureFlowFramework.Helper
         {
             get
             {
-                if(Json.default_Serializer == null)
+                if (Json.default_Serializer == null)
                 {
                     default_Serializer = JsonSerializer.Create(Default_SerializerSettings);
                 }
@@ -73,7 +72,7 @@ namespace FeatureFlowFramework.Helper
         {
             get
             {
-                if(Json.complexObjectsStructure_Serializer == null)
+                if (Json.complexObjectsStructure_Serializer == null)
                 {
                     complexObjectsStructure_Serializer = JsonSerializer.Create(ComplexObjectsStructure_SerializerSettings);
                 }
@@ -85,7 +84,7 @@ namespace FeatureFlowFramework.Helper
         {
             get
             {
-                if(Json.complexObjectsStructure_SerializerSettings == null)
+                if (Json.complexObjectsStructure_SerializerSettings == null)
                 {
                     complexObjectsStructure_SerializerSettings = new JsonSerializerSettings();
                     //convert Enums to Strings (instead of Integer) globally
@@ -140,7 +139,7 @@ namespace FeatureFlowFramework.Helper
                 SerializationBinder = serializer.SerializationBinder,
                 TypeNameAssemblyFormatHandling = serializer.TypeNameAssemblyFormatHandling
             };
-            foreach(var converter in serializer.Converters)
+            foreach (var converter in serializer.Converters)
             {
                 copiedSerializer.Converters.Add(converter);
             }
@@ -149,8 +148,8 @@ namespace FeatureFlowFramework.Helper
 
         public static string SerializeToJson(object obj, JsonSerializerSettings settings = null)
         {
-            if(settings == null && obj is IJsonSerializationSupport) settings = (obj as IJsonSerializationSupport).JsonSerializerSettings;
-            if(settings == null) settings = Default_SerializerSettings;
+            if (settings == null && obj is IJsonSerializationSupport) settings = (obj as IJsonSerializationSupport).JsonSerializerSettings;
+            if (settings == null) settings = Default_SerializerSettings;
             Type type = obj.GetType();
             string json = JsonConvert.SerializeObject(obj, type, settings);
             return json;
@@ -158,36 +157,36 @@ namespace FeatureFlowFramework.Helper
 
         public static T DeserializeFromJson<T>(string json, JsonSerializerSettings settings = null)
         {
-            if(settings == null) settings = Default_SerializerSettings;
+            if (settings == null) settings = Default_SerializerSettings;
             T obj = JsonConvert.DeserializeObject<T>(json, settings);
             return obj;
         }
 
         public static object DeserializeFromJson(string json, Type type, JsonSerializerSettings settings = null)
         {
-            if(settings == null) settings = Default_SerializerSettings;
+            if (settings == null) settings = Default_SerializerSettings;
             var obj = JsonConvert.DeserializeObject(json, type, settings);
             return obj;
         }
 
         public static void UpdateFromJson(object obj, string json, JsonSerializerSettings settings = null)
         {
-            if(settings == null && obj is IJsonSerializationSupport) settings = (obj as IJsonSerializationSupport).JsonSerializerSettings;
-            if(settings == null) settings = Default_SerializerSettings;
+            if (settings == null && obj is IJsonSerializationSupport) settings = (obj as IJsonSerializationSupport).JsonSerializerSettings;
+            if (settings == null) settings = Default_SerializerSettings;
             JsonConvert.PopulateObject(json, obj, settings);
         }
 
         public static string FixJsonStr(string str, bool forceArrayOfObjects = false)
         {
             StringBuilder builder = new StringBuilder();
-            foreach(string line in str.Split('\r', '\n'))
+            foreach (string line in str.Split('\r', '\n'))
             {
                 string myLine = line;
                 myLine = myLine.Trim();
-                if(myLine == "") continue;
-                if(myLine.StartsWith("//")) continue;
+                if (myLine == "") continue;
+                if (myLine.StartsWith("//")) continue;
                 builder.Append(myLine);
-                if(myLine != "{" &&
+                if (myLine != "{" &&
                     !myLine.EndsWith(",") &&
                     !myLine.EndsWith("[")) builder.Append(",");
                 builder.Append(Environment.NewLine);
@@ -195,13 +194,13 @@ namespace FeatureFlowFramework.Helper
             str = builder.ToString();
             str = str.Trim();
             str = str.Trim(',');
-            if(!str.StartsWith("{") && !str.StartsWith("[")) str = "{" + Environment.NewLine + str;
-            if(!str.EndsWith("}") && !str.EndsWith("]")) str = str + Environment.NewLine + "}";
+            if (!str.StartsWith("{") && !str.StartsWith("[")) str = "{" + Environment.NewLine + str;
+            if (!str.EndsWith("}") && !str.EndsWith("]")) str = str + Environment.NewLine + "}";
 
-            if(forceArrayOfObjects)
+            if (forceArrayOfObjects)
             {
-                if(!str.StartsWith("[")) str = "[" + Environment.NewLine + str;
-                if(!str.EndsWith("]")) str = str + Environment.NewLine + "]";
+                if (!str.StartsWith("[")) str = "[" + Environment.NewLine + str;
+                if (!str.EndsWith("]")) str = str + Environment.NewLine + "]";
             }
 
             return str;
@@ -263,7 +262,6 @@ namespace FeatureFlowFramework.Helper
                 result = default;
                 return false;
             }
-            
         }
 
         public class MyContractResolver : Newtonsoft.Json.Serialization.DefaultContractResolver
@@ -276,13 +274,10 @@ namespace FeatureFlowFramework.Helper
                                         .Select(f => base.CreateProperty(f, memberSerialization)))
                             .ToList();
 
-                
                 var props = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(prop => !Attribute.IsDefined(prop, typeof(ScriptIgnoreAttribute)))
                                         .Select(f => base.CreateProperty(f, memberSerialization))
                             .ToList();
-
-                
 
                 props.ForEach(p => { p.Writable = true; p.Readable = true; });
 

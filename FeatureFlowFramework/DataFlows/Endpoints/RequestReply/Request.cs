@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace FeatureFlowFramework.DataFlows
+﻿namespace FeatureFlowFramework.DataFlows
 {
     public interface IRequest : IMessageWrapper
     {
@@ -37,7 +35,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public bool TryGetMessage<T>(out T requestMessage)
         {
-            if(message is T tMsg)
+            if (message is T tMsg)
             {
                 requestMessage = tMsg;
                 return true;

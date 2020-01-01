@@ -1,8 +1,5 @@
 ﻿using FeatureFlowFramework.Helper;
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using System.Linq;
 
 namespace FeatureFlowFramework.Aspects
@@ -19,7 +16,7 @@ namespace FeatureFlowFramework.Aspects
             this.obj = obj;
             var data = obj.GetAspectData();
             handle = data.ObjectHandle;
-            if(!data.TryGetAspectInterface(out aspectInfoValues, IsInfoCollection))
+            if (!data.TryGetAspectInterface(out aspectInfoValues, IsInfoCollection))
             {
                 aspectInfoValues = new AspectValueAddOn(collectionName);
                 data.AddAddOn(aspectInfoValues as AspectValueAddOn);
@@ -31,6 +28,7 @@ namespace FeatureFlowFramework.Aspects
         public T LeaveInfoAspect => obj;
 
         public static implicit operator InfoAspectWrapper<T>(T obj) => new InfoAspectWrapper<T>(obj);
+
         public static implicit operator T(InfoAspectWrapper<T> wrapper) => wrapper.obj;
 
         public InfoAspectWrapper<T> SetName(string name)
@@ -41,7 +39,7 @@ namespace FeatureFlowFramework.Aspects
 
         public string Name
         {
-            get => aspectInfoValues.TryGet("name", out string name)? name : null;
+            get => aspectInfoValues.TryGet("name", out string name) ? name : null;
             set => SetName(value);
         }
 
@@ -57,7 +55,7 @@ namespace FeatureFlowFramework.Aspects
             set => SetDescription(value);
         }
 
-        public InfoAspectWrapper<T> SetParent<P>(P parent) where P:class
+        public InfoAspectWrapper<T> SetParent<P>(P parent) where P : class
         {
             AddParentAndChild(new InfoAspectWrapper<P>(parent), this);
             return this;
@@ -65,11 +63,11 @@ namespace FeatureFlowFramework.Aspects
 
         public object Parent
         {
-            get => aspectInfoValues.TryGet("parent", out object parent) ? parent: null;
+            get => aspectInfoValues.TryGet("parent", out object parent) ? parent : null;
             set => SetParent(value);
         }
 
-        public InfoAspectWrapper<T> AddChild<C>(C child) where C: class
+        public InfoAspectWrapper<T> AddChild<C>(C child) where C : class
         {
             AddParentAndChild(this, new InfoAspectWrapper<C>(child));
             return this;
@@ -82,14 +80,14 @@ namespace FeatureFlowFramework.Aspects
                 .Where(obj => obj != null);
         }
 
-        private void AddParentAndChild<P,C>(InfoAspectWrapper<P> parent, InfoAspectWrapper<C> child) where P : class where C : class
+        private void AddParentAndChild<P, C>(InfoAspectWrapper<P> parent, InfoAspectWrapper<C> child) where P : class where C : class
         {
-            if(!parent.aspectInfoValues.TryGet("children", out HashSet<long> childrenSet))
+            if (!parent.aspectInfoValues.TryGet("children", out HashSet<long> childrenSet))
             {
                 childrenSet = new HashSet<long>();
                 parent.aspectInfoValues.Set("children", childrenSet);
             }
-            if(childrenSet.Add(child.handle))
+            if (childrenSet.Add(child.handle))
             {
                 child.aspectInfoValues.Set("parent", parent.handle);
             }

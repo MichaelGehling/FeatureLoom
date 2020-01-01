@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace FeatureFlowFramework.Helper
+﻿namespace FeatureFlowFramework.Helper
 {
     public struct LazySlim<T> where T : class, new()
     {
-        T obj;
+        private T obj;
 
         public T Obj
         {
@@ -26,5 +22,4 @@ namespace FeatureFlowFramework.Helper
 
         public static implicit operator T(LazySlim<T> lazy) => lazy.Obj;
     }
-
 }

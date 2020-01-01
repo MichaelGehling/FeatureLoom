@@ -1,14 +1,11 @@
-﻿using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.Logging;
+﻿using FeatureFlowFramework.Logging;
 using System;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-
     public class AsyncRunner : AbstractRunner
     {
-
         public async Task RunAsync(IWorkflowControls workflow)
         {
             AddToRunningWorkflows(workflow);
@@ -30,7 +27,5 @@ namespace FeatureFlowFramework.Workflows
         {
             _ = RunAsync(workflow);
         }
-
-        
     }
 }

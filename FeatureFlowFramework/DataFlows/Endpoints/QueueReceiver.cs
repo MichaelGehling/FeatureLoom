@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-
     /// <summary>
     ///     An endpoint with a queue to receive messages asynchronously and process them in one or
     ///     multiple threads. It is thread-safe. When the maximum queue limit is exceeded, the
@@ -47,10 +46,10 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message != null && message is T typedMessage)
+            if (message != null && message is T typedMessage)
             {
-                if(waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
-                if(IsFull && dropLatestMessageOnFullQueue) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
+                if (IsFull && dropLatestMessageOnFullQueue) alternativeSendingHelper.ObjIfExists?.Forward(message);
                 else Enqueue(typedMessage);
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
@@ -58,10 +57,10 @@ namespace FeatureFlowFramework.DataFlows
 
         public async Task PostAsync<M>(M message)
         {
-            if(message != null && message is T typedMessage)
+            if (message != null && message is T typedMessage)
             {
-                if(waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
-                if(IsFull && dropLatestMessageOnFullQueue) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
+                if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
+                if (IsFull && dropLatestMessageOnFullQueue) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
                 else Enqueue(typedMessage);
             }
             else await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
@@ -69,12 +68,12 @@ namespace FeatureFlowFramework.DataFlows
 
         private void Enqueue(T message)
         {
-            lock(queue)
+            lock (queue)
             {
                 queue.Enqueue(message);
                 EnsureMaxSize();
                 readerWakeEvent.Set();
-                if(IsFull) writerWakeEvent.Reset();
+                if (IsFull) writerWakeEvent.Reset();
             }
         }
 
@@ -84,7 +83,7 @@ namespace FeatureFlowFramework.DataFlows
             while (queue.Count > maxQueueSize)
             {
                 var element = queue.Dequeue();
-                alternativeSendingHelper.ObjIfExists?.Forward(element);                    
+                alternativeSendingHelper.ObjIfExists?.Forward(element);
             }
         }
 
@@ -103,16 +102,16 @@ namespace FeatureFlowFramework.DataFlows
 
             // With multiple threads trying to read concurrently it may be necessary to retry multiple times
             TimeFrame waitTime = new TimeFrame(timeout);
-            while (!success && !waitTime.Elapsed) 
+            while (!success && !waitTime.Elapsed)
             {
                 WaitHandle.Wait(waitTime.RemainingTime);
-                lock(queue)
+                lock (queue)
                 {
                     success = queue.TryDequeue(out message);
-                    if(IsEmpty) readerWakeEvent.Reset();
-                    if(!IsFull) writerWakeEvent.Set();
+                    if (IsEmpty) readerWakeEvent.Reset();
+                    if (!IsFull) writerWakeEvent.Set();
                 }
-            }            
+            }
             return success;
         }
 
@@ -121,33 +120,33 @@ namespace FeatureFlowFramework.DataFlows
             T message = default;
             bool success = false;
 
-            if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
-            if(IsEmpty) return new AsyncOutResult<bool, T>(false, default);
-            lock(queue)
+            if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
+            if (IsEmpty) return new AsyncOutResult<bool, T>(false, default);
+            lock (queue)
             {
                 success = queue.TryDequeue(out message);
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
+                if (IsEmpty) readerWakeEvent.Reset();
+                if (!IsFull) writerWakeEvent.Set();
             }
             return new AsyncOutResult<bool, T>(success, message);
         }
 
         public T[] ReceiveAll()
         {
-            if(IsEmpty)
+            if (IsEmpty)
             {
                 return Array.Empty<T>();
             }
 
             T[] messages;
 
-            lock(queue)
+            lock (queue)
             {
                 messages = queue.ToArray();
                 queue.Clear();
 
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
+                if (IsEmpty) readerWakeEvent.Reset();
+                if (!IsFull) writerWakeEvent.Set();
             }
             return messages;
         }
@@ -155,9 +154,9 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
-            lock(queue)
-            {                
-                if(IsEmpty) return false;
+            lock (queue)
+            {
+                if (IsEmpty) return false;
                 nextItem = queue.Peek();
                 return true;
             }
@@ -165,14 +164,14 @@ namespace FeatureFlowFramework.DataFlows
 
         public T[] PeekAll()
         {
-            if(IsEmpty)
+            if (IsEmpty)
             {
                 return new T[0];
             }
 
             T[] messages;
 
-            lock(queue)
+            lock (queue)
             {
                 messages = queue.ToArray();
             }
@@ -181,7 +180,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Clear()
         {
-            lock(queue)
+            lock (queue)
             {
                 queue.Clear();
             }

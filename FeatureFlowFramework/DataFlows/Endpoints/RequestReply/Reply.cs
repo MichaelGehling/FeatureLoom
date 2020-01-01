@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace FeatureFlowFramework.DataFlows
+﻿namespace FeatureFlowFramework.DataFlows
 {
     public interface IReply
     {
@@ -11,8 +9,8 @@ namespace FeatureFlowFramework.DataFlows
 
     public class Reply<REP> : IReply
     {
-        REP message;
-        long requestId;
+        private REP message;
+        private long requestId;
 
         public Reply(REP replyMessage, long requestId)
         {
@@ -27,7 +25,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public bool TryGetMessage<T>(out T replyMessage)
         {
-            if(message is T tMsg)
+            if (message is T tMsg)
             {
                 replyMessage = tMsg;
                 return true;

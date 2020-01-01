@@ -36,5 +36,5 @@ namespace FeatureFlowFramework.Workflows
         Task<bool> LockAndExecuteAsync(Func<Task> action, TimeSpan timeout = default);
 
         IDataFlowSource ExecutionInfoSource { get; }
-    }    
+    }
 }

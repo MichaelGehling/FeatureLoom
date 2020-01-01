@@ -1,5 +1,4 @@
 ﻿using FeatureFlowFramework.DataFlows;
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -36,7 +35,6 @@ namespace FeatureFlowFramework.Workflows
                             workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
                         }
                     }
-
                 }
                 return executionInfoForwarder;
             }

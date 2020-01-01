@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -8,8 +6,8 @@ namespace FeatureFlowFramework.DataFlows.Test
 {
     public class DelayingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
-        DataFlowSourceHelper helper = new DataFlowSourceHelper();
-        TimeSpan delay;
+        private DataFlowSourceHelper helper = new DataFlowSourceHelper();
+        private TimeSpan delay;
 
         public DelayingForwarder(TimeSpan delay)
         {

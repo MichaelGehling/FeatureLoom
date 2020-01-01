@@ -1,13 +1,10 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
-using System;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
     public class ForwarderTest
-    {      
-
+    {
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
@@ -21,6 +18,5 @@ namespace FeatureFlowFramework.DataFlows
             Assert.True(sink.received);
             Assert.Equal(message, sink.receivedMessage);
         }
-
     }
 }

@@ -61,7 +61,7 @@ namespace FeatureFlowFramework.DataFlows.Web
 
         public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if(!request.IsPost)
+            if (!request.IsPost)
             {
                 response.StatusCode = HttpStatusCode.MethodNotAllowed;
                 await response.WriteAsync("Use 'POST' to send request messages!");
@@ -71,14 +71,14 @@ namespace FeatureFlowFramework.DataFlows.Web
             try
             {
                 int timeout = Timeout.Infinite;
-                if(request.TryGetQueryItem("timeout", out string timeoutStr)) int.TryParse(timeoutStr, out timeout);
+                if (request.TryGetQueryItem("timeout", out string timeoutStr)) int.TryParse(timeoutStr, out timeout);
 
                 string bodyString = await request.ReadAsync();
-                if(translator.TryTranslate(bodyString, out object message))
+                if (translator.TryTranslate(bodyString, out object message))
                 {
-                    if((await requester.TryRequestAndReceiveAsync(message, timeout.Milliseconds())).Out(out object reply))
+                    if ((await requester.TryRequestAndReceiveAsync(message, timeout.Milliseconds())).Out(out object reply))
                     {
-                        if(translator.TryTranslate(reply, out string json))
+                        if (translator.TryTranslate(reply, out string json))
                         {
                             await response.WriteAsync(json);
                         }
@@ -99,7 +99,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                     response.StatusCode = HttpStatusCode.BadRequest;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR(this, $"Failed while building response! Route:{route}", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;

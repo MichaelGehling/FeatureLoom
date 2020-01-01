@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
 
 namespace FeatureFlowFramework.Helper
 {
@@ -19,5 +17,4 @@ namespace FeatureFlowFramework.Helper
         public static TimeSpan Elapsed => stopWatch.Elapsed;
         public static TimeKeeper TimeKeeper => new TimeKeeper(Elapsed);
     }
-
 }

@@ -1,14 +1,11 @@
 ﻿using FeatureFlowFramework.Helper;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.Test
 {
     public class SingleMessageTestSink<T> : IDataFlowSink
     {
-        AsyncManualResetEvent receivedEvent = new AsyncManualResetEvent();
+        private AsyncManualResetEvent receivedEvent = new AsyncManualResetEvent();
         public T receivedMessage;
         public bool received = false;
 
@@ -37,7 +34,7 @@ namespace FeatureFlowFramework.DataFlows.Test
         {
             receivedEvent.Reset();
             received = false;
-            receivedMessage = default;                        
+            receivedMessage = default;
         }
 
         public IAsyncWaitHandle WaitHandle => receivedEvent.AsyncWaitHandle;

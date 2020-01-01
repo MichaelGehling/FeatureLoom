@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             long requestId = RandomGenerator.Int64;
             IReplyFuture<REP> replyFuture = queueMultipleReplies ? (IReplyFuture<REP>)new MultiReplyFuture<REP>(requestId) : new SingleReplyFuture<REP>(requestId);
-            lock(replyFutures) replyFutures.Add(new WeakReference<IReplyFuture<REP>>(replyFuture));
+            lock (replyFutures) replyFutures.Add(new WeakReference<IReplyFuture<REP>>(replyFuture));
             var requestWrapper = new Request<REQ>(requestMessage, requestId);
             sender.Forward(requestWrapper);
             return replyFuture;
@@ -50,7 +50,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             long requestId = RandomGenerator.Int64;
             IReplyFuture<REP> replyFuture = queueMultipleReplies ? (IReplyFuture<REP>)new MultiReplyFuture<REP>(requestId) : new SingleReplyFuture<REP>(requestId);
-            lock(replyFutures) replyFutures.Add(new WeakReference<IReplyFuture<REP>>(replyFuture));
+            lock (replyFutures) replyFutures.Add(new WeakReference<IReplyFuture<REP>>(replyFuture));
             var requestWrapper = new Request<REQ>(requestMessage, requestId);
             await sender.ForwardAsync(requestWrapper);
             return replyFuture;
@@ -95,15 +95,15 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(!(message is IReply replyWrapper) || !replyWrapper.TryGetMessage<REP>(out REP replyMessage)) return;
+            if (!(message is IReply replyWrapper) || !replyWrapper.TryGetMessage<REP>(out REP replyMessage)) return;
 
-            lock(replyFutures)
+            lock (replyFutures)
             {
-                for(int i = replyFutures.Count - 1; i >= 0; i--)
+                for (int i = replyFutures.Count - 1; i >= 0; i--)
                 {
-                    if(replyFutures[i].TryGetTarget(out IReplyFuture<REP> future) && !future.Terminated)
+                    if (replyFutures[i].TryGetTarget(out IReplyFuture<REP> future) && !future.Terminated)
                     {
-                        if(replyWrapper.GetRequestId() == future.RequestId)
+                        if (replyWrapper.GetRequestId() == future.RequestId)
                         {
                             future.SetReplyMessage(replyMessage);
                         }
@@ -150,11 +150,11 @@ namespace FeatureFlowFramework.DataFlows
 
         public void SetReplyMessage(REP message)
         {
-            lock(this)
+            lock (this)
             {
                 receivedReplyMessage = message;
                 received = true;
-                if(replyReceivedEvent != null) replyReceivedEvent.Set();
+                if (replyReceivedEvent != null) replyReceivedEvent.Set();
                 Terminated = true;
             }
         }
@@ -163,7 +163,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             get
             {
-                if(replyReceivedEvent == null) replyReceivedEvent = new AsyncManualResetEvent(false);
+                if (replyReceivedEvent == null) replyReceivedEvent = new AsyncManualResetEvent(false);
                 return replyReceivedEvent.AsyncWaitHandle;
             }
         }
@@ -172,17 +172,17 @@ namespace FeatureFlowFramework.DataFlows
         {
             bool success = false;
             replyMessage = default;
-            if(received ||
+            if (received ||
                 (timeout != default && this.WaitHandle.Wait(timeout)))
-                if(received)
+                if (received)
                 {
-                    lock(this)
+                    lock (this)
                     {
                         success = true;
                         replyMessage = this.receivedReplyMessage;
                         this.receivedReplyMessage = default;
                         received = false;
-                        if(replyReceivedEvent != null) replyReceivedEvent.Reset();
+                        if (replyReceivedEvent != null) replyReceivedEvent.Reset();
                     }
                 }
             return success;
@@ -191,7 +191,7 @@ namespace FeatureFlowFramework.DataFlows
         public async Task<AsyncOutResult<bool, REP>> TryReceiveAsync(TimeSpan timeout = default)
         {
             bool success = false;
-            if(!received) await this.WaitHandle.WaitAsync(timeout, CancellationToken.None);
+            if (!received) await this.WaitHandle.WaitAsync(timeout, CancellationToken.None);
             success = received;
             received = false;
             return new AsyncOutResult<bool, REP>(success, this.receivedReplyMessage);
@@ -212,10 +212,10 @@ namespace FeatureFlowFramework.DataFlows
 
         public void SetReplyMessage(REP message)
         {
-            lock(this)
+            lock (this)
             {
                 replyMessageQueue.Enqueue(message);
-                if(replyReceivedEvent != null) replyReceivedEvent.Set();
+                if (replyReceivedEvent != null) replyReceivedEvent.Set();
             }
         }
 
@@ -223,7 +223,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             get
             {
-                if(replyReceivedEvent == null) replyReceivedEvent = new AsyncManualResetEvent(false);
+                if (replyReceivedEvent == null) replyReceivedEvent = new AsyncManualResetEvent(false);
                 return replyReceivedEvent.AsyncWaitHandle;
             }
         }
@@ -232,16 +232,16 @@ namespace FeatureFlowFramework.DataFlows
         {
             bool success = false;
             replyMessage = default;
-            if(this.replyMessageQueue.Count > 0 ||
+            if (this.replyMessageQueue.Count > 0 ||
                 (timeout != default && this.WaitHandle.Wait(timeout)))
-                lock(this)
+                lock (this)
                 {
-                    if(replyMessageQueue.Count > 0)
+                    if (replyMessageQueue.Count > 0)
                     {
                         replyMessage = this.replyMessageQueue.Dequeue();
                         success = true;
                     }
-                    if(replyReceivedEvent != null && this.replyMessageQueue.Count == 0) replyReceivedEvent.Reset();
+                    if (replyReceivedEvent != null && this.replyMessageQueue.Count == 0) replyReceivedEvent.Reset();
                 }
             return success;
         }
@@ -250,15 +250,15 @@ namespace FeatureFlowFramework.DataFlows
         {
             bool success = false;
             REP replyMessage = default;
-            if(replyMessageQueue.Count == 0 && timeout != default) await this.WaitHandle.WaitAsync(timeout, CancellationToken.None);
-            lock(this)
+            if (replyMessageQueue.Count == 0 && timeout != default) await this.WaitHandle.WaitAsync(timeout, CancellationToken.None);
+            lock (this)
             {
-                if(replyMessageQueue.Count > 0)
+                if (replyMessageQueue.Count > 0)
                 {
                     replyMessage = this.replyMessageQueue.Dequeue();
                     success = true;
                 }
-                if(replyReceivedEvent != null && this.replyMessageQueue.Count == 0) replyReceivedEvent.Reset();
+                if (replyReceivedEvent != null && this.replyMessageQueue.Count == 0) replyReceivedEvent.Reset();
             }
             return new AsyncOutResult<bool, REP>(success, replyMessage);
         }

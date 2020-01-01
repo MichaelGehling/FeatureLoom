@@ -14,15 +14,15 @@ namespace FeatureFlowFramework.Helper
 
         public static FileInfoStatus GetFileInfoStatus(this FileInfo fileInfo, bool refresh = true)
         {
-            if(refresh) fileInfo.Refresh();
-            if(!fileInfo.Exists) return new FileInfoStatus();
+            if (refresh) fileInfo.Refresh();
+            if (!fileInfo.Exists) return new FileInfoStatus();
             else return new FileInfoStatus(fileInfo.Length, fileInfo.CreationTime, fileInfo.LastWriteTime);
         }
 
         public static bool ChangedSince(this FileInfo fileInfo, FileInfoStatus oldStatus, bool refresh = true)
         {
-            if(refresh) fileInfo.Refresh();
-            if(fileInfo.Exists)
+            if (refresh) fileInfo.Refresh();
+            if (fileInfo.Exists)
             {
                 return fileInfo.Exists != oldStatus.exists ||
                        fileInfo.Length != oldStatus.length ||

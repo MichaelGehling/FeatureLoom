@@ -13,8 +13,10 @@ namespace FeatureFlowFramework.DataFlows.RPC
             this.requestId = requestId;
             this.result = result;
         }
+
         [JsonIgnore]
         public long RequestId => requestId;
+
         [JsonIgnore]
         public R Result { get => result; }
 
@@ -23,5 +25,4 @@ namespace FeatureFlowFramework.DataFlows.RPC
             return result.ToJson();
         }
     }
-
 }

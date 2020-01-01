@@ -2,7 +2,6 @@
 using FeatureFlowFramework.Helper;
 using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataStorage
@@ -33,7 +32,7 @@ namespace FeatureFlowFramework.DataStorage
         public static bool TrySubscribeForChangeUpdate<T>(this IStorageReader reader, string uriPattern, IDataFlowSink updateSink)
         {
             var converter = new MessageConverter<ChangeNotification, ChangeUpdate<T>>(note => new ChangeUpdate<T>(note, reader));
-            if(reader.TrySubscribeForChangeNotifications(uriPattern, converter))
+            if (reader.TrySubscribeForChangeNotifications(uriPattern, converter))
             {
                 converter.KeepAlive(updateSink);
                 converter.ConnectTo(updateSink);
@@ -99,10 +98,13 @@ namespace FeatureFlowFramework.DataStorage
         Task<bool> TryWriteAsync(string uri, Stream sourceStream);
 
         bool TryAppend<T>(string uri, T data);
+
         Task<bool> TryAppendAsync<T>(string uri, T data);
+
         bool TryAppend(string uri, Stream sourceStream);
+
         Task<bool> TryAppendAsync(string uri, Stream sourceStream);
-  
+
         bool TryDelete(string uri);
 
         Task<bool> TryDeleteAsync(string uri);

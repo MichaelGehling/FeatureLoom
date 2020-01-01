@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace FeatureFlowFramework.DataFlows.TCP
+﻿namespace FeatureFlowFramework.DataFlows.TCP
 {
     public class ConnectionRoutingWrapper : IMessageWrapper
     {

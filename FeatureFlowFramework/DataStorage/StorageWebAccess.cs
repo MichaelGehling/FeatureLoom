@@ -43,17 +43,17 @@ namespace FeatureFlowFramework.DataStorage
         {
             try
             {
-                if(request.IsGet && request.TryGetQueryItem("uris", out string pattern) && config.allowReadUrls) return await ReadUrlsAsync(request, response, pattern);
-                else if(request.IsGet && config.allowRead) return await ReadAsync(request, response);
-                else if(request.IsPut && config.allowChange) return await WriteAsync(request, response);
-                else if(request.IsDelete && config.allowChange) return await DeleteAsync(request, response);
+                if (request.IsGet && request.TryGetQueryItem("uris", out string pattern) && config.allowReadUrls) return await ReadUrlsAsync(request, response, pattern);
+                else if (request.IsGet && config.allowRead) return await ReadAsync(request, response);
+                else if (request.IsPut && config.allowChange) return await WriteAsync(request, response);
+                else if (request.IsDelete && config.allowChange) return await DeleteAsync(request, response);
                 else
                 {
                     response.StatusCode = HttpStatusCode.MethodNotAllowed;
                     return false;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.WARNING($"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());
                 return true;
@@ -62,8 +62,8 @@ namespace FeatureFlowFramework.DataStorage
 
         private async Task<bool> ReadUrlsAsync(IWebRequest request, IWebResponse response, string pattern)
         {
-            if(pattern == "") pattern = null;
-            if((await reader.TryListUrisAsync(pattern)).Out(out string[] uris))
+            if (pattern == "") pattern = null;
+            if ((await reader.TryListUrisAsync(pattern)).Out(out string[] uris))
             {
                 /*for(int i = 0; i < uris.Length; i++)
                 {
@@ -83,7 +83,7 @@ namespace FeatureFlowFramework.DataStorage
 
         private async Task<bool> DeleteAsync(IWebRequest request, IWebResponse response)
         {
-            if(await writer.TryDeleteAsync(request.RelativePath.Trim('/')))
+            if (await writer.TryDeleteAsync(request.RelativePath.Trim('/')))
             {
                 return true;
             }
@@ -96,10 +96,10 @@ namespace FeatureFlowFramework.DataStorage
 
         private async Task<bool> WriteAsync(IWebRequest request, IWebResponse response)
         {
-            if(typeof(T).IsAssignableFrom(typeof(string)) ||
+            if (typeof(T).IsAssignableFrom(typeof(string)) ||
                typeof(T).IsAssignableFrom(typeof(byte[])))
             {
-                if(await writer.TryWriteAsync(request.RelativePath.Trim('/'), request.Stream))
+                if (await writer.TryWriteAsync(request.RelativePath.Trim('/'), request.Stream))
                 {
                     return true;
                 }
@@ -112,7 +112,7 @@ namespace FeatureFlowFramework.DataStorage
             else
             {
                 T obj = request.Stream.FromJson<T>();
-                if(await writer.TryWriteAsync(request.RelativePath.Trim('/'), obj))
+                if (await writer.TryWriteAsync(request.RelativePath.Trim('/'), obj))
                 {
                     return true;
                 }
@@ -126,10 +126,10 @@ namespace FeatureFlowFramework.DataStorage
 
         private async Task<bool> ReadAsync(IWebRequest request, IWebResponse response)
         {
-            if(typeof(T).IsAssignableFrom(typeof(string)) ||
+            if (typeof(T).IsAssignableFrom(typeof(string)) ||
                typeof(T).IsAssignableFrom(typeof(byte[])))
             {
-                if(await reader.TryReadAsync(request.RelativePath.Trim('/'), response.Stream))
+                if (await reader.TryReadAsync(request.RelativePath.Trim('/'), response.Stream))
                 {
                     return true;
                 }
@@ -141,7 +141,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             else
             {
-                if((await reader.TryReadAsync<T>(request.RelativePath.Trim('/'))).Out(out T obj))
+                if ((await reader.TryReadAsync<T>(request.RelativePath.Trim('/'))).Out(out T obj))
                 {
                     //JSON.net does not provide async write to stream, so serialization has to be done before
                     string json = obj.ToJson();

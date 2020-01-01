@@ -1,6 +1,5 @@
 ﻿using FeatureFlowFramework.Helper;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
@@ -25,7 +24,7 @@ namespace FeatureFlowFramework.Workflows
             get
             {
                 PartialStep<CT> partial = CurrentStep;
-                while(partial.doElse != null) partial = partial.doElse;
+                while (partial.doElse != null) partial = partial.doElse;
                 return partial;
             }
         }

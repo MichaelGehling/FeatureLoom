@@ -57,8 +57,8 @@ namespace FeatureFlowFramework.DataFlows
             this.spawnThreshold = spawnThresholdFactor;
             this.maxIdleMilliseconds = maxIdleMilliseconds;
 
-            if(this.spawnThreshold < 1) this.spawnThreshold = 1;
-            if(this.threadLimit < 1) this.threadLimit = 1;
+            if (this.spawnThreshold < 1) this.spawnThreshold = 1;
+            if (this.threadLimit < 1) this.threadLimit = 1;
         }
 
         public int Count => receiver.Count;
@@ -78,7 +78,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private void ManageThreadCount()
         {
-            if(numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
+            if (numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
             {
                 lock (receiver) { numThreads++; }
                 new Task(Run).Start();
@@ -87,13 +87,13 @@ namespace FeatureFlowFramework.DataFlows
 
         private void Run()
         {
-            while(receiver.TryReceive(out T message, maxIdleMilliseconds.Milliseconds()))
+            while (receiver.TryReceive(out T message, maxIdleMilliseconds.Milliseconds()))
             {
                 try
                 {
                     base.Post(message);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Log.ERROR("Exception caught in ActivePriorityForwarder while sending.", e.ToString());
                 }

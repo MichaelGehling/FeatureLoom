@@ -1,19 +1,16 @@
-﻿using FeatureFlowFramework.DataFlows;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 
 namespace FeatureFlowFramework.Aspects.AppStructure
 {
     public class AppStructureAddOn : AspectAddOn, IAcceptsName, IAcceptsDescription, IAcceptsParent, IAcceptsChildren
     {
-        string name = "";
-        string description = "";
-        long parentHandle = 0;
-        HashSet<long> childHandles = null;
+        private string name = "";
+        private string description = "";
+        private long parentHandle = 0;
+        private HashSet<long> childHandles = null;
 
         public string Name { get => name; set => name = value; }
         public string Description { get => description; set => description = value; }
@@ -25,22 +22,22 @@ namespace FeatureFlowFramework.Aspects.AppStructure
         public IAcceptsChildren AddChild(object child, string childName = null)
         {
             if (child is IUpdateAppStructureAspect childUpdate) childUpdate.TryUpdateAppStructureAspects(Timeout.InfiniteTimeSpan);
-            if(childHandles == null) childHandles = new HashSet<long>();
-            lock(childHandles) childHandles.Add(child.GetAspectHandle());
-            if(childName != null) child.GetAspectInterface<IAcceptsName, AppStructureAddOn>().SetName(childName);
+            if (childHandles == null) childHandles = new HashSet<long>();
+            lock (childHandles) childHandles.Add(child.GetAspectHandle());
+            if (childName != null) child.GetAspectInterface<IAcceptsName, AppStructureAddOn>().SetName(childName);
             return this;
         }
 
         public IAcceptsChildren RemoveChild(object child)
         {
-            if(childHandles == null) return this;
-            lock(childHandles) childHandles.Remove(child.GetAspectHandle());
+            if (childHandles == null) return this;
+            lock (childHandles) childHandles.Remove(child.GetAspectHandle());
             return this;
         }
 
         public IAcceptsChildren RemoveAllChildren()
         {
-            lock(childHandles) childHandles?.Clear();
+            lock (childHandles) childHandles?.Clear();
             return this;
         }
 
@@ -51,15 +48,15 @@ namespace FeatureFlowFramework.Aspects.AppStructure
 
         public void UpdateFromObject()
         {
-            if(!TryGetObject(out object obj)) return;
-            if(obj is IHasName nameObj) name = nameObj.Name;
-            if(obj is IHasDescription descriptionObj) description = descriptionObj.Description;
-            if(obj is IHasParent parentObj) Parent = parentObj.Parent;
-            if(obj is IHasChildren childrenObj)
+            if (!TryGetObject(out object obj)) return;
+            if (obj is IHasName nameObj) name = nameObj.Name;
+            if (obj is IHasDescription descriptionObj) description = descriptionObj.Description;
+            if (obj is IHasParent parentObj) Parent = parentObj.Parent;
+            if (obj is IHasChildren childrenObj)
             {
                 RemoveAllChildren();
                 var children = childrenObj.Children;
-                foreach(var child in children)
+                foreach (var child in children)
                 {
                     AddChild(child);
                 }

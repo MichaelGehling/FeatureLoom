@@ -1,10 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
-using Xunit;
+﻿using FeatureFlowFramework.DataFlows.Test;
 using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.DataFlows.Test;
-using System.Threading;
+using System;
 using System.Collections.Generic;
+using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -13,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
-        public void CanForwardObjectsAndValues<T>(T message) where T: IComparable
+        public void CanForwardObjectsAndValues<T>(T message) where T : IComparable
         {
             var sender = new Sender<T>();
             var forwarder = new ActivePriorityForwarder<T>(Comparer<T>.Default);
@@ -32,8 +30,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(10, 10000, 1, 3, 30, 3, 30)]
         [InlineData(2, 10000, 1, 4, 30, 2, 90)]
         [InlineData(3, 0, 1, 3, 30, 0, 30)]
-        public void CanUseMultipleThreads(int threadLimit, int maxIdleMilliseconds, int spawnThresholdFactor, 
-                                                                 int numMessages, int messageDelay, 
+        public void CanUseMultipleThreads(int threadLimit, int maxIdleMilliseconds, int spawnThresholdFactor,
+                                                                 int numMessages, int messageDelay,
                                                                  int expectedThreads, int expectedRuntime)
         {
             var sender = new Sender();
@@ -42,7 +40,7 @@ namespace FeatureFlowFramework.DataFlows
             var sink = new CountingForwarder();
             sender.ConnectTo(forwarder).ConnectTo(delayer).ConnectTo(sink);
 
-            for(int i= 0; i < numMessages; i++)
+            for (int i = 0; i < numMessages; i++)
             {
                 sender.Send(i);
             }
@@ -52,6 +50,5 @@ namespace FeatureFlowFramework.DataFlows
             Assert.Equal(numMessages, sink.Counter);
             Assert.Equal(expectedThreads, forwarder.CountThreads);
         }
-
     }
 }

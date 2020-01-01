@@ -2,7 +2,6 @@
 using FeatureFlowFramework.Logging;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,10 +9,10 @@ namespace FeatureFlowFramework.DataFlows.RPC
 {
     public class StringRpcCaller : IDataFlowSource, IDataFlowSink
     {
-        DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
-        List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
-        readonly TimeSpan timeout;
-        readonly Timer timeoutTimer;
+        private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+        private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
+        private readonly TimeSpan timeout;
+        private readonly Timer timeoutTimer;
 
         public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
 
@@ -78,7 +77,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                     {
                         parameters.Add(param);
                         param = "";
-                    }                    
+                    }
                     else
                     {
                         param += c;
@@ -87,7 +86,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 if (!param.EmptyOrNull()) parameters.Add(param);
             }
             string parameterSet = CreateJsonParamString(parameters);
-            string reqStr = $"{{method:\"{methodName}\", requestId:{requestId}, noResponse:{(noResponse?"true":"false")}, parameterSet:{parameterSet}}}";
+            string reqStr = $"{{method:\"{methodName}\", requestId:{requestId}, noResponse:{(noResponse ? "true" : "false")}, parameterSet:{parameterSet}}}";
             return reqStr;
         }
 
@@ -166,17 +165,19 @@ namespace FeatureFlowFramework.DataFlows.RPC
             return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
         }
 
-        interface IResponseHandler
+        private interface IResponseHandler
         {
             bool Handle<M>(in M message);
+
             TimeFrame LifeTime { get; }
+
             void Cancel();
         }
 
-        class ResponseHandler : IResponseHandler
+        private class ResponseHandler : IResponseHandler
         {
-            readonly long requestId;
-            readonly TaskCompletionSource<string> taskCompletionSource;
+            private readonly long requestId;
+            private readonly TaskCompletionSource<string> taskCompletionSource;
             public readonly TimeFrame lifeTime;
 
             public TimeFrame LifeTime => lifeTime;
@@ -204,6 +205,4 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
         }
     }
-
-    
 }

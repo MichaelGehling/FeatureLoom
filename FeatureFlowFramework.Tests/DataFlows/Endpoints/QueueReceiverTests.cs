@@ -1,9 +1,9 @@
-﻿using System;
-using System.Threading.Tasks;
-using Xunit;
-using FeatureFlowFramework.Helper;
+﻿using FeatureFlowFramework.Helper;
+using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.DataFlows
             var receiver = new QueueReceiver<T>();
             sender.ConnectTo(receiver);
             sender.Send(message);
-            Assert.True(receiver.TryReceive(out T receivedMessage));            
+            Assert.True(receiver.TryReceive(out T receivedMessage));
             Assert.Equal(message, receivedMessage);
         }
 
@@ -37,20 +37,20 @@ namespace FeatureFlowFramework.DataFlows
             var receiver = new QueueReceiver<int>(limit, default, dropLatestMessageOnFullQueue);
             sender.ConnectTo(receiver);
             var sendMessages = new List<int>();
-            for (int i=1; i <= numMessages; i++)
+            for (int i = 1; i <= numMessages; i++)
             {
                 sender.Send(i);
                 sendMessages.Add(i);
-            }            
+            }
             Assert.Equal(limit.ClampHigh(numMessages), receiver.CountQueuedMessages);
             var receivedMessages = receiver.ReceiveAll();
             Assert.Equal(limit.ClampHigh(numMessages), receivedMessages.Length);
 
-            int offset = dropLatestMessageOnFullQueue? 0: (numMessages-limit).ClampLow(0);
+            int offset = dropLatestMessageOnFullQueue ? 0 : (numMessages - limit).ClampLow(0);
 
-            for(int i=0; i < limit.ClampHigh(numMessages); i++)
+            for (int i = 0; i < limit.ClampHigh(numMessages); i++)
             {
-                Assert.Equal(sendMessages[i+offset], receivedMessages[i]);
+                Assert.Equal(sendMessages[i + offset], receivedMessages[i]);
             }
         }
 
@@ -106,7 +106,7 @@ namespace FeatureFlowFramework.DataFlows
         [Theory(Skip = "Unstable when run with other tests.")]
         [InlineData(80, 0, false)]
         [InlineData(80, 40, false)]
-        [InlineData(20, 100, true)]        
+        [InlineData(20, 100, true)]
         public void AllowsBlockingReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {
             TimeSpan tolerance = 20.Milliseconds();
@@ -142,7 +142,7 @@ namespace FeatureFlowFramework.DataFlows
             var expectedTime = sendDelayInMs.Milliseconds().ClampHigh(receivingWaitLimitInMs.Milliseconds());
             Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
         }
-        
+
         [Fact(Skip = "Unstable when run with other tests.")]
         public void MultipleThreadsCanReceiveConcurrently()
         {
@@ -166,7 +166,7 @@ namespace FeatureFlowFramework.DataFlows
                 tasks[threadIndex] = Task.Run(() =>
                 {
                     while (receiver.TryReceive(out int msg))
-                    {                        
+                    {
                         threadCounters[threadIndex] = threadCounters[threadIndex] + 1;
                         //Thread.Sleep(20);
                     }
@@ -181,7 +181,5 @@ namespace FeatureFlowFramework.DataFlows
                 Assert.InRange(threadCounters[i], minReceived, maxReceived);
             }
         }
-
-
     }
 }

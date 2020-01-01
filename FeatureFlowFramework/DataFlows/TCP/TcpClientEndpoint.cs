@@ -1,14 +1,13 @@
-﻿using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.Logging;
+﻿using FeatureFlowFramework.Aspects;
+using FeatureFlowFramework.Aspects.AppStructure;
 using FeatureFlowFramework.DataStorage;
+using FeatureFlowFramework.Helper;
+using FeatureFlowFramework.Logging;
 using FeatureFlowFramework.Workflows;
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Aspects.AppStructure;
-using FeatureFlowFramework.Aspects;
 
 namespace FeatureFlowFramework.DataFlows.TCP
 {
@@ -16,7 +15,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
     {
         public class StateMachine : StateMachine<TcpClientEndpoint>
         {
-
             protected override void Init()
             {
                 logStateChanges = true;
@@ -29,8 +27,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 var waitingForActivation = State("WaitingForActivation");
                 var reconnecting = State("Reconnecting");
                 var observingConnection = State("ObservingConnection");
-       
-                preparing.Build()                                            
+
+                preparing.Build()
                     .Step("Check initially for config update and try connect")
                         .Do(async c =>
                         {
@@ -48,7 +46,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
                 reconnecting.Build()
                     .Step("Reset connection wait event")
-                        .Do(c=> c.connectionWaitEvent.Reset())
+                        .Do(c => c.connectionWaitEvent.Reset())
                     .Step("Wait for reconnection timer or a config change")
                         .WaitFor(c => c.config.SubscriptionWaitHandle, c => c.reconnectionCheckTimer.RemainingTime.ClampLow(TimeSpan.Zero))
                     .Step("If config change available, apply it, eventually try to reconnect")
@@ -133,13 +131,13 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         public TcpClientEndpoint(Config config = null, ITcpMessageEncoder encoder = null, ITcpMessageDecoder decoder = null)
         {
-            if(config == null) config = new Config();
+            if (config == null) config = new Config();
             this.config = config;
-            if(encoder == null || decoder == null)
+            if (encoder == null || decoder == null)
             {
                 DefaultTcpMessageEncoderDecoder defaultEncoderDecoder = new DefaultTcpMessageEncoderDecoder();
-                if(encoder == null) encoder = defaultEncoderDecoder;
-                if(decoder == null) decoder = defaultEncoderDecoder;
+                if (encoder == null) encoder = defaultEncoderDecoder;
+                if (decoder == null) decoder = defaultEncoderDecoder;
                 this.encoder = encoder;
                 this.decoder = decoder;
             }
@@ -163,22 +161,22 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             bool result = false;
             var oldConfig = config;
-            if(config.TryUpdateFromStorage(true) || initial)
+            if (config.TryUpdateFromStorage(true) || initial)
             {
-                if(!initial) Log.INFO(this, "Loading updated configuration!");
+                if (!initial) Log.INFO(this, "Loading updated configuration!");
 
-                if(oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.LapsedTime);
+                if (oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.LapsedTime);
 
-                if(initial || ConfigChanged(oldConfig))
+                if (initial || ConfigChanged(oldConfig))
                 {
                     result = true;
-                    if(config.active)
+                    if (config.active)
                     {
                         await TryConnect(initial);
                     }
                     else
                     {
-                        if(!initial)
+                        if (!initial)
                         {
                             Log.INFO(this, $"TCP Client deactivated, connection will be disconnected.");
                             connection?.Stop();
@@ -186,7 +184,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     }
                 }
             }
-            if(connection?.Connected ?? false)
+            if (connection?.Connected ?? false)
             {
                 disconnectionAndConfigUpdateWaitHandles[0] = config.SubscriptionWaitHandle;
                 disconnectionAndConfigUpdateWaitHandles[1] = connection.DisconnectionWaitHandle;
@@ -209,27 +207,27 @@ namespace FeatureFlowFramework.DataFlows.TCP
             {
                 IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns);
 
-                if(connection != null)
-                {                    
+                if (connection != null)
+                {
                     messageEncoder.DisconnectFrom(connection.SendingSink);
                     connection.Stop();
                     connection = null;
                 }
 
                 Log.INFO(this, $"Trying to connect to {ipAddress}:{config.port}");
-                TcpClient newClient = new TcpClient(ipAddress.AddressFamily);                
+                TcpClient newClient = new TcpClient(ipAddress.AddressFamily);
                 await newClient.ConnectAsync(ipAddress, config.port);
-                if(newClient.Connected)
+                if (newClient.Connected)
                 {
                     IStreamUpgrader sslUpgrader = null;
-                    if(config.serverCertificateName != null) sslUpgrader = new ClientSslStreamUpgrader(config.serverCertificateName, config.ignoreFailedServerAuthentication);
+                    if (config.serverCertificateName != null) sslUpgrader = new ClientSslStreamUpgrader(config.serverCertificateName, config.ignoreFailedServerAuthentication);
                     connection = new TcpConnection(newClient, decoder, config.receivingBufferSize, false, sslUpgrader);
                     connection.ReceivingSource.ConnectTo(receivedMessageSource);
                     messageEncoder.ConnectTo(connection.SendingSink);
                     connectionWaitEvent.Set();
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR(this, $"TcpConnection failed to start with target hostname {config.hostAddress} and port {config.port}!", e.ToString());
                 connection?.Stop();
@@ -279,7 +277,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             return SendingToTcpSink.PostAsync(message);
         }
 
-        public override bool  TryUpdateAppStructureAspects(TimeSpan timeout)
+        public override bool TryUpdateAppStructureAspects(TimeSpan timeout)
         {
             var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
             childrenInterface.AddChild(config, "TcpClientConfig");

@@ -29,10 +29,10 @@ namespace FeatureFlowFramework.Helper
     {
         public static Task[] GetWaitingTasks(this IAsyncWaitHandle[] waitHandles)
         {
-            if(waitHandles.Length == 0) return Array.Empty<Task>();
+            if (waitHandles.Length == 0) return Array.Empty<Task>();
 
             var tasks = new Task[waitHandles.Length];
-            for(int i = 0; i < waitHandles.Length; i++)
+            for (int i = 0; i < waitHandles.Length; i++)
             {
                 tasks[i] = waitHandles[i].WaitingTask;
             }
@@ -42,7 +42,7 @@ namespace FeatureFlowFramework.Helper
         public static Task[] GetWaitingTasks(this IAsyncWaitHandle[] waitHandles, Task extraTask)
         {
             var tasks = new Task[waitHandles.Length + 1];
-            for(int i = 0; i < waitHandles.Length; i++)
+            for (int i = 0; i < waitHandles.Length; i++)
             {
                 tasks[i] = waitHandles[i].WaitingTask;
             }

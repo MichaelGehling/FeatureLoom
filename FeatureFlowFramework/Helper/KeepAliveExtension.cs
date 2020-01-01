@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.Helper
 
         public static T KeepAlive<T>(this T obj, object anchor = null) where T : class
         {
-            if(anchor == null) anchorless.Add(obj);
+            if (anchor == null) anchorless.Add(obj);
             else
             {
                 var anchorList = anchors.GetOrCreateValue(anchor);

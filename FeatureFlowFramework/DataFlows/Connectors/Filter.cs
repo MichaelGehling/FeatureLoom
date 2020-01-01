@@ -33,7 +33,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             get
             {
-                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
+                if (alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
                 return alternativeSendingHelper;
             }
         }
@@ -61,9 +61,9 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(predicate == null || predicate(msgT)) sendingHelper.Forward(msgT);
+                if (predicate == null || predicate(msgT)) sendingHelper.Forward(msgT);
                 else alternativeSendingHelper?.Forward(msgT);
             }
             else alternativeSendingHelper?.Forward(message);
@@ -71,9 +71,9 @@ namespace FeatureFlowFramework.DataFlows
 
         public Task PostAsync<M>(M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(predicate == null || predicate(msgT)) return sendingHelper.ForwardAsync(msgT);
+                if (predicate == null || predicate(msgT)) return sendingHelper.ForwardAsync(msgT);
                 else return alternativeSendingHelper?.ForwardAsync(msgT);
             }
             else return alternativeSendingHelper?.ForwardAsync(message);

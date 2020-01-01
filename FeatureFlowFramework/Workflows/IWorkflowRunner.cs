@@ -7,8 +7,11 @@ namespace FeatureFlowFramework.Workflows
     public interface IWorkflowRunner
     {
         void Run(IWorkflowControls workflow);
+
         IEnumerable<IWorkflowControls> RunningWorkflows { get; }
+
         Task PauseAllWorkflows();
+
         IDataFlowSource ExecutionInfoSource { get; }
     }
 }

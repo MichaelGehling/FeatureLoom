@@ -12,9 +12,13 @@ namespace FeatureFlowFramework.Workflows
         CancellationToken CancellationToken { get; }
         bool PauseRequested { get; set; }
         long ContextId { get; }
+
         void SendExecutionInfoEvent(string executionEvent);
+
         void Unlock();
+
         bool TryLock(TimeSpan timeout);
+
         Task<bool> TryLockAsync(TimeSpan timeout);
     }
 }

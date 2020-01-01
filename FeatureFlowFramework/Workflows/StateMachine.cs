@@ -16,12 +16,12 @@ namespace FeatureFlowFramework.Workflows
         protected StateMachine()
         {
             Init();
-            if(!ValidateAfterInit(out string findings))
+            if (!ValidateAfterInit(out string findings))
             {
                 Log.ERROR($"Creation of statemachine {this.GetType().FullName} failed!", $"Findings: {findings}");
                 throw new Exception($"Creation of statemachine {this.GetType().FullName} failed! Findings: {findings}");
             }
-            else if(!findings.EmptyOrNull())
+            else if (!findings.EmptyOrNull())
             {
                 Log.WARNING($"Issues found for Statemachine {this.GetType().FullName}!", $"Findings: {findings}");
             }
@@ -32,19 +32,19 @@ namespace FeatureFlowFramework.Workflows
             findings = "";
             bool result = true;
 
-            if(this.states.Count == 0)
+            if (this.states.Count == 0)
             {
                 findings += "CRITICAL: No states defined.\n";
                 result = false;
             }
 
-            if(InitialExecutionState.stateIndex + 1 > states.Count)
+            if (InitialExecutionState.stateIndex + 1 > states.Count)
             {
                 findings += "CRITICAL: No state at initial state index.\n";
                 result = false;
             }
 
-            foreach(var state in states)
+            foreach (var state in states)
             {
                 findings = ValidateState(findings, state);
             }
@@ -54,14 +54,14 @@ namespace FeatureFlowFramework.Workflows
 
         private static string ValidateState(string findings, State<CT> state)
         {
-            if(state.steps.Count == 0)
+            if (state.steps.Count == 0)
             {
                 state.Build(state.description).Step("Finish (automatically added)").Finish();
                 findings += $"State {state.name} has no steps defined. A finish step was added.\n";
             }
             else
             {
-                foreach(var step in state.steps)
+                foreach (var step in state.steps)
                 {
                     findings = ValidateStep(findings, state, step);
                 }
@@ -70,10 +70,10 @@ namespace FeatureFlowFramework.Workflows
                 var lastStep = state.steps[state.steps.Count - 1];
                 var validLastStep = false;
                 PartialStep<CT> lastPartialStep = lastStep;
-                while(lastPartialStep.doElse != null) lastPartialStep = lastPartialStep.doElse;
-                if(!lastPartialStep.hasCondition && lastPartialStep.targetState != null) validLastStep = true;
-                else if(!lastPartialStep.hasCondition && lastPartialStep.finishStateMachine) validLastStep = true;
-                if(!validLastStep)
+                while (lastPartialStep.doElse != null) lastPartialStep = lastPartialStep.doElse;
+                if (!lastPartialStep.hasCondition && lastPartialStep.targetState != null) validLastStep = true;
+                else if (!lastPartialStep.hasCondition && lastPartialStep.finishStateMachine) validLastStep = true;
+                if (!validLastStep)
                 {
                     state.Build(state.description).Step("Finish (automatically added)").Finish();
                     findings += $"State {state.name} has a last step {lastStep.description} without a final finish or goto. An extra finish step was added.\n";
@@ -85,27 +85,26 @@ namespace FeatureFlowFramework.Workflows
 
         private static string ValidateStep(string findings, State<CT> state, Step<CT> step)
         {
-            if(step.description == null || step.description == "")
+            if (step.description == null || step.description == "")
                 findings += $"State {state.name} has a step at index {step.stepIndex} without description.\n";
 
-            if(!(step.hasAction || step.hasWaiting || step.finishStateMachine || step.targetState != null))
+            if (!(step.hasAction || step.hasWaiting || step.finishStateMachine || step.targetState != null))
                 findings += $"State {state.name} has a step {step.description} at index {step.stepIndex} without any content. Remove or implement! \n";
             return findings;
         }
 
         public bool ExecuteNextStep(CT context, IStepExecutionController controller)
         {
-
             var executionState = context.ExecutionState;
-            var executionPhase = context.ExecutionPhase;            
-            
+            var executionPhase = context.ExecutionPhase;
+
             bool logStartHere = this.logStart && executionPhase != WorkflowExecutionPhase.Running;
-            if(!CheckAndUpdateExecutionStateBeforeExecution(context)) return false;            
+            if (!CheckAndUpdateExecutionStateBeforeExecution(context)) return false;
 
             var step = states.ItemOrNull(executionState.stateIndex)?.steps.ItemOrNull(executionState.stepIndex);
-            if(step != null)
+            if (step != null)
             {
-                if(logStartHere) Log.TRACE(context, $"Workflow {context.ContextName} is starting with state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
+                if (logStartHere) Log.TRACE(context, $"Workflow {context.ContextName} is starting with state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
 
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
                 controller.ExecuteStep(context, step);
@@ -123,17 +122,16 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> ExecuteNextStepAsync(CT context, IStepExecutionController controller)
         {
-
             var executionState = context.ExecutionState;
             var executionPhase = context.ExecutionPhase;
 
             bool logStartHere = this.logStart && executionPhase != WorkflowExecutionPhase.Running;
-            if(!CheckAndUpdateExecutionStateBeforeExecution(context)) return false;
+            if (!CheckAndUpdateExecutionStateBeforeExecution(context)) return false;
 
             var step = states.ItemOrNull(executionState.stateIndex)?.steps.ItemOrNull(executionState.stepIndex);
-            if(step != null)
+            if (step != null)
             {
-                if(logStartHere) Log.TRACE(context, $"Workflow {context.ContextName} is starting with state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
+                if (logStartHere) Log.TRACE(context, $"Workflow {context.ContextName} is starting with state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
 
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
                 await controller.ExecuteStepAsync(context, step);
@@ -151,10 +149,10 @@ namespace FeatureFlowFramework.Workflows
 
         private bool EvaluteExecutionStateAfterExecution(CT context)
         {
-            switch(context.ExecutionPhase)
+            switch (context.ExecutionPhase)
             {
                 case WorkflowExecutionPhase.Finished:
-                    if(logStop) Log.TRACE(context, $"Workflow {context.ContextName} finished!");
+                    if (logStop) Log.TRACE(context, $"Workflow {context.ContextName} finished!");
                     context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowFinished);
                     return false;
 
@@ -164,7 +162,7 @@ namespace FeatureFlowFramework.Workflows
                     return false;
 
                 case WorkflowExecutionPhase.Paused:
-                    if(logStop) Log.INFO(context, $"Workflow {context.ContextName} is paused!");
+                    if (logStop) Log.INFO(context, $"Workflow {context.ContextName} is paused!");
                     context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowPaused);
                     return false;
 
@@ -177,7 +175,7 @@ namespace FeatureFlowFramework.Workflows
         {
             var executionPhase = context.ExecutionPhase;
             bool proceed = true;
-            if(executionPhase == WorkflowExecutionPhase.Finished ||
+            if (executionPhase == WorkflowExecutionPhase.Finished ||
                executionPhase == WorkflowExecutionPhase.Invalid)
             {
                 Log.WARNING(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToString()}!");
@@ -185,7 +183,7 @@ namespace FeatureFlowFramework.Workflows
             }
             else
             {
-                if(executionPhase != WorkflowExecutionPhase.Running) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowStarted);
+                if (executionPhase != WorkflowExecutionPhase.Running) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowStarted);
                 context.ExecutionPhase = WorkflowExecutionPhase.Running;
             }
 
@@ -194,13 +192,13 @@ namespace FeatureFlowFramework.Workflows
 
         public override bool ExecuteNextStep<C>(C context, IStepExecutionController controller)
         {
-            if(context is CT ct) return ExecuteNextStep(ct, controller);
+            if (context is CT ct) return ExecuteNextStep(ct, controller);
             else throw new Exception("Wrong context object used for this Statemachine!");
         }
 
         public override async Task<bool> ExecuteNextStepAsync<C>(C context, IStepExecutionController controller)
         {
-            if(context is CT ct) return await ExecuteNextStepAsync(ct, controller);
+            if (context is CT ct) return await ExecuteNextStepAsync(ct, controller);
             else throw new Exception("Wrong context object used for this Statemachine!");
         }
 
@@ -213,9 +211,9 @@ namespace FeatureFlowFramework.Workflows
 
         public State<CT> State(string name)
         {
-            foreach(var state in states)
+            foreach (var state in states)
             {
-                if(state.name == name) return state;
+                if (state.name == name) return state;
             }
 
             var index = states.Count;

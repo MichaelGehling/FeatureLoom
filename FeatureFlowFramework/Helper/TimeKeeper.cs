@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.Helper
         }
 
         public TimeSpan Elapsed => AppTime.Elapsed - startTime;
-        public void Restart() => startTime = AppTime.Elapsed;        
-    }
 
+        public void Restart() => startTime = AppTime.Elapsed;
+    }
 }

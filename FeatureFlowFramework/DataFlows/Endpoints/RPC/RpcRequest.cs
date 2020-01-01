@@ -1,15 +1,13 @@
-﻿using FeatureFlowFramework.Helper;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
-
     public struct RpcRequest<P, R> : IRpcRequest
     {
         public string method;
         public long requestId;
         public bool noResponse;
-        public P parameterSet;        
+        public P parameterSet;
 
         public RpcRequest(long requestId, string method, P parameterSet, bool noResponse = false)
         {
@@ -18,8 +16,10 @@ namespace FeatureFlowFramework.DataFlows.RPC
             this.parameterSet = parameterSet;
             this.noResponse = noResponse;
         }
+
         [JsonIgnore]
         public long RequestId => requestId;
+
         [JsonIgnore]
         public string Method => method;
     }

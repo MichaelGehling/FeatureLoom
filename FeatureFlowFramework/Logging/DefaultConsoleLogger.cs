@@ -21,16 +21,16 @@ namespace FeatureFlowFramework.Logging
 
         public void Post<M>(in M message)
         {
-            if(!hasConsole) return;
+            if (!hasConsole) return;
 
             config.TryUpdateFromStorage(true);
 
-            if(message is LogMessage logMessage)
+            if (message is LogMessage logMessage)
             {
-                if(logMessage.level <= config.logFileLoglevel)
+                if (logMessage.level <= config.logFileLoglevel)
                 {
                     string strMsg;
-                    lock(stringBuilder)
+                    lock (stringBuilder)
                     {
                         strMsg = logMessage.PrintToStringBuilder(stringBuilder).ToString();
                         stringBuilder.Clear();

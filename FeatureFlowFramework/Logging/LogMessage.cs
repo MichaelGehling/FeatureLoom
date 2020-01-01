@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.Logging
             this.shortText = shortText;
             this.level = level;
             this.timeStamp = AppTime.Now;
-            if(detailText != null && detailText != "") detailText = $"\n    {detailText}\n";
+            if (detailText != null && detailText != "") detailText = $"\n    {detailText}\n";
             this.detailText = detailText;
             this.caller = caller;
             this.sourceFile = sourceFile;
@@ -47,9 +47,9 @@ namespace FeatureFlowFramework.Logging
 
         public StringBuilder PrintToStringBuilder(StringBuilder sb = null, string format = null, string timeStampFormat = null)
         {
-            if(format == null || format == "") format = defaultFormat;
-            if(timeStampFormat == null || timeStampFormat == "") timeStampFormat = defaultTimeStampFormat;
-            if(sb == null) sb = new StringBuilder();
+            if (format == null || format == "") format = defaultFormat;
+            if (timeStampFormat == null || timeStampFormat == "") timeStampFormat = defaultTimeStampFormat;
+            if (sb == null) sb = new StringBuilder();
 
             return sb.AppendFormat(format,
                 timeStamp.ToString(timeStampFormat),

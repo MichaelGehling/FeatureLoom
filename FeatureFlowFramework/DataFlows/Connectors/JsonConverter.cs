@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.DataFlows
               {
                   json = obj.ToJson(Json.ComplexObjectsStructure_SerializerSettings);
               }
-              catch(Exception e)
+              catch (Exception e)
               {
                   Log.ERROR($"Serializing object to Json in ToJsonConverter failed.", $"Object: {obj} \n Exception: {e}");
               }
@@ -38,7 +38,7 @@ namespace FeatureFlowFramework.DataFlows
               {
                   obj = json.FromJson<object>(Json.ComplexObjectsStructure_SerializerSettings);
               }
-              catch(Exception e)
+              catch (Exception e)
               {
                   Log.ERROR($"Deserializing object from Json in FromJsonConverter failed.", $"Json: {json} \n Exception: {e}");
               }

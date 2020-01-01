@@ -1,14 +1,12 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
-using System;
+using FeatureFlowFramework.Helper;
 using System.Threading.Tasks;
 using Xunit;
-using FeatureFlowFramework.Helper;
 
 namespace FeatureFlowFramework.DataFlows
 {
     public class AsyncForwarderTest
     {
-
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
@@ -28,7 +26,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             var delay = 50.Milliseconds();
             var sender = new Sender();
-            var forwarder = new AsyncForwarder();         
+            var forwarder = new AsyncForwarder();
             var delayerA = new DelayingForwarder(delay);
             var delayerB = new DelayingForwarder(delay);
             var counterA = new CountingForwarder();
@@ -42,6 +40,5 @@ namespace FeatureFlowFramework.DataFlows
             Task.WhenAll(counterA.WaitFor(1), counterB.WaitFor(1));
             Assert.True(timer.Elapsed < delay * 2);
         }
-
     }
 }

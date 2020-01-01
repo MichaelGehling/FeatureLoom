@@ -6,17 +6,19 @@ namespace FeatureFlowFramework.DataFlows.RPC
 {
     public partial class RpcCaller
     {
-        interface IResponseHandler
+        private interface IResponseHandler
         {
             bool Handle<M>(in M message);
+
             TimeFrame LifeTime { get; }
+
             void Cancel();
         }
 
-        class ResponseHandler<R> : IResponseHandler
+        private class ResponseHandler<R> : IResponseHandler
         {
-            readonly long requestId;
-            readonly TaskCompletionSource<R> taskCompletionSource;
+            private readonly long requestId;
+            private readonly TaskCompletionSource<R> taskCompletionSource;
             public readonly TimeFrame lifeTime;
 
             public TimeFrame LifeTime => lifeTime;
@@ -25,7 +27,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             {
                 this.taskCompletionSource = taskCompletionSource;
                 lifeTime = new TimeFrame(timeout);
-                this.requestId = requestId;                
+                this.requestId = requestId;
             }
 
             public bool Handle<M>(in M message)
@@ -44,6 +46,4 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
         }
     }
-
-
 }

@@ -25,7 +25,7 @@ namespace FeatureFlowFramework.Aspects
 
         public static void Disable()
         {
-            if(!active) return;
+            if (!active) return;
 
             active = false;
             weakObjectRegister = new ConditionalWeakTable<object, FinalizationTrigger>();
@@ -35,7 +35,7 @@ namespace FeatureFlowFramework.Aspects
 
         public static void Enable()
         {
-            if(active) return;
+            if (active) return;
 
             active = true;
             notificationSender.Send(new ActivationStatusNotification(true));
@@ -43,13 +43,13 @@ namespace FeatureFlowFramework.Aspects
 
         private static bool FindHandleFor(object obj, out long handle)
         {
-            if(!active)
+            if (!active)
             {
                 handle = default;
                 return false;
             }
 
-            if(weakObjectRegister.TryGetValue(obj, out FinalizationTrigger trigger))
+            if (weakObjectRegister.TryGetValue(obj, out FinalizationTrigger trigger))
             {
                 handle = trigger.ObjectHandle;
                 return true;
@@ -63,13 +63,13 @@ namespace FeatureFlowFramework.Aspects
 
         public static bool TryGetAspectData(long handle, out AspectData data)
         {
-            if(!active)
+            if (!active)
             {
                 data = default;
                 return false;
             }
 
-            lock(handleToAspectData)
+            lock (handleToAspectData)
             {
                 return handleToAspectData.TryGetValue(handle, out data);
             }
@@ -82,7 +82,7 @@ namespace FeatureFlowFramework.Aspects
 
         public static AspectData GetAspectData<T>(this T obj) where T : class
         {
-            lock(handleToAspectData)
+            lock (handleToAspectData)
             {
                 var handle = obj.GetAspectHandle();
                 return TryGetAspectData(handle, out AspectData data) ? data : null;
@@ -93,15 +93,15 @@ namespace FeatureFlowFramework.Aspects
 
         public static long AddObject<T>(T obj) where T : class
         {
-            if(!active || obj == null) return default;
+            if (!active || obj == null) return default;
 
-            lock(handleToAspectData)
+            lock (handleToAspectData)
             {
-                if(FindHandleFor(obj, out long existingHandle)) return existingHandle; // If object is already registered just return the handle
+                if (FindHandleFor(obj, out long existingHandle)) return existingHandle; // If object is already registered just return the handle
                 long handle = ++handleCounter;
                 AspectData data = new AspectData(obj, handle);
                 weakObjectRegister.Add(obj, new FinalizationTrigger(handle));
-                if(!handleToAspectData.TryAdd(handle, data)) return AddObject(obj); // If handle is duplicate, try again!
+                if (!handleToAspectData.TryAdd(handle, data)) return AddObject(obj); // If handle is duplicate, try again!
                 notificationSender.Send(new ObjectAddedNotification(handle, data));
                 return handle;
             }
@@ -109,9 +109,9 @@ namespace FeatureFlowFramework.Aspects
 
         public static IEnumerable<AspectData> GetAllAspectData()
         {
-            if(!active) return default;
+            if (!active) return default;
 
-            lock(handleToAspectData)
+            lock (handleToAspectData)
             {
                 return handleToAspectData.Values;
             }
@@ -119,28 +119,28 @@ namespace FeatureFlowFramework.Aspects
 
         public static void RemoveObject(object obj)
         {
-            if(!active) return;
+            if (!active) return;
 
-            if(FindHandleFor(obj, out long handle)) CleanUpObjectData(handle);
+            if (FindHandleFor(obj, out long handle)) CleanUpObjectData(handle);
         }
 
         public static void RemoveObject(long handle)
         {
-            if(!active) return;
+            if (!active) return;
 
             CleanUpObjectData(handle);
         }
 
         private static void CleanUpObjectData(long handle)
         {
-            if(!active) return;
+            if (!active) return;
 
-            lock(handleToAspectData)
+            lock (handleToAspectData)
             {
-                if(handleToAspectData.TryGetValue(handle, out AspectData data))
+                if (handleToAspectData.TryGetValue(handle, out AspectData data))
                 {
                     var obj = data.Obj;
-                    if(obj != null) weakObjectRegister.Remove(obj);
+                    if (obj != null) weakObjectRegister.Remove(obj);
                     handleToAspectData.Remove(handle);
                     notificationSender.Send(new ObjectRemovedNotification(handle, data));
                 }
@@ -149,8 +149,8 @@ namespace FeatureFlowFramework.Aspects
 
         public static T GetAspectInterface<T>(this object obj, Predicate<T> condition = null) where T : class
         {
-            if(obj is T objT) return objT;
-            if(obj is AspectAddOn addon) addon.TryGetObject(out obj);
+            if (obj is T objT) return objT;
+            if (obj is AspectAddOn addon) addon.TryGetObject(out obj);
             return obj.GetAspectData().TryGetAspectInterface(out T aspectInterface, condition) ? aspectInterface : null;
         }
 
@@ -161,7 +161,7 @@ namespace FeatureFlowFramework.Aspects
             return obj.GetAspectData().TryGetAspectInterface(out T aspectInterface, condition) ? aspectInterface : obj.AddAspectAddOn(new ADDON());
         }
 
-        public static T AddAspectAddOn<T>(this object obj, T addOn) where T: AspectAddOn
+        public static T AddAspectAddOn<T>(this object obj, T addOn) where T : AspectAddOn
         {
             obj.GetAspectData().AddAddOn(addOn);
             return addOn;

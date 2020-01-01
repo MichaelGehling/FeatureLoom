@@ -37,7 +37,6 @@ namespace FeatureFlowFramework.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            
             SendLogMessage(new LogMessage(Loglevel.ALWAYS, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
         }
 
@@ -81,9 +80,9 @@ namespace FeatureFlowFramework.Logging
             SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
         }
 
-        public static void TRACE(object context, 
+        public static void TRACE(object context,
                           string shortText,
-                          string detailText = "",                          
+                          string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)

@@ -48,12 +48,12 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     .Step("Get awaited tasks from connectionRequest and config subscription")
                         .Do(c =>
                         {
-                            if(c.awaitedConnectionRequest?.IsCompleted ?? true)
+                            if (c.awaitedConnectionRequest?.IsCompleted ?? true)
                             {
                                 c.awaitedConnectionRequest = c.listner.AcceptTcpClientAsync();
                                 c.awaitedTasks[0] = c.awaitedConnectionRequest;
                             }
-                            if(c.awaitedTasks[1]?.IsCompleted ?? true)
+                            if (c.awaitedTasks[1]?.IsCompleted ?? true)
                             {
                                 c.awaitedTasks[1] = c.config.SubscriptionWaitHandle.WaitingTask;
                             }
@@ -69,7 +69,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                             .Do(c =>
                             {
                                 IStreamUpgrader sslUpgrader = null;
-                                if(c.serverCertificate != null) sslUpgrader = new ServerSslStreamUpgrader(c.serverCertificate);
+                                if (c.serverCertificate != null) sslUpgrader = new ServerSslStreamUpgrader(c.serverCertificate);
                                 var connection = new TcpConnection(c.awaitedConnectionRequest.Result, c.decoder, c.config.receivingBufferSize, c.config.addRoutingWrapper, sslUpgrader);
                                 c.connectionForwarder.ConnectTo(connection.SendingSink);
                                 connection.ReceivingSource.ConnectTo(c.receivedMessageSource);
@@ -82,7 +82,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                             {
                                 c.connections.RemoveAll(connection =>
                                 {
-                                    if(connection.Disconnected)
+                                    if (connection.Disconnected)
                                     {
                                         connection.Stop();
                                         c.connectionForwarder.DisconnectFrom(connection.SendingSink);
@@ -132,13 +132,13 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         public TcpServerEndpoint(Config config = null, ITcpMessageEncoder encoder = null, ITcpMessageDecoder decoder = null)
         {
-            if(config == null) config = new Config();
+            if (config == null) config = new Config();
             this.config = config;
-            if(encoder == null || decoder == null)
+            if (encoder == null || decoder == null)
             {
                 DefaultTcpMessageEncoderDecoder defaultEncoderDecoder = new DefaultTcpMessageEncoderDecoder();
-                if(encoder == null) encoder = defaultEncoderDecoder;
-                if(decoder == null) decoder = defaultEncoderDecoder;
+                if (encoder == null) encoder = defaultEncoderDecoder;
+                if (decoder == null) decoder = defaultEncoderDecoder;
             }
             this.encoder = encoder;
             this.decoder = decoder;
@@ -151,10 +151,10 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         private object EncodeMessage(object msg)
         {
-            if(msg is ConnectionRoutingWrapper wrapper)
+            if (msg is ConnectionRoutingWrapper wrapper)
             {
                 wrapper.Message = encoder.Encode(wrapper.Message);
-                if(wrapper.Message == null) return null;
+                if (wrapper.Message == null) return null;
                 return wrapper;
             }
             else
@@ -167,22 +167,21 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             bool result = false;
             var oldConfig = config;
-            if(config.TryUpdateFromStorage(true) || initial)
+            if (config.TryUpdateFromStorage(true) || initial)
             {
-                if(!initial) Log.INFO(this, "Loading updated configuration!");
+                if (!initial) Log.INFO(this, "Loading updated configuration!");
 
-
-                if(initial || ConfigChanged(oldConfig))
+                if (initial || ConfigChanged(oldConfig))
                 {
                     result = true;
-                    if(config.active) await RestartServer(initial);
-                    else if(!initial) DeactivateServer();
+                    if (config.active) await RestartServer(initial);
+                    else if (!initial) DeactivateServer();
                 }
             }
             return result;
         }
 
-        void UpdateDisconnectionEventTask()
+        private void UpdateDisconnectionEventTask()
         {
             disconnectionEventTask = Task.WhenAny(connections.Select(con => con.DisconnectionWaitHandle.WaitingTask));
         }
@@ -190,7 +189,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private void DeactivateServer()
         {
             Log.INFO(this, $"TCP Server deactivated. {connections.Count} connections will be disconnected!");
-            foreach(var connection in connections) connection.Stop();
+            foreach (var connection in connections) connection.Stop();
             connections.Clear();
             connectionForwarder.DisconnectAll();
             listner?.Stop();
@@ -201,14 +200,14 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             try
             {
-                if(config.x509CertificateName != null) Storage.GetReader("certificate").TryRead(config.x509CertificateName, out this.serverCertificate);
+                if (config.x509CertificateName != null) Storage.GetReader("certificate").TryRead(config.x509CertificateName, out this.serverCertificate);
 
                 IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns);
 
-                if(!initial)
+                if (!initial)
                 {
                     Log.WARNING(this, $"TCP Server reset. {connections.Count} connections will be disconnected!");
-                    foreach(var connection in connections) connection.Stop();
+                    foreach (var connection in connections) connection.Stop();
                     connections.Clear();
                     connectionForwarder.DisconnectAll();
                 }
@@ -217,12 +216,12 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 listner.Start();
                 Log.TRACE(this, $"TCP server started with hostname {config.hostAddress} and port {config.port}.");
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"TcpListner failed to start with hostname {config.hostAddress} and port {config.port}! {connections.Count} connections will be disconnected!", e.ToString());
                 listner?.Stop();
                 listner = null;
-                foreach(var connection in connections) connection.Stop();
+                foreach (var connection in connections) connection.Stop();
                 connections.Clear();
                 connectionForwarder.DisconnectAll();
             }
@@ -281,20 +280,18 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         public override bool TryUpdateAppStructureAspects(TimeSpan timeout)
         {
+            var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
+            childrenInterface.AddChild(config, "TcpServerConfig");
+            childrenInterface.AddChild(encoder, "Encoder");
+            childrenInterface.AddChild(decoder, "Decoder");
+            childrenInterface.AddChild(sendingSink, "SendingSink");
+            childrenInterface.AddChild(receivedMessageSource, "ReceivedMessageSource");
+            childrenInterface.AddChild(messageEncoder, "MessageEncoder");
+            childrenInterface.AddChild(connectionForwarder, "ConnectionForwarder");
+            foreach (var connection in connections) childrenInterface.AddChild(connection, "Connection " + connection.GetAspectHandle());
 
-                var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
-                childrenInterface.AddChild(config, "TcpServerConfig");
-                childrenInterface.AddChild(encoder, "Encoder");
-                childrenInterface.AddChild(decoder, "Decoder");
-                childrenInterface.AddChild(sendingSink, "SendingSink");
-                childrenInterface.AddChild(receivedMessageSource, "ReceivedMessageSource");
-                childrenInterface.AddChild(messageEncoder, "MessageEncoder");
-                childrenInterface.AddChild(connectionForwarder, "ConnectionForwarder");
-                foreach(var connection in connections) childrenInterface.AddChild(connection, "Connection " + connection.GetAspectHandle());
-
-                base.TryUpdateAppStructureAspects(timeout);
+            base.TryUpdateAppStructureAspects(timeout);
             return true;
-            
         }
     }
 }

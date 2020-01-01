@@ -1,21 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.Test
 {
     public class CountingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
-        DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+        private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
 
-        volatile int counter;
-        object locker = new object();
-        List<(int expectedCount, TaskCompletionSource<int> tcs)> waitings = new List<(int, TaskCompletionSource<int>)>();
+        private volatile int counter;
+        private object locker = new object();
+        private List<(int expectedCount, TaskCompletionSource<int> tcs)> waitings = new List<(int, TaskCompletionSource<int>)>();
 
         public int Counter
         {
-            get { lock (locker) return counter; }            
+            get { lock (locker) return counter; }
         }
 
         public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;

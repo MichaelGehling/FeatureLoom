@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.Web
                 {
                     address = hostAddress.ResolveToIpAddressAsync(true).Result;
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Log.ERROR("Failed resolving hostName", e.ToString());
                 }

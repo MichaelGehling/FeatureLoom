@@ -9,6 +9,6 @@
         {
             this.stateIndex = stateIndex;
             this.stepIndex = stepIndex;
-        } 
+        }
     }
 }

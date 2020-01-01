@@ -6,9 +6,9 @@ namespace FeatureFlowFramework.DataFlows
     /// <summary>
     ///     Messages put to the processing endpoint are processed in the passed action. The
     ///     processing function returns true if successful and false if not, then the message will
-    ///     be forwarded to 'Else'. 
+    ///     be forwarded to 'Else'.
     ///     It is thread-safe as long as the passed action is also
-    ///     thread-safe. If the action is not thread safe, the synchronizationLock parameter in 
+    ///     thread-safe. If the action is not thread safe, the synchronizationLock parameter in
     ///     the constructor can be used to define a lock object.
     ///     Avoid long running processing actions or run them in a task to avoid
     ///     blocking the sender.
@@ -46,20 +46,20 @@ namespace FeatureFlowFramework.DataFlows
         {
             get
             {
-                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
+                if (alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
                 return alternativeSendingHelper;
             }
         }
 
         public void Post<M>(in M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(processing != null)
+                if (processing != null)
                 {
-                    if(syncLock == null)
+                    if (syncLock == null)
                     {
-                        if(!processing(msgT))
+                        if (!processing(msgT))
                         {
                             alternativeSendingHelper?.Forward(message);
                         }
@@ -67,16 +67,16 @@ namespace FeatureFlowFramework.DataFlows
                     else
                     {
                         bool result;
-                        lock(syncLock)
+                        lock (syncLock)
                         {
-                            result = processing(msgT);                            
+                            result = processing(msgT);
                         }
                         if (!result) alternativeSendingHelper?.Forward(message);
                     }
                 }
                 else
                 {
-                    if(!processingAsync(msgT).Result)
+                    if (!processingAsync(msgT).Result)
                     {
                         alternativeSendingHelper?.Forward(message);
                     }
@@ -87,13 +87,13 @@ namespace FeatureFlowFramework.DataFlows
 
         public async Task PostAsync<M>(M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(processing != null)
+                if (processing != null)
                 {
-                    if(syncLock == null)
+                    if (syncLock == null)
                     {
-                        if(!processing(msgT))
+                        if (!processing(msgT))
                         {
                             alternativeSendingHelper?.Forward(message);
                         }
@@ -101,16 +101,16 @@ namespace FeatureFlowFramework.DataFlows
                     else
                     {
                         bool result;
-                        lock(syncLock)
+                        lock (syncLock)
                         {
                             result = processing(msgT);
                         }
-                        if(!result) alternativeSendingHelper?.Forward(message);
+                        if (!result) alternativeSendingHelper?.Forward(message);
                     }
                 }
                 else
                 {
-                    if(!await processingAsync(msgT))
+                    if (!await processingAsync(msgT))
                     {
                         await alternativeSendingHelper?.ForwardAsync(message);
                     }

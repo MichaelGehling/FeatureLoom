@@ -1,9 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
-using Xunit;
+﻿using FeatureFlowFramework.DataFlows.Test;
 using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.DataFlows.Test;
-using System.Threading;
+using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -31,8 +28,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(10, 10000, 1, 3, 30, 3, 30)]
         [InlineData(2, 10000, 1, 4, 30, 2, 90)]
         [InlineData(3, 0, 1, 3, 30, 0, 30)]
-        public void CanUseMultipleThreads(int threadLimit, int maxIdleMilliseconds, int spawnThresholdFactor, 
-                                                         int numMessages, int messageDelay, 
+        public void CanUseMultipleThreads(int threadLimit, int maxIdleMilliseconds, int spawnThresholdFactor,
+                                                         int numMessages, int messageDelay,
                                                          int expectedThreads, int expectedRuntime)
         {
             var sender = new Sender();
@@ -41,16 +38,15 @@ namespace FeatureFlowFramework.DataFlows
             var sink = new CountingForwarder();
             sender.ConnectTo(forwarder).ConnectTo(delayer).ConnectTo(sink);
 
-            for(int i= 0; i < numMessages; i++)
+            for (int i = 0; i < numMessages; i++)
             {
                 sender.Send(i);
             }
             var waitingTask = sink.WaitFor(numMessages);
             waitingTask.Wait(expectedRuntime.Milliseconds() * 5);
 
-            Assert.Equal(numMessages, sink.Counter);                        
+            Assert.Equal(numMessages, sink.Counter);
             Assert.Equal(expectedThreads, forwarder.CountThreads);
         }
-
     }
 }

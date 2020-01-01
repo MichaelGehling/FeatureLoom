@@ -39,9 +39,9 @@ namespace FeatureFlowFramework.Web
 
         public bool TryUpdateConfig()
         {
-            if(config.TryUpdateFromStorage(false))
+            if (config.TryUpdateFromStorage(false))
             {
-                foreach(var endpoint in config.endpointConfigs.EmptyIfNull())
+                foreach (var endpoint in config.endpointConfigs.EmptyIfNull())
                 {
                     AddEndpoint(endpoint);
                 }
@@ -54,11 +54,11 @@ namespace FeatureFlowFramework.Web
 
         public void AddEndpoint(EndpointConfig endpoint)
         {
-            lock(configLock)
+            lock (configLock)
             {
                 //if(started) throw new Exception("Endpoints can only be configured before the server is started.");
                 endpoints.Add(endpoint);
-                if(started)
+                if (started)
                 {
                     Stop().Wait();
                     Start();
@@ -68,13 +68,13 @@ namespace FeatureFlowFramework.Web
 
         public void AddRequestHandler(IWebRequestHandler handler)
         {
-            lock(configLock)
+            lock (configLock)
             {
                 var requestHandlers = this.requestHandlers;
-                if(started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
                 requestHandlers.Add(handler.Route, handler);
                 this.requestHandlers = requestHandlers;
-                if(started)
+                if (started)
                 {
                     Stop().Wait();
                     Start();
@@ -84,13 +84,13 @@ namespace FeatureFlowFramework.Web
 
         public void RemoveRequestHandler(IWebRequestHandler handler)
         {
-            lock(configLock)
+            lock (configLock)
             {
                 var requestHandlers = this.requestHandlers;
-                if(started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
                 requestHandlers.Remove(handler.Route);
                 this.requestHandlers = requestHandlers;
-                if(started)
+                if (started)
                 {
                     Stop().Wait();
                     Start();
@@ -100,13 +100,13 @@ namespace FeatureFlowFramework.Web
 
         public void ClearRequestHandlers()
         {
-            lock(configLock)
+            lock (configLock)
             {
                 var requestHandlers = this.requestHandlers;
-                if(started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
                 else requestHandlers.Clear();
                 this.requestHandlers = requestHandlers;
-                if(started)
+                if (started)
                 {
                     Stop().Wait();
                     Start();
@@ -116,11 +116,11 @@ namespace FeatureFlowFramework.Web
 
         public void ClearEndpoints()
         {
-            lock(configLock)
+            lock (configLock)
             {
-                if(started) throw new Exception("Endpoints can only be configured before the server is started.");
+                if (started) throw new Exception("Endpoints can only be configured before the server is started.");
                 endpoints.Clear();
-                if(started)
+                if (started)
                 {
                     Stop().Wait();
                     Start();
@@ -131,7 +131,7 @@ namespace FeatureFlowFramework.Web
         public void ExecuteHandlers(IApplicationBuilder app)
         {
             var requestHandlers = this.requestHandlers;
-            foreach(var handler in requestHandlers)
+            foreach (var handler in requestHandlers)
             {
                 app.Map(handler.Value.Route, app2 => app2.Run(async context =>
                 {
@@ -188,7 +188,7 @@ namespace FeatureFlowFramework.Web
 
             void IWebResponse.AddCookie(string key, string content, CookieOptions options)
             {
-                if(options != null) context.Response.Cookies.Append(key, content, options);
+                if (options != null) context.Response.Cookies.Append(key, content, options);
                 else context.Response.Cookies.Append(key, content);
             }
 
@@ -209,7 +209,7 @@ namespace FeatureFlowFramework.Web
 
             bool IWebRequest.TryGetQueryItem(string key, out string item)
             {
-                if(context.Request.Query.TryGetValue(key, out StringValues values))
+                if (context.Request.Query.TryGetValue(key, out StringValues values))
                 {
                     item = values[0];
                     return true;
@@ -238,13 +238,13 @@ namespace FeatureFlowFramework.Web
                 {
                     options.Limits.MaxRequestBodySize = null;
                     options.AllowSynchronousIO = false;
-                    foreach(var endpoint in endpoints)
+                    foreach (var endpoint in endpoints)
                     {
-                        if(endpoint.address == null) continue;
+                        if (endpoint.address == null) continue;
 
-                        if(endpoint.certificateName != null)
+                        if (endpoint.certificateName != null)
                         {
-                            if(Storage.GetReader("certificate").TryRead(endpoint.certificateName, out X509Certificate2 certificate))
+                            if (Storage.GetReader("certificate").TryRead(endpoint.certificateName, out X509Certificate2 certificate))
                             {
                                 options.Listen(endpoint.address, endpoint.port, listenOptions =>
                                 {
@@ -282,7 +282,7 @@ namespace FeatureFlowFramework.Web
 
         public async Task Stop()
         {
-            if(webserver != null)
+            if (webserver != null)
             {
                 await webserver.StopAsync();
             }

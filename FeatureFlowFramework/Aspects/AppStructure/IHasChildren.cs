@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace FeatureFlowFramework.Aspects.AppStructure
 {
@@ -7,5 +6,4 @@ namespace FeatureFlowFramework.Aspects.AppStructure
     {
         IEnumerable<object> Children { get; }
     }
-
 }

@@ -4,17 +4,15 @@ using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Logging;
 using FeatureFlowFramework.Workflows;
 using System;
-using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureRpcClient
 {
     public class FeatureRpcClient : Workflow<FeatureRpcClient.StateMachine>
-    {       
+    {
         public int errorCode = 0;
-        string rpcCall;
-        bool multiCall = false;
+        private string rpcCall;
+        private bool multiCall = false;
 
         public FeatureRpcClient(string rpcCall)
         {
@@ -22,9 +20,9 @@ namespace FeatureRpcClient
             if (rpcCall.EmptyOrNull()) multiCall = true;
         }
 
-        TcpClientEndpoint tcpClient;
-        StringRpcCaller rpcCaller;
-        Task<string> rpcCallFuture;
+        private TcpClientEndpoint tcpClient;
+        private StringRpcCaller rpcCaller;
+        private Task<string> rpcCallFuture;
 
         public class StateMachine : StateMachine<FeatureRpcClient>
         {
@@ -59,9 +57,9 @@ namespace FeatureRpcClient
                 calling.Build()
                     .Step("If multi call mode read next command")
                         .If(c => c.multiCall)
-                            .Do(c=> c.rpcCall = Console.ReadLine())
+                            .Do(c => c.rpcCall = Console.ReadLine())
                     .Step("If input is empty goto closing connection state.")
-                        .If(c=> c.rpcCall.EmptyOrNull())
+                        .If(c => c.rpcCall.EmptyOrNull())
                             .Goto(closingConnection)
                     .Step("Call remote procedure.")
                         .Do(c =>
@@ -74,7 +72,7 @@ namespace FeatureRpcClient
                         .If(c => !c.rpcCallFuture.IsCompletedSuccessfully)
                             .Goto(callFailed)
                     .Step("Print result to console.")
-                        .If(c=> c.multiCall)
+                        .If(c => c.multiCall)
                             .Do(c => Console.WriteLine(c.rpcCallFuture.Result))
                         .Else()
                             .Do(c => Console.Write(c.rpcCallFuture.Result))
@@ -104,17 +102,16 @@ namespace FeatureRpcClient
                         .Do(c => c.tcpClient.DisconnectFromTcpServer())
                     .Step("Finish")
                         .Finish();
-
             }
         }
 
-        static int Main(string[] args)
+        private static int Main(string[] args)
         {
             Log.logForwarder.DisconnectFrom(Log.defaultConsoleLogger);
             var workflow = new FeatureRpcClient(args.Length >= 1 ? args[0] : null);
             new BlockingRunner().Run(workflow);
             Workflow.defaultRunner.PauseAllWorkflows().Wait(1.Seconds());
-            return workflow.errorCode;            
+            return workflow.errorCode;
         }
     }
 }

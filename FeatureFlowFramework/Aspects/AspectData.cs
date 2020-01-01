@@ -20,10 +20,10 @@ namespace FeatureFlowFramework.Aspects
 
         public long ObjectHandle => objectHandle;
 
-        public void AddAddOn(AspectAddOn addOn) 
+        public void AddAddOn(AspectAddOn addOn)
         {
             addOn.SetObjectRef(this.objectRef);
-            lock(aspectAddOns)
+            lock (aspectAddOns)
             {
                 aspectAddOns.Add(addOn);
             }
@@ -32,15 +32,15 @@ namespace FeatureFlowFramework.Aspects
         public bool TryGetAspectInterface<T>(out T aspectInterface, Predicate<T> condition = null)
         {
             aspectInterface = default;
-            if(!objectRef.TryGetTarget(out object obj)) return false;
-            if(obj is T objT && (condition?.Invoke(objT) ?? true))
+            if (!objectRef.TryGetTarget(out object obj)) return false;
+            if (obj is T objT && (condition?.Invoke(objT) ?? true))
             {
                 aspectInterface = objT;
                 return true;
             }
-            foreach(var addOn in aspectAddOns)
+            foreach (var addOn in aspectAddOns)
             {
-                if(addOn is T addOnT && (condition?.Invoke(addOnT) ?? true))
+                if (addOn is T addOnT && (condition?.Invoke(addOnT) ?? true))
                 {
                     aspectInterface = addOnT;
                     return true;
@@ -52,11 +52,11 @@ namespace FeatureFlowFramework.Aspects
         public bool TryGetAspectInterfaces<T>(out T[] aspectInterfaces, Predicate<T> condition = null)
         {
             LazySlim<List<T>> interfaceList = new LazySlim<List<T>>();
-            if(!objectRef.TryGetTarget(out object obj))
+            if (!objectRef.TryGetTarget(out object obj))
             {
-                if(aspectAddOns.Count == 0)
+                if (aspectAddOns.Count == 0)
                 {
-                    if(obj is T objT && (condition?.Invoke(objT) ?? true))
+                    if (obj is T objT && (condition?.Invoke(objT) ?? true))
                     {
                         aspectInterfaces = objT.ToSingleEntryArray();
                         return true;
@@ -64,13 +64,13 @@ namespace FeatureFlowFramework.Aspects
                 }
                 else
                 {
-                    if(obj is T objT && (condition?.Invoke(objT) ?? true)) interfaceList.Obj.Add(objT);
-                    foreach(var addOn in aspectAddOns)
+                    if (obj is T objT && (condition?.Invoke(objT) ?? true)) interfaceList.Obj.Add(objT);
+                    foreach (var addOn in aspectAddOns)
                     {
-                        if(addOn is T addOnT && (condition?.Invoke(addOnT) ?? true)) interfaceList.Obj.Add(addOnT);
+                        if (addOn is T addOnT && (condition?.Invoke(addOnT) ?? true)) interfaceList.Obj.Add(addOnT);
                     }
 
-                    if(interfaceList.IsInstantiated)
+                    if (interfaceList.IsInstantiated)
                     {
                         aspectInterfaces = interfaceList.Obj.ToArray();
                         return true;

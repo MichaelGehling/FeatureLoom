@@ -8,7 +8,7 @@ namespace FeatureFlowFramework.Helper
         public async static Task<IPAddress> ResolveToIpAddressAsync(this string str, bool useDns = true)
         {
             IPAddress ipAddress;
-            if(useDns)
+            if (useDns)
             {
                 var hostEntry = await Dns.GetHostEntryAsync(str);
                 ipAddress = hostEntry.AddressList[0];

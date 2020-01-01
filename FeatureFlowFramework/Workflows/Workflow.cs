@@ -21,8 +21,10 @@ namespace FeatureFlowFramework.Workflows
         protected long id;
         protected WorkflowExecutionState executionState;
         protected WorkflowExecutionPhase executionPhase = WorkflowExecutionPhase.Prepared;
+
         [JsonIgnore]
         protected WorkflowControlData controlData = WorkflowControlData.Init();
+
         protected LazySlim<Sender> executionInfoSender;
 
         public static IWorkflowRunner defaultRunner = new AsyncRunner();
@@ -31,8 +33,8 @@ namespace FeatureFlowFramework.Workflows
         {
             if (executionInfoSender.IsInstantiated)
             {
-                    var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
-                    childrenInterface.AddChild(executionInfoSender.Obj);     
+                var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
+                childrenInterface.AddChild(executionInfoSender.Obj);
             }
             return true;
         }
@@ -89,9 +91,9 @@ namespace FeatureFlowFramework.Workflows
             set
             {
                 executionPhase = value;
-                if(this.controlData.notRunningWakeEvent != null)
+                if (this.controlData.notRunningWakeEvent != null)
                 {
-                    if(executionPhase != WorkflowExecutionPhase.Running) this.controlData.notRunningWakeEvent.Set();
+                    if (executionPhase != WorkflowExecutionPhase.Running) this.controlData.notRunningWakeEvent.Set();
                     else this.controlData.notRunningWakeEvent.Reset();
                 }
             }
@@ -109,7 +111,7 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> TryLockAsync(TimeSpan timeout)
         {
-            if(RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
+            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
 
             return await controlData.semaphore.WaitAsync(timeout.TotalMilliseconds.ToIntTruncated());
         }
@@ -124,7 +126,7 @@ namespace FeatureFlowFramework.Workflows
             bool success = false;
             try
             {
-                if(controlData.semaphore.Wait(timeout))
+                if (controlData.semaphore.Wait(timeout))
                 {
                     action();
                     success = true;
@@ -139,12 +141,12 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> LockAndExecuteAsync(Action action, TimeSpan timeout)
         {
-            if(RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
+            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
 
             bool success = false;
             try
             {
-                if(await controlData.semaphore.WaitAsync(timeout))
+                if (await controlData.semaphore.WaitAsync(timeout))
                 {
                     action();
                     success = true;
@@ -159,12 +161,12 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> LockAndExecuteAsync(Func<Task> action, TimeSpan timeout)
         {
-            if(RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
+            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
 
             bool success = false;
             try
             {
-                if(await controlData.semaphore.WaitAsync(timeout))
+                if (await controlData.semaphore.WaitAsync(timeout))
                 {
                     await action();
                     success = true;
@@ -182,7 +184,7 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                if(this.controlData.cancellationTokenSource == null) this.controlData.cancellationTokenSource = new CancellationTokenSource();
+                if (this.controlData.cancellationTokenSource == null) this.controlData.cancellationTokenSource = new CancellationTokenSource();
                 return this.controlData.cancellationTokenSource.Token;
             }
         }
@@ -190,7 +192,7 @@ namespace FeatureFlowFramework.Workflows
         public struct ExecutionInfo
         {
             public readonly Workflow workflow;
-            public readonly string executionEvent;      
+            public readonly string executionEvent;
             public readonly WorkflowExecutionState executionState;
             public readonly WorkflowExecutionPhase executionPhase;
 
@@ -209,7 +211,7 @@ namespace FeatureFlowFramework.Workflows
                 this.executionState = context.ExecutionState;
                 this.executionPhase = context.ExecutionPhase;
             }
-        }        
+        }
 
         public class ExecutionEventList
         {
@@ -231,7 +233,7 @@ namespace FeatureFlowFramework.Workflows
         protected Workflow(string name = null)
         {
             executionState = WorkflowStateMachine.InitialExecutionState;
-            if(AddToAspectRegistry) id = this.GetAspectHandle();
+            if (AddToAspectRegistry) id = this.GetAspectHandle();
             else id = RandomGenerator.Int64;
         }
 
@@ -244,12 +246,12 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> ExecuteNextStepAsync(IStepExecutionController controller, TimeSpan timeout = default)
         {
-            if(RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
+            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
 
-            if(!AutoLockingOnExecution) return await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
+            if (!AutoLockingOnExecution) return await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
 
             bool result = true;
-            if(await TryLockAsync(timeout))
+            if (await TryLockAsync(timeout))
             {
                 try
                 {
@@ -265,10 +267,10 @@ namespace FeatureFlowFramework.Workflows
 
         public bool ExecuteNextStep(IStepExecutionController controller, TimeSpan timeout = default)
         {
-            if(!AutoLockingOnExecution) return WorkflowStateMachine.ExecuteNextStep(this, controller);
+            if (!AutoLockingOnExecution) return WorkflowStateMachine.ExecuteNextStep(this, controller);
 
             bool result = true;
-            if(TryLock(timeout))
+            if (TryLock(timeout))
             {
                 try
                 {
@@ -292,7 +294,7 @@ namespace FeatureFlowFramework.Workflows
         public void RequestPause(bool tryCancelWaitingStep)
         {
             controlData.pauseRequested = true;
-            if(tryCancelWaitingStep) this.TryCancelWaiting();
+            if (tryCancelWaitingStep) this.TryCancelWaiting();
         }
 
         public void Run(IWorkflowRunner runner = null)
@@ -303,24 +305,22 @@ namespace FeatureFlowFramework.Workflows
 
         public bool WaitUntilStopsRunning(TimeSpan timeout)
         {
-            if(!IsRunning) return true;
-            if(controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
-            if(timeout == default) timeout = Timeout.InfiniteTimeSpan;
+            if (!IsRunning) return true;
+            if (controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
+            if (timeout == default) timeout = Timeout.InfiniteTimeSpan;
             return controlData.notRunningWakeEvent.Wait(timeout);
         }
 
         public async Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout)
         {
-            if(RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
+            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
 
-            if(!IsRunning) return true;
-            if(controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
+            if (!IsRunning) return true;
+            if (controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
 
-            if(timeout == default) timeout = Timeout.InfiniteTimeSpan;
+            if (timeout == default) timeout = Timeout.InfiniteTimeSpan;
             return await controlData.notRunningWakeEvent.WaitAsync(timeout);
         }
-
-        
 
         [JsonIgnore]
         public bool IsRunning => this.ExecutionPhase == WorkflowExecutionPhase.Running;

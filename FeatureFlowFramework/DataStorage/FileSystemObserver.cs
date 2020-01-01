@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.DataStorage
         private readonly bool createDirectoriesIfNotExisting;
         private readonly NotifyFilters notifyFilters;
 
-        public FileSystemObserver(string path, 
+        public FileSystemObserver(string path,
                                   string filter = "",
                                   bool includeSubdirectories = false,
                                   NotifyFilters notifyFilters = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
@@ -36,17 +36,17 @@ namespace FeatureFlowFramework.DataStorage
 
         private void InitWatchers(bool reset = false)
         {
-            if (createDirectoriesIfNotExisting) Directory.CreateDirectory(path);            
+            if (createDirectoriesIfNotExisting) Directory.CreateDirectory(path);
 
-            if(reset)
+            if (reset)
             {
-                if(fileWatcher != null)
+                if (fileWatcher != null)
                 {
                     fileWatcher.Dispose();
                     fileWatcher = null;
                 }
 
-                if(dirWatcher != null)
+                if (dirWatcher != null)
                 {
                     dirWatcher.Dispose();
                     dirWatcher = null;

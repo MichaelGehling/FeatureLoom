@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.Helper
 
         public static T ToEnum<T>(this string value, T returnIfFailed) where T : struct, Enum
         {
-            if(Enum.TryParse<T>(value, true, out T result))
+            if (Enum.TryParse<T>(value, true, out T result))
             {
                 return result;
             }
@@ -25,9 +25,9 @@ namespace FeatureFlowFramework.Helper
 
         public static T? ToNullableEnum<T>(this string value, T? returnIfFailed) where T : struct, Enum
         {
-            if(!typeof(T).IsEnum) throw new Exception("This method is only for Enums");
+            if (!typeof(T).IsEnum) throw new Exception("This method is only for Enums");
 
-            if(Enum.TryParse<T>(value, true, out T result))
+            if (Enum.TryParse<T>(value, true, out T result))
             {
                 return result;
             }

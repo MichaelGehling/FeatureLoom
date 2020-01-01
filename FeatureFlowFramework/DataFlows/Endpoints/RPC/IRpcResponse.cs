@@ -3,7 +3,7 @@
     public interface IRpcResponse
     {
         long RequestId { get; }
+
         string ResultToJson();
     }
-
 }

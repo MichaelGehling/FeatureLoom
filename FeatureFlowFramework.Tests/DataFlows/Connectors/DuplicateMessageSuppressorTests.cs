@@ -1,9 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
-using Xunit;
+﻿using FeatureFlowFramework.DataFlows.Test;
 using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.DataFlows.Test;
+using System;
 using System.Threading;
+using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -56,7 +55,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             var suppressionTime = 50.Milliseconds();
             var sender = new Sender();
-            var suppressor = new DuplicateMessageSuppressor(suppressionTime, (a,b) =>
+            var suppressor = new DuplicateMessageSuppressor(suppressionTime, (a, b) =>
                 {
                     if (a is int intA && b is int intB)
                     {
@@ -78,6 +77,5 @@ namespace FeatureFlowFramework.DataFlows
             sender.Send(99);
             Assert.Equal(2, counter.Counter);
         }
-
     }
 }

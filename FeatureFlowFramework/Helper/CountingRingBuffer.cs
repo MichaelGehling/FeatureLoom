@@ -25,7 +25,7 @@ namespace FeatureFlowFramework.Helper
         {
             get
             {
-                if(newEntryEvent == null) newEntryEvent = new AsyncManualResetEvent(false);
+                if (newEntryEvent == null) newEntryEvent = new AsyncManualResetEvent(false);
                 return newEntryEvent.AsyncWaitHandle;
             }
         }
@@ -33,7 +33,7 @@ namespace FeatureFlowFramework.Helper
         public long Add(T item)
         {
             buffer[nextIndex++] = item;
-            if(nextIndex >= buffer.Length)
+            if (nextIndex >= buffer.Length)
             {
                 nextIndex = 0;
                 cycled = true;
@@ -53,18 +53,18 @@ namespace FeatureFlowFramework.Helper
 
         public bool Contains(T item)
         {
-            for(int i = 0; i < nextIndex; i++)
+            for (int i = 0; i < nextIndex; i++)
             {
-                if(buffer[i].Equals(item)) return true;
+                if (buffer[i].Equals(item)) return true;
             }
             return false;
         }
 
         public T GetLatest()
         {
-            if(nextIndex == 0)
+            if (nextIndex == 0)
             {
-                if(cycled) return buffer[buffer.Length - 1];
+                if (cycled) return buffer[buffer.Length - 1];
                 else throw new ArgumentOutOfRangeException();
             }
             else return buffer[nextIndex - 1];
@@ -73,10 +73,10 @@ namespace FeatureFlowFramework.Helper
         public bool TryGetFromNumber(long number, out T result)
         {
             result = default;
-            if(number >= counter || counter - number > Length) return false;
+            if (number >= counter || counter - number > Length) return false;
 
             int offset = (int)(counter - number);
-            if(nextIndex - offset >= 0) result = buffer[nextIndex - offset];
+            if (nextIndex - offset >= 0) result = buffer[nextIndex - offset];
             else result = buffer[buffer.Length - offset];
             return true;
         }
@@ -84,9 +84,9 @@ namespace FeatureFlowFramework.Helper
         public T[] GetAvailableSince(long startNumber, out long missed)
         {
             missed = 0;
-            if(startNumber >= counter) return Array.Empty<T>();
+            if (startNumber >= counter) return Array.Empty<T>();
             long numberToCopyLong = counter - startNumber;
-            if(numberToCopyLong > Length)
+            if (numberToCopyLong > Length)
             {
                 missed = numberToCopyLong - Length;
                 numberToCopyLong = Length;
@@ -106,7 +106,7 @@ namespace FeatureFlowFramework.Helper
         public void CopyTo(T[] array, int arrayIndex, int copyLength)
         {
             var leftSpace = array.Length - arrayIndex;
-            if(leftSpace < copyLength || copyLength > Length) throw new ArgumentOutOfRangeException();
+            if (leftSpace < copyLength || copyLength > Length) throw new ArgumentOutOfRangeException();
 
             int frontBufferSize = nextIndex;
             int backBufferSize = Length - nextIndex;
@@ -114,7 +114,7 @@ namespace FeatureFlowFramework.Helper
             int frontBufferStartIndex = frontBufferSize - copyFromFrontBuffer;
             int copyFromBackbuffer = copyLength - copyFromFrontBuffer;
             int backBufferStartIndex = nextIndex + backBufferSize - copyFromBackbuffer;
-            if(copyFromBackbuffer > 0) Array.Copy(buffer, backBufferStartIndex, array, arrayIndex, copyFromBackbuffer);
+            if (copyFromBackbuffer > 0) Array.Copy(buffer, backBufferStartIndex, array, arrayIndex, copyFromBackbuffer);
             Array.Copy(buffer, frontBufferStartIndex, array, arrayIndex + copyFromBackbuffer, copyFromFrontBuffer);
         }
     }

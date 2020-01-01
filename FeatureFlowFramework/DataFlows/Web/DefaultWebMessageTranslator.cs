@@ -20,7 +20,8 @@ namespace FeatureFlowFramework.DataFlows.Web
 
         [JsonIgnore]
         public T TypedMessage { get => message; set => message = value; }
-        public object Message { get => message; set { if(value is T vT) message = vT; else throw new Exception($"This MessageWrapper can only take objects of type {typeof(T)}!"); } }
+
+        public object Message { get => message; set { if (value is T vT) message = vT; else throw new Exception($"This MessageWrapper can only take objects of type {typeof(T)}!"); } }
     }
 
     public interface IWebMessageTranslator
@@ -39,7 +40,7 @@ namespace FeatureFlowFramework.DataFlows.Web
         {
             this.nameToFactory = new Dictionary<string, Func<JObject, object>>();
             this.typeToName = new Dictionary<Type, string>();
-            foreach(var (name, type, factory) in nameTypeFactoryTuples)
+            foreach (var (name, type, factory) in nameTypeFactoryTuples)
             {
                 nameToFactory.Add(name, factory);
                 typeToName.Add(type, name);
@@ -50,14 +51,14 @@ namespace FeatureFlowFramework.DataFlows.Web
         {
             this.nameToFactory = new Dictionary<string, Func<JObject, object>>();
             this.typeToName = new Dictionary<Type, string>();
-            foreach(var (name, type) in nameToTypeName)
+            foreach (var (name, type) in nameToTypeName)
             {
                 try
                 {
                     nameToFactory.Add(name, jObj => jObj.ToObject(type));
                     typeToName.Add(type, name);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Log.ERROR(this, $"Failed creating an factory function! Name:{name} TypeName:{type.Name}", e.ToString());
                 }
@@ -68,7 +69,7 @@ namespace FeatureFlowFramework.DataFlows.Web
         {
             this.nameToFactory = new Dictionary<string, Func<JObject, object>>();
             this.typeToName = new Dictionary<Type, string>();
-            foreach(var (name, typeName) in nameToTypeName)
+            foreach (var (name, typeName) in nameToTypeName)
             {
                 try
                 {
@@ -76,7 +77,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                     nameToFactory.Add(name, jObj => jObj.ToObject(type, Json.Default_Serializer));
                     typeToName.Add(type, name);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Log.ERROR(this, $"Failed creating an factory function! Name:{name} TypeName:{typeName}", e.ToString());
                 }
@@ -90,7 +91,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                 JObject jWrapper = JObject.Parse(json);
                 var typeName = jWrapper.Value<string>("messageType");
 
-                if(nameToFactory.TryGetValue(typeName, out Func<JObject, object> createMessage))
+                if (nameToFactory.TryGetValue(typeName, out Func<JObject, object> createMessage))
                 {
                     JObject jMessage = jWrapper.GetValue("message") as JObject;
                     message = createMessage(jMessage);
@@ -102,7 +103,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                     return false;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR(this, "Failed deserializing message!", e.ToString());
                 message = default;
@@ -114,7 +115,7 @@ namespace FeatureFlowFramework.DataFlows.Web
         {
             try
             {
-                if(typeToName.TryGetValue(message.GetType(), out string typeName))
+                if (typeToName.TryGetValue(message.GetType(), out string typeName))
                 {
                     var wrappedMessage = new WebMessageWrapper<T>(message, typeName);
                     json = wrappedMessage.ToJson();
@@ -127,7 +128,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                     return false;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR(this, "Failed serializing message!", e.ToString());
                 json = null;

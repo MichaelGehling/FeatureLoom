@@ -17,11 +17,11 @@ namespace FeatureFlowFramework.DataStorage
             {
                 try
                 {
-                    if(Reader.TryRead(this.Uri, out string json))
+                    if (Reader.TryRead(this.Uri, out string json))
                     {
                         this.UpdateFromJson(json);
                     }
-                    else if(autoConfigWriteDefault)
+                    else if (autoConfigWriteDefault)
                     {
                         Writer.TryWrite(this.Uri, this);
                     }
@@ -42,7 +42,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static void SetAutoConfigWriteRule(string configUri, bool set)
         {
-            lock(config.autoConfigWriteRules)
+            lock (config.autoConfigWriteRules)
             {
                 config.autoConfigWriteRules[configUri] = set;
             }
@@ -51,15 +51,15 @@ namespace FeatureFlowFramework.DataStorage
         public static void PerformAutoConfigWrite(Configuration configuration, bool ignore)
         {
             // This enforces the static constructor to be called, so its own config can be written
-            if(ignore) return;
+            if (ignore) return;
 
-            lock(config.autoConfigWriteRules)
+            lock (config.autoConfigWriteRules)
             {
-                if(config.autoConfigWriteRules.TryGetValue(configuration.Uri, out bool write))
+                if (config.autoConfigWriteRules.TryGetValue(configuration.Uri, out bool write))
                 {
-                    if(write) configuration.TryWriteToStorage();
+                    if (write) configuration.TryWriteToStorage();
                 }
-                else if(config.autoConfigWriteDefault) configuration.TryWriteToStorage();
+                else if (config.autoConfigWriteDefault) configuration.TryWriteToStorage();
             }
         }
 
@@ -80,7 +80,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             get
             {
-                if(reader == null) reader = Storage.GetReader(ConfigCategory);
+                if (reader == null) reader = Storage.GetReader(ConfigCategory);
                 return reader;
             }
         }
@@ -93,13 +93,13 @@ namespace FeatureFlowFramework.DataStorage
         {
             get
             {
-                if(writer == null) writer = Storage.GetWriter(ConfigCategory);
+                if (writer == null) writer = Storage.GetWriter(ConfigCategory);
                 return writer;
             }
         }
 
         protected void StartSubscription()
-        {            
+        {
             if (!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
             {
                 Log.ERROR("Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
@@ -121,9 +121,9 @@ namespace FeatureFlowFramework.DataStorage
         {
             bool success = false;
             string json = null;
-            if(useSubscription)
+            if (useSubscription)
             {
-                if(!subscriptionReceiver.IsInstantiated)
+                if (!subscriptionReceiver.IsInstantiated)
                 {
                     success = Reader.TryRead(this.Uri, out json);
                     PerformAutoConfigWrite(this, success);
@@ -134,9 +134,8 @@ namespace FeatureFlowFramework.DataStorage
                     if (this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
                     {
                         success = changeUpdate.isValid;
-                        json = changeUpdate.item;                        
+                        json = changeUpdate.item;
                     }
-
                 }
             }
             else
@@ -144,7 +143,7 @@ namespace FeatureFlowFramework.DataStorage
                 success = Reader.TryRead(this.Uri, out json);
                 PerformAutoConfigWrite(this, success);
             }
-            if(success)
+            if (success)
             {
                 try
                 {

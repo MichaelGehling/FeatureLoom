@@ -1,8 +1,5 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Logging;
+﻿using FeatureFlowFramework.Logging;
 using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
@@ -13,9 +10,9 @@ namespace FeatureFlowFramework.Workflows
             AddToRunningWorkflows(workflow);
             try
             {
-                while(workflow.ExecuteNextStep(executionController)) ;
+                while (workflow.ExecuteNextStep(executionController)) ;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Workflow failed! ({workflow.Name})", e.ToString());
             }

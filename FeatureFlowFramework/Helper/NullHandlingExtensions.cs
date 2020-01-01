@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.Helper
         {
             return obj ?? new T();
         }
-        
+
         public static IEnumerable<T> EmptyIfNull<T>(this IEnumerable<T> enumarable)
         {
             return enumarable ?? Enumerable.Empty<T>();
@@ -59,17 +59,17 @@ namespace FeatureFlowFramework.Helper
 
         public static void AddIfNotNull<T>(this ICollection<T> list, T item) where T : class
         {
-            if(item != null) list?.Add(item);
+            if (item != null) list?.Add(item);
         }
 
         public static void InvokeIfNotNull<T>(this Action<T> action, T item) where T : class
         {
-            if(item != null) action?.Invoke(item);
+            if (item != null) action?.Invoke(item);
         }
 
         public static T ItemOrNull<T>(this IList<T> list, int index) where T : class
         {
-            if(index >= 0 && index < list.Count) return list[index];
+            if (index >= 0 && index < list.Count) return list[index];
             else return null;
         }
     }

@@ -1,14 +1,12 @@
 ﻿using System;
-using System.IO.Compression;
 
 namespace FeatureFlowFramework.Helper
 {
-
     public static class OtherExtensions
     {
         public static T GetTargetOrDefault<T>(this WeakReference<T> weakRef, T defaultObj = default) where T : class
         {
-            if(weakRef.TryGetTarget(out T target)) return target;
+            if (weakRef.TryGetTarget(out T target)) return target;
             else return defaultObj;
         }
 
@@ -26,6 +24,5 @@ namespace FeatureFlowFramework.Helper
         {
             return e.InnerException ?? e;
         }
-
     }
 }

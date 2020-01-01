@@ -25,8 +25,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
             config = config ?? new Config();
             this.config = config;
 
-            if(this.config.charEncodingName != null) encoding = Encoding.GetEncoding(config.charEncodingName);
-            if(config.headerStartMarker == null) config.headerStartMarker = "°>";
+            if (this.config.charEncodingName != null) encoding = Encoding.GetEncoding(config.charEncodingName);
+            if (config.headerStartMarker == null) config.headerStartMarker = "°>";
             headerStartMarkerBytes = encoding.GetBytes(config.headerStartMarker);
         }
 
@@ -36,21 +36,21 @@ namespace FeatureFlowFramework.DataFlows.TCP
             {
                 // 0 = undefined 1 = object 2 = string 3 = byte[]
                 byte type = 0;
-                if(!(obj is byte[]) && !(obj is string))
+                if (!(obj is byte[]) && !(obj is string))
                 {
-                    if(type == 0) type = 1;
+                    if (type == 0) type = 1;
                     obj = obj.ToJson(Json.ComplexObjectsStructure_SerializerSettings);
                 }
 
-                if(obj is string strObj)
+                if (obj is string strObj)
                 {
-                    if(type == 0) type = 2;
+                    if (type == 0) type = 2;
                     obj = encoding.GetBytes(strObj);
                 }
 
-                if(obj is byte[] byteObj)
+                if (obj is byte[] byteObj)
                 {
-                    if(type == 0) type = 3;
+                    if (type == 0) type = 3;
                     byte[] lengthInfo = byteObj.Length.ToBytes(config.uselittleEndian);
                     int totalLength = headerStartMarkerBytes.Length + lengthInfo.Length + sizeof(byte) + byteObj.Length;
 
@@ -71,7 +71,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     return buffer;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR(this, "Encoding failed!", e.ToString());
             }
@@ -82,8 +82,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             var restartBufferReadPosition = bufferReadPosition;
             int leftBytes;
-            
-            if(!TryFindStartMarker(buffer, bufferFillState, ref bufferReadPosition))
+
+            if (!TryFindStartMarker(buffer, bufferFillState, ref bufferReadPosition))
             {
                 decodedMessage = null;
                 return DecodingResult.Incomplete;
@@ -92,7 +92,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             bufferReadPosition += headerStartMarkerBytes.Length;
 
             leftBytes = bufferFillState - bufferReadPosition;
-            if(leftBytes < sizeof(int))
+            if (leftBytes < sizeof(int))
             {
                 bufferReadPosition = restartBufferReadPosition;
                 decodedMessage = null;
@@ -102,7 +102,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             bufferReadPosition += sizeof(int);
 
             leftBytes = bufferFillState - bufferReadPosition;
-            if(leftBytes < sizeof(char))
+            if (leftBytes < sizeof(char))
             {
                 bufferReadPosition = restartBufferReadPosition;
                 decodedMessage = null;
@@ -112,7 +112,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             bufferReadPosition += sizeof(byte);
 
             leftBytes = bufferFillState - bufferReadPosition;
-            if(leftBytes < payloadLength)
+            if (leftBytes < payloadLength)
             {
                 bufferReadPosition = restartBufferReadPosition;
                 decodedMessage = null;
@@ -121,7 +121,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
             try
             {
-                switch(type)
+                switch (type)
                 {
                     case 3:
                         byte[] byteResult = new byte[payloadLength];
@@ -145,7 +145,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                         return DecodingResult.Invalid;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.WARNING(this, $"Decoding message payload failed!", e.ToString());
                 decodedMessage = null;
@@ -161,18 +161,18 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             bool startMarkerFound = false;
             int leftBytes = bufferFillState - bufferReadPosition;
-            while(!startMarkerFound && leftBytes >= headerStartMarkerBytes.Length)
+            while (!startMarkerFound && leftBytes >= headerStartMarkerBytes.Length)
             {
                 bool differs = false;
-                for(int i = 0; i < headerStartMarkerBytes.Length; i++)
+                for (int i = 0; i < headerStartMarkerBytes.Length; i++)
                 {
-                    if(buffer[bufferReadPosition + i] != headerStartMarkerBytes[i])
+                    if (buffer[bufferReadPosition + i] != headerStartMarkerBytes[i])
                     {
                         differs = true;
                         continue;
                     }
                 }
-                if(differs) bufferReadPosition++;
+                if (differs) bufferReadPosition++;
                 else startMarkerFound = true;
             }
 

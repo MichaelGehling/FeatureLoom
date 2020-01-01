@@ -106,7 +106,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public bool TryReply(Func<REQ, REP> replyAction)
         {
-            if(TryReceive(out Request<REQ> request) && request.TryGetMessage(out REQ requestMessage))
+            if (TryReceive(out Request<REQ> request) && request.TryGetMessage(out REQ requestMessage))
             {
                 var replyMessage = replyAction(requestMessage);
                 Send(request.CreateReply(replyMessage));
@@ -122,13 +122,13 @@ namespace FeatureFlowFramework.DataFlows
                 StopAutoReply();
                 cancellationTokenSource = new CancellationTokenSource();
                 var token = cancellationTokenSource.Token;
-                while(!token.IsCancellationRequested)
+                while (!token.IsCancellationRequested)
                 {
                     await WaitHandle.WaitAsync(token);
                     TryReply(replyAction);
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR("AutoReply in Replier failed with an exception that was caught!", e.ToString());
             }
@@ -141,7 +141,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void StopAutoReply()
         {
-            if(cancellationTokenSource != null)
+            if (cancellationTokenSource != null)
             {
                 cancellationTokenSource.Cancel();
             }

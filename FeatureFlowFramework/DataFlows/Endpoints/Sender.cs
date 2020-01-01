@@ -6,6 +6,7 @@ namespace FeatureFlowFramework.DataFlows
     internal interface ISender
     {
         void Send<T>(in T message);
+
         Task SendAsync<T>(T message);
     }
 

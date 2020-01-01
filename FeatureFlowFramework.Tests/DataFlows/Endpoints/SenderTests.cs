@@ -1,13 +1,10 @@
 using FeatureFlowFramework.DataFlows.Test;
-using System;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
     public class SenderTests
     {
-
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]
@@ -76,6 +73,5 @@ namespace FeatureFlowFramework.DataFlows
             Assert.Contains(sinkInt1, sender.GetConnectedSinks());
             Assert.Contains(sinkInt2, sender.GetConnectedSinks());
         }
-
     }
 }

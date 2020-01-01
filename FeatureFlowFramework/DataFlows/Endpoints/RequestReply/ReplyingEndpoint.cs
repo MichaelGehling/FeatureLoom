@@ -29,7 +29,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             get
             {
-                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
+                if (alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
                 return alternativeSendingHelper;
             }
         }
@@ -56,10 +56,10 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is IRequest reqWrapper && reqWrapper.TryGetMessage<REQ>(out REQ requestMessage))
+            if (message is IRequest reqWrapper && reqWrapper.TryGetMessage<REQ>(out REQ requestMessage))
             {
                 var (replyMsg, success) = reply(requestMessage);
-                if(success) sendingHelper.Forward(reqWrapper.CreateReply(replyMsg));
+                if (success) sendingHelper.Forward(reqWrapper.CreateReply(replyMsg));
                 else alternativeSendingHelper?.Forward(message);
             }
             else alternativeSendingHelper?.Forward(message);
@@ -67,10 +67,10 @@ namespace FeatureFlowFramework.DataFlows
 
         public async Task PostAsync<M>(M message)
         {
-            if(message is IRequest reqWrapper && reqWrapper.TryGetMessage<REQ>(out REQ requestMessage))
+            if (message is IRequest reqWrapper && reqWrapper.TryGetMessage<REQ>(out REQ requestMessage))
             {
                 var (replyMsg, success) = reply(requestMessage);
-                if(success) await sendingHelper.ForwardAsync(reqWrapper.CreateReply(replyMsg));
+                if (success) await sendingHelper.ForwardAsync(reqWrapper.CreateReply(replyMsg));
                 else await alternativeSendingHelper?.ForwardAsync(message);
             }
             else await alternativeSendingHelper?.ForwardAsync(message);
@@ -79,7 +79,7 @@ namespace FeatureFlowFramework.DataFlows
         private Func<T, (R, bool)> WrapInTryCatchIfAsync<T, R>(Func<T, (R, bool)> function, bool logOnException = true)
         {
             Func<T, (R, bool)> result = function;
-            if(function.Method.GetCustomAttribute(typeof(AsyncStateMachineAttribute)) != null)
+            if (function.Method.GetCustomAttribute(typeof(AsyncStateMachineAttribute)) != null)
             {
                 result = t =>
                 {
@@ -87,9 +87,9 @@ namespace FeatureFlowFramework.DataFlows
                     {
                         return function(t);
                     }
-                    catch(Exception e)
+                    catch (Exception e)
                     {
-                        if(logOnException) Log.ERROR($"Async function in ReplyingEndpoint failed with an exception that was caught! ", e.ToString());
+                        if (logOnException) Log.ERROR($"Async function in ReplyingEndpoint failed with an exception that was caught! ", e.ToString());
                         return (default, false);
                     }
                 };

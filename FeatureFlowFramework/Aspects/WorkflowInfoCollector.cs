@@ -1,18 +1,16 @@
-﻿using System;
+﻿using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.Workflows;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Workflows;
 
 namespace FeatureFlowFramework.Aspects
 {
     public class WorkflowInfoCollector
     {
-        readonly Dictionary<long, AspectData> workflows = new Dictionary<long, AspectData>();
-        readonly ProcessingEndpoint<AspectRegistry.ObjectAddedNotification> addListner;
-        readonly ProcessingEndpoint<AspectRegistry.ObjectRemovedNotification> removeListner;
-        readonly ProcessingEndpoint<AspectRegistry.ActivationStatusNotification> activationListner;
+        private readonly Dictionary<long, AspectData> workflows = new Dictionary<long, AspectData>();
+        private readonly ProcessingEndpoint<AspectRegistry.ObjectAddedNotification> addListner;
+        private readonly ProcessingEndpoint<AspectRegistry.ObjectRemovedNotification> removeListner;
+        private readonly ProcessingEndpoint<AspectRegistry.ActivationStatusNotification> activationListner;
 
         public WorkflowInfoCollector()
         {
@@ -20,26 +18,26 @@ namespace FeatureFlowFramework.Aspects
             removeListner = new ProcessingEndpoint<AspectRegistry.ObjectRemovedNotification>(msg => workflows.Remove(msg.objectHandle), workflows);
             activationListner = new ProcessingEndpoint<AspectRegistry.ActivationStatusNotification>(msg =>
             {
-                if(!msg.isActive) workflows.Clear();
+                if (!msg.isActive) workflows.Clear();
             }, workflows);
 
             AspectRegistry.NotificationSource.ConnectTo(addListner);
             AspectRegistry.NotificationSource.ConnectTo(removeListner);
             AspectRegistry.NotificationSource.ConnectTo(activationListner);
-            lock(workflows)
+            lock (workflows)
             {
-                foreach(var data in AspectRegistry.GetAllAspectData())
+                foreach (var data in AspectRegistry.GetAllAspectData())
                 {
-                    if(data.TryGetAspectInterface(out Workflow wf)) workflows.Add(data.ObjectHandle, data);
+                    if (data.TryGetAspectInterface(out Workflow wf)) workflows.Add(data.ObjectHandle, data);
                 }
-            }        
+            }
         }
 
         public IEnumerable<Workflow> AllWorkflows
         {
             get
             {
-                lock(workflows)
+                lock (workflows)
                 {
                     return workflows.Values.Select(data =>
                     {
@@ -48,13 +46,11 @@ namespace FeatureFlowFramework.Aspects
                     }).Where(wf => wf != default);
                 }
             }
-        }    
-        
+        }
+
         private void AddStateInfo(AspectData aspectData)
         {
             //aspectData.TryGetAspectInterface(out IWorkflowInfo)
         }
-
     }
-
 }

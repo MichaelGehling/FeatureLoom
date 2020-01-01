@@ -56,7 +56,7 @@ namespace FeatureFlowFramework.DataFlows.Web
 
         public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if(!request.IsPost)
+            if (!request.IsPost)
             {
                 response.StatusCode = HttpStatusCode.MethodNotAllowed;
                 await response.WriteAsync("Use 'POST' to send messages!");
@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.DataFlows.Web
             try
             {
                 string bodyString = await request.ReadAsync();
-                if(translator.TryTranslate(bodyString, out object message))
+                if (translator.TryTranslate(bodyString, out object message))
                 {
                     await sendingHelper.ForwardAsync(message);
                 }
@@ -76,7 +76,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                     response.StatusCode = HttpStatusCode.InternalServerError;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR(this, $"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;

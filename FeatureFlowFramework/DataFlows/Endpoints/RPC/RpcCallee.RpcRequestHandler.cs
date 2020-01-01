@@ -6,11 +6,11 @@ namespace FeatureFlowFramework.DataFlows.RPC
 {
     public partial class RpcCallee
     {
-        class RpcRequestHandler<P1, R> : IRpcRequestHandler
+        private class RpcRequestHandler<P1, R> : IRpcRequestHandler
         {
-            Func<P1, R> method;
-            readonly string name;
-            DataFlowSourceHelper target;
+            private Func<P1, R> method;
+            private readonly string name;
+            private DataFlowSourceHelper target;
 
             public RpcRequestHandler(string name, Func<P1, R> method)
             {
@@ -25,7 +25,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
             public bool Handle<M>(in M message)
             {
-                if(message is RpcRequest<P1, R> myRequest && myRequest.method == this.name)
+                if (message is RpcRequest<P1, R> myRequest && myRequest.method == this.name)
                 {
                     HandleRpcRequest(myRequest);
                     return true;
@@ -36,7 +36,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                     {
                         HandleRpcRequest(rpcRequest);
                         return true;
-                    }                    
+                    }
                 }
                 return false;
             }
@@ -68,7 +68,5 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 }
             }
         }
-
     }
-
 }

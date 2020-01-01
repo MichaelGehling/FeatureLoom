@@ -5,11 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
-using System.Linq;
 using System.Runtime.Caching;
 using System.Text;
 using System.Threading.Tasks;
-using static FeatureFlowFramework.Helper.OtherExtensions;
 
 namespace FeatureFlowFramework.DataStorage
 {
@@ -36,13 +34,13 @@ namespace FeatureFlowFramework.DataStorage
         private Config config;
         private readonly string category;
         private DirectoryInfo rootDir;
-        CacheItemPolicy cacheItemPolicy;
+        private CacheItemPolicy cacheItemPolicy;
         private readonly MemoryCache cache;
-        HashSet<string> fileSet = new HashSet<string>();
+        private HashSet<string> fileSet = new HashSet<string>();
         private Dictionary<string, Subscription> subscriptions = new Dictionary<string, Subscription>();
         public string Category => category;
 
-        bool fileSystemObservationActive = false;
+        private bool fileSystemObservationActive = false;
         private FileSystemObserver fileObserver;
         private ProcessingEndpoint<FileSystemObserver.ChangeNotification> fileChangeProcessor;
         private DuplicateMessageSuppressor duplicateMessageSuppressor;
@@ -52,19 +50,19 @@ namespace FeatureFlowFramework.DataStorage
             this.category = category;
             this.config = config ?? new Config();
             config = this.config;
-            if(config.configUri == null) config.configUri += config.Uri + "_" + category;
+            if (config.configUri == null) config.configUri += config.Uri + "_" + category;
             if (config.ConfigCategory != category) config.TryUpdateFromStorage(false);
             config.configUri = configUri ?? config.configUri;
 
             string basePath = config.basePath;
-            if(config.useCategoryFolder) basePath = Path.Combine(config.basePath, category);
+            if (config.useCategoryFolder) basePath = Path.Combine(config.basePath, category);
             rootDir = new DirectoryInfo(basePath);
 
-            lock(fileSet)
+            lock (fileSet)
             {
                 fileSet = CreateNewFileSet();
             }
-            if(config.updateCacheForSubscription || config.updateCacheOnRead || config.updateCacheOnWrite)
+            if (config.updateCacheForSubscription || config.updateCacheOnRead || config.updateCacheOnWrite)
             {
                 NameValueCollection cacheConfig = new NameValueCollection();
                 cacheConfig.Add("cacheMemoryLimitMegabytes", config.cacheSizeInMb.ToString());
@@ -74,14 +72,14 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        void ActivateFileSystemObservation(bool activate)
+        private void ActivateFileSystemObservation(bool activate)
         {
-            if(activate && !fileSystemObservationActive)
+            if (activate && !fileSystemObservationActive)
             {
                 fileObserver = new FileSystemObserver(rootDir.FullName, "*" + config.fileSuffix, true);
                 duplicateMessageSuppressor = new DuplicateMessageSuppressor(config.duplicateFileEventSuppressionTime, (m1, m2) =>
                 {
-                    if(m1 is FileSystemObserver.ChangeNotification notification1 &&
+                    if (m1 is FileSystemObserver.ChangeNotification notification1 &&
                         m2 is FileSystemObserver.ChangeNotification notification2 &&
                         notification1.changeType == WatcherChangeTypes.Changed &&
                         notification2.changeType == WatcherChangeTypes.Created &&
@@ -112,14 +110,14 @@ namespace FeatureFlowFramework.DataStorage
                 ActivateFileSystemObservation(false);
             }
 
-            if(notification.changeType.HasFlag(WatcherChangeTypes.Deleted))
+            if (notification.changeType.HasFlag(WatcherChangeTypes.Deleted))
             {
                 bool removed;
-                lock(fileSet)
+                lock (fileSet)
                 {
                     removed = fileSet.Remove(notification.path);
                 }
-                if(removed)
+                if (removed)
                 {
                     string uri = FilePathToUri(notification.path);
                     cache?.Remove(uri);
@@ -134,26 +132,26 @@ namespace FeatureFlowFramework.DataStorage
             {
                 DirectoryInfo directoryInfo = new DirectoryInfo(notification.path);
 
-                if(!directoryInfo.Attributes.HasFlag(FileAttributes.Directory))
+                if (!directoryInfo.Attributes.HasFlag(FileAttributes.Directory))
                 {
-                    if(notification.changeType.HasFlag(WatcherChangeTypes.Changed))
+                    if (notification.changeType.HasFlag(WatcherChangeTypes.Changed))
                     {
                         string uri = FilePathToUri(notification.path);
                         cache?.Remove(uri);
                         NotifySubscriptions(uri, UpdateEvent.Updated);
                     }
-                    else if(notification.changeType.HasFlag(WatcherChangeTypes.Created))
+                    else if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
                     {
-                        lock(fileSet)
+                        lock (fileSet)
                         {
                             fileSet.Add(notification.path);
                         }
                         string uri = FilePathToUri(notification.path);
                         NotifySubscriptions(uri, UpdateEvent.Created);
                     }
-                    else if(notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
+                    else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
                     {
-                        lock(fileSet)
+                        lock (fileSet)
                         {
                             fileSet.Remove(notification.oldPath);
                             fileSet.Add(notification.path);
@@ -166,28 +164,28 @@ namespace FeatureFlowFramework.DataStorage
                     }
                 }
                 else
-                {                   
-                    if(notification.changeType.HasFlag(WatcherChangeTypes.Created))
+                {
+                    if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
                     {
-                        var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);                        
-                        foreach(var fileInfo in addedFileInfos)
+                        var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
+                        foreach (var fileInfo in addedFileInfos)
                         {
-                            lock(fileSet)
+                            lock (fileSet)
                             {
                                 fileSet.Add(fileInfo.FullName);
                             }
                             string uri = FilePathToUri(fileInfo.FullName);
                             NotifySubscriptions(uri, UpdateEvent.Created);
-                        }                        
+                        }
                     }
-                    else if(notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
+                    else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
                     {
                         UpdateOnRemovedDir();
 
                         var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
-                        foreach(var fileInfo in addedFileInfos)
+                        foreach (var fileInfo in addedFileInfos)
                         {
-                            lock(fileSet)
+                            lock (fileSet)
                             {
                                 fileSet.Add(fileInfo.FullName);
                             }
@@ -202,10 +200,10 @@ namespace FeatureFlowFramework.DataStorage
         private void UpdateOnRemovedDir()
         {
             var newFileSet = CreateNewFileSet();
-            lock(fileSet)
+            lock (fileSet)
             {
                 fileSet.ExceptWith(newFileSet);
-                foreach(var fileName in fileSet)
+                foreach (var fileName in fileSet)
                 {
                     string uri = FilePathToUri(fileName);
                     cache?.Remove(uri);
@@ -217,24 +215,24 @@ namespace FeatureFlowFramework.DataStorage
 
         private void UpdateCacheForSubscriptions(ChangeNotification changeNotification)
         {
-            if(changeNotification.updateEvent == UpdateEvent.Removed) return;
+            if (changeNotification.updateEvent == UpdateEvent.Removed) return;
 
-            if(config.updateCacheForSubscription)
+            if (config.updateCacheForSubscription)
             {
                 string filePath = UriToFilePath(changeNotification.uri);
                 FileInfo fileInfo = new FileInfo(filePath);
-                if(fileInfo.Exists)
+                if (fileInfo.Exists)
                 {
                     try
                     {
-                        using(var stream = fileInfo.OpenText())
+                        using (var stream = fileInfo.OpenText())
                         {
-                            if(config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                            if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                             var fileContent = stream.ReadToEnd();
                             cache?.Add(changeNotification.uri, fileContent, cacheItemPolicy);
                         }
                     }
-                    catch(Exception e)
+                    catch (Exception e)
                     {
                         cache?.Remove(changeNotification.uri);
                         Log.WARNING($"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
@@ -243,38 +241,36 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        
-
         private HashSet<string> CreateNewFileSet()
         {
-            if(!rootDir.RefreshAnd().Exists) return new HashSet<string>();
+            if (!rootDir.RefreshAnd().Exists) return new HashSet<string>();
 
-            var fileInfos = rootDir.GetFiles("*"+config.fileSuffix, SearchOption.AllDirectories);
+            var fileInfos = rootDir.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
             var newFileSet = new HashSet<string>();
-            foreach(var info in fileInfos)
+            foreach (var info in fileInfos)
             {
                 newFileSet.Add(info.FullName);
-            }            
+            }
             return newFileSet;
         }
 
         private void NotifySubscriptions(string uri, UpdateEvent updateEvent, bool updateCache = true)
-        {            
+        {
             var subscriptions = this.subscriptions;
             List<Subscription> toBeRemoved = null;
-            foreach(var subscription in subscriptions.Values)
+            foreach (var subscription in subscriptions.Values)
             {
-                if(subscription.sender.CountConnectedSinks == 0)
+                if (subscription.sender.CountConnectedSinks == 0)
                 {
-                    if(toBeRemoved == null) toBeRemoved = new List<Subscription>();
+                    if (toBeRemoved == null) toBeRemoved = new List<Subscription>();
                     toBeRemoved.Add(subscription);
                 }
                 else
                 {
-                    if(uri.MatchesWildcard(subscription.uriPattern))
+                    if (uri.MatchesWildcard(subscription.uriPattern))
                     {
                         var changeNotification = new ChangeNotification(this.category, uri, updateEvent, AppTime.Now);
-                        if(updateCache)
+                        if (updateCache)
                         {
                             UpdateCacheForSubscriptions(changeNotification);
                             updateCache = false;
@@ -283,7 +279,7 @@ namespace FeatureFlowFramework.DataStorage
                     }
                 }
             }
-        }        
+        }
 
         private readonly struct Subscription
         {
@@ -299,10 +295,10 @@ namespace FeatureFlowFramework.DataStorage
 
         public bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink)
         {
-            if(!subscriptions.TryGetValue(uriPattern, out Subscription subscription)) 
+            if (!subscriptions.TryGetValue(uriPattern, out Subscription subscription))
             {
                 ActivateFileSystemObservation(true);
-                lock(subscriptions)
+                lock (subscriptions)
                 {
                     var newSubscriptions = new Dictionary<string, Subscription>(subscriptions);
                     subscription = new Subscription(uriPattern, new Sender());
@@ -316,7 +312,7 @@ namespace FeatureFlowFramework.DataStorage
 
         protected virtual string FilePathToUri(string filePath)
         {
-            if(!filePath.StartsWith(rootDir.FullName) || !filePath.EndsWith(config.fileSuffix)) return null;
+            if (!filePath.StartsWith(rootDir.FullName) || !filePath.EndsWith(config.fileSuffix)) return null;
 
             int basePathLength = rootDir.FullName.Length + 1;
             var rawUri = filePath.Substring(basePathLength, filePath.Length - basePathLength - config.fileSuffix.Length);
@@ -332,7 +328,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             data = default;
 
-            if(str is T strObj)
+            if (str is T strObj)
             {
                 data = strObj;
                 return true;
@@ -354,7 +350,7 @@ namespace FeatureFlowFramework.DataStorage
 
         protected virtual bool TrySerialize<T>(T data, out string str)
         {
-            if(data is string strData)
+            if (data is string strData)
             {
                 str = strData;
                 return true;
@@ -366,7 +362,7 @@ namespace FeatureFlowFramework.DataStorage
                     str = data.ToJson();
                     return true;
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Log.ERROR("Failed serializing persiting object", e.ToString());
                     str = default;
@@ -383,35 +379,35 @@ namespace FeatureFlowFramework.DataStorage
         public async Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null)
         {
             try
-            {                                
-                if(this.fileSystemObservationActive)
+            {
+                if (this.fileSystemObservationActive)
                 {
-                    lock(fileSet)
+                    lock (fileSet)
                     {
                         if (fileSet.Count == 0) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
 
                         var uris = new List<string>();
-                        foreach(var fileName in fileSet)
+                        foreach (var fileName in fileSet)
                         {
                             string uri = FilePathToUri(fileName);
-                            if(pattern == null || uri.MatchesWildcard(pattern))
+                            if (pattern == null || uri.MatchesWildcard(pattern))
                             {
                                 uris.Add(uri);
                             }
                         }
                         return new AsyncOutResult<bool, string[]>(true, uris.ToArray());
-                    }                    
+                    }
                 }
                 else
                 {
-                    if(!rootDir.RefreshAnd().Exists) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
+                    if (!rootDir.RefreshAnd().Exists) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
 
                     var uris = new List<string>();
                     var files = await rootDir.GetFilesAsync($"*{config.fileSuffix}", SearchOption.AllDirectories);
-                    foreach(var file in files)
+                    foreach (var file in files)
                     {
                         string uri = FilePathToUri(file.FullName);
-                        if(pattern == null || uri.MatchesWildcard(pattern))
+                        if (pattern == null || uri.MatchesWildcard(pattern))
                         {
                             uris.Add(uri);
                         }
@@ -419,7 +415,7 @@ namespace FeatureFlowFramework.DataStorage
                     return new AsyncOutResult<bool, string[]>(true, uris.ToArray());
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR("Reading files to retreive Uris failed!", e.ToString());
                 return new AsyncOutResult<bool, string[]>(false, null);
@@ -430,21 +426,21 @@ namespace FeatureFlowFramework.DataStorage
         {
             try
             {
-                if(cache?.Get(uri) is string cacheString)
+                if (cache?.Get(uri) is string cacheString)
                 {
                     return TryDeserialize(cacheString, out data);
                 }
 
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
-                if(fileInfo.Exists)
+                if (fileInfo.Exists)
                 {
-                    using(var stream = fileInfo.OpenText())
+                    using (var stream = fileInfo.OpenText())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         var fileContent = stream.ReadToEnd();
 
-                        if(config.updateCacheOnRead)
+                        if (config.updateCacheOnRead)
                         {
                             cache?.Add(uri, fileContent, cacheItemPolicy);
                         }
@@ -470,23 +466,22 @@ namespace FeatureFlowFramework.DataStorage
                 T data = default;
                 bool success = false;
 
-                if(cache?.Get(uri) is string cacheString)
+                if (cache?.Get(uri) is string cacheString)
                 {
                     success = TryDeserialize(cacheString, out data);
                     return new AsyncOutResult<bool, T>(success, data);
                 }
 
-                
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
-                if(fileInfo.Exists)
+                if (fileInfo.Exists)
                 {
-                    using(var stream = fileInfo.OpenText())
+                    using (var stream = fileInfo.OpenText())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         var fileContent = await stream.ReadToEndAsync();
 
-                        if(config.updateCacheOnRead)
+                        if (config.updateCacheOnRead)
                         {
                             cache?.Add(uri, fileContent, cacheItemPolicy);
                         }
@@ -507,7 +502,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             try
             {
-                if(cache?.Get(uri) is string cacheString)
+                if (cache?.Get(uri) is string cacheString)
                 {
                     var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
                     stream.CopyTo(targetStream);
@@ -516,16 +511,16 @@ namespace FeatureFlowFramework.DataStorage
 
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
-                if(fileInfo.Exists)
+                if (fileInfo.Exists)
                 {
-                    using(var stream = fileInfo.OpenRead())
+                    using (var stream = fileInfo.OpenRead())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
 
-                        if(config.updateCacheOnRead)
+                        if (config.updateCacheOnRead)
                         {
-                            using(var memoryStream = new MemoryStream())
-                            using(var textReader = new StreamReader(memoryStream))
+                            using (var memoryStream = new MemoryStream())
+                            using (var textReader = new StreamReader(memoryStream))
                             {
                                 stream.CopyTo(memoryStream);
                                 memoryStream.Position = 0;
@@ -555,7 +550,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             try
             {
-                if(cache?.Get(uri) is string cacheString)
+                if (cache?.Get(uri) is string cacheString)
                 {
                     var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
                     await stream.CopyToAsync(targetStream);
@@ -564,21 +559,21 @@ namespace FeatureFlowFramework.DataStorage
 
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
-                if(fileInfo.Exists)
+                if (fileInfo.Exists)
                 {
-                    using(var stream = fileInfo.OpenRead())
+                    using (var stream = fileInfo.OpenRead())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
 
-                        if(config.updateCacheOnRead)
+                        if (config.updateCacheOnRead)
                         {
-                            using(var memoryStream = new MemoryStream())
-                            using(var textReader = new StreamReader(memoryStream))
+                            using (var memoryStream = new MemoryStream())
+                            using (var textReader = new StreamReader(memoryStream))
                             {
                                 await stream.CopyToAsync(memoryStream);
                                 memoryStream.Position = 0;
                                 await memoryStream.CopyToAsync(targetStream);
-                                memoryStream.Position = 0;                                
+                                memoryStream.Position = 0;
                                 string fileContent = await textReader.ReadToEndAsync();
                                 cache?.Add(uri, fileContent, cacheItemPolicy);
                             }
@@ -607,30 +602,30 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                if(TrySerialize(data, out string fileContent))
+                if (TrySerialize(data, out string fileContent))
                 {
-                    if(config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
-                    {                        
+                    if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
+                    {
                         cache?.Add(uri, fileContent, cacheItemPolicy);
-                        if(fileSystemObservationActive)
+                        if (fileSystemObservationActive)
                         {
                             UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
                             NotifySubscriptions(uri, updateEvent, false);
-                            if(updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                            if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
                             else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                         }
                     }
 
-                    using(var stream = fileInfo.CreateText())
+                    using (var stream = fileInfo.CreateText())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         stream.Write(fileContent);
                         return true;
                     }
                 }
                 else return false;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
@@ -645,30 +640,30 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                if(TrySerialize(data, out string fileContent))
+                if (TrySerialize(data, out string fileContent))
                 {
-                    if(config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
-                    {                        
+                    if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
+                    {
                         cache?.Add(uri, fileContent, cacheItemPolicy);
-                        if(fileSystemObservationActive)
+                        if (fileSystemObservationActive)
                         {
                             UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
                             NotifySubscriptions(uri, updateEvent, false);
-                            if(updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                            if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
                             else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                         }
                     }
 
-                    using(var stream = fileInfo.CreateText())
+                    using (var stream = fileInfo.CreateText())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         await stream.WriteAsync(fileContent);
                         return true;
                     }
                 }
                 else return false;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
@@ -684,9 +679,9 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                if(config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
+                if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
                 {
-                    if(!sourceStream.CanSeek)
+                    if (!sourceStream.CanSeek)
                     {
                         MemoryStream memoryStream = new MemoryStream();
                         sourceStream.CopyTo(memoryStream);
@@ -696,37 +691,37 @@ namespace FeatureFlowFramework.DataStorage
                     }
                     string fileContent;
                     var origPosition = sourceStream.Position;
-                    // Without using, otherwise the streamreader would dispose the stream already here!   
+                    // Without using, otherwise the streamreader would dispose the stream already here!
                     var textReader = new StreamReader(sourceStream);
                     fileContent = textReader.ReadToEnd();
-                    sourceStream.Position = origPosition;                    
+                    sourceStream.Position = origPosition;
                     cache?.Add(uri, fileContent, cacheItemPolicy);
 
-                    if(fileSystemObservationActive)
+                    if (fileSystemObservationActive)
                     {
                         UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
                         NotifySubscriptions(uri, updateEvent, false);
-                        if(updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                        if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
                         else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                     }
                 }
 
-                using(var stream = fileInfo.OpenWrite())
+                using (var stream = fileInfo.OpenWrite())
                 {
-                    if(config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                    if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.SetLength(0);
                     sourceStream.CopyTo(stream);
                     return true;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
             finally
             {
-                if(disposeStream) sourceStream.Dispose();
+                if (disposeStream) sourceStream.Dispose();
             }
         }
 
@@ -739,9 +734,9 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                if(config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
+                if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
                 {
-                    if(!sourceStream.CanSeek)
+                    if (!sourceStream.CanSeek)
                     {
                         MemoryStream memoryStream = new MemoryStream();
                         await sourceStream.CopyToAsync(memoryStream);
@@ -754,34 +749,34 @@ namespace FeatureFlowFramework.DataStorage
                     // Without using, otherwise the streamreader would dispose the stream already here!
                     var textReader = new StreamReader(sourceStream);
                     fileContent = await textReader.ReadToEndAsync();
-                    sourceStream.Position = origPosition;                    
+                    sourceStream.Position = origPosition;
                     cache?.Add(uri, fileContent, cacheItemPolicy);
 
-                    if(fileSystemObservationActive)
+                    if (fileSystemObservationActive)
                     {
                         UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
                         NotifySubscriptions(uri, updateEvent, false);
-                        if(updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                        if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
                         else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                     }
                 }
 
-                using(var stream = fileInfo.OpenWrite())
+                using (var stream = fileInfo.OpenWrite())
                 {
-                    if(config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                    if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.SetLength(0);
                     await sourceStream.CopyToAsync(stream);
                     return true;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
             finally
             {
-                if(disposeStream) sourceStream.Dispose();
+                if (disposeStream) sourceStream.Dispose();
             }
         }
 
@@ -793,18 +788,18 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                if(TrySerialize(data, out string fileContent))
-                {                    
-                    using(var stream = fileInfo.AppendText())
+                if (TrySerialize(data, out string fileContent))
+                {
+                    using (var stream = fileInfo.AppendText())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         stream.Write(fileContent);
                         return true;
                     }
                 }
                 else return false;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
@@ -819,18 +814,18 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                if(TrySerialize(data, out string fileContent))
+                if (TrySerialize(data, out string fileContent))
                 {
-                    using(var stream = fileInfo.AppendText())
+                    using (var stream = fileInfo.AppendText())
                     {
-                        if(config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         await stream.WriteAsync(fileContent);
                         return true;
                     }
                 }
                 else return false;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
@@ -845,15 +840,15 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                using(var stream = fileInfo.OpenWrite())
+                using (var stream = fileInfo.OpenWrite())
                 {
-                    if(config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                    if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.Seek(0, SeekOrigin.End);
                     sourceStream.CopyTo(stream);
                     return true;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
@@ -868,15 +863,15 @@ namespace FeatureFlowFramework.DataStorage
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                using(var stream = fileInfo.OpenWrite())
+                using (var stream = fileInfo.OpenWrite())
                 {
-                    if(config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                    if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.Seek(0, SeekOrigin.End);
                     await sourceStream.CopyToAsync(stream);
                     return true;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
@@ -891,10 +886,10 @@ namespace FeatureFlowFramework.DataStorage
             try
             {
                 cache?.Remove(uri);
-                if(fileInfo.Exists) fileInfo.Delete();
+                if (fileInfo.Exists) fileInfo.Delete();
                 return true;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Log.ERROR($"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
                 return false;
@@ -905,6 +900,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             return Task.FromResult(TryDelete(uri));
         }
+
         private class FileSubscriptionStatus
         {
             public FileInfo fileInfo;
@@ -921,7 +917,7 @@ namespace FeatureFlowFramework.DataStorage
                 get
                 {
                     bool changed = fileInfo.ChangedSince(fileInfoStatus);
-                    if(changed) fileInfoStatus = fileInfo.GetFileInfoStatus();
+                    if (changed) fileInfoStatus = fileInfo.GetFileInfoStatus();
                     return changed;
                 }
             }

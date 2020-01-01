@@ -35,24 +35,24 @@ namespace FeatureFlowFramework.Workflows
             {
                 List<IStateInfo> targetStates = null;
                 var nextElse = doElse;
-                while(nextElse != null)
+                while (nextElse != null)
                 {
-                    if(nextElse.targetState != null)
+                    if (nextElse.targetState != null)
                     {
-                        if(targetStates == null) targetStates = new List<IStateInfo>();
+                        if (targetStates == null) targetStates = new List<IStateInfo>();
                         targetStates.Add(nextElse.targetState);
                     }
                     nextElse = nextElse.doElse;
                 }
 
-                if(targetStates == null)
+                if (targetStates == null)
                 {
-                    if(targetState == null) return new IStateInfo[] { };
+                    if (targetState == null) return new IStateInfo[] { };
                     else return new IStateInfo[] { targetState };
                 }
                 else
                 {
-                    if(targetState != null) targetStates.Add(targetState);
+                    if (targetState != null) targetStates.Add(targetState);
                     return targetStates.ToArray();
                 }
             }
@@ -62,11 +62,11 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                if(finishStateMachine) return true;
+                if (finishStateMachine) return true;
                 var nextElse = doElse;
-                while(nextElse != null)
+                while (nextElse != null)
                 {
-                    if(nextElse.finishStateMachine) return true;
+                    if (nextElse.finishStateMachine) return true;
                     nextElse = nextElse.doElse;
                 }
                 return false;
@@ -77,7 +77,7 @@ namespace FeatureFlowFramework.Workflows
 
         public void AddUsingResource(Func<CT, object> resourceDelegate)
         {
-            if(usingResourcesDelegates == null) usingResourcesDelegates = new List<Func<CT, object>>();
+            if (usingResourcesDelegates == null) usingResourcesDelegates = new List<Func<CT, object>>();
             usingResourcesDelegates.Add(resourceDelegate);
         }
     }

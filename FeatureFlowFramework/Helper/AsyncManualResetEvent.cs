@@ -14,7 +14,7 @@ namespace FeatureFlowFramework.Helper
 
         public AsyncManualResetEvent(bool initialState)
         {
-            if(initialState) Set();
+            if (initialState) Set();
         }
 
         public bool IsSet => tcs.Task.IsCompleted;
@@ -74,14 +74,14 @@ namespace FeatureFlowFramework.Helper
 
         public void Reset()
         {
-            if(!IsSet) return;
+            if (!IsSet) return;
             TaskCompletionSource<bool> oldTcs, newTcs;
             do
             {
                 oldTcs = this.tcs;
                 newTcs = new TaskCompletionSource<bool>();
             }
-            while(IsSet && this.tcs != Interlocked.CompareExchange(ref this.tcs, newTcs, oldTcs));
+            while (IsSet && this.tcs != Interlocked.CompareExchange(ref this.tcs, newTcs, oldTcs));
         }
 
         public void SetAndReset()

@@ -8,7 +8,7 @@
         {
             get
             {
-                if(webServer == null) webServer = new DefaultWebServer();
+                if (webServer == null) webServer = new DefaultWebServer();
                 return webServer;
             }
             set
