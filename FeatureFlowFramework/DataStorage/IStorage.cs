@@ -1,6 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helper;
-using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -25,64 +24,6 @@ namespace FeatureFlowFramework.DataStorage
         Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null);
 
         bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink);
-    }
-
-    public static class StorageReaderExtensions
-    {
-        public static bool TrySubscribeForChangeUpdate<T>(this IStorageReader reader, string uriPattern, IDataFlowSink updateSink)
-        {
-            var converter = new MessageConverter<ChangeNotification, ChangeUpdate<T>>(note => new ChangeUpdate<T>(note, reader));
-            if (reader.TrySubscribeForChangeNotifications(uriPattern, converter))
-            {
-                converter.KeepAlive(updateSink);
-                converter.ConnectTo(updateSink);
-                return true;
-            }
-            return false;
-        }
-    }
-
-    public readonly struct ChangeNotification
-    {
-        public readonly string category;
-        public readonly string uri;
-        public readonly UpdateEvent updateEvent;
-        public readonly DateTime timestamp;
-
-        public ChangeNotification(string category, string uri, UpdateEvent updateEvent, DateTime timestamp)
-        {
-            this.category = category;
-            this.uri = uri;
-            this.updateEvent = updateEvent;
-            this.timestamp = timestamp;
-        }
-    }
-
-    public readonly struct ChangeUpdate<T>
-    {
-        public readonly string category;
-        public readonly string uri;
-        public readonly UpdateEvent updateEvent;
-        public readonly DateTime timestamp;
-        public readonly bool isValid;
-        public readonly T item;
-
-        public ChangeUpdate(ChangeNotification notification, IStorageReader reader = null)
-        {
-            this.category = notification.category;
-            this.uri = notification.uri;
-            this.updateEvent = notification.updateEvent;
-            this.timestamp = notification.timestamp;
-            reader = reader ?? Storage.GetReader(category);
-            isValid = reader.TryRead<T>(uri, out item);
-        }
-    }
-
-    public enum UpdateEvent
-    {
-        Created,
-        Updated,
-        Removed
     }
 
     public interface IStorageWriter
