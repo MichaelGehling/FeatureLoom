@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helper;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -23,5 +24,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 base.Post(request);
             }
         }
+
+        public IAsyncWaitHandle WaitHandle => queue.WaitHandle;
     }
 }
