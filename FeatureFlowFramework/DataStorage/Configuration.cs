@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.DataStorage
     {
         public class Config : Configuration
         {
-            public bool autoConfigWriteDefault = true;
+            public bool autoConfigWriteDefault = false;
             public Dictionary<string, bool> autoConfigWriteRules = new Dictionary<string, bool>();
 
             public Config()

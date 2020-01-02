@@ -45,7 +45,8 @@ namespace FeatureFlowFramework.DataFlows.Web
                 int timeout = Timeout.Infinite;
                 if (request.TryGetQueryItem("timeout", out string timeoutStr)) int.TryParse(timeoutStr, out timeout);
                 
-                string rpcRequest = await request.ReadAsync();                
+                string rpcRequest = await request.ReadAsync();
+                rpcRequest = rpcRequest.Trim();
                 string rpcResponse = await rpcCaller.CallAsync(rpcRequest);
                 await response.WriteAsync(rpcResponse);
             }
