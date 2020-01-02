@@ -35,24 +35,24 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
         }
 
-        public void CallMultiResponse<P, R>(string method, P parameterTuple, IDataFlowSink sink)
+        public void CallMultiResponse<P, R>(string method, P parameterTuple, IDataFlowSink responseSink)
         {
             var requestId = RandomGenerator.Int64;
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
             lock (responseHandlers)
             {
-                responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
+                responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
             sourceHelper.Forward(request);
         }
 
-        public void CallMultiResponse<R>(string method, IDataFlowSink sink)
+        public void CallMultiResponse<R>(string method, IDataFlowSink responseSink)
         {
             var requestId = RandomGenerator.Int64;
             var request = new RpcRequest<bool, R>(requestId, method, true);
             lock (responseHandlers)
             {
-                responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
+                responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
             sourceHelper.Forward(request);
         }

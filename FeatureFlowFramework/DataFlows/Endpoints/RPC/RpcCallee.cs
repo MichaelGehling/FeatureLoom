@@ -7,7 +7,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
     public partial class RpcCallee : IDataFlowSink, IDataFlowSource, IReplier
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
-        private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();
+        private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();        
 
         private void AddRpcRequestHandler(IRpcRequestHandler handler)
         {
@@ -20,7 +20,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
         }
 
-        public void Post<M>(in M message)
+        public virtual void Post<M>(in M message)
         {
             if (message is IRpcRequest || message is string)
             {

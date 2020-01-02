@@ -131,5 +131,22 @@ namespace FeatureFlowFramework.DataFlows.RPC
             Assert.Contains("42", resultReceiver.PeekAll());
             Assert.Contains("99", resultReceiver.PeekAll());
         }
+
+        [Fact]
+        public void RpcRequestsCanBeQueuedAndHandledLater()
+        {
+            var callee = new QueuingRpcCallee();
+            var caller = new RpcCaller(1.Seconds());
+            caller.ConnectToAndBack(callee);
+
+            callee.RegisterMethod("Get42", () => 42);
+
+            var callTask = caller.CallAsync<int>("Get42");
+            Assert.False(callTask.IsCompleted);
+
+            callee.HandleQueuedRpcRequests();
+            Assert.True(callTask.IsCompleted);
+            Assert.Equal(42, callTask.Result);
+        }
     }
 }
