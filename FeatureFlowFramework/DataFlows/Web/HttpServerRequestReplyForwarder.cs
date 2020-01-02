@@ -13,16 +13,14 @@ namespace FeatureFlowFramework.DataFlows.Web
     {
         private Requester<object, object> requester = new Requester<object, object>();
         private readonly string route;
-        private readonly int bufferSize;
         private IWebMessageTranslator translator;
         private readonly IWebServer webServer;
 
-        public HttpServerRequestReplyForwarder(string route, IWebMessageTranslator translator, int bufferSize = 1024 * 128, IWebServer webServer = null)
+        public HttpServerRequestReplyForwarder(string route, IWebMessageTranslator translator, IWebServer webServer = null)
         {
             this.route = route;
             this.translator = translator;
             this.webServer = webServer ?? SharedWebServer.WebServer;
-            this.bufferSize = bufferSize;
             this.webServer.AddRequestHandler(this);
         }
 
