@@ -26,5 +26,6 @@ namespace FeatureFlowFramework.DataFlows.RPC
         }
 
         public IAsyncWaitHandle WaitHandle => queue.WaitHandle;
+        public int Count => queue.Count;
     }
 }

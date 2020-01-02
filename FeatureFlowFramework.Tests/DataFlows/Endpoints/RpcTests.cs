@@ -143,10 +143,13 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
             var callTask = caller.CallAsync<int>("Get42");
             Assert.False(callTask.IsCompleted);
+            Assert.Equal(1, callee.Count);
 
+            callee.WaitHandle.Wait();
             callee.HandleQueuedRpcRequests();
             Assert.True(callTask.IsCompleted);
             Assert.Equal(42, callTask.Result);
+            Assert.Equal(0, callee.Count);
         }
     }
 }
