@@ -50,6 +50,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static void PerformAutoConfigWrite(Configuration configuration, bool ignore)
         {
+            /*
             // This enforces the static constructor to be called, so its own config can be written
             if (ignore) return;
 
@@ -61,6 +62,7 @@ namespace FeatureFlowFramework.DataStorage
                 }
                 else if (config.autoConfigWriteDefault) configuration.TryWriteToStorage();
             }
+            */
         }
 
         [JsonIgnore]

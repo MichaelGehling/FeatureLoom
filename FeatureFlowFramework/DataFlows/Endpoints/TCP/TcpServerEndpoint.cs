@@ -74,6 +74,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                 c.connectionForwarder.ConnectTo(connection.SendingSink);
                                 connection.ReceivingSource.ConnectTo(c.receivedMessageSource);
                                 c.connections.Add(connection);
+                                c.connectionWaitEvent.Set();
                                 c.UpdateDisconnectionEventTask();
                             })
                     .Step("Stop and remove disconnected clients if timer expired")
@@ -90,6 +91,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                     }
                                     return false;
                                 });
+                                if (c.connections.Count == 0) c.connectionWaitEvent.Reset();
                                 c.UpdateDisconnectionEventTask();
                             })
                     .Step("Continue waiting for next events")
@@ -129,6 +131,9 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private Task<TcpClient> awaitedConnectionRequest;
         private Task[] awaitedTasks = new Task[3];
         private Task disconnectionEventTask = Task.Delay(-1); // TODO Workaround... find cleaner solution
+
+        private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
+        public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent.AsyncWaitHandle;
 
         public TcpServerEndpoint(Config config = null, ITcpMessageEncoder encoder = null, ITcpMessageDecoder decoder = null)
         {
