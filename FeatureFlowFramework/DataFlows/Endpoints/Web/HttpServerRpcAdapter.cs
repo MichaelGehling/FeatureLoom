@@ -1,5 +1,4 @@
 ﻿using FeatureFlowFramework.DataFlows.RPC;
-using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Logging;
 using FeatureFlowFramework.Web;
 using System;
@@ -15,7 +14,6 @@ namespace FeatureFlowFramework.DataFlows.Web
         private readonly string route;
         private readonly IWebServer webServer;
         TimeSpan rpcTimeout;
-
 
         public HttpServerRpcAdapter(string route, TimeSpan rpcTimeout, IWebServer webServer = null)
         {
