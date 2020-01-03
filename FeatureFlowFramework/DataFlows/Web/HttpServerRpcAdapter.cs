@@ -1,5 +1,4 @@
-﻿using FeatureFlowFramework.DataFlows.RequestReply;
-using FeatureFlowFramework.DataFlows.RPC;
+﻿using FeatureFlowFramework.DataFlows.RPC;
 using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Logging;
 using FeatureFlowFramework.Web;
