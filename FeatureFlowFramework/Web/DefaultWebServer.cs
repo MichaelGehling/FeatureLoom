@@ -19,7 +19,7 @@ namespace FeatureFlowFramework.Web
     {
         public class Config : Configuration
         {
-            public EndpointConfig[] endpointConfigs = { new EndpointConfig(IPAddress.Loopback, 5000) };
+            public HttpEndpointConfig[] endpointConfigs = { new HttpEndpointConfig(IPAddress.Loopback, 5000) };
         }
 
         private Config config = new Config();
@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.Web
         //public List<Action<IServiceCollection>> serviceExtensions = new List<Action<IServiceCollection>>();
         public SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>();
 
-        public List<EndpointConfig> endpoints = new List<EndpointConfig>();
+        public List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
         public DefaultWebServer()
         {
@@ -52,7 +52,7 @@ namespace FeatureFlowFramework.Web
 
         public bool Started => started;
 
-        public void AddEndpoint(EndpointConfig endpoint)
+        public void AddEndpoint(HttpEndpointConfig endpoint)
         {
             lock (configLock)
             {

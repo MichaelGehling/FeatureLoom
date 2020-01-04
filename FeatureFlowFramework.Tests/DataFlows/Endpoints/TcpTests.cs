@@ -50,8 +50,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
             Assert.Equal(testData2, receivedData2);
 
             client.DisconnectFromTcpServer();
-            server.RequestPause(true);
-            server.WaitUntilStopsRunning(1.Seconds());
         }
 
         [Fact]
@@ -89,6 +87,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
             serverSender.Send(testData2);
             Assert.True(clientReceiver.TryReceive(out string receivedData2, 1.Seconds()));
             Assert.Equal(testData2, receivedData2);
+
+            client.DisconnectFromTcpServer();
         }
 
         [Fact]

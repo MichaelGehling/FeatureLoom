@@ -6,7 +6,7 @@ using System.Net;
 
 namespace FeatureFlowFramework.Web
 {
-    public struct EndpointConfig
+    public struct HttpEndpointConfig
     {
         [JsonIgnore]
         public IPAddress address;
@@ -37,13 +37,13 @@ namespace FeatureFlowFramework.Web
             }
         }
 
-        public EndpointConfig(IPAddress address, int port) : this()
+        public HttpEndpointConfig(IPAddress address, int port) : this()
         {
             this.address = address;
             this.port = port;
         }
 
-        public EndpointConfig(IPAddress address, int port, string certificateName)
+        public HttpEndpointConfig(IPAddress address, int port, string certificateName)
         {
             this.address = address;
             this.port = port;

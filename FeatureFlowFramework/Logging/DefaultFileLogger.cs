@@ -83,29 +83,40 @@ namespace FeatureFlowFramework.Logging
         private async Task WriteToLogFile()
         {
             if (receiver.IsEmpty) return;
-
-            bool updateCreationTime = false;
-            var logFileInfo = new FileInfo(config.logFilePath);
-            if (!logFileInfo.Exists) updateCreationTime = true;
-
-            using (FileStream stream = File.Open(config.logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-            using (StreamWriter writer = new StreamWriter(stream))
+            
+            var wasThreadBackground = Thread.CurrentThread.IsBackground;
+            try
             {
-                if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
-                if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").Print(config.logFileLogFormat));
+                // Make thread temporarily foreground to ensure writing the last log entries before process ends.
+                Thread.CurrentThread.IsBackground = false;
 
-                var messages = receiver.ReceiveAll();
-                foreach (var msg in messages)
+                bool updateCreationTime = false;
+                var logFileInfo = new FileInfo(config.logFilePath);
+                if (!logFileInfo.Exists) updateCreationTime = true;
+
+                using (FileStream stream = File.Open(config.logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                using (StreamWriter writer = new StreamWriter(stream))
                 {
-                    if (msg is LogMessage logMsg)
+                    if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
+                    if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").Print(config.logFileLogFormat));
+
+                    var messages = receiver.ReceiveAll();
+                    foreach (var msg in messages)
                     {
-                        if (logMsg.level <= config.logFileLoglevel)
+                        if (msg is LogMessage logMsg)
                         {
-                            await writer.WriteLineAsync(logMsg.Print(config.logFileLogFormat));
+                            if (logMsg.level <= config.logFileLoglevel)
+                            {
+                                await writer.WriteLineAsync(logMsg.Print(config.logFileLogFormat));
+                            }
                         }
+                        else await writer.WriteLineAsync(msg.ToString());
                     }
-                    else await writer.WriteLineAsync(msg.ToString());
                 }
+            }
+            finally
+            {
+                Thread.CurrentThread.IsBackground = wasThreadBackground;
             }
         }
 
@@ -115,12 +126,13 @@ namespace FeatureFlowFramework.Logging
             var logFileInfo = new FileInfo(config.logFilePath);
             logFileInfo.Refresh();
             if (!logFileInfo.Exists) return;
-
-            // Make thread temporarily foreground to avoid the risk of corrupting the archive if the app is closed while archiving.
+            
             var wasThreadBackground = Thread.CurrentThread.IsBackground;
-            Thread.CurrentThread.IsBackground = false;
             try
             {
+                // Make thread temporarily foreground to avoid the risk of corrupting the archive if the app is closed while archiving.
+                Thread.CurrentThread.IsBackground = false;
+
                 using (var fileStream = new FileStream(config.archiveFilePath, FileMode.OpenOrCreate))
                 {
                     using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
@@ -145,11 +157,10 @@ namespace FeatureFlowFramework.Logging
                 }
                 logFileInfo.Delete();
             }
-            catch (Exception e)
+            finally
             {
-                Log.ERROR("Archiving log file failed", e.ToString());
+                Thread.CurrentThread.IsBackground = wasThreadBackground;
             }
-            Thread.CurrentThread.IsBackground = wasThreadBackground;
         }
 
         public Task PostAsync<M>(M message)

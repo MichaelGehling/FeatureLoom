@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Web
 
         void ClearRequestHandlers();
 
-        void AddEndpoint(EndpointConfig endpoint);
+        void AddEndpoint(HttpEndpointConfig endpoint);
 
         void ClearEndpoints();
     }
