@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public interface IWorkflowControls
     {
-        WorkflowExecutionState ExecutionState { get; set; }
+        Workflow.ExecutionState CurrentExecutionState { get; set; }
         string Name { get; }
 
         Task<bool> ExecuteNextStepAsync(IStepExecutionController controller, TimeSpan timeout = default);

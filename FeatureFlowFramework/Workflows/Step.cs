@@ -101,12 +101,4 @@ namespace FeatureFlowFramework.Workflows
         public bool finishStateMachine = false;
         public State targetState;
     }
-
-    public interface IStepInfo
-    {
-        string Description { get; }
-        IStateInfo[] TargetStates { get; }
-        bool MayTerminate { get; }
-        int StepIndex { get; }
-    }
 }

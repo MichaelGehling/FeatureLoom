@@ -9,21 +9,15 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public interface IWorkflowInfo
-    {
-        IStateMachineInfo StateMachineInfo { get; }
-        WorkflowExecutionState ExecutionState { get; }
-        IDataFlowSource ExecutionInfoSource { get; }
-    }
 
-    public abstract class Workflow : IWorkflowInfo, IStateMachineContext, IUpdateAppStructureAspect
+    public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext, IUpdateAppStructureAspect
     {
         protected long id;
-        protected WorkflowExecutionState executionState;
-        protected WorkflowExecutionPhase executionPhase = WorkflowExecutionPhase.Prepared;
+        protected ExecutionState executionState;
+        protected ExecutionPhase executionPhase = ExecutionPhase.Prepared;
 
         [JsonIgnore]
-        protected WorkflowControlData controlData = WorkflowControlData.Init();
+        protected ControlData controlData = ControlData.Init();
 
         protected LazySlim<Sender> executionInfoSender;
 
@@ -51,10 +45,10 @@ namespace FeatureFlowFramework.Workflows
         public virtual bool AddToAspectRegistry => true;
 
         [JsonIgnore]
-        public WorkflowExecutionState ExecutionState { get => executionState; set => executionState = value; }
+        public ExecutionState CurrentExecutionState { get => executionState; set => executionState = value; }
 
         [JsonIgnore]
-        public WorkflowExecutionPhase ExecutionPhase => executionPhase;
+        public ExecutionPhase CurrentExecutionPhase => executionPhase;
 
         [JsonIgnore]
         private readonly ExecutionEventList executionEvents = new ExecutionEventList();
@@ -85,7 +79,7 @@ namespace FeatureFlowFramework.Workflows
         long IStateMachineContext.ContextId => id;
 
         [JsonIgnore]
-        WorkflowExecutionPhase IStateMachineContext.ExecutionPhase
+        ExecutionPhase IStateMachineContext.ExecutionPhase
         {
             get => executionPhase;
             set
@@ -93,15 +87,20 @@ namespace FeatureFlowFramework.Workflows
                 executionPhase = value;
                 if (this.controlData.notRunningWakeEvent != null)
                 {
-                    if (executionPhase != WorkflowExecutionPhase.Running) this.controlData.notRunningWakeEvent.Set();
+                    if (executionPhase != ExecutionPhase.Running) this.controlData.notRunningWakeEvent.Set();
                     else this.controlData.notRunningWakeEvent.Reset();
                 }
             }
         }
 
-        void IStateMachineContext.SendExecutionInfoEvent(string executionEvent)
+        void IStateMachineContext.SendExecutionInfoEvent(string executionEvent, object additionalInfo)
         {
-            executionInfoSender.ObjIfExists?.Send(new ExecutionInfo(this, executionEvent));
+            executionInfoSender.ObjIfExists?.Send(new ExecutionInfo(this, executionEvent, additionalInfo));
+        }
+
+        void IStateMachineContext.SendExecutionInfoEvent(string executionEvent, ExecutionState state, ExecutionPhase phase, object additionalInfo)
+        {
+            executionInfoSender.ObjIfExists?.Send(new ExecutionInfo(this, executionEvent, state, phase, additionalInfo));
         }
 
         public bool TryLock(TimeSpan timeout)
@@ -187,44 +186,6 @@ namespace FeatureFlowFramework.Workflows
                 if (this.controlData.cancellationTokenSource == null) this.controlData.cancellationTokenSource = new CancellationTokenSource();
                 return this.controlData.cancellationTokenSource.Token;
             }
-        }
-
-        public struct ExecutionInfo
-        {
-            public readonly Workflow workflow;
-            public readonly string executionEvent;
-            public readonly WorkflowExecutionState executionState;
-            public readonly WorkflowExecutionPhase executionPhase;
-
-            public ExecutionInfo(Workflow workflow, string executionEvent, WorkflowExecutionState executionState, WorkflowExecutionPhase executionPhase)
-            {
-                this.workflow = workflow;
-                this.executionEvent = executionEvent;
-                this.executionState = executionState;
-                this.executionPhase = executionPhase;
-            }
-
-            public ExecutionInfo(IStateMachineContext context, string executionEvent)
-            {
-                this.workflow = context as Workflow;
-                this.executionEvent = executionEvent;
-                this.executionState = context.ExecutionState;
-                this.executionPhase = context.ExecutionPhase;
-            }
-        }
-
-        public class ExecutionEventList
-        {
-            public const string WorkflowStarted = "WorkflowStarted";
-            public const string WorkflowFinished = "WorkflowFinished";
-            public const string WorkflowPaused = "WorkflowPaused";
-            public const string WorkflowInvalid = "WorkflowInvalid";
-            public const string StepStarted = "StepStarted";
-            public const string StepFinished = "StepFinished";
-            public const string StepFailed = "StepFailed";
-            public const string BeginWaiting = "BeginWaiting";
-            public const string EndWaiting = "EndWaiting";
-            public const string StateTransition = "StateTransition";
         }
     }
 
@@ -323,6 +284,6 @@ namespace FeatureFlowFramework.Workflows
         }
 
         [JsonIgnore]
-        public bool IsRunning => this.ExecutionPhase == WorkflowExecutionPhase.Running;
+        public bool IsRunning => this.CurrentExecutionPhase == ExecutionPhase.Running;
     }
 }

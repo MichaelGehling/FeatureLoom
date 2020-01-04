@@ -95,54 +95,48 @@ namespace FeatureFlowFramework.Workflows
 
         public bool ExecuteNextStep(CT context, IStepExecutionController controller)
         {
-            var executionState = context.ExecutionState;
+            var executionState = context.CurrentExecutionState;
             var executionPhase = context.ExecutionPhase;
 
-            bool logStartHere = this.logStart && executionPhase != WorkflowExecutionPhase.Running;
             if (!CheckAndUpdateExecutionStateBeforeExecution(context)) return false;
 
             var step = states.ItemOrNull(executionState.stateIndex)?.steps.ItemOrNull(executionState.stepIndex);
             if (step != null)
-            {
-                if (logStartHere) Log.TRACE(context, $"Workflow {context.ContextName} is starting with state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
-
+            {                
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
                 controller.ExecuteStep(context, step);
-                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished);
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished, executionState, executionPhase);
                 return EvaluteExecutionStateAfterExecution(context);
             }
             else
             {
                 Log.ERROR(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state refers to an invalid state or step index. Execution state is set to invalid!");
-                context.ExecutionPhase = WorkflowExecutionPhase.Invalid;
-                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFailed);
+                context.ExecutionPhase = Workflow.ExecutionPhase.Invalid;
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFailed, executionState, executionPhase);
                 return false;
             }
         }
 
         public async Task<bool> ExecuteNextStepAsync(CT context, IStepExecutionController controller)
         {
-            var executionState = context.ExecutionState;
+            var executionState = context.CurrentExecutionState;
             var executionPhase = context.ExecutionPhase;
 
-            bool logStartHere = this.logStart && executionPhase != WorkflowExecutionPhase.Running;
             if (!CheckAndUpdateExecutionStateBeforeExecution(context)) return false;
 
             var step = states.ItemOrNull(executionState.stateIndex)?.steps.ItemOrNull(executionState.stepIndex);
             if (step != null)
-            {
-                if (logStartHere) Log.TRACE(context, $"Workflow {context.ContextName} is starting with state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
-
+            {                
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
                 await controller.ExecuteStepAsync(context, step);
-                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished);
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished, executionState, executionPhase);
                 return EvaluteExecutionStateAfterExecution(context);
             }
             else
             {
                 Log.ERROR(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state refers to an invalid state or step index. Execution state is set to invalid!");
-                context.ExecutionPhase = WorkflowExecutionPhase.Invalid;
-                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFailed);
+                context.ExecutionPhase = Workflow.ExecutionPhase.Invalid;
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFailed, executionState, executionPhase);
                 return false;
             }
         }
@@ -151,18 +145,17 @@ namespace FeatureFlowFramework.Workflows
         {
             switch (context.ExecutionPhase)
             {
-                case WorkflowExecutionPhase.Finished:
-                    if (logStop) Log.TRACE(context, $"Workflow {context.ContextName} finished!");
+                case Workflow.ExecutionPhase.Finished:
                     context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowFinished);
                     return false;
 
-                case WorkflowExecutionPhase.Invalid:
+                case Workflow.ExecutionPhase.Invalid:
                     Log.ERROR(context, $"Workflow {context.ContextName} failed and is now invalid!");
                     context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowInvalid);
                     return false;
 
-                case WorkflowExecutionPhase.Paused:
-                    if (logStop) Log.INFO(context, $"Workflow {context.ContextName} is paused!");
+                case Workflow.ExecutionPhase.Paused:
+                    Log.INFO(context, $"Workflow {context.ContextName} is paused!");
                     context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowPaused);
                     return false;
 
@@ -175,16 +168,16 @@ namespace FeatureFlowFramework.Workflows
         {
             var executionPhase = context.ExecutionPhase;
             bool proceed = true;
-            if (executionPhase == WorkflowExecutionPhase.Finished ||
-               executionPhase == WorkflowExecutionPhase.Invalid)
+            if (executionPhase == Workflow.ExecutionPhase.Finished ||
+               executionPhase == Workflow.ExecutionPhase.Invalid)
             {
                 Log.WARNING(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToString()}!");
                 proceed = false;
             }
             else
             {
-                if (executionPhase != WorkflowExecutionPhase.Running) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowStarted);
-                context.ExecutionPhase = WorkflowExecutionPhase.Running;
+                if (executionPhase != Workflow.ExecutionPhase.Running) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowStarted);
+                context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             }
 
             return proceed;
@@ -202,9 +195,9 @@ namespace FeatureFlowFramework.Workflows
             else throw new Exception("Wrong context object used for this Statemachine!");
         }
 
-        public virtual WorkflowExecutionState HandleException(CT context, Exception e)
+        public virtual Workflow.ExecutionState HandleException(CT context, Exception e)
         {
-            var step = this.states.ItemOrNull(context.ExecutionState.stateIndex)?.steps.ItemOrNull(context.ExecutionState.stepIndex);
+            var step = this.states.ItemOrNull(context.CurrentExecutionState.stateIndex)?.steps.ItemOrNull(context.CurrentExecutionState.stepIndex);
             Log.ERROR(context, $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
             throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e);
         }
@@ -240,20 +233,13 @@ namespace FeatureFlowFramework.Workflows
     {
         protected abstract void Init();
 
-        private WorkflowExecutionState initialExecutionState = new WorkflowExecutionState(0, 0);
+        private Workflow.ExecutionState initialExecutionState = (0, 0);
 
-        public WorkflowExecutionState InitialExecutionState
+        public Workflow.ExecutionState InitialExecutionState
         {
             get => initialExecutionState;
             protected set => initialExecutionState = value;
         }
-
-        public bool logStateChanges = false;
-        public bool logStartWaiting = false;
-        public bool logFinishWaiting = false;
-        public bool logExeption = true;
-        public bool logStart = true;
-        public bool logStop = true;
 
         public string Name { get; }
 
@@ -268,12 +254,5 @@ namespace FeatureFlowFramework.Workflows
         public abstract Task<bool> ExecuteNextStepAsync<CT>(CT context, IStepExecutionController controller = null);
 
         public abstract bool ExecuteNextStep<CT>(CT context, IStepExecutionController controller = null);
-    }
-
-    public interface IStateMachineInfo
-    {
-        IStateInfo[] StateInfos { get; }
-        string Name { get; }
-        IStateInfo StartStateInfo { get; }
     }
 }

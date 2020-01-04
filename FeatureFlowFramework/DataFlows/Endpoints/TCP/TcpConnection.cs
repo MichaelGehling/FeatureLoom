@@ -16,12 +16,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             protected override void Init()
             {
-                logStateChanges = true;
-                logStateChanges = true;
-                logExeption = true;
-                logStartWaiting = true;
-                logFinishWaiting = true;
-
                 var receivingAndDecoding = State("ReceivingAndDecoding");
                 var closing = State("Closing");
 

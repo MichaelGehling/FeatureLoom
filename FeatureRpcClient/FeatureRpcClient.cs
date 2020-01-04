@@ -34,8 +34,6 @@ namespace FeatureRpcClient
                 var callFailed = State("CallFailed");
                 var closingConnection = State("ClosingConnection");
 
-                logStateChanges = true;
-
                 setup.Build()
                     .Step("Create TCP client and start connecting.")
                         .Do(c => c.tcpClient = new TcpClientEndpoint())

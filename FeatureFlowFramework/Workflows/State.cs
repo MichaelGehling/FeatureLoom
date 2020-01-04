@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.Workflows
             return builder;
         }
 
-        public static implicit operator WorkflowExecutionState(State<CT> state) => new WorkflowExecutionState(state.stateIndex, 0);
+        public static implicit operator Workflow.ExecutionState(State<CT> state) => (state.stateIndex, 0);
     }
 
     public abstract class State : IStateInfo
@@ -44,13 +44,5 @@ namespace FeatureFlowFramework.Workflows
         public string Name => name;
         public string Description => description;
         public int StateIndex => stateIndex;
-    }
-
-    public interface IStateInfo
-    {
-        IStepInfo[] StepInfos { get; }
-        string Name { get; }
-        string Description { get; }
-        int StateIndex { get; }
     }
 }

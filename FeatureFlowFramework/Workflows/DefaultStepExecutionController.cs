@@ -17,9 +17,9 @@ namespace FeatureFlowFramework.Workflows
     {
         public void ExecuteStep<C>(C context, Step<C> step) where C : IStateMachineContext
         {
-            var currentExecutionState = context.ExecutionState;
-            var nextExecutionState = new WorkflowExecutionState(currentExecutionState.stateIndex, currentExecutionState.stepIndex + 1);
-            var nextExecutionPhase = WorkflowExecutionPhase.Running;
+            var currentExecutionState = context.CurrentExecutionState;
+            var nextExecutionState = new Workflow.ExecutionState(currentExecutionState.stateIndex, currentExecutionState.stepIndex + 1);
+            var nextExecutionPhase = Workflow.ExecutionPhase.Running;
             var proceedStep = true;
             PartialStep<C> partialStep = step;
             try
@@ -60,9 +60,9 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task ExecuteStepAsync<C>(C context, Step<C> step) where C : IStateMachineContext
         {
-            var currentExecutionState = context.ExecutionState;
-            var nextExecutionState = new WorkflowExecutionState(currentExecutionState.stateIndex, currentExecutionState.stepIndex + 1);
-            var nextExecutionPhase = WorkflowExecutionPhase.Running;
+            var currentExecutionState = context.CurrentExecutionState;
+            var nextExecutionState = new Workflow.ExecutionState(currentExecutionState.stateIndex, currentExecutionState.stepIndex + 1);
+            var nextExecutionPhase = Workflow.ExecutionPhase.Running;
             var proceedStep = true;
             PartialStep<C> partialStep = step;
             try
@@ -101,20 +101,18 @@ namespace FeatureFlowFramework.Workflows
             FinishStepExecution(context, nextExecutionState, nextExecutionPhase, proceedStep, partialStep);
         }
 
-        private static void DoTransition<C>(C context, Step<C> step, WorkflowExecutionState currentExecutionState, ref WorkflowExecutionState nextExecutionState, ref WorkflowExecutionPhase nextExecutionPhase, ref bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
+        private static void DoTransition<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, ref Workflow.ExecutionState nextExecutionState, ref Workflow.ExecutionPhase nextExecutionPhase, ref bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
         {
             if (partialStep.targetState != null)
             {
-                nextExecutionState = new WorkflowExecutionState(partialStep.targetState.stateIndex, 0);
-                if (step.parentStateMachine.logStateChanges && step.parentState != partialStep.targetState) Log.TRACE(context, $"Workflow {context.ContextName} changes state from \"{step.parentState.Name}\" to \"{partialStep.targetState.Name}\"");
-                if (step.parentState != partialStep.targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
+                nextExecutionState = (partialStep.targetState.stateIndex, 0);                
+                if (step.parentState != partialStep.targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StateTransition, partialStep.targetState);
                 proceed = false;
             }
             else if (partialStep.finishStateMachine)
             {
-                Log.TRACE(context, $"Workflow {context.ContextName} finishes execution in state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
-                nextExecutionState = new WorkflowExecutionState(currentExecutionState.stateIndex, currentExecutionState.stepIndex);
-                nextExecutionPhase = WorkflowExecutionPhase.Finished;
+                nextExecutionState = (currentExecutionState.stateIndex, currentExecutionState.stepIndex);
+                nextExecutionPhase = Workflow.ExecutionPhase.Finished;
                 proceed = false;
             }
             else
@@ -126,7 +124,6 @@ namespace FeatureFlowFramework.Workflows
         private static bool DoWaiting<C>(C context, Step<C> step, PartialStep<C> partialStep) where C : IStateMachineContext
         {
             bool proceed;
-            if (step.parentStateMachine.logStartWaiting) Log.TRACE(context, $"Workflow {context.ContextName} starts waiting in state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
             Task waitTask = partialStep.waitingTaskDelegate(context);
             var timeoutDelegate = partialStep.timeoutDelegate;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
@@ -147,11 +144,10 @@ namespace FeatureFlowFramework.Workflows
 
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
             proceed = !waitTask.IsCanceled;
-            if (step.parentStateMachine.logFinishWaiting) Log.TRACE(context, $"Workflow {context.ContextName} ends waiting in state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
             return proceed;
         }
 
-        private static WorkflowExecutionState HandleException<C>(C context, Step<C> step, WorkflowExecutionState currentExecutionState, WorkflowExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleException<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
         {
             if (!step.hasCatchException)
             {
@@ -173,56 +169,56 @@ namespace FeatureFlowFramework.Workflows
                 }
                 else if (step.onExceptionRepeatCondition != null)
                 {
-                    nextExecutionState = HandleExceptionTransition(context, step, currentExecutionState, nextExecutionState, e);
+                    nextExecutionState = HandleExceptionRepeat(context, step, currentExecutionState, nextExecutionState, e);
                 }
                 else if (step.onExceptionRepeatConditionAsync != null)
                 {
-                    nextExecutionState = HandleAsyncExceptionTransition(context, step, currentExecutionState, nextExecutionState, e);
+                    nextExecutionState = HandleAsyncExceptionRepeat(context, step, currentExecutionState, nextExecutionState, e);
                 }
             }
 
             return nextExecutionState;
         }
 
-        private static WorkflowExecutionState HandleAsyncExceptionTransition<C>(C context, Step<C> step, WorkflowExecutionState currentExecutionState, WorkflowExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleAsyncExceptionRepeat<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
         {
             if (step.onExceptionRepeatConditionAsync(context, e).Result)
             {
-                if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The step execution will be retried, because the defined condition was met!", e.ToString());
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithRetry, e);                
                 nextExecutionState = currentExecutionState;
             }
-            else if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The step execution will not be retried, because the defined condition was not met!", e.ToString());
+            else context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithoutRetry, e);
             return nextExecutionState;
         }
 
-        private static WorkflowExecutionState HandleExceptionTransition<C>(C context, Step<C> step, WorkflowExecutionState currentExecutionState, WorkflowExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleExceptionRepeat<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
         {
             if (step.onExceptionRepeatCondition(context, e))
             {
-                if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The step execution will be retried, because the defined condition was met!", e.ToString());
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithRetry, e);
                 nextExecutionState = currentExecutionState;
             }
-            else if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The step execution will not be retried, because the defined condition was not met!", e.ToString());
+            else context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithoutRetry, e);
             return nextExecutionState;
         }
 
         private static void HandleAsyncExceptionAction<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
         {
-            if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The defined action will be executed and then proceeded with the next step!", e.ToString());
+            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
             step.onExceptionAsync(context, e).Wait();
         }
 
-        private static WorkflowExecutionState HandleExceptionTransition<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleExceptionTransition<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
         {
-            WorkflowExecutionState nextExecutionState;
-            if (step.parentStateMachine.logExeption || step.parentStateMachine.logStateChanges) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\" and will continue with state \"{step.onExceptionTargetState.Name}\"!", e.ToString());
-            nextExecutionState = new WorkflowExecutionState(step.onExceptionTargetState.stateIndex, 0);
+            Workflow.ExecutionState nextExecutionState;
+            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithTransition, e);
+            nextExecutionState = (step.onExceptionTargetState.stateIndex, 0);
             return nextExecutionState;
         }
 
         private static void HandleExceptionAction<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
         {
-            if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The defined action will be executed and then proceeded with the next step!", e.ToString());
+            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
             step.onException(context, e);
         }
 
@@ -261,25 +257,24 @@ namespace FeatureFlowFramework.Workflows
             return result;
         }
 
-        private static void FinishStepExecution<C>(C context, WorkflowExecutionState nextExecutionState, WorkflowExecutionPhase nextPhase, bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
+        private static void FinishStepExecution<C>(C context, Workflow.ExecutionState nextExecutionState, Workflow.ExecutionPhase nextPhase, bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
         {
             if (partialStep.repeatWhileCondition && partialStep.hasCondition && proceed) { /* stay in execution state*/}
             else
             {
-                context.ExecutionState = nextExecutionState;
+                context.CurrentExecutionState = nextExecutionState;
                 context.ExecutionPhase = nextPhase;
             }
 
             if (context.PauseRequested)
             {
-                context.ExecutionPhase = WorkflowExecutionPhase.Paused;
+                context.ExecutionPhase = Workflow.ExecutionPhase.Paused;
                 context.PauseRequested = false;
             }
         }
 
         private static async Task<bool> DoWaitingAsync<C>(C context, Step<C> step, bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
-        {
-            if (step.parentStateMachine.logStartWaiting) Log.TRACE(context, $"Workflow {context.ContextName} starts waiting in state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
+        {            
             Task waitTask = partialStep.waitingTaskDelegate(context);
             var timeoutDelegate = partialStep.timeoutDelegate;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
@@ -302,12 +297,11 @@ namespace FeatureFlowFramework.Workflows
             }
             await context.TryLockAsync(Timeout.InfiniteTimeSpan);
 
-            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
-            if (step.parentStateMachine.logFinishWaiting) Log.TRACE(context, $"Workflow {context.ContextName} ends waiting in state/step \"{step.parentState.Name}\"/\"{step.Description}\"");
+            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);            
             return proceed;
         }
 
-        private static async Task<WorkflowExecutionState> HandleExceptionAsync<C>(C context, Step<C> step, WorkflowExecutionState currentExecutionState, WorkflowExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static async Task<Workflow.ExecutionState> HandleExceptionAsync<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
         {
             if (!step.hasCatchException)
             {
@@ -329,31 +323,35 @@ namespace FeatureFlowFramework.Workflows
                 }
                 else if (step.onExceptionRepeatCondition != null)
                 {
-                    nextExecutionState = HandleExceptionTransition(context, step, currentExecutionState, nextExecutionState, e);
+                    nextExecutionState = HandleExceptionRepeat(context, step, currentExecutionState, nextExecutionState, e);
                 }
                 else if (step.onExceptionRepeatConditionAsync != null)
                 {
-                    nextExecutionState = HandleAsyncExceptionTransitionAsync(context, step, currentExecutionState, nextExecutionState, e);
+                    nextExecutionState = HandleAsyncExceptionRepeatAsync(context, step, currentExecutionState, nextExecutionState, e);
+                }
+                else
+                {
+                    context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionCatched, e);
                 }
             }
 
             return nextExecutionState;
         }
 
-        private static WorkflowExecutionState HandleAsyncExceptionTransitionAsync<C>(C context, Step<C> step, WorkflowExecutionState currentExecutionState, WorkflowExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleAsyncExceptionRepeatAsync<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
         {
             if (step.onExceptionRepeatConditionAsync(context, e).Result)
             {
-                if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The step execution will be retried, because the defined condition was met!", e.ToString());
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithRetry, e);
                 nextExecutionState = currentExecutionState;
             }
-            else if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The step execution will not be retried, because the defined condition was not met!", e.ToString());
+            else context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithoutRetry, e);
             return nextExecutionState;
         }
 
         private static async Task HandleAsyncExceptionActionAsync<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
         {
-            if (step.parentStateMachine.logExeption) Log.TRACE($"Workflow {context.ContextName} threw an exception in state/step \"{step.parentState.Name}\"/\"{step.Description}\". The defined action will be executed and then proceeded with the next step!", e.ToString());
+            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
             await step.onExceptionAsync(context, e);
         }
 
