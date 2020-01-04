@@ -107,7 +107,7 @@ namespace FeatureFlowFramework.Workflows
             {
                 nextExecutionState = new WorkflowExecutionState(partialStep.targetState.stateIndex, 0);
                 if (step.parentStateMachine.logStateChanges && step.parentState != partialStep.targetState) Log.TRACE(context, $"Workflow {context.ContextName} changes state from \"{step.parentState.Name}\" to \"{partialStep.targetState.Name}\"");
-                if (step.parentState != partialStep.targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
+                if (step.parentState != partialStep.targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StateTransition);
                 proceed = false;
             }
             else if (partialStep.finishStateMachine)
