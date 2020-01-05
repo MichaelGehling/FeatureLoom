@@ -112,21 +112,7 @@ namespace FeatureFlowFramework.DataStorage
 
             if (notification.changeType.HasFlag(WatcherChangeTypes.Deleted))
             {
-                bool removed;
-                lock (fileSet)
-                {
-                    removed = fileSet.Remove(notification.path);
-                }
-                if (removed)
-                {
-                    string uri = FilePathToUri(notification.path);
-                    cache?.Remove(uri);
-                    NotifySubscriptions(uri, UpdateEvent.Removed);
-                }
-                else
-                {
-                    UpdateOnRemovedDir();
-                }
+                ProcessChangeNotification_Delete(notification);
             }
             else
             {
@@ -134,66 +120,95 @@ namespace FeatureFlowFramework.DataStorage
 
                 if (!directoryInfo.Attributes.HasFlag(FileAttributes.Directory))
                 {
-                    if (notification.changeType.HasFlag(WatcherChangeTypes.Changed))
-                    {
-                        string uri = FilePathToUri(notification.path);
-                        cache?.Remove(uri);
-                        NotifySubscriptions(uri, UpdateEvent.Updated);
-                    }
-                    else if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
-                    {
-                        lock (fileSet)
-                        {
-                            fileSet.Add(notification.path);
-                        }
-                        string uri = FilePathToUri(notification.path);
-                        NotifySubscriptions(uri, UpdateEvent.Created);
-                    }
-                    else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
-                    {
-                        lock (fileSet)
-                        {
-                            fileSet.Remove(notification.oldPath);
-                            fileSet.Add(notification.path);
-                        }
-                        string oldUri = FilePathToUri(notification.oldPath);
-                        cache?.Remove(oldUri);
-                        NotifySubscriptions(oldUri, UpdateEvent.Removed);
-                        string newUri = FilePathToUri(notification.path);
-                        NotifySubscriptions(newUri, UpdateEvent.Created);
-                    }
+                    ProcessChangeNotification_Directory(notification);
                 }
                 else
                 {
-                    if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
-                    {
-                        var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
-                        foreach (var fileInfo in addedFileInfos)
-                        {
-                            lock (fileSet)
-                            {
-                                fileSet.Add(fileInfo.FullName);
-                            }
-                            string uri = FilePathToUri(fileInfo.FullName);
-                            NotifySubscriptions(uri, UpdateEvent.Created);
-                        }
-                    }
-                    else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
-                    {
-                        UpdateOnRemovedDir();
-
-                        var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
-                        foreach (var fileInfo in addedFileInfos)
-                        {
-                            lock (fileSet)
-                            {
-                                fileSet.Add(fileInfo.FullName);
-                            }
-                            string uri = FilePathToUri(fileInfo.FullName);
-                            NotifySubscriptions(uri, UpdateEvent.Created);
-                        }
-                    }
+                    ProcessChangeNotification_File(notification, directoryInfo);
                 }
+            }
+        }
+
+        private void ProcessChangeNotification_File(FileSystemObserver.ChangeNotification notification, DirectoryInfo directoryInfo)
+        {
+            if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
+            {
+                var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
+                foreach (var fileInfo in addedFileInfos)
+                {
+                    lock (fileSet)
+                    {
+                        fileSet.Add(fileInfo.FullName);
+                    }
+                    string uri = FilePathToUri(fileInfo.FullName);
+                    NotifySubscriptions(uri, UpdateEvent.Created);
+                }
+            }
+            else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
+            {
+                UpdateOnRemovedDir();
+
+                var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
+                foreach (var fileInfo in addedFileInfos)
+                {
+                    lock (fileSet)
+                    {
+                        fileSet.Add(fileInfo.FullName);
+                    }
+                    string uri = FilePathToUri(fileInfo.FullName);
+                    NotifySubscriptions(uri, UpdateEvent.Created);
+                }
+            }
+        }
+
+        private void ProcessChangeNotification_Directory(FileSystemObserver.ChangeNotification notification)
+        {
+            if (notification.changeType.HasFlag(WatcherChangeTypes.Changed))
+            {
+                string uri = FilePathToUri(notification.path);
+                cache?.Remove(uri);
+                NotifySubscriptions(uri, UpdateEvent.Updated);
+            }
+            else if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
+            {
+                lock (fileSet)
+                {
+                    fileSet.Add(notification.path);
+                }
+                string uri = FilePathToUri(notification.path);
+                NotifySubscriptions(uri, UpdateEvent.Created);
+            }
+            else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
+            {
+                lock (fileSet)
+                {
+                    fileSet.Remove(notification.oldPath);
+                    fileSet.Add(notification.path);
+                }
+                string oldUri = FilePathToUri(notification.oldPath);
+                cache?.Remove(oldUri);
+                NotifySubscriptions(oldUri, UpdateEvent.Removed);
+                string newUri = FilePathToUri(notification.path);
+                NotifySubscriptions(newUri, UpdateEvent.Created);
+            }
+        }
+
+        private void ProcessChangeNotification_Delete(FileSystemObserver.ChangeNotification notification)
+        {
+            bool removed;
+            lock (fileSet)
+            {
+                removed = fileSet.Remove(notification.path);
+            }
+            if (removed)
+            {
+                string uri = FilePathToUri(notification.path);
+                cache?.Remove(uri);
+                NotifySubscriptions(uri, UpdateEvent.Removed);
+            }
+            else
+            {
+                UpdateOnRemovedDir();
             }
         }
 
