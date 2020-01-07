@@ -10,23 +10,23 @@ namespace FeatureFlowFramework.Helper
     public class AsyncSafeLock
     {
         private static ConditionalWeakTable<object, AsyncSafeLock> lockObjects = new ConditionalWeakTable<object, AsyncSafeLock>();
-        public static IDisposable LockForReading<T>(T obj) where T : class
+        public static IDisposable LockForReading<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
             return objLock.ForReading;
         }
 
-        public static Task<IDisposable> LockForReadingAsync<T>(T obj) where T : class
+        public static Task<IDisposable> LockForReadingAsync<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
             return objLock.ForReadingAsync();
         }
-        public static IDisposable LockForWriting<T>(T obj) where T : class
+        public static IDisposable LockForWriting<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
             return objLock.ForWriting;
         }
-        public static Task<IDisposable> LockForWritingAsync<T>(T obj) where T : class
+        public static Task<IDisposable> LockForWritingAsync<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
             return objLock.ForWritingAsync();
