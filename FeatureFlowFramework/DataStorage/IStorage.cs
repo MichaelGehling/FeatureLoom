@@ -24,6 +24,8 @@ namespace FeatureFlowFramework.DataStorage
         Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null);
 
         bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink);
+
+        bool Exists(string uri);
     }
 
     public interface IStorageWriter
@@ -49,5 +51,7 @@ namespace FeatureFlowFramework.DataStorage
         bool TryDelete(string uri);
 
         Task<bool> TryDeleteAsync(string uri);
+
+        bool Exists(string uri);
     }
 }

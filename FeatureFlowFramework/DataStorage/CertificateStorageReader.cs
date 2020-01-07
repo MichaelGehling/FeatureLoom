@@ -44,6 +44,12 @@ namespace FeatureFlowFramework.DataStorage
             else return Path.Combine(config.basePath, $"{uri}{config.fileSuffix}");
         }
 
+        public bool Exists(string uri)
+        {
+            string filePath = BuildFilePath(uri);
+            return File.Exists(filePath);
+        }
+
         public bool TryRead<T>(string uri, out T data)
         {
             var type = typeof(T);

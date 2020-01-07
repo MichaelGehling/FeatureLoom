@@ -69,6 +69,7 @@ namespace FeatureFlowFramework.Helper
 
         public void Set()
         {
+            if(IsSet) return;
             tcs.TrySetResult(true);
         }
 

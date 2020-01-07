@@ -437,6 +437,14 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
+        public bool Exists(string uri)
+        {
+            if(cache?.Contains(uri) ?? false) return true;
+
+            string filePath = UriToFilePath(uri);
+            return File.Exists(filePath);
+        }
+
         public bool TryRead<T>(string uri, out T data)
         {
             try

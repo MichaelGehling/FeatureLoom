@@ -1,10 +1,13 @@
 ﻿using FeatureFlowFramework.DataFlows.RPC;
 using FeatureFlowFramework.DataFlows.TCP;
+using FeatureFlowFramework.DataStorage;
 using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Logging;
 using FeatureFlowFramework.Workflows;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Sources;
 
 namespace FeatureRpcClient
 {
@@ -13,11 +16,12 @@ namespace FeatureRpcClient
         public int errorCode = 0;
         private string rpcCall;
         private bool multiCall = false;
+        TcpClientEndpoint.Config tcpConfig = new TcpClientEndpoint.Config();
 
         public FeatureRpcClient(string rpcCall)
         {
             this.rpcCall = rpcCall;
-            if (rpcCall.EmptyOrNull()) multiCall = true;
+            if(rpcCall.EmptyOrNull()) multiCall = true;
         }
 
         private TcpClientEndpoint tcpClient;
@@ -35,6 +39,9 @@ namespace FeatureRpcClient
                 var closingConnection = State("ClosingConnection");
 
                 setup.Build()
+                    .Step("Write default config files if not existing")
+                        .If(c => !Storage.GetReader(c.tcpConfig.ConfigCategory).Exists(c.tcpConfig.Uri))
+                            .Do(c => c.tcpConfig.TryWriteToStorage())
                     .Step("Create TCP client and start connecting.")
                         .Do(c => c.tcpClient = new TcpClientEndpoint())
                     .Step("Create RPC caller and wire it to TCP connection.")
@@ -102,8 +109,8 @@ namespace FeatureRpcClient
                         .Finish();
             }
         }
-
-        private static int Main(string[] args)
+    
+        public static int Main(string[] args)
         {
             Log.logForwarder.DisconnectFrom(Log.defaultConsoleLogger);
             var workflow = new FeatureRpcClient(args.Length >= 1 ? args[0] : null);

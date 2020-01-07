@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.Helper;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -6,6 +7,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public abstract class AbstractRunner : IWorkflowRunner
     {
+        AsyncSafeLock runningWorkflowsLock = new AsyncSafeLock();
         protected List<IWorkflowControls> runningWorkflows = new List<IWorkflowControls>();
         protected readonly IStepExecutionController executionController = new DefaultStepExecutionController();
         protected Forwarder executionInfoForwarder = null;
@@ -14,7 +16,7 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                lock (runningWorkflows)
+                using (runningWorkflowsLock.ForReading)
                 {
                     return runningWorkflows.ToArray();
                 }
@@ -28,7 +30,7 @@ namespace FeatureFlowFramework.Workflows
                 if (executionInfoForwarder == null)
                 {
                     executionInfoForwarder = new Forwarder();
-                    lock (runningWorkflows)
+                    using(runningWorkflowsLock.ForReading)
                     {
                         foreach (var workflow in runningWorkflows)
                         {
@@ -43,7 +45,7 @@ namespace FeatureFlowFramework.Workflows
         public Task PauseAllWorkflows()
         {
             List<Task> tasks = new List<Task>();
-            lock (runningWorkflows)
+            using(runningWorkflowsLock.ForReading)
             {
                 foreach (var wf in runningWorkflows)
                 {
@@ -56,7 +58,7 @@ namespace FeatureFlowFramework.Workflows
 
         protected void RemoveFromRunningWorkflows(IWorkflowControls workflow)
         {
-            lock (runningWorkflows)
+            using(runningWorkflowsLock.ForWriting)
             {
                 runningWorkflows.Remove(workflow);
                 if (executionInfoForwarder != null) workflow.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
@@ -65,7 +67,7 @@ namespace FeatureFlowFramework.Workflows
 
         protected void AddToRunningWorkflows(IWorkflowControls workflow)
         {
-            lock (runningWorkflows)
+            using(runningWorkflowsLock.ForWriting)
             {
                 runningWorkflows.Add(workflow);
                 if (executionInfoForwarder != null) workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
