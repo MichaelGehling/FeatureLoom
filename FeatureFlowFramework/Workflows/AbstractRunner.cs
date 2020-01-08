@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                using (runningWorkflowsLock.ForReading)
+                using (runningWorkflowsLock.ForReading())
                 {
                     return runningWorkflows.ToArray();
                 }
@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.Workflows
                 if (executionInfoForwarder == null)
                 {
                     executionInfoForwarder = new Forwarder();
-                    using(runningWorkflowsLock.ForReading)
+                    using(runningWorkflowsLock.ForReading())
                     {
                         foreach (var workflow in runningWorkflows)
                         {
@@ -45,7 +45,7 @@ namespace FeatureFlowFramework.Workflows
         public Task PauseAllWorkflows()
         {
             List<Task> tasks = new List<Task>();
-            using(runningWorkflowsLock.ForReading)
+            using(runningWorkflowsLock.ForReading())
             {
                 foreach (var wf in runningWorkflows)
                 {
@@ -58,7 +58,7 @@ namespace FeatureFlowFramework.Workflows
 
         protected void RemoveFromRunningWorkflows(IWorkflowControls workflow)
         {
-            using(runningWorkflowsLock.ForWriting)
+            using(runningWorkflowsLock.ForWriting())
             {
                 runningWorkflows.Remove(workflow);
                 if (executionInfoForwarder != null) workflow.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
@@ -67,7 +67,7 @@ namespace FeatureFlowFramework.Workflows
 
         protected void AddToRunningWorkflows(IWorkflowControls workflow)
         {
-            using(runningWorkflowsLock.ForWriting)
+            using(runningWorkflowsLock.ForWriting())
             {
                 runningWorkflows.Add(workflow);
                 if (executionInfoForwarder != null) workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);

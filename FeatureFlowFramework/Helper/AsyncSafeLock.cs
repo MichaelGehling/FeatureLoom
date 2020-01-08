@@ -39,10 +39,9 @@ namespace FeatureFlowFramework.Helper
 
         const int NO_LOCKID = 0;
 
-        public IDisposable ForReading
+        [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
+        public IDisposable ForReading()
         {
-            get
-            {
                 var newLockId = 0;
                 var currentLockId = 0;
                 do
@@ -58,7 +57,6 @@ namespace FeatureFlowFramework.Helper
                 while(currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
                 var after = lockId;
                 return new ReadLock(this);
-            }
         }
 
         public async Task<IDisposable> ForReadingAsync()
@@ -80,10 +78,9 @@ namespace FeatureFlowFramework.Helper
             return new ReadLock(this);
         }
 
-        public IDisposable ForWriting
+        [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
+        public IDisposable ForWriting()
         {
-            get
-            {
                 var newLockId = Interlocked.Increment(ref lockIdCounter);
                 while(newLockId <= NO_LOCKID) newLockId = Interlocked.Increment(ref lockIdCounter);
 
@@ -99,8 +96,9 @@ namespace FeatureFlowFramework.Helper
                 }
                 while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
 
+                if(lockId <= 0) Console.WriteLine("OMG");
+                if(newLockId <= 0) Console.WriteLine("OMG");
                 return new WriteLock(this);
-            }
         }
 
         public async Task<IDisposable> ForWritingAsync()
@@ -125,15 +123,17 @@ namespace FeatureFlowFramework.Helper
         {
             AsyncSafeLock safeLock;
 
+            [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
             public ReadLock(AsyncSafeLock safeLock)
             {
                 this.safeLock = safeLock;
                 safeLock.activeWaitingEvent?.Reset();
             }
 
+            [MethodImpl(MethodImplOptions.NoOptimization)]
             public void Dispose()
             {
-                if(safeLock.lockId >= 0) Console.WriteLine("OMG");
+                //if(safeLock.lockId >= 0) Console.WriteLine("OMG");
                 var newLockId = 0;
                 var currentLockId = 0;
                 do
@@ -155,15 +155,17 @@ namespace FeatureFlowFramework.Helper
         {
             AsyncSafeLock safeLock;
 
+            [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
             public WriteLock(AsyncSafeLock safeLock)
             {
                 this.safeLock = safeLock;
                 safeLock.activeWaitingEvent?.Reset();
             }
 
+            [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
             public void Dispose()
             {
-                if(safeLock.lockId <= 0) Console.WriteLine("OMG!!!!!!!!!");
+                //if(safeLock.lockId <= 0) Console.WriteLine("OMG!!!!!!!!!");
                 safeLock.lockId = NO_LOCKID;
                 safeLock.activeWaitingEvent = null;
                 safeLock.storedWaitingEvent.ObjIfExists?.Set();
