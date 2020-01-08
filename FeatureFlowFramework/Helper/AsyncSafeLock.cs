@@ -41,21 +41,26 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
         public IDisposable ForReading()
         {
-                var newLockId = 0;
-                var currentLockId = 0;
-                do
+            var newLockId = 0;
+            var currentLockId = 0;
+            do
+            {
+                if(lockId > NO_LOCKID)
                 {
-                    if(lockId > NO_LOCKID)
-                    {
-                        waitingEvent.Wait();
-                    }
-                    currentLockId = lockId;
-                    newLockId = currentLockId - 1;
+                    waitingEvent.Wait();
                 }
-                while(currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
-                waitingEvent.Reset();
+                currentLockId = lockId;
+                newLockId = currentLockId - 1;
+            }
+            while(currentLockId > NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
+            waitingEvent.Reset();
 
-                return new ReadLock(this);
+            if(currentLockId > NO_LOCKID)
+            {
+                Console.WriteLine("RL" + currentLockId + "/" + newLockId + " ");
+            }
+
+            return new ReadLock(this);
         }
 
         public async Task<IDisposable> ForReadingAsync()
@@ -80,22 +85,27 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
         public IDisposable ForWriting()
         {
-                var newLockId = Interlocked.Increment(ref lockIdCounter);
-                while(newLockId <= NO_LOCKID) newLockId = Interlocked.Increment(ref lockIdCounter);
+            var newLockId = Interlocked.Increment(ref lockIdCounter);
+            while(newLockId <= NO_LOCKID) newLockId = Interlocked.Increment(ref lockIdCounter);
 
-                var currentLockId = 0;
-                do
+            var currentLockId = 0;
+            do
+            {
+                currentLockId = lockId;
+                if(currentLockId != NO_LOCKID)
                 {
-                    currentLockId = lockId;
-                    if(currentLockId != NO_LOCKID)
-                    {
                     waitingEvent.Wait();
-                    }
                 }
-                while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
-                waitingEvent.Reset();
+            }
+            while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
+            waitingEvent.Reset();
 
-                return new WriteLock(this, newLockId);
+            if(currentLockId != NO_LOCKID)
+            {
+                Console.WriteLine("WL" + currentLockId + "/" + newLockId + " ");
+            }
+
+            return new WriteLock(this, newLockId);
         }
 
         public async Task<IDisposable> ForWritingAsync()
@@ -129,7 +139,7 @@ namespace FeatureFlowFramework.Helper
             [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
             public void Dispose()
             {
-                var newLockId = 0;
+                /*var newLockId = 0;
                 var currentLockId = 0;
                 do
                 { 
@@ -142,14 +152,16 @@ namespace FeatureFlowFramework.Helper
                     }
                 }
                 while(currentLockId != Interlocked.CompareExchange(ref safeLock.lockId, newLockId, currentLockId));
+                */
+                var newLockId = Interlocked.Increment(ref safeLock.lockId);
 
                 if (NO_LOCKID == newLockId)
                 {
                     safeLock.waitingEvent.Set();
                 }
-                else if (currentLockId >= NO_LOCKID)
+                else if (newLockId > NO_LOCKID)
                 {
-                    Console.WriteLine("R"+ currentLockId + "/" + newLockId + "/" + safeLock.lockId + " ");
+                    Console.WriteLine("RU"+ newLockId + "/" + safeLock.lockId + " ");
                 }
             }
         }
@@ -178,7 +190,7 @@ namespace FeatureFlowFramework.Helper
                 }
                 else
                 {
-                    Console.WriteLine("W" + currentLockId + "/" + myLockId + " ");
+                    Console.WriteLine("WU" + currentLockId + "/" + myLockId + " ");
                 }
             }
         }
