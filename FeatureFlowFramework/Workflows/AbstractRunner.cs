@@ -7,7 +7,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public abstract class AbstractRunner : IWorkflowRunner
     {
-        AsyncSafeLock runningWorkflowsLock = new AsyncSafeLock();
+        AsyncLock runningWorkflowsLock = new AsyncLock();
         protected List<IWorkflowControls> runningWorkflows = new List<IWorkflowControls>();
         protected readonly IStepExecutionController executionController = new DefaultStepExecutionController();
         protected Forwarder executionInfoForwarder = null;

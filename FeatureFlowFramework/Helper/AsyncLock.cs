@@ -7,31 +7,46 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Helper
 {
-    public class AsyncSafeLock
+    public static class AsyncLockExtensions
     {
-        /*private static ConditionalWeakTable<object, AsyncSafeLock> lockObjects = new ConditionalWeakTable<object, AsyncSafeLock>();
-        public static IDisposable LockForReading<T>(this T obj) where T : class
+        private static ConditionalWeakTable<object, AsyncLock> lockObjects = new ConditionalWeakTable<object, AsyncLock>();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static AsyncLock.ReadLock LockForReading<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
-            return objLock.ForReading;
+            return objLock.ForReading();
         }
 
-        public static Task<IDisposable> LockForReadingAsync<T>(this T obj) where T : class
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ValueTask<AsyncLock.ReadLock> LockForReadingAsync<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
             return objLock.ForReadingAsync();
         }
-        public static IDisposable LockForWriting<T>(this T obj) where T : class
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static AsyncLock.WriteLock LockForWriting<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
-            return objLock.ForWriting;
+            return objLock.ForWriting();
         }
-        public static Task<IDisposable> LockForWritingAsync<T>(this T obj) where T : class
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ValueTask<AsyncLock.WriteLock> LockForWritingAsync<T>(this T obj) where T : class
         {
             var objLock = lockObjects.GetOrCreateValue(obj);
             return objLock.ForWritingAsync();
-        }*/
+        }
+    }
 
+    public class Box<T> where T : struct
+    {
+        public T value;
+    }
+
+    public class AsyncLock
+    {
         const int NO_LOCKID = 0;
 
         /// <summary>
@@ -47,10 +62,10 @@ namespace FeatureFlowFramework.Helper
         /// When exceeding the maximum value it is reset to NO_LOCKID.
         /// </summary>
         volatile int lockIdCounter = NO_LOCKID;
-        //AsyncManualResetEvent waitingEvent = new AsyncManualResetEvent();
         TaskCompletionSource<bool> tcs;
 
-        public IDisposable ForReading()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ReadLock ForReading()
         {
             var newLockId = 0;
             var currentLockId = 0;
@@ -58,7 +73,6 @@ namespace FeatureFlowFramework.Helper
             {
                 if(lockId > NO_LOCKID)
                 {
-                    //waitingEvent.Wait();
                     if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
                     tcs?.Task.Wait();
                 }
@@ -67,12 +81,12 @@ namespace FeatureFlowFramework.Helper
             }
             while(currentLockId > NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
 
-            //waitingEvent.Reset();
             ResetTcs();
 
             return new ReadLock(this);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResetTcs()
         {
             bool ok = true;
@@ -85,7 +99,8 @@ namespace FeatureFlowFramework.Helper
             while(!ok);
         }
 
-        public async Task<IDisposable> ForReadingAsync()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async ValueTask<ReadLock> ForReadingAsync()
         {
             var newLockId = 0;
             var currentLockId = 0;
@@ -93,7 +108,6 @@ namespace FeatureFlowFramework.Helper
             {
                 if(lockId > NO_LOCKID)
                 {
-                    //await waitingEvent.WaitingTask;
                     if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
                     await tcs?.Task;
                 }
@@ -102,13 +116,13 @@ namespace FeatureFlowFramework.Helper
             }
             while(currentLockId > NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
 
-            //waitingEvent.Reset();
             ResetTcs();
 
             return new ReadLock(this);
         }
 
-        public IDisposable ForWriting()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public WriteLock ForWriting()
         {
             var newLockId = Interlocked.Increment(ref lockIdCounter);
             while(newLockId <= NO_LOCKID)
@@ -123,20 +137,19 @@ namespace FeatureFlowFramework.Helper
                 currentLockId = lockId;
                 if(currentLockId != NO_LOCKID)
                 {
-                    //waitingEvent.Wait();
                     if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
                     tcs?.Task.Wait();
                 }
             }
             while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
 
-            //waitingEvent.Reset();
             ResetTcs();
 
             return new WriteLock(this);
         }
 
-        public async Task<IDisposable> ForWritingAsync()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async ValueTask<WriteLock> ForWritingAsync()
         {
             var newLockId = Interlocked.Increment(ref lockIdCounter);
             while(newLockId <= NO_LOCKID)
@@ -151,53 +164,53 @@ namespace FeatureFlowFramework.Helper
                 currentLockId = lockId;
                 if(currentLockId != NO_LOCKID)
                 {
-                    //await waitingEvent.WaitingTask;
                     if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
                     await tcs?.Task;
                 }
             }
             while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
 
-            //waitingEvent.Reset();
             ResetTcs();
 
             return new WriteLock(this);
         }
 
-        private struct ReadLock : IDisposable
+        public struct ReadLock : IDisposable
         {
-            AsyncSafeLock safeLock;
+            AsyncLock safeLock;
 
-            public ReadLock(AsyncSafeLock safeLock)
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public ReadLock(AsyncLock safeLock)
             {
                 this.safeLock = safeLock;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
                 var newLockId = Interlocked.Increment(ref safeLock.lockId);
 
                 if (NO_LOCKID == newLockId)
                 {
-                    //safeLock.waitingEvent.Set();
                     safeLock.tcs?.TrySetResult(true);
                 }
             }
         }
 
-        private struct WriteLock : IDisposable
+        public struct WriteLock : IDisposable
         {
-            AsyncSafeLock safeLock;
+            AsyncLock safeLock;
 
-            public WriteLock(AsyncSafeLock safeLock)
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public WriteLock(AsyncLock safeLock)
             {
                 this.safeLock = safeLock;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
                 safeLock.lockId = NO_LOCKID;
-                //safeLock.waitingEvent.Set();
                 safeLock.tcs?.TrySetResult(true);
             }
         }
