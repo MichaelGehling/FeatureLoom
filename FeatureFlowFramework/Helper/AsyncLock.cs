@@ -260,12 +260,12 @@ namespace FeatureFlowFramework.Helper
 
             public void WaitForReading()
             {
-                //new ValueTask(this, READ).AsTask().Wait();
+                new ValueTask(this, READ).AsTask().Wait();
             }
 
             public void WaitForWriting()
             {
-                //new ValueTask(this, WRITE).AsTask().Wait();
+                new ValueTask(this, WRITE).AsTask().Wait();
             }
 
             public ValueTask WaitForReadingAsync()
@@ -292,33 +292,21 @@ namespace FeatureFlowFramework.Helper
 
             public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
             {
-                bool ready = false;
-                lock(queue)
+                if (GetStatus(token) == ValueTaskSourceStatus.Succeeded) continuation(state);
+                else
                 {
-                    if (GetStatus(token) == ValueTaskSourceStatus.Succeeded) ready = true;
-                    else queue.Enqueue(new Continuation(continuation, state, token));
+                    queue.Enqueue(new Continuation(continuation, state, token));
+                    if (parent.lockId == NO_LOCKID) Continue();
                 }
-                if (ready) continuation(state);
             }
 
             public void Continue()
             {
-                bool next = false;
-                Continuation c;
-                do
+                while(queue.TryPeek(out Continuation c) && GetStatus(c.token) == ValueTaskSourceStatus.Succeeded)
                 {
-                    lock (queue)
-                    {
-                        next = queue.TryPeek(out c);
-                    }
-                    if (next && GetStatus(c.token) == ValueTaskSourceStatus.Succeeded)
-                    {
-                        c.execute(c.state);
-                        queue.TryDequeue(out c);
-                    }
-                }
-                while (next);
-                
+                    c.execute(c.state);
+                    queue.TryDequeue(out c);
+                }                
             }
 
             struct Continuation
