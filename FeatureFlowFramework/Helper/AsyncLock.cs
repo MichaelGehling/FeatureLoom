@@ -63,20 +63,27 @@ namespace FeatureFlowFramework.Helper
         /// </summary>
         volatile int lockIdCounter = NO_LOCKID;
         TaskCompletionSource<bool> tcs;
+        SpinWait spinWait = new SpinWait();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ReadLock ForReading()
+        public ReadLock ForReading(bool onlySpinWaiting = false)
         {
             var newLockId = 0;
             var currentLockId = 0;
             do
             {
-                if(lockId > NO_LOCKID)
+                currentLockId = lockId;
+                if (currentLockId > NO_LOCKID)
                 {
+                    if (onlySpinWaiting || !spinWait.NextSpinWillYield)
+                    {
+                        spinWait.SpinOnce();
+                        continue;
+                    }
                     if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
                     tcs?.Task.Wait();
+                    currentLockId = lockId;
                 }
-                currentLockId = lockId;
                 newLockId = currentLockId - 1;
             }
             while(currentLockId > NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
@@ -100,18 +107,24 @@ namespace FeatureFlowFramework.Helper
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<ReadLock> ForReadingAsync()
+        public async ValueTask<ReadLock> ForReadingAsync(bool onlySpinWaiting = false)
         {
             var newLockId = 0;
             var currentLockId = 0;
             do
             {
-                if(lockId > NO_LOCKID)
-                {
-                    if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
-                    await tcs?.Task;
-                }
                 currentLockId = lockId;
+                if (currentLockId > NO_LOCKID)
+                {
+                    if (onlySpinWaiting || !spinWait.NextSpinWillYield)
+                    {
+                        spinWait.SpinOnce();
+                        continue;
+                    }
+                    if (tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
+                    await tcs?.Task;
+                    currentLockId = lockId;
+                }
                 newLockId = currentLockId - 1;
             }
             while(currentLockId > NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
@@ -122,7 +135,7 @@ namespace FeatureFlowFramework.Helper
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public WriteLock ForWriting()
+        public WriteLock ForWriting(bool onlySpinWaiting = false)
         {
             var newLockId = Interlocked.Increment(ref lockIdCounter);
             while(newLockId <= NO_LOCKID)
@@ -137,8 +150,14 @@ namespace FeatureFlowFramework.Helper
                 currentLockId = lockId;
                 if(currentLockId != NO_LOCKID)
                 {
-                    if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
+                    if (onlySpinWaiting || !spinWait.NextSpinWillYield)
+                    {
+                        spinWait.SpinOnce();
+                        continue;
+                    }
+                    if (tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
                     tcs?.Task.Wait();
+                    currentLockId = lockId;
                 }
             }
             while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
@@ -149,7 +168,7 @@ namespace FeatureFlowFramework.Helper
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<WriteLock> ForWritingAsync()
+        public async ValueTask<WriteLock> ForWritingAsync(bool onlySpinWaiting = false)
         {
             var newLockId = Interlocked.Increment(ref lockIdCounter);
             while(newLockId <= NO_LOCKID)
@@ -164,8 +183,14 @@ namespace FeatureFlowFramework.Helper
                 currentLockId = lockId;
                 if(currentLockId != NO_LOCKID)
                 {
-                    if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
+                    if (onlySpinWaiting || !spinWait.NextSpinWillYield)
+                    {
+                        spinWait.SpinOnce();
+                        continue;
+                    }
+                    if (tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
                     await tcs?.Task;
+                    currentLockId = lockId;
                 }
             }
             while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
@@ -192,6 +217,7 @@ namespace FeatureFlowFramework.Helper
 
                 if (NO_LOCKID == newLockId)
                 {
+                    safeLock.spinWait.Reset();
                     safeLock.tcs?.TrySetResult(true);
                 }
             }
@@ -210,6 +236,7 @@ namespace FeatureFlowFramework.Helper
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
+                safeLock.spinWait.Reset();
                 safeLock.lockId = NO_LOCKID;
                 safeLock.tcs?.TrySetResult(true);
             }
