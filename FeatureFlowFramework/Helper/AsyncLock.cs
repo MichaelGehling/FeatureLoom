@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Sources;
 
 namespace FeatureFlowFramework.Helper
 {
@@ -40,13 +42,10 @@ namespace FeatureFlowFramework.Helper
         }
     }
 
-    public class Box<T> where T : struct
-    {
-        public T value;
-    }
 
     public class AsyncLock
     {
+
         const int NO_LOCKID = 0;
 
         /// <summary>
@@ -64,6 +63,12 @@ namespace FeatureFlowFramework.Helper
         volatile int lockIdCounter = NO_LOCKID;
         TaskCompletionSource<bool> tcs;
         SpinWait spinWait = new SpinWait();
+        ValueTaskSource vts;        
+
+        public AsyncLock()
+        {
+            vts = new ValueTaskSource(this);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ReadLock ForReading(bool onlySpinWaiting = false)
@@ -80,8 +85,7 @@ namespace FeatureFlowFramework.Helper
                         spinWait.SpinOnce();
                         continue;
                     }
-                    if(tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
-                    tcs?.Task.Wait();
+                    vts.WaitForReading();
                     currentLockId = lockId;
                 }
                 newLockId = currentLockId - 1;
@@ -121,8 +125,7 @@ namespace FeatureFlowFramework.Helper
                         spinWait.SpinOnce();
                         continue;
                     }
-                    if (tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
-                    await tcs?.Task;
+                    await vts.WaitForReadingAsync();
                     currentLockId = lockId;
                 }
                 newLockId = currentLockId - 1;
@@ -155,8 +158,7 @@ namespace FeatureFlowFramework.Helper
                         spinWait.SpinOnce();
                         continue;
                     }
-                    if (tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
-                    tcs?.Task.Wait();
+                    vts.WaitForWriting();
                     currentLockId = lockId;
                 }
             }
@@ -188,8 +190,7 @@ namespace FeatureFlowFramework.Helper
                         spinWait.SpinOnce();
                         continue;
                     }
-                    if (tcs == null) Interlocked.CompareExchange(ref tcs, new TaskCompletionSource<bool>(), null);
-                    await tcs?.Task;
+                    await vts.WaitForWritingAsync();
                     currentLockId = lockId;
                 }
             }
@@ -199,6 +200,8 @@ namespace FeatureFlowFramework.Helper
 
             return new WriteLock(this);
         }
+
+        
 
         public struct ReadLock : IDisposable
         {
@@ -218,7 +221,7 @@ namespace FeatureFlowFramework.Helper
                 if (NO_LOCKID == newLockId)
                 {
                     safeLock.spinWait.Reset();
-                    safeLock.tcs?.TrySetResult(true);
+                    safeLock.vts.Continue();
                 }
             }
         }
@@ -238,7 +241,98 @@ namespace FeatureFlowFramework.Helper
             {
                 safeLock.spinWait.Reset();
                 safeLock.lockId = NO_LOCKID;
-                safeLock.tcs?.TrySetResult(true);
+                safeLock.vts.Continue();
+            }
+        }
+
+        public class ValueTaskSource : IValueTaskSource
+        {
+            AsyncLock parent;
+            public const short READ = 1;
+            public const short WRITE = 2;
+
+            ConcurrentQueue<Continuation> queue = new ConcurrentQueue<Continuation>();
+
+            public ValueTaskSource(AsyncLock parent)
+            {
+                this.parent = parent;
+            }
+
+            public void WaitForReading()
+            {
+                //new ValueTask(this, READ).AsTask().Wait();
+            }
+
+            public void WaitForWriting()
+            {
+                //new ValueTask(this, WRITE).AsTask().Wait();
+            }
+
+            public ValueTask WaitForReadingAsync()
+            {
+                return new ValueTask(this, READ);
+            }
+
+            public ValueTask WaitForWritingAsync()
+            {
+                return new ValueTask(this, WRITE);
+            }
+
+            public void GetResult(short token)
+            {
+                return;
+            }
+
+            public ValueTaskSourceStatus GetStatus(short token)
+            {
+                if (token == READ) return (parent.lockId <= NO_LOCKID) ? ValueTaskSourceStatus.Succeeded : ValueTaskSourceStatus.Pending;
+                if (token == WRITE) return (parent.lockId == NO_LOCKID) ? ValueTaskSourceStatus.Succeeded : ValueTaskSourceStatus.Pending;
+                return ValueTaskSourceStatus.Faulted;
+            }
+
+            public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
+            {
+                bool ready = false;
+                lock(queue)
+                {
+                    if (GetStatus(token) == ValueTaskSourceStatus.Succeeded) ready = true;
+                    else queue.Enqueue(new Continuation(continuation, state, token));
+                }
+                if (ready) continuation(state);
+            }
+
+            public void Continue()
+            {
+                bool next = false;
+                Continuation c;
+                do
+                {
+                    lock (queue)
+                    {
+                        next = queue.TryPeek(out c);
+                    }
+                    if (next && GetStatus(c.token) == ValueTaskSourceStatus.Succeeded)
+                    {
+                        c.execute(c.state);
+                        queue.TryDequeue(out c);
+                    }
+                }
+                while (next);
+                
+            }
+
+            struct Continuation
+            {
+                public Action<object> execute;
+                public object state;
+                public short token;
+
+                public Continuation(Action<object> execute, object state, short token)
+                {
+                    this.execute = execute;
+                    this.state = state;
+                    this.token = token;
+                }
             }
         }
     }
