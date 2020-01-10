@@ -63,7 +63,8 @@ namespace FeatureFlowFramework.Helper
         volatile int lockIdCounter = NO_LOCKID;
         TaskCompletionSource<bool> tcs;
         SpinWait spinWait = new SpinWait();
-        ValueTaskSource vts;        
+        ValueTaskSource vts;
+        ManualResetEventSlim mre = new ManualResetEventSlim(true, 0);
 
         public AsyncLock()
         {
@@ -80,12 +81,17 @@ namespace FeatureFlowFramework.Helper
                 currentLockId = lockId;
                 if (currentLockId > NO_LOCKID)
                 {
-                    if (onlySpinWaiting || !spinWait.NextSpinWillYield)
+                    if(onlySpinWaiting || !spinWait.NextSpinWillYield)
                     {
                         spinWait.SpinOnce();
                         continue;
                     }
-                    vts.WaitForReading();
+                    else
+                    {
+                        if(lockId == currentLockId) mre.Reset();
+                        mre.Wait();
+                        currentLockId = lockId;
+                    }
                     currentLockId = lockId;
                 }
                 newLockId = currentLockId - 1;
@@ -158,7 +164,12 @@ namespace FeatureFlowFramework.Helper
                         spinWait.SpinOnce();
                         continue;
                     }
-                    vts.WaitForWriting();
+                    else
+                    {
+                        if (lockId == currentLockId) mre.Reset();
+                        mre.Wait();
+                        currentLockId = lockId;
+                    }
                     currentLockId = lockId;
                 }
             }
@@ -221,7 +232,8 @@ namespace FeatureFlowFramework.Helper
                 if (NO_LOCKID == newLockId)
                 {
                     safeLock.spinWait.Reset();
-                    safeLock.vts.Continue();
+                    if(!safeLock.mre.IsSet) safeLock.mre.Set();
+                    safeLock.vts.Complete();
                 }
             }
         }
@@ -241,85 +253,186 @@ namespace FeatureFlowFramework.Helper
             {
                 safeLock.spinWait.Reset();
                 safeLock.lockId = NO_LOCKID;
-                safeLock.vts.Continue();
+                if (!safeLock.mre.IsSet) safeLock.mre.Set();
+                safeLock.vts.Complete();
             }
         }
 
         public class ValueTaskSource : IValueTaskSource
         {
             AsyncLock parent;
-            public const short READ = 1;
-            public const short WRITE = 2;
+            const int maxTasks = 100;
+            ValueTaskData[] valueTaskDataSet = new ValueTaskData[maxTasks];
+            volatile int lastToken = -1;
+            volatile int nextCompletion = 0;
 
-            ConcurrentQueue<Continuation> queue = new ConcurrentQueue<Continuation>();
+            struct ValueTaskData
+            {
+                public readonly short token;
+                public readonly bool reading;
+                public readonly bool initialized;
+                public bool completed;
+                public ContinuationData continuationData;
+
+                public ValueTaskData(short token, bool reading)
+                {
+                    this.token = token;
+                    this.reading = reading;
+                    completed = false;
+                    this.continuationData = default;
+                    this.initialized = true;
+                }
+
+                public ValueTaskData WithContinuation(ContinuationData data)
+                {
+                    continuationData = data;
+                    return this;
+                }
+
+                public ValueTaskData Complete()
+                {
+                    completed = true;
+                    return this;
+                }
+
+                public bool Continue()
+                {
+                    if(continuationData.initialized)
+                    {
+                        continuationData.Continue();
+                        return true;
+                    }
+                    else return false;
+                }
+            }
+            
 
             public ValueTaskSource(AsyncLock parent)
             {
                 this.parent = parent;
             }
 
-            public void WaitForReading()
-            {
-                new ValueTask(this, READ).AsTask().Wait();
-            }
-
-            public void WaitForWriting()
-            {
-                new ValueTask(this, WRITE).AsTask().Wait();
-            }
-
             public ValueTask WaitForReadingAsync()
             {
-                return new ValueTask(this, READ);
+                var token = Interlocked.Increment(ref lastToken);
+                if(token == maxTasks-1) lastToken = -1;
+                else if (token >= maxTasks-1) token = Interlocked.Increment(ref lastToken);
+                short shortToken = (short)token;
+                valueTaskDataSet[token] = new ValueTaskData(shortToken, true);
+                return new ValueTask(this, shortToken);
             }
 
             public ValueTask WaitForWritingAsync()
             {
-                return new ValueTask(this, WRITE);
+                var token = Interlocked.Increment(ref lastToken);
+                if(token == maxTasks - 1) lastToken = -1;
+                else if(token >= maxTasks - 1) token = Interlocked.Increment(ref lastToken);
+                short shortToken = (short)token;
+                valueTaskDataSet[token] = new ValueTaskData(shortToken, false);
+                return new ValueTask(this, shortToken);
             }
 
             public void GetResult(short token)
             {
+                var data = valueTaskDataSet[token];
+                if(!data.initialized) throw new Exception("Invalid token!");
+                if(data.completed) valueTaskDataSet[token] = new ValueTaskData();
                 return;
             }
 
             public ValueTaskSourceStatus GetStatus(short token)
             {
-                if (token == READ) return (parent.lockId <= NO_LOCKID) ? ValueTaskSourceStatus.Succeeded : ValueTaskSourceStatus.Pending;
-                if (token == WRITE) return (parent.lockId == NO_LOCKID) ? ValueTaskSourceStatus.Succeeded : ValueTaskSourceStatus.Pending;
-                return ValueTaskSourceStatus.Faulted;
+                return valueTaskDataSet[token].completed ? ValueTaskSourceStatus.Succeeded : ValueTaskSourceStatus.Pending;
             }
 
             public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
             {
-                if (GetStatus(token) == ValueTaskSourceStatus.Succeeded) continuation(state);
+                var data = valueTaskDataSet[token];
+                if (data.completed) continuation(state);
                 else
                 {
-                    queue.Enqueue(new Continuation(continuation, state, token));
-                    if (parent.lockId == NO_LOCKID) Continue();
+                    object scheduler = null;
+                    SynchronizationContext sc = SynchronizationContext.Current;
+                    if(sc != null && sc.GetType() != typeof(SynchronizationContext))
+                    {
+                        scheduler = sc;
+                    }
+                    else
+                    {
+                        TaskScheduler ts = TaskScheduler.Current;
+                        if(ts != TaskScheduler.Default)
+                        {
+                            scheduler = ts;
+                        }
+                    }
+
+                    var continuationData = new ContinuationData(continuation, state, token, scheduler);
+                    valueTaskDataSet[token] = data.WithContinuation(continuationData);
                 }
             }
 
-            public void Continue()
+
+            public void Complete()
             {
-                while(queue.TryPeek(out Continuation c) && GetStatus(c.token) == ValueTaskSourceStatus.Succeeded)
+                var from = nextCompletion;
+                var to = lastToken;
+                while ((from <= to || from > to + 1))
                 {
-                    c.execute(c.state);
-                    queue.TryDequeue(out c);
-                }                
+                    var i = nextCompletion++;
+                    if(nextCompletion >= maxTasks) nextCompletion = 0;
+
+                    var data = valueTaskDataSet[i];
+                    if(!data.initialized) continue;
+                    if(data.continuationData.initialized)
+                    {
+                        data.continuationData.Continue();
+                        valueTaskDataSet[i] = new ValueTaskData();
+                    }
+                    else valueTaskDataSet[i] = data.Complete();
+
+                    from = nextCompletion;
+                    to = lastToken;
+                }
             }
 
-            struct Continuation
+            struct ContinuationData
             {
-                public Action<object> execute;
+                public Action<object> continuation;
                 public object state;
                 public short token;
+                public object scheduler;
+                public bool initialized;
 
-                public Continuation(Action<object> execute, object state, short token)
+                public ContinuationData(Action<object> continuation, object state, short token, object syncContext)
                 {
-                    this.execute = execute;
+                    this.continuation = continuation;
                     this.state = state;
                     this.token = token;
+                    this.scheduler = syncContext;
+                    this.initialized = true;
+                }
+
+                public void Continue()
+                {
+                    if(scheduler != null)
+                    {
+                        if(scheduler is SynchronizationContext sc)
+                        {
+                            sc.Post(s =>
+                            {
+                                (Action<object> execute, object state) t = ((Action<object> execute, object state))s;
+                                t.execute(t.state);
+                            }, (continuation, state));
+                        }
+                        else if(scheduler is TaskScheduler ts)
+                        {
+                            Task.Factory.StartNew(continuation, state, CancellationToken.None, TaskCreationOptions.DenyChildAttach, ts);
+                        }
+                    }
+                    else
+                    {
+                        continuation(state);
+                    }
                 }
             }
         }
