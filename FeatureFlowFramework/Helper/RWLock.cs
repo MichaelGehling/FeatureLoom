@@ -9,8 +9,7 @@ using System.Threading.Tasks.Sources;
 
 namespace FeatureFlowFramework.Helper
 {
-
-    public class RWSpinLock
+    public class RWLock
     {
         const int NO_LOCKID = 0;
         const int WRITE_LOCKID = NO_LOCKID + 1;
@@ -23,19 +22,33 @@ namespace FeatureFlowFramework.Helper
         /// </summary>
         volatile int lockId = NO_LOCKID;
         SpinWait spinWait = new SpinWait();
+        ManualResetEventSlim mre = new ManualResetEventSlim(false);
+
+        public enum SpinWaitBehaviour
+        {
+            BalancedSpinning,
+            NoSpinning,
+            OnlySpinning
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ReadLock ForReading()
+        public ReadLock ForReading(SpinWaitBehaviour spinWaitBehaviour = SpinWaitBehaviour.BalancedSpinning)
         {
             var newLockId = 0;
             var currentLockId = 0;
             do
             {
                 currentLockId = lockId;
-                if (currentLockId > NO_LOCKID)
+                if(currentLockId > NO_LOCKID)
                 {
+                    if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
+                        (spinWaitBehaviour == SpinWaitBehaviour.BalancedSpinning && !spinWait.NextSpinWillYield))
+                    {
                         spinWait.SpinOnce();
                         continue;
+                    }
+                    if(mre.IsSet) mre.Reset();
+                    if (currentLockId > NO_LOCKID) mre.Wait();
                 }
                 currentLockId = lockId;
                 newLockId = currentLockId - 1;
@@ -52,21 +65,27 @@ namespace FeatureFlowFramework.Helper
             if(NO_LOCKID == newLockId)
             {
                 spinWait.Reset();
+                if (!mre.IsSet) mre.Set();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public WriteLock ForWriting()
+        public WriteLock ForWriting(SpinWaitBehaviour spinWaitBehaviour = SpinWaitBehaviour.BalancedSpinning)
         {
             var newLockId = WRITE_LOCKID;
             var currentLockId = 0;
             do
             {
-                currentLockId = lockId;
-                if(currentLockId != NO_LOCKID)
+                if(currentLockId > NO_LOCKID)
                 {
-                    spinWait.SpinOnce();
-                    continue;
+                    if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
+                        (spinWaitBehaviour == SpinWaitBehaviour.BalancedSpinning && !spinWait.NextSpinWillYield))
+                    {
+                        spinWait.SpinOnce();
+                        continue;
+                    }
+                    if(mre.IsSet) mre.Reset();
+                    if(currentLockId > NO_LOCKID) mre.Wait();
                 }
             }
             while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
@@ -79,14 +98,15 @@ namespace FeatureFlowFramework.Helper
         {
             lockId = NO_LOCKID;
             spinWait.Reset();
+            if(!mre.IsSet) mre.Set();
         }
 
         public struct ReadLock : IDisposable
         {
-            RWSpinLock lockObj;
+            RWLock lockObj;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ReadLock(RWSpinLock safeLock)
+            public ReadLock(RWLock safeLock)
             {
                 this.lockObj = safeLock;
             }
@@ -100,10 +120,10 @@ namespace FeatureFlowFramework.Helper
 
         public struct WriteLock : IDisposable
         {
-            RWSpinLock lockObj;
+            RWLock lockObj;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public WriteLock(RWSpinLock safeLock)
+            public WriteLock(RWLock safeLock)
             {
                 this.lockObj = safeLock;
             }
