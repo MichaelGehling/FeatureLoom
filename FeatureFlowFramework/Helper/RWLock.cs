@@ -22,13 +22,25 @@ namespace FeatureFlowFramework.Helper
         /// </summary>
         volatile int lockId = NO_LOCKID;
         SpinWait spinWait = new SpinWait();
-        ManualResetEventSlim mre = new ManualResetEventSlim(false);
+        ManualResetEventSlim mre = new ManualResetEventSlim(true);
+        SpinWaitBehaviour defaultSpinningBehaviour = SpinWaitBehaviour.BalancedSpinning;
+
+        public RWLock(SpinWaitBehaviour defaultSpinningBehaviour = SpinWaitBehaviour.BalancedSpinning)
+        {
+            this.defaultSpinningBehaviour = defaultSpinningBehaviour;
+        }
 
         public enum SpinWaitBehaviour
         {
             BalancedSpinning,
             NoSpinning,
             OnlySpinning
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ReadLock ForReading()
+        {
+            return ForReading(defaultSpinningBehaviour);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -48,7 +60,7 @@ namespace FeatureFlowFramework.Helper
                         continue;
                     }
                     if(mre.IsSet) mre.Reset();
-                    if (currentLockId > NO_LOCKID) mre.Wait();
+                    if (lockId > NO_LOCKID) mre.Wait();
                 }
                 currentLockId = lockId;
                 newLockId = currentLockId - 1;
@@ -65,8 +77,17 @@ namespace FeatureFlowFramework.Helper
             if(NO_LOCKID == newLockId)
             {
                 spinWait.Reset();
-                if (!mre.IsSet) mre.Set();
+                if (!(mre?.IsSet ?? true))
+                {
+                    mre.Set();
+                }
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public WriteLock ForWriting()
+        {
+            return ForWriting(defaultSpinningBehaviour);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -76,7 +97,8 @@ namespace FeatureFlowFramework.Helper
             var currentLockId = 0;
             do
             {
-                if(currentLockId > NO_LOCKID)
+                currentLockId = lockId;
+                if (currentLockId != NO_LOCKID)
                 {
                     if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
                         (spinWaitBehaviour == SpinWaitBehaviour.BalancedSpinning && !spinWait.NextSpinWillYield))
@@ -85,7 +107,7 @@ namespace FeatureFlowFramework.Helper
                         continue;
                     }
                     if(mre.IsSet) mre.Reset();
-                    if(currentLockId > NO_LOCKID) mre.Wait();
+                    if(lockId != NO_LOCKID) mre.Wait();
                 }
             }
             while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
