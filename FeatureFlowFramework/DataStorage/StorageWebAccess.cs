@@ -129,7 +129,7 @@ namespace FeatureFlowFramework.DataStorage
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
                typeof(T).IsAssignableFrom(typeof(byte[])))
             {
-                if (await reader.TryReadAsync(request.RelativePath.Trim('/'), response.Stream))
+                if (await reader.TryReadAsync(request.RelativePath.Trim('/'), s => s.CopyToAsync(response.Stream)))
                 {
                     return true;
                 }

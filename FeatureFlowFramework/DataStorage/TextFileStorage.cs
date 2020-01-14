@@ -520,34 +520,34 @@ namespace FeatureFlowFramework.DataStorage
                 return new AsyncOutResult<bool, T>(false, default);
             }
         }
-
-        public bool TryRead(string uri, Stream targetStream)
+        
+        public bool TryRead(string uri, Action<Stream> consumer)
         {
             try
             {
-                if (cache?.Get(uri) is string cacheString)
+                if(cache?.Get(uri) is string cacheString)
                 {
                     var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
-                    stream.CopyTo(targetStream);
+                    consumer(stream);
                     return true;
                 }
 
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
-                if (fileInfo.Exists)
+                if(fileInfo.Exists)
                 {
-                    using (var stream = fileInfo.OpenRead())
+                    using(var stream = fileInfo.OpenRead())
                     {
-                        if (config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if(config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
 
-                        if (config.updateCacheOnRead)
+                        if(config.updateCacheOnRead)
                         {
-                            using (var memoryStream = new MemoryStream())
-                            using (var textReader = new StreamReader(memoryStream))
+                            using(var memoryStream = new MemoryStream())
+                            using(var textReader = new StreamReader(memoryStream))
                             {
                                 stream.CopyTo(memoryStream);
                                 memoryStream.Position = 0;
-                                memoryStream.CopyTo(targetStream);
+                                consumer(memoryStream);
                                 memoryStream.Position = 0;
                                 string fileContent = textReader.ReadToEnd();
                                 cache?.Add(uri, fileContent, cacheItemPolicy);
@@ -555,7 +555,7 @@ namespace FeatureFlowFramework.DataStorage
                         }
                         else
                         {
-                            stream.CopyTo(targetStream);
+                            consumer(stream);
                         }
 
                         return true;
@@ -569,33 +569,33 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        public async Task<bool> TryReadAsync(string uri, Stream targetStream)
+        public async Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer)
         {
             try
             {
-                if (cache?.Get(uri) is string cacheString)
+                if(cache?.Get(uri) is string cacheString)
                 {
                     var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
-                    await stream.CopyToAsync(targetStream);
+                    await consumer(stream);
                     return true;
                 }
 
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
-                if (fileInfo.Exists)
+                if(fileInfo.Exists)
                 {
-                    using (var stream = fileInfo.OpenRead())
+                    using(var stream = fileInfo.OpenRead())
                     {
-                        if (config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
+                        if(config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
 
-                        if (config.updateCacheOnRead)
+                        if(config.updateCacheOnRead)
                         {
-                            using (var memoryStream = new MemoryStream())
-                            using (var textReader = new StreamReader(memoryStream))
+                            using(var memoryStream = new MemoryStream())
+                            using(var textReader = new StreamReader(memoryStream))
                             {
                                 await stream.CopyToAsync(memoryStream);
                                 memoryStream.Position = 0;
-                                await memoryStream.CopyToAsync(targetStream);
+                                await consumer(memoryStream);
                                 memoryStream.Position = 0;
                                 string fileContent = await textReader.ReadToEndAsync();
                                 cache?.Add(uri, fileContent, cacheItemPolicy);
@@ -603,7 +603,7 @@ namespace FeatureFlowFramework.DataStorage
                         }
                         else
                         {
-                            await stream.CopyToAsync(targetStream);
+                            await consumer(stream);
                         }
 
                         return true;

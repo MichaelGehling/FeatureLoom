@@ -112,12 +112,12 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        public bool TryRead(string uri, Stream targetStream)
+        public bool TryRead(string uri, Action<Stream> consumer)
         {
             return false;
         }
 
-        public Task<bool> TryReadAsync(string uri, Stream targetStream)
+        public Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer)
         {
             return Task.FromResult(false);
         }

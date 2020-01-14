@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helper;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -15,9 +16,9 @@ namespace FeatureFlowFramework.DataStorage
 
         Task<AsyncOutResult<bool, T>> TryReadAsync<T>(string uri);
 
-        bool TryRead(string uri, Stream targetStream);
+        bool TryRead(string uri, Action<Stream> consumer);
 
-        Task<bool> TryReadAsync(string uri, Stream targetStream);
+        Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer);
 
         bool TryListUris(out string[] uris, string pattern = null);
 

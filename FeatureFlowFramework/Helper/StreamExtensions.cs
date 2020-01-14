@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Helper
@@ -15,6 +16,11 @@ namespace FeatureFlowFramework.Helper
         {
             StreamReader reader = new StreamReader(stream);
             return reader.ReadToEndAsync();
+        }
+
+        public static Stream ToStream(this string str, Encoding encoding)
+        {
+            return new MemoryStream(encoding.GetBytes(str));
         }
     }
 }
