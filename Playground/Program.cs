@@ -31,8 +31,8 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 6;
-            int numWriteLocks = 6;
+            int numReadLocks = 4;
+            int numWriteLocks = 4;
 
             List<DateTime> dummyList = new List<DateTime>();
             Random rnd = new Random();
