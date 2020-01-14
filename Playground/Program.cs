@@ -26,41 +26,41 @@ namespace Playground
      
         private static void PerformanceTestParallel()
         {
-            var duration = 3.Seconds();
+            var duration = 5.Seconds();
             double timeFactor = duration.TotalMilliseconds * 1_000_000;
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 4;
-            int numWriteLocks = 4;
+            int numReadLocks = 0;
+            int numWriteLocks = 2;
 
             List<DateTime> dummyList = new List<DateTime>();
             Random rnd = new Random();
             
             Action workWrite = () =>
             {
-                if(dummyList.Count > 1000) dummyList.Clear();
-                dummyList.Add(AppTime.Now);
+                //if(dummyList.Count > 1000) dummyList.Clear();
+                //dummyList.Add(AppTime.Now);
                 TimeFrame tf = new TimeFrame(0.01.Milliseconds());
-                //while(!tf.Elapsed) ;
+                while(!tf.Elapsed) ;
             };
             Action workRead = () =>
             {
-                foreach(var d in dummyList) d.Add(1.Milliseconds());
+                //foreach(var d in dummyList) d.Add(1.Milliseconds());
                 TimeFrame tf = new TimeFrame(0.01.Milliseconds());
-                //while(!tf.Elapsed) ;
+                while(!tf.Elapsed) ;
             };
             Action slack = () =>
             {
-                TimeFrame tf = new TimeFrame(0.31.Milliseconds());
-                while (!tf.Elapsed) ;
+                /*TimeFrame tf = new TimeFrame(1.0.Milliseconds());
+                while (!tf.Elapsed) ;*/
+                //Thread.Sleep(1.Milliseconds());
             };
 
             name = "Overhead";
             Prepare(out gcs);
-            //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
-            //double overhead = timeFactor / c;
-            double overhead = 0;
+            c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
+            double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + name);
 
             name = "ClassicLock";
