@@ -124,7 +124,7 @@ namespace FeatureFlowFramework.Workflows
         private static bool DoWaiting<C>(C context, Step<C> step, PartialStep<C> partialStep) where C : IStateMachineContext
         {
             bool proceed;
-            Task waitTask = partialStep.waitingTaskDelegate(context);
+            Task waitTask = partialStep.waitingTaskDelegate?.Invoke(context);
             var timeoutDelegate = partialStep.timeoutDelegate;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
 
@@ -275,10 +275,11 @@ namespace FeatureFlowFramework.Workflows
 
         private static async Task<bool> DoWaitingAsync<C>(C context, Step<C> step, bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
         {            
-            Task waitTask = partialStep.waitingTaskDelegate(context);
+            Task waitTask = partialStep.waitingTaskDelegate?.Invoke(context);
             var timeoutDelegate = partialStep.timeoutDelegate;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
 
+            
             context.Unlock();
             try
             {

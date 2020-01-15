@@ -74,7 +74,7 @@ namespace FeatureFlowFramework.Helper
             var registration = cancellationToken.Register(s =>
             {
                 var source = (TaskCompletionSource<bool>)s;
-                source.SetResult(false);
+                source.TrySetResult(false);
             }, tcs);
 
             _ = task.ContinueWith((t, s) =>
@@ -163,7 +163,7 @@ namespace FeatureFlowFramework.Helper
             var registration = linkedToken.Register(s =>
             {
                 var source = (TaskCompletionSource<bool>)s;
-                source.SetResult(false);
+                source.TrySetResult(false);
             }, tcs);
 
             _ = task.ContinueWith((t, s) =>

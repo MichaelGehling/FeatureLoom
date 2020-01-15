@@ -56,7 +56,7 @@ namespace FeatureFlowFramework.Workflows
         {
             if (state.steps.Count == 0)
             {
-                state.Build(state.description).Step("Finish (automatically added)").Finish();
+                state.steps.Add(new Step<CT>(state.parentStateMachine, state, state.steps.Count) { description = "Finish (automatically added)", finishStateMachine = true });
                 findings += $"State {state.name} has no steps defined. A finish step was added.\n";
             }
             else
@@ -75,7 +75,7 @@ namespace FeatureFlowFramework.Workflows
                 else if (!lastPartialStep.hasCondition && lastPartialStep.finishStateMachine) validLastStep = true;
                 if (!validLastStep)
                 {
-                    state.Build(state.description).Step("Finish (automatically added)").Finish();
+                    state.steps.Add(new Step<CT>(state.parentStateMachine, state, state.steps.Count) { description = "Finish (automatically added)", finishStateMachine = true });
                     findings += $"State {state.name} has a last step {lastStep.description} without a final finish or goto. An extra finish step was added.\n";
                 }
             }
