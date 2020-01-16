@@ -14,7 +14,6 @@ namespace Playground
         static void Main(string[] args)
         {
             FunctionTestRWLock(2.Seconds(), 1, 2);
-            FunctionTestSpinLock(2.Seconds(), 2, 2);
             Console.WriteLine("----");
             PerformanceTest();
             Console.WriteLine("----");
@@ -26,12 +25,12 @@ namespace Playground
      
         private static void PerformanceTestParallel()
         {
-            var duration = 3.Seconds();
+            var duration = 5.Seconds();
             double timeFactor = duration.TotalMilliseconds * 1_000_000;
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 0;
+            int numReadLocks = 8;
             int numWriteLocks = 4;
 
 
@@ -42,14 +41,14 @@ namespace Playground
             {
                 //if(dummyList.Count > 10000) dummyList.Clear();
                 //dummyList.Add(AppTime.Now);
-                TimeFrame tf = new TimeFrame((0.1 * rnd.Next(1,1)).Milliseconds());
+                TimeFrame tf = new TimeFrame((0.01 * rnd.Next(1,10) * rnd.Next(1, 2)).Milliseconds());
                 while(!tf.Elapsed) ;
-                Thread.Yield(); ;
+                Thread.Yield();
             };
             Action workRead = () =>
             {
                 //foreach(var d in dummyList) d.Add(1.Milliseconds());
-                TimeFrame tf = new TimeFrame((0.1 * rnd.Next(1, 1)).Milliseconds());
+                TimeFrame tf = new TimeFrame((0.01 * rnd.Next(1, 10) * rnd.Next(1, 2)).Milliseconds());
                 while(!tf.Elapsed) ;
                 Thread.Yield();
             };
@@ -58,7 +57,7 @@ namespace Playground
                 /*TimeFrame tf = new TimeFrame(1.0.Milliseconds());
                 while (!tf.Elapsed) ;*/
                 //Thread.Sleep(1.Milliseconds());
-                Thread.Sleep(0);
+                Thread.Sleep(rnd.Next(0, 1));
             };
 
             name = "Overhead";
@@ -78,11 +77,6 @@ namespace Playground
             c = RunParallel(new SpinLock(), duration, SpinLock, numReadLocks, SpinLock, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
             */
-
-            name = "RWSpinLock";
-            Prepare(out gcs);
-            c = RunParallel(new RWSpinLock(), duration, RWSpinReadLock, numReadLocks, RWSpinWriteLock, numWriteLocks, workRead, workWrite, slack).Sum();
-            Finish(timeFactor, name, c, gcs, overhead);
 
             name = "RWLock";
             Prepare(out gcs);
@@ -164,16 +158,6 @@ namespace Playground
             c = Overhead(new object(), duration, work, slack);
             double time_overhead_ns = timeFactor / c;
             Console.WriteLine(time_overhead_ns + " " + -1 + " " + name);
-
-            name = "RWSpinLock Read";
-            Prepare(out gcs);
-            c = RWSpinReadLock(new RWSpinLock(), duration, work, slack);
-            Finish(timeFactor, name, c, gcs, time_overhead_ns);
-
-            name = "RWSpinLock Write";
-            Prepare(out gcs);
-            c = RWSpinWriteLock(new RWSpinLock(), duration, work, slack);
-            Finish(timeFactor, name, c, gcs, time_overhead_ns);
             
             name = "RWLock Read";
             Prepare(out gcs);
@@ -449,38 +433,6 @@ namespace Playground
             return c;
         }
 
-        private static long RWSpinWriteLock(RWSpinLock myLock, TimeSpan duration, Action work, Action slack)
-        {
-            long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
-            {
-                using(myLock.ForWriting())
-                {
-                    c++;
-                    work?.Invoke();
-                }
-                slack?.Invoke();
-            }
-            return c;
-        }
-
-        private static long RWSpinReadLock(RWSpinLock myLock, TimeSpan duration, Action work, Action slack)
-        {
-            long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
-            {
-                using(myLock.ForReading())
-                {
-                    c++;
-                    work?.Invoke();
-                }
-                slack?.Invoke();
-            }
-            return c;
-        }
-
         private static long Overhead(object dummy, TimeSpan duration, Action work, Action slack)
         {
             long c = 0;
@@ -516,27 +468,5 @@ namespace Playground
             }
         }
 
-      
-        private static void FunctionTestSpinLock(TimeSpan duration, int numWriting, int numReading)
-        { 
-            List<DateTime> dummyList = new List<DateTime>();
-            Action workWrite = () =>
-            {
-                if (dummyList.Count > 100) dummyList.Clear();
-                dummyList.Add(AppTime.Now);
-            };
-            Action workRead = () =>
-            {
-                foreach (var d in dummyList) d.Add(1.Milliseconds());
-            };
-
-            var t1 = Task.Run(() => RunParallel(new RWSpinLock(), duration, RWSpinReadLock, numReading, RWSpinWriteLock, numWriting, workRead, workWrite, null));
-            t1.Wait();
-
-            foreach(var c in t1.Result)
-            {
-                Console.WriteLine(c);
-            }
-        }
     }
 }

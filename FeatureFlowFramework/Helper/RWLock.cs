@@ -21,11 +21,11 @@ namespace FeatureFlowFramework.Helper
         /// When entering a write-lock, a positive lockId (greater than NO_LOCK) is set and set back to NO_LOCK when the write-lock is left.
         /// </summary>
         volatile int lockId = NO_LOCKID;
-        volatile bool writerIsWaiting = false;
-        volatile bool readerIsWaiting = false;
+        bool writerIsWaiting = false;
+        bool readerIsWaiting = false;
 
         ManualResetEventSlim mre = new ManualResetEventSlim(true, 0);
-        
+
         SpinWaitBehaviour defaultSpinningBehaviour = SpinWaitBehaviour.Balanced;
 
         public RWLock(SpinWaitBehaviour defaultSpinningBehaviour = SpinWaitBehaviour.Balanced)
