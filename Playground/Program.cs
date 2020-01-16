@@ -31,7 +31,7 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 4;
+            int numReadLocks = 0;
             int numWriteLocks = 4;
 
 
@@ -91,7 +91,7 @@ namespace Playground
             
             name = "RWLock OnlySpinning";
             Prepare(out gcs);
-            c = RunParallel(new RWLock(RWLock.SpinWaitBehaviour.NoWaiting), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            c = RunParallel(new RWLock(RWLock.SpinWaitBehaviour.OnlySpinning), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
             
             name = "RWLock NoSpinning";

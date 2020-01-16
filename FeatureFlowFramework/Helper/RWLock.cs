@@ -37,7 +37,7 @@ namespace FeatureFlowFramework.Helper
         {
             Balanced,
             NoSpinning,
-            NoWaiting
+            OnlySpinning
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -55,7 +55,7 @@ namespace FeatureFlowFramework.Helper
             while(currentLockId > NO_LOCKID || (currentLockId < NO_LOCKID && writerIsWaiting) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
             {
                 readerIsWaiting = true;
-                if(spinWaitBehaviour == SpinWaitBehaviour.NoWaiting ||
+                if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
                     (spinWaitBehaviour == SpinWaitBehaviour.Balanced && !spinWait.NextSpinWillYield))
                 {
                     spinWait.SpinOnce();
@@ -103,7 +103,7 @@ namespace FeatureFlowFramework.Helper
             while(currentLockId != NO_LOCKID || (currentLockId > NO_LOCKID && readerIsWaiting) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
             {
                 writerIsWaiting = true;
-                if(spinWaitBehaviour == SpinWaitBehaviour.NoWaiting ||
+                if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
                     (spinWaitBehaviour == SpinWaitBehaviour.Balanced && !spinWait.NextSpinWillYield))
                 {
                     spinWait.SpinOnce();
