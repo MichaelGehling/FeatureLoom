@@ -13,7 +13,7 @@ namespace Playground
     {
         static void Main(string[] args)
         {
-            FunctionTestRWLock(2.Seconds(), 2, 2);
+            FunctionTestRWLock(2.Seconds(), 1, 2);
             FunctionTestSpinLock(2.Seconds(), 2, 2);
             Console.WriteLine("----");
             PerformanceTest();
@@ -26,13 +26,13 @@ namespace Playground
      
         private static void PerformanceTestParallel()
         {
-            var duration = 5.Seconds();
+            var duration = 3.Seconds();
             double timeFactor = duration.TotalMilliseconds * 1_000_000;
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 6;
-            int numWriteLocks = 3;
+            int numReadLocks = 3;
+            int numWriteLocks = 2;
 
 
             List<DateTime> dummyList = new List<DateTime>();
@@ -40,15 +40,15 @@ namespace Playground
             
             Action workWrite = () =>
             {
-                if(dummyList.Count > 100) dummyList.Clear();
-                dummyList.Add(AppTime.Now);
+                //if(dummyList.Count > 100) dummyList.Clear();
+                //dummyList.Add(AppTime.Now);
                 //TimeFrame tf = new TimeFrame((0.1 * rnd.Next(0,20)).Milliseconds());
                 //while(!tf.Elapsed) ;
                 //Thread.Yield(); ;
             };
             Action workRead = () =>
             {
-                foreach(var d in dummyList) d.Add(1.Milliseconds());
+                //foreach(var d in dummyList) d.Add(1.Milliseconds());
                 //TimeFrame tf = new TimeFrame((0.1 * rnd.Next(0, 20)).Milliseconds());
                 //while(!tf.Elapsed) ;
                 //Thread.Yield();
@@ -63,7 +63,7 @@ namespace Playground
 
             name = "Overhead";
             Prepare(out gcs);
-            //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
+            c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
             double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
 
@@ -126,7 +126,7 @@ namespace Playground
                 {
                     starter.Task.Wait();
                     var c = writeLock(lockObj, duration, workWrite, slack);
-                    Console.Write(" W" + c);
+                    //Console.Write("W" + c + " ");
                     lock(counts) counts.Add(c);
                 }));
             }
@@ -137,7 +137,7 @@ namespace Playground
                 {
                     starter.Task.Wait();
                     var c = readLock(lockObj, duration, workRead, slack);
-                    Console.Write(" R" + c);
+                    //Console.Write("R" + c + " ");
                     lock (counts) counts.Add(c);
                 }));
             }

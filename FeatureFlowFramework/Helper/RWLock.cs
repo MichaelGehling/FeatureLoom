@@ -48,26 +48,24 @@ namespace FeatureFlowFramework.Helper
         public ReadLock ForReading(SpinWaitBehaviour spinWaitBehaviour = SpinWaitBehaviour.BalancedSpinning)
         {
             SpinWait spinWait = new SpinWait();
-            var newLockId = 0;
-            var currentLockId = 0;
-            do
+            var currentLockId = lockId;
+            var newLockId = currentLockId - 1;
+            while(currentLockId > NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
             {
-                currentLockId = lockId;
-                if(currentLockId > NO_LOCKID)
+                if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
+                    (spinWaitBehaviour == SpinWaitBehaviour.BalancedSpinning && !spinWait.NextSpinWillYield))
                 {
-                    if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
-                        (spinWaitBehaviour == SpinWaitBehaviour.BalancedSpinning && !spinWait.NextSpinWillYield))
-                    {
-                        spinWait.SpinOnce();
-                        continue;
-                    }
-                    if(mreR.IsSet) mreR.Reset();
-                    if (lockId > NO_LOCKID) mreR.Wait();
+                    spinWait.SpinOnce();
                 }
+                else
+                {
+                    if(mreR.IsSet) mreR.Reset();
+                    if(lockId > NO_LOCKID) mreR.Wait();
+                }
+
                 currentLockId = lockId;
                 newLockId = currentLockId - 1;
             }
-            while(currentLockId > NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId));
 
             return new ReadLock(this);
         }
@@ -79,7 +77,7 @@ namespace FeatureFlowFramework.Helper
             if(NO_LOCKID == newLockId)
             {
                 if (!mreW.IsSet) mreW.Set();
-                //else if (!mreR.IsSet) mreR.Set();
+                if (!mreR.IsSet) mreR.Set();
             }
         }
 
@@ -94,23 +92,22 @@ namespace FeatureFlowFramework.Helper
         {
             SpinWait spinWait = new SpinWait();
             var newLockId = WRITE_LOCKID;
-            var currentLockId = 0;
-            do
+            var currentLockId = lockId;
+            while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
             {
-                currentLockId = lockId;
-                if (currentLockId != NO_LOCKID)
+                if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
+                    (spinWaitBehaviour == SpinWaitBehaviour.BalancedSpinning && !spinWait.NextSpinWillYield))
                 {
-                    if (spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
-                        (spinWaitBehaviour == SpinWaitBehaviour.BalancedSpinning && !spinWait.NextSpinWillYield))
-                    {
-                        spinWait.SpinOnce();
-                        continue;
-                    }
+                    spinWait.SpinOnce();
+                }
+                else
+                {
                     if(mreW.IsSet) mreW.Reset();
                     if(lockId != NO_LOCKID) mreW.Wait();
                 }
+                currentLockId = lockId;
             }
-            while(currentLockId != NO_LOCKID || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID));
+            
 
             return new WriteLock(this);
         }
@@ -120,7 +117,7 @@ namespace FeatureFlowFramework.Helper
         {
             lockId = NO_LOCKID;
             if (!mreR.IsSet) mreR.Set();
-            else if (!mreW.IsSet) mreW.Set();
+            if (!mreW.IsSet) mreW.Set();
         }
 
         public struct ReadLock : IDisposable
