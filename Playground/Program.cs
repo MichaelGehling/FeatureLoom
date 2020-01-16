@@ -31,34 +31,34 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 3;
-            int numWriteLocks = 2;
+            int numReadLocks = 4;
+            int numWriteLocks = 4;
 
 
             List<DateTime> dummyList = new List<DateTime>();
             Random rnd = new Random();
-            
+
             Action workWrite = () =>
             {
-                //if(dummyList.Count > 100) dummyList.Clear();
+                //if(dummyList.Count > 10000) dummyList.Clear();
                 //dummyList.Add(AppTime.Now);
-                //TimeFrame tf = new TimeFrame((0.1 * rnd.Next(0,20)).Milliseconds());
-                //while(!tf.Elapsed) ;
-                //Thread.Yield(); ;
+                TimeFrame tf = new TimeFrame((0.1 * rnd.Next(1,1)).Milliseconds());
+                while(!tf.Elapsed) ;
+                Thread.Yield(); ;
             };
             Action workRead = () =>
             {
                 //foreach(var d in dummyList) d.Add(1.Milliseconds());
-                //TimeFrame tf = new TimeFrame((0.1 * rnd.Next(0, 20)).Milliseconds());
-                //while(!tf.Elapsed) ;
-                //Thread.Yield();
+                TimeFrame tf = new TimeFrame((0.1 * rnd.Next(1, 1)).Milliseconds());
+                while(!tf.Elapsed) ;
+                Thread.Yield();
             };
             Action slack = () =>
             {
                 /*TimeFrame tf = new TimeFrame(1.0.Milliseconds());
                 while (!tf.Elapsed) ;*/
                 //Thread.Sleep(1.Milliseconds());
-                //Thread.Sleep(0);
+                Thread.Sleep(0);
             };
 
             name = "Overhead";
@@ -91,7 +91,7 @@ namespace Playground
             
             name = "RWLock OnlySpinning";
             Prepare(out gcs);
-            c = RunParallel(new RWLock(RWLock.SpinWaitBehaviour.OnlySpinning), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            c = RunParallel(new RWLock(RWLock.SpinWaitBehaviour.NoWaiting), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
             
             name = "RWLock NoSpinning";
@@ -126,7 +126,7 @@ namespace Playground
                 {
                     starter.Task.Wait();
                     var c = writeLock(lockObj, duration, workWrite, slack);
-                    //Console.Write("W" + c + " ");
+                    Console.WriteLine("W" + c);
                     lock(counts) counts.Add(c);
                 }));
             }
@@ -137,7 +137,7 @@ namespace Playground
                 {
                     starter.Task.Wait();
                     var c = readLock(lockObj, duration, workRead, slack);
-                    //Console.Write("R" + c + " ");
+                    Console.WriteLine("R" + c);
                     lock (counts) counts.Add(c);
                 }));
             }
