@@ -22,11 +22,11 @@ namespace FeatureFlowFramework.Helper
         /// When entering a write-lock, a positive lockId (greater than NO_LOCK) is set and set back to NO_LOCK when the write-lock is left.
         /// </summary>
         volatile int lockId = NO_LOCKID;
-        SpinWait spinWait = new SpinWait();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ReadLock ForReading()
         {
+            SpinWait spinWait = new SpinWait();
             var newLockId = 0;
             var currentLockId = 0;
             do
@@ -48,16 +48,13 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReadLock()
         {
-            var newLockId = Interlocked.Increment(ref lockId);
-            if(NO_LOCKID == newLockId)
-            {
-                spinWait.Reset();
-            }
+            var newLockId = Interlocked.Increment(ref lockId);            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public WriteLock ForWriting()
         {
+            SpinWait spinWait = new SpinWait();
             var newLockId = WRITE_LOCKID;
             var currentLockId = 0;
             do
@@ -78,7 +75,6 @@ namespace FeatureFlowFramework.Helper
         private void ExitWriteLock()
         {
             lockId = NO_LOCKID;
-            spinWait.Reset();
         }
 
         public struct ReadLock : IDisposable

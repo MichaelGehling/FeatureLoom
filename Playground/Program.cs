@@ -13,7 +13,7 @@ namespace Playground
     {
         static void Main(string[] args)
         {
-            FunctionTest(2.Seconds(), 4, 4);
+            FunctionTestRWLock(2.Seconds(), 2, 2);
             FunctionTestSpinLock(2.Seconds(), 2, 2);
             Console.WriteLine("----");
             PerformanceTest();
@@ -31,37 +31,41 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 0;
-            int numWriteLocks = 2;
+            int numReadLocks = 6;
+            int numWriteLocks = 3;
+
 
             List<DateTime> dummyList = new List<DateTime>();
             Random rnd = new Random();
             
             Action workWrite = () =>
             {
-                //if(dummyList.Count > 1000) dummyList.Clear();
-                //dummyList.Add(AppTime.Now);
-                TimeFrame tf = new TimeFrame(0.01.Milliseconds());
-                while(!tf.Elapsed) ;
+                if(dummyList.Count > 100) dummyList.Clear();
+                dummyList.Add(AppTime.Now);
+                //TimeFrame tf = new TimeFrame((0.1 * rnd.Next(0,20)).Milliseconds());
+                //while(!tf.Elapsed) ;
+                //Thread.Yield(); ;
             };
             Action workRead = () =>
             {
-                //foreach(var d in dummyList) d.Add(1.Milliseconds());
-                TimeFrame tf = new TimeFrame(0.01.Milliseconds());
-                while(!tf.Elapsed) ;
+                foreach(var d in dummyList) d.Add(1.Milliseconds());
+                //TimeFrame tf = new TimeFrame((0.1 * rnd.Next(0, 20)).Milliseconds());
+                //while(!tf.Elapsed) ;
+                //Thread.Yield();
             };
             Action slack = () =>
             {
                 /*TimeFrame tf = new TimeFrame(1.0.Milliseconds());
                 while (!tf.Elapsed) ;*/
                 //Thread.Sleep(1.Milliseconds());
+                //Thread.Sleep(0);
             };
 
             name = "Overhead";
             Prepare(out gcs);
-            c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
+            //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
             double overhead = timeFactor / c;
-            Console.WriteLine(overhead + " " + (-1) + " " + name);
+            Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
 
             name = "ClassicLock";
             Prepare(out gcs);
@@ -70,10 +74,9 @@ namespace Playground
 
             /*
             name = "SpinLock";
-            var sl = new SpinLock();
             Prepare(out gcs);
-            c = RunParallel(sl, duration, SpinLock, numReadLocks, SpinLock, numWriteLocks, workRead, workWrite, slack).Sum();
-            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+            c = RunParallel(new SpinLock(), duration, SpinLock, numReadLocks, SpinLock, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
             */
 
             name = "RWSpinLock";
@@ -95,7 +98,7 @@ namespace Playground
             Prepare(out gcs);
             c = RunParallel(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
-            
+
             name = "SemaphoreSlim";
             Prepare(out gcs);
             c = RunParallel(new SemaphoreSlim(1,1), duration, SemaphoreLock, numReadLocks, SemaphoreLock, numWriteLocks, workRead, workWrite, slack).Sum();
@@ -123,6 +126,7 @@ namespace Playground
                 {
                     starter.Task.Wait();
                     var c = writeLock(lockObj, duration, workWrite, slack);
+                    Console.Write(" W" + c);
                     lock(counts) counts.Add(c);
                 }));
             }
@@ -133,7 +137,8 @@ namespace Playground
                 {
                     starter.Task.Wait();
                     var c = readLock(lockObj, duration, workRead, slack);
-                    lock(counts) counts.Add(c);
+                    Console.Write(" R" + c);
+                    lock (counts) counts.Add(c);
                 }));
             }
 
@@ -228,7 +233,7 @@ namespace Playground
             double time = timeFactor / c - time_overhead_ns;
             gcs = (GC.CollectionCount(0) - gcs);
             long iterationsPerGC = gcs > 0 ? c / gcs : -1;
-            Console.WriteLine(time + " " + iterationsPerGC + " " + name);
+            Console.WriteLine(time + " " + iterationsPerGC + " " + c +" " + name);
         }
 
         private static void Prepare(out int gcs)
@@ -489,33 +494,43 @@ namespace Playground
             return c;
         }
 
-        private static void FunctionTest(TimeSpan duration, int numWriting, int numReading)
+        private static void FunctionTestRWLock(TimeSpan duration, int numWriting, int numReading)
         {
-            RWLock myLock = new RWLock();
+            List<DateTime> dummyList = new List<DateTime>();
+            Action workWrite = () =>
+            {
+                if (dummyList.Count > 100) dummyList.Clear();
+                dummyList.Add(AppTime.Now);
+            };
+            Action workRead = () =>
+            {
+                foreach (var d in dummyList) d.Add(1.Milliseconds());
+            };
 
-            var t1 = Task.Run(() => RunParallel(myLock, duration, RWLockRead, numReading, RWLockWrite, numWriting, null, null, null));
-            //var t2 = Task.Run(() => RunParallelAsync(myLock, duration, ASLReadLockAsync, numReadingAsync, ASLWriteLockAsync, numWritingAsync, null, null, null));
-
-            //Task.WhenAll(t1, t2).Wait();
+            var t1 = Task.Run(() => RunParallel(new RWLock(), duration, RWLockRead, numReading, RWLockWrite, numWriting, workRead, workWrite, null));
             t1.Wait();
 
             foreach(var c in t1.Result)
             {
                 Console.WriteLine(c);
             }
-            //foreach(var c in t2.Result)
-            //{
-            //    Console.WriteLine(c);
-            //}
         }
 
       
         private static void FunctionTestSpinLock(TimeSpan duration, int numWriting, int numReading)
-        {
-            RWSpinLock myLock = new RWSpinLock();
+        { 
+            List<DateTime> dummyList = new List<DateTime>();
+            Action workWrite = () =>
+            {
+                if (dummyList.Count > 100) dummyList.Clear();
+                dummyList.Add(AppTime.Now);
+            };
+            Action workRead = () =>
+            {
+                foreach (var d in dummyList) d.Add(1.Milliseconds());
+            };
 
-            var t1 = Task.Run(() => RunParallel(myLock, duration, RWSpinReadLock, numReading, RWSpinWriteLock, numWriting, null, null, null));
-
+            var t1 = Task.Run(() => RunParallel(new RWSpinLock(), duration, RWSpinReadLock, numReading, RWSpinWriteLock, numWriting, workRead, workWrite, null));
             t1.Wait();
 
             foreach(var c in t1.Result)
