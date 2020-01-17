@@ -13,6 +13,9 @@ namespace Playground
     {
         static void Main(string[] args)
         {
+            TestAsyncManualResetEvent();
+            return;
+
             FunctionTestRWLock(2.Seconds(), 1, 2);
             FunctionTestSpinLock(2.Seconds(), 2, 2);
             Console.WriteLine("----");
@@ -20,6 +23,24 @@ namespace Playground
             Console.WriteLine("----");
             PerformanceTestParallel();
 
+            Console.ReadKey();
+        }
+
+        static void TestAsyncManualResetEvent()
+        {
+
+            AsyncManualResetEvent2 mre = new AsyncManualResetEvent2(false);
+
+            Task.Run(async () =>
+            {
+                Console.WriteLine("A");
+                await mre.WaitAsync();
+                Console.WriteLine("C");
+            });
+
+            Thread.Sleep(100);
+            Console.WriteLine("B");
+            mre.Set();
             Console.ReadKey();
         }
 
