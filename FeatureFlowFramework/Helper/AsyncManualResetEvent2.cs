@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +12,8 @@ namespace FeatureFlowFramework.Helper
     {
         ManualResetEventSlim mre;
         volatile int currentToken = 0;
-        ConcurrentBag<ContinuationData> continuationDataStore = new ConcurrentBag<ContinuationData>();
+        volatile bool tokenUsed = false;
+        List<ContinuationData> continuationDataStore = new List<ContinuationData>();
 
         public AsyncManualResetEvent2(bool initialState = false)
         {
@@ -22,22 +24,34 @@ namespace FeatureFlowFramework.Helper
         {
             if(!mre.IsSet)
             {
-                mre.Set();
-
-                while(continuationDataStore.TryTake(out ContinuationData data))
+                lock(continuationDataStore)
                 {
-                    InvokeContinuation(data);
+                    mre.Set();
+                    int numContinuations = continuationDataStore.Count;
+                    if (numContinuations == 0) return;
+                    for (int i = 0; i < numContinuations; i++)
+                    {
+                        InvokeContinuation(continuationDataStore[i]);
+                    }
+                    continuationDataStore.Clear();
                 }
+
             }                        
         }
+
+        public bool IsSet => mre.IsSet;
 
         public void Reset()
         {
             if(mre.IsSet)
             {
-                var token = currentToken;
-                var nextToken = token >= short.MaxValue ? short.MinValue : token + 1;
-                Interlocked.CompareExchange(ref currentToken, nextToken, token);
+                if(tokenUsed)
+                {
+                    tokenUsed = false;
+                    var token = currentToken;
+                    var nextToken = token >= short.MaxValue ? short.MinValue : token + 1;
+                    Interlocked.CompareExchange(ref currentToken, nextToken, token);
+                }
 
                 mre.Reset();                
             }
@@ -45,6 +59,7 @@ namespace FeatureFlowFramework.Helper
 
         public ValueTask WaitAsync()
         {
+            tokenUsed = true;
             return new ValueTask(this, (short)currentToken);
         }
 
@@ -102,8 +117,11 @@ namespace FeatureFlowFramework.Helper
                 }
             }
 
-            if(token == currentToken && !mre.IsSet) continuationDataStore.Add(data);
-            else InvokeContinuation(data);
+            lock(continuationDataStore)
+            {
+                if(token == currentToken && !mre.IsSet) continuationDataStore.Add(data);
+                else InvokeContinuation(data);
+            }
         }
 
         private void InvokeContinuation(ContinuationData data)
@@ -128,7 +146,9 @@ namespace FeatureFlowFramework.Helper
             }
             else
             {
+                //TODO ThreadPool.QueueUserWorkItemonly accepts Action<> in .Net Standard 2.1+
                 Task.Factory.StartNew(data.continuation, data.state, TaskCreationOptions.DenyChildAttach);
+                //ThreadPool.QueueUserWorkItem(data.continuation(s), data.state, preferLocal: true);
             }
         }
     }
