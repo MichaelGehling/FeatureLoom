@@ -5,10 +5,10 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Helper
 {
-    public class AsyncManualResetEvent3 : IAsyncWaitHandleSource, IAsyncWaitHandle
+    public class AsyncManualResetEvent3 : IAsyncWaitHandle
     {
         volatile bool taskUsed = false;
-        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+        volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
         ManualResetEventSlim mre = new ManualResetEventSlim(false);
 
         public AsyncManualResetEvent3()
@@ -22,36 +22,59 @@ namespace FeatureFlowFramework.Helper
         
         public bool IsSet => mre.IsSet;
 
-        public Task WaitingTask => tcs.Task;
+        public Task WaitingTask
+        {
+            get
+            {
+                taskUsed = true;
+                return tcs.Task;
+            }
+        }
 
         public IAsyncWaitHandle AsyncWaitHandle => this;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync()
         {
-            taskUsed = true;
-            return tcs.Task.WaitAsync();
+            if (mre.IsSet) return Task.FromResult(true);
+            else
+            {
+                taskUsed = true;                
+                return tcs.Task.WaitAsync();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(TimeSpan timeout)
         {
-            taskUsed = true;
-            return tcs.Task.WaitAsync(timeout);
+            if (mre.IsSet) return Task.FromResult(true);
+            else
+            {
+                taskUsed = true;                
+                return tcs.Task.WaitAsync(timeout);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(CancellationToken cancellationToken)
         {
-            taskUsed = true;
-            return tcs.Task.WaitAsync(cancellationToken);
+            if (mre.IsSet) return Task.FromResult(true);
+            else
+            {
+                taskUsed = true;                
+                return tcs.Task.WaitAsync(cancellationToken);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
-            taskUsed = true;
-            return tcs.Task.WaitAsync(timeout, cancellationToken);
+            if (mre.IsSet) return Task.FromResult(true);
+            else
+            {
+                taskUsed = true;
+                return tcs.Task.WaitAsync(timeout, cancellationToken);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -85,7 +108,10 @@ namespace FeatureFlowFramework.Helper
         {
             if(mre.IsSet) return;
             mre.Set();
-            tcs.TrySetResult(true);
+            if (taskUsed)
+            {
+                tcs.TrySetResult(true);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -109,6 +135,17 @@ namespace FeatureFlowFramework.Helper
         {
             Set();
             Reset();
+        }
+
+        public bool WouldWait()
+        {
+            return !mre.IsSet;
+        }
+
+        public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
+        {
+            waitHandle = mre.WaitHandle;
+            return true;
         }
     }
 }

@@ -30,7 +30,7 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 2;
+            int numReadLocks = 5;
             int numWriteLocks = 2;
 
 

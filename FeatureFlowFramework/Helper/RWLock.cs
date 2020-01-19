@@ -21,8 +21,8 @@ namespace FeatureFlowFramework.Helper
         /// When entering a write-lock, a positive lockId (greater than NO_LOCK) is set and set back to NO_LOCK when the write-lock is left.
         /// </summary>
         volatile int lockId = NO_LOCKID;
-        volatile bool writerIsWaiting = false;
-        volatile bool readerIsWaiting = false;
+        volatile int writerWaitingPressure = int.MinValue;
+        volatile int readerWaitingPressure = int.MinValue;
 
         AsyncManualResetEvent3 mre = new AsyncManualResetEvent3(true);
 
@@ -54,7 +54,7 @@ namespace FeatureFlowFramework.Helper
             var newLockId = currentLockId - 1;
             while (ReaderMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
             {
-                readerIsWaiting = true;
+                readerWaitingPressure += 1;
                 if (spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
                     (spinWaitBehaviour == SpinWaitBehaviour.Balanced && !spinWait.NextSpinWillYield))
                 {
@@ -74,7 +74,6 @@ namespace FeatureFlowFramework.Helper
                 currentLockId = lockId;
                 newLockId = currentLockId - 1;
             }
-            readerIsWaiting = false;
 
             return new ReadLock(this);
         }
@@ -93,7 +92,7 @@ namespace FeatureFlowFramework.Helper
             var newLockId = currentLockId - 1;
             while(ReaderMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
             {
-                readerIsWaiting = true;
+                readerWaitingPressure += 1;
                 if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
                     (spinWaitBehaviour == SpinWaitBehaviour.Balanced && !spinWait.NextSpinWillYield))
                 {
@@ -113,20 +112,19 @@ namespace FeatureFlowFramework.Helper
                 currentLockId = lockId;
                 newLockId = currentLockId - 1;
             }
-            readerIsWaiting = false;
-
             return new ReadLock(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReaderMustWait(int currentLockId)
         {
-            return currentLockId > NO_LOCKID || (currentLockId < NO_LOCKID && writerIsWaiting);
+            return currentLockId > NO_LOCKID || (currentLockId < NO_LOCKID && writerWaitingPressure > int.MinValue);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReadLock()
         {
+            readerWaitingPressure = int.MinValue;
             var newLockId = Interlocked.Increment(ref lockId);
             if(NO_LOCKID == newLockId)
             {
@@ -148,7 +146,7 @@ namespace FeatureFlowFramework.Helper
             var currentLockId = lockId;
             while(WriterMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
             {
-                writerIsWaiting = true;
+                writerWaitingPressure += 2;
                 if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
                     (spinWaitBehaviour == SpinWaitBehaviour.Balanced && !spinWait.NextSpinWillYield))
                 {
@@ -166,7 +164,6 @@ namespace FeatureFlowFramework.Helper
                 }
                 currentLockId = lockId;
             }
-            writerIsWaiting = false;
 
             return new WriteLock(this);
         }
@@ -185,7 +182,7 @@ namespace FeatureFlowFramework.Helper
             var currentLockId = lockId;
             while(WriterMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
             {
-                writerIsWaiting = true;
+                writerWaitingPressure += 2;
                 if(spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
                     (spinWaitBehaviour == SpinWaitBehaviour.Balanced && !spinWait.NextSpinWillYield))
                 {
@@ -203,20 +200,19 @@ namespace FeatureFlowFramework.Helper
                 }
                 currentLockId = lockId;
             }
-            writerIsWaiting = false;
-
             return new WriteLock(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool WriterMustWait(int currentLockId)
         {
-            return currentLockId != NO_LOCKID || (currentLockId > NO_LOCKID && readerIsWaiting);
+            return currentLockId != NO_LOCKID || (currentLockId > NO_LOCKID && readerWaitingPressure > int.MaxValue);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
+            writerWaitingPressure = int.MinValue;
             lockId = NO_LOCKID;
             if (!mre.IsSet) mre.Set();
         }
