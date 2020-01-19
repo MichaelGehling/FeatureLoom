@@ -234,5 +234,15 @@ namespace FeatureFlowFramework.DataFlows
         {
             return WaitHandle.Wait(timeout, cancellationToken);
         }
+
+        public bool WouldWait()
+        {
+            return WaitHandle.WouldWait();
+        }
+
+        public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
+        {
+            return WaitHandle.TryConvertToWaitHandle(out waitHandle);
+        }
     }
 }

@@ -172,7 +172,7 @@ namespace FeatureFlowFramework.Helper
         }
 
 
-        public static IAsyncWaitHandle NoWaitingHandle { get; } = new AsyncManualResetEvent3(true);
+        public static IAsyncWaitHandle NoWaitingHandle { get; } = new AsyncManualResetEvent(true);
         public static IAsyncWaitHandle FromTask(Task task) => task.IsCompleted ? NoWaitingHandle : new AsyncWaitHandle(task);
         private Task task;
         
