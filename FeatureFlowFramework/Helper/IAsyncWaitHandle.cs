@@ -23,6 +23,10 @@ namespace FeatureFlowFramework.Helper
         bool Wait(CancellationToken cancellationToken);
 
         bool Wait(TimeSpan timeout, CancellationToken cancellationToken);
+
+        bool WouldWait();
+
+        bool TryConvertToWaitHandle(out WaitHandle waitHandle);
     }
 
     public static class IAsyncWaitHandleExtensions

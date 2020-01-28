@@ -155,6 +155,16 @@ namespace FeatureFlowFramework.DataFlows
             return ((IAsyncWaitHandle)readerWakeEvent).Wait(timeout, cancellationToken);
         }
 
+        public bool WouldWait()
+        {
+            return ((IAsyncWaitHandle)readerWakeEvent).WouldWait();
+        }
+
+        public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
+        {
+            return ((IAsyncWaitHandle)readerWakeEvent).TryConvertToWaitHandle(out waitHandle);
+        }
+
         public int CountQueuedMessages => Count;
 
         public Task WaitingTask => ((IAsyncWaitHandle)readerWakeEvent).WaitingTask;
