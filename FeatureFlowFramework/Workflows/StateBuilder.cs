@@ -7,7 +7,8 @@ namespace FeatureFlowFramework.Workflows
     public class StateBuilder<CT> : IAfterStartStateBuilder<CT>, INextStateBuilder<CT>, IInitialStateBuilder<CT>,
                                     IAfterPreconditionStateBuilder<CT>, IAfterActionStateBuilder<CT>,
                                     IAfterWhileStateBuilder<CT>, IAfterConditionedActionStateBuilder<CT>,
-                                    IAfterFinalPreconditionStateBuilder<CT>
+                                    IAfterFinalPreconditionStateBuilder<CT>, IAfterActionStateBuilderWithoutTransition<CT>, 
+                                    IAfterConditionedStateBuilderWithoutTransition<CT>
                                     where CT : IStateMachineContext
     {
         public State<CT> state;
@@ -94,6 +95,12 @@ namespace FeatureFlowFramework.Workflows
 
         public State<CT> Goto(State targetState)
         {
+            CurrentPartialStep.targetState = c => targetState;
+            return this.state;
+        }
+
+        public State<CT> Goto(Func<CT, State> targetState)
+        {
             CurrentPartialStep.targetState = targetState;
             return this.state;
         }
@@ -136,7 +143,7 @@ namespace FeatureFlowFramework.Workflows
 
         public State<CT> Loop()
         {
-            CurrentPartialStep.targetState = state;
+            CurrentPartialStep.targetState = c => state;
             return state;
         }
 
@@ -309,37 +316,97 @@ namespace FeatureFlowFramework.Workflows
             return this;
         }
 
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Goto(State targetState)
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterPreconditionStateBuilder<CT>.Goto(State targetState)
         {
             this.Goto(targetState);
             return this;
         }
 
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Loop()
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterPreconditionStateBuilder<CT>.Loop()
         {
             this.Loop();
             return this;
         }
 
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.Finish()
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterPreconditionStateBuilder<CT>.Finish()
         {
             this.Finish();
             return this;
         }
 
-        IAfterActionStateBuilder<CT> IAfterFinalPreconditionStateBuilder<CT>.Goto(State targetState)
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterFinalPreconditionStateBuilder<CT>.Goto(State targetState)
         {
             this.Goto(targetState);
             return this;
         }
 
-        IAfterActionStateBuilder<CT> IAfterFinalPreconditionStateBuilder<CT>.Loop()
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterFinalPreconditionStateBuilder<CT>.Loop()
         {
             this.Loop();
             return this;
         }
 
-        IAfterActionStateBuilder<CT> IAfterFinalPreconditionStateBuilder<CT>.Finish()
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterFinalPreconditionStateBuilder<CT>.Finish()
+        {
+            this.Finish();
+            return this;
+        }
+
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterActionStateBuilder<CT>.Goto(State targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterActionStateBuilder<CT>.Loop()
+        {
+            this.Loop();
+            return this;
+        }
+
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterConditionedActionStateBuilder<CT>.Goto(State targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterConditionedActionStateBuilder<CT>.Loop()
+        {
+            this.Loop();
+            return this;
+        }
+
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterPreconditionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterActionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterConditionedActionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterFinalPreconditionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        {
+            this.Goto(targetState);
+            return this;
+        }
+
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterActionStateBuilder<CT>.Finish()
+        {
+            this.Finish();
+            return this;
+        }
+
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterConditionedActionStateBuilder<CT>.Finish()
         {
             this.Finish();
             return this;
@@ -387,6 +454,8 @@ namespace FeatureFlowFramework.Workflows
         //Transitions
         State<CT> Goto(State targetState);
 
+        State<CT> Goto(Func<CT, State> targetState);
+
         State<CT> Loop();
 
         State<CT> Finish();
@@ -418,11 +487,12 @@ namespace FeatureFlowFramework.Workflows
         IAfterConditionedActionStateBuilder<CT> WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout = default);
 
         //Transitions
-        IAfterConditionedActionStateBuilder<CT> Goto(State targetState);
+        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(State targetState);
+        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
 
-        IAfterConditionedActionStateBuilder<CT> Loop();
+        IAfterConditionedStateBuilderWithoutTransition<CT> Loop();
 
-        IAfterConditionedActionStateBuilder<CT> Finish();
+        IAfterConditionedStateBuilderWithoutTransition<CT> Finish();
     }
 
     public interface IAfterWhileStateBuilder<CT> where CT : IStateMachineContext
@@ -473,14 +543,50 @@ namespace FeatureFlowFramework.Workflows
         IAfterActionStateBuilder<CT> WaitFor(Func<CT, Task> task, Func<CT, TimeSpan> timeout = default);
 
         //Transitions
-        IAfterActionStateBuilder<CT> Goto(State targetState);
+        IAfterActionStateBuilderWithoutTransition<CT> Goto(State targetState);
+        IAfterActionStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
 
-        IAfterActionStateBuilder<CT> Loop();
+        IAfterActionStateBuilderWithoutTransition<CT> Loop();
 
-        IAfterActionStateBuilder<CT> Finish();
+        IAfterActionStateBuilderWithoutTransition<CT> Finish();
     }
 
     public interface IAfterConditionedActionStateBuilder<CT> where CT : IStateMachineContext
+    {
+        IAfterFinalPreconditionStateBuilder<CT> Else();
+
+        IAfterPreconditionStateBuilder<CT> ElseIf(Func<CT, Task<bool>> predicate);
+
+        IAfterPreconditionStateBuilder<CT> ElseIf(Func<CT, bool> predicate);
+
+        //Descriptions
+        IAfterActionStateBuilder<CT> Using(Func<CT, object> resource);
+
+        //Transitions
+        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(State targetState);
+        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
+
+        IAfterConditionedStateBuilderWithoutTransition<CT> Loop();
+        IAfterConditionedStateBuilderWithoutTransition<CT> Finish();
+
+        //ExceptionHandling
+        INextStateBuilder<CT> Catch();
+
+        INextStateBuilder<CT> CatchAndDo(Func<CT, Exception, Task> action);
+
+        INextStateBuilder<CT> CatchAndDo(Action<CT, Exception> action);
+
+        INextStateBuilder<CT> CatchAndGoto(State state);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, Task<bool>> predicate);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, bool> predicate);
+
+        // Next Step
+        IAfterStartStateBuilder<CT> Step(string description = "");
+    }
+
+    public interface IAfterConditionedStateBuilderWithoutTransition<CT> where CT : IStateMachineContext
     {
         IAfterFinalPreconditionStateBuilder<CT> Else();
 
@@ -509,6 +615,36 @@ namespace FeatureFlowFramework.Workflows
     }
 
     public interface IAfterActionStateBuilder<CT> where CT : IStateMachineContext
+    {
+        //Descriptions
+        IAfterActionStateBuilder<CT> Using(Func<CT, object> resource);
+
+        //Transitions
+        IAfterActionStateBuilderWithoutTransition<CT> Goto(State targetState);
+        IAfterActionStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
+
+        IAfterActionStateBuilderWithoutTransition<CT> Loop();
+
+        IAfterActionStateBuilderWithoutTransition<CT> Finish();
+
+        //ExceptionHandling
+        INextStateBuilder<CT> Catch();
+
+        INextStateBuilder<CT> CatchAndDo(Func<CT, Exception, Task> action);
+
+        INextStateBuilder<CT> CatchAndDo(Action<CT, Exception> action);
+
+        INextStateBuilder<CT> CatchAndGoto(State state);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, Task<bool>> predicate);
+
+        INextStateBuilder<CT> CatchAndRepeatIf(Func<CT, Exception, bool> predicate);
+
+        // Next Step
+        IAfterStartStateBuilder<CT> Step(string description = "");
+    }
+
+    public interface IAfterActionStateBuilderWithoutTransition<CT> where CT : IStateMachineContext
     {
         //Descriptions
         IAfterActionStateBuilder<CT> Using(Func<CT, object> resource);

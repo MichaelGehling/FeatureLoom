@@ -43,7 +43,8 @@ namespace FeatureFlowFramework.Workflows
                     {
                         proceedStep = DoWaiting(context, step, partialStep);
                     }
-                    else
+
+                    if(partialStep.targetState != null || partialStep.finishStateMachine)
                     {
                         DoTransition(context, step, currentExecutionState, ref nextExecutionState, ref nextExecutionPhase, ref proceedStep, partialStep);
                     }
@@ -86,7 +87,8 @@ namespace FeatureFlowFramework.Workflows
                     {
                         proceedStep = await DoWaitingAsync(context, step, proceedStep, partialStep);
                     }
-                    else
+                    
+                    if (partialStep.targetState != null || partialStep.finishStateMachine)
                     {
                         DoTransition(context, step, currentExecutionState, ref nextExecutionState, ref nextExecutionPhase, ref proceedStep, partialStep);
                     }
@@ -105,8 +107,9 @@ namespace FeatureFlowFramework.Workflows
         {
             if (partialStep.targetState != null)
             {
-                nextExecutionState = (partialStep.targetState.stateIndex, 0);                
-                if (step.parentState != partialStep.targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StateTransition, partialStep.targetState);
+                var targetState = partialStep.targetState(context);
+                nextExecutionState = (targetState.stateIndex, 0);                
+                if (step.parentState != targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StateTransition, targetState);
                 proceed = false;
             }
             else if (partialStep.finishStateMachine)

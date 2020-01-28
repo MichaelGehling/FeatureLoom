@@ -33,7 +33,8 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                List<IStateInfo> targetStates = null;
+                return null;
+                /*List<IStateInfo> targetStates = null;
                 var nextElse = doElse;
                 while (nextElse != null)
                 {
@@ -54,7 +55,7 @@ namespace FeatureFlowFramework.Workflows
                 {
                     if (targetState != null) targetStates.Add(targetState);
                     return targetStates.ToArray();
-                }
+                }*/
             }
         }
 
@@ -99,6 +100,6 @@ namespace FeatureFlowFramework.Workflows
         public Func<CT, Task> waitingTaskDelegate;
 
         public bool finishStateMachine = false;
-        public State targetState;
+        public Func<CT, State> targetState;
     }
 }
