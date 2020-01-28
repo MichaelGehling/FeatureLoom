@@ -14,7 +14,7 @@ namespace Playground
         static void Main(string[] args)
         {
             //FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
-            FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 2.Seconds(), 4, 4, 0, 0);
+            FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 2.Seconds(), 0, 4, 0, 0);
             Console.WriteLine("----");
             PerformanceTest();
             Console.WriteLine("----");
