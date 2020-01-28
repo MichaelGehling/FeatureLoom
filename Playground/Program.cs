@@ -13,9 +13,10 @@ namespace Playground
     {
         static void Main(string[] args)
         {
-            FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
+            //FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
+            FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 2.Seconds(), 4, 4, 0, 0);
             Console.WriteLine("----");
-            //PerformanceTest();
+            PerformanceTest();
             Console.WriteLine("----");
             PerformanceTestParallel();
 
@@ -25,7 +26,7 @@ namespace Playground
      
         private static void PerformanceTestParallel()
         {
-            var duration = 4.Seconds();
+            var duration = 2.Seconds();
             double timeFactor = duration.TotalMilliseconds * 1_000_000;
             string name;
             long c = 0;
@@ -70,7 +71,7 @@ namespace Playground
             double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
 
-            name = "RWLock";
+           /* name = "RWLock";
             Prepare(out gcs);
             c = RunParallel(new RWLock(), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
@@ -95,6 +96,7 @@ namespace Playground
             c = RunParallel(new RWLock(RWLock.SpinWaitBehaviour.OnlySpinning), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
 
+
             name = "RWLock2";
             Prepare(out gcs);
             c = RunParallel(new RWLock2(), duration, RWLockRead2, numReadLocks, RWLockWrite2, numWriteLocks, workRead, workWrite, slack).Sum();
@@ -105,7 +107,6 @@ namespace Playground
             c = RunParallelAsync(new RWLock2(), duration, RWLockReadAsync2, numReadLocks, RWLockWriteAsync2, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
 
-            
             name = "RWLock2 NoSpinning";
             Prepare(out gcs);
             c = RunParallel(new RWLock2(RWLock2.SpinWaitBehaviour.NoSpinning), duration, RWLockRead2, numReadLocks, RWLockWrite2, numWriteLocks, workRead, workWrite, slack).Sum();
@@ -120,7 +121,32 @@ namespace Playground
             Prepare(out gcs);
             c = RunParallel(new RWLock2(RWLock2.SpinWaitBehaviour.OnlySpinning), duration, RWLockRead2, numReadLocks, RWLockWrite2, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
+            */
 
+            name = "RWLock3";
+            Prepare(out gcs);
+            c = RunParallel(new RWLock3(), duration, RWLockRead3, numReadLocks, RWLockWrite3, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+
+            name = "RWLock3 Async";
+            Prepare(out gcs);
+            c = RunParallelAsync(new RWLock3(), duration, RWLockReadAsync3, numReadLocks, RWLockWriteAsync3, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+
+            name = "RWLock3 NoSpinning";
+            Prepare(out gcs);
+            c = RunParallel(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), duration, RWLockRead3, numReadLocks, RWLockWrite3, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+
+            name = "RWLock3 NoSpinning Async";
+            Prepare(out gcs);
+            c = RunParallelAsync(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), duration, RWLockReadAsync3, numReadLocks, RWLockWriteAsync3, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+
+            name = "RWLock3 OnlySpinning";
+            Prepare(out gcs);
+            c = RunParallel(new RWLock3(RWLock3.SpinWaitBehaviour.OnlySpinning), duration, RWLockRead3, numReadLocks, RWLockWrite3, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
 
 
             name = "ClassicLock";
@@ -249,6 +275,26 @@ namespace Playground
             name = "RWLock2 Write Async";
             Prepare(out gcs);
             c = RWLockWriteAsync2(new RWLock2(), duration, work, slack).Result;
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock3 Read";
+            Prepare(out gcs);
+            c = RWLockRead3(new RWLock3(), duration, work, slack);
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock3 Write";
+            Prepare(out gcs);
+            c = RWLockWrite3(new RWLock3(), duration, work, slack);
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock3 Read Async";
+            Prepare(out gcs);
+            c = RWLockReadAsync3(new RWLock3(), duration, work, slack).Result;
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock3 Write Async";
+            Prepare(out gcs);
+            c = RWLockWriteAsync3(new RWLock3(), duration, work, slack).Result;
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "Classic Lock";
@@ -628,6 +674,74 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
+        private static long RWLockWrite3(RWLock3 myLock, TimeSpan duration, Action work, Action slack)
+        {
+            long c = 0;
+            TimeFrame tf = new TimeFrame(duration);
+            while (!tf.Elapsed)
+            {
+                using (myLock.ForWriting())
+                {
+                    c++;
+                    work?.Invoke();
+                }
+                slack?.Invoke();
+            }
+            return c;
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private static long RWLockRead3(RWLock3 myLock, TimeSpan duration, Action work, Action slack)
+        {
+            long c = 0;
+            TimeFrame tf = new TimeFrame(duration);
+            while (!tf.Elapsed)
+            {
+                using (myLock.ForReading())
+                {
+                    c++;
+                    work?.Invoke();
+                }
+                slack?.Invoke();
+            }
+            return c;
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private async static Task<long> RWLockWriteAsync3(RWLock3 myLock, TimeSpan duration, Action work, Action slack)
+        {
+            long c = 0;
+            TimeFrame tf = new TimeFrame(duration);
+            while (!tf.Elapsed)
+            {
+                using (await myLock.ForWritingAsync())
+                {
+                    c++;
+                    work?.Invoke();
+                }
+                slack?.Invoke();
+            }
+            return c;
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private async static Task<long> RWLockReadAsync3(RWLock3 myLock, TimeSpan duration, Action work, Action slack)
+        {
+            long c = 0;
+            TimeFrame tf = new TimeFrame(duration);
+            while (!tf.Elapsed)
+            {
+                using (await myLock.ForReadingAsync())
+                {
+                    c++;
+                    work?.Invoke();
+                }
+                slack?.Invoke();
+            }
+            return c;
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         private static long Overhead(object dummy, TimeSpan duration, Action work, Action slack)
         {
             long c = 0;
@@ -663,6 +777,33 @@ namespace Playground
                 Console.WriteLine(c);
             }
             foreach(var c in t2.Result)
+            {
+                Console.WriteLine(c);
+            }
+        }
+
+        private static void FunctionTestRWLock(RWLock3 myLock, TimeSpan duration, int numReading, int numWriting, int numReadingAsync, int numWritingAsync)
+        {
+            List<DateTime> dummyList = new List<DateTime>();
+            Action workWrite = () =>
+            {
+                if (dummyList.Count > 100) dummyList.Clear();
+                dummyList.Add(AppTime.Now);
+            };
+            Action workRead = () =>
+            {
+                foreach (var d in dummyList) d.Add(1.Milliseconds());
+            };
+
+            var t1 = Task.Run(() => RunParallel(myLock, duration, RWLockRead3, numReading, RWLockWrite3, numWriting, workRead, workWrite, null));
+            var t2 = Task.Run(() => RunParallelAsync(myLock, duration, RWLockReadAsync3, numReadingAsync, RWLockWriteAsync3, numWritingAsync, workRead, workWrite, null));
+            Task.WhenAll(t1, t2).Wait();
+
+            foreach (var c in t1.Result)
+            {
+                Console.WriteLine(c);
+            }
+            foreach (var c in t2.Result)
             {
                 Console.WriteLine(c);
             }
