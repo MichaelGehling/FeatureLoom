@@ -199,11 +199,13 @@ namespace FeatureFlowFramework.Helper
                         mreWriter.Reset();
                         reset = true;
                     }
+                    //if(myWaitStart == Thread.VolatileRead(ref longestWaitingWriter)) Thread.VolatileWrite(ref longestWaitingWriter, long.MaxValue);
                     currentLockId = lockId;
                     if (WriterMustWait(currentLockId, myWaitStart))
                     {
                         mreWriter.Wait();
                         spinWait.Reset();
+                        if (myWaitStart != Thread.VolatileRead(ref longestWaitingWriter)) spinWait.SpinOnce();
                     }
                     else if(reset) mreWriter.Set();
                 }
@@ -266,8 +268,8 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool WriterMustWait(int currentLockId, long myWaitStart)
         {
-            return currentLockId != NO_LOCKID || myWaitStart > Thread.VolatileRead(ref longestWaitingWriter);
-            //return currentLockId != NO_LOCKID;
+            //return currentLockId != NO_LOCKID || myWaitStart > Thread.VolatileRead(ref longestWaitingWriter);
+            return currentLockId != NO_LOCKID;
         }
 
 
