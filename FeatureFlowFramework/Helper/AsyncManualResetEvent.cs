@@ -122,7 +122,7 @@ namespace FeatureFlowFramework.Helper
             if (!mre.IsSet) return false;
 
             mre.Reset();
-            if (taskUsed)
+            if (this.tcs.Task.IsCompleted)
             {
                 TaskCompletionSource<bool> oldTcs, newTcs;
                 do
