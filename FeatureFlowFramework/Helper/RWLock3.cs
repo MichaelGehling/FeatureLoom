@@ -13,6 +13,7 @@ namespace FeatureFlowFramework.Helper
     {
         const int NO_LOCKID = 0;
         const int WRITE_LOCKID = NO_LOCKID + 1;
+        const long NO_WAITING = long.MaxValue;
 
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
@@ -21,10 +22,8 @@ namespace FeatureFlowFramework.Helper
         /// When entering a write-lock, a positive lockId (greater than NO_LOCK) is set and set back to NO_LOCK when the write-lock is left.
         /// </summary>
         volatile int lockId = NO_LOCKID;
-        //volatile int maxReadPressure = 0;
-        //volatile int maxWritePressure = 0;
-        long longestWaitingReader = long.MaxValue;
-        long longestWaitingWriter = long.MaxValue;
+        long longestWaitingReader = NO_WAITING;
+        long longestWaitingWriter = NO_WAITING;
 
         AsyncManualResetEvent mreReader = new AsyncManualResetEvent(true);
         AsyncManualResetEvent mreWriter = new AsyncManualResetEvent(true);
@@ -53,16 +52,13 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ReadLock ForReading(SpinWaitBehaviour spinWaitBehaviour)
         {
-            long myWaitStart = long.MaxValue;
+            long myWaitStart = NO_WAITING;
             SpinWait spinWait = new SpinWait();
-            //int myPressure = 0;
             var currentLockId = lockId;
             var newLockId = currentLockId - 1;            
             while (ReaderMustWait(currentLockId, myWaitStart) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
             {
-                //myPressure++;
-                //if (myPressure > maxReadPressure) maxReadPressure = myPressure;
-                if(myWaitStart == long.MaxValue) myWaitStart = AppTime.Elapsed.Ticks;
+                if(myWaitStart == NO_WAITING) myWaitStart = AppTime.Elapsed.Ticks;
                 if(myWaitStart < Thread.VolatileRead(ref longestWaitingReader)) Thread.VolatileWrite(ref longestWaitingReader, myWaitStart);
 
                 if (spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
@@ -72,26 +68,19 @@ namespace FeatureFlowFramework.Helper
                 }
                 else
                 {
-                    bool reset = false;
-                    if(mreReader.IsSet)
-                    {
-                        mreReader.Reset();
-                        reset = true;
-                    }
-                    currentLockId = lockId;
-                    if(ReaderMustWait(currentLockId, int.MaxValue))
+                    bool didReset = mreReader.Reset(); ;
+                    if(ReaderMustWait(lockId, myWaitStart))
                     {
                         mreReader.Wait();
                         spinWait.Reset();
                     }
-                    else if(reset) mreReader.Set();
-                        
+                    else if(didReset) mreReader.Set();
                 } 
 
                 currentLockId = lockId;
                 newLockId = currentLockId - 1;
             }
-            Thread.VolatileWrite(ref longestWaitingReader, long.MaxValue);
+            if (myWaitStart != NO_WAITING && myWaitStart <= Thread.VolatileRead(ref longestWaitingReader)) Thread.VolatileWrite(ref longestWaitingReader, NO_WAITING);
             return new ReadLock(this);
         }
 
@@ -104,16 +93,13 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<ReadLock> ForReadingAsync(SpinWaitBehaviour spinWaitBehaviour)
         {
-            long myWaitStart = long.MaxValue;
+            long myWaitStart = NO_WAITING;
             SpinWait spinWait = new SpinWait();
-            //int myPressure = 0;
             var currentLockId = lockId;
             var newLockId = currentLockId - 1;
             while (ReaderMustWait(currentLockId, myWaitStart) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
             {
-                //myPressure++;
-                //if (myPressure > maxReadPressure) maxReadPressure = myPressure;
-                if(myWaitStart == long.MaxValue) myWaitStart = AppTime.Elapsed.Ticks;
+                if(myWaitStart == NO_WAITING) myWaitStart = AppTime.Elapsed.Ticks;
                 if(myWaitStart < Thread.VolatileRead(ref longestWaitingReader)) Thread.VolatileWrite(ref longestWaitingReader, myWaitStart);
 
                 if (spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
@@ -123,34 +109,27 @@ namespace FeatureFlowFramework.Helper
                 }
                 else
                 {
-                    bool reset = false;
-                    if(mreReader.IsSet)
-                    {
-                        mreReader.Reset();
-                        reset = true;
-                    }
-                    currentLockId = lockId;
-                    if (ReaderMustWait(currentLockId, int.MaxValue))
+                    bool didReset = mreReader.Reset();
+                    if (ReaderMustWait(lockId, myWaitStart))
                     {
                         await mreReader.WaitAsync();
                         spinWait.Reset();
                     }
-                    else if(reset) mreReader.Set();
+                    else if(didReset) mreReader.Set();
                 }
 
                 currentLockId = lockId;
                 newLockId = currentLockId - 1;
             }
-            Thread.VolatileWrite(ref longestWaitingReader, long.MaxValue);
+            if (myWaitStart != NO_WAITING && myWaitStart <= Thread.VolatileRead(ref longestWaitingReader)) Thread.VolatileWrite(ref longestWaitingReader, NO_WAITING);
             return new ReadLock(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReaderMustWait(int currentLockId, long myWaitStart)
         {
-            //return currentLockId > NO_LOCKID || (currentLockId < NO_LOCKID && maxWritePressure >= maxReadPressure) || myPressure < maxReadPressure;
             return currentLockId > NO_LOCKID || (currentLockId < NO_LOCKID && Thread.VolatileRead(ref longestWaitingReader) > Thread.VolatileRead(ref longestWaitingWriter));
-            //return currentLockId > NO_LOCKID;
+            //return currentLockId > NO_LOCKID || Thread.VolatileRead(ref longestWaitingReader) > Thread.VolatileRead(ref longestWaitingWriter);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -159,8 +138,7 @@ namespace FeatureFlowFramework.Helper
             var newLockId = Interlocked.Increment(ref lockId);
             if (NO_LOCKID == newLockId)
             {
-                if (!mreWriter.IsSet) mreWriter.Set();
-                else if (!mreReader.IsSet) mreReader.Set();
+                if (!mreWriter.Set()) mreReader.Set();
             }
         }
 
@@ -173,17 +151,13 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public WriteLock ForWriting(SpinWaitBehaviour spinWaitBehaviour)
         {
-            long myWaitStart = long.MaxValue;
+            long myWaitStart = NO_WAITING;
             SpinWait spinWait = new SpinWait();
-            //int myPressure = 0;
             var newLockId = WRITE_LOCKID;
             var currentLockId = lockId;
             while (WriterMustWait(currentLockId, myWaitStart) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
             {
-
-                //myPressure++;
-                //if (myPressure > maxWritePressure) maxWritePressure = myPressure;
-                if(myWaitStart == long.MaxValue) myWaitStart = AppTime.Elapsed.Ticks;
+                if(myWaitStart == NO_WAITING) myWaitStart = AppTime.Elapsed.Ticks;
                 if(myWaitStart < Thread.VolatileRead(ref longestWaitingWriter)) Thread.VolatileWrite(ref longestWaitingWriter, myWaitStart);
 
                 if (spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
@@ -193,26 +167,19 @@ namespace FeatureFlowFramework.Helper
                 }
                 else
                 {
-                    bool reset = false;
-                    if(mreWriter.IsSet)
-                    {
-                        mreWriter.Reset();
-                        reset = true;
-                    }
-                    //if(myWaitStart == Thread.VolatileRead(ref longestWaitingWriter)) Thread.VolatileWrite(ref longestWaitingWriter, long.MaxValue);
-                    currentLockId = lockId;
-                    if (WriterMustWait(currentLockId, myWaitStart))
+                    bool didReset = mreWriter.Reset(); ;
+                    if (WriterMustWait(lockId, myWaitStart))
                     {
                         mreWriter.Wait();
                         spinWait.Reset();
                         if (myWaitStart != Thread.VolatileRead(ref longestWaitingWriter)) spinWait.SpinOnce();
                     }
-                    else if(reset) mreWriter.Set();
+                    else if(didReset) mreWriter.Set();
                 }
 
                 currentLockId = lockId;
             }
-            Thread.VolatileWrite(ref longestWaitingWriter, long.MaxValue);
+            if (myWaitStart != NO_WAITING && myWaitStart <= Thread.VolatileRead(ref longestWaitingWriter)) Thread.VolatileWrite(ref longestWaitingWriter, NO_WAITING);
             return new WriteLock(this);
         }
 
@@ -225,16 +192,13 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<WriteLock> ForWritingAsync(SpinWaitBehaviour spinWaitBehaviour)
         {
-            long myWaitStart = long.MaxValue;
+            long myWaitStart = NO_WAITING;
             SpinWait spinWait = new SpinWait();
-            //int myPressure = 0;
             var newLockId = WRITE_LOCKID;
             var currentLockId = lockId;
             while (WriterMustWait(currentLockId, myWaitStart) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
             {
-                //myPressure++;
-                //if (myPressure > maxWritePressure) maxWritePressure = myPressure;
-                if(myWaitStart == long.MaxValue) myWaitStart = AppTime.Elapsed.Ticks;
+                if(myWaitStart == NO_WAITING) myWaitStart = AppTime.Elapsed.Ticks;
                 if(myWaitStart < Thread.VolatileRead(ref longestWaitingWriter)) Thread.VolatileWrite(ref longestWaitingWriter, myWaitStart);
 
                 if (spinWaitBehaviour == SpinWaitBehaviour.OnlySpinning ||
@@ -244,32 +208,27 @@ namespace FeatureFlowFramework.Helper
                 }
                 else
                 {
-                    bool reset = false;
-                    if(mreWriter.IsSet)
-                    {
-                        mreWriter.Reset();
-                        reset = true;
-                    }
-                    currentLockId = lockId;
-                    if (WriterMustWait(currentLockId, myWaitStart))
+                    bool didReset = mreWriter.Reset();
+                    if (WriterMustWait(lockId, myWaitStart))
                     {
                         await mreWriter.WaitAsync();
                         spinWait.Reset();
+                        if (myWaitStart != Thread.VolatileRead(ref longestWaitingWriter)) spinWait.SpinOnce();
                     }
-                    else if(reset) mreWriter.Set();
+                    else if(didReset) mreWriter.Set();
                 }
 
                 currentLockId = lockId;
             }
-            Thread.VolatileWrite(ref longestWaitingWriter, long.MaxValue);
+            if (myWaitStart != NO_WAITING && myWaitStart <= Thread.VolatileRead(ref longestWaitingWriter)) Thread.VolatileWrite(ref longestWaitingWriter, NO_WAITING);
             return new WriteLock(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool WriterMustWait(int currentLockId, long myWaitStart)
         {
-            //return currentLockId != NO_LOCKID || myWaitStart > Thread.VolatileRead(ref longestWaitingWriter);
             return currentLockId != NO_LOCKID;
+            //return currentLockId != NO_LOCKID || Thread.VolatileRead(ref longestWaitingReader) < Thread.VolatileRead(ref longestWaitingWriter);
         }
 
 
@@ -277,8 +236,7 @@ namespace FeatureFlowFramework.Helper
         private void ExitWriteLock()
         {
             lockId = NO_LOCKID;
-            if (!mreReader.IsSet) mreReader.Set();            
-            else if (!mreWriter.IsSet) mreWriter.Set();
+            if (!mreReader.Set()) mreWriter.Set();
         }
 
         public struct ReadLock : IDisposable

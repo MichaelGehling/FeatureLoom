@@ -8,8 +8,8 @@ namespace FeatureFlowFramework.Helper
     {
         IAsyncWaitHandle AsyncWaitHandle { get; }
         bool IsSet { get; }
-        void Reset();
-        void Set();
+        bool Reset();
+        bool Set();
         void SetAndReset();
     }
 }
