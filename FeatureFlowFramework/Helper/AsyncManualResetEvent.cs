@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.Helper
     {
         volatile bool taskUsed = false;
         volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-        ManualResetEventSlim mre = new ManualResetEventSlim(false);
+        ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
 
         public AsyncManualResetEvent()
         {
@@ -108,21 +108,25 @@ namespace FeatureFlowFramework.Helper
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set()
+        public bool Set()
         {
-            if(mre.IsSet) return;
+            if(mre.IsSet) return false;
+
             mre.Set();
             if (taskUsed)
             {
                 tcs.TrySetResult(true);
             }
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Reset()
+        public bool Reset()
         {
-            if (!mre.IsSet) return;
-            if(taskUsed)
+            if (!mre.IsSet) return false;
+
+            mre.Reset();
+            if (this.tcs.Task.IsCompleted)
             {
                 TaskCompletionSource<bool> oldTcs, newTcs;
                 do
@@ -132,7 +136,7 @@ namespace FeatureFlowFramework.Helper
                 }
                 while(!this.tcs.Task.IsCompleted && this.tcs != Interlocked.CompareExchange(ref this.tcs, newTcs, oldTcs));
             }
-            mre.Reset();
+            return true;
         }
 
         public void SetAndReset()

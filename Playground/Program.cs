@@ -14,9 +14,9 @@ namespace Playground
         static void Main(string[] args)
         {
             //FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
-            FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 2.Seconds(), 4, 4, 0, 0);
+            FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 5.Seconds(), 2, 2, 2, 2);
             Console.WriteLine("----");
-            PerformanceTest();
+            //PerformanceTest();
             Console.WriteLine("----");
             PerformanceTestParallel();
 
@@ -39,20 +39,20 @@ namespace Playground
 
             Action workWrite = () =>
             {
-                //if(dummyList.Count > 10000) dummyList.Clear();
-                //dummyList.Add(AppTime.Now);
-                TimeFrame tf = new TimeFrame(1.1.Milliseconds());
-                while(!tf.Elapsed) ;
+                if(dummyList.Count > 10000) dummyList.Clear();
+                dummyList.Add(AppTime.Now);
+                //TimeFrame tf = new TimeFrame(1.1.Milliseconds());
+                //while(!tf.Elapsed) ;
                 //Thread.Sleep(1);
-                Thread.Yield();
+                //Thread.Yield();
             };
             Action workRead = () =>
             {
-                //foreach(var d in dummyList) d.Add(1.Milliseconds());
-                TimeFrame tf = new TimeFrame(1.1.Milliseconds());
-                while(!tf.Elapsed) ;
+                foreach(var d in dummyList) d.Add(1.Milliseconds());
+                //TimeFrame tf = new TimeFrame(1.1.Milliseconds());
+                //while(!tf.Elapsed) ;
                 //Thread.Sleep(1);
-                Thread.Yield();
+                //Thread.Yield();
             };
             Action slack = () =>
             {
@@ -62,12 +62,12 @@ namespace Playground
                 //Thread.Sleep(1);
                 TimeFrame tf = new TimeFrame(0.1.Milliseconds());
                 while(!tf.Elapsed) ;
-                Thread.Yield();
+                //Thread.Yield();
             };
 
             name = "Overhead";
             Prepare(out gcs);
-            c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
+            //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
             double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
 
