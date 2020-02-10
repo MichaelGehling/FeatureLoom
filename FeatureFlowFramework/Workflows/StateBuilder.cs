@@ -163,7 +163,6 @@ namespace FeatureFlowFramework.Workflows
         public IAfterActionStateBuilder<CT> Wait(Func<CT, TimeSpan> waitingTime)
         {
             CurrentPartialStep.hasWaiting = true;
-            //CurrentPartialStep.timeoutDelegate = waitingTime;
             CurrentPartialStep.waitingDelegate = c => Task.Delay(waitingTime(c), c.CancellationToken).Wait();
             CurrentPartialStep.waitingAsyncDelegate = c => Task.Delay(waitingTime(c), c.CancellationToken);
             return this;
@@ -172,7 +171,6 @@ namespace FeatureFlowFramework.Workflows
         public IAfterActionStateBuilder<CT> Wait(TimeSpan waitingTime)
         {
             CurrentPartialStep.hasWaiting = true;
-            //CurrentPartialStep.timeoutDelegate = c => waitingTime;
             CurrentPartialStep.waitingDelegate = c => Task.Delay(waitingTime, c.CancellationToken).Wait();
             CurrentPartialStep.waitingAsyncDelegate = c => Task.Delay(waitingTime, c.CancellationToken);
             return this;
@@ -181,8 +179,6 @@ namespace FeatureFlowFramework.Workflows
         public IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default)
         {
             CurrentPartialStep.hasWaiting = true;
-            //CurrentPartialStep.timeoutDelegate = timeout;
-            //CurrentPartialStep.waitingTaskDelegate = c => waitHandle(c).WaitingTask;
             if(timeout == default)            
             {
                 CurrentPartialStep.waitingDelegate = c => waitHandle(c).Wait(c.CancellationToken);
@@ -196,27 +192,9 @@ namespace FeatureFlowFramework.Workflows
             return this;
         }
 
-        public IAfterActionStateBuilder<CT> WaitFor(IAsyncWaitHandle waitHandle, TimeSpan timeout = default)
-        {
-            CurrentPartialStep.hasWaiting = true;
-            if(timeout == default)
-            {
-                CurrentPartialStep.waitingDelegate = c => waitHandle.Wait(c.CancellationToken);
-                CurrentPartialStep.waitingAsyncDelegate = c => waitHandle.WaitAsync(c.CancellationToken);
-            }
-            else
-            {
-                CurrentPartialStep.waitingDelegate = c => waitHandle.Wait(timeout, c.CancellationToken);
-                CurrentPartialStep.waitingAsyncDelegate = c => waitHandle.WaitAsync(timeout, c.CancellationToken);
-            }
-            return this;
-        }
-
         public IAfterActionStateBuilder<CT> WaitForAll(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default)
         {
             CurrentPartialStep.hasWaiting = true;
-            //CurrentPartialStep.timeoutDelegate = timeout;
-            //CurrentPartialStep.waitingTaskDelegate = c => Task.WhenAll(waitHandles(c).GetWaitingTasks());
             if(timeout == default)
             {
                 CurrentPartialStep.waitingDelegate = c => AsyncWaitHandle.WaitAll(c.CancellationToken, waitHandles(c));
@@ -230,27 +208,9 @@ namespace FeatureFlowFramework.Workflows
             return this;
         }
 
-        public IAfterActionStateBuilder<CT> WaitForAll(params IAsyncWaitHandle[] waitHandles)
-        {
-            CurrentPartialStep.hasWaiting = true;
-            CurrentPartialStep.waitingDelegate = c => AsyncWaitHandle.WaitAll(c.CancellationToken, waitHandles);
-            CurrentPartialStep.waitingAsyncDelegate = c => AsyncWaitHandle.WaitAllAsync(c.CancellationToken, waitHandles);
-            return this;
-        }
-
-        public IAfterActionStateBuilder<CT> WaitForAll(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles)
-        {
-            CurrentPartialStep.hasWaiting = true;
-            CurrentPartialStep.waitingDelegate = c => AsyncWaitHandle.WaitAll(timeout, c.CancellationToken, waitHandles);
-            CurrentPartialStep.waitingAsyncDelegate = c => AsyncWaitHandle.WaitAllAsync(timeout, c.CancellationToken, waitHandles);
-            return this;
-        }
-
         public IAfterActionStateBuilder<CT> WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default)
         {
             CurrentPartialStep.hasWaiting = true;
-            //CurrentPartialStep.timeoutDelegate = timeout;
-            //CurrentPartialStep.waitingTaskDelegate = c => Task.WhenAny(waitHandles(c).GetWaitingTasks());
             if(timeout == default)
             {
                 CurrentPartialStep.waitingDelegate = c => AsyncWaitHandle.WaitAny(c.CancellationToken, waitHandles(c));
@@ -261,22 +221,6 @@ namespace FeatureFlowFramework.Workflows
                 CurrentPartialStep.waitingDelegate = c => AsyncWaitHandle.WaitAny(timeout(c), c.CancellationToken, waitHandles(c));
                 CurrentPartialStep.waitingAsyncDelegate = c => AsyncWaitHandle.WaitAnyAsync(timeout(c), c.CancellationToken, waitHandles(c));
             }
-            return this;
-        }
-
-        public IAfterActionStateBuilder<CT> WaitForAny(params IAsyncWaitHandle[] waitHandles)
-        {
-            CurrentPartialStep.hasWaiting = true;
-            CurrentPartialStep.waitingDelegate = c => AsyncWaitHandle.WaitAny(c.CancellationToken, waitHandles);
-            CurrentPartialStep.waitingAsyncDelegate = c => AsyncWaitHandle.WaitAnyAsync(c.CancellationToken, waitHandles);
-            return this;
-        }
-
-        public IAfterActionStateBuilder<CT> WaitForAny(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles)
-        {
-            CurrentPartialStep.hasWaiting = true;
-            CurrentPartialStep.waitingDelegate = c => AsyncWaitHandle.WaitAny(timeout, c.CancellationToken, waitHandles);
-            CurrentPartialStep.waitingAsyncDelegate = c => AsyncWaitHandle.WaitAnyAsync(timeout, c.CancellationToken, waitHandles);
             return this;
         }
 
@@ -453,36 +397,6 @@ namespace FeatureFlowFramework.Workflows
             this.WaitFor(waitHandle, timeout);
             return this;
         }
-
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAll(params IAsyncWaitHandle[] waitHandles)
-        {
-            this.WaitForAll(waitHandles);
-            return this;
-        }
-
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAll(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles)
-        {
-            this.WaitForAll(timeout, waitHandles);
-            return this;
-        }
-
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAny(params IAsyncWaitHandle[] waitHandles)
-        {
-            this.WaitForAny(waitHandles);
-            return this;
-        }
-
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitForAny(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles)
-        {
-            this.WaitForAny(timeout, waitHandles);
-            return this;
-        }
-
-        IAfterConditionedActionStateBuilder<CT> IAfterPreconditionStateBuilder<CT>.WaitFor(IAsyncWaitHandle waitHandle, TimeSpan timeout)
-        {
-            this.WaitFor(waitHandle, timeout);
-            return this;
-        }
     }
 
     public interface IInitialStateBuilder<CT> where CT : IStateMachineContext
@@ -517,15 +431,6 @@ namespace FeatureFlowFramework.Workflows
 
         IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
 
-        IAfterActionStateBuilder<CT> WaitForAll(params IAsyncWaitHandle[] waitHandles);
-        IAfterActionStateBuilder<CT> WaitForAll(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitForAny(params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitForAny(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitFor(IAsyncWaitHandle waitHandle, TimeSpan timeout = default);
-
         //Transitions
         State<CT> Goto(State targetState);
 
@@ -555,15 +460,6 @@ namespace FeatureFlowFramework.Workflows
 
         IAfterConditionedActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
 
-        IAfterConditionedActionStateBuilder<CT> WaitForAll(params IAsyncWaitHandle[] waitHandles);
-        IAfterConditionedActionStateBuilder<CT> WaitForAll(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterConditionedActionStateBuilder<CT> WaitForAny(params IAsyncWaitHandle[] waitHandles);
-
-        IAfterConditionedActionStateBuilder<CT> WaitForAny(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterConditionedActionStateBuilder<CT> WaitFor(IAsyncWaitHandle waitHandle, TimeSpan timeout = default);
-
         //Transitions
         IAfterConditionedStateBuilderWithoutTransition<CT> Goto(State targetState);
         IAfterConditionedStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
@@ -590,14 +486,6 @@ namespace FeatureFlowFramework.Workflows
 
         IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
 
-        IAfterActionStateBuilder<CT> WaitForAll(params IAsyncWaitHandle[] waitHandles);
-        IAfterActionStateBuilder<CT> WaitForAll(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitForAny(params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitForAny(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitFor(IAsyncWaitHandle waitHandle, TimeSpan timeout = default);
     }
 
     public interface IAfterFinalPreconditionStateBuilder<CT> where CT : IStateMachineContext
@@ -616,16 +504,6 @@ namespace FeatureFlowFramework.Workflows
         IAfterActionStateBuilder<CT> WaitForAny(Func<CT, IAsyncWaitHandle[]> waitHandles, Func<CT, TimeSpan> timeout = default);
 
         IAfterActionStateBuilder<CT> WaitFor(Func<CT, IAsyncWaitHandle> waitHandle, Func<CT, TimeSpan> timeout = default);
-
-        IAfterActionStateBuilder<CT> WaitForAll(params IAsyncWaitHandle[] waitHandles);
-        IAfterActionStateBuilder<CT> WaitForAll(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitForAny(params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitForAny(TimeSpan timeout, params IAsyncWaitHandle[] waitHandles);
-
-        IAfterActionStateBuilder<CT> WaitFor(IAsyncWaitHandle waitHandle, TimeSpan timeout = default);
-
 
         //Transitions
         IAfterActionStateBuilderWithoutTransition<CT> Goto(State targetState);
