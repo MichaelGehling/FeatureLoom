@@ -48,10 +48,65 @@ namespace FeatureFlowFramework.Helper
 
             return true;
         }
+
+        public async static Task<bool> WaitAllAsync(params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            bool anyWouldWait = false;
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                anyWouldWait |= asyncWaitHandles[i].WouldWait();
+            }
+
+            if(!anyWouldWait) return true;
+
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks());
+            return true;
+        }
+
+        public static bool WaitAll(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return false;
+
+            bool allReady;
+            do
+            {
+                allReady = true;
+                for(int i = 0; i < asyncWaitHandles.Length; i++)
+                {
+                    if(asyncWaitHandles[i].WouldWait())
+                    {
+                        allReady = false;
+                        asyncWaitHandles[i].Wait(token);
+                        break;
+                    }
+                }
+            }
+            while(!allReady);
+
+            return true;
+        }
+
+        public async static Task<bool> WaitAllAsync(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return false;
+
+            bool anyWouldWait = false;
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                anyWouldWait |= asyncWaitHandles[i].WouldWait();
+            }
+
+            if(!anyWouldWait) return true;
+
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(token);
+            return true;
+        }
+
         public static bool WaitAll(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
         {
+            if(timeout <= TimeSpan.Zero) return false;
+
             TimeFrame timeoutFrame = new TimeFrame(timeout);
-            
 
             bool allProvideWaitHandle = true;
             bool anyWouldWait = false;
@@ -79,7 +134,7 @@ namespace FeatureFlowFramework.Helper
                 do
                 {
                     allReady = true;
-                    for (int i = 0; i < asyncWaitHandles.Length; i++)
+                    for (int i = 0; i < asyncWaitHandles.Length && !timeoutFrame.Elapsed; i++)
                     {
                         if (asyncWaitHandles[i].WouldWait())
                         {
@@ -93,6 +148,68 @@ namespace FeatureFlowFramework.Helper
             }
 
             return !timeoutFrame.Elapsed;
+        }
+
+        public async static Task<bool> WaitAllAsync(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(timeout <= TimeSpan.Zero) return false;
+
+            TimeFrame timeoutFrame = new TimeFrame(timeout);
+
+            bool anyWouldWait = false;
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                anyWouldWait |= asyncWaitHandles[i].WouldWait();
+            }
+
+            if(!anyWouldWait) return true;
+
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.RemainingTime);
+            return true;
+        }
+
+        public static bool WaitAll(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return false;
+            if(timeout <= TimeSpan.Zero) return false;
+
+            TimeFrame timeoutFrame = new TimeFrame(timeout);
+
+            bool allReady;
+            do
+            {
+                allReady = true;
+                for(int i = 0; i < asyncWaitHandles.Length && !timeoutFrame.Elapsed; i++)
+                {
+                    if(asyncWaitHandles[i].WouldWait())
+                    {
+                        allReady = false;
+                        asyncWaitHandles[i].Wait(timeoutFrame.RemainingTime, token);
+                        break;
+                    }
+                }
+            }
+            while(!allReady);
+
+            return true;
+        }
+
+        public async static Task<bool> WaitAllAsync(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return false;
+            if(timeout <= TimeSpan.Zero) return false;
+            TimeFrame timeoutFrame = new TimeFrame(timeout);
+
+            bool anyWouldWait = false;
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                anyWouldWait |= asyncWaitHandles[i].WouldWait();
+            }
+
+            if(!anyWouldWait) return true;
+
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.RemainingTime, token);
+            return true;
         }
 
 
@@ -117,11 +234,7 @@ namespace FeatureFlowFramework.Helper
             }
             else
             {
-                Task[] tasks = new Task[asyncWaitHandles.Length];
-                for (int i = 0; i < tasks.Length; i++)
-                {
-                    tasks[i] = asyncWaitHandles[i].WaitingTask;
-                }
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks();
                 Task.WhenAny(tasks).Wait();                
                 for (int i = 0; i < tasks.Length; i++)
                 {
@@ -131,8 +244,78 @@ namespace FeatureFlowFramework.Helper
             }
         }
 
+        public async static Task<int> WaitAnyAsync(params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                if(!asyncWaitHandles[i].WouldWait()) return i;
+            }
+
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks();
+            await Task.WhenAny(tasks);
+            for(int i = 0; i < tasks.Length; i++)
+            {
+                if(tasks[i].IsCompleted) return i;
+            }
+            return WaitHandle.WaitTimeout;
+        }
+
+        public static int WaitAny(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
+
+            bool allProvideWaitHandle = true;
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                if(!asyncWaitHandles[i].WouldWait()) return i;
+
+                allProvideWaitHandle &= asyncWaitHandles[i].TryConvertToWaitHandle(out _);
+            }
+
+            if(allProvideWaitHandle)
+            {
+                WaitHandle[] handles = new WaitHandle[asyncWaitHandles.Length + 1];
+                for(int i = 0; i < handles.Length; i++)
+                {
+                    asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
+                }
+                handles[handles.Length - 1] = token.WaitHandle;
+                return WaitHandle.WaitAny(handles);
+            }
+            else
+            {
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks();
+                Task.WhenAny(tasks).Wait(token);
+                for(int i = 0; i < tasks.Length; i++)
+                {
+                    if(tasks[i].IsCompleted) return i;
+                }
+                return WaitHandle.WaitTimeout;
+            }
+        }
+
+        public async static Task<int> WaitAnyAsync(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
+
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                if(!asyncWaitHandles[i].WouldWait()) return i;
+            }
+
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks();
+            await Task.WhenAny(tasks).WaitAsync(token);
+            for(int i = 0; i < tasks.Length; i++)
+            {
+                if(tasks[i].IsCompleted) return i;
+            }
+            return WaitHandle.WaitTimeout;
+        }
+
         public static int WaitAny(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
         {
+            if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
+
             TimeFrame timeoutFrame = new TimeFrame(timeout);
 
             bool allProvideWaitHandle = true;
@@ -156,19 +339,96 @@ namespace FeatureFlowFramework.Helper
             }
             else
             {
-                Task[] tasks = new Task[asyncWaitHandles.Length+1];                
-                for (int i = 0; i < asyncWaitHandles.Length; i++)
-                {
-                    tasks[i] = asyncWaitHandles[i].WaitingTask;
-                }
-                tasks[tasks.Length - 1] = Task.Delay(timeoutFrame.RemainingTime);
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
                 Task.WhenAny(tasks).Wait();
-                for (int i = 0; i < asyncWaitHandles.Length; i++)
+                for (int i = 0; i < tasks.Length-1; i++)
                 {
                     if (tasks[i].IsCompleted) return i;
                 }
                 return WaitHandle.WaitTimeout;
             }
+        }
+
+        public async static Task<int> WaitAnyAsync(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
+
+            TimeFrame timeoutFrame = new TimeFrame(timeout);
+
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                if(!asyncWaitHandles[i].WouldWait()) return i;
+            }
+
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
+            await Task.WhenAny(tasks);
+            for(int i = 0; i < tasks.Length-1; i++)
+            {
+                if(tasks[i].IsCompleted) return i;
+            }
+            return WaitHandle.WaitTimeout;
+        }
+
+        public static int WaitAny(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
+            if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
+
+            TimeFrame timeoutFrame = new TimeFrame(timeout);
+
+            bool allProvideWaitHandle = true;
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                if(!asyncWaitHandles[i].WouldWait()) return i;
+
+                allProvideWaitHandle &= asyncWaitHandles[i].TryConvertToWaitHandle(out _);
+            }
+
+            if(timeoutFrame.Elapsed) return WaitHandle.WaitTimeout;
+
+            if(allProvideWaitHandle)
+            {
+                WaitHandle[] handles = new WaitHandle[asyncWaitHandles.Length + 1];
+                for(int i = 0; i < handles.Length; i++)
+                {
+                    asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
+                }
+                handles[handles.Length - 1] = token.WaitHandle;
+                var index = WaitHandle.WaitAny(handles, timeoutFrame.RemainingTime);
+                if(index == handles.Length - 1) index = WaitHandle.WaitTimeout;
+                return index;
+            }
+            else
+            {
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
+                Task.WhenAny(tasks).Wait(token);
+                for(int i = 0; i < tasks.Length-1; i++)
+                {
+                    if(tasks[i].IsCompleted) return i;
+                }
+                return WaitHandle.WaitTimeout;
+            }
+        }
+
+        public async static Task<int> WaitAnyAsync(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        {
+            if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
+            if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
+
+            TimeFrame timeoutFrame = new TimeFrame(timeout);
+
+            for(int i = 0; i < asyncWaitHandles.Length; i++)
+            {
+                if(!asyncWaitHandles[i].WouldWait()) return i;
+            }
+
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
+            await Task.WhenAny(tasks).WaitAsync(token);
+            for(int i = 0; i < tasks.Length-1; i++)
+            {
+                if(tasks[i].IsCompleted) return i;
+            }
+            return WaitHandle.WaitTimeout;
         }
 
 

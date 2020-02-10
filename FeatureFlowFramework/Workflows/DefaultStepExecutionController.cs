@@ -126,27 +126,32 @@ namespace FeatureFlowFramework.Workflows
 
         private static bool DoWaiting<C>(C context, Step<C> step, PartialStep<C> partialStep) where C : IStateMachineContext
         {
-            bool proceed;
-            Task waitTask = partialStep.waitingTaskDelegate?.Invoke(context);
-            var timeoutDelegate = partialStep.timeoutDelegate;
+            bool proceed = true;
+            //Task waitTask = partialStep.waitingTaskDelegate?.Invoke(context);
+            //var timeoutDelegate = partialStep.timeoutDelegate;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
 
             context.Unlock();
             try
             {
-                if (waitTask == null && timeoutDelegate != null) Task.Delay(timeoutDelegate(context).TotalMilliseconds.ToIntTruncated(), context.CancellationToken).Wait();
+                /*if (waitTask == null && timeoutDelegate != null) Task.Delay(timeoutDelegate(context).TotalMilliseconds.ToIntTruncated(), context.CancellationToken).Wait();
                 else if (waitTask != null && timeoutDelegate != null) waitTask.Wait(timeoutDelegate(context).TotalMilliseconds.ToIntTruncated(), context.CancellationToken);
-                else if (waitTask != null) waitTask.Wait(context.CancellationToken);
+                else if (waitTask != null) waitTask.Wait(context.CancellationToken);*/
+                partialStep.waitingDelegate?.Invoke(context);
             }
             catch (Exception e)
             {
-                if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context, "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                if(e.InnerOrSelf() is TaskCanceledException)
+                {
+                    proceed = false;
+                    Log.DEBUG(context, "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                }
                 else throw e.InnerOrSelf();
             }
             context.TryLock(Timeout.InfiniteTimeSpan);
 
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
-            proceed = !waitTask.IsCanceled;
+            //proceed = !waitTask.IsCanceled;
             return proceed;
         }
 
@@ -278,25 +283,31 @@ namespace FeatureFlowFramework.Workflows
 
         private static async Task<bool> DoWaitingAsync<C>(C context, Step<C> step, bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
         {            
-            Task waitTask = partialStep.waitingTaskDelegate?.Invoke(context);
-            var timeoutDelegate = partialStep.timeoutDelegate;
+            //Task waitTask = partialStep.waitingTaskDelegate?.Invoke(context);
+            //var timeoutDelegate = partialStep.timeoutDelegate;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
 
             
             context.Unlock();
             try
             {
-                if (waitTask == null && timeoutDelegate != null)
+                /*if (waitTask == null && timeoutDelegate != null)
                 {
                     await Task.Delay(timeoutDelegate(context).TotalMilliseconds.ToIntTruncated(), context.CancellationToken);
                     proceed = !context.CancellationToken.IsCancellationRequested;
                 }
                 else if (waitTask != null && timeoutDelegate != null) proceed = await waitTask.WaitAsync(timeoutDelegate(context), context.CancellationToken);
                 else if (waitTask != null) proceed = await waitTask.WaitAsync(context.CancellationToken);
+                */
+                await partialStep.waitingAsyncDelegate?.Invoke(context);
             }
             catch (Exception e)
             {
-                if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context, "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                if(e.InnerOrSelf() is TaskCanceledException)
+                {
+                    proceed = false;
+                    Log.DEBUG(context, "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                }
                 else throw e.InnerOrSelf();
             }
             await context.TryLockAsync(Timeout.InfiniteTimeSpan);

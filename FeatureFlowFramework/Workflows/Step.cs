@@ -96,8 +96,10 @@ namespace FeatureFlowFramework.Workflows
         public Action<CT> action;
 
         public bool hasWaiting = false;
-        public Func<CT, TimeSpan> timeoutDelegate;
-        public Func<CT, Task> waitingTaskDelegate;
+        //public Func<CT, TimeSpan> timeoutDelegate;
+        //public Func<CT, Task> waitingTaskDelegate;
+        public Action<CT> waitingDelegate;
+        public Func<CT, Task> waitingAsyncDelegate;
 
         public bool finishStateMachine = false;
         public Func<CT, State> targetState;

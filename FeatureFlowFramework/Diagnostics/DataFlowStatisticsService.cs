@@ -115,7 +115,8 @@ namespace FeatureFlowFramework.Diagnostics
                     currentTimeSlice.counter++;
                 }
             }
-            manualResetEvent.ObjIfExists?.SetAndReset();
+            manualResetEvent.ObjIfExists?.Set();
+            manualResetEvent.ObjIfExists?.Reset();
         }
 
         public Task PostAsync<M>(M message)

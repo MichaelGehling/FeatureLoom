@@ -42,19 +42,20 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     .Step("Get awaited tasks from connectionRequest and config subscription")
                         .Do(c =>
                         {
+                            c.awaited.Clear();
                             if (c.awaitedConnectionRequest?.IsCompleted ?? true)
                             {
                                 c.awaitedConnectionRequest = c.listner.AcceptTcpClientAsync();
-                                c.awaitedTasks[0] = c.awaitedConnectionRequest;
+                                c.awaited.Add(AsyncWaitHandle.FromTask(c.awaitedConnectionRequest));
                             }
-                            if (c.awaitedTasks[1]?.IsCompleted ?? true)
+                            c.awaited.Add(c.config.SubscriptionWaitHandle);
+                            foreach(var con in c.connections)
                             {
-                                c.awaitedTasks[1] = c.config.SubscriptionWaitHandle.WaitingTask;
+                                c.awaited.Add(con.DisconnectionWaitHandle);
                             }
-                            c.awaitedTasks[2] = c.disconnectionEventTask;
                         })
-                    .Step("Wait for connection request or timeout of the update timer")
-                        .WaitForAny(c => c.awaitedTasks)
+                    .Step("Wait for connection request or other event")
+                        .WaitForAny(c => c.awaited.ToArray())
                     .Step("If config update available apply it and if TCP server has to be restarted restart running state")
                         .If(async c => c.config.HasSubscriptionUpdate && await c.UpdateConfigAsync(false))
                             .Loop()
@@ -69,10 +70,16 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                 connection.ReceivingSource.ConnectTo(c.receivedMessageSource);
                                 c.connections.Add(connection);
                                 c.connectionWaitEvent.Set();
-                                c.UpdateDisconnectionEventTask();
                             })
                     .Step("Stop and remove disconnected clients if timer expired")
-                        .If(c => c.disconnectionEventTask.IsCompleted)
+                        .If(c =>
+                        {
+                            foreach(var conn in c.connections)
+                            {
+                                if(conn.Disconnected) return true;
+                            }
+                            return false;
+                        })
                             .Do(c =>
                             {
                                 c.connections.RemoveAll(connection =>
@@ -86,7 +93,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                     return false;
                                 });
                                 if (c.connections.Count == 0) c.connectionWaitEvent.Reset();
-                                c.UpdateDisconnectionEventTask();
                             })
                     .Step("Continue waiting for next events")
                         .Loop();
@@ -123,8 +129,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private Forwarder receivedMessageSource = new Forwarder();
 
         private Task<TcpClient> awaitedConnectionRequest;
-        private Task[] awaitedTasks = new Task[3];
-        private Task disconnectionEventTask = Task.Delay(-1); // TODO Workaround... find cleaner solution
+        private List<IAsyncWaitHandle> awaited = new List<IAsyncWaitHandle>();
 
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
         public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent.AsyncWaitHandle;
@@ -178,11 +183,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 }
             }
             return result;
-        }
-
-        private void UpdateDisconnectionEventTask()
-        {
-            disconnectionEventTask = Task.WhenAny(connections.Select(con => con.DisconnectionWaitHandle.WaitingTask));
         }
 
         private void DeactivateServer()

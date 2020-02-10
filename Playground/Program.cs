@@ -44,7 +44,7 @@ namespace Playground
                 //TimeFrame tf = new TimeFrame(1.1.Milliseconds());
                 //while(!tf.Elapsed) ;
                 //Thread.Sleep(1);
-                //Thread.Yield();
+                Thread.Yield();
             };
             Action workRead = () =>
             {
@@ -52,7 +52,7 @@ namespace Playground
                 //TimeFrame tf = new TimeFrame(1.1.Milliseconds());
                 //while(!tf.Elapsed) ;
                 //Thread.Sleep(1);
-                //Thread.Yield();
+                Thread.Yield();
             };
             Action slack = () =>
             {
@@ -62,7 +62,7 @@ namespace Playground
                 //Thread.Sleep(1);
                 TimeFrame tf = new TimeFrame(0.1.Milliseconds());
                 while(!tf.Elapsed) ;
-                //Thread.Yield();
+                Thread.Yield();
             };
 
             name = "Overhead";

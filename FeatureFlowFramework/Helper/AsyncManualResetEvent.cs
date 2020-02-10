@@ -126,23 +126,13 @@ namespace FeatureFlowFramework.Helper
             if (!mre.IsSet) return false;
 
             mre.Reset();
-            if (this.tcs.Task.IsCompleted)
+            var oldTcs = this.tcs;
+            if (oldTcs.Task.IsCompleted)
             {
-                TaskCompletionSource<bool> oldTcs, newTcs;
-                do
-                {
-                    oldTcs = this.tcs;
-                    newTcs = new TaskCompletionSource<bool>();
-                }
-                while(!this.tcs.Task.IsCompleted && this.tcs != Interlocked.CompareExchange(ref this.tcs, newTcs, oldTcs));
+                //this.tcs = new TaskCompletionSource<bool>();           
+                Interlocked.CompareExchange(ref this.tcs, new TaskCompletionSource<bool>(), oldTcs);                
             }
             return true;
-        }
-
-        public void SetAndReset()
-        {
-            Set();
-            Reset();
         }
 
         public bool WouldWait()

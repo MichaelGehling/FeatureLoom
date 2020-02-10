@@ -10,6 +10,5 @@ namespace FeatureFlowFramework.Helper
         bool IsSet { get; }
         bool Reset();
         bool Set();
-        void SetAndReset();
     }
 }

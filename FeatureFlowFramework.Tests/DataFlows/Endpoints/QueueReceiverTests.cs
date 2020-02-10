@@ -72,7 +72,7 @@ namespace FeatureFlowFramework.DataFlows
             Assert.True(receiver.IsFull);
             if (sendAsync)
             {
-                TimeSpan tolerance = 20.Milliseconds();
+                TimeSpan tolerance = 30.Milliseconds();
 
                 var timeKeeper = AppTime.TimeKeeper;
                 var task = sender.SendAsync(42);

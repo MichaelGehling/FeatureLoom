@@ -72,7 +72,7 @@ namespace FeatureRpcClient
                             c.rpcCallFuture = c.rpcCaller.CallAsync(c.rpcCall);
                         })
                     .Step("Wait for RPC response.")
-                        .WaitFor(c => c.rpcCallFuture)
+                        .WaitFor(c => AsyncWaitHandle.FromTask(c.rpcCallFuture))
                     .Step("If response was not received go to call failed state.")
                         .If(c => !c.rpcCallFuture.IsCompletedSuccessfully)
                             .Goto(callFailed)
