@@ -12,10 +12,6 @@ namespace FeatureFlowFramework.Workflows
             {
                 while (workflow.ExecuteNextStep(executionController)) ;
             }
-            catch (Exception e)
-            {
-                Log.ERROR($"Workflow failed! ({workflow.Name})", e.ToString());
-            }
             finally
             {
                 RemoveFromRunningWorkflows(workflow);

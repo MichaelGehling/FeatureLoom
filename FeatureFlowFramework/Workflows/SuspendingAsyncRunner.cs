@@ -25,11 +25,10 @@ namespace FeatureFlowFramework.Workflows
             AddToRunningWorkflows(workflow);
             try
             {
-                while(await workflow.ExecuteNextStepAsync(executionController)) await Task.Delay(suspensionTime);
-            }
-            catch(Exception e)
-            {
-                Log.ERROR($"Workflow failed! ({workflow.Name})", e.ToString());
+                while(await workflow.ExecuteNextStepAsync(executionController)) 
+                {
+                    if (SynchronizationContext.Current != null) await Task.Delay(suspensionTime);
+                }
             }
             finally
             {

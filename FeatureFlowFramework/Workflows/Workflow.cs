@@ -21,7 +21,7 @@ namespace FeatureFlowFramework.Workflows
 
         protected LazySlim<Sender> executionInfoSender;
 
-        public static IWorkflowRunner defaultRunner = new AsyncRunner();
+        public static IWorkflowRunner defaultRunner = new SuspendingAsyncRunner();
 
         public virtual bool TryUpdateAppStructureAspects(TimeSpan timeout)
         {
@@ -58,9 +58,6 @@ namespace FeatureFlowFramework.Workflows
 
         [JsonIgnore]
         protected virtual bool AutoLockingOnExecution => true;
-
-        [JsonIgnore]
-        protected virtual bool RemoveSynchronizationContextOnAsync => false;
 
         [JsonIgnore]
         public string Name => $"{this.GetType().ToString()}_{this.id}";
@@ -110,8 +107,6 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> TryLockAsync(TimeSpan timeout)
         {
-            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
-
             return await controlData.semaphore.WaitAsync(timeout.TotalMilliseconds.ToIntTruncated());
         }
 
@@ -140,8 +135,6 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> LockAndExecuteAsync(Action action, TimeSpan timeout)
         {
-            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
-
             bool success = false;
             try
             {
@@ -160,7 +153,6 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> LockAndExecuteAsync(Func<Task> action, TimeSpan timeout)
         {
-            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
 
             bool success = false;
             try
@@ -207,7 +199,6 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> ExecuteNextStepAsync(IStepExecutionController controller, TimeSpan timeout = default)
         {
-            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
 
             if (!AutoLockingOnExecution) return await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
 
@@ -274,8 +265,6 @@ namespace FeatureFlowFramework.Workflows
 
         public async Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout)
         {
-            if (RemoveSynchronizationContextOnAsync) await new SyncContextRemover();
-
             if (!IsRunning) return true;
             if (controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
 

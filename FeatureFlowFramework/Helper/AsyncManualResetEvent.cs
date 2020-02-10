@@ -26,8 +26,12 @@ namespace FeatureFlowFramework.Helper
         {
             get
             {
-                taskUsed = true;
-                return tcs.Task;
+                if(mre.IsSet) return Task.CompletedTask;
+                else
+                {
+                    taskUsed = true;
+                    return tcs.Task;
+                }
             }
         }
 
