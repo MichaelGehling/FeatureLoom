@@ -99,13 +99,13 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Send<U>(in U message)
         {
-            if (typeof(U) is T) sendingHelper.Forward(message);
+            if (typeof(T).IsAssignableFrom(typeof(U))) sendingHelper.Forward(message);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow sending messages of type {typeof(U)}.");
         }
 
         public Task SendAsync<U>(U message)
         {
-            if (typeof(U) is T) return sendingHelper.ForwardAsync(message);
+            if (typeof(T).IsAssignableFrom(typeof(U))) return sendingHelper.ForwardAsync(message);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow sending messages of type {typeof(U)}.");
         }
     }

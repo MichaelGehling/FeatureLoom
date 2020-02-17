@@ -14,7 +14,20 @@ namespace Playground
         static void Main(string[] args)
         {
             //FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
-            FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 5.Seconds(), 2, 2, 2, 2);
+            Console.WriteLine("--2,2,2,2--");
+            for (int i= 0; i< 5; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 2, 2, 2, 2);
+            /*Console.WriteLine("--0,0,1,1--");
+            for(int i = 0; i < 5; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 1, 1);
+            Console.WriteLine("--0,0,0,4--");
+            for(int i = 0; i < 5; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 0, 4);
+            Console.WriteLine("--0,0,4,0--");
+            for(int i = 0; i < 5; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 4, 0);
+            Console.WriteLine("--0,0,3,1--");
+            for(int i = 0; i < 5; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 3, 1);
+            Console.WriteLine("--0,0,1,2--");
+            for(int i = 0; i < 15; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 1, 2);
+            Console.WriteLine("--0,0,2,2--");
+            for(int i = 0; i < 15; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 2, 2);*/
             Console.WriteLine("----");
             //PerformanceTest();
             Console.WriteLine("----");
@@ -26,7 +39,7 @@ namespace Playground
      
         private static void PerformanceTestParallel()
         {
-            var duration = 2.Seconds();
+            var duration = 5.Seconds();
             double timeFactor = duration.TotalMilliseconds * 1_000_000;
             string name;
             long c = 0;
@@ -39,7 +52,7 @@ namespace Playground
 
             Action workWrite = () =>
             {
-                if(dummyList.Count > 10000) dummyList.Clear();
+                if(dummyList.Count > 1000) dummyList.Clear();
                 dummyList.Add(AppTime.Now);
                 //TimeFrame tf = new TimeFrame(1.1.Milliseconds());
                 //while(!tf.Elapsed) ;
@@ -60,7 +73,7 @@ namespace Playground
                 while (!tf.Elapsed) ;*/
                 //Thread.Sleep(1.Milliseconds());
                 //Thread.Sleep(1);
-                TimeFrame tf = new TimeFrame(0.1.Milliseconds());
+                TimeFrame tf = new TimeFrame(0.0.Milliseconds());
                 while(!tf.Elapsed) ;
                 Thread.Yield();
             };

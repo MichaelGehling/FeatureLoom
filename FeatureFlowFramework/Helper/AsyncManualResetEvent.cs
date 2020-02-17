@@ -128,8 +128,7 @@ namespace FeatureFlowFramework.Helper
             mre.Reset();
             var oldTcs = this.tcs;
             if (oldTcs.Task.IsCompleted)
-            {
-                //this.tcs = new TaskCompletionSource<bool>();           
+            {    
                 Interlocked.CompareExchange(ref this.tcs, new TaskCompletionSource<bool>(), oldTcs);                
             }
             return true;

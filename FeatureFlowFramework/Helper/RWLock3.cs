@@ -128,8 +128,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReaderMustWait(int currentLockId, long myWaitStart)
         {
-            //return currentLockId > NO_LOCKID || (currentLockId < NO_LOCKID && Thread.VolatileRead(ref longestWaitingReader) > Thread.VolatileRead(ref longestWaitingWriter));
-            return currentLockId > NO_LOCKID || Thread.VolatileRead(ref longestWaitingReader) > Thread.VolatileRead(ref longestWaitingWriter);            
+            return currentLockId > NO_LOCKID || (currentLockId < NO_LOCKID && Thread.VolatileRead(ref longestWaitingReader) > Thread.VolatileRead(ref longestWaitingWriter));         
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -228,16 +227,6 @@ namespace FeatureFlowFramework.Helper
         private bool WriterMustWait(int currentLockId, long myWaitStart)
         {
             return currentLockId != NO_LOCKID;
-            //return currentLockId != NO_LOCKID || Thread.VolatileRead(ref longestWaitingReader) < Thread.VolatileRead(ref longestWaitingWriter);
-            //return currentLockId != NO_LOCKID || (Thread.VolatileRead(ref longestWaitingReader) < myWaitStart && mreWriter.IsSet);
-
-            /*if(currentLockId != NO_LOCKID) return true;
-            else if(Thread.VolatileRead(ref longestWaitingReader) < myWaitStart)
-            {
-                if(!mreWriter.IsSet) mreWriter.Set();
-                return true;
-            }
-            else return false;*/
         }
 
 

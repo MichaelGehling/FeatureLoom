@@ -27,7 +27,15 @@ namespace FeatureFlowFramework.DataFlows
             mre.Reset();
         }
 
-        public bool IsTriggered => mre.IsSet;
+        public bool IsTriggered(bool reset = false)
+        {
+            if(mre.IsSet)
+            {
+                if (reset) Reset();
+                return true;
+            }
+            return false;
+        }
 
         public Task WaitingTask => ((IAsyncWaitHandle)mre).WaitingTask;
 
