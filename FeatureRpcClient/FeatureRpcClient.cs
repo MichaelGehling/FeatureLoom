@@ -41,7 +41,7 @@ namespace FeatureRpcClient
                 setup.Build()
                     .Step("Write default config files if not existing")
                         .If(c => !Storage.GetReader(c.tcpConfig.ConfigCategory).Exists(c.tcpConfig.Uri))
-                            .Do(c => c.tcpConfig.TryWriteToStorage())
+                            .Do(async c => await c.tcpConfig.TryWriteToStorageAsync())
                     .Step("Create TCP client and start connecting.")
                         .Do(c => c.tcpClient = new TcpClientEndpoint())
                     .Step("Create RPC caller and wire it to TCP connection.")

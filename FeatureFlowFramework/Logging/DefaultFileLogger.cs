@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.Logging
 
                 starting.Build()
                     .Step("Load Configuration")
-                        .Do(c => c.config.TryUpdateFromStorage(true))
+                        .Do(async c => await c.config.TryUpdateFromStorageAsync(true))
                     .Step("If NewFileOnStartup is configured force archiving.")
                         .If(c => c.config.newFileOnStartup)
                             .Do(c => c.ArchiveCurrentLogfile())
@@ -31,11 +31,11 @@ namespace FeatureFlowFramework.Logging
 
                 logging.Build("Logging")
                     .Step("Check for config update")
-                        .Do(c => c.config.TryUpdateFromStorage(true))
+                        .Do(async c => await c.config.TryUpdateFromStorageAsync(true))
                     .Step("Wait until receiving logMessages")
                         .WaitFor(c => c.receiver)
                     .Step("Write all logMessages from receiver to file")
-                        .Do(c => c.WriteToLogFile())
+                        .Do(async c => await c.WriteToLogFileAsync())
                         .CatchAndDo((c, e) => Log.ERROR($"{c.Name}: Writing to log file failed.", e.ToString()))
                     .Step("Do archiving if file limit is exceeded")
                         .If(c => c.config.logFileSizeLimitInMB * 1024 * 1024 <= c.GetLogFileSize())
@@ -80,7 +80,7 @@ namespace FeatureFlowFramework.Logging
             return logFileInfo.Length;
         }
 
-        private async Task WriteToLogFile()
+        private async Task WriteToLogFileAsync()
         {
             if (receiver.IsEmpty) return;
             

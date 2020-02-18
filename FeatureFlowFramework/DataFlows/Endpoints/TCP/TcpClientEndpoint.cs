@@ -155,7 +155,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             bool result = false;
             var oldConfig = config;
-            if (config.TryUpdateFromStorage(true) || initial)
+            if (await config.TryUpdateFromStorageAsync(true) || initial)
             {
                 if (!initial) Log.INFO(this, "Loading updated configuration!");
 

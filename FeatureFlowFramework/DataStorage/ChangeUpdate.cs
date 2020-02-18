@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.DataStorage
             this.updateEvent = notification.updateEvent;
             this.timestamp = notification.timestamp;
             reader = reader ?? Storage.GetReader(category);
-            isValid = reader.TryRead<T>(uri, out item);
+            isValid = reader.TryReadAsync<T>(uri).Result.Out(out item);
         }
     }
 }

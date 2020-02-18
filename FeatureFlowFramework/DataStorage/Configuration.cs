@@ -3,67 +3,12 @@ using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Logging;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataStorage
 {
     public abstract class Configuration
     {
-        public class Config : Configuration
-        {
-            public bool autoConfigWriteDefault = false;
-            public Dictionary<string, bool> autoConfigWriteRules = new Dictionary<string, bool>();
-
-            public Config()
-            {
-                try
-                {
-                    if (Reader.TryRead(this.Uri, out string json))
-                    {
-                        this.UpdateFromJson(json);
-                    }
-                    else if (autoConfigWriteDefault)
-                    {
-                        Writer.TryWrite(this.Uri, this);
-                    }
-                }
-                catch
-                {
-                }
-            }
-        }
-
-        private static Config config = new Config();
-
-        public static bool AutoConfigWriteDefault
-        {
-            get => config.autoConfigWriteDefault;
-            set => config.autoConfigWriteDefault = value;
-        }
-
-        public static void SetAutoConfigWriteRule(string configUri, bool set)
-        {
-            lock (config.autoConfigWriteRules)
-            {
-                config.autoConfigWriteRules[configUri] = set;
-            }
-        }
-
-        public static void PerformAutoConfigWrite(Configuration configuration, bool ignore)
-        {
-            /*
-            // This enforces the static constructor to be called, so its own config can be written
-            if (ignore) return;
-
-            lock (config.autoConfigWriteRules)
-            {
-                if (config.autoConfigWriteRules.TryGetValue(configuration.Uri, out bool write))
-                {
-                    if (write) configuration.TryWriteToStorage();
-                }
-                else if (config.autoConfigWriteDefault) configuration.TryWriteToStorage();
-            }
-            */
-        }
 
         [JsonIgnore]
         public virtual string Uri => this.GetType().FullName;
@@ -114,12 +59,12 @@ namespace FeatureFlowFramework.DataStorage
         [JsonIgnore]
         public bool HasSubscriptionUpdate => (!subscriptionReceiver.ObjIfExists?.IsEmpty) ?? false;
 
-        public bool TryWriteToStorage()
+        public async Task<bool> TryWriteToStorageAsync()
         {
-            return Writer.TryWrite(Uri, this);
+            return await Writer.TryWriteAsync(Uri, this);
         }
 
-        public bool TryUpdateFromStorage(bool useSubscription)
+        public async Task<bool> TryUpdateFromStorageAsync(bool useSubscription)
         {
             bool success = false;
             string json = null;
@@ -127,8 +72,7 @@ namespace FeatureFlowFramework.DataStorage
             {
                 if (!subscriptionReceiver.IsInstantiated)
                 {
-                    success = Reader.TryRead(this.Uri, out json);
-                    PerformAutoConfigWrite(this, success);
+                    success = (await Reader.TryReadAsync<string>(this.Uri)).Out(out json);
                     StartSubscription();
                 }
                 else
@@ -142,8 +86,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             else
             {
-                success = Reader.TryRead(this.Uri, out json);
-                PerformAutoConfigWrite(this, success);
+                success = (await Reader.TryReadAsync<string>(this.Uri)).Out(out json);
             }
             if (success)
             {

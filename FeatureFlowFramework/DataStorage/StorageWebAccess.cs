@@ -29,7 +29,7 @@ namespace FeatureFlowFramework.DataStorage
         public StorageWebAccess(Config config = null, IWebServer webServer = null)
         {
             this.config = config ?? new Config();
-            this.config.TryUpdateFromStorage(false);
+            this.config.TryUpdateFromStorageAsync(false).Wait();
             webServer = webServer ?? SharedWebServer.WebServer;
             webServer.AddRequestHandler(this);
 

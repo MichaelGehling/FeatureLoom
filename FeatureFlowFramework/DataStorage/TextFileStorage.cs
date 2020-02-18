@@ -51,7 +51,7 @@ namespace FeatureFlowFramework.DataStorage
             this.config = config ?? new Config();
             config = this.config;
             if (config.configUri == null) config.configUri += config.Uri + "_" + category;
-            if (config.ConfigCategory != category) config.TryUpdateFromStorage(false);
+            if (config.ConfigCategory != category) config.TryUpdateFromStorageAsync(false).Wait();
             config.configUri = configUri ?? config.configUri;
 
             string basePath = config.basePath;

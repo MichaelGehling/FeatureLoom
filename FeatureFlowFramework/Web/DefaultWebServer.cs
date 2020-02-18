@@ -34,12 +34,12 @@ namespace FeatureFlowFramework.Web
 
         public DefaultWebServer()
         {
-            TryUpdateConfig();
+            TryUpdateConfigAsync().Wait();
         }
 
-        public bool TryUpdateConfig()
+        public async Task<bool> TryUpdateConfigAsync()
         {
-            if (config.TryUpdateFromStorage(false))
+            if (await config.TryUpdateFromStorageAsync(false))
             {
                 foreach (var endpoint in config.endpointConfigs.EmptyIfNull())
                 {
@@ -244,7 +244,7 @@ namespace FeatureFlowFramework.Web
 
                         if (endpoint.certificateName != null)
                         {
-                            if (Storage.GetReader("certificate").TryRead(endpoint.certificateName, out X509Certificate2 certificate))
+                            if (Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName).Result.Out(out X509Certificate2 certificate))
                             {
                                 options.Listen(endpoint.address, endpoint.port, listenOptions =>
                                 {

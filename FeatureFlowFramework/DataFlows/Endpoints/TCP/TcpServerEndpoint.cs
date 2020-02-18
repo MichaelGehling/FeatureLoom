@@ -171,7 +171,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             bool result = false;
             var oldConfig = config;
-            if (config.TryUpdateFromStorage(true) || initial)
+            if (await config.TryUpdateFromStorageAsync(true) || initial)
             {
                 if (!initial) Log.INFO(this, "Loading updated configuration!");
 
@@ -199,7 +199,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             try
             {
-                if (config.x509CertificateName != null) Storage.GetReader("certificate").TryRead(config.x509CertificateName, out this.serverCertificate);
+                if (config.x509CertificateName != null) (await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(config.x509CertificateName)).Out(out this.serverCertificate);
 
                 IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns);
 
