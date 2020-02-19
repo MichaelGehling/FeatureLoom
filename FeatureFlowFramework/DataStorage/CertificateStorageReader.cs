@@ -79,11 +79,6 @@ namespace FeatureFlowFramework.DataStorage
             return new AsyncOutResult<bool, T>(true, data);
         }
 
-        public bool TryListUris(out string[] uris, string pattern = null)
-        {
-            return TryListUrisAsync(pattern).Result.Out(out uris);
-        }
-
         public async Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null)
         {
             try
@@ -110,11 +105,6 @@ namespace FeatureFlowFramework.DataStorage
                 Log.ERROR("Reading files to retreive Uris failed!", e.ToString());
                 return new AsyncOutResult<bool, string[]>(false, null);
             }
-        }
-
-        public bool TryRead(string uri, Action<Stream> consumer)
-        {
-            return false;
         }
 
         public Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer)

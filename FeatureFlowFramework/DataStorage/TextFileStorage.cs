@@ -386,11 +386,6 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        public bool TryListUris(out string[] uris, string pattern = null)
-        {
-            return TryListUrisAsync(pattern).Result.Out(out uris);
-        }
-
         public async Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null)
         {
             try
@@ -445,43 +440,6 @@ namespace FeatureFlowFramework.DataStorage
             return File.Exists(filePath);
         }
 
-        public bool TryRead<T>(string uri, out T data)
-        {
-            try
-            {
-                if (cache?.Get(uri) is string cacheString)
-                {
-                    return TryDeserialize(cacheString, out data);
-                }
-
-                string filePath = UriToFilePath(uri);
-                FileInfo fileInfo = new FileInfo(filePath);
-                if (fileInfo.Exists)
-                {
-                    using (var stream = fileInfo.OpenText())
-                    {
-                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        var fileContent = stream.ReadToEnd();
-
-                        if (config.updateCacheOnRead)
-                        {
-                            cache?.Add(uri, fileContent, cacheItemPolicy);
-                        }
-
-                        return TryDeserialize(fileContent, out data);
-                    }
-                }
-
-                data = default;
-                return false;
-            }
-            catch
-            {
-                data = default;
-                return false;
-            }
-        }
-
         public async Task<AsyncOutResult<bool, T>> TryReadAsync<T>(string uri)
         {
             try
@@ -518,54 +476,6 @@ namespace FeatureFlowFramework.DataStorage
             catch
             {
                 return new AsyncOutResult<bool, T>(false, default);
-            }
-        }
-        
-        public bool TryRead(string uri, Action<Stream> consumer)
-        {
-            try
-            {
-                if(cache?.Get(uri) is string cacheString)
-                {
-                    var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
-                    consumer(stream);
-                    return true;
-                }
-
-                string filePath = UriToFilePath(uri);
-                FileInfo fileInfo = new FileInfo(filePath);
-                if(fileInfo.Exists)
-                {
-                    using(var stream = fileInfo.OpenRead())
-                    {
-                        if(config.timeout > TimeSpan.Zero) stream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-
-                        if(config.updateCacheOnRead)
-                        {
-                            using(var memoryStream = new MemoryStream())
-                            using(var textReader = new StreamReader(memoryStream))
-                            {
-                                stream.CopyTo(memoryStream);
-                                memoryStream.Position = 0;
-                                consumer(memoryStream);
-                                memoryStream.Position = 0;
-                                string fileContent = textReader.ReadToEnd();
-                                cache?.Add(uri, fileContent, cacheItemPolicy);
-                            }
-                        }
-                        else
-                        {
-                            consumer(stream);
-                        }
-
-                        return true;
-                    }
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -616,45 +526,7 @@ namespace FeatureFlowFramework.DataStorage
                 return false;
             }
         }
-
-        public bool TryWrite<T>(string uri, T data)
-        {
-            try
-            {
-                string filePath = UriToFilePath(uri);
-                FileInfo fileInfo = new FileInfo(filePath);
-                fileInfo.Directory.Create();
-
-                if (TrySerialize(data, out string fileContent))
-                {
-                    if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
-                    {
-                        cache?.Add(uri, fileContent, cacheItemPolicy);
-                        if (fileSystemObservationActive)
-                        {
-                            UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
-                            NotifySubscriptions(uri, updateEvent, false);
-                            if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
-                            else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
-                        }
-                    }
-
-                    using (var stream = fileInfo.CreateText())
-                    {
-                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        stream.Write(fileContent);
-                        return true;
-                    }
-                }
-                else return false;
-            }
-            catch (Exception e)
-            {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
-                return false;
-            }
-        }
-
+        
         public async Task<bool> TryWriteAsync<T>(string uri, T data)
         {
             try
@@ -690,61 +562,6 @@ namespace FeatureFlowFramework.DataStorage
             {
                 Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
-            }
-        }
-
-        public bool TryWrite(string uri, Stream sourceStream)
-        {
-            bool disposeStream = false;
-            try
-            {
-                string filePath = UriToFilePath(uri);
-                FileInfo fileInfo = new FileInfo(filePath);
-                fileInfo.Directory.Create();
-
-                if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
-                {
-                    if (!sourceStream.CanSeek)
-                    {
-                        MemoryStream memoryStream = new MemoryStream();
-                        sourceStream.CopyTo(memoryStream);
-                        sourceStream = memoryStream;
-                        sourceStream.Position = 0;
-                        disposeStream = true;
-                    }
-                    string fileContent;
-                    var origPosition = sourceStream.Position;
-                    // Without using, otherwise the streamreader would dispose the stream already here!
-                    var textReader = new StreamReader(sourceStream);
-                    fileContent = textReader.ReadToEnd();
-                    sourceStream.Position = origPosition;
-                    cache?.Add(uri, fileContent, cacheItemPolicy);
-
-                    if (fileSystemObservationActive)
-                    {
-                        UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
-                        NotifySubscriptions(uri, updateEvent, false);
-                        if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
-                        else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
-                    }
-                }
-
-                using (var stream = fileInfo.OpenWrite())
-                {
-                    if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                    stream.SetLength(0);
-                    sourceStream.CopyTo(stream);
-                    return true;
-                }
-            }
-            catch (Exception e)
-            {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
-                return false;
-            }
-            finally
-            {
-                if (disposeStream) sourceStream.Dispose();
             }
         }
 
@@ -803,32 +620,6 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        public bool TryAppend<T>(string uri, T data)
-        {
-            try
-            {
-                string filePath = UriToFilePath(uri);
-                FileInfo fileInfo = new FileInfo(filePath);
-                fileInfo.Directory.Create();
-
-                if (TrySerialize(data, out string fileContent))
-                {
-                    using (var stream = fileInfo.AppendText())
-                    {
-                        if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        stream.Write(fileContent);
-                        return true;
-                    }
-                }
-                else return false;
-            }
-            catch (Exception e)
-            {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
-                return false;
-            }
-        }
-
         public async Task<bool> TryAppendAsync<T>(string uri, T data)
         {
             try
@@ -847,29 +638,6 @@ namespace FeatureFlowFramework.DataStorage
                     }
                 }
                 else return false;
-            }
-            catch (Exception e)
-            {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
-                return false;
-            }
-        }
-
-        public bool TryAppend(string uri, Stream sourceStream)
-        {
-            try
-            {
-                string filePath = UriToFilePath(uri);
-                FileInfo fileInfo = new FileInfo(filePath);
-                fileInfo.Directory.Create();
-
-                using (var stream = fileInfo.OpenWrite())
-                {
-                    if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                    stream.Seek(0, SeekOrigin.End);
-                    sourceStream.CopyTo(stream);
-                    return true;
-                }
             }
             catch (Exception e)
             {
@@ -901,7 +669,7 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        public bool TryDelete(string uri)
+        public Task<bool> TryDeleteAsync(string uri)
         {
             string filePath = UriToFilePath(uri);
             FileInfo fileInfo = new FileInfo(filePath);
@@ -909,19 +677,14 @@ namespace FeatureFlowFramework.DataStorage
             try
             {
                 cache?.Remove(uri);
-                if (fileInfo.Exists) fileInfo.Delete();
-                return true;
+                if(fileInfo.Exists) fileInfo.Delete();
+                return Task.FromResult(true);
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 Log.ERROR($"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
-                return false;
+                return Task.FromResult(false);
             }
-        }
-
-        public Task<bool> TryDeleteAsync(string uri)
-        {
-            return Task.FromResult(TryDelete(uri));
         }
 
         private class FileSubscriptionStatus
