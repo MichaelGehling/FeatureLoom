@@ -44,8 +44,8 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 0;
-            int numWriteLocks = 1;
+            int numReadLocks = 3;
+            int numWriteLocks = 3;
 
             List<DateTime> dummyList = new List<DateTime>();
             Random rnd = new Random();
@@ -61,9 +61,9 @@ namespace Playground
             };
             Action workRead = () =>
             {
-                //DateTime x = AppTime.Now;
-                //TimeSpan y;
-                //foreach (var d in dummyList) y = x.Subtract(d);
+                DateTime x = AppTime.Now;
+                TimeSpan y;
+                foreach (var d in dummyList) y = x.Subtract(d);
                 //TimeFrame tf = new TimeFrame(0.1.Milliseconds());
                 //while(!tf.Elapsed) ;
                 //Thread.Sleep(1);
@@ -82,7 +82,7 @@ namespace Playground
 
             name = "Overhead";
             Prepare(out gcs);
-            c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
+            //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
             double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
 
@@ -139,9 +139,14 @@ namespace Playground
             c = RunParallelAsync(new SemaphoreSlim(1, 1), duration, SemaphoreLockAsync, numReadLocks, SemaphoreLockAsync, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
 
-            name = "ReaderWriterLockSlim";
+            name = "ReaderWriterLockSlim w/o recursion";
             Prepare(out gcs);
-            c = RunParallel(new ReaderWriterLockSlim(), duration, ReaderWriterLockRead, numReadLocks, ReaderWriterLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            c = RunParallel(new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion), duration, ReaderWriterLockRead, numReadLocks, ReaderWriterLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+
+            name = "ReaderWriterLockSlim with recursion";
+            Prepare(out gcs);
+            c = RunParallel(new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion), duration, ReaderWriterLockRead, numReadLocks, ReaderWriterLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
         }
 
