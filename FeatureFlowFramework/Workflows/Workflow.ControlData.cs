@@ -9,7 +9,6 @@ namespace FeatureFlowFramework.Workflows
         {
             public CancellationTokenSource cancellationTokenSource;
             public AsyncManualResetEvent notRunningWakeEvent;
-            public SemaphoreSlim semaphore;
             public volatile bool pauseRequested;
 
             public static ControlData Init()
@@ -19,7 +18,6 @@ namespace FeatureFlowFramework.Workflows
                     cancellationTokenSource = null,
                     pauseRequested = false,
                     notRunningWakeEvent = null,
-                    semaphore = new SemaphoreSlim(1, 1)
                 };
             }
         }
