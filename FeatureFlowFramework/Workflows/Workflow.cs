@@ -57,9 +57,6 @@ namespace FeatureFlowFramework.Workflows
         public virtual ExecutionEventList ExecutionEvents => executionEvents;
 
         [JsonIgnore]
-        protected virtual bool AutoLockingOnExecution => true;
-
-        [JsonIgnore]
         public string Name => $"{this.GetType().ToString()}_{this.id}";
 
         [JsonIgnore]
@@ -100,76 +97,6 @@ namespace FeatureFlowFramework.Workflows
             executionInfoSender.ObjIfExists?.Send(new ExecutionInfo(this, executionEvent, state, phase, additionalInfo));
         }
 
-        public bool TryLock(TimeSpan timeout)
-        {
-            return controlData.semaphore.Wait(timeout.TotalMilliseconds.ToIntTruncated());
-        }
-
-        public async Task<bool> TryLockAsync(TimeSpan timeout)
-        {
-            return await controlData.semaphore.WaitAsync(timeout.TotalMilliseconds.ToIntTruncated());
-        }
-
-        public void Unlock()
-        {
-            controlData.semaphore.Release();
-        }
-
-        public bool LockAndExecute(Action action, TimeSpan timeout)
-        {
-            bool success = false;
-            try
-            {
-                if (controlData.semaphore.Wait(timeout))
-                {
-                    action();
-                    success = true;
-                }
-            }
-            finally
-            {
-                controlData.semaphore.Release();
-            }
-            return success;
-        }
-
-        public async Task<bool> LockAndExecuteAsync(Action action, TimeSpan timeout)
-        {
-            bool success = false;
-            try
-            {
-                if (await controlData.semaphore.WaitAsync(timeout))
-                {
-                    action();
-                    success = true;
-                }
-            }
-            finally
-            {
-                controlData.semaphore.Release();
-            }
-            return success;
-        }
-
-        public async Task<bool> LockAndExecuteAsync(Func<Task> action, TimeSpan timeout)
-        {
-
-            bool success = false;
-            try
-            {
-                if (await controlData.semaphore.WaitAsync(timeout))
-                {
-                    await action();
-                    success = true;
-                }
-            }
-            finally
-            {
-                controlData.semaphore.Release();
-            }
-            return success;
-        }
-
         [JsonIgnore]
         public CancellationToken CancellationToken
         {
@@ -197,42 +124,17 @@ namespace FeatureFlowFramework.Workflows
 
         public override IStateMachineInfo StateMachineInfo => WorkflowStateMachine;
 
-        public async Task<bool> ExecuteNextStepAsync(IStepExecutionController controller, TimeSpan timeout = default)
+        public async Task<bool> ExecuteNextStepAsync(IStepExecutionController controller)
         {
-
-            if (!AutoLockingOnExecution) return await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
-
             bool result = true;
-            if (await TryLockAsync(timeout))
-            {
-                try
-                {
-                    result = await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
-                }
-                finally
-                {
-                    Unlock();
-                }
-            }
+            result = await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
             return result;
         }
 
-        public bool ExecuteNextStep(IStepExecutionController controller, TimeSpan timeout = default)
+        public bool ExecuteNextStep(IStepExecutionController controller)
         {
-            if (!AutoLockingOnExecution) return WorkflowStateMachine.ExecuteNextStep(this, controller);
-
             bool result = true;
-            if (TryLock(timeout))
-            {
-                try
-                {
-                    result = WorkflowStateMachine.ExecuteNextStep(this, controller);
-                }
-                finally
-                {
-                    Unlock();
-                }
-            }
+            result = WorkflowStateMachine.ExecuteNextStep(this, controller);
             return result;
         }
 

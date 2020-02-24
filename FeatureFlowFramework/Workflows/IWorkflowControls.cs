@@ -9,9 +9,9 @@ namespace FeatureFlowFramework.Workflows
         Workflow.ExecutionState CurrentExecutionState { get; set; }
         string Name { get; }
 
-        Task<bool> ExecuteNextStepAsync(IStepExecutionController controller, TimeSpan timeout = default);
+        Task<bool> ExecuteNextStepAsync(IStepExecutionController controller);
 
-        bool ExecuteNextStep(IStepExecutionController controller, TimeSpan timeout = default);
+        bool ExecuteNextStep(IStepExecutionController controller);
 
         void Run(IWorkflowRunner runner = null);
 
@@ -22,18 +22,6 @@ namespace FeatureFlowFramework.Workflows
         Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout = default);
 
         bool IsRunning { get; }
-
-        bool TryLock(TimeSpan timeout = default);
-
-        Task<bool> TryLockAsync(TimeSpan timeout = default);
-
-        void Unlock();
-
-        bool LockAndExecute(Action action, TimeSpan timeout = default);
-
-        Task<bool> LockAndExecuteAsync(Action action, TimeSpan timeout = default);
-
-        Task<bool> LockAndExecuteAsync(Func<Task> action, TimeSpan timeout = default);
 
         IDataFlowSource ExecutionInfoSource { get; }
     }

@@ -15,11 +15,5 @@ namespace FeatureFlowFramework.Workflows
 
         void SendExecutionInfoEvent(string executionEvent, object additionalInfo = null);
         void SendExecutionInfoEvent(string executionEvent, Workflow.ExecutionState state, Workflow.ExecutionPhase phase, object additionalInfo = null);
-
-        void Unlock();
-
-        bool TryLock(TimeSpan timeout);
-
-        Task<bool> TryLockAsync(TimeSpan timeout);
     }
 }
