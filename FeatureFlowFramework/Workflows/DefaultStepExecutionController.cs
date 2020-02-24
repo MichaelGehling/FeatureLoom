@@ -159,7 +159,7 @@ namespace FeatureFlowFramework.Workflows
         {
             if (!step.hasCatchException)
             {
-                step.parentStateMachine.HandleException(context, e);
+                nextExecutionState = step.parentStateMachine.HandleException(context, e, nextExecutionState);
             }
             else
             {
@@ -320,7 +320,7 @@ namespace FeatureFlowFramework.Workflows
         {
             if (!step.hasCatchException)
             {
-                step.parentStateMachine.HandleException(context, e);
+                nextExecutionState = step.parentStateMachine.HandleException(context, e, nextExecutionState);
             }
             else
             {

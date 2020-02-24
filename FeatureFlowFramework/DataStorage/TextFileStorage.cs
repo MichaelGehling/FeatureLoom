@@ -45,7 +45,7 @@ namespace FeatureFlowFramework.DataStorage
         private ProcessingEndpoint<FileSystemObserver.ChangeNotification> fileChangeProcessor;
         private DuplicateMessageSuppressor duplicateMessageSuppressor;
 
-        public TextFileStorage(string category, string configUri, Config config = default)
+        public TextFileStorage(string category, string configUri = null, Config config = default)
         {
             this.category = category;
             this.config = config ?? new Config();

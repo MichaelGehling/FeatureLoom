@@ -195,11 +195,19 @@ namespace FeatureFlowFramework.Workflows
             else throw new Exception("Wrong context object used for this Statemachine!");
         }
 
-        public virtual Workflow.ExecutionState HandleException(CT context, Exception e)
+        public virtual Workflow.ExecutionState HandleException(CT context, Exception e, Workflow.ExecutionState nextExecutionState)
         {
             var step = this.states.ItemOrNull(context.CurrentExecutionState.stateIndex)?.steps.ItemOrNull(context.CurrentExecutionState.stepIndex);
-            Log.ERROR(context, $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
-            throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e);
+            if(this.robustExecutionActive)
+            {
+                Log.ERROR(context, $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
+                return nextExecutionState;
+            }
+            else
+            {
+                Log.ERROR(context, $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
+                throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e);
+            }
         }
 
         public State<CT> State(string name)
@@ -234,6 +242,7 @@ namespace FeatureFlowFramework.Workflows
         protected abstract void Init();
 
         private Workflow.ExecutionState initialExecutionState = (0, 0);
+        protected bool robustExecutionActive = false;
 
         public Workflow.ExecutionState InitialExecutionState
         {
