@@ -11,6 +11,9 @@ namespace FeatureFlowFramework.Helper
 {
     public class RWLock
     {
+        public const int NO_SPIN_WAIT = 0;
+        public const int ONLY_SPIN_WAIT = int.MaxValue;
+        public const int BALANCED_SPIN_WAIT = 1;
         const int NO_LOCKID = 0;
         const int WRITE_LOCKID = NO_LOCKID + 1;
         const long NO_WAITING = long.MaxValue;
@@ -25,12 +28,12 @@ namespace FeatureFlowFramework.Helper
         volatile bool writePriority = false;
         volatile bool readPriority = false;
 
-        int defaultFullSpinCycles = 1;
+        int defaultFullSpinCycles = BALANCED_SPIN_WAIT;
 
         AsyncManualResetEvent mreReader = new AsyncManualResetEvent(true);
         AsyncManualResetEvent mreWriter = new AsyncManualResetEvent(true);
 
-        public RWLock(int defaultFullSpinCycles = 1)
+        public RWLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT)
         {
             this.defaultFullSpinCycles = defaultFullSpinCycles;
         }
