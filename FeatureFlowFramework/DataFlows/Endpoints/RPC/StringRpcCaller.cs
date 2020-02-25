@@ -39,7 +39,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CallMultiResponse<P, R>(string method, P parameterTuple, IDataFlowSink sink)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
             lock (responseHandlers)
             {
@@ -50,7 +50,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CallMultiResponse<R>(string method, IDataFlowSink sink)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
             lock (responseHandlers)
             {
@@ -61,7 +61,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public Task<string> CallAsync(string methodCall)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
             TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
             lock (responseHandlers)
@@ -74,7 +74,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CallNoResponse(string methodCall)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, true);
             sourceHelper.Forward(serializedRpcRequest);
         }

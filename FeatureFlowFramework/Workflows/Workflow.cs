@@ -114,7 +114,7 @@ namespace FeatureFlowFramework.Workflows
         {
             executionState = WorkflowStateMachine.InitialExecutionState;
             if (AddToAspectRegistry) id = this.GetAspectHandle();
-            else id = RandomGenerator.Int64;
+            else id = RandomGenerator.Int64();
         }
 
         protected static SM stateMachineInstance = new SM();

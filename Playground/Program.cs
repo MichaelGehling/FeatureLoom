@@ -44,7 +44,7 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 3;
+            int numReadLocks = 10;
             int numWriteLocks = 3;
 
             List<DateTime> dummyList = new List<DateTime>();
@@ -85,11 +85,6 @@ namespace Playground
             //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
             double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
-
-            name = "RWLock";
-            Prepare(out gcs);
-            c = RunParallel(new RWLock(), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
-            Finish(timeFactor, name, c, gcs, overhead);
 
             name = "RWLock";
             Prepare(out gcs);
