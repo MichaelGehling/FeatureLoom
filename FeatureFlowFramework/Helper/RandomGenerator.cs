@@ -5,7 +5,7 @@ namespace FeatureFlowFramework.Helper
     public static class RandomGenerator
     {
         private static Random rnd = new Random();
-        private static RWLock myLock = new RWLock();
+        private static FeatureLock myLock = new FeatureLock();
 
         public static int Int32()
         {

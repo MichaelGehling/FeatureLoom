@@ -9,10 +9,14 @@ using System.Threading.Tasks.Sources;
 
 namespace FeatureFlowFramework.Helper
 {
-    public class RWLock
+    public class FeatureLock
     {
         const int NO_LOCK = 0;
         const int WRITE_LOCK = NO_LOCK + 1;
+
+        public const int NO_SPIN_WAIT = 0;
+        public const int ONLY_SPIN_WAIT = int.MaxValue;
+        public const int BALANCED_SPIN_WAIT = 1;
 
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
@@ -29,9 +33,53 @@ namespace FeatureFlowFramework.Helper
         AsyncManualResetEvent mreReader = new AsyncManualResetEvent(true);
         AsyncManualResetEvent mreWriter = new AsyncManualResetEvent(true);
 
-        public RWLock(int defaultFullSpinCycles = 1000)
+        public FeatureLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT)
         {
             this.defaultFullSpinCycles = defaultFullSpinCycles;
+        }
+
+        public bool TryForReading(out ReadLock readLock, TimeSpan timeout = default)
+        {
+            int fullSpinCyclesBeforeWait = defaultFullSpinCycles;
+            var timer = AppTime.TimeKeeper;
+            readLock = new ReadLock(null);
+
+            int fullSpins = 0;
+            SpinWait spinWait = new SpinWait();
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator - 1;
+            while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            {
+                if (timer.Elapsed >= timeout) return false;
+
+                if (currentLockIndicator > NO_LOCK) readPriority = true;
+
+                if (fullSpins < fullSpinCyclesBeforeWait)
+                {
+                    spinWait.SpinOnce();
+                    if (spinWait.NextSpinWillYield) fullSpins++;
+                }
+                else
+                {
+                    readPriority = true;
+                    bool didReset = mreReader.Reset();
+                    if (ReaderMustWait(lockIndicator))
+                    {
+                        if (!mreReader.Wait(timeout - timer.Elapsed)) return false;                        
+                        spinWait.Reset();
+                        fullSpins++;
+                        readPriority = true;
+                    }
+                    else if (didReset) mreReader.Set();
+                }
+
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator - 1;
+            }
+            readPriority = false;
+
+            readLock = new ReadLock(this);
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -239,10 +287,10 @@ namespace FeatureFlowFramework.Helper
 
         public struct ReadLock : IDisposable
         {
-            RWLock parentLock;
+            FeatureLock parentLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ReadLock(RWLock parentLock)
+            public ReadLock(FeatureLock parentLock)
             {
                 this.parentLock = parentLock;
             }
@@ -263,10 +311,10 @@ namespace FeatureFlowFramework.Helper
 
         public struct WriteLock : IDisposable
         {
-            RWLock parentLock;
+            FeatureLock parentLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public WriteLock(RWLock parentLock)
+            public WriteLock(FeatureLock parentLock)
             {
                 this.parentLock = parentLock;
             }
