@@ -13,6 +13,27 @@ namespace Playground
     {
         static void Main(string[] args)
         {
+            var timer = AppTime.TimeKeeper;
+            TimeSpan x;
+            long c1 = 0;
+            while(timer.Elapsed < 1.Seconds())
+            {
+                x = AppTime.Elapsed;
+                c1++;
+            }
+
+            timer.Restart();
+            long c2 = 0;
+            DateTime s = AppTime.Now;
+            TimeSpan y;
+            while(timer.Elapsed < 1.Seconds())
+            {
+                y = AppTime.Now.Subtract(s);
+                c2++;
+            }
+
+            Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
+
             //FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
             Console.WriteLine("--2,2,2,2--");
             for (int i= 0; i< 5; i++) FunctionTestRWLock(new RWLock(0), 1.Seconds(), 2, 2, 2, 2);

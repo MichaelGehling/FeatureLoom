@@ -11,23 +11,31 @@ namespace FeatureFlowFramework.Workflows
         public SuspendingAsyncRunner()
         {
             this.suspensionTime = 1.Milliseconds();
+            this.suspensionIntervall = 10.Milliseconds();
         }
 
-        public SuspendingAsyncRunner(TimeSpan suspensionTime)
+        public SuspendingAsyncRunner(TimeSpan suspensionTime, TimeSpan suspensionIntervall)
         {
             this.suspensionTime = suspensionTime;
+            this.suspensionIntervall = suspensionIntervall;
         }
 
         TimeSpan suspensionTime;
+        TimeSpan suspensionIntervall;
 
         public async Task RunAsync(IWorkflowControls workflow)
         {
             AddToRunningWorkflows(workflow);
             try
             {
+                var timer = AppTime.TimeKeeper;
                 while(await workflow.ExecuteNextStepAsync(executionController)) 
                 {
-                    if (SynchronizationContext.Current != null) await Task.Delay(suspensionTime);
+                    if(SynchronizationContext.Current != null && timer.Elapsed > suspensionIntervall)
+                    {
+                        await Task.Delay(suspensionTime);
+                        timer.Restart();
+                    }
                 }
             }
             finally
