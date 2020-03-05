@@ -5,37 +5,37 @@ namespace FeatureFlowFramework.Helper
     public static class RandomGenerator
     {
         private static Random rnd = new Random();
+        private static FeatureLock myLock = new FeatureLock();
 
-        public static int Int32
+        public static int Int32()
         {
-            get
+            using (myLock.ForWriting())
             {
-                lock (rnd)
-                {
-                    return rnd.Next();
-                }
+                return rnd.Next();
             }
         }
 
-        public static long Int64
+        public static int Int32(int min, int max)
         {
-            get
+            using (myLock.ForWriting())
             {
-                lock (rnd)
-                {
-                    return (long)(rnd.NextDouble() * Int64.MaxValue);
-                }
+                return rnd.Next(min, max);
             }
         }
 
-        public static double Double
+        public static long Int64()
         {
-            get
+            using (myLock.ForWriting())
             {
-                lock (rnd)
-                {
-                    return rnd.NextDouble();
-                }
+                return (long)(rnd.NextDouble() * long.MaxValue);
+            }            
+        }
+
+        public static double Double()
+        {
+            using (myLock.ForWriting())
+            {
+                return rnd.NextDouble();
             }
         }
     }

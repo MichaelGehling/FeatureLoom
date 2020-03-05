@@ -9,33 +9,77 @@ using System.Threading.Tasks.Sources;
 
 namespace FeatureFlowFramework.Helper
 {
-    public class RWLock
+    public class FeatureLock
     {
+        const int NO_LOCK = 0;
+        const int WRITE_LOCK = NO_LOCK + 1;
+
         public const int NO_SPIN_WAIT = 0;
         public const int ONLY_SPIN_WAIT = int.MaxValue;
         public const int BALANCED_SPIN_WAIT = 1;
-        const int NO_LOCKID = 0;
-        const int WRITE_LOCKID = NO_LOCKID + 1;
-        const long NO_WAITING = long.MaxValue;
 
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
-        /// A lockId larger than NO_LOCKID (0) implies a write-lock, while a lockId smaller than NO_LOCKID implies a read-lock.
-        /// When entering a read-lock, the lockId is decreased and increased when leaving a read-lock.
-        /// When entering a write-lock, a positive lockId (greater than NO_LOCK) is set and set back to NO_LOCK when the write-lock is left.
+        /// A lockIndicator larger than NO_LOCK (0) implies a write-lock, while a lockIndicator smaller than NO_LOCK implies a read-lock.
+        /// When entering a read-lock, the lockIndicator is decreased and increased when leaving a read-lock.
+        /// When entering a write-lock, a positive lockIndicator (WRITE_LOCK) is set and set back to NO_LOCK when the write-lock is left.
         /// </summary>
-        volatile int lockId = NO_LOCKID;
+        volatile int lockIndicator = NO_LOCK;
         volatile bool writePriority = false;
         volatile bool readPriority = false;
 
-        int defaultFullSpinCycles = BALANCED_SPIN_WAIT;
+        int defaultFullSpinCycles;
 
         AsyncManualResetEvent mreReader = new AsyncManualResetEvent(true);
         AsyncManualResetEvent mreWriter = new AsyncManualResetEvent(true);
 
-        public RWLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT)
+        public FeatureLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT)
         {
             this.defaultFullSpinCycles = defaultFullSpinCycles;
+        }
+
+        public bool TryForReading(out ReadLock readLock, TimeSpan timeout = default)
+        {
+            int fullSpinCyclesBeforeWait = defaultFullSpinCycles;
+            var timer = AppTime.TimeKeeper;
+            readLock = new ReadLock(null);
+
+            int fullSpins = 0;
+            SpinWait spinWait = new SpinWait();
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator - 1;
+            while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            {
+                if (timer.Elapsed >= timeout) return false;
+
+                if (currentLockIndicator > NO_LOCK) readPriority = true;
+
+                if (fullSpins < fullSpinCyclesBeforeWait)
+                {
+                    spinWait.SpinOnce();
+                    if (spinWait.NextSpinWillYield) fullSpins++;
+                }
+                else
+                {
+                    readPriority = true;
+                    bool didReset = mreReader.Reset();
+                    if (ReaderMustWait(lockIndicator))
+                    {
+                        if (!mreReader.Wait(timeout - timer.Elapsed)) return false;                        
+                        spinWait.Reset();
+                        fullSpins++;
+                        readPriority = true;
+                    }
+                    else if (didReset) mreReader.Set();
+                }
+
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator - 1;
+            }
+            readPriority = false;
+
+            readLock = new ReadLock(this);
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -49,11 +93,11 @@ namespace FeatureFlowFramework.Helper
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
-            var currentLockId = lockId;
-            var newLockId = currentLockId - 1;            
-            while (ReaderMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator - 1;            
+            while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (currentLockId > NO_LOCKID || fullSpins > 0) readPriority = true;
+                if (currentLockIndicator > NO_LOCK) readPriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
@@ -64,7 +108,7 @@ namespace FeatureFlowFramework.Helper
                 {
                     readPriority = true;
                     bool didReset = mreReader.Reset();
-                    if(ReaderMustWait(lockId))
+                    if(ReaderMustWait(lockIndicator))
                     {
                         mreReader.Wait();
                         spinWait.Reset();
@@ -74,8 +118,8 @@ namespace FeatureFlowFramework.Helper
                     else if(didReset) mreReader.Set();
                 } 
 
-                currentLockId = lockId;
-                newLockId = currentLockId - 1;
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator - 1;
             }
             readPriority = false;
 
@@ -93,11 +137,11 @@ namespace FeatureFlowFramework.Helper
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
-            var currentLockId = lockId;
-            var newLockId = currentLockId - 1;
-            while (ReaderMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, currentLockId))
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator - 1;
+            while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (currentLockId > NO_LOCKID || fullSpins > 0) readPriority = true;
+                if (currentLockIndicator > NO_LOCK) readPriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {
@@ -108,7 +152,7 @@ namespace FeatureFlowFramework.Helper
                 {
                     readPriority = true;
                     bool didReset = mreReader.Reset();
-                    if (ReaderMustWait(lockId))
+                    if (ReaderMustWait(lockIndicator))
                     {
                         await mreReader.WaitAsync();
                         spinWait.Reset();
@@ -118,8 +162,8 @@ namespace FeatureFlowFramework.Helper
                     else if(didReset) mreReader.Set();
                 }
 
-                currentLockId = lockId;
-                newLockId = currentLockId - 1;
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator - 1;
             }
             readPriority = false;
 
@@ -127,16 +171,16 @@ namespace FeatureFlowFramework.Helper
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool ReaderMustWait(int currentLockId)
+        private bool ReaderMustWait(int currentLockIndicator)
         {
-            return currentLockId > NO_LOCKID || (writePriority && !readPriority);
+            return currentLockIndicator > NO_LOCK || (writePriority && !readPriority);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReadLock()
         {
-            var newLockId = Interlocked.Increment(ref lockId);
-            if (NO_LOCKID == newLockId)
+            var newLockIndicator = Interlocked.Increment(ref lockIndicator);
+            if (NO_LOCK == newLockIndicator)
             {
                 if (!mreWriter.Set()) mreReader.Set();               
             }
@@ -153,11 +197,11 @@ namespace FeatureFlowFramework.Helper
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
-            var newLockId = WRITE_LOCKID;
-            var currentLockId = lockId;
-            while (WriterMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
+            var newLockIndicator = WRITE_LOCK;
+            var currentLockIndicator = lockIndicator;
+            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
-                if (currentLockId < NO_LOCKID || fullSpins > 0) writePriority = true;
+                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
@@ -168,7 +212,7 @@ namespace FeatureFlowFramework.Helper
                 {
                     writePriority = true;
                     bool didReset = mreWriter.Reset();
-                    if (WriterMustWait(lockId))
+                    if (WriterMustWait(lockIndicator))
                     {
                         mreWriter.Wait();
                         spinWait.Reset();
@@ -178,7 +222,7 @@ namespace FeatureFlowFramework.Helper
                     else if(didReset) mreWriter.Set();
                 }
 
-                currentLockId = lockId;
+                currentLockIndicator = lockIndicator;
             }
             writePriority = false;
             
@@ -196,11 +240,11 @@ namespace FeatureFlowFramework.Helper
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
-            var newLockId = WRITE_LOCKID;
-            var currentLockId = lockId;
-            while (WriterMustWait(currentLockId) || currentLockId != Interlocked.CompareExchange(ref lockId, newLockId, NO_LOCKID))
+            var newLockIndicator = WRITE_LOCK;
+            var currentLockIndicator = lockIndicator;
+            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
-                if (currentLockId < NO_LOCKID || fullSpins > 0) writePriority = true;
+                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
@@ -211,7 +255,7 @@ namespace FeatureFlowFramework.Helper
                 {
                     writePriority = true;
                     bool didReset = mreWriter.Reset();
-                    if (WriterMustWait(lockId))
+                    if (WriterMustWait(lockIndicator))
                     {
                         await mreWriter.WaitAsync();
                         spinWait.Reset();
@@ -221,58 +265,73 @@ namespace FeatureFlowFramework.Helper
                     else if(didReset) mreWriter.Set();
                 }
 
-                currentLockId = lockId;
+                currentLockIndicator = lockIndicator;
             }
             writePriority = false;
             return new WriteLock(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool WriterMustWait(int currentLockId)
+        private bool WriterMustWait(int currentLockIndicator)
         {
-            return currentLockId != NO_LOCKID || (readPriority && !writePriority);
+            return currentLockIndicator != NO_LOCK || (readPriority && !writePriority);
         }
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
-            lockId = NO_LOCKID;
+            lockIndicator = NO_LOCK;
             if (!mreReader.Set()) mreWriter.Set();
         }
 
         public struct ReadLock : IDisposable
         {
-            RWLock lockObj;
+            FeatureLock parentLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ReadLock(RWLock safeLock)
+            public ReadLock(FeatureLock parentLock)
             {
-                this.lockObj = safeLock;
+                this.parentLock = parentLock;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                lockObj.ExitReadLock();
+                parentLock?.ExitReadLock();
+                parentLock = null;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Exit()
+            {
+                Dispose();
             }
         }
 
         public struct WriteLock : IDisposable
         {
-            RWLock lockObj;
+            FeatureLock parentLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public WriteLock(RWLock safeLock)
+            public WriteLock(FeatureLock parentLock)
             {
-                this.lockObj = safeLock;
+                this.parentLock = parentLock;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                lockObj.ExitWriteLock();
+                parentLock?.ExitWriteLock();
+                parentLock = null;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Exit()
+            {
+                Dispose();
             }
         }
+
     }
 }

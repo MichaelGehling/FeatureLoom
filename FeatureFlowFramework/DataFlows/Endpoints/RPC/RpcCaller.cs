@@ -37,7 +37,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CallMultiResponse<P, R>(string method, P parameterTuple, IDataFlowSink responseSink)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
             lock (responseHandlers)
             {
@@ -48,7 +48,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CallMultiResponse<R>(string method, IDataFlowSink responseSink)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
             lock (responseHandlers)
             {
@@ -59,7 +59,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public Task<R> CallAsync<P, R>(string method, P parameterTuple)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
             lock (responseHandlers)
@@ -72,7 +72,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public Task CallAsync<P>(string method, P parameterTuple)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, bool>(requestId, method, parameterTuple);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
             lock (responseHandlers)
@@ -85,7 +85,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public Task<R> CallAsync<R>(string method)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
             lock (responseHandlers)
@@ -98,7 +98,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public Task CallAsync(string method)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, bool>(requestId, method, true);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
             lock (responseHandlers)
@@ -111,28 +111,28 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CallNoResponse<P, R>(string method, P parameterTuple)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple, true);
             sourceHelper.Forward(request);
         }
 
         public void CallNoResponse<P>(string method, P parameterTuple)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, bool>(requestId, method, parameterTuple, true);
             sourceHelper.Forward(request);
         }
 
         public void CallNoResponse<R>(string method)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true, true);
             sourceHelper.Forward(request);
         }
 
         public void CallNoResponse(string method)
         {
-            var requestId = RandomGenerator.Int64;
+            var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, bool>(requestId, method, true, true);
             sourceHelper.Forward(request);
         }
