@@ -126,7 +126,7 @@ namespace FeatureFlowFramework.Helper
                 {
                     asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
                 }
-                return WaitHandle.WaitAll(handles, timeoutFrame.RemainingTime);
+                return WaitHandle.WaitAll(handles, timeoutFrame.Remaining);
             }
             else
             {
@@ -139,7 +139,7 @@ namespace FeatureFlowFramework.Helper
                         if (asyncWaitHandles[i].WouldWait())
                         {
                             allReady = false;
-                            asyncWaitHandles[i].Wait(timeoutFrame.RemainingTime);
+                            asyncWaitHandles[i].Wait(timeoutFrame.Remaining);
                             break;
                         }
                     }
@@ -164,7 +164,7 @@ namespace FeatureFlowFramework.Helper
 
             if(!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.RemainingTime);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.Remaining);
             return true;
         }
 
@@ -184,7 +184,7 @@ namespace FeatureFlowFramework.Helper
                     if(asyncWaitHandles[i].WouldWait())
                     {
                         allReady = false;
-                        asyncWaitHandles[i].Wait(timeoutFrame.RemainingTime, token);
+                        asyncWaitHandles[i].Wait(timeoutFrame.Remaining, token);
                         break;
                     }
                 }
@@ -208,7 +208,7 @@ namespace FeatureFlowFramework.Helper
 
             if(!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.RemainingTime, token);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.Remaining, token);
             return true;
         }
 
@@ -335,11 +335,11 @@ namespace FeatureFlowFramework.Helper
                 {
                     asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
                 }
-                return WaitHandle.WaitAny(handles, timeoutFrame.RemainingTime);
+                return WaitHandle.WaitAny(handles, timeoutFrame.Remaining);
             }
             else
             {
-                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
                 Task.WhenAny(tasks).Wait();
                 for (int i = 0; i < tasks.Length-1; i++)
                 {
@@ -360,7 +360,7 @@ namespace FeatureFlowFramework.Helper
                 if(!asyncWaitHandles[i].WouldWait()) return i;
             }
 
-            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
             await Task.WhenAny(tasks);
             for(int i = 0; i < tasks.Length-1; i++)
             {
@@ -394,13 +394,13 @@ namespace FeatureFlowFramework.Helper
                     asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
                 }
                 handles[handles.Length - 1] = token.WaitHandle;
-                var index = WaitHandle.WaitAny(handles, timeoutFrame.RemainingTime);
+                var index = WaitHandle.WaitAny(handles, timeoutFrame.Remaining);
                 if(index == handles.Length - 1) index = WaitHandle.WaitTimeout;
                 return index;
             }
             else
             {
-                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
                 Task.WhenAny(tasks).Wait(token);
                 for(int i = 0; i < tasks.Length-1; i++)
                 {
@@ -422,7 +422,7 @@ namespace FeatureFlowFramework.Helper
                 if(!asyncWaitHandles[i].WouldWait()) return i;
             }
 
-            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.RemainingTime));
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
             await Task.WhenAny(tasks).WaitAsync(token);
             for(int i = 0; i < tasks.Length-1; i++)
             {

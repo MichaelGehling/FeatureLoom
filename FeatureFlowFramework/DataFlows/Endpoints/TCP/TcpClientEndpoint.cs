@@ -42,7 +42,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     .Step("Reset connection wait event")
                         .Do(c => c.connectionWaitEvent.Reset())
                     .Step("Wait for reconnection timer or a config change")
-                        .WaitFor(c => c.config.SubscriptionWaitHandle, c => c.reconnectionCheckTimer.RemainingTime.ClampLow(TimeSpan.Zero))
+                        .WaitFor(c => c.config.SubscriptionWaitHandle, c => c.reconnectionCheckTimer.Remaining.ClampLow(TimeSpan.Zero))
                     .Step("If config change available, apply it, eventually try to reconnect")
                         .If(c => c.config.HasSubscriptionUpdate)
                             .Do(async c => await c.UpdateConfig(false))
