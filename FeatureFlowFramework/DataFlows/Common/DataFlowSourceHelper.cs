@@ -29,6 +29,10 @@ namespace FeatureFlowFramework.DataFlows
             this.onDisconnection = onDisconnection;
         }
 
+        public DataFlowSourceHelper()
+        {
+        }
+
         public IDataFlowSink[] GetConnectedSinks()
         {
             var currentSinks = this.sinks;
