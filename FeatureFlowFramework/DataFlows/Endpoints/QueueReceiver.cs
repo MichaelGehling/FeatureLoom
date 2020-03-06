@@ -104,7 +104,7 @@ namespace FeatureFlowFramework.DataFlows
             TimeFrame waitTime = new TimeFrame(timeout);
             while (!success && !waitTime.Elapsed)
             {
-                WaitHandle.Wait(waitTime.RemainingTime);
+                WaitHandle.Wait(waitTime.Remaining);
                 lock (queue)
                 {
                     success = queue.TryDequeue(out message);

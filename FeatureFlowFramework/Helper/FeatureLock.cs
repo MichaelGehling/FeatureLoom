@@ -38,10 +38,16 @@ namespace FeatureFlowFramework.Helper
             this.defaultFullSpinCycles = defaultFullSpinCycles;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryForReading(out ReadLock readLock, TimeSpan timeout = default)
         {
-            int fullSpinCyclesBeforeWait = defaultFullSpinCycles;
-            var timer = AppTime.TimeKeeper;
+            return TryForReading(defaultFullSpinCycles, out readLock, timeout);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryForReading(int fullSpinCyclesBeforeWait, out ReadLock readLock, TimeSpan timeout = default)
+        {
+            var timer = new TimeFrame(timeout);
             readLock = new ReadLock(null);
 
             int fullSpins = 0;
@@ -50,7 +56,7 @@ namespace FeatureFlowFramework.Helper
             var newLockIndicator = currentLockIndicator - 1;
             while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (timer.Elapsed >= timeout) return false;
+                if (timer.Elapsed) return false;
 
                 if (currentLockIndicator > NO_LOCK) readPriority = true;
 
@@ -65,7 +71,7 @@ namespace FeatureFlowFramework.Helper
                     bool didReset = mreReader.Reset();
                     if (ReaderMustWait(lockIndicator))
                     {
-                        if (!mreReader.Wait(timeout - timer.Elapsed)) return false;                        
+                        if (!mreReader.Wait(timer.Remaining)) return false;                        
                         spinWait.Reset();
                         fullSpins++;
                         readPriority = true;
@@ -86,7 +92,7 @@ namespace FeatureFlowFramework.Helper
         public ReadLock ForReading()
         {
             return ForReading(defaultFullSpinCycles);
-        }
+        }        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ReadLock ForReading(int fullSpinCyclesBeforeWait)
