@@ -121,5 +121,15 @@ namespace FeatureFlowFramework.Helper
             result += input.Substring(lastBreak);
             return result;
         }
+        
+        public static string TrimEnd(this string str, string trimStr)
+        {
+            // TODO: Not very efficient when trim is performed multiple times... improve!
+            while(str.EndsWith(trimStr))
+            {
+                str = str.Substring(0, str.Length - trimStr.Length);
+            }
+            return str;
+        }
     }
 }

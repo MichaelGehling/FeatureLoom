@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.Logging
             this.shortText = shortText;
             this.level = level;
             this.timeStamp = AppTime.Now;
-            if (detailText != null && detailText != "") detailText = $"\n    {detailText}\n";
+            if (detailText != null && detailText != "") detailText = $"\n  {detailText}";
             this.detailText = detailText;
             this.caller = caller;
             this.sourceFile = sourceFile;

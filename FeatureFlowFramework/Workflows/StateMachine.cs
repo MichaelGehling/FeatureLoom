@@ -18,12 +18,14 @@ namespace FeatureFlowFramework.Workflows
             Init();
             if (!ValidateAfterInit(out string findings))
             {
-                Log.ERROR($"Creation of statemachine {this.GetType().FullName} failed!", $"Findings: {findings}");
+                findings = findings.TrimEnd("\n");
+                Log.ERROR(this, $"Creation of statemachine {this.GetType().FullName} failed!", $"Findings:\n{findings}");
                 throw new Exception($"Creation of statemachine {this.GetType().FullName} failed! Findings: {findings}");
             }
             else if (!findings.EmptyOrNull())
             {
-                Log.WARNING($"Issues found for Statemachine {this.GetType().FullName}!", $"Findings: {findings}");
+                findings = findings.TrimEnd("\n");
+                Log.WARNING(this, $"Issues found for Statemachine {this.GetType().FullName}!", $"Findings:\n{findings}");
             }
         }
 
@@ -221,12 +223,6 @@ namespace FeatureFlowFramework.Workflows
             var newState = new State<CT>(this, index, name, "");
             states.Add(newState);
             return newState;
-        }
-
-        public IInitialStateBuilder<CT> BuildState(string name, string description = "")
-        {
-            var state = State(name);
-            return BuildState(state, description);
         }
 
         public IInitialStateBuilder<CT> BuildState(State<CT> state, string description = "")
