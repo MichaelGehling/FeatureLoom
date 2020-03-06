@@ -9,6 +9,7 @@ namespace FeatureFlowFramework.Logging
         static Log()
         {
             logSender.ConnectTo(logForwarder);
+            logForwarder.ConnectTo(logForwarderBuffer);
             logForwarder.ConnectTo(defaultConsoleLogger);
             logForwarder.ConnectTo(defaultFileLogger);
             defaultFileLogger.Run();
@@ -16,6 +17,7 @@ namespace FeatureFlowFramework.Logging
 
         private static readonly Sender<LogMessage> logSender = new Sender<LogMessage>();
         public static readonly ActiveForwarder logForwarder = new ActiveForwarder(1, 1000, 10, 10000, TimeSpan.Zero, true);
+        public static readonly BufferingForwarder<LogMessage> logForwarderBuffer = new BufferingForwarder<LogMessage>(1000);
         public static DefaultConsoleLogger defaultConsoleLogger = new DefaultConsoleLogger();
         public static DefaultFileLogger defaultFileLogger = new DefaultFileLogger();
 

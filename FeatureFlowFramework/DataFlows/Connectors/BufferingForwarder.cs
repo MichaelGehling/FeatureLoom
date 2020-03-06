@@ -10,6 +10,7 @@ namespace FeatureFlowFramework.DataFlows
     {
         DataFlowSourceHelper sourceHelper;
         CountingRingBuffer<T> buffer;
+        FeatureLock bufferLock = new FeatureLock();
 
         public BufferingForwarder(int bufferSize)
         {
@@ -19,6 +20,14 @@ namespace FeatureFlowFramework.DataFlows
 
         void OnConnection(IDataFlowSink sink)
         {
+            using(bufferLock.ForReading())
+            {
+                var bufferedMessages = buffer.GetAvailableSince(0, out long missed);
+                foreach(var msg in bufferedMessages)
+                {
+                    sink.Post(msg);                        
+                }
+            }
             
         }
 
@@ -51,14 +60,14 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is T msgT) buffer.Add(msgT);
+            if(message is T msgT) using(bufferLock.ForWriting()) buffer.Add(msgT);
             sourceHelper.Forward(in message);
         }
 
-        public Task PostAsync<M>(M message)
+        public async Task PostAsync<M>(M message)
         {
-            if(message is T msgT) buffer.Add(msgT);
-            return sourceHelper.ForwardAsync(message);
+            if(message is T msgT) using(await bufferLock.ForWritingAsync()) buffer.Add(msgT);
+            await sourceHelper.ForwardAsync(message);
         }
     }
 }

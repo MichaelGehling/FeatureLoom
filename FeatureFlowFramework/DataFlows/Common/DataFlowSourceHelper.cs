@@ -29,6 +29,10 @@ namespace FeatureFlowFramework.DataFlows
             this.onDisconnection = onDisconnection;
         }
 
+        public DataFlowSourceHelper()
+        {
+        }
+
         public IDataFlowSink[] GetConnectedSinks()
         {
             var currentSinks = this.sinks;
@@ -185,14 +189,14 @@ namespace FeatureFlowFramework.DataFlows
 
         public void ConnectTo(IDataFlowSink sink)
         {
-            onConnection?.Invoke(sink);
             if (sinks == null)
             {
                 lock (this)
                 {
                     List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(1);
-                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));
+                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));                    
                     sinks = newSinks;
+                    onConnection?.Invoke(sink);
                 }
             }
             else
@@ -201,8 +205,9 @@ namespace FeatureFlowFramework.DataFlows
                 {
                     List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count + 1);
                     newSinks.AddRange(sinks);
-                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));
+                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));                    
                     sinks = newSinks;
+                    onConnection?.Invoke(sink);
                 }
             }
         }
