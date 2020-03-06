@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using FeatureFlowFramework.Helper;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -17,6 +18,16 @@ namespace FeatureFlowFramework.DataFlows
     {
         [JsonIgnore]
         volatile public List<WeakReference<IDataFlowSink>> sinks;
+
+        Action<IDataFlowSink> onConnection;
+        Action<IDataFlowSink> onDisconnection;
+
+
+        public DataFlowSourceHelper(Action<IDataFlowSink> onConnection = null, Action<IDataFlowSink> onDisconnection = null)
+        {
+            this.onConnection = onConnection;
+            this.onDisconnection = onDisconnection;
+        }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
@@ -174,6 +185,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void ConnectTo(IDataFlowSink sink)
         {
+            onConnection?.Invoke(sink);
             if (sinks == null)
             {
                 lock (this)
@@ -203,6 +215,12 @@ namespace FeatureFlowFramework.DataFlows
 
         public void DisconnectAll()
         {
+            var currentSinks = this.sinks;
+            foreach(var sinkRef in currentSinks.EmptyIfNull())
+            {
+                if (sinkRef.TryGetTarget(out IDataFlowSink sink)) onDisconnection?.Invoke(sink);
+            }
+
             if (sinks == null || sinks.Count == 0) return;
             lock (this)
             {
@@ -212,7 +230,8 @@ namespace FeatureFlowFramework.DataFlows
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            if (sinks == null) return;
+            onDisconnection?.Invoke(sink);
+            if (sinks == null) return;            
             lock (this)
             {
                 if (sinks.Count == 1)
