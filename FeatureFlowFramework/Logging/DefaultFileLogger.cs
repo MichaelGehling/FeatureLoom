@@ -83,40 +83,29 @@ namespace FeatureFlowFramework.Logging
         private async Task WriteToLogFileAsync()
         {
             if (receiver.IsEmpty) return;
-            
-            var wasThreadBackground = Thread.CurrentThread.IsBackground;
-            try
+
+            bool updateCreationTime = false;
+            var logFileInfo = new FileInfo(config.logFilePath);
+            if (!logFileInfo.Exists) updateCreationTime = true;
+
+            using (FileStream stream = File.Open(config.logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            using (StreamWriter writer = new StreamWriter(stream))
             {
-                // Make thread temporarily foreground to ensure writing the last log entries before process ends.
-                Thread.CurrentThread.IsBackground = false;
+                if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
+                if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").Print(config.logFileLogFormat));
 
-                bool updateCreationTime = false;
-                var logFileInfo = new FileInfo(config.logFilePath);
-                if (!logFileInfo.Exists) updateCreationTime = true;
-
-                using (FileStream stream = File.Open(config.logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-                using (StreamWriter writer = new StreamWriter(stream))
+                var messages = receiver.ReceiveAll();
+                foreach (var msg in messages)
                 {
-                    if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
-                    if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").Print(config.logFileLogFormat));
-
-                    var messages = receiver.ReceiveAll();
-                    foreach (var msg in messages)
+                    if (msg is LogMessage logMsg)
                     {
-                        if (msg is LogMessage logMsg)
+                        if (logMsg.level <= config.logFileLoglevel)
                         {
-                            if (logMsg.level <= config.logFileLoglevel)
-                            {
-                                await writer.WriteLineAsync(logMsg.Print(config.logFileLogFormat));
-                            }
+                            await writer.WriteLineAsync(logMsg.Print(config.logFileLogFormat));
                         }
-                        else await writer.WriteLineAsync(msg.ToString());
                     }
+                    else await writer.WriteLineAsync(msg.ToString());
                 }
-            }
-            finally
-            {
-                Thread.CurrentThread.IsBackground = wasThreadBackground;
             }
         }
 
@@ -127,40 +116,29 @@ namespace FeatureFlowFramework.Logging
             logFileInfo.Refresh();
             if (!logFileInfo.Exists) return;
             
-            var wasThreadBackground = Thread.CurrentThread.IsBackground;
-            try
+            using (var fileStream = new FileStream(config.archiveFilePath, FileMode.OpenOrCreate))
             {
-                // Make thread temporarily foreground to avoid the risk of corrupting the archive if the app is closed while archiving.
-                Thread.CurrentThread.IsBackground = false;
-
-                using (var fileStream = new FileStream(config.archiveFilePath, FileMode.OpenOrCreate))
+                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
                 {
-                    using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
-                    {
-                        archive.CreateEntryFromFile(config.logFilePath, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
-                    }
+                    archive.CreateEntryFromFile(config.logFilePath, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
+                }
 
-                    using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                {
+                    List<ZipArchiveEntry> entries = new List<ZipArchiveEntry>(archive.Entries);
+                    entries.Sort(nameComparer);
+                    long overallLength = 0;
+                    foreach (var entry in entries)
                     {
-                        List<ZipArchiveEntry> entries = new List<ZipArchiveEntry>(archive.Entries);
-                        entries.Sort(nameComparer);
-                        long overallLength = 0;
-                        foreach (var entry in entries)
+                        if (overallLength > config.logFilesArchiveLimitInMB * 1024 * 1024)
                         {
-                            if (overallLength > config.logFilesArchiveLimitInMB * 1024 * 1024)
-                            {
-                                entry.Delete();
-                            }
-                            else overallLength += entry.CompressedLength;
+                            entry.Delete();
                         }
+                        else overallLength += entry.CompressedLength;
                     }
                 }
-                logFileInfo.Delete();
             }
-            finally
-            {
-                Thread.CurrentThread.IsBackground = wasThreadBackground;
-            }
+            logFileInfo.Delete();
         }
 
         public Task PostAsync<M>(M message)

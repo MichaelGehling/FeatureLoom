@@ -15,6 +15,13 @@ namespace FeatureFlowFramework.Workflows
         protected long id;
         protected ExecutionState executionState;
         protected ExecutionPhase executionPhase = ExecutionPhase.Prepared;
+        protected IWorkflowRunner currentRunner;
+
+        public IWorkflowRunner Runner
+        {
+            get => currentRunner;
+            set => currentRunner = value;
+        }
 
         [JsonIgnore]
         protected ControlData controlData = ControlData.Init();
@@ -152,8 +159,8 @@ namespace FeatureFlowFramework.Workflows
         }
 
         public void Run(IWorkflowRunner runner = null)
-        {
-            runner = runner ?? DefaultRunner;
+        {            
+            runner = runner ?? this.currentRunner ?? DefaultRunner;
             runner.Run(this);
         }
 
@@ -161,17 +168,18 @@ namespace FeatureFlowFramework.Workflows
         {
             if (!IsRunning) return true;
             if (controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
-            if (timeout == default) timeout = Timeout.InfiniteTimeSpan;
-            return controlData.notRunningWakeEvent.Wait(timeout);
+
+            if(timeout == default) return controlData.notRunningWakeEvent.Wait();
+            else return controlData.notRunningWakeEvent.Wait(timeout);
         }
 
-        public async Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout)
+        public Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout)
         {
-            if (!IsRunning) return true;
+            if (!IsRunning) return Task<bool>.FromResult(true);
             if (controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
 
-            if (timeout == default) timeout = Timeout.InfiniteTimeSpan;
-            return await controlData.notRunningWakeEvent.WaitAsync(timeout);
+            if (timeout == default) return controlData.notRunningWakeEvent.WaitAsync();
+            else return controlData.notRunningWakeEvent.WaitAsync(timeout);
         }
 
         [JsonIgnore]

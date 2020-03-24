@@ -51,6 +51,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(TimeSpan timeout)
         {
+            if(timeout <= TimeSpan.Zero) return Task.FromResult(false);
             if (mre.IsSet) return Task.FromResult(true);
             else
             {
@@ -62,6 +63,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(CancellationToken cancellationToken)
         {
+            if(cancellationToken.IsCancellationRequested) return Task.FromResult(false);
             if (mre.IsSet) return Task.FromResult(true);
             else
             {
@@ -73,6 +75,8 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
+            if(timeout <= TimeSpan.Zero) return Task.FromResult(false);
+            if(cancellationToken.IsCancellationRequested) return Task.FromResult(false);
             if (mre.IsSet) return Task.FromResult(true);
             else
             {
@@ -91,12 +95,14 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout)
         {
+            if(timeout <= TimeSpan.Zero) return false;
             return mre.Wait(timeout);            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(CancellationToken cancellationToken)
         {
+            if(cancellationToken.IsCancellationRequested) return false;
             mre.Wait(cancellationToken);
             return !cancellationToken.IsCancellationRequested;
         }
@@ -104,6 +110,8 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout, CancellationToken cancellationToken)
         {
+            if(cancellationToken.IsCancellationRequested) return false;
+            if(timeout <= TimeSpan.Zero) return false;
             return mre.Wait(timeout, cancellationToken);
         }
 

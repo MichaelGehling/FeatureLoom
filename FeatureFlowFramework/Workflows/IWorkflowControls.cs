@@ -24,5 +24,7 @@ namespace FeatureFlowFramework.Workflows
         bool IsRunning { get; }
 
         IDataFlowSource ExecutionInfoSource { get; }
+
+        IWorkflowRunner Runner { get; set; }
     }
 }

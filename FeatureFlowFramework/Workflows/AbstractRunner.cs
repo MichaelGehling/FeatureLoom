@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helper;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
@@ -30,30 +31,25 @@ namespace FeatureFlowFramework.Workflows
                 if (executionInfoForwarder == null)
                 {
                     executionInfoForwarder = new Forwarder();
-                    using(runningWorkflowsLock.ForReading())
+                    foreach (var workflow in RunningWorkflows)
                     {
-                        foreach (var workflow in runningWorkflows)
-                        {
-                            workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
-                        }
+                        workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
                     }
                 }
                 return executionInfoForwarder;
             }
         }
 
-        public Task PauseAllWorkflows()
+        public async Task PauseAllWorkflows()
         {
             List<Task> tasks = new List<Task>();
-            using(runningWorkflowsLock.ForReading())
-            {
-                foreach (var wf in runningWorkflows)
-                {
-                    wf.RequestPause();
-                    tasks.Add(wf.WaitUntilStopsRunningAsync());
-                }
+            foreach (var wf in RunningWorkflows)
+            {                
+                wf.RequestPause();
+
+                tasks.Add(wf.WaitUntilStopsRunningAsync());              
             }
-            return Task.WhenAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray());
         }
 
         protected void RemoveFromRunningWorkflows(IWorkflowControls workflow)
@@ -67,6 +63,7 @@ namespace FeatureFlowFramework.Workflows
 
         protected void AddToRunningWorkflows(IWorkflowControls workflow)
         {
+            workflow.Runner = this;
             using(runningWorkflowsLock.ForWriting())
             {
                 runningWorkflows.Add(workflow);
