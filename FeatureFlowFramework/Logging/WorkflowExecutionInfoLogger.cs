@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.Logging
         void LogInfo(Workflow.ExecutionInfo executionInfo)
         {            
             var wf = executionInfo.workflow;
-            if (wf is Logging.DefaultFileLogger) return;
+            if (wf is DefaultFileLogger) return;
 
             var evnt = executionInfo.executionEvent;
             var phase = executionInfo.executionPhase;

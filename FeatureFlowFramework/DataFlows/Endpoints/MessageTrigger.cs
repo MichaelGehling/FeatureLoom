@@ -10,11 +10,18 @@ namespace FeatureFlowFramework.DataFlows
     public class MessageTrigger : IDataFlowSink, IAsyncWaitHandle
     {
         AsyncManualResetEvent mre = new AsyncManualResetEvent();
-        bool autoReset;
+        Mode mode;
 
-        public MessageTrigger(bool autoReset)
+        public enum Mode
         {
-            this.autoReset = autoReset;
+            Default,
+            InstantReset,
+            Toggle
+        }
+
+        public MessageTrigger(Mode mode = Mode.Default)
+        {
+            this.mode = mode;
         }
 
         public void Trigger()
@@ -31,7 +38,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(mre.IsSet)
             {
-                if (reset) Reset();
+                if(reset) Reset();
                 return true;
             }
             return false;
@@ -41,14 +48,27 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Post<M>(in M message)
         {
-            mre.Set();
-            if(autoReset) mre.Reset();
+            HandleMessage(message);
         }
 
         public Task PostAsync<M>(M message)
         {
-            mre.Set();
+            HandleMessage(message);
             return Task.CompletedTask;
+        }
+
+        protected virtual void HandleMessage<M>(in M message)
+        {
+            if(mode == Mode.Toggle)
+            {
+                if(IsTriggered(false)) Reset();
+                else Trigger();
+            }
+            else
+            {
+                mre.Set();
+                if(mode == Mode.InstantReset) Reset();
+            }
         }
 
         public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
