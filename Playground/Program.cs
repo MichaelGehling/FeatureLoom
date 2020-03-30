@@ -5,14 +5,36 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helper;
 
 namespace Playground
 {
+
+
     class Program
     {
         static void Main(string[] args)
         {
+            QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
+            SharedData<int> sharedInt = new SharedData<int>(42, "mySharedInt");
+            SharedData<string> sharedObj = new SharedData<string>("Hello", "mySharedObj");
+            sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
+
+            using (var myInt = sharedInt.GetReadAccess())
+            using (var myObj = sharedObj.GetWriteAccess(99))
+            {
+                myObj.SetValue(myObj.Value + myInt.Value);                
+            }            
+            
+            if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
+            {
+                if (update.sharedData.Name == "mySharedObj" &&  update.sharedData is SharedData<string> objUpdate)
+                {
+                    objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
+                }
+            }
+
             var timer = AppTime.TimeKeeper;
             TimeSpan x;
             long c1 = 0;
