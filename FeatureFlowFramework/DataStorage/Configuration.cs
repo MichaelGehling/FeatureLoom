@@ -9,12 +9,23 @@ namespace FeatureFlowFramework.DataStorage
 {
     public abstract class Configuration
     {
+        public static string defaultCategory = "config";
+
+        public static async Task DeleteAllConfigAsync()
+        {
+            var writer = Storage.GetWriter(defaultCategory);
+            var reader = Storage.GetReader(defaultCategory);
+            if ((await reader.TryListUrisAsync()).Out(out string[] uris))
+            {
+                foreach(var uri in uris) await writer.TryDeleteAsync(uri);
+            }
+        }
 
         [JsonIgnore]
-        public virtual string Uri => this.GetType().FullName;
+        public virtual string Uri => this.GetType().FullName;        
 
         [JsonIgnore]
-        public virtual string ConfigCategory => "config";
+        public virtual string ConfigCategory => defaultCategory;
 
         [JsonIgnore]
         protected LazySlim<LatestMessageReceiver<ChangeUpdate<string>>> subscriptionReceiver = new LazySlim<LatestMessageReceiver<ChangeUpdate<string>>>();
