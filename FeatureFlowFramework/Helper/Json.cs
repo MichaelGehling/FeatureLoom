@@ -42,7 +42,7 @@ namespace FeatureFlowFramework.Helper
                     default_SerializerSettings.ObjectCreationHandling = ObjectCreationHandling.Replace;
                     /*default_SerializerSettings.Error = (sender, args) =>
                     {
-                        Log.WARNING($"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
+                        Log.WARNING(null, $"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
                         args.ErrorContext.Handled = true;
                     };*/
                 }

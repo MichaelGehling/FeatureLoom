@@ -67,7 +67,7 @@ namespace FeatureFlowFramework.DataStorage
 
         private void OnError(object sender, ErrorEventArgs e)
         {
-            Log.ERROR("FileSystemWatcher failed, will be reset!", e.GetException().ToString());
+            Log.ERROR(this, "FileSystemWatcher failed, will be reset!", e.GetException().ToString());
             InitWatchers(true);
         }
 

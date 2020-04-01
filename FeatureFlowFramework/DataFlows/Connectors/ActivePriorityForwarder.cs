@@ -95,7 +95,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR("Exception caught in ActivePriorityForwarder while sending.", e.ToString());
+                    Log.ERROR(this, "Exception caught in ActivePriorityForwarder while sending.", e.ToString());
                 }
             }
             lock (receiver) { numThreads--; }

@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.Workflows
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR($"Workflow failed! ({workflow.Name})", e.ToString());
+                    Log.ERROR(this, $"Workflow failed! ({workflow.Name})", e.ToString());
                 }
                 finally
                 {

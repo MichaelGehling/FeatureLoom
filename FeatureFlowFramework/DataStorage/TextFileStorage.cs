@@ -250,7 +250,7 @@ namespace FeatureFlowFramework.DataStorage
                     catch (Exception e)
                     {
                         cache?.Remove(changeNotification.uri);
-                        Log.WARNING($"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
+                        Log.WARNING(this, $"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
                     }
                 }
             }
@@ -379,7 +379,7 @@ namespace FeatureFlowFramework.DataStorage
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR("Failed serializing persiting object", e.ToString());
+                    Log.ERROR(this, "Failed serializing persiting object", e.ToString());
                     str = default;
                     return false;
                 }
@@ -427,7 +427,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR("Reading files to retreive Uris failed!", e.ToString());
+                Log.ERROR(this, "Reading files to retreive Uris failed!", e.ToString());
                 return new AsyncOutResult<bool, string[]>(false, null);
             }
         }
@@ -560,7 +560,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -611,7 +611,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
             finally
@@ -641,7 +641,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -664,7 +664,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR($"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -682,7 +682,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch(Exception e)
             {
-                Log.ERROR($"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
+                Log.ERROR(this, $"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
                 return Task.FromResult(false);
             }
         }

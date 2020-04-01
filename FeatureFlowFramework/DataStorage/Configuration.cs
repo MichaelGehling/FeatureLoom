@@ -60,7 +60,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             if (!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
             {
-                Log.ERROR("Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
+                Log.ERROR(this, "Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
             }
         }
 

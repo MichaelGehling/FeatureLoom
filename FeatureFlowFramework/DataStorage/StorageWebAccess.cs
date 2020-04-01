@@ -55,7 +55,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.WARNING($"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());
+                Log.WARNING(this, $"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());
                 return true;
             }
         }

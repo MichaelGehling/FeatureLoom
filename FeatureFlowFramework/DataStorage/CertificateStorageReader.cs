@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.WARNING($"Certificate {uri} could not be loaded", e.ToString());
+                Log.WARNING(this, $"Certificate {uri} could not be loaded", e.ToString());
             }
 
             return false;
@@ -102,7 +102,7 @@ namespace FeatureFlowFramework.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR("Reading files to retreive Uris failed!", e.ToString());
+                Log.ERROR(this, "Reading files to retreive Uris failed!", e.ToString());
                 return new AsyncOutResult<bool, string[]>(false, null);
             }
         }

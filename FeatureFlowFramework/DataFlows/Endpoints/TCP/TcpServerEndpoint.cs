@@ -217,7 +217,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR($"TcpListner failed to start with hostname {config.hostAddress} and port {config.port}! {connections.Count} connections will be disconnected!", e.ToString());
+                Log.ERROR(this, $"TcpListner failed to start with hostname {config.hostAddress} and port {config.port}! {connections.Count} connections will be disconnected!", e.ToString());
                 listner?.Stop();
                 listner = null;
                 foreach (var connection in connections) connection.Stop();

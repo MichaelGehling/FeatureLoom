@@ -32,7 +32,7 @@ namespace FeatureFlowFramework.Web
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR("Failed resolving hostName", e.ToString());
+                    Log.ERROR(this, "Failed resolving hostName", e.ToString());
                 }
             }
         }

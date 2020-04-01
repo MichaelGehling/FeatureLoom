@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                         .CatchAndDo((c, e) =>
                         {
                             c.ResetBuffer(false);
-                            Log.ERROR($"Decoding data from TCP connection {c.id.ToString()} failed! Buffer was reset and all data omitted. (id={c.id})", e.ToString());
+                            Log.ERROR(this, $"Decoding data from TCP connection {c.id.ToString()} failed! Buffer was reset and all data omitted. (id={c.id})", e.ToString());
                         })
                     .Step("If decoding was completed put message in routing wrapper and send it, else reset buffer, but preserve the unprocessed bytes if chance exists to fit more data into the buffer.")
                         .If(c => c.decodingResult == DecodingResult.Complete)
@@ -92,7 +92,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR($"Could not get stream from tcpClient or stream upgrade failed. (id={id})", e.ToString());
+                Log.ERROR(this, $"Could not get stream from tcpClient or stream upgrade failed. (id={id})", e.ToString());
             }
 
             this.bufferSize = bufferSize;

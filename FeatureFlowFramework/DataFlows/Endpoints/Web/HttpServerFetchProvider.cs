@@ -107,7 +107,7 @@ $@"{{
             }
             catch (Exception e)
             {
-                Log.ERROR($"Failed while building response! Route:{route}", e.ToString());
+                Log.ERROR(this, $"Failed while building response! Route:{route}", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;
                 return true;
             }
