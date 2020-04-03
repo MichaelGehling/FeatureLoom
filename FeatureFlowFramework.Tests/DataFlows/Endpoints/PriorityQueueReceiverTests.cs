@@ -22,34 +22,32 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Theory]
-        [InlineData(0, 10, true)]
-        [InlineData(5, 10, true)]
-        [InlineData(10, 10, true)]
-        [InlineData(20, 10, true)]
-        [InlineData(0, 10, false)]
-        [InlineData(5, 10, false)]
-        [InlineData(10, 10, false)]
-        [InlineData(20, 10, false)]
-        public void CanLimitQueueSize(int numMessages, int limit, bool dropLatestMessageOnFullQueue)
+        [InlineData(0, 10)]
+        [InlineData(5, 10)]
+        [InlineData(10, 10)]
+        [InlineData(20, 10)]
+        public void CanLimitQueueSize(int numMessages, int limit)
         {
             var sender = new Sender();
-            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Create((a, b) => a == b ? 0 : a > b ? -1 : 1), limit, default, dropLatestMessageOnFullQueue);
+            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Create((a, b) => a == b ? 0 : a < b ? -1 : 1), limit, default);
             sender.ConnectTo(receiver);
             var sendMessages = new List<int>();
             for (int i = 1; i <= numMessages; i++)
             {
-                sender.Send(i);
-                sendMessages.Add(i);
+                int number = RandomGenerator.Int32();
+                sender.Send(number);
+                sendMessages.Add(number);
             }
             Assert.Equal(limit.ClampHigh(numMessages), receiver.CountQueuedMessages);
             var receivedMessages = receiver.ReceiveAll();
             Assert.Equal(limit.ClampHigh(numMessages), receivedMessages.Length);
 
-            int offset = dropLatestMessageOnFullQueue ? 0 : (numMessages - limit).ClampLow(0);
+            int offset = (numMessages - limit).ClampLow(0);
 
-            for (int i = 0; i < limit.ClampHigh(numMessages); i++)
+            sendMessages.Sort();            
+            for (int i = 0; i < receivedMessages.Length; i++)
             {
-                Assert.Equal(sendMessages[i + offset], receivedMessages[i]);
+                Assert.Equal(sendMessages[sendMessages.Count-1-i], receivedMessages[i]);
             }
         }
 
@@ -102,25 +100,6 @@ namespace FeatureFlowFramework.DataFlows
             Assert.True(waitHandle.WaitingTask.IsCompleted);
         }
 
-        [Theory]
-        [InlineData(80, 0, false)]
-        [InlineData(80, 40, false)]
-        [InlineData(20, 100, true)]
-        public void AllowsBlockingReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
-        {
-            TimeSpan tolerance = 20.Milliseconds();
-            var sender = new Sender();
-            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);
-            sender.ConnectTo(receiver);
-
-            var timeKeeper = AppTime.TimeKeeper;
-            new Timer(_ => sender.Send(42), null, sendDelayInMs, -1);
-
-            var received = receiver.TryReceive(out int message, receivingWaitLimitInMs.Milliseconds());
-            Assert.Equal(shouldBeReceived, received);
-            var expectedTime = sendDelayInMs.Milliseconds().ClampHigh(receivingWaitLimitInMs.Milliseconds());
-            Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
-        }
 
         [Theory]
         [InlineData(80, 0, false)]

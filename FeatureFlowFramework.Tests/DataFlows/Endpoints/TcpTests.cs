@@ -41,12 +41,12 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
             var testData1 = new byte[] { 42, 43, 99 };
             clientSender.Send(testData1);
-            Assert.True(serverReceiver.TryReceive(out byte[] receivedData1, 1.Seconds()));
+            Assert.True(serverReceiver.TryReceiveAsync(1.Seconds()).Result.Out(out byte[] receivedData1));
             Assert.Equal(testData1, receivedData1);
 
             var testData2 = new byte[] { 23, 11, 0 };
             serverSender.Send(testData2);
-            Assert.True(clientReceiver.TryReceive(out byte[] receivedData2, 1.Seconds()));
+            Assert.True(clientReceiver.TryReceiveAsync(1.Seconds()).Result.Out(out byte[] receivedData2));
             Assert.Equal(testData2, receivedData2);
 
             client.DisconnectFromTcpServer();
@@ -80,21 +80,15 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
             var testData1 = "Test Data 1";
             clientSender.Send(testData1);
-            Assert.True(serverReceiver.TryReceive(out string receivedData1, 1.Seconds()));
+            Assert.True(serverReceiver.TryReceiveAsync(1.Seconds()).Result.Out(out string receivedData1));
             Assert.Equal(testData1, receivedData1);
 
             var testData2 = "{ testData: 2 }";
             serverSender.Send(testData2);
-            Assert.True(clientReceiver.TryReceive(out string receivedData2, 1.Seconds()));
+            Assert.True(clientReceiver.TryReceiveAsync(1.Seconds()).Result.Out(out string receivedData2));
             Assert.Equal(testData2, receivedData2);
 
             client.DisconnectFromTcpServer();
-        }
-
-        [Fact]
-        public void ClientReconnectsAutomatically()
-        {
-
         }
     }
 }

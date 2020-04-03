@@ -50,26 +50,6 @@ namespace FeatureFlowFramework.DataFlows
         [Theory]
         [InlineData(80, 0, false)]
         [InlineData(80, 40, false)]
-        [InlineData(20, 100, true)]
-        public void AllowsBlockingReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
-        {
-            TimeSpan tolerance = 20.Milliseconds();
-            var sender = new Sender();
-            var receiver = new LatestMessageReceiver<int>();
-            sender.ConnectTo(receiver);
-
-            var timeKeeper = AppTime.TimeKeeper;
-            new Timer(_ => sender.Send(42), null, sendDelayInMs, -1);
-
-            var received = receiver.TryReceive(out int message, receivingWaitLimitInMs.Milliseconds());
-            Assert.Equal(shouldBeReceived, received);
-            var expectedTime = sendDelayInMs.Milliseconds().ClampHigh(receivingWaitLimitInMs.Milliseconds());
-            Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
-        }
-
-        [Theory]
-        [InlineData(80, 0, false)]
-        [InlineData(80, 40, false)]
         [InlineData(20, 50, true)]
         public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {

@@ -19,25 +19,22 @@ namespace FeatureFlowFramework.DataFlows
     public class PriorityQueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAsyncWaitHandle
     {
         private PriorityQueue<T> queue;
-        private int queueSize = 0;
 
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;
         public int maxQueueSize = int.MaxValue;
-        public bool dropLatestMessageOnFullQueue = true;
 
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         private AsyncManualResetEvent writerWakeEvent = new AsyncManualResetEvent(true);
 
         private LazySlim<DataFlowSourceHelper> alternativeSendingHelper;
 
-        public PriorityQueueReceiver(Comparer<T> priorityComparer, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
+        public PriorityQueueReceiver(Comparer<T> priorityComparer, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
         {
             this.queue = new PriorityQueue<T>(priorityComparer);
             this.maxQueueSize = maxQueueSize;
             this.waitOnFullQueue = maxWaitOnFullQueue != default;
             this.timeoutOnFullQueue = maxWaitOnFullQueue;
-            this.dropLatestMessageOnFullQueue = dropLatestMessageOnFullQueue;
         }
 
         public IDataFlowSource Else => alternativeSendingHelper.Obj;
@@ -52,8 +49,7 @@ namespace FeatureFlowFramework.DataFlows
             if (message != null && message is T typedMessage)
             {
                 if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
-                if (IsFull && dropLatestMessageOnFullQueue) alternativeSendingHelper.ObjIfExists?.Forward(message);
-                else Enqueue(typedMessage);
+                Enqueue(typedMessage);
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
         }
@@ -62,9 +58,8 @@ namespace FeatureFlowFramework.DataFlows
         {
             if (message != null && message is T typedMessage)
             {
-                if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
-                if (IsFull && dropLatestMessageOnFullQueue) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
-                else Enqueue(typedMessage);
+                if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);                
+                Enqueue(typedMessage);
             }
             else await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
         }
@@ -85,17 +80,16 @@ namespace FeatureFlowFramework.DataFlows
         {
             while (queue.Count > maxQueueSize)
             {
-                var element = queue.Dequeue();
+                var element = queue.Dequeue(false);
                 alternativeSendingHelper.ObjIfExists?.Forward(element);
             }
         }
 
-        public bool TryReceive(out T message, TimeSpan timeout = default)
+        public bool TryReceive(out T message)
         {
             message = default;
             bool success = false;
 
-            if (IsEmpty && timeout != default) WaitHandle.Wait(timeout);
             if (IsEmpty) return false;
             lock (queue)
             {

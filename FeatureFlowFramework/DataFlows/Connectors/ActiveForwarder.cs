@@ -11,9 +11,23 @@ namespace FeatureFlowFramework.DataFlows
     ///     scaling parameters can be configured.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
-    public class ActiveForwarder : Forwarder
+    public class ActiveForwarder : ActiveForwarder<object>
     {
-        private readonly QueueReceiver<object> receiver;
+        public ActiveForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
+            : base(threadLimit, maxIdleMilliseconds, spawnThresholdFactor, maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue)
+        {
+        }
+    }
+
+    /// <summary>
+    ///     Creates an active forwarder that queues incoming messages and forwards them in threads
+    ///     from the ThreadPool. The number of threads is scaled dynamically based on load. The
+    ///     scaling parameters can be configured.
+    ///     Note: Using more than one thread may alter the order of forwarded messages!
+    /// </summary>
+    public class ActiveForwarder<T> : Forwarder
+    {
+        private readonly QueueReceiver<T> receiver;
         public volatile int threadLimit;
         public volatile int spawnThreshold;
         public volatile int maxIdleMilliseconds;
@@ -47,7 +61,7 @@ namespace FeatureFlowFramework.DataFlows
         /// </param>
         public ActiveForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
         {
-            this.receiver = new QueueReceiver<object>(maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue);
+            this.receiver = new QueueReceiver<T>(maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue);
             this.threadLimit = threadLimit;
             this.spawnThreshold = spawnThresholdFactor;
             this.maxIdleMilliseconds = maxIdleMilliseconds;
@@ -85,7 +99,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private void Run()
         {
-            while (receiver.TryReceive(out object message, maxIdleMilliseconds.Milliseconds()))
+            while (receiver.TryReceiveAsync(maxIdleMilliseconds.Milliseconds()).Result.Out(out T message))
             {
                 try
                 {

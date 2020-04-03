@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
         int Count { get; }
         IAsyncWaitHandle WaitHandle { get; }
 
-        bool TryReceive(out T message, TimeSpan timeout = default);
+        bool TryReceive(out T message);
 
         Task<AsyncOutResult<bool, T>> TryReceiveAsync(TimeSpan timeout = default);
 

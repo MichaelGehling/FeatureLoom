@@ -87,7 +87,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private void Run()
         {
-            while (receiver.TryReceive(out T message, maxIdleMilliseconds.Milliseconds()))
+            while (receiver.TryReceiveAsync(maxIdleMilliseconds.Milliseconds()).Result.Out(out T message))
             {
                 try
                 {

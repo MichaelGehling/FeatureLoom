@@ -87,7 +87,7 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        public bool TryReceive(out T message, TimeSpan timeout = default)
+        public bool TryReceive(out T message)
         {
             message = default;
             bool success = false;
@@ -96,21 +96,6 @@ namespace FeatureFlowFramework.DataFlows
                 success = queue.TryDequeue(out message);
                 if (IsEmpty) readerWakeEvent.Reset();
                 if (!IsFull) writerWakeEvent.Set();
-            }
-            if (success) return true;
-            else if (timeout <= TimeSpan.Zero) return false;
-
-            // With multiple threads trying to read concurrently it may be necessary to retry multiple times
-            TimeFrame waitTime = new TimeFrame(timeout);
-            while (!success && !waitTime.Elapsed)
-            {
-                WaitHandle.Wait(waitTime.Remaining);
-                lock (queue)
-                {
-                    success = queue.TryDequeue(out message);
-                    if (IsEmpty) readerWakeEvent.Reset();
-                    if (!IsFull) writerWakeEvent.Set();
-                }
             }
             return success;
         }

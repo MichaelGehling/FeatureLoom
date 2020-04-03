@@ -37,10 +37,9 @@ namespace FeatureFlowFramework.DataFlows
             else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
         }
 
-        public bool TryReceive(out T message, TimeSpan timeout = default)
+        public bool TryReceive(out T message)
         {
             message = default;
-            if (IsEmpty && timeout != default) WaitHandle.Wait(timeout);
             lock (readerWakeEvent)
             {
                 if (IsEmpty) return false;

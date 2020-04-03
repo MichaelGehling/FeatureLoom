@@ -88,6 +88,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait()
         {
+            if(mre.IsSet) return true;
             mre.Wait();
             return true;
         }
@@ -95,6 +96,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout)
         {
+            if(mre.IsSet) return true;
             if(timeout <= TimeSpan.Zero) return false;
             return mre.Wait(timeout);            
         }
@@ -102,6 +104,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(CancellationToken cancellationToken)
         {
+            if(mre.IsSet) return true;
             if(cancellationToken.IsCancellationRequested) return false;
             mre.Wait(cancellationToken);
             return !cancellationToken.IsCancellationRequested;
@@ -110,6 +113,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout, CancellationToken cancellationToken)
         {
+            if(mre.IsSet) return true;
             if(cancellationToken.IsCancellationRequested) return false;
             if(timeout <= TimeSpan.Zero) return false;
             return mre.Wait(timeout, cancellationToken);
