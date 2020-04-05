@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Aspects
             this.obj = obj;
             var data = obj.GetAspectData();
             handle = data.ObjectHandle;
-            if (!data.TryGetAspectInterface(out aspectInfoValues, IsInfoCollection))
+            if(!data.TryGetAspectInterface(out aspectInfoValues, IsInfoCollection))
             {
                 aspectInfoValues = new AspectValueAddOn(collectionName);
                 data.AddAddOn(aspectInfoValues as AspectValueAddOn);
@@ -82,12 +82,12 @@ namespace FeatureFlowFramework.Aspects
 
         private void AddParentAndChild<P, C>(InfoAspectWrapper<P> parent, InfoAspectWrapper<C> child) where P : class where C : class
         {
-            if (!parent.aspectInfoValues.TryGet("children", out HashSet<long> childrenSet))
+            if(!parent.aspectInfoValues.TryGet("children", out HashSet<long> childrenSet))
             {
                 childrenSet = new HashSet<long>();
                 parent.aspectInfoValues.Set("children", childrenSet);
             }
-            if (childrenSet.Add(child.handle))
+            if(childrenSet.Add(child.handle))
             {
                 child.aspectInfoValues.Set("parent", parent.handle);
             }

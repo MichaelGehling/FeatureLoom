@@ -2,7 +2,6 @@
 using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Logging;
 using Newtonsoft.Json;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataStorage
@@ -15,14 +14,14 @@ namespace FeatureFlowFramework.DataStorage
         {
             var writer = Storage.GetWriter(defaultCategory);
             var reader = Storage.GetReader(defaultCategory);
-            if ((await reader.TryListUrisAsync()).Out(out string[] uris))
+            if((await reader.TryListUrisAsync()).Out(out string[] uris))
             {
                 foreach(var uri in uris) await writer.TryDeleteAsync(uri);
             }
         }
 
         [JsonIgnore]
-        public virtual string Uri => this.GetType().FullName;        
+        public virtual string Uri => this.GetType().FullName;
 
         [JsonIgnore]
         public virtual string ConfigCategory => defaultCategory;
@@ -38,7 +37,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             get
             {
-                if (reader == null) reader = Storage.GetReader(ConfigCategory);
+                if(reader == null) reader = Storage.GetReader(ConfigCategory);
                 return reader;
             }
         }
@@ -51,14 +50,14 @@ namespace FeatureFlowFramework.DataStorage
         {
             get
             {
-                if (writer == null) writer = Storage.GetWriter(ConfigCategory);
+                if(writer == null) writer = Storage.GetWriter(ConfigCategory);
                 return writer;
             }
         }
 
         protected void StartSubscription()
         {
-            if (!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
+            if(!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
             {
                 Log.ERROR(this, "Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
             }
@@ -79,16 +78,16 @@ namespace FeatureFlowFramework.DataStorage
         {
             bool success = false;
             string json = null;
-            if (useSubscription)
+            if(useSubscription)
             {
-                if (!subscriptionReceiver.IsInstantiated)
+                if(!subscriptionReceiver.IsInstantiated)
                 {
                     success = (await Reader.TryReadAsync<string>(this.Uri)).Out(out json);
                     StartSubscription();
                 }
                 else
                 {
-                    if (this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
+                    if(this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
                     {
                         success = changeUpdate.isValid;
                         json = changeUpdate.item;
@@ -99,7 +98,7 @@ namespace FeatureFlowFramework.DataStorage
             {
                 success = (await Reader.TryReadAsync<string>(this.Uri)).Out(out json);
             }
-            if (success)
+            if(success)
             {
                 try
                 {

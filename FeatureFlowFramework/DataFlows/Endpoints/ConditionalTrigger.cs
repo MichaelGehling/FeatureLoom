@@ -4,8 +4,8 @@ namespace FeatureFlowFramework.DataFlows
 {
     public class ConditionalTrigger<T, R> : MessageTrigger
     {
-        Predicate<T> triggerCondition;
-        Predicate<R> resetCondition;
+        private readonly Predicate<T> triggerCondition;
+        private readonly Predicate<R> resetCondition;
 
         public ConditionalTrigger(Predicate<T> triggerCondition, Predicate<R> resetCondition = null)
         {

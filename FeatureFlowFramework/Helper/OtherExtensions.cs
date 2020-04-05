@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.Helper
     {
         public static T GetTargetOrDefault<T>(this WeakReference<T> weakRef, T defaultObj = default) where T : class
         {
-            if (weakRef.TryGetTarget(out T target)) return target;
+            if(weakRef.TryGetTarget(out T target)) return target;
             else return defaultObj;
         }
 

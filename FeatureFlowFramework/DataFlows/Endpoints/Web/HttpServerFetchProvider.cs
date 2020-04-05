@@ -28,9 +28,9 @@ namespace FeatureFlowFramework.DataFlows.Web
 
         public void Post<M>(in M message)
         {
-            if (translator.TryTranslate(message, out string json))
+            if(translator.TryTranslate(message, out string json))
             {
-                lock (ringBuffer)
+                lock(ringBuffer)
                 {
                     ringBuffer.Add(json);
                 }
@@ -45,7 +45,7 @@ namespace FeatureFlowFramework.DataFlows.Web
 
         public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (!request.IsGet)
+            if(!request.IsGet)
             {
                 response.StatusCode = HttpStatusCode.MethodNotAllowed;
                 await response.WriteAsync("Use 'GET' to fetch messages!");
@@ -55,17 +55,17 @@ namespace FeatureFlowFramework.DataFlows.Web
             try
             {
                 long requestedStart = 0;
-                if (request.TryGetQueryItem("next", out string requestedStartStr)) long.TryParse(requestedStartStr, out requestedStart);
+                if(request.TryGetQueryItem("next", out string requestedStartStr)) long.TryParse(requestedStartStr, out requestedStart);
                 int maxWait = 0;
-                if (request.TryGetQueryItem("maxWait", out string maxWaitStr)) int.TryParse(maxWaitStr, out maxWait);
+                if(request.TryGetQueryItem("maxWait", out string maxWaitStr)) int.TryParse(maxWaitStr, out maxWait);
                 long missed = 0;
                 long next = 0;
                 bool onlyLatest = false;
                 string[] messages = Array.Empty<string>();
-                lock (ringBuffer)
+                lock(ringBuffer)
                 {
                     next = ringBuffer.Counter;
-                    if (requestedStart > next || requestedStart < 0)
+                    if(requestedStart > next || requestedStart < 0)
                     {
                         onlyLatest = true;
                         requestedStart = next < 0 ? 0 : next - 1;
@@ -73,11 +73,11 @@ namespace FeatureFlowFramework.DataFlows.Web
                     messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
                 }
 
-                if (messages.Length == 0 && maxWait > 0)
+                if(messages.Length == 0 && maxWait > 0)
                 {
-                    if (await ringBuffer.WaitHandle.WaitAsync(maxWait.Milliseconds()))
+                    if(await ringBuffer.WaitHandle.WaitAsync(maxWait.Milliseconds()))
                     {
-                        lock (ringBuffer)
+                        lock(ringBuffer)
                         {
                             messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
                             next = ringBuffer.Counter;
@@ -85,7 +85,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                     }
                 }
 
-                if (onlyLatest) missed = -1;
+                if(onlyLatest) missed = -1;
 
                 StringBuilder sb = new StringBuilder();
                 sb.Append(
@@ -94,10 +94,10 @@ $@"{{
     ""next"" : {next},
     ""messages"" : [
 ");
-                for (int i = 0; i < messages.Length; i++)
+                for(int i = 0; i < messages.Length; i++)
                 {
                     sb.Append(messages[i]);
-                    if (i + 1 != messages.Length) sb.Append(",\n");
+                    if(i + 1 != messages.Length) sb.Append(",\n");
                 }
                 sb.Append($@"
                    ]
@@ -105,7 +105,7 @@ $@"{{
                 await response.WriteAsync(sb.ToString());
                 return true;
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 Log.ERROR(this, $"Failed while building response! Route:{route}", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;

@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.DataStorage
 
         protected virtual string BuildFilePath(string uri)
         {
-            if (config.useCategoryFolder) return Path.Combine(config.basePath, category, $"{uri}{config.fileSuffix}");
+            if(config.useCategoryFolder) return Path.Combine(config.basePath, category, $"{uri}{config.fileSuffix}");
             else return Path.Combine(config.basePath, $"{uri}{config.fileSuffix}");
         }
 
@@ -58,13 +58,13 @@ namespace FeatureFlowFramework.DataStorage
             {
                 string filePath = BuildFilePath(uri);
                 var x509 = new X509Certificate2(filePath);
-                if (x509 is T x509T)
+                if(x509 is T x509T)
                 {
                     data = x509T;
                     return true;
                 }
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 Log.WARNING(this, $"Certificate {uri} could not be loaded", e.ToString());
             }
@@ -85,22 +85,22 @@ namespace FeatureFlowFramework.DataStorage
             {
                 string path = config.useCategoryFolder ? Path.Combine(config.basePath, category) : config.basePath;
                 DirectoryInfo dir = new DirectoryInfo(path);
-                if (!dir.Exists) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
+                if(!dir.Exists) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
 
                 List<string> uris = new List<string>();
                 var files = await dir.GetFilesAsync($"*{config.fileSuffix}", SearchOption.AllDirectories);
                 int basePathLength = dir.FullName.Length + 1;
-                foreach (var file in files)
+                foreach(var file in files)
                 {
                     string uri = file.FullName.Substring(basePathLength, file.FullName.Length - basePathLength - config.fileSuffix.Length);
-                    if (pattern == null || uri.MatchesWildcard(pattern))
+                    if(pattern == null || uri.MatchesWildcard(pattern))
                     {
                         uris.Add(uri);
                     }
                 }
                 return new AsyncOutResult<bool, string[]>(true, uris.ToArray());
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 Log.ERROR(this, "Reading files to retreive Uris failed!", e.ToString());
                 return new AsyncOutResult<bool, string[]>(false, null);

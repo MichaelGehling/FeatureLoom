@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading;
 
 namespace FeatureFlowFramework.Workflows
 {
@@ -14,6 +12,7 @@ namespace FeatureFlowFramework.Workflows
         long ContextId { get; }
 
         void SendExecutionInfoEvent(string executionEvent, object additionalInfo = null);
+
         void SendExecutionInfoEvent(string executionEvent, Workflow.ExecutionState state, Workflow.ExecutionPhase phase, object additionalInfo = null);
     }
 }

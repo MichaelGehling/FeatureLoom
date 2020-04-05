@@ -31,9 +31,9 @@ namespace FeatureFlowFramework.Helper
 
         public T Dequeue(bool highest = true)
         {
-            if (linkedList.Count == 0) throw new InvalidOperationException("The queue is empty!");
+            if(linkedList.Count == 0) throw new InvalidOperationException("The queue is empty!");
             T value;
-            if (highest)
+            if(highest)
             {
                 value = linkedList.First.Value;
                 linkedList.RemoveFirst();
@@ -48,7 +48,7 @@ namespace FeatureFlowFramework.Helper
 
         public bool TryDequeue(out T item)
         {
-            if (this.Count > 0)
+            if(this.Count > 0)
             {
                 item = this.Dequeue();
                 return true;
@@ -62,7 +62,7 @@ namespace FeatureFlowFramework.Helper
 
         public T Peek()
         {
-            if (linkedList.Count == 0) throw new InvalidOperationException("The queue is empty!");
+            if(linkedList.Count == 0) throw new InvalidOperationException("The queue is empty!");
 
             var value = linkedList.First.Value;
             return value;
@@ -78,11 +78,11 @@ namespace FeatureFlowFramework.Helper
         public void Enqueue(T item)
         {
             var node = linkedList.First;
-            if (node == null) linkedList.AddFirst(new LinkedListNode<T>(item));
+            if(node == null) linkedList.AddFirst(new LinkedListNode<T>(item));
             else
             {
-                while (node != null && comparer.Compare(item, node.Value) < 0) node = node.Next;
-                if (node == null) linkedList.AddLast(new LinkedListNode<T>(item));
+                while(node != null && comparer.Compare(item, node.Value) < 0) node = node.Next;
+                if(node == null) linkedList.AddLast(new LinkedListNode<T>(item));
                 else linkedList.AddBefore(node, new LinkedListNode<T>(item));
             }
         }

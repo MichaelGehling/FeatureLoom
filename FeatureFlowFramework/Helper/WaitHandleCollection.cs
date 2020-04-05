@@ -1,10 +1,8 @@
-﻿using FeatureFlowFramework.Helper;
-
-namespace FeatureFlowFramework.Helper
+﻿namespace FeatureFlowFramework.Helper
 {
     public struct WaitHandleCollection
     {
-        IAsyncWaitHandle[] array;
+        private IAsyncWaitHandle[] array;
 
         public IAsyncWaitHandle[] Init(params IAsyncWaitHandle[] newArray)
         {
@@ -12,8 +10,6 @@ namespace FeatureFlowFramework.Helper
             return All;
         }
 
-        public IAsyncWaitHandle[] All => array;        
-
+        public IAsyncWaitHandle[] All => array;
     }
-
 }

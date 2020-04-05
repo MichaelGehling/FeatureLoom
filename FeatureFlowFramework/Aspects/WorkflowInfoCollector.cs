@@ -18,17 +18,17 @@ namespace FeatureFlowFramework.Aspects
             removeListner = new ProcessingEndpoint<AspectRegistry.ObjectRemovedNotification>(msg => workflows.Remove(msg.objectHandle), workflows);
             activationListner = new ProcessingEndpoint<AspectRegistry.ActivationStatusNotification>(msg =>
             {
-                if (!msg.isActive) workflows.Clear();
+                if(!msg.isActive) workflows.Clear();
             }, workflows);
 
             AspectRegistry.NotificationSource.ConnectTo(addListner);
             AspectRegistry.NotificationSource.ConnectTo(removeListner);
             AspectRegistry.NotificationSource.ConnectTo(activationListner);
-            lock (workflows)
+            lock(workflows)
             {
-                foreach (var data in AspectRegistry.GetAllAspectData())
+                foreach(var data in AspectRegistry.GetAllAspectData())
                 {
-                    if (data.TryGetAspectInterface(out Workflow wf)) workflows.Add(data.ObjectHandle, data);
+                    if(data.TryGetAspectInterface(out Workflow wf)) workflows.Add(data.ObjectHandle, data);
                 }
             }
         }
@@ -37,7 +37,7 @@ namespace FeatureFlowFramework.Aspects
         {
             get
             {
-                lock (workflows)
+                lock(workflows)
                 {
                     return workflows.Values.Select(data =>
                     {

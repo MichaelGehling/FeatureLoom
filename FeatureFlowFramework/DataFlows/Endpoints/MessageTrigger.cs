@@ -1,7 +1,5 @@
 ﻿using FeatureFlowFramework.Helper;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,8 +7,8 @@ namespace FeatureFlowFramework.DataFlows
 {
     public class MessageTrigger : IDataFlowSink, IAsyncWaitHandle
     {
-        AsyncManualResetEvent mre = new AsyncManualResetEvent();
-        Mode mode;
+        private AsyncManualResetEvent mre = new AsyncManualResetEvent();
+        private readonly Mode mode;
 
         public enum Mode
         {

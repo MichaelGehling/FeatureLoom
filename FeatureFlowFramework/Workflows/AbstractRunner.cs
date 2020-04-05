@@ -1,14 +1,13 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helper;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
     public abstract class AbstractRunner : IWorkflowRunner
     {
-        FeatureLock runningWorkflowsLock = new FeatureLock();
+        private FeatureLock runningWorkflowsLock = new FeatureLock();
         protected List<IWorkflowControls> runningWorkflows = new List<IWorkflowControls>();
         protected readonly IStepExecutionController executionController = new DefaultStepExecutionController();
         protected Forwarder executionInfoForwarder = null;
@@ -17,7 +16,7 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                using (runningWorkflowsLock.ForReading())
+                using(runningWorkflowsLock.ForReading())
                 {
                     return runningWorkflows.ToArray();
                 }
@@ -28,10 +27,10 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                if (executionInfoForwarder == null)
+                if(executionInfoForwarder == null)
                 {
                     executionInfoForwarder = new Forwarder();
-                    foreach (var workflow in RunningWorkflows)
+                    foreach(var workflow in RunningWorkflows)
                     {
                         workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
                     }
@@ -43,11 +42,11 @@ namespace FeatureFlowFramework.Workflows
         public async Task PauseAllWorkflows()
         {
             List<Task> tasks = new List<Task>();
-            foreach (var wf in RunningWorkflows)
-            {                
+            foreach(var wf in RunningWorkflows)
+            {
                 wf.RequestPause();
 
-                tasks.Add(wf.WaitUntilStopsRunningAsync());              
+                tasks.Add(wf.WaitUntilStopsRunningAsync());
             }
             await Task.WhenAll(tasks.ToArray());
         }
@@ -57,7 +56,7 @@ namespace FeatureFlowFramework.Workflows
             using(runningWorkflowsLock.ForWriting())
             {
                 runningWorkflows.Remove(workflow);
-                if (executionInfoForwarder != null) workflow.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
+                if(executionInfoForwarder != null) workflow.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
             }
         }
 
@@ -67,7 +66,7 @@ namespace FeatureFlowFramework.Workflows
             using(runningWorkflowsLock.ForWriting())
             {
                 runningWorkflows.Add(workflow);
-                if (executionInfoForwarder != null) workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
+                if(executionInfoForwarder != null) workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
             }
         }
 

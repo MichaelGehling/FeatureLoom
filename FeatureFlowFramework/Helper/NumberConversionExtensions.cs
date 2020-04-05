@@ -12,18 +12,18 @@ namespace FeatureFlowFramework.Helper
         public static byte[] ToBytes(this int number, bool littleEndian)
         {
             byte[] bytes = BitConverter.GetBytes(number);
-            if (!BitConverter.IsLittleEndian && littleEndian) Array.Reverse(bytes);
+            if(!BitConverter.IsLittleEndian && littleEndian) Array.Reverse(bytes);
             return bytes;
         }
 
         public static int ToInt32(this byte[] bytes, int startIndex, bool littleEndian)
         {
-            if (!BitConverter.IsLittleEndian && littleEndian)
+            if(!BitConverter.IsLittleEndian && littleEndian)
             {
                 int len = sizeof(int);
                 int maxIdx = len - 1;
                 byte[] part = new byte[len];
-                for (int i = 0; i <= len; i++)
+                for(int i = 0; i <= len; i++)
                 {
                     part[maxIdx - i] = bytes[startIndex + i];
                 }
@@ -34,8 +34,8 @@ namespace FeatureFlowFramework.Helper
 
         public static int ToIntTruncated(this double d)
         {
-            if (d > int.MaxValue) return int.MaxValue;
-            else if (d < int.MinValue) return int.MinValue;
+            if(d > int.MaxValue) return int.MaxValue;
+            else if(d < int.MinValue) return int.MinValue;
             else return (int)d;
         }
     }

@@ -32,7 +32,7 @@ namespace FeatureFlowFramework.DataFlows
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Create((a, b) => a == b ? 0 : a < b ? -1 : 1), limit, default);
             sender.ConnectTo(receiver);
             var sendMessages = new List<int>();
-            for (int i = 1; i <= numMessages; i++)
+            for(int i = 1; i <= numMessages; i++)
             {
                 int number = RandomGenerator.Int32();
                 sender.Send(number);
@@ -44,10 +44,10 @@ namespace FeatureFlowFramework.DataFlows
 
             int offset = (numMessages - limit).ClampLow(0);
 
-            sendMessages.Sort();            
-            for (int i = 0; i < receivedMessages.Length; i++)
+            sendMessages.Sort();
+            for(int i = 0; i < receivedMessages.Length; i++)
             {
-                Assert.Equal(sendMessages[sendMessages.Count-1-i], receivedMessages[i]);
+                Assert.Equal(sendMessages[sendMessages.Count - 1 - i], receivedMessages[i]);
             }
         }
 
@@ -62,12 +62,12 @@ namespace FeatureFlowFramework.DataFlows
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default, limit, blockTime);
             sender.ConnectTo(receiver);
             Assert.True(receiver.IsEmpty);
-            for (int i = 1; i <= limit; i++)
+            for(int i = 1; i <= limit; i++)
             {
                 sender.Send(i);
             }
             Assert.True(receiver.IsFull);
-            if (sendAsync)
+            if(sendAsync)
             {
                 TimeSpan tolerance = 30.Milliseconds();
 
@@ -99,7 +99,6 @@ namespace FeatureFlowFramework.DataFlows
             sender.Send(42);
             Assert.True(waitHandle.WaitingTask.IsCompleted);
         }
-
 
         [Theory]
         [InlineData(80, 0, false)]

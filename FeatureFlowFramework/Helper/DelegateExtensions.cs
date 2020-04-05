@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.Helper
         public static Action<T> WrapInTryCatchIfAsync<T>(this Action<T> action, bool logOnException = true)
         {
             Action<T> result = action;
-            if (action.Method.GetCustomAttribute(typeof(AsyncStateMachineAttribute)) != null)
+            if(action.Method.GetCustomAttribute(typeof(AsyncStateMachineAttribute)) != null)
             {
                 result = t =>
                 {
@@ -18,9 +18,9 @@ namespace FeatureFlowFramework.Helper
                     {
                         action(t);
                     }
-                    catch (Exception e)
+                    catch(Exception e)
                     {
-                        if (logOnException) Log.ERROR(null, $"Async function failed with an exception that was caught! ", e.ToString());
+                        if(logOnException) Log.ERROR(null, $"Async function failed with an exception that was caught! ", e.ToString());
                     }
                 };
             }

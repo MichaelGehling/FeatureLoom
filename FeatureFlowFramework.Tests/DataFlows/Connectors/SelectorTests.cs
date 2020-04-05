@@ -1,6 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
 using FeatureFlowFramework.Helper;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
@@ -29,25 +28,25 @@ namespace FeatureFlowFramework.DataFlows
             var sender = new Sender();
             var selector = new Selector<int>(true);
             sender.ConnectTo(selector);
-            var lessThan10Option = selector.AddOption(msg => msg < 10);            
+            var lessThan10Option = selector.AddOption(msg => msg < 10);
             var greaterThan5Option = selector.AddOption(msg => msg > 5);
-            var lessThan10Counter = new CountingForwarder();            
+            var lessThan10Counter = new CountingForwarder();
             var greaterThan5Counter = new CountingForwarder();
             var elseCounter = new CountingForwarder();
-            lessThan10Option.ConnectTo(lessThan10Counter);            
+            lessThan10Option.ConnectTo(lessThan10Counter);
             greaterThan5Option.ConnectTo(greaterThan5Counter);
             selector.Else.ConnectTo(elseCounter);
 
             sender.Send(7);
-            Assert.Equal(1, lessThan10Counter.Counter);            
-            Assert.Equal(1, greaterThan5Counter.Counter);            
+            Assert.Equal(1, lessThan10Counter.Counter);
+            Assert.Equal(1, greaterThan5Counter.Counter);
 
             sender.Send(2);
-            Assert.Equal(2, lessThan10Counter.Counter);            
+            Assert.Equal(2, lessThan10Counter.Counter);
             Assert.Equal(1, greaterThan5Counter.Counter);
 
             sender.Send(99);
-            Assert.Equal(2, lessThan10Counter.Counter);            
+            Assert.Equal(2, lessThan10Counter.Counter);
             Assert.Equal(2, greaterThan5Counter.Counter);
 
             selector.MultiMatch = false;
@@ -60,5 +59,5 @@ namespace FeatureFlowFramework.DataFlows
             Assert.Equal(2, greaterThan5Counter.Counter);
             Assert.Equal(1, elseCounter.Counter);
         }
-    }    
+    }
 }

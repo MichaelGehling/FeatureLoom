@@ -27,42 +27,42 @@ namespace FeatureFlowFramework.DataFlows
         {
             bool alternative = true;
             (bool ready, object msg, bool enumerate) output = default;
-            if (message is T validMessage)
+            if(message is T validMessage)
             {
-                lock (aggregationData)
+                lock(aggregationData)
                 {
                     alternative = !aggregate(validMessage, aggregationData);
                     output = aggregationData.TryCreateOutputMessage();
                 }
             }
 
-            if (output.ready && output.msg != null)
+            if(output.ready && output.msg != null)
             {
-                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sender.Forward(msg);
+                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(msg);
                 else sender.Forward(output.msg);
             }
-            if (alternative) alternativeSender.Forward(message);
+            if(alternative) alternativeSender.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
         {
             bool alternative = true;
             (bool ready, object msg, bool enumerate) output = default;
-            if (message is T validMessage)
+            if(message is T validMessage)
             {
-                lock (aggregationData)
+                lock(aggregationData)
                 {
                     alternative = !aggregate(validMessage, aggregationData);
                     output = aggregationData.TryCreateOutputMessage();
                 }
             }
 
-            if (output.ready && output.msg != null)
+            if(output.ready && output.msg != null)
             {
-                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sender.Forward(msg);
+                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(msg);
                 else return sender.ForwardAsync(output.msg);
             }
-            if (alternative) return alternativeSender.ForwardAsync(message);
+            if(alternative) return alternativeSender.ForwardAsync(message);
             return Task.CompletedTask;
         }
 

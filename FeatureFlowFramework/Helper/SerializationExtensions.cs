@@ -18,8 +18,8 @@ namespace FeatureFlowFramework.Helper
         public static void ToJson<T>(this T obj, Stream jsonStream, JsonSerializer serializer = null)
         {
             serializer = serializer ?? Json.Default_Serializer;
-            using (var sw = new StreamWriter(jsonStream))
-            using (var writer = new JsonTextWriter(sw))
+            using(var sw = new StreamWriter(jsonStream))
+            using(var writer = new JsonTextWriter(sw))
             {
                 serializer.Serialize(writer, obj);
             }
@@ -29,8 +29,8 @@ namespace FeatureFlowFramework.Helper
         {
             serializer = serializer ?? Json.Default_Serializer;
             T obj;
-            using (StreamReader sr = new StreamReader(jsonStream))
-            using (JsonTextReader jsonReader = new JsonTextReader(sr))
+            using(StreamReader sr = new StreamReader(jsonStream))
+            using(JsonTextReader jsonReader = new JsonTextReader(sr))
             {
                 obj = serializer.Deserialize<T>(jsonReader);
             }

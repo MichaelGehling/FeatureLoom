@@ -5,9 +5,7 @@ using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Logging;
 using FeatureFlowFramework.Workflows;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Sources;
 
 namespace FeatureRpcClient
 {
@@ -16,7 +14,7 @@ namespace FeatureRpcClient
         public int errorCode = 0;
         private string rpcCall;
         private bool multiCall = false;
-        TcpClientEndpoint.Config tcpConfig = new TcpClientEndpoint.Config();
+        private TcpClientEndpoint.Config tcpConfig = new TcpClientEndpoint.Config();
 
         public FeatureRpcClient(string rpcCall)
         {
@@ -109,7 +107,7 @@ namespace FeatureRpcClient
                         .Finish();
             }
         }
-    
+
         public static int Main(string[] args)
         {
             Log.logForwarder.DisconnectFrom(Log.defaultConsoleLogger);

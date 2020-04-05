@@ -24,11 +24,11 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CheckForTimeouts(object state)
         {
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
-                for (int i = 0; i < responseHandlers.Count; i++)
+                for(int i = 0; i < responseHandlers.Count; i++)
                 {
-                    if (responseHandlers[i].LifeTime.Elapsed)
+                    if(responseHandlers[i].LifeTime.Elapsed)
                     {
                         responseHandlers[i].Cancel();
                         responseHandlers.RemoveAt(i--);
@@ -41,7 +41,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
             }
@@ -52,7 +52,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
             }
@@ -64,7 +64,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
             TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler(requestId, tcs, timeout));
             }
@@ -87,26 +87,26 @@ namespace FeatureFlowFramework.DataFlows.RPC
             int openBraces = 0;
             bool openQuotationMark = false;
             string param = "";
-            if (parts.Length > 1)
+            if(parts.Length > 1)
             {
-                foreach (var c in parts[1])
+                foreach(var c in parts[1])
                 {
-                    if (c == '"')
+                    if(c == '"')
                     {
                         openQuotationMark = !openQuotationMark;
                         param += c;
                     }
-                    else if (c == '{' && !openQuotationMark)
+                    else if(c == '{' && !openQuotationMark)
                     {
                         openBraces++;
                         param += c;
                     }
-                    else if (openBraces > 0 && !openQuotationMark)
+                    else if(openBraces > 0 && !openQuotationMark)
                     {
-                        if (c == '}') openBraces--;
+                        if(c == '}') openBraces--;
                         param += c;
                     }
-                    else if (c == ' ' && !openQuotationMark)
+                    else if(c == ' ' && !openQuotationMark)
                     {
                         parameters.Add(param);
                         param = "";
@@ -116,7 +116,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                         param += c;
                     }
                 }
-                if (!param.EmptyOrNull()) parameters.Add(param);
+                if(!param.EmptyOrNull()) parameters.Add(param);
             }
             string parameterSet = CreateJsonParamString(parameters);
             string reqStr = $"{{method:\"{methodName}\", requestId:{requestId}, noResponse:{(noResponse ? "true" : "false")}, parameterSet:{parameterSet}}}";
@@ -125,13 +125,13 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         private string CreateJsonParamString(List<string> parameters)
         {
-            if (parameters.Count == 0) return "true";
-            else if (parameters.Count == 1) return parameters[0];
+            if(parameters.Count == 0) return "true";
+            else if(parameters.Count == 1) return parameters[0];
             else
             {
                 string result = "{";
                 int paramCount = 1;
-                foreach (string p in parameters)
+                foreach(string p in parameters)
                 {
                     result += $"Item{paramCount++}:{p},";
                 }
@@ -142,22 +142,22 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void Post<M>(in M message)
         {
-            if (message is RpcErrorResponse errorResponse)
+            if(message is RpcErrorResponse errorResponse)
             {
                 Log.ERROR(this, "String-RPC call failed!", errorResponse.ErrorMessage);
             }
-            else if (message is IRpcResponse)
+            else if(message is IRpcResponse)
             {
-                lock (responseHandlers)
+                lock(responseHandlers)
                 {
-                    for (int i = 0; i < responseHandlers.Count; i++)
+                    for(int i = 0; i < responseHandlers.Count; i++)
                     {
-                        if (responseHandlers[i].Handle(message))
+                        if(responseHandlers[i].Handle(message))
                         {
                             responseHandlers.RemoveAt(i--);
                             break;
                         }
-                        else if (responseHandlers[i].LifeTime.Elapsed)
+                        else if(responseHandlers[i].LifeTime.Elapsed)
                         {
                             responseHandlers[i].Cancel();
                             responseHandlers.RemoveAt(i--);

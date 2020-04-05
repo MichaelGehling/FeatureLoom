@@ -8,23 +8,23 @@ namespace FeatureFlowFramework.DataFlows.Test
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
 
         private volatile int counter;
-        private object locker = new object();
+        private readonly object locker = new object();
         private List<(int expectedCount, TaskCompletionSource<int> tcs)> waitings = new List<(int, TaskCompletionSource<int>)>();
 
         public int Counter
         {
-            get { lock (locker) return counter; }
+            get { lock(locker) return counter; }
         }
 
         public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
 
         public Task<int> WaitFor(int numMessages)
         {
-            lock (locker)
+            lock(locker)
             {
                 var currentCounter = counter;
                 TaskCompletionSource<int> waitingTaskSource = new TaskCompletionSource<int>();
-                if (currentCounter >= numMessages) waitingTaskSource.SetResult(currentCounter);
+                if(currentCounter >= numMessages) waitingTaskSource.SetResult(currentCounter);
                 else
                 {
                     waitings.Add((numMessages, waitingTaskSource));
@@ -47,12 +47,12 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         private void Count()
         {
-            lock (locker)
+            lock(locker)
             {
                 counter++;
-                for (int i = waitings.Count - 1; i >= 0; i--)
+                for(int i = waitings.Count - 1; i >= 0; i--)
                 {
-                    if (waitings[i].expectedCount <= counter)
+                    if(waitings[i].expectedCount <= counter)
                     {
                         waitings[i].tcs.SetResult(counter);
                         waitings.RemoveAt(i);

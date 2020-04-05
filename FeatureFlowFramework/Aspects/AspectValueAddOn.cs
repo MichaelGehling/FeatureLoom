@@ -16,12 +16,12 @@ namespace FeatureFlowFramework.Aspects
 
         public void Set<T>(string key, T value)
         {
-            lock (keyValuePairs) keyValuePairs.Add(key, value);
+            lock(keyValuePairs) keyValuePairs.Add(key, value);
         }
 
         public bool Contains(string key)
         {
-            lock (keyValuePairs)
+            lock(keyValuePairs)
             {
                 return keyValuePairs.ContainsKey(key);
             }
@@ -29,9 +29,9 @@ namespace FeatureFlowFramework.Aspects
 
         public bool TryGet<T>(string key, out T value)
         {
-            lock (keyValuePairs)
+            lock(keyValuePairs)
             {
-                if (keyValuePairs.TryGetValue(key, out object obj) && obj is T objT)
+                if(keyValuePairs.TryGetValue(key, out object obj) && obj is T objT)
                 {
                     value = objT;
                     return true;

@@ -1,5 +1,4 @@
 ﻿using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,8 +19,8 @@ namespace FeatureFlowFramework.Workflows
             this.suspensionIntervall = suspensionIntervall;
         }
 
-        TimeSpan suspensionTime;
-        TimeSpan suspensionIntervall;
+        private readonly TimeSpan suspensionTime;
+        private readonly TimeSpan suspensionIntervall;
 
         public async Task RunAsync(IWorkflowControls workflow)
         {
@@ -29,7 +28,7 @@ namespace FeatureFlowFramework.Workflows
             try
             {
                 var timer = AppTime.TimeKeeper;
-                while(await workflow.ExecuteNextStepAsync(executionController)) 
+                while(await workflow.ExecuteNextStepAsync(executionController))
                 {
                     if(SynchronizationContext.Current != null && timer.Elapsed > suspensionIntervall)
                     {

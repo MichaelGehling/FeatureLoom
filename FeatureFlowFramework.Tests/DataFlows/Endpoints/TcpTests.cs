@@ -1,9 +1,4 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.DataFlows.TCP;
-using FeatureFlowFramework.Helper;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using FeatureFlowFramework.Helper;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows.TCP
@@ -18,8 +13,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             int testPort = TcpTests.testPortCounter++;
             var server = new TcpServerEndpoint(new TcpServerEndpoint.Config()
             {
-                port = testPort                
-                
+                port = testPort
             });
             var client = new TcpClientEndpoint(new TcpClientEndpoint.Config()
             {

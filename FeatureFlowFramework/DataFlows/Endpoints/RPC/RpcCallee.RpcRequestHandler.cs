@@ -25,14 +25,14 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
             public bool Handle<M>(in M message)
             {
-                if (message is RpcRequest<P1, R> myRequest && myRequest.method == this.name)
+                if(message is RpcRequest<P1, R> myRequest && myRequest.method == this.name)
                 {
                     HandleRpcRequest(myRequest);
                     return true;
                 }
-                else if (message is string stringMessage)
+                else if(message is string stringMessage)
                 {
-                    if (stringMessage.TryParseJson(out RpcRequest<P1, R> rpcRequest) && rpcRequest.method == this.name)
+                    if(stringMessage.TryParseJson(out RpcRequest<P1, R> rpcRequest) && rpcRequest.method == this.name)
                     {
                         HandleRpcRequest(rpcRequest);
                         return true;
@@ -47,15 +47,15 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 try
                 {
                     result = method.Invoke(myRequest.parameterSet);
-                    if (!myRequest.noResponse)
+                    if(!myRequest.noResponse)
                     {
                         var response = new RpcResponse<R>(myRequest.requestId, result);
                         target.Forward(response);
                     }
                 }
-                catch (Exception e)
+                catch(Exception e)
                 {
-                    if (myRequest.noResponse)
+                    if(myRequest.noResponse)
                     {
                         Log.ERROR(null, $"Failed executing RPC call {myRequest.method}", e.ToString());
                     }

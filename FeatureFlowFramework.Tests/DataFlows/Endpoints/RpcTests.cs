@@ -1,8 +1,4 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helper;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using FeatureFlowFramework.Helper;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows.RPC
@@ -11,7 +7,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
     {
         [Fact]
         public void CanCallMethodViaDataFlow()
-        {            
+        {
             var callee = new RpcCallee();
             var caller = new RpcCaller(1.Seconds());
             caller.ConnectToAndBack(callee);
@@ -32,7 +28,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             callee.RegisterMethod<string, int, string>("RepeatString", (str, num) =>
             {
                 string response = "";
-                for (int i = 0; i < num; i++) response += str;
+                for(int i = 0; i < num; i++) response += str;
                 return response;
             });
 
@@ -54,7 +50,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             Assert.True(callFlag);
         }
 
-        struct TestParameters
+        private struct TestParameters
         {
             public string str;
             public int num;
@@ -76,7 +72,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             callee.RegisterMethod<string, int, string>("RepeatString", (str, num) =>
             {
                 string response = "";
-                for (int i = 0; i < num; i++) response += str;
+                for(int i = 0; i < num; i++) response += str;
                 return response;
             });
 
@@ -86,7 +82,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             callee.RegisterMethod<TestParameters, string>("RepeatString2", (testParams) =>
             {
                 string response = "";
-                for (int i = 0; i < testParams.num; i++) response += testParams.str;
+                for(int i = 0; i < testParams.num; i++) response += testParams.str;
                 return response;
             });
 
@@ -96,7 +92,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         [Fact]
         public void CanCallMethodOnMultipleCalleesAndReceiveAllResults()
-        {            
+        {
             var caller = new RpcCaller(1.Seconds());
             var calleeA = new RpcCallee();
             var calleeB = new RpcCallee();

@@ -22,11 +22,11 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CheckForTimeouts(object state)
         {
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
-                for (int i = 0; i < responseHandlers.Count; i++)
+                for(int i = 0; i < responseHandlers.Count; i++)
                 {
-                    if (responseHandlers[i].LifeTime.Elapsed)
+                    if(responseHandlers[i].LifeTime.Elapsed)
                     {
                         responseHandlers[i].Cancel();
                         responseHandlers.RemoveAt(i--);
@@ -39,7 +39,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
@@ -50,7 +50,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
@@ -62,7 +62,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
@@ -75,7 +75,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, bool>(requestId, method, parameterTuple);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
@@ -88,7 +88,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
@@ -101,7 +101,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, bool>(requestId, method, true);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-            lock (responseHandlers)
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
@@ -139,22 +139,22 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void Post<M>(in M message)
         {
-            if (message is RpcErrorResponse errorResponse)
+            if(message is RpcErrorResponse errorResponse)
             {
                 Log.ERROR(this, "RPC call failed!", errorResponse.ErrorMessage);
             }
-            else if (message is IRpcResponse)
+            else if(message is IRpcResponse)
             {
-                lock (responseHandlers)
+                lock(responseHandlers)
                 {
-                    for (int i = 0; i < responseHandlers.Count; i++)
+                    for(int i = 0; i < responseHandlers.Count; i++)
                     {
-                        if (responseHandlers[i].Handle(message))
+                        if(responseHandlers[i].Handle(message))
                         {
                             responseHandlers.RemoveAt(i--);
                             break;
                         }
-                        else if (responseHandlers[i].LifeTime.Elapsed)
+                        else if(responseHandlers[i].LifeTime.Elapsed)
                         {
                             responseHandlers[i].Cancel();
                             responseHandlers.RemoveAt(i--);

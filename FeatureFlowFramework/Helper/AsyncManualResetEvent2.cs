@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -10,10 +9,10 @@ namespace FeatureFlowFramework.Helper
 {
     public class AsyncManualResetEvent2 : IValueTaskSource
     {
-        ManualResetEventSlim mre;
-        volatile int currentToken = 0;
-        volatile bool tokenUsed = false;
-        List<ContinuationData> continuationDataStore = new List<ContinuationData>();
+        private ManualResetEventSlim mre;
+        private volatile int currentToken = 0;
+        private volatile bool tokenUsed = false;
+        private List<ContinuationData> continuationDataStore = new List<ContinuationData>();
 
         public AsyncManualResetEvent2(bool initialState = false)
         {
@@ -28,15 +27,14 @@ namespace FeatureFlowFramework.Helper
                 {
                     mre.Set();
                     int numContinuations = continuationDataStore.Count;
-                    if (numContinuations == 0) return;
-                    for (int i = 0; i < numContinuations; i++)
+                    if(numContinuations == 0) return;
+                    for(int i = 0; i < numContinuations; i++)
                     {
                         InvokeContinuation(continuationDataStore[i]);
                     }
                     continuationDataStore.Clear();
                 }
-
-            }                        
+            }
         }
 
         public bool IsSet => mre.IsSet;
@@ -53,7 +51,7 @@ namespace FeatureFlowFramework.Helper
                     Interlocked.CompareExchange(ref currentToken, nextToken, token);
                 }
 
-                mre.Reset();                
+                mre.Reset();
             }
         }
 
@@ -74,10 +72,10 @@ namespace FeatureFlowFramework.Helper
         }
 
         public void GetResult(short token)
-        {            
+        {
         }
 
-        struct ContinuationData
+        private struct ContinuationData
         {
             public Action<object> continuation;
             public object state;
@@ -127,7 +125,7 @@ namespace FeatureFlowFramework.Helper
         private void InvokeContinuation(ContinuationData data)
         {
             if(data.continuation == null) return;
-                
+
             if(data.scheduler != null)
             {
                 if(data.scheduler is SynchronizationContext sc)
@@ -151,6 +149,5 @@ namespace FeatureFlowFramework.Helper
                 //ThreadPool.QueueUserWorkItem(data.continuation(s), data.state, preferLocal: true);
             }
         }
-
     }
 }

@@ -1,17 +1,14 @@
 ﻿using FeatureFlowFramework.Helper;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
     public class QueuingRpcCallee : RpcCallee
     {
-        QueueReceiver<object> queue = new QueueReceiver<object>();
+        private QueueReceiver<object> queue = new QueueReceiver<object>();
 
         public override void Post<M>(in M message)
         {
-            if (message is IRpcRequest || message is string)
+            if(message is IRpcRequest || message is string)
             {
                 queue.Post(message);
             }

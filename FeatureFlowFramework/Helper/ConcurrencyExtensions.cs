@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.Helper
     {
         public static int LockedCount<T>(this ICollection<T> collection)
         {
-            lock (collection)
+            lock(collection)
             {
                 return collection.Count;
             }

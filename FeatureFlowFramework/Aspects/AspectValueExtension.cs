@@ -8,8 +8,8 @@ namespace FeatureFlowFramework.Aspects
         {
             var data = obj.GetAspectData();
             Predicate<IAspectValueContainer> predicate = null;
-            if (collectionName != null) predicate = kv => kv.CollectionName == collectionName;
-            if (data.TryGetAspectInterface(out IAspectValueContainer keyValue, predicate))
+            if(collectionName != null) predicate = kv => kv.CollectionName == collectionName;
+            if(data.TryGetAspectInterface(out IAspectValueContainer keyValue, predicate))
             {
                 keyValue.Set(key, value);
             }
@@ -26,8 +26,8 @@ namespace FeatureFlowFramework.Aspects
         {
             var data = obj.GetAspectData();
             Predicate<IAspectValueContainer> predicate = null;
-            if (collectionName != null) predicate = kv => kv.CollectionName == collectionName;
-            if (data.TryGetAspectInterface(out IAspectValueContainer keyValue, predicate))
+            if(collectionName != null) predicate = kv => kv.CollectionName == collectionName;
+            if(data.TryGetAspectInterface(out IAspectValueContainer keyValue, predicate))
             {
                 return keyValue.TryGet(key, out value);
             }

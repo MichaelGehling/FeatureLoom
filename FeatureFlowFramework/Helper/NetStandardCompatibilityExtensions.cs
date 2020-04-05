@@ -7,7 +7,7 @@ namespace FeatureFlowFramework.Helper
         // Available since .Net Standard 2.1
         public static bool TryAdd<K, V>(this Dictionary<K, V> dict, K key, V value)
         {
-            if (!dict.ContainsKey(key))
+            if(!dict.ContainsKey(key))
             {
                 dict.Add(key, value);
                 return true;
@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.Helper
         // Available since .Net Standard 2.1
         public static bool TryDequeue<T>(this Queue<T> queue, out T item)
         {
-            if (queue.Count > 0)
+            if(queue.Count > 0)
             {
                 item = queue.Dequeue();
                 return true;

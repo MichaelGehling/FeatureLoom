@@ -1,16 +1,13 @@
 ﻿using FeatureFlowFramework.Helper;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
     public class BufferingForwarder<T> : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
-        DataFlowSourceHelper sourceHelper;
-        CountingRingBuffer<T> buffer;
-        FeatureLock bufferLock = new FeatureLock();
+        private DataFlowSourceHelper sourceHelper;
+        private CountingRingBuffer<T> buffer;
+        private FeatureLock bufferLock = new FeatureLock();
 
         public BufferingForwarder(int bufferSize)
         {
@@ -18,17 +15,16 @@ namespace FeatureFlowFramework.DataFlows
             buffer = new CountingRingBuffer<T>(bufferSize);
         }
 
-        void OnConnection(IDataFlowSink sink)
+        private void OnConnection(IDataFlowSink sink)
         {
             using(bufferLock.ForReading())
             {
                 var bufferedMessages = buffer.GetAvailableSince(0, out long missed);
                 foreach(var msg in bufferedMessages)
                 {
-                    sink.Post(msg);                        
+                    sink.Post(msg);
                 }
             }
-            
         }
 
         public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;

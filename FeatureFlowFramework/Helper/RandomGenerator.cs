@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.Helper
 
         public static int Int32()
         {
-            using (myLock.ForWriting())
+            using(myLock.ForWriting())
             {
                 return rnd.Next();
             }
@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.Helper
 
         public static int Int32(int min, int max)
         {
-            using (myLock.ForWriting())
+            using(myLock.ForWriting())
             {
                 return rnd.Next(min, max);
             }
@@ -25,15 +25,15 @@ namespace FeatureFlowFramework.Helper
 
         public static long Int64()
         {
-            using (myLock.ForWriting())
+            using(myLock.ForWriting())
             {
                 return (long)(rnd.NextDouble() * long.MaxValue);
-            }            
+            }
         }
 
         public static double Double()
         {
-            using (myLock.ForWriting())
+            using(myLock.ForWriting())
             {
                 return rnd.NextDouble();
             }

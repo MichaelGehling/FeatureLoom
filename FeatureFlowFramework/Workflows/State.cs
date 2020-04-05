@@ -23,7 +23,7 @@ namespace FeatureFlowFramework.Workflows
         public IInitialStateBuilder<CT> Build(string description = "")
         {
             var builder = parentStateMachine.BuildState(this, description) as StateBuilder<CT>;
-            if (builder.state != this)
+            if(builder.state != this)
             {
                 Log.ERROR(parentStateMachine, $"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
                 throw new Exception($"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");

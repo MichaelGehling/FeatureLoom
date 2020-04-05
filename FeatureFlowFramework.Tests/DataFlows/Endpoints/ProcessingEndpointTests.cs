@@ -1,6 +1,4 @@
 ﻿using FeatureFlowFramework.Helper;
-using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -20,22 +18,23 @@ namespace FeatureFlowFramework.DataFlows
             Assert.True(processed);
         }
 
-        volatile object locker = new object();
+        private readonly object locker = new object();
+
         [Fact]
         public void CanLockObjectBeforeProcessing()
-        {            
+        {
             bool processed = false;
             var sender = new Sender();
-            var processor = new ProcessingEndpoint<bool>(async msg => 
+            var processor = new ProcessingEndpoint<bool>(async msg =>
             {
                 await Task.Delay(50.Milliseconds());
-                processed = msg;                       
+                processed = msg;
             }, locker);
             sender.ConnectTo(processor);
 
             var processingTask = sender.SendAsync(true);
             var assertionTask = Task.Run(() =>
-            {                
+            {
                 try
                 {
                     Monitor.Enter(locker);

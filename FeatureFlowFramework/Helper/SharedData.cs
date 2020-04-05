@@ -1,16 +1,14 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace FeatureFlowFramework.Helper
 {
     public class SharedData<T> : ISharedData
     {
-        FeatureLock myLock = new FeatureLock();
-        T value;
-        Sender updateSender;
-        string name;
+        private FeatureLock myLock = new FeatureLock();
+        private T value;
+        private Sender updateSender;
+        private readonly string name;
 
         public SharedData(T value, string name = null)
         {
@@ -22,7 +20,7 @@ namespace FeatureFlowFramework.Helper
         {
             get
             {
-                if (updateSender == null) updateSender = new Sender();
+                if(updateSender == null) updateSender = new Sender();
                 return updateSender;
             }
         }
@@ -31,30 +29,31 @@ namespace FeatureFlowFramework.Helper
 
         public Type ValueType => value?.GetType() ?? typeof(T);
 
-        void PublishUpdate(long updateOriginatorId)
+        private void PublishUpdate(long updateOriginatorId)
         {
             updateSender?.Send(new SharedDataUpdateNotification(this, updateOriginatorId));
-        }        
+        }
 
         public WriteAccess GetWriteAccess(long updateOriginatorId = -1) => new WriteAccess(myLock.ForWriting(), this, updateOriginatorId);
+
         public ReadAccess GetReadAccess() => new ReadAccess(myLock.ForReading(), this);
 
         public void WithWriteAccess(Action<WriteAccess> writeAction, long updateOriginatorId = -1)
         {
-            using (var writer = this.GetWriteAccess(updateOriginatorId)) writeAction(writer);
+            using(var writer = this.GetWriteAccess(updateOriginatorId)) writeAction(writer);
         }
 
         public void WithReadAccess(Action<ReadAccess> readAction)
         {
-            using (var reader = this.GetReadAccess()) readAction(reader);
-        }        
+            using(var reader = this.GetReadAccess()) readAction(reader);
+        }
 
         public struct WriteAccess : IDisposable
         {
-            FeatureLock.WriteLock myLock;
-            SharedData<T> shared;
-            bool publish;
-            long updateOriginatorId;
+            private FeatureLock.WriteLock myLock;
+            private SharedData<T> shared;
+            private bool publish;
+            private readonly long updateOriginatorId;
 
             public T Value
             {
@@ -63,6 +62,7 @@ namespace FeatureFlowFramework.Helper
             }
 
             public void SetValue(T newValue) => shared.value = newValue;
+
             public void SuppressPublishUpdate() => publish = false;
 
             public WriteAccess(FeatureLock.WriteLock myLock, SharedData<T> shared, long updateOriginatorId)
@@ -71,20 +71,20 @@ namespace FeatureFlowFramework.Helper
                 this.shared = shared;
                 this.publish = true;
                 this.updateOriginatorId = updateOriginatorId;
-            }            
+            }
 
             public void Dispose()
             {
                 myLock.Dispose();
-                if (publish) shared?.PublishUpdate(updateOriginatorId);
+                if(publish) shared?.PublishUpdate(updateOriginatorId);
                 shared = null;
             }
         }
 
         public struct ReadAccess : IDisposable
         {
-            FeatureLock.ReadLock myLock;
-            SharedData<T> shared;
+            private FeatureLock.ReadLock myLock;
+            private SharedData<T> shared;
 
             public T Value
             {
@@ -102,7 +102,7 @@ namespace FeatureFlowFramework.Helper
                 myLock.Dispose();
                 shared = null;
             }
-        }                
+        }
     }
 
     public interface ISharedData

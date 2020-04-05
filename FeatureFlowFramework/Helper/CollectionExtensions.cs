@@ -8,9 +8,9 @@ namespace FeatureFlowFramework.Helper
         public static int RemoveWhere<T>(this IList<T> list, Predicate<T> predicate)
         {
             int numRemoved = 0;
-            for (int i = list.Count - 1; i >= 0; i--)
+            for(int i = list.Count - 1; i >= 0; i--)
             {
-                if (predicate(list[i]))
+                if(predicate(list[i]))
                 {
                     list.RemoveAt(i);
                     numRemoved++;

@@ -13,9 +13,9 @@ namespace FeatureFlowFramework.Workflows
                 AddToRunningWorkflows(workflow);
                 try
                 {
-                    while (workflow.ExecuteNextStep(executionController)) ;
+                    while(workflow.ExecuteNextStep(executionController)) ;
                 }
-                catch (Exception e)
+                catch(Exception e)
                 {
                     Log.ERROR(this, $"Workflow failed! ({workflow.Name})", e.ToString());
                 }

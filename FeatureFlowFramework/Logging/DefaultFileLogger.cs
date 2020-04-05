@@ -2,11 +2,9 @@
 using FeatureFlowFramework.DataStorage;
 using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Workflows;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Logging
@@ -82,24 +80,24 @@ namespace FeatureFlowFramework.Logging
 
         private async Task WriteToLogFileAsync()
         {
-            if (receiver.IsEmpty) return;
+            if(receiver.IsEmpty) return;
 
             bool updateCreationTime = false;
             var logFileInfo = new FileInfo(config.logFilePath);
-            if (!logFileInfo.Exists) updateCreationTime = true;
+            if(!logFileInfo.Exists) updateCreationTime = true;
 
-            using (FileStream stream = File.Open(config.logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-            using (StreamWriter writer = new StreamWriter(stream))
+            using(FileStream stream = File.Open(config.logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            using(StreamWriter writer = new StreamWriter(stream))
             {
-                if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
-                if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").Print(config.logFileLogFormat));
+                if(updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
+                if(receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").Print(config.logFileLogFormat));
 
                 var messages = receiver.ReceiveAll();
-                foreach (var msg in messages)
+                foreach(var msg in messages)
                 {
-                    if (msg is LogMessage logMsg)
+                    if(msg is LogMessage logMsg)
                     {
-                        if (logMsg.level <= config.logFileLoglevel)
+                        if(logMsg.level <= config.logFileLoglevel)
                         {
                             await writer.WriteLineAsync(logMsg.Print(config.logFileLogFormat));
                         }
@@ -114,23 +112,23 @@ namespace FeatureFlowFramework.Logging
         {
             var logFileInfo = new FileInfo(config.logFilePath);
             logFileInfo.Refresh();
-            if (!logFileInfo.Exists) return;
-            
-            using (var fileStream = new FileStream(config.archiveFilePath, FileMode.OpenOrCreate))
+            if(!logFileInfo.Exists) return;
+
+            using(var fileStream = new FileStream(config.archiveFilePath, FileMode.OpenOrCreate))
             {
-                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                using(var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
                 {
                     archive.CreateEntryFromFile(config.logFilePath, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
                 }
 
-                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                using(var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
                 {
                     List<ZipArchiveEntry> entries = new List<ZipArchiveEntry>(archive.Entries);
                     entries.Sort(nameComparer);
                     long overallLength = 0;
-                    foreach (var entry in entries)
+                    foreach(var entry in entries)
                     {
-                        if (overallLength > config.logFilesArchiveLimitInMB * 1024 * 1024)
+                        if(overallLength > config.logFilesArchiveLimitInMB * 1024 * 1024)
                         {
                             entry.Delete();
                         }

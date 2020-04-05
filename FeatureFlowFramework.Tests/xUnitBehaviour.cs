@@ -2,6 +2,6 @@
 
 [assembly: CollectionBehavior
     (
-        DisableTestParallelization = true, 
+        DisableTestParallelization = true,
         MaxParallelThreads = 1
     )]

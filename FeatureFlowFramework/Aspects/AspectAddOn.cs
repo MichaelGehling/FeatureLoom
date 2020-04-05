@@ -8,7 +8,7 @@ namespace FeatureFlowFramework.Aspects
 
         internal void SetObjectRef(WeakReference<object> objectRef)
         {
-            if (this.objectRef == null) this.objectRef = objectRef;
+            if(this.objectRef == null) this.objectRef = objectRef;
             else throw new Exception("The objectRef of an AspectExtension is not allowed to be changed!");
         }
 

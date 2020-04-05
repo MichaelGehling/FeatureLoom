@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         public void Post<M>(in M message)
         {
-            if (message is T msgT)
+            if(message is T msgT)
             {
                 receivedMessage = msgT;
                 received = true;
@@ -21,7 +21,7 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         public Task PostAsync<M>(M message)
         {
-            if (message is T msgT)
+            if(message is T msgT)
             {
                 receivedMessage = msgT;
                 received = true;

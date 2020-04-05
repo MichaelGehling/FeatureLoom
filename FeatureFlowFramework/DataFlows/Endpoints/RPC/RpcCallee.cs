@@ -7,11 +7,11 @@ namespace FeatureFlowFramework.DataFlows.RPC
     public partial class RpcCallee : IDataFlowSink, IDataFlowSource, IReplier
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
-        private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();        
+        private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();
 
         private void AddRpcRequestHandler(IRpcRequestHandler handler)
         {
-            lock (requestHandlers)
+            lock(requestHandlers)
             {
                 var newRequestHandlers = new List<IRpcRequestHandler>(requestHandlers);
                 handler.SetTarget(this.sourceHelper);
@@ -22,19 +22,19 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public virtual void Post<M>(in M message)
         {
-            if (message is IRpcRequest || message is string)
+            if(message is IRpcRequest || message is string)
             {
                 bool handled = false;
-                for (int i = 0; i < requestHandlers.Count; i++)
+                for(int i = 0; i < requestHandlers.Count; i++)
                 {
-                    if (requestHandlers[i].Handle(message))
+                    if(requestHandlers[i].Handle(message))
                     {
                         handled = true;
                         break;
                     }
                 }
 
-                if (!handled && message is IRpcRequest request) sourceHelper.Forward(new RpcErrorResponse(request.RequestId, $"No matching method registered for {request.Method}"));
+                if(!handled && message is IRpcRequest request) sourceHelper.Forward(new RpcErrorResponse(request.RequestId, $"No matching method registered for {request.Method}"));
             }
         }
 

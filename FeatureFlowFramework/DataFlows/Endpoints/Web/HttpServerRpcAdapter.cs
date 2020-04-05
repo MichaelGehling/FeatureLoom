@@ -10,10 +10,10 @@ namespace FeatureFlowFramework.DataFlows.Web
 {
     public class HttpServerRpcAdapter : IWebRequestHandler, IRequester
     {
-        StringRpcCaller rpcCaller;
+        private StringRpcCaller rpcCaller;
         private readonly string route;
         private readonly IWebServer webServer;
-        TimeSpan rpcTimeout;
+        private readonly TimeSpan rpcTimeout;
 
         public HttpServerRpcAdapter(string route, TimeSpan rpcTimeout, IWebServer webServer = null)
         {
@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.DataFlows.Web
 
         public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (!request.IsPost)
+            if(!request.IsPost)
             {
                 response.StatusCode = HttpStatusCode.MethodNotAllowed;
                 await response.WriteAsync("Use 'POST' to send request messages!");
@@ -40,8 +40,8 @@ namespace FeatureFlowFramework.DataFlows.Web
             try
             {
                 int timeout = Timeout.Infinite;
-                if (request.TryGetQueryItem("timeout", out string timeoutStr)) int.TryParse(timeoutStr, out timeout);
-                
+                if(request.TryGetQueryItem("timeout", out string timeoutStr)) int.TryParse(timeoutStr, out timeout);
+
                 string rpcRequest = await request.ReadAsync();
                 rpcRequest = rpcRequest.Trim();
                 string rpcResponse = await rpcCaller.CallAsync(rpcRequest);
@@ -52,7 +52,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                 response.StatusCode = HttpStatusCode.RequestTimeout;
                 Log.WARNING(this, "Web RPC request timed out", cancelException.ToString());
             }
-                 
+
             catch(Exception e)
             {
                 Log.ERROR(this, $"Failed while building response! Route:{route}", e.ToString());

@@ -7,7 +7,7 @@ namespace FeatureFlowFramework.DataFlows.Test
     public class DelayingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
         private DataFlowSourceHelper helper = new DataFlowSourceHelper();
-        private TimeSpan delay;
+        private readonly TimeSpan delay;
 
         public DelayingForwarder(TimeSpan delay)
         {

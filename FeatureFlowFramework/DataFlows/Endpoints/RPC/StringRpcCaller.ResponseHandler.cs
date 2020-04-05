@@ -32,7 +32,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
             public bool Handle<M>(in M message)
             {
-                if (message is IRpcResponse myResponse && myResponse.RequestId == this.requestId)
+                if(message is IRpcResponse myResponse && myResponse.RequestId == this.requestId)
                 {
                     taskCompletionSource.SetResult(myResponse.ResultToJson().Trim('"'.ToSingleEntryArray()));
                     return true;

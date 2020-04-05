@@ -11,11 +11,11 @@ namespace FeatureFlowFramework.Helper
 
         public TimeFrame(TimeSpan duration) : this()
         {
-            if (duration != default)
+            if(duration != default)
             {
                 this.utcStartTime = AppTime.Now;
                 this.utcEndTime = duration > TimeSpan.Zero ? utcStartTime + duration : utcStartTime;
-            }            
+            }
         }
 
         public TimeFrame(DateTime startTime, DateTime endTime)
@@ -32,6 +32,7 @@ namespace FeatureFlowFramework.Helper
             this.utcStartTime = startTime;
             this.utcEndTime = duration > TimeSpan.Zero ? startTime + duration : startTime;
         }
+
         public bool IsInvalid => utcStartTime == default;
         public bool Elapsed => IsZero ? true : AppTime.Now > utcEndTime;
         public TimeSpan Remaining => IsInvalid ? TimeSpan.Zero : utcEndTime - AppTime.Now;
@@ -47,7 +48,7 @@ namespace FeatureFlowFramework.Helper
         public bool Overlaps(TimeFrame otherTimeFrame) => IsInvalid ? false : (utcStartTime >= otherTimeFrame.utcStartTime && utcStartTime < otherTimeFrame.utcEndTime) || (utcEndTime <= otherTimeFrame.utcEndTime && utcEndTime > otherTimeFrame.utcStartTime);
 
         public Task WaitForStartAsync()
-        {            
+        {
             return Task.Delay(TimeUntilStart.ClampLow(TimeSpan.Zero));
         }
 

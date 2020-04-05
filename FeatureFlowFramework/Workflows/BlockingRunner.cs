@@ -1,7 +1,4 @@
-﻿using FeatureFlowFramework.Logging;
-using System;
-
-namespace FeatureFlowFramework.Workflows
+﻿namespace FeatureFlowFramework.Workflows
 {
     public class BlockingRunner : AbstractRunner
     {
@@ -10,7 +7,7 @@ namespace FeatureFlowFramework.Workflows
             AddToRunningWorkflows(workflow);
             try
             {
-                while (workflow.ExecuteNextStep(executionController)) ;
+                while(workflow.ExecuteNextStep(executionController)) ;
             }
             finally
             {

@@ -19,7 +19,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             get
             {
-                if (alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
+                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
                 return alternativeSendingHelper;
             }
         }
@@ -28,44 +28,44 @@ namespace FeatureFlowFramework.DataFlows
         {
             var options = this.options;
             bool success = false;
-            if (options != null)
+            if(options != null)
             {
-                foreach (var option in options)
+                foreach(var option in options)
                 {
-                    if (message is T msgT && option.predicate(msgT))
+                    if(message is T msgT && option.predicate(msgT))
                     {
                         option.sender.Forward(message);
                         success = true;
                     }
-                    if (!multiMatch && success) return;
+                    if(!multiMatch && success) return;
                 }
             }
-            if (!success) alternativeSendingHelper?.Forward(message);
+            if(!success) alternativeSendingHelper?.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
         {
             var options = this.options;
             bool success = false;
-            if (options != null)
+            if(options != null)
             {
                 Task[] tasks = null;
-                if (multiMatch) tasks = new Task[options.Count];
+                if(multiMatch) tasks = new Task[options.Count];
                 int i = 0;
-                foreach (var option in options)
+                foreach(var option in options)
                 {
-                    if (message is T msgT && option.predicate(msgT))
+                    if(message is T msgT && option.predicate(msgT))
                     {
                         Task task = option.sender.ForwardAsync(message);
                         success = true;
-                        if (!multiMatch && success) return task;
-                        else if (multiMatch) tasks[i++] = task;
+                        if(!multiMatch && success) return task;
+                        else if(multiMatch) tasks[i++] = task;
                     }
-                    else if (multiMatch) tasks[i++] = Task.CompletedTask;
+                    else if(multiMatch) tasks[i++] = Task.CompletedTask;
                 }
-                if (multiMatch) return Task.WhenAll(tasks);
+                if(multiMatch) return Task.WhenAll(tasks);
             }
-            if (!success) return alternativeSendingHelper?.ForwardAsync(message);
+            if(!success) return alternativeSendingHelper?.ForwardAsync(message);
             else return Task.CompletedTask;
         }
 
@@ -77,11 +77,11 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSource InsertOptionAt(Func<T, bool> predicate, int index)
         {
             (Func<T, bool> predicate, DataFlowSourceHelper sender) newOption = (predicate, new DataFlowSourceHelper());
-            lock (this)
+            lock(this)
             {
                 var newOptions = new List<(Func<T, bool> predicate, DataFlowSourceHelper sender)>();
-                if (options != null) newOptions.AddRange(options);
-                if (index <= newOptions.Count) newOptions.Insert(index, newOption);
+                if(options != null) newOptions.AddRange(options);
+                if(index <= newOptions.Count) newOptions.Insert(index, newOption);
                 else newOptions.Add(newOption);
                 options = newOptions;
             }
@@ -92,7 +92,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             get
             {
-                if (options != null) return options.Count;
+                if(options != null) return options.Count;
                 else return 0;
             }
         }
@@ -101,7 +101,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public IDataFlowSource GetOptionAt(int index)
         {
-            if (options != null && options.Count > index)
+            if(options != null && options.Count > index)
             {
                 return options[index].sender;
             }
@@ -110,17 +110,17 @@ namespace FeatureFlowFramework.DataFlows
 
         public bool RemoveOptionAt(int index)
         {
-            lock (this)
+            lock(this)
             {
-                if (options.Count == 1 && index == 0)
+                if(options.Count == 1 && index == 0)
                 {
                     options = null;
                     return true;
                 }
-                else if (options.Count > index)
+                else if(options.Count > index)
                 {
                     var newOptions = new List<(Func<T, bool> predicate, DataFlowSourceHelper sender)>();
-                    if (options != null) newOptions.AddRange(options);
+                    if(options != null) newOptions.AddRange(options);
                     newOptions.RemoveAt(index);
                     options = newOptions;
                     return true;
@@ -131,7 +131,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void ClearOptions()
         {
-            lock (this)
+            lock(this)
             {
                 options = null;
             }

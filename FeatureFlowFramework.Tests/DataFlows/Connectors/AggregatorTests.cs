@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows
 
             public (bool ready, object msg, bool enumerate) TryCreateOutputMessage()
             {
-                if (firstName != null && lastName != null)
+                if(firstName != null && lastName != null)
                 {
                     var result = (true, firstName + " " + lastName, false);
                     firstName = null;
@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.DataFlows
 
             public (bool ready, object msg, bool enumerate) TryCreateOutputMessage()
             {
-                if (firstName != null && lastName != null)
+                if(firstName != null && lastName != null)
                 {
                     List<string> multipleResultMessages = new List<string>();
                     multipleResultMessages.Add(firstName + " " + lastName);
@@ -52,8 +52,8 @@ namespace FeatureFlowFramework.DataFlows
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), FullNameAggrergationData>((msg, aggregation) =>
             {
-                if (msg.key == "firstName") aggregation.firstName = msg.val;
-                else if (msg.key == "lastName") aggregation.lastName = msg.val;
+                if(msg.key == "firstName") aggregation.firstName = msg.val;
+                else if(msg.key == "lastName") aggregation.lastName = msg.val;
                 else return false;
 
                 return true;
@@ -86,8 +86,8 @@ namespace FeatureFlowFramework.DataFlows
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), FullNameAggrergationData>((msg, aggregation) =>
             {
-                if (msg.key == "firstName") aggregation.firstName = msg.val;
-                else if (msg.key == "lastName") aggregation.lastName = msg.val;
+                if(msg.key == "firstName") aggregation.firstName = msg.val;
+                else if(msg.key == "lastName") aggregation.lastName = msg.val;
                 else return false;
 
                 return true;
@@ -107,8 +107,8 @@ namespace FeatureFlowFramework.DataFlows
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), VariantNameAggrergationData>((msg, aggregation) =>
             {
-                if (msg.key == "firstName") aggregation.firstName = msg.val;
-                else if (msg.key == "lastName") aggregation.lastName = msg.val;
+                if(msg.key == "firstName") aggregation.firstName = msg.val;
+                else if(msg.key == "lastName") aggregation.lastName = msg.val;
                 else return false;
 
                 return true;

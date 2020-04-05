@@ -36,17 +36,17 @@ namespace FeatureFlowFramework.DataStorage
 
         private void InitWatchers(bool reset = false)
         {
-            if (createDirectoriesIfNotExisting) Directory.CreateDirectory(path);
+            if(createDirectoriesIfNotExisting) Directory.CreateDirectory(path);
 
-            if (reset)
+            if(reset)
             {
-                if (fileWatcher != null)
+                if(fileWatcher != null)
                 {
                     fileWatcher.Dispose();
                     fileWatcher = null;
                 }
 
-                if (dirWatcher != null)
+                if(dirWatcher != null)
                 {
                     dirWatcher.Dispose();
                     dirWatcher = null;

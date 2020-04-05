@@ -1,6 +1,5 @@
 ﻿namespace FeatureFlowFramework.Workflows
 {
-
     public abstract partial class Workflow
     {
         public class ExecutionEventList

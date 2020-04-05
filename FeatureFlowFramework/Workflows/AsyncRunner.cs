@@ -1,6 +1,4 @@
-﻿using FeatureFlowFramework.Logging;
-using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
@@ -11,7 +9,7 @@ namespace FeatureFlowFramework.Workflows
             AddToRunningWorkflows(workflow);
             try
             {
-                while (await workflow.ExecuteNextStepAsync(executionController)) ;
+                while(await workflow.ExecuteNextStepAsync(executionController)) ;
             }
             finally
             {

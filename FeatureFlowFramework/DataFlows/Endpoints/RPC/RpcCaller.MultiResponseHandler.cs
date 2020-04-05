@@ -1,12 +1,10 @@
 ﻿using FeatureFlowFramework.Helper;
 using System;
-using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {
     public partial class RpcCaller
     {
-
         private class MultiResponseHandler<R> : IResponseHandler
         {
             private readonly long requestId;
@@ -24,7 +22,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
             public bool Handle<M>(in M message)
             {
-                if (message is RpcResponse<R> myResponse && myResponse.RequestId == this.requestId)
+                if(message is RpcResponse<R> myResponse && myResponse.RequestId == this.requestId)
                 {
                     sink.Post(myResponse.Result);
                 }

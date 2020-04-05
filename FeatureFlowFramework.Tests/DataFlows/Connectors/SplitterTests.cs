@@ -1,13 +1,9 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helper;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Xunit;
+﻿using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
     public class SplitterTests
-    {        
+    {
         [Fact]
         public void CanSplitMessageIntoMultiple()
         {

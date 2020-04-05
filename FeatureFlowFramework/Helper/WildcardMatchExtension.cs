@@ -43,7 +43,7 @@ namespace FeatureFlowFramework.Helper
             int reversedWordIndex = 0;
             List<char[]> reversedPatterns = new List<char[]>();
 
-            if (text == null || wildcardString == null)
+            if(text == null || wildcardString == null)
             {
                 return false;
             }
@@ -52,39 +52,39 @@ namespace FeatureFlowFramework.Helper
             filter = wildcardString.ToCharArray();
 
             //Set which case will be used (0 = no wildcards, 1 = only ?, 2 = only *, 3 = both ? and *
-            for (int i = 0; i < filter.Length; i++)
+            for(int i = 0; i < filter.Length; i++)
             {
-                if (filter[i] == '?')
+                if(filter[i] == '?')
                 {
                     matchCase += 1;
                     break;
                 }
             }
 
-            for (int i = 0; i < filter.Length; i++)
+            for(int i = 0; i < filter.Length; i++)
             {
-                if (filter[i] == '*')
+                if(filter[i] == '*')
                 {
                     matchCase += 2;
                     break;
                 }
             }
 
-            if ((matchCase == 0 || matchCase == 1) && word.Length != filter.Length)
+            if((matchCase == 0 || matchCase == 1) && word.Length != filter.Length)
             {
                 return false;
             }
 
-            switch (matchCase)
+            switch(matchCase)
             {
                 case 0:
                     isLike = (text == wildcardString);
                     break;
 
                 case 1:
-                    for (int i = 0; i < text.Length; i++)
+                    for(int i = 0; i < text.Length; i++)
                     {
-                        if ((word[i] != filter[i]) && filter[i] != '?')
+                        if((word[i] != filter[i]) && filter[i] != '?')
                         {
                             isLike = false;
                         }
@@ -93,11 +93,11 @@ namespace FeatureFlowFramework.Helper
 
                 case 2:
                     //Search for matches until first *
-                    for (int i = 0; i < filter.Length; i++)
+                    for(int i = 0; i < filter.Length; i++)
                     {
-                        if (filter[i] != '*')
+                        if(filter[i] != '*')
                         {
-                            if (filter[i] != word[i])
+                            if(filter[i] != word[i])
                             {
                                 return false;
                             }
@@ -109,11 +109,11 @@ namespace FeatureFlowFramework.Helper
                         }
                     }
                     //Search Tail for matches until first *
-                    for (int i = 0; i < filter.Length; i++)
+                    for(int i = 0; i < filter.Length; i++)
                     {
-                        if (filter[filter.Length - 1 - i] != '*')
+                        if(filter[filter.Length - 1 - i] != '*')
                         {
-                            if (filter[filter.Length - 1 - i] != word[word.Length - 1 - i])
+                            if(filter[filter.Length - 1 - i] != word[word.Length - 1 - i])
                             {
                                 return false;
                             }
@@ -129,24 +129,24 @@ namespace FeatureFlowFramework.Helper
                     reversedWord = new char[word.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
                     reversedFilter = new char[filter.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
 
-                    for (int i = 0; i < reversedWord.Length; i++)
+                    for(int i = 0; i < reversedWord.Length; i++)
                     {
                         reversedWord[i] = word[word.Length - (i + 1) - lastCheckedTailIndex];
                     }
-                    for (int i = 0; i < reversedFilter.Length; i++)
+                    for(int i = 0; i < reversedFilter.Length; i++)
                     {
                         reversedFilter[i] = filter[filter.Length - (i + 1) - lastCheckedTailIndex];
                     }
 
                     //Cut up the filter into seperate patterns, exclude * as they are not longer needed
-                    for (int i = 0; i < reversedFilter.Length; i++)
+                    for(int i = 0; i < reversedFilter.Length; i++)
                     {
-                        if (reversedFilter[i] == '*')
+                        if(reversedFilter[i] == '*')
                         {
-                            if (i - currentPatternStartIndex > 0)
+                            if(i - currentPatternStartIndex > 0)
                             {
                                 char[] pattern = new char[i - currentPatternStartIndex];
-                                for (int j = 0; j < pattern.Length; j++)
+                                for(int j = 0; j < pattern.Length; j++)
                                 {
                                     pattern[j] = reversedFilter[currentPatternStartIndex + j];
                                 }
@@ -157,23 +157,23 @@ namespace FeatureFlowFramework.Helper
                     }
 
                     //Search for the patterns
-                    for (int i = 0; i < reversedPatterns.Count; i++)
+                    for(int i = 0; i < reversedPatterns.Count; i++)
                     {
-                        for (int j = 0; j < reversedPatterns[i].Length; j++)
+                        for(int j = 0; j < reversedPatterns[i].Length; j++)
                         {
-                            if ((reversedPatterns[i].Length - 1 - j) > (reversedWord.Length - 1 - reversedWordIndex))
+                            if((reversedPatterns[i].Length - 1 - j) > (reversedWord.Length - 1 - reversedWordIndex))
                             {
                                 return false;
                             }
 
-                            if (reversedPatterns[i][j] != reversedWord[reversedWordIndex + j])
+                            if(reversedPatterns[i][j] != reversedWord[reversedWordIndex + j])
                             {
                                 reversedWordIndex += 1;
                                 j = -1;
                             }
                             else
                             {
-                                if (j == reversedPatterns[i].Length - 1)
+                                if(j == reversedPatterns[i].Length - 1)
                                 {
                                     reversedWordIndex = reversedWordIndex + reversedPatterns[i].Length;
                                 }
@@ -185,11 +185,11 @@ namespace FeatureFlowFramework.Helper
                 case 3:
                     //Same as Case 2 except ? is considered a match
                     //Search Head for matches util first *
-                    for (int i = 0; i < filter.Length; i++)
+                    for(int i = 0; i < filter.Length; i++)
                     {
-                        if (filter[i] != '*')
+                        if(filter[i] != '*')
                         {
-                            if (filter[i] != word[i] && filter[i] != '?')
+                            if(filter[i] != word[i] && filter[i] != '?')
                             {
                                 return false;
                             }
@@ -201,11 +201,11 @@ namespace FeatureFlowFramework.Helper
                         }
                     }
                     //Search Tail for matches until first *
-                    for (int i = 0; i < filter.Length; i++)
+                    for(int i = 0; i < filter.Length; i++)
                     {
-                        if (filter[filter.Length - 1 - i] != '*')
+                        if(filter[filter.Length - 1 - i] != '*')
                         {
-                            if (filter[filter.Length - 1 - i] != word[word.Length - 1 - i] && filter[filter.Length - 1 - i] != '?')
+                            if(filter[filter.Length - 1 - i] != word[word.Length - 1 - i] && filter[filter.Length - 1 - i] != '?')
                             {
                                 return false;
                             }
@@ -220,23 +220,23 @@ namespace FeatureFlowFramework.Helper
                     reversedWord = new char[word.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
                     reversedFilter = new char[filter.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
 
-                    for (int i = 0; i < reversedWord.Length; i++)
+                    for(int i = 0; i < reversedWord.Length; i++)
                     {
                         reversedWord[i] = word[word.Length - (i + 1) - lastCheckedTailIndex];
                     }
-                    for (int i = 0; i < reversedFilter.Length; i++)
+                    for(int i = 0; i < reversedFilter.Length; i++)
                     {
                         reversedFilter[i] = filter[filter.Length - (i + 1) - lastCheckedTailIndex];
                     }
 
-                    for (int i = 0; i < reversedFilter.Length; i++)
+                    for(int i = 0; i < reversedFilter.Length; i++)
                     {
-                        if (reversedFilter[i] == '*')
+                        if(reversedFilter[i] == '*')
                         {
-                            if (i - currentPatternStartIndex > 0)
+                            if(i - currentPatternStartIndex > 0)
                             {
                                 char[] pattern = new char[i - currentPatternStartIndex];
-                                for (int j = 0; j < pattern.Length; j++)
+                                for(int j = 0; j < pattern.Length; j++)
                                 {
                                     pattern[j] = reversedFilter[currentPatternStartIndex + j];
                                 }
@@ -247,23 +247,23 @@ namespace FeatureFlowFramework.Helper
                         }
                     }
                     //Search for the patterns
-                    for (int i = 0; i < reversedPatterns.Count; i++)
+                    for(int i = 0; i < reversedPatterns.Count; i++)
                     {
-                        for (int j = 0; j < reversedPatterns[i].Length; j++)
+                        for(int j = 0; j < reversedPatterns[i].Length; j++)
                         {
-                            if ((reversedPatterns[i].Length - 1 - j) > (reversedWord.Length - 1 - reversedWordIndex))
+                            if((reversedPatterns[i].Length - 1 - j) > (reversedWord.Length - 1 - reversedWordIndex))
                             {
                                 return false;
                             }
 
-                            if (reversedPatterns[i][j] != '?' && reversedPatterns[i][j] != reversedWord[reversedWordIndex + j])
+                            if(reversedPatterns[i][j] != '?' && reversedPatterns[i][j] != reversedWord[reversedWordIndex + j])
                             {
                                 reversedWordIndex += 1;
                                 j = -1;
                             }
                             else
                             {
-                                if (j == reversedPatterns[i].Length - 1)
+                                if(j == reversedPatterns[i].Length - 1)
                                 {
                                     reversedWordIndex = reversedWordIndex + reversedPatterns[i].Length;
                                 }
@@ -277,7 +277,7 @@ namespace FeatureFlowFramework.Helper
 
         public static bool MatchesWildcard(this string text, string wildcardString, bool ignoreCase)
         {
-            if (ignoreCase == true)
+            if(ignoreCase == true)
             {
                 return text.ToLower().MatchesWildcard(wildcardString.ToLower());
             }

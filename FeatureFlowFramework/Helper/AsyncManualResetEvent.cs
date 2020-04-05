@@ -7,9 +7,9 @@ namespace FeatureFlowFramework.Helper
 {
     public class AsyncManualResetEvent : IAsyncManualResetEvent
     {
-        volatile bool taskUsed = false;
-        volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-        ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
+        private volatile bool taskUsed = false;
+        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+        private ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
 
         public AsyncManualResetEvent()
         {
@@ -17,9 +17,9 @@ namespace FeatureFlowFramework.Helper
 
         public AsyncManualResetEvent(bool initialState)
         {
-            if (initialState) Set();
+            if(initialState) Set();
         }
-        
+
         public bool IsSet => mre.IsSet;
 
         public Task WaitingTask
@@ -40,10 +40,10 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync()
         {
-            if (mre.IsSet) return Task.FromResult(true);
+            if(mre.IsSet) return Task.FromResult(true);
             else
             {
-                taskUsed = true;                
+                taskUsed = true;
                 return tcs.Task.WaitAsync();
             }
         }
@@ -52,10 +52,10 @@ namespace FeatureFlowFramework.Helper
         public Task<bool> WaitAsync(TimeSpan timeout)
         {
             if(timeout <= TimeSpan.Zero) return Task.FromResult(false);
-            if (mre.IsSet) return Task.FromResult(true);
+            if(mre.IsSet) return Task.FromResult(true);
             else
             {
-                taskUsed = true;                
+                taskUsed = true;
                 return tcs.Task.WaitAsync(timeout);
             }
         }
@@ -64,10 +64,10 @@ namespace FeatureFlowFramework.Helper
         public Task<bool> WaitAsync(CancellationToken cancellationToken)
         {
             if(cancellationToken.IsCancellationRequested) return Task.FromResult(false);
-            if (mre.IsSet) return Task.FromResult(true);
+            if(mre.IsSet) return Task.FromResult(true);
             else
             {
-                taskUsed = true;                
+                taskUsed = true;
                 return tcs.Task.WaitAsync(cancellationToken);
             }
         }
@@ -77,7 +77,7 @@ namespace FeatureFlowFramework.Helper
         {
             if(timeout <= TimeSpan.Zero) return Task.FromResult(false);
             if(cancellationToken.IsCancellationRequested) return Task.FromResult(false);
-            if (mre.IsSet) return Task.FromResult(true);
+            if(mre.IsSet) return Task.FromResult(true);
             else
             {
                 taskUsed = true;
@@ -98,7 +98,7 @@ namespace FeatureFlowFramework.Helper
         {
             if(mre.IsSet) return true;
             if(timeout <= TimeSpan.Zero) return false;
-            return mre.Wait(timeout);            
+            return mre.Wait(timeout);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -125,7 +125,7 @@ namespace FeatureFlowFramework.Helper
             if(mre.IsSet) return false;
 
             mre.Set();
-            if (taskUsed)
+            if(taskUsed)
             {
                 tcs.TrySetResult(true);
             }
@@ -135,13 +135,13 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Reset()
         {
-            if (!mre.IsSet) return false;
+            if(!mre.IsSet) return false;
 
             mre.Reset();
             var oldTcs = this.tcs;
-            if (oldTcs.Task.IsCompleted)
-            {    
-                Interlocked.CompareExchange(ref this.tcs, new TaskCompletionSource<bool>(), oldTcs);                
+            if(oldTcs.Task.IsCompleted)
+            {
+                Interlocked.CompareExchange(ref this.tcs, new TaskCompletionSource<bool>(), oldTcs);
             }
             return true;
         }

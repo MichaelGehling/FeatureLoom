@@ -26,13 +26,13 @@ namespace FeatureFlowFramework.Helper
                     tcs);
                 result = await tcs.Task;
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 string s = e.ToString();
             }
             finally
             {
-                if (registeredHandle != null)
+                if(registeredHandle != null)
                     registeredHandle.Unregister(null);
                 tokenRegistration.Dispose();
             }
@@ -53,7 +53,7 @@ namespace FeatureFlowFramework.Helper
         {
             bool completed = true;
             Task[] tasks = new Task[handles.Length];
-            for (int i = 0; i < handles.Length; i++)
+            for(int i = 0; i < handles.Length; i++)
             {
                 tasks[i] = handles[i].WaitOneAsync(timeout, cancellationToken);
             }
@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.Helper
         {
             bool completed = true;
             Task[] tasks = new Task[handles.Length];
-            for (int i = 0; i < handles.Length; i++)
+            for(int i = 0; i < handles.Length; i++)
             {
                 tasks[i] = handles[i].WaitOneAsync(timeout, cancellationToken);
             }
@@ -78,7 +78,7 @@ namespace FeatureFlowFramework.Helper
         {
             bool completed = true;
             Task[] tasks = new Task[handles.Length];
-            for (int i = 0; i < handles.Length; i++)
+            for(int i = 0; i < handles.Length; i++)
             {
                 tasks[i] = handles[i].WaitOneAsync(cancellationToken);
             }
@@ -90,7 +90,7 @@ namespace FeatureFlowFramework.Helper
         {
             bool completed = true;
             Task[] tasks = new Task[handles.Length];
-            for (int i = 0; i < handles.Length; i++)
+            for(int i = 0; i < handles.Length; i++)
             {
                 tasks[i] = handles[i].WaitOneAsync(cancellationToken);
             }

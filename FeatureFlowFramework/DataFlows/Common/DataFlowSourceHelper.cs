@@ -19,9 +19,8 @@ namespace FeatureFlowFramework.DataFlows
         [JsonIgnore]
         volatile public List<WeakReference<IDataFlowSink>> sinks;
 
-        Action<IDataFlowSink> onConnection;
-        Action<IDataFlowSink> onDisconnection;
-
+        private readonly Action<IDataFlowSink> onConnection;
+        private readonly Action<IDataFlowSink> onDisconnection;
 
         public DataFlowSourceHelper(Action<IDataFlowSink> onConnection = null, Action<IDataFlowSink> onDisconnection = null)
         {
@@ -37,10 +36,10 @@ namespace FeatureFlowFramework.DataFlows
         {
             var currentSinks = this.sinks;
 
-            if (currentSinks == null || currentSinks.Count == 0) return Array.Empty<IDataFlowSink>();
-            else if (currentSinks.Count == 1)
+            if(currentSinks == null || currentSinks.Count == 0) return Array.Empty<IDataFlowSink>();
+            else if(currentSinks.Count == 1)
             {
-                if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
+                if(currentSinks[0].TryGetTarget(out IDataFlowSink target))
                 {
                     return new IDataFlowSink[] { target };
                 }
@@ -54,9 +53,9 @@ namespace FeatureFlowFramework.DataFlows
             {
                 List<IDataFlowSink> resultList = null;
                 int invalidReferences = 0;
-                for (int i = currentSinks.Count - 1; i >= 0; i--)
+                for(int i = currentSinks.Count - 1; i >= 0; i--)
                 {
-                    if (currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                    if(currentSinks[i].TryGetTarget(out IDataFlowSink target))
                     {
                         resultList = resultList ?? new List<IDataFlowSink>();
                         resultList.Add(target);
@@ -66,7 +65,7 @@ namespace FeatureFlowFramework.DataFlows
                         invalidReferences++;
                     }
                 }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
                 return resultList?.ToArray() ?? Array.Empty<IDataFlowSink>();
             }
         }
@@ -77,18 +76,18 @@ namespace FeatureFlowFramework.DataFlows
             {
                 var currentSinks = this.sinks;
 
-                if (currentSinks == null || currentSinks.Count == 0) return 0;
+                if(currentSinks == null || currentSinks.Count == 0) return 0;
                 else
                 {
                     int invalidReferences = 0;
-                    for (int i = currentSinks.Count - 1; i >= 0; i--)
+                    for(int i = currentSinks.Count - 1; i >= 0; i--)
                     {
-                        if (!currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                        if(!currentSinks[i].TryGetTarget(out IDataFlowSink target))
                         {
                             invalidReferences++;
                         }
                     }
-                    if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                    if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
                     return this.sinks.Count;
                 }
             }
@@ -96,14 +95,14 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Forward<M>(in M message)
         {
-            if (message == null || this.sinks == null) return;
+            if(message == null || this.sinks == null) return;
 
             var currentSinks = this.sinks;
 
-            if (currentSinks.Count == 0) return;
-            else if (currentSinks.Count == 1)
+            if(currentSinks.Count == 0) return;
+            else if(currentSinks.Count == 1)
             {
-                if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
+                if(currentSinks[0].TryGetTarget(out IDataFlowSink target))
                 {
                     target.Post(message);
                 }
@@ -115,9 +114,9 @@ namespace FeatureFlowFramework.DataFlows
             else
             {
                 int invalidReferences = 0;
-                for (int i = currentSinks.Count - 1; i >= 0; i--)
+                for(int i = currentSinks.Count - 1; i >= 0; i--)
                 {
-                    if (currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                    if(currentSinks[i].TryGetTarget(out IDataFlowSink target))
                     {
                         target.Post(message);
                     }
@@ -126,20 +125,20 @@ namespace FeatureFlowFramework.DataFlows
                         invalidReferences++;
                     }
                 }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
             }
         }
 
         public Task ForwardAsync<M>(M message)
         {
-            if (message == null || this.sinks == null) return Task.CompletedTask;
+            if(message == null || this.sinks == null) return Task.CompletedTask;
 
             var currentSinks = this.sinks;
 
-            if (currentSinks.Count == 0) return Task.CompletedTask;
-            else if (currentSinks.Count == 1)
+            if(currentSinks.Count == 0) return Task.CompletedTask;
+            else if(currentSinks.Count == 1)
             {
-                if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
+                if(currentSinks[0].TryGetTarget(out IDataFlowSink target))
                 {
                     return target.PostAsync(message);
                 }
@@ -153,9 +152,9 @@ namespace FeatureFlowFramework.DataFlows
             {
                 int invalidReferences = 0;
                 Task[] tasks = new Task[currentSinks.Count];
-                for (int i = currentSinks.Count - 1; i >= 0; i--)
+                for(int i = currentSinks.Count - 1; i >= 0; i--)
                 {
-                    if (currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                    if(currentSinks[i].TryGetTarget(out IDataFlowSink target))
                     {
                         tasks[i] = target.PostAsync(message);
                     }
@@ -165,20 +164,20 @@ namespace FeatureFlowFramework.DataFlows
                         invalidReferences++;
                     }
                 }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
                 return Task.WhenAll(tasks);
             }
         }
 
         private void RemoveInvalidReferences(int invalidReferences)
         {
-            if (sinks == null) return;
-            lock (this)
+            if(sinks == null) return;
+            lock(this)
             {
                 List<WeakReference<IDataFlowSink>> validSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count - invalidReferences);
-                for (int i = sinks.Count - 1; i >= 0; i--)
+                for(int i = sinks.Count - 1; i >= 0; i--)
                 {
-                    if (sinks[i].TryGetTarget(out IDataFlowSink target))
+                    if(sinks[i].TryGetTarget(out IDataFlowSink target))
                     {
                         validSinks.Add(sinks[i]);
                     }
@@ -189,23 +188,23 @@ namespace FeatureFlowFramework.DataFlows
 
         public void ConnectTo(IDataFlowSink sink)
         {
-            if (sinks == null)
+            if(sinks == null)
             {
-                lock (this)
+                lock(this)
                 {
                     List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(1);
-                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));                    
+                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));
                     sinks = newSinks;
                     onConnection?.Invoke(sink);
                 }
             }
             else
             {
-                lock (this)
+                lock(this)
                 {
                     List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count + 1);
                     newSinks.AddRange(sinks);
-                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));                    
+                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));
                     sinks = newSinks;
                     onConnection?.Invoke(sink);
                 }
@@ -223,11 +222,11 @@ namespace FeatureFlowFramework.DataFlows
             var currentSinks = this.sinks;
             foreach(var sinkRef in currentSinks.EmptyIfNull())
             {
-                if (sinkRef.TryGetTarget(out IDataFlowSink sink)) onDisconnection?.Invoke(sink);
+                if(sinkRef.TryGetTarget(out IDataFlowSink sink)) onDisconnection?.Invoke(sink);
             }
 
-            if (sinks == null || sinks.Count == 0) return;
-            lock (this)
+            if(sinks == null || sinks.Count == 0) return;
+            lock(this)
             {
                 sinks = null;
             }
@@ -236,12 +235,12 @@ namespace FeatureFlowFramework.DataFlows
         public void DisconnectFrom(IDataFlowSink sink)
         {
             onDisconnection?.Invoke(sink);
-            if (sinks == null) return;            
-            lock (this)
+            if(sinks == null) return;
+            lock(this)
             {
-                if (sinks.Count == 1)
+                if(sinks.Count == 1)
                 {
-                    if (sinks[0].TryGetTarget(out IDataFlowSink target) && target == sink)
+                    if(sinks[0].TryGetTarget(out IDataFlowSink target) && target == sink)
                     {
                         sinks = null;
                     }
@@ -249,9 +248,9 @@ namespace FeatureFlowFramework.DataFlows
                 else
                 {
                     List<WeakReference<IDataFlowSink>> remainingSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count - 1);
-                    for (int i = sinks.Count - 1; i >= 0; i--)
+                    for(int i = sinks.Count - 1; i >= 0; i--)
                     {
-                        if (sinks[i].TryGetTarget(out IDataFlowSink target) && target != sink)
+                        if(sinks[i].TryGetTarget(out IDataFlowSink target) && target != sink)
                         {
                             remainingSinks.Add(sinks[i]);
                         }

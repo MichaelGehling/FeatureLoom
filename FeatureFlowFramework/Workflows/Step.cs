@@ -63,11 +63,11 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                if (finishStateMachine) return true;
+                if(finishStateMachine) return true;
                 var nextElse = doElse;
-                while (nextElse != null)
+                while(nextElse != null)
                 {
-                    if (nextElse.finishStateMachine) return true;
+                    if(nextElse.finishStateMachine) return true;
                     nextElse = nextElse.doElse;
                 }
                 return false;
@@ -78,7 +78,7 @@ namespace FeatureFlowFramework.Workflows
 
         public void AddUsingResource(Func<CT, object> resourceDelegate)
         {
-            if (usingResourcesDelegates == null) usingResourcesDelegates = new List<Func<CT, object>>();
+            if(usingResourcesDelegates == null) usingResourcesDelegates = new List<Func<CT, object>>();
             usingResourcesDelegates.Add(resourceDelegate);
         }
     }
@@ -96,9 +96,11 @@ namespace FeatureFlowFramework.Workflows
         public Action<CT> action;
 
         public bool hasWaiting = false;
+
         //public Func<CT, TimeSpan> timeoutDelegate;
         //public Func<CT, Task> waitingTaskDelegate;
         public Action<CT> waitingDelegate;
+
         public Func<CT, Task> waitingAsyncDelegate;
 
         public bool finishStateMachine = false;

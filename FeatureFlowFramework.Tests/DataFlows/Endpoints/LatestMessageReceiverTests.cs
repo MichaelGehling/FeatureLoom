@@ -1,8 +1,6 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helper;
+﻿using FeatureFlowFramework.Helper;
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
@@ -66,6 +64,5 @@ namespace FeatureFlowFramework.DataFlows
             var expectedTime = sendDelayInMs.Milliseconds().ClampHigh(receivingWaitLimitInMs.Milliseconds());
             Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
         }
-
     }
 }
