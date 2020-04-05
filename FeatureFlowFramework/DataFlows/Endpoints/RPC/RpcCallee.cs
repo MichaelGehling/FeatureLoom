@@ -1,5 +1,4 @@
-﻿using FeatureFlowFramework.Helper;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -9,11 +8,10 @@ namespace FeatureFlowFramework.DataFlows.RPC
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();
-        FeatureLock requestHandlersLock = new FeatureLock();
 
         private void AddRpcRequestHandler(IRpcRequestHandler handler)
         {
-            using(requestHandlersLock.ForWriting())
+            lock(requestHandlers)
             {
                 var newRequestHandlers = new List<IRpcRequestHandler>(requestHandlers);
                 handler.SetTarget(this.sourceHelper);

@@ -1,5 +1,4 @@
-﻿using FeatureFlowFramework.Helper;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -12,7 +11,6 @@ namespace FeatureFlowFramework.Aspects.AppStructure
         private string description = "";
         private long parentHandle = 0;
         private HashSet<long> childHandles = null;
-        FeatureLock childHandlesLock = new FeatureLock();
 
         public string Name { get => name; set => name = value; }
         public string Description { get => description; set => description = value; }
@@ -25,7 +23,7 @@ namespace FeatureFlowFramework.Aspects.AppStructure
         {
             if(child is IUpdateAppStructureAspect childUpdate) childUpdate.TryUpdateAppStructureAspects(Timeout.InfiniteTimeSpan);
             if(childHandles == null) childHandles = new HashSet<long>();
-            using (childHandlesLock.ForWriting()) childHandles.Add(child.GetAspectHandle());
+            lock(childHandles) childHandles.Add(child.GetAspectHandle());
             if(childName != null) child.GetAspectInterface<IAcceptsName, AppStructureAddOn>().SetName(childName);
             return this;
         }
@@ -33,13 +31,13 @@ namespace FeatureFlowFramework.Aspects.AppStructure
         public IAcceptsChildren RemoveChild(object child)
         {
             if(childHandles == null) return this;
-            using (childHandlesLock.ForWriting()) childHandles.Remove(child.GetAspectHandle());
+            lock(childHandles) childHandles.Remove(child.GetAspectHandle());
             return this;
         }
 
         public IAcceptsChildren RemoveAllChildren()
         {
-            using (childHandlesLock.ForWriting()) childHandles?.Clear();
+            lock(childHandles) childHandles?.Clear();
             return this;
         }
 

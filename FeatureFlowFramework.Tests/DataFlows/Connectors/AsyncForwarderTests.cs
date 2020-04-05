@@ -37,7 +37,7 @@ namespace FeatureFlowFramework.DataFlows
 
             var timer = AppTime.TimeKeeper;
             sender.Send(42);
-            Task.WhenAll(counterA.WaitForAsync(1), counterB.WaitForAsync(1));
+            Task.WhenAll(counterA.WaitFor(1), counterB.WaitFor(1));
             Assert.True(timer.Elapsed < delay * 2);
         }
     }

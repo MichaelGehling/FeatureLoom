@@ -9,7 +9,6 @@ namespace FeatureFlowFramework.Aspects
         private WeakReference<object> objectRef;
         private readonly long objectHandle;
         private List<AspectAddOn> aspectAddOns = new List<AspectAddOn>();
-        FeatureLock aspectAddonsLock = new FeatureLock();
 
         public AspectData(object obj, long objectHandle)
         {
@@ -24,7 +23,7 @@ namespace FeatureFlowFramework.Aspects
         public void AddAddOn(AspectAddOn addOn)
         {
             addOn.SetObjectRef(this.objectRef);
-            using(aspectAddonsLock.ForWriting())            
+            lock(aspectAddOns)
             {
                 aspectAddOns.Add(addOn);
             }

@@ -19,8 +19,6 @@ namespace FeatureFlowFramework.DataFlows
         private readonly Func<T, bool> processing;
         private readonly Func<T, Task<bool>> processingAsync;
         private DataFlowSourceHelper alternativeSendingHelper = null;
-
-        //TODO: Better switch to FeatureLock?
         private readonly object syncLock;
 
         public ProcessingEndpoint(Func<T, bool> processing, object synchronizationLock = null)

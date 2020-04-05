@@ -11,7 +11,6 @@ namespace FeatureFlowFramework.DataFlows.Web
     public class HttpServerFetchProvider : IDataFlowSink, IWebRequestHandler
     {
         private CountingRingBuffer<string> ringBuffer;
-        FeatureLock ringBufferLock = new FeatureLock();
         private readonly string route;
         private IWebMessageTranslator translator;
         private readonly IWebServer webServer;
@@ -31,7 +30,7 @@ namespace FeatureFlowFramework.DataFlows.Web
         {
             if(translator.TryTranslate(message, out string json))
             {
-                using(ringBufferLock.ForWriting())
+                lock(ringBuffer)
                 {
                     ringBuffer.Add(json);
                 }
@@ -63,7 +62,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                 long next = 0;
                 bool onlyLatest = false;
                 string[] messages = Array.Empty<string>();
-                using (ringBufferLock.ForReading())
+                lock(ringBuffer)
                 {
                     next = ringBuffer.Counter;
                     if(requestedStart > next || requestedStart < 0)
@@ -78,7 +77,7 @@ namespace FeatureFlowFramework.DataFlows.Web
                 {
                     if(await ringBuffer.WaitHandle.WaitAsync(maxWait.Milliseconds()))
                     {
-                        using (ringBufferLock.ForReading())
+                        lock(ringBuffer)
                         {
                             messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
                             next = ringBuffer.Counter;

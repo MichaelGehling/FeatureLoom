@@ -1,6 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.DataStorage;
-using FeatureFlowFramework.Helper;
 using System;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,8 +10,6 @@ namespace FeatureFlowFramework.Logging
     {
         private readonly bool hasConsole = CheckHasConsole();
         private StringBuilder stringBuilder = new StringBuilder();
-        FeatureLock stringBuilderLock = new FeatureLock();
-
 
         public class Config : Configuration
         {
@@ -33,7 +30,7 @@ namespace FeatureFlowFramework.Logging
                 if(logMessage.level <= config.logFileLoglevel)
                 {
                     string strMsg;
-                    using(stringBuilderLock.ForWriting())
+                    lock(stringBuilder)
                     {
                         strMsg = logMessage.PrintToStringBuilder(stringBuilder).ToString();
                         stringBuilder.Clear();

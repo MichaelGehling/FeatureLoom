@@ -44,7 +44,7 @@ namespace FeatureFlowFramework.DataFlows
             {
                 sender.Send(i);
             }
-            var waitingTask = sink.WaitForAsync(numMessages);
+            var waitingTask = sink.WaitFor(numMessages);
             waitingTask.Wait(expectedRuntime.Milliseconds() * 5);
 
             Assert.Equal(numMessages, sink.Counter);

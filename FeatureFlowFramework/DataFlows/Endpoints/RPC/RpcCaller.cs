@@ -11,7 +11,6 @@ namespace FeatureFlowFramework.DataFlows.RPC
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
-        FeatureLock responseHandlersLock = new FeatureLock();
         private readonly TimeSpan timeout;
         private readonly Timer timeoutTimer;
 
@@ -23,11 +22,11 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CheckForTimeouts(object state)
         {
-            using (responseHandlersLock.ForWriting())
+            lock(responseHandlers)
             {
-                for (int i = 0; i < responseHandlers.Count; i++)
+                for(int i = 0; i < responseHandlers.Count; i++)
                 {
-                    if (responseHandlers[i].LifeTime.Elapsed)
+                    if(responseHandlers[i].LifeTime.Elapsed)
                     {
                         responseHandlers[i].Cancel();
                         responseHandlers.RemoveAt(i--);
@@ -40,7 +39,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
-            using (responseHandlersLock.ForWriting())
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
@@ -51,7 +50,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
-            using (responseHandlersLock.ForWriting())
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
@@ -63,7 +62,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
-            using (responseHandlersLock.ForWriting())
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
@@ -76,7 +75,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, bool>(requestId, method, parameterTuple);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-            using (responseHandlersLock.ForWriting())
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
@@ -89,7 +88,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
-            using (responseHandlersLock.ForWriting())
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
@@ -102,7 +101,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, bool>(requestId, method, true);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-            using (responseHandlersLock.ForWriting())
+            lock(responseHandlers)
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
@@ -146,7 +145,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
             else if(message is IRpcResponse)
             {
-                using (responseHandlersLock.ForWriting())
+                lock(responseHandlers)
                 {
                     for(int i = 0; i < responseHandlers.Count; i++)
                     {

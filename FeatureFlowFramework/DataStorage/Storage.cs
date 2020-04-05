@@ -1,5 +1,4 @@
-﻿using FeatureFlowFramework.Helper;
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace FeatureFlowFramework.DataStorage
@@ -16,9 +15,7 @@ namespace FeatureFlowFramework.DataStorage
         }
 
         private static Dictionary<string, IStorageReader> categoryToReader = new Dictionary<string, IStorageReader>();
-        static FeatureLock categoryToReaderLock = new FeatureLock();
         private static Dictionary<string, IStorageWriter> categoryToWriter = new Dictionary<string, IStorageWriter>();
-        static FeatureLock categoryToWriterLock = new FeatureLock();
         private static Func<string, IStorageReader> createDefaultReader = category => new TextFileStorage(category, "defaultStorage");
         private static Func<string, IStorageWriter> createDefaultWriter = category => new TextFileStorage(category, "defaultStorage");
         public static Func<string, IStorageReader> DefaultReaderFactory { set => createDefaultReader = value; }
@@ -26,7 +23,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static IStorageReader GetReader(string category)
         {
-            using(categoryToReaderLock.ForWriting())
+            lock(categoryToReader)
             {
                 if(categoryToReader.TryGetValue(category, out IStorageReader reader)) return reader;
                 else
@@ -43,7 +40,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static IStorageWriter GetWriter(string category)
         {
-            using (categoryToWriterLock.ForWriting())
+            lock(categoryToWriter)
             {
                 if(categoryToWriter.TryGetValue(category, out IStorageWriter writer)) return writer;
                 else
@@ -60,7 +57,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static void RegisterReader(IStorageReader reader)
         {
-            using (categoryToReaderLock.ForWriting())
+            lock(categoryToReader)
             {
                 categoryToReader[reader.Category] = reader;
             }
@@ -68,7 +65,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static void RegisterWriter(IStorageWriter writer)
         {
-            using (categoryToWriterLock.ForWriting())
+            lock(categoryToWriter)
             {
                 categoryToWriter[writer.Category] = writer;
             }
@@ -82,7 +79,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static bool HasCategoryReader(string category)
         {
-            using (categoryToReaderLock.ForReading())
+            lock(categoryToReader)
             {
                 if(categoryToReader.ContainsKey(category)) return true;
                 else if(HasCategoryWriter(category) && GetWriter(category) is IStorageReader) return true;
@@ -92,7 +89,7 @@ namespace FeatureFlowFramework.DataStorage
 
         public static bool HasCategoryWriter(string category)
         {
-            using (categoryToWriterLock.ForReading())
+            lock(categoryToWriter)
             {
                 if(categoryToWriter.ContainsKey(category)) return true;
                 else if(HasCategoryReader(category) && GetReader(category) is IStorageWriter) return true;
