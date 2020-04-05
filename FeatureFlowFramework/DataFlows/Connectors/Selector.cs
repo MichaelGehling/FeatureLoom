@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helper;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -9,6 +10,8 @@ namespace FeatureFlowFramework.DataFlows
         private volatile bool multiMatch = false;
         private List<(Func<T, bool> predicate, DataFlowSourceHelper sender)> options = null;
         private DataFlowSourceHelper alternativeSendingHelper = null;
+
+        FeatureLock myLock = new FeatureLock();
 
         public Selector(bool multiMatch = false)
         {
@@ -77,7 +80,7 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSource InsertOptionAt(Func<T, bool> predicate, int index)
         {
             (Func<T, bool> predicate, DataFlowSourceHelper sender) newOption = (predicate, new DataFlowSourceHelper());
-            lock(this)
+            using(myLock.ForWriting())
             {
                 var newOptions = new List<(Func<T, bool> predicate, DataFlowSourceHelper sender)>();
                 if(options != null) newOptions.AddRange(options);
@@ -110,7 +113,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public bool RemoveOptionAt(int index)
         {
-            lock(this)
+            using (myLock.ForWriting())
             {
                 if(options.Count == 1 && index == 0)
                 {
@@ -131,7 +134,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void ClearOptions()
         {
-            lock(this)
+            using (myLock.ForWriting())
             {
                 options = null;
             }
