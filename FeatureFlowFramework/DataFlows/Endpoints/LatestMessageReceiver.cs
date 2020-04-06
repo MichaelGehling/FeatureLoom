@@ -21,7 +21,10 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(message is T typedMessage)
             {
-                receivedMessage = typedMessage;
+                using(myLock.ForWriting())
+                {
+                    receivedMessage = typedMessage;
+                }
                 readerWakeEvent.Set();
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
@@ -31,7 +34,10 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(message is T typedMessage)
             {
-                receivedMessage = typedMessage;
+                using(myLock.ForWriting())
+                {
+                    receivedMessage = typedMessage;
+                }
                 readerWakeEvent.Set();
                 return Task.CompletedTask;
             }
@@ -109,7 +115,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public object[] GetQueuedMesssages()
         {
-            using (myLock.ForWriting())
+            using (myLock.ForReading())
             {
                 if(IsEmpty) return Array.Empty<object>();
                 T message = receivedMessage;

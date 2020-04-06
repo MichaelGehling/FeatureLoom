@@ -70,10 +70,10 @@ namespace FeatureFlowFramework.DataFlows
             using(queueLock.ForWriting())
             {
                 queue.Enqueue(message);
-                EnsureMaxSize();
-                readerWakeEvent.Set();
-                if(IsFull) writerWakeEvent.Reset();
+                EnsureMaxSize();                                
             }
+            if(IsFull) writerWakeEvent.Reset();
+            readerWakeEvent.Set();
         }
 
         // ONLY USE IN LOCKED QUEUE!
@@ -94,10 +94,10 @@ namespace FeatureFlowFramework.DataFlows
             if(IsEmpty) return false;
             using (queueLock.ForWriting())
             {
-                success = queue.TryDequeue(out message);
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
+                success = queue.TryDequeue(out message);                
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
             return success;
         }
 
@@ -111,9 +111,9 @@ namespace FeatureFlowFramework.DataFlows
             using (queueLock.ForWriting())
             {
                 success = queue.TryDequeue(out message);
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
             return new AsyncOutResult<bool, T>(success, message);
         }
 
@@ -130,10 +130,9 @@ namespace FeatureFlowFramework.DataFlows
             {
                 messages = queue.ToArray();
                 queue.Clear();
-
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
             return messages;
         }
 
@@ -170,6 +169,8 @@ namespace FeatureFlowFramework.DataFlows
             {
                 queue.Clear();
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
         }
 
         public int CountQueuedMessages => queue.Count;

@@ -169,6 +169,8 @@ namespace FeatureFlowFramework.DataFlows
             {
                 queue.Clear();
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
         }
 
         public int CountQueuedMessages => queue.Count;
