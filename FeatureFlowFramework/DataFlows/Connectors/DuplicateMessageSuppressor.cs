@@ -10,6 +10,7 @@ namespace FeatureFlowFramework.DataFlows
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private Queue<(object message, DateTime suppressionEnd)> suppressors = new Queue<(object, DateTime)>();
+        FeatureLock suppressorsLock = new FeatureLock();
         private readonly TimeSpan suppressionTime;
         private readonly TimeSpan cleanupPeriode = 10.Seconds();
         private readonly Func<object, object, bool> isDuplicate;
@@ -28,7 +29,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void AddSuppressor<M>(M suppressorMessage)
         {
-            lock(suppressors)
+            using (suppressorsLock.ForWriting())
             {
                 DateTime now = AppTime.Now;
                 suppressors.Enqueue((suppressorMessage, now + suppressionTime));
@@ -37,7 +38,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private bool IsSuppressed<M>(M message)
         {
-            lock(suppressors)
+            using (suppressorsLock.ForWriting())
             {
                 DateTime now = AppTime.Now;
                 CleanUpSuppressors(now);
@@ -55,7 +56,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private void CleanUpSuppressors(DateTime now)
         {
-            lock(suppressors)
+            using (suppressorsLock.ForWriting())
             {
                 while(suppressors.Count > 0)
                 {

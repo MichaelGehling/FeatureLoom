@@ -19,6 +19,7 @@ namespace FeatureFlowFramework.DataFlows
     public class ActivePriorityForwarder<T> : Forwarder
     {
         private PriorityQueueReceiver<T> receiver;
+        FeatureLock receiverLock = new FeatureLock();
         public volatile int threadLimit;
         public volatile int spawnThreshold;
         public volatile int maxIdleMilliseconds;
@@ -80,7 +81,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
             {
-                lock(receiver) { numThreads++; }
+                using (receiverLock.ForWriting()) { numThreads++; }
                 new Task(Run).Start();
             }
         }
@@ -98,7 +99,7 @@ namespace FeatureFlowFramework.DataFlows
                     Log.ERROR(this, "Exception caught in ActivePriorityForwarder while sending.", e.ToString());
                 }
             }
-            lock(receiver) { numThreads--; }
+            using (receiverLock.ForWriting()) { numThreads--; }
         }
     }
 }
