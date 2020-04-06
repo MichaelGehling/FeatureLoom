@@ -6,13 +6,9 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Diagnostics
 {
-    public class DataFlowStatisticsService
-    {
-    }
-
     public class DataFlowProbe<T1, T2> : IDataFlowSink
     {
-        private readonly object locker = new object();
+        FeatureLock myLock = new FeatureLock();
         private readonly string name;
         private readonly Predicate<T1> filter;
         private readonly Func<T1, T2> convert;
@@ -48,9 +44,12 @@ namespace FeatureFlowFramework.Diagnostics
         {
             if(messageBuffer != null)
             {
-                var result = messageBuffer.GetAvailableSince(bufferPosition, out _);
-                bufferPosition = messageBuffer.Counter;
-                return result;
+                using (myLock.ForReading())
+                {
+                    var result = messageBuffer.GetAvailableSince(bufferPosition, out _);
+                    bufferPosition = messageBuffer.Counter;
+                    return result;
+                }
             }
             else
             {
@@ -61,22 +60,25 @@ namespace FeatureFlowFramework.Diagnostics
 
         public DateTime[] GetBufferedTimestamps(ref long bufferPosition)
         {
-            if(timestampBuffer != null)
+            using (myLock.ForReading())
             {
-                var result = timestampBuffer.GetAvailableSince(bufferPosition, out _);
-                bufferPosition = timestampBuffer.Counter;
-                return result;
-            }
-            else if(messageBuffer != null)
-            {
-                var result = messageBuffer.GetAvailableSince(bufferPosition, out _).Select(set => set.timestamp).ToArray();
-                bufferPosition = messageBuffer.Counter;
-                return result;
-            }
-            else
-            {
-                bufferPosition = 0;
-                return Array.Empty<DateTime>();
+                if (timestampBuffer != null)
+                {
+                    var result = timestampBuffer.GetAvailableSince(bufferPosition, out _);
+                    bufferPosition = timestampBuffer.Counter;
+                    return result;
+                }
+                else if (messageBuffer != null)
+                {
+                    var result = messageBuffer.GetAvailableSince(bufferPosition, out _).Select(set => set.timestamp).ToArray();
+                    bufferPosition = messageBuffer.Counter;
+                    return result;
+                }
+                else
+                {
+                    bufferPosition = 0;
+                    return Array.Empty<DateTime>();
+                }
             }
         }
 
@@ -84,9 +86,12 @@ namespace FeatureFlowFramework.Diagnostics
         {
             if(timeSliceCounterBuffer != null)
             {
-                var result = timeSliceCounterBuffer.GetAvailableSince(bufferPosition, out _);
-                bufferPosition = timeSliceCounterBuffer.Counter;
-                return result;
+                using (myLock.ForReading())
+                {
+                    var result = timeSliceCounterBuffer.GetAvailableSince(bufferPosition, out _);
+                    bufferPosition = timeSliceCounterBuffer.Counter;
+                    return result;
+                }
             }
             else
             {
@@ -100,7 +105,7 @@ namespace FeatureFlowFramework.Diagnostics
             if(!(message is T1 msgT1)) return;
             if(!(filter?.Invoke(msgT1) ?? true)) return;
             T2 msgT2 = convert == null ? default : convert(msgT1);
-            lock(locker)
+            using(myLock.ForWriting())
             {
                 counter++;
                 messageBuffer?.Add((AppTime.Now, msgT2));

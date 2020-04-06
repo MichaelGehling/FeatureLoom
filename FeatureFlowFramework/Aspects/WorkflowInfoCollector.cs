@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.Helper;
 using FeatureFlowFramework.Workflows;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +13,8 @@ namespace FeatureFlowFramework.Aspects
         private readonly ProcessingEndpoint<AspectRegistry.ObjectRemovedNotification> removeListner;
         private readonly ProcessingEndpoint<AspectRegistry.ActivationStatusNotification> activationListner;
 
+        FeatureLock workflowsLock = new FeatureLock();
+
         public WorkflowInfoCollector()
         {
             addListner = new ProcessingEndpoint<AspectRegistry.ObjectAddedNotification>(msg => workflows.Add(msg.objectHandle, msg.aspectData), workflows);
@@ -24,11 +27,11 @@ namespace FeatureFlowFramework.Aspects
             AspectRegistry.NotificationSource.ConnectTo(addListner);
             AspectRegistry.NotificationSource.ConnectTo(removeListner);
             AspectRegistry.NotificationSource.ConnectTo(activationListner);
-            lock(workflows)
+            using(workflowsLock.ForWriting())
             {
-                foreach(var data in AspectRegistry.GetAllAspectData())
+                foreach (var data in AspectRegistry.GetAllAspectData())
                 {
-                    if(data.TryGetAspectInterface(out Workflow wf)) workflows.Add(data.ObjectHandle, data);
+                    if (data.TryGetAspectInterface(out Workflow wf)) workflows.Add(data.ObjectHandle, data);
                 }
             }
         }
@@ -37,7 +40,7 @@ namespace FeatureFlowFramework.Aspects
         {
             get
             {
-                lock(workflows)
+                using (workflowsLock.ForReading())
                 {
                     return workflows.Values.Select(data =>
                     {

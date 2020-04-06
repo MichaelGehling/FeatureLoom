@@ -11,6 +11,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
+        FeatureLock responseHandlersLock = new FeatureLock();
         private readonly TimeSpan timeout;
         private readonly Timer timeoutTimer;
 
@@ -24,7 +25,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CheckForTimeouts(object state)
         {
-            lock(responseHandlers)
+            using (responseHandlersLock.ForWriting())
             {
                 for(int i = 0; i < responseHandlers.Count; i++)
                 {
@@ -41,7 +42,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
-            lock(responseHandlers)
+            using (responseHandlersLock.ForWriting())
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
             }
@@ -52,7 +53,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
-            lock(responseHandlers)
+            using (responseHandlersLock.ForWriting())
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
             }
@@ -64,7 +65,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
             TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
-            lock(responseHandlers)
+            using (responseHandlersLock.ForWriting())
             {
                 responseHandlers.Add(new ResponseHandler(requestId, tcs, timeout));
             }
@@ -148,7 +149,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
             else if(message is IRpcResponse)
             {
-                lock(responseHandlers)
+                using (responseHandlersLock.ForWriting())
                 {
                     for(int i = 0; i < responseHandlers.Count; i++)
                     {

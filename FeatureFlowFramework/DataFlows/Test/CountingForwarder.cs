@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using FeatureFlowFramework.Helper;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.Test
@@ -8,19 +9,19 @@ namespace FeatureFlowFramework.DataFlows.Test
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
 
         private volatile int counter;
-        private readonly object locker = new object();
+        FeatureLock myLock = new FeatureLock();
         private List<(int expectedCount, TaskCompletionSource<int> tcs)> waitings = new List<(int, TaskCompletionSource<int>)>();
 
         public int Counter
         {
-            get { lock(locker) return counter; }
+            get { using (myLock.ForReading()) return counter; }
         }
 
         public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
 
-        public Task<int> WaitFor(int numMessages)
+        public Task<int> WaitForAsync(int numMessages)
         {
-            lock(locker)
+            using (myLock.ForWriting())
             {
                 var currentCounter = counter;
                 TaskCompletionSource<int> waitingTaskSource = new TaskCompletionSource<int>();
@@ -47,7 +48,7 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         private void Count()
         {
-            lock(locker)
+            using (myLock.ForWriting())
             {
                 counter++;
                 for(int i = waitings.Count - 1; i >= 0; i--)

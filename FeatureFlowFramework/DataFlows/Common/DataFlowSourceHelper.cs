@@ -22,6 +22,8 @@ namespace FeatureFlowFramework.DataFlows
         private readonly Action<IDataFlowSink> onConnection;
         private readonly Action<IDataFlowSink> onDisconnection;
 
+        FeatureLock myLock = new FeatureLock(FeatureLock.ONLY_SPIN_WAIT);
+
         public DataFlowSourceHelper(Action<IDataFlowSink> onConnection = null, Action<IDataFlowSink> onDisconnection = null)
         {
             this.onConnection = onConnection;
@@ -172,7 +174,7 @@ namespace FeatureFlowFramework.DataFlows
         private void RemoveInvalidReferences(int invalidReferences)
         {
             if(sinks == null) return;
-            lock(this)
+            using(myLock.ForWriting())
             {
                 List<WeakReference<IDataFlowSink>> validSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count - invalidReferences);
                 for(int i = sinks.Count - 1; i >= 0; i--)
@@ -190,7 +192,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(sinks == null)
             {
-                lock(this)
+                using (myLock.ForWriting())
                 {
                     List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(1);
                     newSinks.Add(new WeakReference<IDataFlowSink>(sink));
@@ -200,7 +202,7 @@ namespace FeatureFlowFramework.DataFlows
             }
             else
             {
-                lock(this)
+                using (myLock.ForWriting())
                 {
                     List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count + 1);
                     newSinks.AddRange(sinks);
@@ -226,7 +228,7 @@ namespace FeatureFlowFramework.DataFlows
             }
 
             if(sinks == null || sinks.Count == 0) return;
-            lock(this)
+            using (myLock.ForWriting())
             {
                 sinks = null;
             }
@@ -236,7 +238,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             onDisconnection?.Invoke(sink);
             if(sinks == null) return;
-            lock(this)
+            using (myLock.ForWriting())
             {
                 if(sinks.Count == 1)
                 {

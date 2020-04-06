@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using FeatureFlowFramework.Helper;
+using System.Collections.Generic;
 
 namespace FeatureFlowFramework.Aspects
 {
@@ -6,6 +7,7 @@ namespace FeatureFlowFramework.Aspects
     {
         private readonly string collectionName;
         private Dictionary<string, object> keyValuePairs = new Dictionary<string, object>();
+        FeatureLock keyValueLock = new FeatureLock();
 
         public AspectValueAddOn(string collectionName)
         {
@@ -16,12 +18,12 @@ namespace FeatureFlowFramework.Aspects
 
         public void Set<T>(string key, T value)
         {
-            lock(keyValuePairs) keyValuePairs.Add(key, value);
+            using (keyValueLock.ForWriting()) keyValuePairs.Add(key, value);
         }
 
         public bool Contains(string key)
         {
-            lock(keyValuePairs)
+            using (keyValueLock.ForReading())
             {
                 return keyValuePairs.ContainsKey(key);
             }
@@ -29,7 +31,7 @@ namespace FeatureFlowFramework.Aspects
 
         public bool TryGet<T>(string key, out T value)
         {
-            lock(keyValuePairs)
+            using (keyValueLock.ForReading())
             {
                 if(keyValuePairs.TryGetValue(key, out object obj) && obj is T objT)
                 {

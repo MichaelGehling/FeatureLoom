@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helper;
+using System;
 using System.Collections;
 using System.Threading.Tasks;
 
@@ -10,6 +11,7 @@ namespace FeatureFlowFramework.DataFlows
         private DataFlowSourceHelper alternativeSender = new DataFlowSourceHelper();
 
         private A aggregationData = new A();
+        FeatureLock dataLock = new FeatureLock();
         private readonly Func<T, A, bool> aggregate;
 
         /// <summary> The constructor taking the aggregation function. </summary>
@@ -29,7 +31,7 @@ namespace FeatureFlowFramework.DataFlows
             (bool ready, object msg, bool enumerate) output = default;
             if(message is T validMessage)
             {
-                lock(aggregationData)
+                using(dataLock.ForWriting())
                 {
                     alternative = !aggregate(validMessage, aggregationData);
                     output = aggregationData.TryCreateOutputMessage();
@@ -50,7 +52,7 @@ namespace FeatureFlowFramework.DataFlows
             (bool ready, object msg, bool enumerate) output = default;
             if(message is T validMessage)
             {
-                lock(aggregationData)
+                using (dataLock.ForWriting())
                 {
                     alternative = !aggregate(validMessage, aggregationData);
                     output = aggregationData.TryCreateOutputMessage();
