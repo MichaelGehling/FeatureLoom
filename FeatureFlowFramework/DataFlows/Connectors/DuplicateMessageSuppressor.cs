@@ -56,13 +56,10 @@ namespace FeatureFlowFramework.DataFlows
 
         private void CleanUpSuppressors(DateTime now)
         {
-            using (suppressorsLock.ForWriting())
+            while(suppressors.Count > 0)
             {
-                while(suppressors.Count > 0)
-                {
-                    if(now > suppressors.Peek().suppressionEnd) suppressors.Dequeue();
-                    else break;
-                }
+                if(now > suppressors.Peek().suppressionEnd) suppressors.Dequeue();
+                else break;
             }
         }
 

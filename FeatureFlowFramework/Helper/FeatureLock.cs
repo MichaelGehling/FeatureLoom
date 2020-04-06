@@ -27,6 +27,7 @@ namespace FeatureFlowFramework.Helper
         volatile int lockIndicator = NO_LOCK;
         volatile bool writePriority = false;
         volatile bool readPriority = false;
+        volatile Thread lockingThread = null;
 
         int defaultFullSpinCycles;
 
@@ -54,6 +55,7 @@ namespace FeatureFlowFramework.Helper
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator - 1;
+            if (lockingThread != null && lockingThread == Thread.CurrentThread) return false;
             while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (timer.Elapsed) return false;
@@ -70,7 +72,7 @@ namespace FeatureFlowFramework.Helper
                     readPriority = true;
                     bool didReset = mreReader.Reset();
                     if (ReaderMustWait(lockIndicator))
-                    {
+                    {                        
                         if (!mreReader.Wait(timer.Remaining)) return false;                        
                         spinWait.Reset();
                         fullSpins++;
@@ -100,7 +102,8 @@ namespace FeatureFlowFramework.Helper
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator - 1;            
+            var newLockIndicator = currentLockIndicator - 1;
+            if (lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
             while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (currentLockIndicator > NO_LOCK) readPriority = true;
@@ -145,6 +148,7 @@ namespace FeatureFlowFramework.Helper
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator - 1;
+            if (lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
             while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (currentLockIndicator > NO_LOCK) readPriority = true;
@@ -205,6 +209,7 @@ namespace FeatureFlowFramework.Helper
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
+            if (lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
             while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
                 if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
@@ -230,6 +235,7 @@ namespace FeatureFlowFramework.Helper
 
                 currentLockIndicator = lockIndicator;
             }
+            lockingThread = Thread.CurrentThread;
             writePriority = false;
             
             return new WriteLock(this);
@@ -248,6 +254,7 @@ namespace FeatureFlowFramework.Helper
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
+            if (lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
             while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
                 if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
@@ -273,6 +280,7 @@ namespace FeatureFlowFramework.Helper
 
                 currentLockIndicator = lockIndicator;
             }
+            lockingThread = Thread.CurrentThread;
             writePriority = false;
             return new WriteLock(this);
         }
@@ -287,6 +295,7 @@ namespace FeatureFlowFramework.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
+            lockingThread = null;
             lockIndicator = NO_LOCK;
             if (!mreReader.Set()) mreWriter.Set();
         }
