@@ -29,16 +29,16 @@ namespace FeatureFlowFramework.Workflows
             {
                 var timer = AppTime.TimeKeeper;
                 
-                /*while(await workflow.ExecuteNextStepAsync(executionController))
+                while(await workflow.ExecuteNextStepAsync(executionController))
                 {
                     if(SynchronizationContext.Current != null && timer.Elapsed > suspensionIntervall)
                     {
                         await Task.Delay(suspensionTime);
                         timer.Restart();
                     }
-                }*/
+                }
 
-                bool running;
+                /*bool running;
                 do
                 {
                     Task<bool> stepTask = workflow.ExecuteNextStepAsync(executionController);
@@ -49,6 +49,7 @@ namespace FeatureFlowFramework.Workflows
                     }
                     running = await stepTask;
                 } while (running);
+                */
             }
             finally
             {
