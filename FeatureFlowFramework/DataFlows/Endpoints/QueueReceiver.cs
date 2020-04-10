@@ -72,10 +72,10 @@ namespace FeatureFlowFramework.DataFlows
             using(queueLock.ForWriting())
             {
                 queue.Enqueue(message);
-                EnsureMaxSize();
-                readerWakeEvent.Set();
-                if(IsFull) writerWakeEvent.Reset();
+                EnsureMaxSize();                
             }
+            if(IsFull) writerWakeEvent.Reset();
+            readerWakeEvent.Set();            
         }
 
         // ONLY USE IN LOCKED QUEUE!
@@ -94,10 +94,10 @@ namespace FeatureFlowFramework.DataFlows
             bool success = false;
             using (queueLock.ForWriting())
             {
-                success = queue.TryDequeue(out message);
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
+                success = queue.TryDequeue(out message);                
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
             return success;
         }
 
@@ -110,10 +110,10 @@ namespace FeatureFlowFramework.DataFlows
             if(IsEmpty) return new AsyncOutResult<bool, T>(false, default);
             using (queueLock.ForWriting())
             {
-                success = queue.TryDequeue(out message);
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
+                success = queue.TryDequeue(out message);                
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
             return new AsyncOutResult<bool, T>(success, message);
         }
 
@@ -129,11 +129,10 @@ namespace FeatureFlowFramework.DataFlows
             using (queueLock.ForWriting())
             {
                 messages = queue.ToArray();
-                queue.Clear();
-
-                if(IsEmpty) readerWakeEvent.Reset();
-                if(!IsFull) writerWakeEvent.Set();
+                queue.Clear();                
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
             return messages;
         }
 
@@ -170,6 +169,8 @@ namespace FeatureFlowFramework.DataFlows
             {
                 queue.Clear();
             }
+            if(IsEmpty) readerWakeEvent.Reset();
+            if(!IsFull) writerWakeEvent.Set();
         }
 
         public int CountQueuedMessages => queue.Count;
