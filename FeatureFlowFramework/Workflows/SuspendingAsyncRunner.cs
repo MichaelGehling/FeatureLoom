@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.Workflows
         public SuspendingAsyncRunner()
         {
             this.suspensionTime = 1.Milliseconds();
-            this.suspensionIntervall = 10.Milliseconds();
+            this.suspensionIntervall = 100.Milliseconds();
         }
 
         public SuspendingAsyncRunner(TimeSpan suspensionTime, TimeSpan suspensionIntervall)
@@ -28,28 +28,25 @@ namespace FeatureFlowFramework.Workflows
             try
             {
                 var timer = AppTime.TimeKeeper;
-                
-                while(await workflow.ExecuteNextStepAsync(executionController))
-                {
-                    if(SynchronizationContext.Current != null && timer.Elapsed > suspensionIntervall)
-                    {
-                        await Task.Delay(suspensionTime);
-                        timer.Restart();
-                    }
-                }
 
-                /*bool running;
+                bool running;
                 do
                 {
                     Task<bool> stepTask = workflow.ExecuteNextStepAsync(executionController);
-                    if (stepTask.IsCompleted && timer.Elapsed > suspensionIntervall)
+                    // If step is already completed, it was executed synchronously.                  
+                    if (stepTask.IsCompleted)
                     {
-                        await Task.Delay(suspensionTime);
-                        timer.Restart();
-                    }
+                        // If also the suspension intervall is elapsed a suspension has to be performed.
+                        if(timer.Elapsed > suspensionIntervall)
+                        {
+                            await Task.Delay(suspensionTime);
+                            timer.Restart(); // When suspension was forced, the suspensionTimer can be reset.
+                        }
+                    }    
+                    else timer.Restart(); // When step ran async the suspensionTimer can be reset.
+
                     running = await stepTask;
-                } while (running);
-                */
+                } while (running);                
             }
             finally
             {
