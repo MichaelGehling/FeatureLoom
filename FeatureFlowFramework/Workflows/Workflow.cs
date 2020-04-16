@@ -88,7 +88,7 @@ namespace FeatureFlowFramework.Workflows
                 executionPhase = value;
                 if (this.controlData.notRunningWakeEvent != null)
                 {
-                    if (executionPhase != ExecutionPhase.Running) this.controlData.notRunningWakeEvent.Set();
+                    if (executionPhase != ExecutionPhase.Running && executionPhase != ExecutionPhase.Waiting) this.controlData.notRunningWakeEvent.Set();
                     else this.controlData.notRunningWakeEvent.Reset();
                 }
             }
@@ -183,6 +183,6 @@ namespace FeatureFlowFramework.Workflows
         }
 
         [JsonIgnore]
-        public bool IsRunning => this.CurrentExecutionPhase == ExecutionPhase.Running;
+        public bool IsRunning => this.CurrentExecutionPhase == ExecutionPhase.Running || this.CurrentExecutionPhase == ExecutionPhase.Waiting;
     }
 }

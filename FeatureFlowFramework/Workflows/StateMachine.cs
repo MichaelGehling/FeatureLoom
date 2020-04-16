@@ -176,9 +176,9 @@ namespace FeatureFlowFramework.Workflows
                 Log.WARNING(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToString()}!");
                 proceed = false;
             }
-            else
+            else if(executionPhase != Workflow.ExecutionPhase.Running)
             {
-                if (executionPhase != Workflow.ExecutionPhase.Running) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowStarted);
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowStarted);
                 context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             }
 

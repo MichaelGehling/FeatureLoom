@@ -28,6 +28,8 @@ namespace FeatureFlowFramework.DataStorage
             public bool updateCacheOnWrite = true;
             public TimeSpan cacheSlidingExpiration = 10.Minutes();
             public int cacheSizeInMb = 10;
+            public bool logFailedDeserialization = true;
+
             public override string Uri => configUri ?? base.Uri;
         }
 
@@ -355,8 +357,9 @@ namespace FeatureFlowFramework.DataStorage
                     data = str.FromJson<T>();
                     return true;
                 }
-                catch
+                catch(Exception e)
                 {
+                    if (config.logFailedDeserialization) Log.WARNING(this, "Failed on deserializing!", e.ToString());
                     data = default;
                     return false;
                 }
