@@ -64,8 +64,8 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\F3\FeatureFlowFramework\FeatureFlowFramework.csproj">
-      <Project>{d312424f-de75-4ec0-875d-6d7cb42664fe}</Project>
+    <ProjectReference Include="..\FeatureFlowFramework\FeatureFlowFramework.csproj">
+      <Project>{52d3f346-b06a-419c-87e9-11bd1c3155d9}</Project>
       <Name>FeatureFlowFramework</Name>
     </ProjectReference>
   </ItemGroup>

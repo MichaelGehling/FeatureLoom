@@ -21,6 +21,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Playground\Pl
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlowFramework.Forms", "FeatureFlowFramework.Forms\FeatureFlowFramework.Forms.csproj", "{6ABB1FCC-6E5A-4934-9782-7381B2F492B6}"
+	ProjectSection(ProjectDependencies) = postProject
+		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
