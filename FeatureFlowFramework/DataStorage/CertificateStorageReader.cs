@@ -76,7 +76,7 @@ namespace FeatureFlowFramework.DataStorage
         {
             T data = default;
             await Task.Run(() => TryRead<T>(uri, out data));
-            return new AsyncOutResult<bool, T>(true, data);
+            return (true, data);
         }
 
         public async Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null)
@@ -85,7 +85,7 @@ namespace FeatureFlowFramework.DataStorage
             {
                 string path = config.useCategoryFolder ? Path.Combine(config.basePath, category) : config.basePath;
                 DirectoryInfo dir = new DirectoryInfo(path);
-                if(!dir.Exists) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
+                if(!dir.Exists) return (true, Array.Empty<string>());
 
                 List<string> uris = new List<string>();
                 var files = await dir.GetFilesAsync($"*{config.fileSuffix}", SearchOption.AllDirectories);
@@ -98,12 +98,12 @@ namespace FeatureFlowFramework.DataStorage
                         uris.Add(uri);
                     }
                 }
-                return new AsyncOutResult<bool, string[]>(true, uris.ToArray());
+                return (true, uris.ToArray());
             }
             catch(Exception e)
             {
                 Log.ERROR(this, "Reading files to retreive Uris failed!", e.ToString());
-                return new AsyncOutResult<bool, string[]>(false, null);
+                return (false, null);
             }
         }
 

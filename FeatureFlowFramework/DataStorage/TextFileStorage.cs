@@ -39,7 +39,7 @@ namespace FeatureFlowFramework.DataStorage
         private CacheItemPolicy cacheItemPolicy;
         private readonly MemoryCache cache;
         private HashSet<string> fileSet = new HashSet<string>();
-        private Dictionary<string, Subscription> subscriptions = new Dictionary<string, Subscription>();
+        private StorageSubscriptions subscriptions = new StorageSubscriptions();
         public string Category => category;
 
         private bool fileSystemObservationActive = false;
@@ -52,12 +52,12 @@ namespace FeatureFlowFramework.DataStorage
             this.category = category;
             this.config = config ?? new Config();
             config = this.config;
-            if (config.configUri == null) config.configUri += config.Uri + "_" + category;
-            if (config.ConfigCategory != category) config.TryUpdateFromStorageAsync(false).Wait();
+            if (config.configUri == null) config.configUri = config.Uri + "_" + this.category;
+            if (config.ConfigCategory != this.category) config.TryUpdateFromStorageAsync(false).Wait();
             config.configUri = configUri ?? config.configUri;
 
             string basePath = config.basePath;
-            if (config.useCategoryFolder) basePath = Path.Combine(config.basePath, category);
+            if (config.useCategoryFolder) basePath = Path.Combine(config.basePath, this.category);
             rootDir = new DirectoryInfo(basePath);
 
             lock (fileSet)
@@ -230,13 +230,11 @@ namespace FeatureFlowFramework.DataStorage
             }
         }
 
-        private void UpdateCacheForSubscriptions(ChangeNotification changeNotification)
+        private void UpdateCacheForSubscriptions(string uri)
         {
-            if (changeNotification.updateEvent == UpdateEvent.Removed) return;
-
             if (config.updateCacheForSubscription)
             {
-                string filePath = UriToFilePath(changeNotification.uri);
+                string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
                 if (fileInfo.Exists)
                 {
@@ -246,12 +244,12 @@ namespace FeatureFlowFramework.DataStorage
                         {
                             if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                             var fileContent = stream.ReadToEnd();
-                            cache?.Add(changeNotification.uri, fileContent, cacheItemPolicy);
+                            cache?.Add(uri, fileContent, cacheItemPolicy);
                         }
                     }
                     catch (Exception e)
                     {
-                        cache?.Remove(changeNotification.uri);
+                        cache?.Remove(uri);
                         Log.WARNING(this, $"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
                     }
                 }
@@ -273,28 +271,9 @@ namespace FeatureFlowFramework.DataStorage
 
         private void NotifySubscriptions(string uri, UpdateEvent updateEvent, bool updateCache = true)
         {
-            var subscriptions = this.subscriptions;
-            List<Subscription> toBeRemoved = null;
-            foreach (var subscription in subscriptions.Values)
+            if (subscriptions.Notify(uri, this.category, updateEvent) && updateCache)
             {
-                if (subscription.sender.CountConnectedSinks == 0)
-                {
-                    if (toBeRemoved == null) toBeRemoved = new List<Subscription>();
-                    toBeRemoved.Add(subscription);
-                }
-                else
-                {
-                    if (uri.MatchesWildcard(subscription.uriPattern))
-                    {
-                        var changeNotification = new ChangeNotification(this.category, uri, updateEvent, AppTime.Now);
-                        if (updateCache)
-                        {
-                            UpdateCacheForSubscriptions(changeNotification);
-                            updateCache = false;
-                        }
-                        subscription.sender.Send(changeNotification);
-                    }
-                }
+                UpdateCacheForSubscriptions(uri);
             }
         }
 
@@ -312,18 +291,8 @@ namespace FeatureFlowFramework.DataStorage
 
         public bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink)
         {
-            if (!subscriptions.TryGetValue(uriPattern, out Subscription subscription))
-            {
-                ActivateFileSystemObservation(true);
-                lock (subscriptions)
-                {
-                    var newSubscriptions = new Dictionary<string, Subscription>(subscriptions);
-                    subscription = new Subscription(uriPattern, new Sender());
-                    newSubscriptions.Add(uriPattern, subscription);
-                    subscriptions = newSubscriptions;
-                }
-            }
-            subscription.sender.ConnectTo(notificationSink);
+            ActivateFileSystemObservation(true);
+            subscriptions.Add(uriPattern, notificationSink);
             return true;
         }
 
@@ -397,7 +366,7 @@ namespace FeatureFlowFramework.DataStorage
                 {
                     lock (fileSet)
                     {
-                        if (fileSet.Count == 0) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
+                        if (fileSet.Count == 0) return (true, Array.Empty<string>());
 
                         var uris = new List<string>();
                         foreach (var fileName in fileSet)
@@ -408,12 +377,12 @@ namespace FeatureFlowFramework.DataStorage
                                 uris.Add(uri);
                             }
                         }
-                        return new AsyncOutResult<bool, string[]>(true, uris.ToArray());
+                        return (true, uris.ToArray());
                     }
                 }
                 else
                 {
-                    if (!rootDir.RefreshAnd().Exists) return new AsyncOutResult<bool, string[]>(true, Array.Empty<string>());
+                    if (!rootDir.RefreshAnd().Exists) return (true, Array.Empty<string>());
 
                     var uris = new List<string>();
                     var files = await rootDir.GetFilesAsync($"*{config.fileSuffix}", SearchOption.AllDirectories);
@@ -425,13 +394,13 @@ namespace FeatureFlowFramework.DataStorage
                             uris.Add(uri);
                         }
                     }
-                    return new AsyncOutResult<bool, string[]>(true, uris.ToArray());
+                    return (true, uris.ToArray());
                 }
             }
             catch (Exception e)
             {
                 Log.ERROR(this, "Reading files to retreive Uris failed!", e.ToString());
-                return new AsyncOutResult<bool, string[]>(false, null);
+                return (false, null);
             }
         }
 
@@ -453,7 +422,7 @@ namespace FeatureFlowFramework.DataStorage
                 if (cache?.Get(uri) is string cacheString)
                 {
                     success = TryDeserialize(cacheString, out data);
-                    return new AsyncOutResult<bool, T>(success, data);
+                    return (success, data);
                 }
 
                 string filePath = UriToFilePath(uri);
@@ -474,11 +443,11 @@ namespace FeatureFlowFramework.DataStorage
                     }
                 }
 
-                return new AsyncOutResult<bool, T>(success, data);
+                return (success, data);
             }
             catch
             {
-                return new AsyncOutResult<bool, T>(false, default);
+                return (false, default);
             }
         }
 

@@ -107,14 +107,14 @@ namespace FeatureFlowFramework.DataFlows
             bool success = false;
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
-            if(IsEmpty) return new AsyncOutResult<bool, T>(false, default);
+            if(IsEmpty) return (false, default);
             using (queueLock.ForWriting())
             {
                 success = queue.TryDequeue(out message);
             }
             if(IsEmpty) readerWakeEvent.Reset();
             if(!IsFull) writerWakeEvent.Set();
-            return new AsyncOutResult<bool, T>(success, message);
+            return (success, message);
         }
 
         public T[] ReceiveAll()

@@ -63,11 +63,11 @@ namespace FeatureFlowFramework.DataFlows
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
             using (myLock.ForWriting())
             {
-                if(IsEmpty) return new AsyncOutResult<bool, T>(false, message);
+                if(IsEmpty) return (false, message);
                 message = receivedMessage;
                 receivedMessage = default;
                 readerWakeEvent.Reset();
-                return new AsyncOutResult<bool, T>(true, message);
+                return (true, message);
             }
         }
 
