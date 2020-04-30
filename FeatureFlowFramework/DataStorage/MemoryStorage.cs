@@ -29,7 +29,8 @@ namespace FeatureFlowFramework.DataStorage
         public MemoryStorage(string category, Config config = default)
         {
             this.category = category;
-            if(config.configUri == null) config.configUri+= config.Uri + "_" + this.category;
+            if(config.configUri == null) config.configUri = "MemoryStorageConfig";
+            config.configUri = config.Uri + "_" + this.category;
         }
 
         public string Category => category;

@@ -12,12 +12,12 @@ namespace FeatureFlowFramework.DataStorage
             public FeatureLock categoryToReaderLock = new FeatureLock();
             public Dictionary<string, IStorageWriter> categoryToWriter = new Dictionary<string, IStorageWriter>();
             public FeatureLock categoryToWriterLock = new FeatureLock();
-            public Func<string, IStorageReader> createDefaultReader = category => new TextFileStorage(category, "defaultStorage");
-            public Func<string, IStorageWriter> createDefaultWriter = category => new TextFileStorage(category, "defaultStorage");
+            public Func<string, IStorageReader> createDefaultReader = category => new TextFileStorage(category);
+            public Func<string, IStorageWriter> createDefaultWriter = category => new TextFileStorage(category);
 
             public Context()
             {
-                var configStorage = new TextFileStorage("config", "configStorage", new TextFileStorage.Config() { fileSuffix = ".json" });
+                var configStorage = new TextFileStorage("config", new TextFileStorage.Config() { fileSuffix = ".json" });
                 categoryToReader[configStorage.Category] = configStorage;
                 categoryToWriter[configStorage.Category] = configStorage;
 
@@ -42,6 +42,19 @@ namespace FeatureFlowFramework.DataStorage
 
         public static Func<string, IStorageReader> DefaultReaderFactory { set => context.Data.createDefaultReader = value; }
         public static Func<string, IStorageWriter> DefaultWriterFactory { set => context.Data.createDefaultWriter = value; }
+
+        public static void RemoveAllReaderAndWriter()
+        {
+            var contextData = context.Data;
+            using(contextData.categoryToReaderLock.ForWriting())
+            {
+                contextData.categoryToReader.Clear();
+            }
+            using(contextData.categoryToWriterLock.ForWriting())
+            {
+                contextData.categoryToWriter.Clear();
+            }
+        }
 
         public static IStorageReader GetReader(string category)
         {
