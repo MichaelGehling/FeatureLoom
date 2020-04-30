@@ -43,7 +43,7 @@ namespace FeatureFlowFramework.Forms
                 this.logViewer = logViewer;
 
                 logViewer.FormClosing += (a, b) => closingTrigger.Post(true);
-                Log.logForwarderBuffer.ConnectTo(queue);
+                Log.LogForwarderBuffer.ConnectTo(queue);
             }
 
             public class SM : StateMachine<WritingLogWorkflow>
@@ -55,7 +55,7 @@ namespace FeatureFlowFramework.Forms
                             .WaitForAny(c => c.waitHandles.All ?? c.waitHandles.Init(c.queue, c.closingTrigger))
                         .Step("If the window was closed disconnect and finish the workflow")
                             .If(c => c.closingTrigger.IsTriggered(false) && !c.logViewer.hideOnClosing)
-                                .Do(c => Log.logForwarder.DisconnectFrom(c.queue))
+                                .Do(c => Log.LogForwarder.DisconnectFrom(c.queue))
                                 .Finish()
                         .Step("Read logmessages from queue and write them to the textbox for a short time")
                             .Do(c =>
