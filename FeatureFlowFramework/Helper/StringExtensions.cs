@@ -7,21 +7,6 @@ namespace FeatureFlowFramework.Helper
 {
     public static class StringExtensions
     {
-        public static string StripNameCollisionCounter(this string nameWithCounter)
-        {
-            char preFix = '[';
-            char postFix = ']';
-            if(nameWithCounter.Length < 3) return nameWithCounter;
-            if(nameWithCounter[nameWithCounter.Length - 1] != postFix) return nameWithCounter;
-            int preFixPos = nameWithCounter.LastIndexOf(preFix, nameWithCounter.Length - 3);
-            if(preFixPos < -1) return nameWithCounter;
-            string counter = nameWithCounter.Substring(preFixPos + 1, nameWithCounter.Length - 2 - preFixPos);
-            if(!int.TryParse(counter, out int dummy)) return nameWithCounter;
-
-            string nameWithoutCounter = nameWithCounter.Substring(0, nameWithCounter.Length - (2 + counter.Length));
-            return nameWithoutCounter;
-        }
-
         public static byte[] ToByteArray(this string str, Encoding encoding = default)
         {
             if(encoding == default) encoding = Encoding.UTF8;
@@ -60,10 +45,7 @@ namespace FeatureFlowFramework.Helper
             return patternPos;
         }
 
-        public static int FindPatternPos(this byte[] buffer, byte[] pattern)
-        {
-            return buffer.FindPatternPos(0, buffer.Length, pattern);
-        }
+        
 
         public static string MakeValidFilename(this string fileName)
         {
@@ -130,6 +112,21 @@ namespace FeatureFlowFramework.Helper
                 str = str.Substring(0, str.Length - trimStr.Length);
             }
             return str;
+        }
+
+        public static string Substring(this string str, string startAfter, string endBefore = null)
+        {
+            int startPos = 0;
+            int endPos = str.Length-1;
+            if (!startAfter.EmptyOrNull())
+            {
+                startPos = str.IndexOf(startAfter);
+            }
+            if (!endBefore.EmptyOrNull())
+            {
+                endPos = str.IndexOf(endBefore, startPos);
+            }
+            return str.Substring(startPos, endPos - startPos);
         }
     }
 }

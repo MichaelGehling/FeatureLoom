@@ -1,29 +1,45 @@
 ﻿using FeatureFlowFramework.Aspects;
 using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.Helper;
 using System;
 
 namespace FeatureFlowFramework.Logging
 {
     public static class Log
     {
-        static Log()
-        {
-            logSender.ConnectTo(logForwarder);
-            logForwarder.ConnectTo(logForwarderBuffer);
-            logForwarder.ConnectTo(defaultConsoleLogger);
-            logForwarder.ConnectTo(defaultFileLogger);
-            defaultFileLogger.Run();
-        }
 
-        private static readonly Sender<LogMessage> logSender = new Sender<LogMessage>();
-        public static readonly ActiveForwarder logForwarder = new ActiveForwarder(1, 1000, 10, 10000, TimeSpan.Zero, true);
-        public static readonly BufferingForwarder<LogMessage> logForwarderBuffer = new BufferingForwarder<LogMessage>(1000);
         public static DefaultConsoleLogger defaultConsoleLogger = new DefaultConsoleLogger();
         public static DefaultFileLogger defaultFileLogger = new DefaultFileLogger();
 
+        class Context : IServiceContextData
+        {
+            public readonly Sender<LogMessage> logSender = new Sender<LogMessage>();
+            public readonly ActiveForwarder logForwarder = new ActiveForwarder(1, 1000, 10, 10000, TimeSpan.Zero, true);
+            public readonly BufferingForwarder<LogMessage> logForwarderBuffer = new BufferingForwarder<LogMessage>(1000);
+
+            public Context()
+            {
+                logSender.ConnectTo(logForwarder);
+                logForwarder.ConnectTo(logForwarderBuffer);
+                logForwarder.ConnectTo(defaultConsoleLogger);
+                logForwarder.ConnectTo(defaultFileLogger);
+            }
+
+            public IServiceContextData Copy()
+            {
+                Context newContext = new Context();
+                newContext.logForwarderBuffer.AddRangeToBuffer(logForwarderBuffer.GetAllBufferEntries());
+                return newContext;
+            }
+        }
+        static ServiceContext<Context> context = new ServiceContext<Context>();
+
+        public static BufferingForwarder<LogMessage> LogForwarderBuffer => context.Data.logForwarderBuffer;
+        public static ActiveForwarder LogForwarder => context.Data.logForwarder;
+
         public static void SendLogMessage(LogMessage msg)
         {
-            logSender.Send(msg);
+            context.Data.logSender.Send(msg);
         }
 
         public static bool IsEnabledFor(Loglevel level, string contextName = null)

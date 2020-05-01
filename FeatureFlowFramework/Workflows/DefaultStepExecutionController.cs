@@ -127,6 +127,7 @@ namespace FeatureFlowFramework.Workflows
         private static bool DoWaiting<C>(C context, Step<C> step, PartialStep<C> partialStep) where C : IStateMachineContext
         {
             bool proceed = true;
+            context.ExecutionPhase = Workflow.ExecutionPhase.Waiting;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
             try
             {
@@ -141,7 +142,7 @@ namespace FeatureFlowFramework.Workflows
                 }
                 else throw e.InnerOrSelf();
             }
-
+            context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
             return proceed;
         }

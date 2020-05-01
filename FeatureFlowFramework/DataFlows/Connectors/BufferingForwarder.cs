@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helper;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
@@ -64,6 +65,22 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(message is T msgT) using(await bufferLock.ForWritingAsync()) buffer.Add(msgT);
             await sourceHelper.ForwardAsync(message);
+        }
+
+        public T[] GetAllBufferEntries()
+        {
+            using(bufferLock.ForReading())
+            {
+                return buffer.GetAvailableSince(0, out _);
+            }
+        }
+
+        public void AddRangeToBuffer(IEnumerable<T> messages)
+        {
+            using(bufferLock.ForWriting())
+            {
+                foreach(var msg in messages) buffer.Add(msg);
+            }
         }
     }
 }

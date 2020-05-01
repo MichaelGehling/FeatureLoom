@@ -6,36 +6,69 @@ namespace FeatureFlowFramework.DataStorage
 {
     public static class Storage
     {
-        static Storage()
+        class Context : IServiceContextData
         {
-            var configStorage = new TextFileStorage("config", "configStorage", new TextFileStorage.Config() { fileSuffix = ".json" });
-            RegisterReaderWriter(configStorage);
+            public Dictionary<string, IStorageReader> categoryToReader = new Dictionary<string, IStorageReader>();
+            public FeatureLock categoryToReaderLock = new FeatureLock();
+            public Dictionary<string, IStorageWriter> categoryToWriter = new Dictionary<string, IStorageWriter>();
+            public FeatureLock categoryToWriterLock = new FeatureLock();
+            public Func<string, IStorageReader> createDefaultReader = category => new TextFileStorage(category);
+            public Func<string, IStorageWriter> createDefaultWriter = category => new TextFileStorage(category);
 
-            var certificateStorage = new CertificateStorageReader("certificate");
-            RegisterReader(certificateStorage);
+            public Context()
+            {
+                var configStorage = new TextFileStorage("config", new TextFileStorage.Config() { fileSuffix = ".json" });
+                categoryToReader[configStorage.Category] = configStorage;
+                categoryToWriter[configStorage.Category] = configStorage;
+
+                var certificateStorage = new CertificateStorageReader("certificate");
+                categoryToReader[certificateStorage.Category] = certificateStorage;
+            }
+
+            public IServiceContextData Copy()
+            {
+                Context newContext = new Context()
+                {
+                    categoryToReader = new Dictionary<string, IStorageReader>(this.categoryToReader),
+                    categoryToWriter = new Dictionary<string, IStorageWriter>(this.categoryToWriter),
+                    createDefaultReader = this.createDefaultReader,
+                    createDefaultWriter = this.createDefaultWriter
+                };
+                return newContext;
+            }
         }
+        static ServiceContext<Context> context = new ServiceContext<Context>();
+        
 
-        private static Dictionary<string, IStorageReader> categoryToReader = new Dictionary<string, IStorageReader>();
-        static FeatureLock categoryToReaderLock = new FeatureLock();
-        private static Dictionary<string, IStorageWriter> categoryToWriter = new Dictionary<string, IStorageWriter>();
-        static FeatureLock categoryToWriterLock = new FeatureLock();
-        private static Func<string, IStorageReader> createDefaultReader = category => new TextFileStorage(category, "defaultStorage");
-        private static Func<string, IStorageWriter> createDefaultWriter = category => new TextFileStorage(category, "defaultStorage");
-        public static Func<string, IStorageReader> DefaultReaderFactory { set => createDefaultReader = value; }
-        public static Func<string, IStorageWriter> DefaultWriterFactory { set => createDefaultWriter = value; }
+        public static Func<string, IStorageReader> DefaultReaderFactory { set => context.Data.createDefaultReader = value; }
+        public static Func<string, IStorageWriter> DefaultWriterFactory { set => context.Data.createDefaultWriter = value; }
+
+        public static void RemoveAllReaderAndWriter()
+        {
+            var contextData = context.Data;
+            using(contextData.categoryToReaderLock.ForWriting())
+            {
+                contextData.categoryToReader.Clear();
+            }
+            using(contextData.categoryToWriterLock.ForWriting())
+            {
+                contextData.categoryToWriter.Clear();
+            }
+        }
 
         public static IStorageReader GetReader(string category)
         {
-            using(categoryToReaderLock.ForWriting())
+            var contextData = context.Data;
+            using(contextData.categoryToReaderLock.ForWriting())
             {
-                if(categoryToReader.TryGetValue(category, out IStorageReader reader)) return reader;
+                if(contextData.categoryToReader.TryGetValue(category, out IStorageReader reader)) return reader;
                 else
                 {
-                    if(!(categoryToWriter.TryGetValue(category, out IStorageWriter writer) && writer is IStorageReader newReader))
+                    if(!(contextData.categoryToWriter.TryGetValue(category, out IStorageWriter writer) && writer is IStorageReader newReader))
                     {
-                        newReader = createDefaultReader(category);
+                        newReader = contextData.createDefaultReader(category);
                     }
-                    categoryToReader[category] = newReader;
+                    contextData.categoryToReader[category] = newReader;
                     return newReader;
                 };
             }
@@ -43,16 +76,17 @@ namespace FeatureFlowFramework.DataStorage
 
         public static IStorageWriter GetWriter(string category)
         {
-            using (categoryToWriterLock.ForWriting())
+            var contextData = context.Data;
+            using (contextData.categoryToWriterLock.ForWriting())
             {
-                if(categoryToWriter.TryGetValue(category, out IStorageWriter writer)) return writer;
+                if(contextData.categoryToWriter.TryGetValue(category, out IStorageWriter writer)) return writer;
                 else
                 {
-                    if(!(categoryToReader.TryGetValue(category, out IStorageReader reader) && reader is IStorageWriter newWriter))
+                    if(!(contextData.categoryToReader.TryGetValue(category, out IStorageReader reader) && reader is IStorageWriter newWriter))
                     {
-                        newWriter = createDefaultWriter(category);
+                        newWriter = contextData.createDefaultWriter(category);
                     }
-                    categoryToWriter[category] = newWriter;
+                    contextData.categoryToWriter[category] = newWriter;
                     return newWriter;
                 };
             }
@@ -60,17 +94,19 @@ namespace FeatureFlowFramework.DataStorage
 
         public static void RegisterReader(IStorageReader reader)
         {
-            using (categoryToReaderLock.ForWriting())
+            var contextData = context.Data;
+            using (contextData.categoryToReaderLock.ForWriting())
             {
-                categoryToReader[reader.Category] = reader;
+                contextData.categoryToReader[reader.Category] = reader;
             }
         }
 
         public static void RegisterWriter(IStorageWriter writer)
         {
-            using (categoryToWriterLock.ForWriting())
+            var contextData = context.Data;
+            using (contextData.categoryToWriterLock.ForWriting())
             {
-                categoryToWriter[writer.Category] = writer;
+                contextData.categoryToWriter[writer.Category] = writer;
             }
         }
 
@@ -82,9 +118,10 @@ namespace FeatureFlowFramework.DataStorage
 
         public static bool HasCategoryReader(string category)
         {
-            using (categoryToReaderLock.ForReading())
+            var contextData = context.Data;
+            using (contextData.categoryToReaderLock.ForReading())
             {
-                if(categoryToReader.ContainsKey(category)) return true;
+                if(contextData.categoryToReader.ContainsKey(category)) return true;
                 else if(HasCategoryWriter(category) && GetWriter(category) is IStorageReader) return true;
                 else return false;
             }
@@ -92,9 +129,10 @@ namespace FeatureFlowFramework.DataStorage
 
         public static bool HasCategoryWriter(string category)
         {
-            using (categoryToWriterLock.ForReading())
+            var contextData = context.Data;
+            using (contextData.categoryToWriterLock.ForReading())
             {
-                if(categoryToWriter.ContainsKey(category)) return true;
+                if(contextData.categoryToWriter.ContainsKey(category)) return true;
                 else if(HasCategoryReader(category) && GetReader(category) is IStorageWriter) return true;
                 else return false;
             }

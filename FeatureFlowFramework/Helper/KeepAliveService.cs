@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace FeatureFlowFramework.Helper
 {
-    public static class KeepAliveExtension
+    public static class KeepAliveService
     {
         private static ConditionalWeakTable<object, List<object>> anchors = new ConditionalWeakTable<object, List<object>>();
         private static List<object> anchorless = new List<object>();
