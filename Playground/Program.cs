@@ -16,6 +16,7 @@ namespace Playground
     {
         static void Main(string[] args)
         {
+            /*
             QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
             SharedData<int> sharedInt = new SharedData<int>(42, "mySharedInt");
             SharedData<string> sharedObj = new SharedData<string>("Hello", "mySharedObj");
@@ -34,7 +35,7 @@ namespace Playground
                     objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
                 }
             }
-
+            */
             var timer = AppTime.TimeKeeper;
             TimeSpan x;
             long c1 = 0;

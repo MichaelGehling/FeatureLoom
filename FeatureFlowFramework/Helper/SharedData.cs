@@ -8,12 +8,10 @@ namespace FeatureFlowFramework.Helper
         private FeatureLock myLock = new FeatureLock();
         private T value;
         private Sender updateSender;
-        private readonly string name;
 
-        public SharedData(T value, string name = null)
+        public SharedData(T value)
         {
             this.value = value;
-            this.name = name;
         }
 
         public IDataFlowSource UpdateNotifications
@@ -24,8 +22,6 @@ namespace FeatureFlowFramework.Helper
                 return updateSender;
             }
         }
-
-        public string Name => name;
 
         public Type ValueType => value?.GetType() ?? typeof(T);
 
@@ -107,7 +103,6 @@ namespace FeatureFlowFramework.Helper
 
     public interface ISharedData
     {
-        string Name { get; }
         Type ValueType { get; }
         IDataFlowSource UpdateNotifications { get; }
     }

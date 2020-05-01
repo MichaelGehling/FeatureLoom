@@ -34,7 +34,9 @@ namespace FeatureFlowFramework.Workflows
             get
             {
                 return null;
-                /*List<IStateInfo> targetStates = null;
+                //TODO: How to handle variable targetStates?
+                /*
+                List<IStateInfo> targetStates = null;
                 var nextElse = doElse;
                 while (nextElse != null)
                 {
@@ -48,14 +50,15 @@ namespace FeatureFlowFramework.Workflows
 
                 if (targetStates == null)
                 {
-                    if (targetState == null) return new IStateInfo[] { };
+                    if (targetState == null) return Array.Empty<IStateInfo>();
                     else return new IStateInfo[] { targetState };
                 }
                 else
                 {
                     if (targetState != null) targetStates.Add(targetState);
                     return targetStates.ToArray();
-                }*/
+                }
+                */
             }
         }
 
