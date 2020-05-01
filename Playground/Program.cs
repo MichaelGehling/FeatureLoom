@@ -16,10 +16,10 @@ namespace Playground
     {
         static void Main(string[] args)
         {
-            /*
+            
             QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
-            SharedData<int> sharedInt = new SharedData<int>(42, "mySharedInt");
-            SharedData<string> sharedObj = new SharedData<string>("Hello", "mySharedObj");
+            SharedData<int> sharedInt = new SharedData<int>(42);
+            SharedData<string> sharedObj = new SharedData<string>("Hello");
             sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
 
             using (var myInt = sharedInt.GetReadAccess())
@@ -30,12 +30,12 @@ namespace Playground
             
             if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
             {
-                if (update.sharedData.Name == "mySharedObj" &&  update.sharedData is SharedData<string> objUpdate)
+                if (update.originatorId == 99 && update.sharedData is SharedData<string> objUpdate)
                 {
                     objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
                 }
             }
-            */
+            
             var timer = AppTime.TimeKeeper;
             TimeSpan x;
             long c1 = 0;
