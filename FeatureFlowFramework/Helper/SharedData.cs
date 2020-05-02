@@ -3,6 +3,24 @@ using System;
 
 namespace FeatureFlowFramework.Helper
 {
+    /// <summary>
+    /// Shared data can be used in multiple parallel contexts to store and share data.
+    /// The sharedData variable has to grant read or write access, before the data can be accessed.
+    /// Additionally, it is possible to listen to update notifications, so one context can react 
+    /// on data changes made by another. When requesting write access an originatorId can be set, so
+    /// it is possible to identifiy update notifications from specific originators, e.g. to filter
+    /// own changes.
+    /// 
+    /// Usage:
+    /// using(var access = sharedData.GetWriteAccess())
+    /// {
+    ///     access.SetValue(someValue)
+    /// }
+    /// 
+    /// IMPORTANT: The access-variable must be used with a using block, so it will be disposed afterwards.
+    /// If the WriteAccess is not disposed, the access to the shared data is permanently blocked!
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public class SharedData<T> : ISharedData
     {
         private FeatureLock myLock = new FeatureLock();
@@ -44,6 +62,16 @@ namespace FeatureFlowFramework.Helper
             using(var reader = this.GetReadAccess()) readAction(reader);
         }
 
+        /// <summary>
+        /// Provides read and write access to the shared data.
+        /// The WriteAccess must be used in a using block, so it will be disposed afterwards.
+        /// IMPORTANT: If the WriteAccess is not disposed, the access to the shared data is permanently blocked!
+        /// By default the SharedData will send a notification when the WriteAccess is disposed,
+        /// which can be suppressed by calling SuppressPublishUpdate() inside the using block;
+        /// 
+        /// That problem could be reduced by using a class instead of a struct (a finalizer could call the dispose),
+        /// but creating a new object each time a variable is accessed would be quite costly on the GC.
+        /// </summary>
         public struct WriteAccess : IDisposable
         {
             private FeatureLock.WriteLock myLock;
@@ -54,7 +82,7 @@ namespace FeatureFlowFramework.Helper
             public T Value
             {
                 get => shared.value;
-                //set => shared.value = value;
+                //set => shared.value = value; //Not possible with a struct as a using-variable :(
             }
 
             public void SetValue(T newValue) => shared.value = newValue;
@@ -77,6 +105,14 @@ namespace FeatureFlowFramework.Helper
             }
         }
 
+        /// <summary>
+        /// Provides only read access to the shared data.
+        /// The ReadAccess must be used in a using block, so it will be disposed afterwards.
+        /// IMPORTANT: If the ReadAccess is not disposed, the access to the shared data is permanently blocked!
+        ///
+        /// That problem could be reduced by using a class instead of a struct (a finalizer could call the dispose),
+        /// but creating a new object each time a variable is accessed would be quite costly on the GC.
+        /// </summary>
         public struct ReadAccess : IDisposable
         {
             private FeatureLock.ReadLock myLock;

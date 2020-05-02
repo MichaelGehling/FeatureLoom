@@ -35,6 +35,8 @@ namespace Playground
                     objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
                 }
             }
+
+
             
             var timer = AppTime.TimeKeeper;
             TimeSpan x;
