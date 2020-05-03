@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
+using FeatureFlowFramework.Helper;
 using System.Collections.Generic;
 using Xunit;
 
@@ -49,6 +50,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanAggregateComplementMessagesToASingleMessage()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), FullNameAggrergationData>((msg, aggregation) =>
             {
@@ -83,6 +86,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void ForwardsUnusedMessagesToElse()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), FullNameAggrergationData>((msg, aggregation) =>
             {
@@ -104,6 +109,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanProduceMultipleMessagesAsAggregationResult()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), VariantNameAggrergationData>((msg, aggregation) =>
             {

@@ -14,6 +14,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var forwarder = new CountingForwarder();
             var sink = new SingleMessageTestSink<T>();
@@ -26,6 +28,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CountsTheForwardedMessages()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var forwarder = new CountingForwarder();
             var sink = new SingleMessageTestSink<object>();
@@ -41,6 +45,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanWaitForANumberOfMessages()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var forwarder = new CountingForwarder();
             var sink = new SingleMessageTestSink<object>();

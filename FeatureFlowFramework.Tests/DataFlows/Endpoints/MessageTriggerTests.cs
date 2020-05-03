@@ -11,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void IsSetToTriggeredWhenReceivesAnyMessage()
         {
+            TestHelper.PrepareTestContext();
+
             MessageTrigger trigger = new MessageTrigger(MessageTrigger.Mode.Default);
             Assert.False(trigger.IsTriggered());
             trigger.Post(42);
@@ -24,6 +26,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanToggleStatusWhenReceivingMultipleMessages()
         {
+            TestHelper.PrepareTestContext();
+
             MessageTrigger trigger = new MessageTrigger(MessageTrigger.Mode.Toggle);
             Assert.False(trigger.IsTriggered());
             trigger.Post(42);
@@ -37,6 +41,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanAutoResetTriggerStatus()
         {
+            TestHelper.PrepareTestContext();
+
             MessageTrigger trigger = new MessageTrigger(MessageTrigger.Mode.InstantReset);
             Assert.False(trigger.IsTriggered());
             var task = trigger.WaitAsync();

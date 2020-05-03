@@ -1,4 +1,5 @@
 using FeatureFlowFramework.DataFlows.Test;
+using FeatureFlowFramework.Helper;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
@@ -10,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanSendObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var sink = new SingleMessageTestSink<T>();
             sender.ConnectTo(sink);
@@ -21,6 +24,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanConnectToMultipleSinks()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var sinkInt1 = new SingleMessageTestSink<int>();
             var sinkInt2 = new SingleMessageTestSink<int>();
@@ -45,6 +50,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanDisconnectSinks()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var sinkInt1 = new SingleMessageTestSink<int>();
             var sinkInt2 = new SingleMessageTestSink<int>();
@@ -65,6 +72,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void ProvidesConnectedSinks()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var sinkInt1 = new SingleMessageTestSink<int>();
             var sinkInt2 = new SingleMessageTestSink<int>();

@@ -13,6 +13,8 @@ namespace FeatureFlowFramework.Tests.DataFlows.Endpoints
         [Fact]
         public void ProvidesSingleMessageWithHighestPriority()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var receiver = new PriorityMessageReceiver<int>(Comparer<int>.Create((oldMsg, newMsg) => oldMsg - newMsg));
             sender.ConnectTo(receiver);
@@ -29,6 +31,8 @@ namespace FeatureFlowFramework.Tests.DataFlows.Endpoints
         [Fact]
         public void SignalsFilledQueue()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var receiver = new PriorityMessageReceiver<int>(Comparer<int>.Create((oldMsg, newMsg) => oldMsg - newMsg));
             sender.ConnectTo(receiver);
@@ -45,6 +49,8 @@ namespace FeatureFlowFramework.Tests.DataFlows.Endpoints
         [InlineData(20, 50, true)]
         public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {
+            TestHelper.PrepareTestContext();
+
             TimeSpan tolerance = 20.Milliseconds();
             var sender = new Sender();
             var receiver = new PriorityMessageReceiver<int>(Comparer<int>.Create((oldMsg, newMsg) => oldMsg - newMsg));

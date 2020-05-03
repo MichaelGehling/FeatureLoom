@@ -8,6 +8,8 @@ namespace FeatureFlowFramework.DataFlows.RPC
         [Fact]
         public void CanCallMethodViaDataFlow()
         {
+            TestHelper.PrepareTestContext();
+
             var callee = new RpcCallee();
             var caller = new RpcCaller(1.Seconds());
             caller.ConnectToAndBack(callee);
@@ -21,6 +23,8 @@ namespace FeatureFlowFramework.DataFlows.RPC
         [Fact]
         public void CanCallMethodWithSeveralParameters()
         {
+            TestHelper.PrepareTestContext();
+
             var callee = new RpcCallee();
             var caller = new RpcCaller(1.Seconds());
             caller.ConnectToAndBack(callee);
@@ -39,6 +43,8 @@ namespace FeatureFlowFramework.DataFlows.RPC
         [Fact]
         public void CanCallMethodAndIgnoringResponse()
         {
+            TestHelper.PrepareTestContext();
+
             var callee = new RpcCallee();
             var caller = new RpcCaller(1.Seconds());
             caller.ConnectTo(callee);
@@ -65,6 +71,8 @@ namespace FeatureFlowFramework.DataFlows.RPC
         [Fact]
         public void CanCallMethodWithSeveralParametersFromString()
         {
+            TestHelper.PrepareTestContext();
+
             var callee = new RpcCallee();
             var caller = new StringRpcCaller(1.Seconds());
             caller.ConnectToAndBack(callee);
@@ -93,6 +101,8 @@ namespace FeatureFlowFramework.DataFlows.RPC
         [Fact]
         public void CanCallMethodOnMultipleCalleesAndReceiveAllResults()
         {
+            TestHelper.PrepareTestContext();
+
             var caller = new RpcCaller(1.Seconds());
             var calleeA = new RpcCallee();
             var calleeB = new RpcCallee();
@@ -112,6 +122,8 @@ namespace FeatureFlowFramework.DataFlows.RPC
         [Fact]
         public void CanCallMethodOnMultipleCalleesAndReceiveAllResultsFromString()
         {
+            TestHelper.PrepareTestContext();
+
             var caller = new StringRpcCaller(1.Seconds());
             var calleeA = new RpcCallee();
             var calleeB = new RpcCallee();
@@ -131,6 +143,8 @@ namespace FeatureFlowFramework.DataFlows.RPC
         [Fact]
         public void RpcRequestsCanBeQueuedAndHandledLater()
         {
+            TestHelper.PrepareTestContext();
+
             var callee = new QueuingRpcCallee();
             var caller = new RpcCaller(1.Seconds());
             caller.ConnectToAndBack(callee);

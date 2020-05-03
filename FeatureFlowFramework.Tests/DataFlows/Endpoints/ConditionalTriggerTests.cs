@@ -11,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void IsOnlySetWhenReceivedValidMessage()
         {
+            TestHelper.PrepareTestContext();
+
             MessageTrigger trigger = new ConditionalTrigger<int, int>(m => m >= 42, null);
             Assert.False(trigger.IsTriggered());
             trigger.Post(41);
@@ -26,6 +28,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void IsResetWhenReceivedValidMessage()
         {
+            TestHelper.PrepareTestContext();
+
             MessageTrigger trigger = new ConditionalTrigger<int, int>(m => m > 42, m => m < 42);
             Assert.False(trigger.IsTriggered());
             trigger.Post(43);

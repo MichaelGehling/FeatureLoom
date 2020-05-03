@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
+using FeatureFlowFramework.Helper;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
@@ -8,6 +9,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanConvertMessage()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<string>();
             var converter = new MessageConverter<string, int>(str => int.Parse(str));
             var sink = new SingleMessageTestSink<int>();

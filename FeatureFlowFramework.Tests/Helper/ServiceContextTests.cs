@@ -123,7 +123,7 @@ namespace FeatureFlowFramework.Tests.Helper
 
         [Fact(Skip = "NoContextSeperationPolicy will interfere other tests")]
         public void NoContextSeperationPolicyWillPreventCopyingContexts()
-        {
+        {            
             ServiceContext.NoContextSeperationPolicy = true;
             
             ServiceContext<TestContextData> context1 = new ServiceContext<TestContextData>();

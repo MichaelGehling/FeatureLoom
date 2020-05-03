@@ -10,6 +10,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
         [Fact]
         public void CanTransferByteArray()
         {
+            TestHelper.PrepareTestContext();
+
             int testPort = TcpTests.testPortCounter++;
             var server = new TcpServerEndpoint(new TcpServerEndpoint.Config()
             {
@@ -49,6 +51,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
         [Fact]
         public void CanTransferString()
         {
+            TestHelper.PrepareTestContext();
+
             int testPort = TcpTests.testPortCounter++;
             var server = new TcpServerEndpoint(new TcpServerEndpoint.Config()
             {

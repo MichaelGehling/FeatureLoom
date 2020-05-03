@@ -11,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var forwarder = new ActiveForwarder();
             var sink = new SingleMessageTestSink<T>();
@@ -32,6 +34,8 @@ namespace FeatureFlowFramework.DataFlows
                                                          int numMessages, int messageDelay,
                                                          int expectedThreads, int expectedRuntime)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var forwarder = new ActiveForwarder(threadLimit, maxIdleMilliseconds, spawnThresholdFactor);
             var delayer = new DelayingForwarder(messageDelay.Milliseconds());

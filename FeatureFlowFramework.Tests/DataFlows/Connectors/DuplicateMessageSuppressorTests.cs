@@ -13,6 +13,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var suppressor = new DuplicateMessageSuppressor(100.Milliseconds());
             var sink = new SingleMessageTestSink<T>();
@@ -25,6 +27,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void SuppressesIdenticalMessagesWithinTimeFrame()
         {
+            TestHelper.PrepareTestContext();
+
             var suppressionTime = 50.Milliseconds();
             var sender = new Sender();
             var suppressor = new DuplicateMessageSuppressor(suppressionTime);
@@ -53,6 +57,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void SupportsCustomIdentityCheck()
         {
+            TestHelper.PrepareTestContext();
+
             var suppressionTime = 50.Milliseconds();
             var sender = new Sender();
             var suppressor = new DuplicateMessageSuppressor(suppressionTime, (a, b) =>

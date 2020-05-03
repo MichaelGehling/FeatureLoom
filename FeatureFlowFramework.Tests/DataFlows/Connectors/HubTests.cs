@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
+using FeatureFlowFramework.Helper;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
@@ -10,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var hub = new Hub();
             var senderSocket = hub.CreateSocket(sender);
@@ -26,6 +29,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void MessagesAreForwardedToAllButSendingSocket()
         {
+            TestHelper.PrepareTestContext();
+
             var senderA = new Sender();
             var senderB = new Sender();
             var senderC = new Sender();

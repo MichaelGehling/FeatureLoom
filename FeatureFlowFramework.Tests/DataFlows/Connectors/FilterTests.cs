@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
+using FeatureFlowFramework.Helper;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
@@ -10,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var filter = new Filter<T>(msg => true);
             var sink = new SingleMessageTestSink<T>();
@@ -22,6 +25,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanFilterMessages()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var filter = new Filter<int>(msg => msg <= 10);
             var counter = new CountingForwarder();

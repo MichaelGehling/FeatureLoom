@@ -11,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var selector = new Selector<T>();
             var trueOption = selector.AddOption(msg => true);
@@ -25,6 +27,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void RoutesMessagesToMatchingOptions()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var selector = new Selector<int>(true);
             sender.ConnectTo(selector);

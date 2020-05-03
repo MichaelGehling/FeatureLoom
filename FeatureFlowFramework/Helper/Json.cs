@@ -169,7 +169,7 @@ namespace FeatureFlowFramework.Helper
             return obj;
         }
 
-        public static void UpdateFromJson(object obj, string json, JsonSerializerSettings settings = null)
+        public static void UpdateFromJson<T>(T obj, string json, JsonSerializerSettings settings = null) where T : class
         {
             if (settings == null && obj is IJsonSerializationSupport) settings = (obj as IJsonSerializationSupport).JsonSerializerSettings;
             if (settings == null) settings = Default_SerializerSettings;

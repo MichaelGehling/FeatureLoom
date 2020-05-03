@@ -13,6 +13,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var forwarder = new BufferingForwarder<object>(10);
             var sink = new SingleMessageTestSink<T>();
@@ -25,6 +27,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void BuffersForwardedDataAndSendsItOnConnection()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<int>();
             var forwarder = new BufferingForwarder<int>(10);
             var sink = new QueueReceiver<int>();

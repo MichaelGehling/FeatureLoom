@@ -13,6 +13,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message) where T : IComparable
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var forwarder = new ActivePriorityForwarder<T>(Comparer<T>.Default);
             var sink = new SingleMessageTestSink<T>();
@@ -34,6 +36,8 @@ namespace FeatureFlowFramework.DataFlows
                                                                  int numMessages, int messageDelay,
                                                                  int expectedThreads, int expectedRuntime)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var forwarder = new ActivePriorityForwarder<int>(Comparer<int>.Default, threadLimit, maxIdleMilliseconds, spawnThresholdFactor);
             var delayer = new DelayingForwarder(messageDelay.Milliseconds());

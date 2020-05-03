@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
+using FeatureFlowFramework.Helper;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
@@ -10,6 +11,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanReceiveObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();            
             var sink = new SingleMessageTestSink<T>();
             sender.ConnectTo(sink);

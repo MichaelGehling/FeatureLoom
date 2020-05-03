@@ -13,6 +13,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanReceiveObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var receiver = new PriorityQueueReceiver<T>(Comparer<T>.Default);
             sender.ConnectTo(receiver);
@@ -28,6 +30,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(20, 10)]
         public void CanLimitQueueSize(int numMessages, int limit)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Create((a, b) => a == b ? 0 : a < b ? -1 : 1), limit, default);
             sender.ConnectTo(receiver);
@@ -56,6 +60,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(false)]
         public void CanBlockOnFullQueue(bool sendAsync)
         {
+            TestHelper.PrepareTestContext();
+
             TimeSpan blockTime = 100.Milliseconds();
             int limit = 5;
             var sender = new Sender();
@@ -90,6 +96,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void SignalsFilledQueue()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);
             sender.ConnectTo(receiver);
@@ -106,6 +114,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(20, 50, true)]
         public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {
+            TestHelper.PrepareTestContext();
+
             TimeSpan tolerance = 20.Milliseconds();
             var sender = new Sender();
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);

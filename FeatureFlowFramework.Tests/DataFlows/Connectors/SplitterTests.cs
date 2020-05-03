@@ -1,4 +1,5 @@
-﻿using Xunit;
+﻿using FeatureFlowFramework.Helper;
+using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -7,6 +8,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanSplitMessageIntoMultiple()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var splitter = new Splitter<string>(str => str.ToCharArray());
             var receiver = new QueueReceiver<char>();

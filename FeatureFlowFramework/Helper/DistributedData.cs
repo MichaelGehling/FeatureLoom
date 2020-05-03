@@ -48,8 +48,7 @@ namespace FeatureFlowFramework.Helper
                         if (update.timestamp > this.timestamp)
                         {
                             var value = data.Value;
-                            // TODO check if this work with primitive types.
-                            value.UpdateFromJson(update.serializedData); 
+                            value = update.serializedData.FromJson<T>(); 
                             data.SetValue(value);
                             this.timestamp = update.timestamp;
                             return true;
@@ -72,7 +71,9 @@ namespace FeatureFlowFramework.Helper
                 {
                     using (var data = sharedData.GetReadAccess())
                     {
-                        DistributedDataUpdate update = new DistributedDataUpdate(data.Value.ToJson(), uri, timestamp);
+                        this.timestamp = AppTime.Now;
+                        DistributedDataUpdate update = new DistributedDataUpdate(data.Value.ToJson(), uri, this.timestamp);
+                        updateSender.Send(update);
                         return true;
                     }
                 }

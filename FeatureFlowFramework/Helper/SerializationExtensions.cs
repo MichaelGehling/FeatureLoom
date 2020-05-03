@@ -37,7 +37,7 @@ namespace FeatureFlowFramework.Helper
             return obj;
         }
 
-        public static void UpdateFromJson<T>(this T obj, string json, JsonSerializerSettings settings = null)
+        public static void UpdateFromJson<T>(this T obj, string json, JsonSerializerSettings settings = null) where T : class
         {
             Json.UpdateFromJson(obj, json, settings);
         }

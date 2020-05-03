@@ -10,6 +10,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanProcessMessage()
         {
+            TestHelper.PrepareTestContext();
+
             bool processed = false;
             var sender = new Sender();
             var processor = new ProcessingEndpoint<bool>(msg => processed = msg);
@@ -23,6 +25,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void CanLockObjectBeforeProcessing()
         {
+            TestHelper.PrepareTestContext();
+
             bool processed = false;
             var sender = new Sender();
             var processor = new ProcessingEndpoint<bool>(async msg =>

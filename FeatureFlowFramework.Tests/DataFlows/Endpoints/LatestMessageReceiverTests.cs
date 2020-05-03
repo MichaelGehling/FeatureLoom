@@ -12,6 +12,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData("test string")]
         public void CanReceiveObjectsAndValues<T>(T message)
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender<T>();
             var receiver = new LatestMessageReceiver<T>();
             sender.ConnectTo(receiver);
@@ -23,6 +25,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void OnlyProvidesLatestMessage()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var receiver = new LatestMessageReceiver<int>();
             sender.ConnectTo(receiver);
@@ -35,6 +39,8 @@ namespace FeatureFlowFramework.DataFlows
         [Fact]
         public void SignalsFilledQueue()
         {
+            TestHelper.PrepareTestContext();
+
             var sender = new Sender();
             var receiver = new LatestMessageReceiver<int>();
             sender.ConnectTo(receiver);
@@ -51,6 +57,8 @@ namespace FeatureFlowFramework.DataFlows
         [InlineData(20, 50, true)]
         public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {
+            TestHelper.PrepareTestContext();
+
             TimeSpan tolerance = 20.Milliseconds();
             var sender = new Sender();
             var receiver = new LatestMessageReceiver<int>();
