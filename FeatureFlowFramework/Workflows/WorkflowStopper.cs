@@ -35,6 +35,14 @@ namespace FeatureFlowFramework.Workflows
         {
             workflow.ExecutionInfoSource.DisconnectFrom(processor);
         }
-
     }
+
+    public static class WorkflowStopperExtensions
+    {
+        public static WorkflowStopper StopWorkflowWhen(this Workflow workflow, Predicate<Workflow.ExecutionInfo> condition, bool tryCancelWaitingState, bool deactivateWhenFired)
+        {
+            return new WorkflowStopper(workflow, condition, tryCancelWaitingState, deactivateWhenFired);
+        }
+    }
+
 }
