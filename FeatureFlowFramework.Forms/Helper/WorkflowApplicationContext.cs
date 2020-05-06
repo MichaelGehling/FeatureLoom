@@ -34,7 +34,7 @@ namespace FeatureFlowFramework.Helper
                         }
                         Application.ExitThread();
                     }
-                }).KeepAlive(workflow));
+                }));
             }
         }
     }
