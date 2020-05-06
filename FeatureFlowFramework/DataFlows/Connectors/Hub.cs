@@ -116,16 +116,6 @@ namespace FeatureFlowFramework.DataFlows
                 return sendingHelper.ForwardAsync(message);
             }
 
-            public void ConnectTo(IDataFlowSink sink)
-            {
-                ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-            }
-
-            public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-            {
-                return ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-            }
-
             public void DisconnectFrom(IDataFlowSink sink)
             {
                 ((IDataFlowSource)sendingHelper).DisconnectFrom(sink);
@@ -147,6 +137,16 @@ namespace FeatureFlowFramework.DataFlows
                 {
                     RemoveFromHub();
                 }
+            }
+
+            public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+            {
+                ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            }
+
+            public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+            {
+                return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
             }
         }
     }

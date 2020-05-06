@@ -242,16 +242,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         public int CountConnectedSinks => ReceivingFromTcpSource.CountConnectedSinks;
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ReceivingFromTcpSource.ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ReceivingFromTcpSource.ConnectTo(sink);
-        }
-
         public void DisconnectFrom(IDataFlowSink sink)
         {
             ReceivingFromTcpSource.DisconnectFrom(sink);
@@ -291,6 +281,16 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
             base.TryUpdateAppStructureAspects(timeout);
             return true;
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ReceivingFromTcpSource.ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ReceivingFromTcpSource.ConnectTo(sink, weakReference);
         }
     }
 }

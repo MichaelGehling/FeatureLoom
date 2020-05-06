@@ -62,16 +62,6 @@ namespace FeatureFlowFramework.DataFlows.Test
             }
         }
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink);
-        }
-
         public void DisconnectFrom(IDataFlowSink sink)
         {
             ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
@@ -85,6 +75,16 @@ namespace FeatureFlowFramework.DataFlows.Test
         public IDataFlowSink[] GetConnectedSinks()
         {
             return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
         }
     }
 }

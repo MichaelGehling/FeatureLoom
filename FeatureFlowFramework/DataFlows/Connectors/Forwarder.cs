@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.DataFlows
     ///     Just forwards messages without processing it. It is thread-safe. Can be used as a
     ///     hub-element in a dataFlow route.
     /// </summary>
-    public class Forwarder : IDataFlowConnection
+    public class Forwarder : IDataFlowSource, IDataFlowConnection
     {
         protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
 
@@ -15,17 +15,6 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSink[] GetConnectedSinks()
         {
             return sendingHelper.GetConnectedSinks();
-        }
-
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-            return sink;
         }
 
         public void DisconnectAll()
@@ -46,6 +35,16 @@ namespace FeatureFlowFramework.DataFlows
         public virtual async Task PostAsync<M>(M message)
         {
             await sendingHelper.ForwardAsync(message);
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
         }
     }
 }

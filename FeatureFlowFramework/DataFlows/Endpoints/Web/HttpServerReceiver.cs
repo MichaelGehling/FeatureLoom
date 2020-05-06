@@ -29,16 +29,6 @@ namespace FeatureFlowFramework.DataFlows.Web
 
         public string Route => route;
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-        }
-
         public void DisconnectAll()
         {
             ((IDataFlowSource)sendingHelper).DisconnectAll();
@@ -82,6 +72,16 @@ namespace FeatureFlowFramework.DataFlows.Web
                 response.StatusCode = HttpStatusCode.InternalServerError;
             }
             return true;
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
         }
     }
 }

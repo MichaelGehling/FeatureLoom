@@ -22,17 +22,6 @@ namespace FeatureFlowFramework.DataFlows
             return sendingHelper.GetConnectedSinks();
         }
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-            return sink;
-        }
-
         public void DisconnectAll()
         {
             ((IDataFlowSource)sendingHelper).DisconnectAll();
@@ -52,6 +41,16 @@ namespace FeatureFlowFramework.DataFlows
         {
             return sendingHelper.ForwardAsync(message);
         }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
     }
 
     /// <summary> Used to send messages of a specific type to all connected sinks. It is thread safe. <summary>
@@ -64,17 +63,6 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSink[] GetConnectedSinks()
         {
             return sendingHelper.GetConnectedSinks();
-        }
-
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-            return sink;
         }
 
         public void DisconnectAll()
@@ -107,6 +95,16 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(typeof(T).IsAssignableFrom(typeof(U))) return sendingHelper.ForwardAsync(message);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow sending messages of type {typeof(U)}.");
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
         }
     }
 }

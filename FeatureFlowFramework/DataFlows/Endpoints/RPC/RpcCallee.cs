@@ -48,15 +48,6 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink);
-        }
 
         public void DisconnectAll()
         {
@@ -138,6 +129,16 @@ namespace FeatureFlowFramework.DataFlows.RPC
         public void RegisterMethod<P1, P2, P3, P4, P5>(string methodName, Action<P1, P2, P3, P4, P5> method)
         {
             RegisterMethod<(P1, P2, P3, P4, P5), bool>(methodName, p => { method(p.Item1, p.Item2, p.Item3, p.Item4, p.Item5); return true; });
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
         }
     }
 }

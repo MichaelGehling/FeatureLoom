@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
     ///     also thread-safe. Avoid long running functions to avoid blocking the sender
     /// </summary>
     /// <typeparam name="T"> The input type for the filter function </typeparam>
-    public class Filter<T> : IDataFlowConnection, IAlternativeDataFlow
+    public class Filter<T> : IDataFlowSource, IDataFlowConnection, IAlternativeDataFlow
     {
         protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
         protected Func<T, bool> predicate;
@@ -36,17 +36,6 @@ namespace FeatureFlowFramework.DataFlows
                 if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
                 return alternativeSendingHelper;
             }
-        }
-
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-            return sink;
         }
 
         public void DisconnectAll()
@@ -77,6 +66,16 @@ namespace FeatureFlowFramework.DataFlows
                 else return alternativeSendingHelper?.ForwardAsync(msgT);
             }
             else return alternativeSendingHelper?.ForwardAsync(message);
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
         }
     }
 }

@@ -54,16 +54,6 @@ namespace FeatureFlowFramework.DataFlows
 
         public IDataFlowSource Else => alternativeSender;
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sender).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ((IDataFlowSource)sender).ConnectTo(sink);
-        }
-
         public void DisconnectAll()
         {
             ((IDataFlowSource)sender).DisconnectAll();
@@ -77,6 +67,16 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSink[] GetConnectedSinks()
         {
             return ((IDataFlowSource)sender).GetConnectedSinks();
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
         }
     }
 }

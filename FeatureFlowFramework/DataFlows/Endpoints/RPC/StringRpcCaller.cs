@@ -174,16 +174,6 @@ namespace FeatureFlowFramework.DataFlows.RPC
             return Task.CompletedTask;
         }
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink);
-        }
-
         public void DisconnectFrom(IDataFlowSink sink)
         {
             ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
@@ -199,10 +189,20 @@ namespace FeatureFlowFramework.DataFlows.RPC
             return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
         }
 
-        public void ConnectToAndBack(IReplier replier)
+        public void ConnectToAndBack(IReplier replier, bool weakReference= false)
         {
-            this.ConnectTo(replier);
-            replier.ConnectTo(this);
+            this.ConnectTo(replier, weakReference);
+            replier.ConnectTo(this, weakReference);
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
         }
     }
 }

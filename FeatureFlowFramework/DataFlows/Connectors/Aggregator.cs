@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class Aggregator<T, A> : IDataFlowConnection, IAlternativeDataFlow where A : IAggregationData, new()
+    public class Aggregator<T, A> : IDataFlowSource, IDataFlowConnection, IAlternativeDataFlow where A : IAggregationData, new()
     {
         private DataFlowSourceHelper sender = new DataFlowSourceHelper();
         private DataFlowSourceHelper alternativeSender = new DataFlowSourceHelper();
@@ -72,16 +72,6 @@ namespace FeatureFlowFramework.DataFlows
 
         public IDataFlowSource Else => alternativeSender;
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sender).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ((IDataFlowSource)sender).ConnectTo(sink);
-        }
-
         public void DisconnectAll()
         {
             ((IDataFlowSource)sender).DisconnectAll();
@@ -95,6 +85,16 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSink[] GetConnectedSinks()
         {
             return ((IDataFlowSource)sender).GetConnectedSinks();
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
         }
     }
 

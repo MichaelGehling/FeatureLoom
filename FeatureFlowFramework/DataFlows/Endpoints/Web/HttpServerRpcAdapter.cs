@@ -61,16 +61,6 @@ namespace FeatureFlowFramework.DataFlows.Web
             return true;
         }
 
-        public void ConnectToAndBack(IReplier replier)
-        {
-            ((IRequester)rpcCaller).ConnectToAndBack(replier);
-        }
-
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IRequester)rpcCaller).ConnectTo(sink);
-        }
-
         public IDataFlowSource ConnectTo(IDataFlowConnection sink)
         {
             return ((IRequester)rpcCaller).ConnectTo(sink);
@@ -99,6 +89,21 @@ namespace FeatureFlowFramework.DataFlows.Web
         public Task PostAsync<M>(M message)
         {
             return ((IRequester)rpcCaller).PostAsync(message);
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)rpcCaller).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)rpcCaller).ConnectTo(sink, weakReference);
+        }
+
+        public void ConnectToAndBack(IReplier replier, bool weakReference = false)
+        {
+            ((IRequester)rpcCaller).ConnectToAndBack(replier, weakReference);
         }
     }
 }

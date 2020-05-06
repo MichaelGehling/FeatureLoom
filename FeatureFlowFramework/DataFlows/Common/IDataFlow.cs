@@ -20,9 +20,9 @@ namespace FeatureFlowFramework.DataFlows
 
     public interface IDataFlowSource : IDataFlow
     {
-        void ConnectTo(IDataFlowSink sink);
+        void ConnectTo(IDataFlowSink sink, bool weakReference = false);
 
-        IDataFlowSource ConnectTo(IDataFlowConnection sink);
+        IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false);
 
         void DisconnectFrom(IDataFlowSink sink);
 
@@ -46,6 +46,6 @@ namespace FeatureFlowFramework.DataFlows
 
     public interface IRequester : IDataFlowSource, IDataFlowSink
     {
-        void ConnectToAndBack(IReplier replier);
+        void ConnectToAndBack(IReplier replier, bool weakReference = false);
     };
 }
