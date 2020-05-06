@@ -17,6 +17,8 @@
             return returnValue;
         }
 
+        public T ReturnValue => returnValue;
+
         public static implicit operator AsyncOutResult<T, OUT>((T returnValue ,OUT result) tuple) => new AsyncOutResult<T, OUT>(tuple.returnValue, tuple.result);
     }
 }

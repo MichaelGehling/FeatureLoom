@@ -28,7 +28,7 @@ namespace FeatureFlowFramework.Forms
             this.richTextBox1.DoubleClick += (a, b) => keepReading = !keepReading;
 
             this.workflow = new WritingLogWorkflow(this);
-            workflow.Run(new SuspendingAsyncRunner());
+            Log.logRunner.Run(workflow);
         }
 
         private class WritingLogWorkflow : Workflow<WritingLogWorkflow.SM>

@@ -12,6 +12,11 @@ namespace FeatureFlowFramework.Workflows
         protected readonly IStepExecutionController executionController = new DefaultStepExecutionController();
         protected Forwarder executionInfoForwarder = null;
 
+        protected AbstractRunner()
+        {
+            WorkflowRunnerService.Register(this);
+        }
+
         public IEnumerable<IWorkflowControls> RunningWorkflows
         {
             get

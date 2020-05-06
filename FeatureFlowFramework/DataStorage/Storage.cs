@@ -116,26 +116,27 @@ namespace FeatureFlowFramework.DataStorage
             RegisterWriter(readerWriter);
         }
 
-        public static bool HasCategoryReader(string category)
+        public static bool HasCategoryReader(string category, bool acceptReaderWriter = true)
         {
             var contextData = context.Data;
             using (contextData.categoryToReaderLock.ForReading())
             {
                 if(contextData.categoryToReader.ContainsKey(category)) return true;
-                else if(HasCategoryWriter(category) && GetWriter(category) is IStorageReader) return true;
+                else if(acceptReaderWriter && HasCategoryWriter(category, false) && GetWriter(category) is IStorageReader) return true;
                 else return false;
             }
         }
 
-        public static bool HasCategoryWriter(string category)
+        public static bool HasCategoryWriter(string category, bool acceptReaderWriter = true)
         {
             var contextData = context.Data;
             using (contextData.categoryToWriterLock.ForReading())
             {
                 if(contextData.categoryToWriter.ContainsKey(category)) return true;
-                else if(HasCategoryReader(category) && GetReader(category) is IStorageWriter) return true;
+                else if(acceptReaderWriter && HasCategoryReader(category, false) && GetReader(category) is IStorageWriter) return true;
                 else return false;
             }
         }
+
     }
 }
