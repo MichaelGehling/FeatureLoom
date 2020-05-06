@@ -127,7 +127,7 @@ namespace FeatureFlowFramework.Workflows
             if(tryCancelWaitingStep) this.TryCancelWaiting();
         }
 
-        public bool WaitUntilStopsRunning(TimeSpan timeout)
+        public bool WaitUntilStopsRunning(TimeSpan timeout = default)
         {
             if(!IsRunning) return true;
             if(controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
@@ -136,7 +136,7 @@ namespace FeatureFlowFramework.Workflows
             else return controlData.notRunningWakeEvent.Wait(timeout);
         }
 
-        public Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout)
+        public Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout = default)
         {
             if(!IsRunning) return Task<bool>.FromResult(true);
             if(controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);

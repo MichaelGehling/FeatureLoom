@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.Workflows
         Predicate<Workflow.ExecutionInfo> predicate;
         ProcessingEndpoint<Workflow.ExecutionInfo> processor;
 
-        public WorkflowStopper(Workflow workflow, Predicate<Workflow.ExecutionInfo> predicate, bool deactivateWhenFired)
+        public WorkflowStopper(Workflow workflow, Predicate<Workflow.ExecutionInfo> predicate, bool tryCancelWaitingState, bool deactivateWhenFired)
         {
             this.workflow = workflow;
             this.predicate = predicate;
@@ -19,7 +19,7 @@ namespace FeatureFlowFramework.Workflows
             {
                 if(predicate(info))
                 {
-                    workflow.RequestPause(true);
+                    workflow.RequestPause(tryCancelWaitingState);
                     if(deactivateWhenFired) Deactivate();
                 }
             });
