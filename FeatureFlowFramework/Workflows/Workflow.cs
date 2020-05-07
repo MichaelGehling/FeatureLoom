@@ -98,6 +98,11 @@ namespace FeatureFlowFramework.Workflows
             executionInfoSender.ObjIfExists?.Send(new ExecutionInfo(this, executionEvent, state, phase, additionalInfo));
         }
 
+        public ExecutionInfo CreateExecutionInfo()
+        {
+            return new ExecutionInfo(this, ExecutionEventList.InfoRequested);
+        }
+
         [JsonIgnore]
         protected abstract StateMachine WorkflowStateMachine { get; }
 

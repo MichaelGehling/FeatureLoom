@@ -4,6 +4,8 @@
     {
         public class ExecutionEventList
         {
+            public const string InfoRequested = "InfoRequested";
+
             public const string WorkflowStarted = "WorkflowStarted";
             public const string WorkflowFinished = "WorkflowFinished";
             public const string WorkflowPaused = "WorkflowPaused";

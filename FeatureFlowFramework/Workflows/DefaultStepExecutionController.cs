@@ -274,7 +274,8 @@ namespace FeatureFlowFramework.Workflows
         }
 
         private static async Task<bool> DoWaitingAsync<C>(C context, Step<C> step, bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
-        {            
+        {
+            context.ExecutionPhase = Workflow.ExecutionPhase.Waiting;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
             try
             {
@@ -289,7 +290,7 @@ namespace FeatureFlowFramework.Workflows
                 }
                 else throw e.InnerOrSelf();
             }
-
+            context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);            
             return proceed;
         }

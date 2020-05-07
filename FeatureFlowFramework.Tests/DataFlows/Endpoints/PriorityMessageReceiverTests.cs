@@ -51,7 +51,7 @@ namespace FeatureFlowFramework.Tests.DataFlows.Endpoints
         {
             TestHelper.PrepareTestContext();
 
-            TimeSpan tolerance = 20.Milliseconds();
+            TimeSpan tolerance = 30.Milliseconds();
             var sender = new Sender();
             var receiver = new PriorityMessageReceiver<int>(Comparer<int>.Create((oldMsg, newMsg) => oldMsg - newMsg));
             sender.ConnectTo(receiver);
