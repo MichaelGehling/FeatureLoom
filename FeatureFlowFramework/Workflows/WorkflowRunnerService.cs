@@ -60,12 +60,12 @@ namespace FeatureFlowFramework.Workflows
             }
         }
 
-        public static async Task PauseAllWorkflows()
+        public static async Task PauseAllWorkflows(bool tryCancelWaitingStep)
         {
             List<Task> tasks = new List<Task>();
             foreach(var runner in GetAllRunners())
             {
-                tasks.Add(runner.PauseAllWorkflows());
+                tasks.Add(runner.PauseAllWorkflows(tryCancelWaitingStep));
             }
             await Task.WhenAll(tasks.ToArray());
         }

@@ -57,7 +57,7 @@ namespace FeatureFlowFramework.Helper
                        value =  data2.Value;
                     }
                 });
-                Thread.Sleep(10.Milliseconds());
+                Thread.Sleep(20.Milliseconds());
                 Assert.Equal(data.Value, value);
             }
             

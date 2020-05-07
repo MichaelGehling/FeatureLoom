@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public class ThreadPoolRunner : AbstractRunner
     {
-        public override void Run(IWorkflowControls workflow)
+        public override void Run(Workflow workflow)
         {
             Task.Run(() =>
             {

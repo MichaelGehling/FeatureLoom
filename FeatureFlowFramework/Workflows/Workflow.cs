@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext, IUpdateAppStructureAspect, IWorkflowControls
+    public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext, IUpdateAppStructureAspect
     {                
         protected long id;
         protected ExecutionState executionState;
@@ -80,11 +80,6 @@ namespace FeatureFlowFramework.Workflows
             set
             {
                 executionPhase = value;
-                if (this.controlData.notRunningWakeEvent != null)
-                {
-                    if (executionPhase != ExecutionPhase.Running && executionPhase != ExecutionPhase.Waiting) this.controlData.notRunningWakeEvent.Set();
-                    else this.controlData.notRunningWakeEvent.Reset();
-                }
             }
         }
 
@@ -130,24 +125,6 @@ namespace FeatureFlowFramework.Workflows
         {
             controlData.pauseRequested = true;
             if(tryCancelWaitingStep) this.TryCancelWaiting();
-        }
-
-        public bool WaitUntilStopsRunning(TimeSpan timeout = default)
-        {
-            if(!IsRunning) return true;
-            if(controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
-
-            if(timeout == default) return controlData.notRunningWakeEvent.Wait();
-            else return controlData.notRunningWakeEvent.Wait(timeout);
-        }
-
-        public Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout = default)
-        {
-            if(!IsRunning) return Task<bool>.FromResult(true);
-            if(controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
-
-            if(timeout == default) return controlData.notRunningWakeEvent.WaitAsync();
-            else return controlData.notRunningWakeEvent.WaitAsync(timeout);
         }
 
         [JsonIgnore]

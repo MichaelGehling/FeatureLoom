@@ -8,7 +8,6 @@ namespace FeatureFlowFramework.Workflows
         public struct ControlData
         {
             public CancellationTokenSource cancellationTokenSource;
-            public AsyncManualResetEvent notRunningWakeEvent;
             public volatile bool pauseRequested;
 
             public static ControlData Init()
@@ -17,7 +16,6 @@ namespace FeatureFlowFramework.Workflows
                 {
                     cancellationTokenSource = null,
                     pauseRequested = false,
-                    notRunningWakeEvent = null,
                 };
             }
         }
