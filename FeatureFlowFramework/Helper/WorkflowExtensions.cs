@@ -14,11 +14,13 @@ namespace FeatureFlowFramework.Helper
             return new WorkflowStopper(workflow, condition, tryCancelWaitingState, deactivateWhenFired);
         }
 
-        public static async Task<bool> WaitUntilAsync(this Workflow workflow, Predicate<Workflow.ExecutionInfo> condition, TimeSpan timeout = default)
+        public static async Task<bool> WaitUntilAsync(this Workflow workflow, Predicate<Workflow.ExecutionInfo> condition, TimeSpan timeout = default, bool ignoreCurrentState = false)
         {
+            if (!ignoreCurrentState) if(condition(workflow.CreateExecutionInfo())) return true;
+
             ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> trigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(condition);
             workflow.ExecutionInfoSource.ConnectTo(trigger);
-            trigger.Post(workflow.CreateExecutionInfo());
+            if(!ignoreCurrentState) trigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
             if(timeout == default) await trigger.WaitAsync();
@@ -28,17 +30,77 @@ namespace FeatureFlowFramework.Helper
             return success;
         }
 
-        public static bool WaitUntil(this Workflow workflow, Predicate<Workflow.ExecutionInfo> condition, TimeSpan timeout = default)
+        public static bool WaitUntil(this Workflow workflow, Predicate<Workflow.ExecutionInfo> condition, TimeSpan timeout = default, bool ignoreCurrentState = false)
         {
+            if(!ignoreCurrentState) if(condition(workflow.CreateExecutionInfo())) return true;
+
             ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> trigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(condition);
             workflow.ExecutionInfoSource.ConnectTo(trigger);
-            trigger.Post(workflow.CreateExecutionInfo());
+            if(!ignoreCurrentState) trigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
             if(timeout == default) trigger.Wait();
             else success = trigger.Wait(timeout);
 
             workflow.ExecutionInfoSource.DisconnectFrom(trigger);
+            return success;
+        }
+
+        public static async Task<bool> WaitUntilAsync(this Workflow workflow, Predicate<Workflow.ExecutionInfo> startCondition, Predicate<Workflow.ExecutionInfo> endCondition, TimeSpan timeout = default)
+        {
+            TimeFrame timeFrame = new TimeFrame(timeout);
+
+            ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> startTrigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(startCondition);
+            workflow.ExecutionInfoSource.ConnectTo(startTrigger);
+            startTrigger.Post(workflow.CreateExecutionInfo());
+
+            bool success = true;
+            if(timeout == default) await startTrigger.WaitAsync();
+            else success = await startTrigger.WaitAsync(timeFrame.Remaining);
+
+            workflow.ExecutionInfoSource.DisconnectFrom(startTrigger);
+
+            if(!success) return false;
+            else
+            {
+                ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> endTrigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(endCondition);
+                workflow.ExecutionInfoSource.ConnectTo(endTrigger);
+                endTrigger.Post(workflow.CreateExecutionInfo());
+
+                if(timeout == default) await endTrigger.WaitAsync();
+                else success = await endTrigger.WaitAsync(timeFrame.Remaining);
+
+                workflow.ExecutionInfoSource.DisconnectFrom(endTrigger);
+            }
+            return success;
+        }
+
+        public static bool WaitUntil(this Workflow workflow, Predicate<Workflow.ExecutionInfo> startCondition, Predicate<Workflow.ExecutionInfo> endCondition, TimeSpan timeout = default)
+        {
+            TimeFrame timeFrame = new TimeFrame(timeout);
+
+            ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> startTrigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(startCondition);
+            workflow.ExecutionInfoSource.ConnectTo(startTrigger);
+            startTrigger.Post(workflow.CreateExecutionInfo());
+
+            bool success = true;
+            if(timeout == default) startTrigger.Wait();
+            else success = startTrigger.Wait(timeFrame.Remaining);
+
+            workflow.ExecutionInfoSource.DisconnectFrom(startTrigger);
+
+            if(!success) return false;
+            else
+            {
+                ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> endTrigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(endCondition);
+                workflow.ExecutionInfoSource.ConnectTo(endTrigger);
+                endTrigger.Post(workflow.CreateExecutionInfo());
+
+                if(timeout == default) endTrigger.Wait();
+                else success = endTrigger.Wait(timeFrame.Remaining);
+
+                workflow.ExecutionInfoSource.DisconnectFrom(endTrigger);
+            }
             return success;
         }
     }

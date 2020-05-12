@@ -119,7 +119,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             TestHelper.PrepareTestContext();
 
-            TimeSpan tolerance = 20.Milliseconds();
+            TimeSpan tolerance = 30.Milliseconds();
             var sender = new Sender();
             var receiver = new QueueReceiver<int>();
             sender.ConnectTo(receiver);
