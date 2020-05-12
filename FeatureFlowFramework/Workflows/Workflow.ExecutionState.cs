@@ -13,6 +13,11 @@
                 this.stepIndex = stepIndex;
             }
 
+            public override string ToString()
+            {
+                return $"ExecutionState(stateIndex: {stateIndex}, stepIndex: {stepIndex})";
+            }
+
             public static implicit operator ExecutionState((int stateIndex, int stepIndex) tupel) => new ExecutionState(tupel.stateIndex, tupel.stepIndex);
             public override bool Equals(object obj)
             {
