@@ -8,8 +8,8 @@ namespace FeatureFlowFramework.Workflows
     public class WorkflowStopper
     {
         Workflow workflow;
-        Predicate<Workflow.ExecutionInfo> predicate;
-        ProcessingEndpoint<Workflow.ExecutionInfo> processor;
+        readonly Predicate<Workflow.ExecutionInfo> predicate;
+        readonly ProcessingEndpoint<Workflow.ExecutionInfo> processor;
 
         public WorkflowStopper(Workflow workflow, Predicate<Workflow.ExecutionInfo> predicate, bool tryCancelWaitingState, bool deactivateWhenFired)
         {

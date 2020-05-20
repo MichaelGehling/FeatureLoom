@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.DataFlows
     {
         DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         bool active = true;
-        Func<bool> autoActivationCondition = null;
+        readonly Func<bool> autoActivationCondition = null;
 
         public DeactivatableForwarder(Func<bool> autoActivationCondition = null)
         {

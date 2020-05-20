@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.Forms
             Log.logRunner.Run(workflow);
         }
 
-        private class WritingLogWorkflow : Workflow<WritingLogWorkflow.SM>
+        public class WritingLogWorkflow : Workflow<WritingLogWorkflow.SM>
         {
             private LogViewer logViewer;
             private QueueReceiver<LogMessage> queue = new QueueReceiver<LogMessage>(10000, default, false);

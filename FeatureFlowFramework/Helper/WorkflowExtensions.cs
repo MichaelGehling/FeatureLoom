@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.Helper
 {
     public static class WorkflowExtensions
     {
-        public static WorkflowStopper StopWorkflowWhen(this Workflow workflow, Predicate<Workflow.ExecutionInfo> condition, bool tryCancelWaitingState, bool deactivateWhenFired)
+        public static WorkflowStopper RequestStopWhen(this Workflow workflow, Predicate<Workflow.ExecutionInfo> condition, bool tryCancelWaitingState, bool deactivateWhenFired)
         {
             return new WorkflowStopper(workflow, condition, tryCancelWaitingState, deactivateWhenFired);
         }

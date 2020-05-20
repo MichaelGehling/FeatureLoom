@@ -44,6 +44,16 @@ namespace FeatureFlowFramework.Workflows
             }
         }
 
+        public static IReadOnlyList<Workflow> GetAllRunningWorkflows()
+        {
+            List<Workflow> workflows = new List<Workflow>();
+            foreach(var runner in GetAllRunners())
+            {
+                workflows.AddRange(runner.RunningWorkflows);
+            }
+            return workflows;
+        }
+
         public static IDataFlowSource ExecutionInfoSource
         {
             get
