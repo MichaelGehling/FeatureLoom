@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
     /// </summary>
     /// <typeparam name="I"> The input type for the converter function </typeparam>
     /// <typeparam name="O"> The output type for the converter function </typeparam>
-    public class MessageConverter<I, O> : IDataFlowConnection, IAlternativeDataFlow
+    public class MessageConverter<I, O> : IDataFlowSource, IDataFlowConnection, IAlternativeDataFlow
     {
         private DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
         private readonly Func<I, O> convertFunc;
@@ -36,17 +36,6 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSink[] GetConnectedSinks()
         {
             return sendingHelper.GetConnectedSinks();
-        }
-
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
-            return sink;
         }
 
         public void DisconnectAll()
@@ -75,6 +64,16 @@ namespace FeatureFlowFramework.DataFlows
                 return sendingHelper.ForwardAsync(convertFunc(msgT));
             }
             else return alternativeSendingHelper?.ForwardAsync(message);
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
         }
     }
 }

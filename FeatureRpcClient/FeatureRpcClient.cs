@@ -113,7 +113,7 @@ namespace FeatureRpcClient
             Log.LogForwarder.DisconnectFrom(Log.defaultConsoleLogger);
             var workflow = new FeatureRpcClient(args.Length >= 1 ? args[0] : null);
             new BlockingRunner().Run(workflow);
-            Workflow.defaultRunner.PauseAllWorkflows().Wait(1.Seconds());
+            WorkflowRunnerService.PauseAllWorkflows(true).Wait(1.Seconds());
             return workflow.errorCode;
         }
     }

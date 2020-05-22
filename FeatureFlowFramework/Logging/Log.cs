@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.Aspects;
 using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helper;
+using FeatureFlowFramework.Workflows;
 using System;
 
 namespace FeatureFlowFramework.Logging
@@ -10,12 +11,19 @@ namespace FeatureFlowFramework.Logging
 
         public static DefaultConsoleLogger defaultConsoleLogger = new DefaultConsoleLogger();
         public static DefaultFileLogger defaultFileLogger = new DefaultFileLogger();
+        public static IWorkflowRunner logRunner = new SuspendingAsyncRunner();
+
+        static Log()
+        {
+            WorkflowRunnerService.Unregister(logRunner);
+            logRunner.Run(defaultFileLogger);
+        }
 
         class Context : IServiceContextData
         {
             public readonly Sender<LogMessage> logSender = new Sender<LogMessage>();
             public readonly ActiveForwarder logForwarder = new ActiveForwarder(1, 1000, 10, 10000, TimeSpan.Zero, true);
-            public readonly BufferingForwarder<LogMessage> logForwarderBuffer = new BufferingForwarder<LogMessage>(1000);
+            public readonly BufferingForwarder<LogMessage> logForwarderBuffer = new BufferingForwarder<LogMessage>(1000);            
 
             public Context()
             {

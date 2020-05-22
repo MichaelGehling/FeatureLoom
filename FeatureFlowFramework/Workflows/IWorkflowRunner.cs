@@ -6,11 +6,11 @@ namespace FeatureFlowFramework.Workflows
 {
     public interface IWorkflowRunner
     {
-        void Run(IWorkflowControls workflow);
+        void Run(Workflow workflow);
 
-        IEnumerable<IWorkflowControls> RunningWorkflows { get; }
+        IEnumerable<Workflow> RunningWorkflows { get; }
 
-        Task PauseAllWorkflows();
+        Task PauseAllWorkflows(bool tryCancelWaitingStep);
 
         IDataFlowSource ExecutionInfoSource { get; }
     }

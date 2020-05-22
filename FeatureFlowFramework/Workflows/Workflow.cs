@@ -9,13 +9,12 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-
     public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext, IUpdateAppStructureAspect
-    {
+    {                
         protected long id;
         protected ExecutionState executionState;
         protected ExecutionPhase executionPhase = ExecutionPhase.Prepared;
-        protected IWorkflowRunner currentRunner;
+        protected IWorkflowRunner currentRunner;        
 
         public IWorkflowRunner Runner
         {
@@ -26,9 +25,7 @@ namespace FeatureFlowFramework.Workflows
         [JsonIgnore]
         protected ControlData controlData = ControlData.Init();
 
-        protected LazySlim<Sender> executionInfoSender;
-
-        public static IWorkflowRunner defaultRunner = new SuspendingAsyncRunner();
+        protected LazySlim<Sender> executionInfoSender;        
 
         public virtual bool TryUpdateAppStructureAspects(TimeSpan timeout)
         {
@@ -44,10 +41,7 @@ namespace FeatureFlowFramework.Workflows
         public IDataFlowSource ExecutionInfoSource => executionInfoSender.Obj;
 
         [JsonIgnore]
-        protected virtual IWorkflowRunner DefaultRunner => defaultRunner;
-
-        [JsonIgnore]
-        public abstract IStateMachineInfo StateMachineInfo { get; }
+        protected virtual IWorkflowRunner DefaultRunner => WorkflowRunnerService.DefaultRunner;
 
         public virtual bool AddToAspectRegistry => true;
 
@@ -86,11 +80,6 @@ namespace FeatureFlowFramework.Workflows
             set
             {
                 executionPhase = value;
-                if (this.controlData.notRunningWakeEvent != null)
-                {
-                    if (executionPhase != ExecutionPhase.Running && executionPhase != ExecutionPhase.Waiting) this.controlData.notRunningWakeEvent.Set();
-                    else this.controlData.notRunningWakeEvent.Reset();
-                }
             }
         }
 
@@ -104,32 +93,13 @@ namespace FeatureFlowFramework.Workflows
             executionInfoSender.ObjIfExists?.Send(new ExecutionInfo(this, executionEvent, state, phase, additionalInfo));
         }
 
-        [JsonIgnore]
-        public CancellationToken CancellationToken
+        public ExecutionInfo CreateExecutionInfo()
         {
-            get
-            {
-                if (this.controlData.cancellationTokenSource == null) this.controlData.cancellationTokenSource = new CancellationTokenSource();
-                return this.controlData.cancellationTokenSource.Token;
-            }
-        }
-    }
-
-    public abstract class Workflow<SM> : Workflow, IWorkflowControls where SM : StateMachine, new()
-    {
-        protected Workflow(string name = null)
-        {
-            executionState = WorkflowStateMachine.InitialExecutionState;
-            if (AddToAspectRegistry) id = this.GetAspectHandle();
-            else id = RandomGenerator.Int64();
+            return new ExecutionInfo(this, ExecutionEventList.InfoRequested);
         }
 
-        protected static SM stateMachineInstance = new SM();
-
         [JsonIgnore]
-        protected virtual SM WorkflowStateMachine => stateMachineInstance;
-
-        public override IStateMachineInfo StateMachineInfo => WorkflowStateMachine;
+        protected abstract StateMachine WorkflowStateMachine { get; }
 
         public async Task<bool> ExecuteNextStepAsync(IStepExecutionController controller)
         {
@@ -145,6 +115,31 @@ namespace FeatureFlowFramework.Workflows
             return result;
         }
 
+        public void Run(IWorkflowRunner runner = null)
+        {
+            runner = runner ?? this.currentRunner ?? DefaultRunner;
+            runner.Run(this);
+        }
+
+        public void RequestPause(bool tryCancelWaitingStep)
+        {
+            controlData.pauseRequested = true;
+            if(tryCancelWaitingStep) this.TryCancelWaiting();
+        }
+
+        [JsonIgnore]
+        public CancellationToken CancellationToken
+        {
+            get
+            {
+                if (this.controlData.cancellationTokenSource == null) this.controlData.cancellationTokenSource = new CancellationTokenSource();
+                return this.controlData.cancellationTokenSource.Token;
+            }
+        }
+
+        [JsonIgnore]
+        public bool IsRunning => this.CurrentExecutionPhase == ExecutionPhase.Running || this.CurrentExecutionPhase == ExecutionPhase.Waiting;
+
         protected void TryCancelWaiting()
         {
             this.controlData.cancellationTokenSource?.Cancel();
@@ -152,37 +147,22 @@ namespace FeatureFlowFramework.Workflows
             this.controlData.cancellationTokenSource = null;
         }
 
-        public void RequestPause(bool tryCancelWaitingStep)
+        public IStateMachineInfo StateMachineInfo => WorkflowStateMachine;
+
+    }
+
+    public abstract class Workflow<SM> : Workflow where SM : StateMachine, new()
+    {
+        protected Workflow(string name = null)
         {
-            controlData.pauseRequested = true;
-            if (tryCancelWaitingStep) this.TryCancelWaiting();
+            executionState = WorkflowStateMachine.InitialExecutionState;
+            if (AddToAspectRegistry) id = this.GetAspectHandle();
+            else id = RandomGenerator.Int64();
         }
 
-        public void Run(IWorkflowRunner runner = null)
-        {            
-            runner = runner ?? this.currentRunner ?? DefaultRunner;
-            runner.Run(this);
-        }
-
-        public bool WaitUntilStopsRunning(TimeSpan timeout)
-        {
-            if (!IsRunning) return true;
-            if (controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
-
-            if(timeout == default) return controlData.notRunningWakeEvent.Wait();
-            else return controlData.notRunningWakeEvent.Wait(timeout);
-        }
-
-        public Task<bool> WaitUntilStopsRunningAsync(TimeSpan timeout)
-        {
-            if (!IsRunning) return Task<bool>.FromResult(true);
-            if (controlData.notRunningWakeEvent == null) controlData.notRunningWakeEvent = new AsyncManualResetEvent(!IsRunning);
-
-            if (timeout == default) return controlData.notRunningWakeEvent.WaitAsync();
-            else return controlData.notRunningWakeEvent.WaitAsync(timeout);
-        }
+        protected static SM stateMachineInstance = new SM();
 
         [JsonIgnore]
-        public bool IsRunning => this.CurrentExecutionPhase == ExecutionPhase.Running || this.CurrentExecutionPhase == ExecutionPhase.Waiting;
+        protected override StateMachine WorkflowStateMachine => stateMachineInstance;
     }
 }

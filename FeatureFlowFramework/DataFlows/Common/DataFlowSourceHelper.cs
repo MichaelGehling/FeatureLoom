@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.DataFlows
     public class DataFlowSourceHelper : IDataFlowSource
     {
         [JsonIgnore]
-        volatile public List<WeakReference<IDataFlowSink>> sinks;
+        volatile public List<DataFlowReference> sinks;
 
         private readonly Action<IDataFlowSink> onConnection;
         private readonly Action<IDataFlowSink> onDisconnection;
@@ -176,7 +176,7 @@ namespace FeatureFlowFramework.DataFlows
             if(sinks == null) return;
             using(myLock.ForWriting())
             {
-                List<WeakReference<IDataFlowSink>> validSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count - invalidReferences);
+                List<DataFlowReference> validSinks = new List<DataFlowReference>(sinks.Count - invalidReferences);
                 for(int i = sinks.Count - 1; i >= 0; i--)
                 {
                     if(sinks[i].TryGetTarget(out IDataFlowSink target))
@@ -188,14 +188,14 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        public void ConnectTo(IDataFlowSink sink)
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
             if(sinks == null)
             {
                 using (myLock.ForWriting())
                 {
-                    List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(1);
-                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));
+                    List<DataFlowReference> newSinks = new List<DataFlowReference>(1);
+                    newSinks.Add(new DataFlowReference(sink, weakReference));
                     sinks = newSinks;
                     onConnection?.Invoke(sink);
                 }
@@ -204,16 +204,16 @@ namespace FeatureFlowFramework.DataFlows
             {
                 using (myLock.ForWriting())
                 {
-                    List<WeakReference<IDataFlowSink>> newSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count + 1);
+                    List<DataFlowReference> newSinks = new List<DataFlowReference>(sinks.Count + 1);
                     newSinks.AddRange(sinks);
-                    newSinks.Add(new WeakReference<IDataFlowSink>(sink));
+                    newSinks.Add(new DataFlowReference(sink, weakReference));
                     sinks = newSinks;
                     onConnection?.Invoke(sink);
                 }
             }
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
             ConnectTo(sink as IDataFlowSink);
             return sink;
@@ -249,7 +249,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
                 else
                 {
-                    List<WeakReference<IDataFlowSink>> remainingSinks = new List<WeakReference<IDataFlowSink>>(sinks.Count - 1);
+                    List<DataFlowReference> remainingSinks = new List<DataFlowReference>(sinks.Count - 1);
                     for(int i = sinks.Count - 1; i >= 0; i--)
                     {
                         if(sinks[i].TryGetTarget(out IDataFlowSink target) && target != sink)

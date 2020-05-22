@@ -4,7 +4,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public class AsyncRunner : AbstractRunner
     {
-        public async Task RunAsync(IWorkflowControls workflow)
+        public async Task RunAsync(Workflow workflow)
         {
             AddToRunningWorkflows(workflow);
             try
@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.Workflows
             }
         }
 
-        public override void Run(IWorkflowControls workflow)
+        public override void Run(Workflow workflow)
         {
             _ = RunAsync(workflow);
         }

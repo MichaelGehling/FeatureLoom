@@ -4,7 +4,7 @@ using Xunit;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class ForwarderTest
+    public class ForwarderTests
     {
         [Theory]
         [InlineData(42)]

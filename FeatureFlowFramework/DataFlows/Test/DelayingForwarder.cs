@@ -16,16 +16,6 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         public int CountConnectedSinks => ((IDataFlowSource)helper).CountConnectedSinks;
 
-        public void ConnectTo(IDataFlowSink sink)
-        {
-            ((IDataFlowSource)helper).ConnectTo(sink);
-        }
-
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
-        {
-            return ((IDataFlowSource)helper).ConnectTo(sink);
-        }
-
         public void DisconnectAll()
         {
             ((IDataFlowSource)helper).DisconnectAll();
@@ -51,6 +41,16 @@ namespace FeatureFlowFramework.DataFlows.Test
         {
             await Task.Delay(delay);
             await helper.ForwardAsync(message);
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            ((IDataFlowSource)helper).ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return ((IDataFlowSource)helper).ConnectTo(sink, weakReference);
         }
     }
 }

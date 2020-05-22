@@ -9,10 +9,10 @@ namespace FeatureFlowFramework.Helper
     {
         public class WorkflowApplicationContext : ApplicationContext
         {
-            private IWorkflowControls workflow;
+            private Workflow workflow;
             private SuspendingAsyncRunner runner = new SuspendingAsyncRunner();
 
-            public WorkflowApplicationContext(IWorkflowControls workflow)
+            public WorkflowApplicationContext(Workflow workflow)
             {
                 this.workflow = workflow;
                 Application.Idle += StartWorkflow;
@@ -28,13 +28,13 @@ namespace FeatureFlowFramework.Helper
                     if(msg.executionPhase == Workflow.ExecutionPhase.Finished ||
                        msg.executionPhase == Workflow.ExecutionPhase.Invalid)
                     {
-                        if (!await runner.PauseAllWorkflows().WaitAsync(5.Seconds()))
+                        if (!await runner.PauseAllWorkflows(true).WaitAsync(5.Seconds()))
                         {
                             throw new Exception("Failed to stop workflows!");
                         }
                         Application.ExitThread();
                     }
-                }).KeepAlive(workflow));
+                }));
             }
         }
     }

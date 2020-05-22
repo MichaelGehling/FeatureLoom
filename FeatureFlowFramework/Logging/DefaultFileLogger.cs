@@ -60,10 +60,11 @@ namespace FeatureFlowFramework.Logging
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
         }
-
-        public Config config = new Config();
+        public Config config;
 
         private QueueReceiver<object> receiver = new QueueReceiver<object>(100000);
+        private string logFilePath;
+        private string archiveFilePath;
 
         public void Post<M>(in M message)
         {
@@ -72,9 +73,16 @@ namespace FeatureFlowFramework.Logging
 
         private static readonly Comparer<ZipArchiveEntry> nameComparer = Comparer<ZipArchiveEntry>.Create((f1, f2) => f2.Name.CompareTo(f1.Name));
 
+        public DefaultFileLogger(Config config = null)
+        {
+            this.config = config ?? new Config();
+            this.logFilePath = new FileInfo(this.config.logFilePath).FullName;
+            this.archiveFilePath = new FileInfo(this.config.archiveFilePath).FullName;
+        }
+
         private float GetLogFileSize()
         {
-            var logFileInfo = new FileInfo(config.logFilePath);
+            var logFileInfo = new FileInfo(logFilePath);
             return logFileInfo.Length;
         }
 
@@ -83,10 +91,10 @@ namespace FeatureFlowFramework.Logging
             if(receiver.IsEmpty) return;
 
             bool updateCreationTime = false;
-            var logFileInfo = new FileInfo(config.logFilePath);
+            var logFileInfo = new FileInfo(logFilePath);
             if(!logFileInfo.Exists) updateCreationTime = true;
 
-            using(FileStream stream = File.Open(config.logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            using(FileStream stream = File.Open(logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
             using(StreamWriter writer = new StreamWriter(stream))
             {
                 if(updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
@@ -110,15 +118,15 @@ namespace FeatureFlowFramework.Logging
         // TODO: Make async
         private void ArchiveCurrentLogfile()
         {
-            var logFileInfo = new FileInfo(config.logFilePath);
+            var logFileInfo = new FileInfo(logFilePath);
             logFileInfo.Refresh();
             if(!logFileInfo.Exists) return;
 
-            using(var fileStream = new FileStream(config.archiveFilePath, FileMode.OpenOrCreate))
+            using(var fileStream = new FileStream(archiveFilePath, FileMode.OpenOrCreate))
             {
                 using(var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
                 {
-                    archive.CreateEntryFromFile(config.logFilePath, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
+                    archive.CreateEntryFromFile(logFilePath, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
                 }
 
                 using(var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))

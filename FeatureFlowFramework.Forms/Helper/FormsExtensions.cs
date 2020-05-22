@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Helper
             return control;
         }
 
-        public static ApplicationContext RunAsApplicationContext(this IWorkflowControls workflow)
+        public static ApplicationContext RunAsApplicationContext(this Workflow workflow)
         {
             return new WorkflowApplicationContext(workflow);
         }

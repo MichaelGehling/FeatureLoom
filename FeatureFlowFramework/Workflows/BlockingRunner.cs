@@ -2,7 +2,7 @@
 {
     public class BlockingRunner : AbstractRunner
     {
-        public override void Run(IWorkflowControls workflow)
+        public override void Run(Workflow workflow)
         {
             AddToRunningWorkflows(workflow);
             try

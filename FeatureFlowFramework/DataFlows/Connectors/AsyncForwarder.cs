@@ -8,14 +8,14 @@ namespace FeatureFlowFramework.DataFlows
 
         public int CountConnectedSinks => ((IDataFlowSource)sendingHelper).CountConnectedSinks;
 
-        public void ConnectTo(IDataFlowSink sink)
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink);
+            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sendingHelper).ConnectTo(sink);
+            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
         }
 
         public void DisconnectAll()

@@ -7,6 +7,20 @@ namespace FeatureFlowFramework.Helper
 {
     public static class StringExtensions
     {
+        public static bool StartsWith(this string str, char c)
+        {
+            return !str.EmptyOrNull() && str[0] == c;
+        }
+
+        public static bool Contains(this string str, char c)
+        {
+            foreach(var sc in str)
+            {
+                if(sc == c) return true;
+            }
+            return false;
+        }
+
         public static byte[] ToByteArray(this string str, Encoding encoding = default)
         {
             if(encoding == default) encoding = Encoding.UTF8;

@@ -8,11 +8,16 @@ namespace FeatureFlowFramework.Workflows
     public abstract class AbstractRunner : IWorkflowRunner
     {
         private FeatureLock runningWorkflowsLock = new FeatureLock();
-        protected List<IWorkflowControls> runningWorkflows = new List<IWorkflowControls>();
+        protected List<Workflow> runningWorkflows = new List<Workflow>();
         protected readonly IStepExecutionController executionController = new DefaultStepExecutionController();
         protected Forwarder executionInfoForwarder = null;
 
-        public IEnumerable<IWorkflowControls> RunningWorkflows
+        protected AbstractRunner()
+        {
+            WorkflowRunnerService.Register(this);
+        }
+
+        public IEnumerable<Workflow> RunningWorkflows
         {
             get
             {
@@ -39,19 +44,19 @@ namespace FeatureFlowFramework.Workflows
             }
         }
 
-        public async Task PauseAllWorkflows()
+        public async Task PauseAllWorkflows(bool tryCancelWaitingStep)
         {
             List<Task> tasks = new List<Task>();
             foreach(var wf in RunningWorkflows)
             {
-                wf.RequestPause();
+                wf.RequestPause(tryCancelWaitingStep);
 
-                tasks.Add(wf.WaitUntilStopsRunningAsync());
+                tasks.Add(wf.WaitUntilAsync(info => info.executionPhase != Workflow.ExecutionPhase.Running && info.executionPhase != Workflow.ExecutionPhase.Waiting));
             }
             await Task.WhenAll(tasks.ToArray());
         }
 
-        protected void RemoveFromRunningWorkflows(IWorkflowControls workflow)
+        protected void RemoveFromRunningWorkflows(Workflow workflow)
         {
             using(runningWorkflowsLock.ForWriting())
             {
@@ -60,7 +65,7 @@ namespace FeatureFlowFramework.Workflows
             }
         }
 
-        protected void AddToRunningWorkflows(IWorkflowControls workflow)
+        protected void AddToRunningWorkflows(Workflow workflow)
         {
             workflow.Runner = this;
             using(runningWorkflowsLock.ForWriting())
@@ -70,6 +75,6 @@ namespace FeatureFlowFramework.Workflows
             }
         }
 
-        public abstract void Run(IWorkflowControls workflow);
+        public abstract void Run(Workflow workflow);
     }
 }
