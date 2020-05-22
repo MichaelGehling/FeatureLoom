@@ -6,37 +6,41 @@ namespace FeatureFlowFramework.Helper
 {
     public static class Factory
     {
-        public static T Create<T>() where T: class, new()
+        public static T Create<T>() where T: new()
         {
-            return OverrideFactory<T>.Create() ?? new T();
+            if (OverrideFactory<T>.Create(out T value)) return value;
+            else return new T();
         }
 
-        public static T Create<T>(string factoryName) where T : class, new()
+        public static T Create<T>(string factoryName) where T : new()
         {
-            return OverrideFactory<T>.Create(factoryName) ?? new T();
+            if (OverrideFactory<T>.Create(factoryName, out T value)) return value;
+            else return new T();
         }
 
-        public static T Create<T>(Func<T> defaultCreate) where T : class
+        public static T Create<T>(Func<T> defaultCreate)
         {
-            return OverrideFactory<T>.Create() ?? defaultCreate();
+            if (OverrideFactory<T>.Create(out T value)) return value;
+            else return defaultCreate();
         }
 
-        public static T Create<T>(string factoryName, Func<T> defaultCreate) where T : class
+        public static T Create<T>(string factoryName, Func<T> defaultCreate)
         {
-            return OverrideFactory<T>.Create(factoryName) ?? defaultCreate();
+            if (OverrideFactory<T>.Create(factoryName, out T value)) return value;
+            else return defaultCreate();
         }
 
-        public static void SetupOverride<T>(Func<T> overrideCreate) where T : class
+        public static void SetupOverride<T>(Func<T> overrideCreate)
         {
             OverrideFactory<T>.Setup(overrideCreate);
         }
 
-        public static void SetupOverride<T>(string factoryName, Func<T> overrideCreate) where T : class
+        public static void SetupOverride<T>(string factoryName, Func<T> overrideCreate)
         {
             OverrideFactory<T>.Setup(factoryName, overrideCreate);            
         }
 
-        private static class OverrideFactory<T> where T: class
+        private static class OverrideFactory<T>
         {
             public class Context : IServiceContextData
             {
@@ -60,9 +64,13 @@ namespace FeatureFlowFramework.Helper
                 context.Obj.Data.create = newCreate;
             }
 
-            public static T Create()
+            public static bool Create(out T value)
             {
-                return context.ObjIfExists.Data.create?.Invoke();
+                value = default;
+                if (!context.IsInstantiated || context.Obj.Data.create == null) return false;
+
+                value = context.Obj.Data.create();
+                return true;
             }
 
             public static void Setup(string factoryName, Func<T> newCreate)
@@ -71,11 +79,16 @@ namespace FeatureFlowFramework.Helper
                 context.Obj.Data.namedFactories[factoryName] = newCreate;
             }
 
-            public static T Create(string factoryName)
-            {
+            public static bool Create(string factoryName, out T value)
+            {                
                 Func<T> create = null;
-                if (context.ObjIfExists.Data.namedFactories?.TryGetValue(factoryName, out create) ?? false) return create.Invoke();
-                else return null;
+                value = default;
+                if (!context.IsInstantiated || 
+                    context.ObjIfExists.Data.namedFactories == null || 
+                    !context.ObjIfExists.Data.namedFactories.TryGetValue(factoryName, out create)) return false;
+
+                value = create();
+                return true;
             }
         }
     }
