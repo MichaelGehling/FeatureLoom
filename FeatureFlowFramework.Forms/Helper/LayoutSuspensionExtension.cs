@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Helper;
+﻿using FeatureFlowFramework.Helpers.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
-namespace FeatureFlowFramework.Helper
+namespace FeatureFlowFramework.Helpers
 {
     public static class LayoutSuspensionExtension
     {

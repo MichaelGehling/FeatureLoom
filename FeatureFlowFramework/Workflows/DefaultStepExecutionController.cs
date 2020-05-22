@@ -1,5 +1,6 @@
-﻿using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.Logging;
+﻿using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Services.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;

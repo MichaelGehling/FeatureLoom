@@ -1,12 +1,12 @@
 ﻿using FeatureFlowFramework.DataFlows;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using FeatureFlowFramework.Helpers.Data;
+using FeatureFlowFramework.Helpers.Diagnostics;
+using FeatureFlowFramework.Helpers.Time;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureFlowFramework.Helper
+namespace FeatureFlowFramework.Helpers
 {
     public class SharedDataTests
     {

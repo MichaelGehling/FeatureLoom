@@ -1,4 +1,5 @@
-﻿using FeatureFlowFramework.Helper;
+﻿using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Helpers.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;

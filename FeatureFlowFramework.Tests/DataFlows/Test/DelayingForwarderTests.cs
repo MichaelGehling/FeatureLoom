@@ -1,7 +1,9 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helper;
+using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Helpers.Diagnostics;
 using Xunit;
+using FeatureFlowFramework.Services;
 
 namespace FeatureFlowFramework.DataFlows
 {

@@ -1,4 +1,4 @@
-﻿using FeatureFlowFramework.Helper;
+﻿using FeatureFlowFramework.Helpers;
 using System.Threading;
 
 namespace FeatureFlowFramework.Workflows

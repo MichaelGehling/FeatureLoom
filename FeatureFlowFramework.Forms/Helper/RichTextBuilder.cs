@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
+using FeatureFlowFramework.Helpers.Extensions;
 
-namespace FeatureFlowFramework.Helper
+namespace FeatureFlowFramework.Helpers
 {
     public class RichTextBuilder
     {

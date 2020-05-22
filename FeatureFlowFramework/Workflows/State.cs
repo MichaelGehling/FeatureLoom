@@ -1,4 +1,4 @@
-﻿using FeatureFlowFramework.Logging;
+﻿using FeatureFlowFramework.Services.Logging;
 using System;
 using System.Collections.Generic;
 

@@ -1,6 +1,8 @@
 ﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.Logging;
+using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Workflows;
 using System.Drawing;
 using System.Windows.Forms;

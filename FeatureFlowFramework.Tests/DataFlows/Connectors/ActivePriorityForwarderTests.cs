@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helper;
+using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Helpers.Diagnostics;
 using System;
 using System.Collections.Generic;
 using Xunit;

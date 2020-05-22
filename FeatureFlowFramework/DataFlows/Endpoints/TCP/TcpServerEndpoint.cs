@@ -1,8 +1,10 @@
 ﻿using FeatureFlowFramework.Aspects;
 using FeatureFlowFramework.Aspects.AppStructure;
-using FeatureFlowFramework.DataStorage;
-using FeatureFlowFramework.Helper;
-using FeatureFlowFramework.Logging;
+using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureFlowFramework.Services.DataStorage;
+using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Workflows;
 using System;
 using System.Collections.Generic;

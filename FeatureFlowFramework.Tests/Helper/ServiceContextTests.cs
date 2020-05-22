@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
-using FeatureFlowFramework.Helper;
+using FeatureFlowFramework.Helpers;
 using System.Threading.Tasks;
+using FeatureFlowFramework.Helpers.Data;
 
 namespace FeatureFlowFramework.Tests.Helper
 {

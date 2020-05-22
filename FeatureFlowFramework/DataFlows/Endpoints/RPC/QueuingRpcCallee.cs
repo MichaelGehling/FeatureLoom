@@ -1,4 +1,5 @@
-﻿using FeatureFlowFramework.Helper;
+﻿using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.DataFlows.RPC
 {

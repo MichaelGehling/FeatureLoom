@@ -1,7 +1,7 @@
 ﻿using System.Drawing;
 using System.Windows.Forms;
 
-namespace FeatureFlowFramework.Helper
+namespace FeatureFlowFramework.Helpers
 {
     public static class RichTextBoxExtensions
     {

@@ -2,8 +2,10 @@
 using FeatureFlowFramework.Workflows;
 using System;
 using System.Windows.Forms;
+using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureFlowFramework.Helpers.Time;
 
-namespace FeatureFlowFramework.Helper
+namespace FeatureFlowFramework.Helpers
 {
     public static partial class FormsExtensions
     {

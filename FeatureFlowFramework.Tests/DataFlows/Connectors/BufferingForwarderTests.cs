@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helper;
+using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Diagnostics;
 using System.Linq;
 using Xunit;
 

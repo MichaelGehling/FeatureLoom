@@ -1,9 +1,11 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helpers.Data;
+using FeatureFlowFramework.Helpers.Diagnostics;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
 
-namespace FeatureFlowFramework.Helper
+namespace FeatureFlowFramework.Helpers
 {
     public class DistributedDataTests
     {
