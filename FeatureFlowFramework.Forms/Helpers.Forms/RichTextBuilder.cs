@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Text;
 using FeatureFlowFramework.Helpers.Extensions;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureFlowFramework.Helpers.Forms
 {
     public class RichTextBuilder
     {

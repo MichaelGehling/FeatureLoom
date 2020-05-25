@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureFlowFramework.Workflows
 {
     public static class WorkflowExtensions
     {

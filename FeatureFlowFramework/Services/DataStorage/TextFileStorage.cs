@@ -664,16 +664,6 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
         }
 
-        Task<AsyncOutResult<bool, T>> IStorageReader.TryReadAsync<T>(string uri)
-        {
-            throw new NotImplementedException();
-        }
-
-        Task<AsyncOutResult<bool, string[]>> IStorageReader.TryListUrisAsync(string pattern)
-        {
-            throw new NotImplementedException();
-        }
-
         private class FileSubscriptionStatus
         {
             public FileInfo fileInfo;

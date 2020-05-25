@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureFlowFramework.Helpers.Forms
 {
     public static class LayoutSuspensionExtension
     {
