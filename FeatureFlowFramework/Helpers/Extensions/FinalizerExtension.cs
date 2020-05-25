@@ -1,8 +1,9 @@
 ﻿using FeatureFlowFramework.Services;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
 
-namespace FeatureFlowFramework.Services.MetaData
+namespace FeatureFlowFramework.Helpers.Extensions
 {
     public static class FinalizerExtension
     {

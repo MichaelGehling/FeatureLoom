@@ -109,26 +109,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else return true;
         }
 
-        /*public async static Task<bool> WaitAsync(this Task task, CancellationToken cancellationToken)
-        {
-            if (task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested) return false;
-            else if (task.IsCompleted) return true;
-
-            var tcs = new TaskCompletionSource<bool>();
-            var registration = cancellationToken.Register(s =>
-            {
-                var source = (TaskCompletionSource<bool>)s;
-                source.TrySetResult(false);
-            }, tcs);
-
-            await Task.WhenAny(task, tcs.Task);
-            registration.Dispose();
-
-            if (task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
-            else return true;
-        }
-        */
-
         public async static Task<bool> WaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken)
         {
             if(task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested) return false;

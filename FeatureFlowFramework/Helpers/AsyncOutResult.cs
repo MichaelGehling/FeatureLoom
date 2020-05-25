@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Helpers.Synchronization
+﻿namespace FeatureFlowFramework.Helpers
 {
     public struct AsyncOutResult<T, OUT>
     {
