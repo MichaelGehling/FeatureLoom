@@ -5,7 +5,7 @@ using System.Windows.Forms;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureFlowFramework.Helpers.Forms
 {
     public static partial class FormsExtensions
     {

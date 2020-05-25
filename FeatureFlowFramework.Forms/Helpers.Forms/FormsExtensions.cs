@@ -1,7 +1,7 @@
 ﻿using FeatureFlowFramework.Workflows;
 using System.Windows.Forms;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureFlowFramework.Helpers.Forms
 {
     public static partial class FormsExtensions
     {
