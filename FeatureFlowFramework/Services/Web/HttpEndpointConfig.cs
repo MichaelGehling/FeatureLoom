@@ -1,4 +1,4 @@
-﻿using FeatureFlowFramework.Helpers;
+﻿using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
 using Newtonsoft.Json;
@@ -33,7 +33,7 @@ namespace FeatureFlowFramework.Services.Web
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this, "Failed resolving hostName", e.ToString());
+                    Log.ERROR("Failed resolving hostName", e.ToString());
                 }
             }
         }

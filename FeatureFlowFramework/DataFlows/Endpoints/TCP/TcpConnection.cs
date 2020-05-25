@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Workflows;
 using System;
 using System.IO;
@@ -41,11 +42,11 @@ namespace FeatureFlowFramework.DataFlows.TCP
                         .CatchAndDo((c, e) =>
                         {
                             c.ResetBuffer(false);
-                            Log.ERROR(this, $"Decoding data from TCP connection {c.id.ToString()} failed! Buffer was reset and all data omitted. (id={c.id})", e.ToString());
+                            Log.ERROR(c.GetHandle(), $"Decoding data from TCP connection {c.GetHandle()} failed! Buffer was reset and all data omitted. (id={c.GetHandle()})", e.ToString());
                         })
                     .Step("If decoding was completed put message in routing wrapper and send it, else reset buffer, but preserve the unprocessed bytes if chance exists to fit more data into the buffer.")
                         .If(c => c.decodingResult == DecodingResult.Complete)
-                            .Do(c => c.receivedMessageSender.Send(c.addRoutingWrapper ? new ConnectionRoutingWrapper(c.id, c.decodedMessage) : c.decodedMessage))
+                            .Do(c => c.receivedMessageSender.Send(c.addRoutingWrapper ? new ConnectionRoutingWrapper(c.GetHandle().id, c.decodedMessage) : c.decodedMessage))
                         .Else()
                             .Do(c => c.ResetBuffer(!(c.bufferReadPosition == 0 && c.bufferFillState == c.bufferSize)))
                     .Step("Start over again")
@@ -55,7 +56,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     .Step("Stop connection")
                         .Do(c =>
                         {
-                            Log.INFO(c, $"Connection was closed! (id={c.id})");
+                            Log.INFO(c.GetHandle(), $"Connection was closed! (id={c.GetHandle()})");
                             c.Stop(false);
                         })
                     .Step("Finish workflow")
@@ -93,7 +94,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"Could not get stream from tcpClient or stream upgrade failed. (id={id})", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Could not get stream from tcpClient or stream upgrade failed. (id={this.GetHandle()})", e.ToString());
             }
 
             this.bufferSize = bufferSize;
@@ -110,8 +111,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             if (msg is ConnectionRoutingWrapper wrapper)
             {
-                if ((wrapper.inverseConnectionFiltering && wrapper.connectionId != id) ||
-                    (!wrapper.inverseConnectionFiltering && wrapper.connectionId == id) ||
+                if ((wrapper.inverseConnectionFiltering && wrapper.connectionId != this.GetHandle().id) ||
+                    (!wrapper.inverseConnectionFiltering && wrapper.connectionId == this.GetHandle().id) ||
                     wrapper.connectionId == default)
                 {
                     return wrapper.Message;
@@ -125,7 +126,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             if (Disconnected)
             {
-                Log.WARNING(this, $"Message was not set over connection because of disconnection! (id={id})");
+                Log.WARNING(this.GetHandle(), $"Message was not set over connection because of disconnection! (id={this.GetHandle()})");
                 return false;
             }
 
@@ -136,7 +137,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"Failed when writing to stream, closing connection! (id={id})", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed when writing to stream, closing connection! (id={this.GetHandle()})", e.ToString());
                 this.client.Close();
                 return false;
             }

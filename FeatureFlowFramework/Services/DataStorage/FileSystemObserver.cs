@@ -2,6 +2,7 @@
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.IO;
 
@@ -68,7 +69,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         private void OnError(object sender, ErrorEventArgs e)
         {
-            Log.ERROR(this, "FileSystemWatcher failed, will be reset!", e.GetException().ToString());
+            Log.ERROR(this.GetHandle(), "FileSystemWatcher failed, will be reset!", e.GetException().ToString());
             InitWatchers(true);
         }
 

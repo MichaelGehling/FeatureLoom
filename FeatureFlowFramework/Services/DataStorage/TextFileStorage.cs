@@ -4,6 +4,7 @@ using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -255,7 +256,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                     catch (Exception e)
                     {
                         cache?.Remove(uri);
-                        Log.WARNING(this, $"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
+                        Log.WARNING(this.GetHandle(), $"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
                     }
                 }
             }
@@ -333,7 +334,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                 }
                 catch(Exception e)
                 {
-                    if (config.logFailedDeserialization) Log.WARNING(this, "Failed on deserializing!", e.ToString());
+                    if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!", e.ToString());
                     data = default;
                     return false;
                 }
@@ -356,7 +357,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR(this, "Failed serializing persiting object", e.ToString());
+                    Log.ERROR(this.GetHandle(), "Failed serializing persiting object", e.ToString());
                     str = default;
                     return false;
                 }
@@ -404,7 +405,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR(this, "Reading files to retreive Uris failed!", e.ToString());
+                Log.ERROR(this.GetHandle(), "Reading files to retreive Uris failed!", e.ToString());
                 return (false, null);
             }
         }
@@ -537,7 +538,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -588,7 +589,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
             finally
@@ -618,7 +619,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -641,7 +642,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"Failed writing file for uri {uri}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -659,19 +660,9 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch(Exception e)
             {
-                Log.ERROR(this, $"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
                 return Task.FromResult(false);
             }
-        }
-
-        Task<AsyncOutResult<bool, T>> IStorageReader.TryReadAsync<T>(string uri)
-        {
-            throw new NotImplementedException();
-        }
-
-        Task<AsyncOutResult<bool, string[]>> IStorageReader.TryListUrisAsync(string pattern)
-        {
-            throw new NotImplementedException();
         }
 
         private class FileSubscriptionStatus

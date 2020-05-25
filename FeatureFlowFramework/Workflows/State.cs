@@ -1,10 +1,11 @@
 ﻿using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public class State<CT> : State where CT : IStateMachineContext
+    public class State<CT> : State where CT : class, IStateMachineContext
     {
         public readonly List<Step<CT>> steps = new List<Step<CT>>();
 
@@ -25,7 +26,7 @@ namespace FeatureFlowFramework.Workflows
             var builder = parentStateMachine.BuildState(this, description) as StateBuilder<CT>;
             if(builder.state != this)
             {
-                Log.ERROR(parentStateMachine, $"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
+                Log.ERROR(parentStateMachine.GetHandle(), $"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
                 throw new Exception($"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
             }
             return builder;

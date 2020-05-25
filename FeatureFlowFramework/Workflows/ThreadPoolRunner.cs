@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Threading.Tasks;
 
@@ -17,7 +18,7 @@ namespace FeatureFlowFramework.Workflows
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this, $"Workflow failed! ({workflow.Name})", e.ToString());
+                    Log.ERROR(this.GetHandle(), $"Workflow failed! ({workflow.Name})", e.ToString());
                 }
                 finally
                 {

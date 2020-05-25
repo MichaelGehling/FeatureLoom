@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.DataStorage;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -253,7 +254,7 @@ namespace FeatureFlowFramework.Services.Web
                             }
                             else
                             {
-                                Log.ERROR(this, $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
+                                Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
                             }
                         }
                         else

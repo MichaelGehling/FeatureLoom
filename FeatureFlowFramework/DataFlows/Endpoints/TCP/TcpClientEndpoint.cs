@@ -1,11 +1,9 @@
-﻿using FeatureFlowFramework.Aspects;
-using FeatureFlowFramework.Aspects.AppStructure;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
+﻿using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.DataStorage;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Workflows;
 using System;
 using System.Net;
@@ -160,7 +158,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             var oldConfig = config;
             if (await config.TryUpdateFromStorageAsync(true) || initial)
             {
-                if (!initial) Log.INFO(this, "Loading updated configuration!");
+                if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
 
                 if (oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.LapsedTime);
 
@@ -175,7 +173,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     {
                         if (!initial)
                         {
-                            Log.INFO(this, $"TCP Client deactivated, connection will be disconnected.");
+                            Log.INFO(this.GetHandle(), $"TCP Client deactivated, connection will be disconnected.");
                             connection?.Stop();
                         }
                     }
@@ -211,7 +209,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     connection = null;
                 }
 
-                Log.INFO(this, $"Trying to connect to {ipAddress}:{config.port}");
+                Log.INFO(this.GetHandle(), $"Trying to connect to {ipAddress}:{config.port}");
                 TcpClient newClient = new TcpClient(ipAddress.AddressFamily);
                 await newClient.ConnectAsync(ipAddress, config.port);
                 if (newClient.Connected)
@@ -226,7 +224,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"TcpConnection failed to start with target hostname {config.hostAddress} and port {config.port}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"TcpConnection failed to start with target hostname {config.hostAddress} and port {config.port}!", e.ToString());
                 connection?.Stop();
             }
             reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime);
@@ -262,22 +260,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
         public Task PostAsync<M>(M message)
         {
             return SendingToTcpSink.PostAsync(message);
-        }
-
-        public override bool TryUpdateAppStructureAspects(TimeSpan timeout)
-        {
-            var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
-            childrenInterface.AddChild(config, "TcpClientConfig");
-            childrenInterface.AddChild(encoder, "Encoder");
-            childrenInterface.AddChild(decoder, "Decoder");
-            childrenInterface.AddChild(sendingSink, "SendingSink");
-            childrenInterface.AddChild(receivedMessageSource, "ReceivedMessageSource");
-            childrenInterface.AddChild(messageEncoder, "MessageEncoder");
-            if (connection != null) childrenInterface.AddChild(connection, "Connection " + connection.GetAspectHandle());
-
-            base.TryUpdateAppStructureAspects(timeout);
-
-            return true;
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)

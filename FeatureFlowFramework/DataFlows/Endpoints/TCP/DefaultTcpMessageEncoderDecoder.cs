@@ -3,6 +3,7 @@ using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.DataStorage;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Text;
 
@@ -75,7 +76,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             }
             catch(Exception e)
             {
-                Log.ERROR(this, "Encoding failed!", e.ToString());
+                Log.ERROR(this.GetHandle(), "Encoding failed!", e.ToString());
             }
             return null;
         }
@@ -143,13 +144,13 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
                     default:
                         decodedMessage = null;
-                        Log.WARNING(this, $"Unknown type byte {type} in message buffer!");
+                        Log.WARNING(this.GetHandle(), $"Unknown type byte {type} in message buffer!");
                         return DecodingResult.Invalid;
                 }
             }
             catch(Exception e)
             {
-                Log.WARNING(this, $"Decoding message payload failed!", e.ToString());
+                Log.WARNING(this.GetHandle(), $"Decoding message payload failed!", e.ToString());
                 decodedMessage = null;
                 return DecodingResult.Invalid;
             }

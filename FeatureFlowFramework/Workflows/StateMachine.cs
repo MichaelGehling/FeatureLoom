@@ -1,13 +1,14 @@
 ﻿using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public abstract class StateMachine<CT> : StateMachine where CT : IStateMachineContext
+    public abstract class StateMachine<CT> : StateMachine where CT : class, IStateMachineContext
     {
         protected readonly List<State<CT>> states = new List<State<CT>>();
 
@@ -20,13 +21,13 @@ namespace FeatureFlowFramework.Workflows
             if (!ValidateAfterInit(out string findings))
             {
                 findings = findings.TrimEnd("\n");
-                Log.ERROR(this, $"Creation of statemachine {this.GetType().FullName} failed!", $"Findings:\n{findings}");
+                Log.ERROR(this.GetHandle(), $"Creation of statemachine {this.GetType().FullName} failed!", $"Findings:\n{findings}");
                 throw new Exception($"Creation of statemachine {this.GetType().FullName} failed! Findings: {findings}");
             }
             else if (!findings.EmptyOrNull())
             {
                 findings = findings.TrimEnd("\n");
-                Log.WARNING(this, $"Issues found for Statemachine {this.GetType().FullName}!", $"Findings:\n{findings}");
+                Log.WARNING(this.GetHandle(), $"Issues found for Statemachine {this.GetType().FullName}!", $"Findings:\n{findings}");
             }
         }
 
@@ -113,7 +114,7 @@ namespace FeatureFlowFramework.Workflows
             }
             else
             {
-                Log.ERROR(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state refers to an invalid state or step index. Execution state is set to invalid!");
+                Log.ERROR(context.GetHandle(), $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state refers to an invalid state or step index. Execution state is set to invalid!");
                 context.ExecutionPhase = Workflow.ExecutionPhase.Invalid;
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFailed, executionState, executionPhase);
                 return false;
@@ -137,7 +138,7 @@ namespace FeatureFlowFramework.Workflows
             }
             else
             {
-                Log.ERROR(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state refers to an invalid state or step index. Execution state is set to invalid!");
+                Log.ERROR(context.GetHandle(), $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state refers to an invalid state or step index. Execution state is set to invalid!");
                 context.ExecutionPhase = Workflow.ExecutionPhase.Invalid;
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFailed, executionState, executionPhase);
                 return false;
@@ -153,12 +154,12 @@ namespace FeatureFlowFramework.Workflows
                     return false;
 
                 case Workflow.ExecutionPhase.Invalid:
-                    Log.ERROR(context, $"Workflow {context.ContextName} failed and is now invalid!");
+                    Log.ERROR(context.GetHandle(), $"Workflow {context.ContextName} failed and is now invalid!");
                     context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowInvalid);
                     return false;
 
                 case Workflow.ExecutionPhase.Paused:
-                    Log.INFO(context, $"Workflow {context.ContextName} is paused!");
+                    Log.INFO(context.GetHandle(), $"Workflow {context.ContextName} is paused!");
                     context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowPaused);
                     return false;
 
@@ -174,7 +175,7 @@ namespace FeatureFlowFramework.Workflows
             if (executionPhase == Workflow.ExecutionPhase.Finished ||
                executionPhase == Workflow.ExecutionPhase.Invalid)
             {
-                Log.WARNING(context, $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToString()}!");
+                Log.WARNING(context.GetHandle(), $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToString()}!");
                 proceed = false;
             }
             else if(executionPhase != Workflow.ExecutionPhase.Running)
@@ -203,12 +204,12 @@ namespace FeatureFlowFramework.Workflows
             var step = this.states.ItemOrNull(context.CurrentExecutionState.stateIndex)?.steps.ItemOrNull(context.CurrentExecutionState.stepIndex);
             if(this.robustExecutionActive)
             {
-                Log.ERROR(context, $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
+                Log.ERROR(context.GetHandle(), $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
                 return nextExecutionState;
             }
             else
             {
-                Log.ERROR(context, $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
+                Log.ERROR(context.GetHandle(), $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
                 throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e);
             }
         }

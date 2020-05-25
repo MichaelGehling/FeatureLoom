@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Services.Web;
 using System;
 using System.Collections.Generic;
@@ -56,7 +57,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch(Exception e)
             {
-                Log.WARNING(this, $"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());
+                Log.WARNING(this.GetHandle(), $"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());
                 return true;
             }
         }

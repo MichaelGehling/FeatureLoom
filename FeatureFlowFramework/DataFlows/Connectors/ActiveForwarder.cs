@@ -2,6 +2,7 @@
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Threading.Tasks;
 
@@ -110,7 +111,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this, "Exception caught in ActiveForwarder while sending.", e.ToString());
+                    Log.ERROR(this.GetHandle(), "Exception caught in ActiveForwarder while sending.", e.ToString());
                 }
             }
             using (receiverLock.ForWriting())

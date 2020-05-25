@@ -11,6 +11,7 @@ using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services;
+using FeatureFlowFramework.Services.MetaData;
 
 namespace Playground
 {
@@ -38,10 +39,8 @@ namespace Playground
                 {
                     objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
                 }
-            }
+            }            
 
-
-            
             var timer = AppTime.TimeKeeper;
             TimeSpan x;
             long c1 = 0;

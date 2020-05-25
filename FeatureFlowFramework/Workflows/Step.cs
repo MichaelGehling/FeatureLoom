@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public class Step<CT> : PartialStep<CT>, IStepInfo where CT : IStateMachineContext
+    public class Step<CT> : PartialStep<CT>, IStepInfo where CT : class, IStateMachineContext
     {
         public StateMachine<CT> parentStateMachine;
         public State<CT> parentState;

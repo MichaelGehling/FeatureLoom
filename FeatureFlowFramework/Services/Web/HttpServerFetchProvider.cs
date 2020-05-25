@@ -4,6 +4,7 @@ using FeatureFlowFramework.Helpers.Collections;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Net;
 using System.Text;
@@ -111,7 +112,7 @@ $@"{{
             }
             catch(Exception e)
             {
-                Log.ERROR(this, $"Failed while building response! Route:{route}", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;
                 return true;
             }

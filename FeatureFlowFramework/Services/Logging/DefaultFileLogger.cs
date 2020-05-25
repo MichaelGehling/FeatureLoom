@@ -2,6 +2,7 @@
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.DataStorage;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Workflows;
 using System;
 using System.Collections.Generic;
@@ -36,11 +37,11 @@ namespace FeatureFlowFramework.Services.Logging
                         .WaitFor(c => c.receiver)
                     .Step("Write all logMessages from receiver to file")
                         .Do(async c => await c.WriteToLogFileAsync())
-                        .CatchAndDo((c, e) => Log.ERROR(c, $"{c.Name}: Writing to log file failed.", e.ToString()))
+                        .CatchAndDo((c, e) => Log.ERROR(c.GetHandle(), $"{c.Name}: Writing to log file failed.", e.ToString()))
                     .Step("Do archiving if file limit is exceeded")
                         .If(c => c.config.logFileSizeLimitInMB * 1024 * 1024 <= c.GetLogFileSize())
                             .Do(c => c.ArchiveCurrentLogfile())
-                        .CatchAndDo((c, e) => Log.ERROR(c, $"{c.Name}: Moving log file to archive failed.", e.ToString()))
+                        .CatchAndDo((c, e) => Log.ERROR(c.GetHandle(), $"{c.Name}: Moving log file to archive failed.", e.ToString()))
                     .Step("Delay before next writing, if configured")
                         .If(c => c.config.delayAfterWritingInMs > 0)
                             .Wait(c => c.config.delayAfterWritingInMs.Milliseconds())

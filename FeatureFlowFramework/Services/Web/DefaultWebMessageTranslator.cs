@@ -3,6 +3,7 @@ using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -63,7 +64,7 @@ namespace FeatureFlowFramework.Services.Web
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this, $"Failed creating an factory function! Name:{name} TypeName:{type.Name}", e.ToString());
+                    Log.ERROR(this.GetHandle(), $"Failed creating an factory function! Name:{name} TypeName:{type.Name}", e.ToString());
                 }
             }
         }
@@ -82,7 +83,7 @@ namespace FeatureFlowFramework.Services.Web
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this, $"Failed creating an factory function! Name:{name} TypeName:{typeName}", e.ToString());
+                    Log.ERROR(this.GetHandle(), $"Failed creating an factory function! Name:{name} TypeName:{typeName}", e.ToString());
                 }
             }
         }
@@ -108,7 +109,7 @@ namespace FeatureFlowFramework.Services.Web
             }
             catch(Exception e)
             {
-                Log.ERROR(this, "Failed deserializing message!", e.ToString());
+                Log.ERROR(this.GetHandle(), "Failed deserializing message!", e.ToString());
                 message = default;
                 return false;
             }
@@ -126,14 +127,14 @@ namespace FeatureFlowFramework.Services.Web
                 }
                 else
                 {
-                    Log.WARNING(this, $"TypeName for message {message.GetType()} not available.");
+                    Log.WARNING(this.GetHandle(), $"TypeName for message {message.GetType()} not available.");
                     json = null;
                     return false;
                 }
             }
             catch(Exception e)
             {
-                Log.ERROR(this, "Failed serializing message!", e.ToString());
+                Log.ERROR(this.GetHandle(), "Failed serializing message!", e.ToString());
                 json = null;
                 return false;
             }

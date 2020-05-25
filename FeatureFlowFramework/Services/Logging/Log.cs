@@ -1,6 +1,5 @@
-﻿using FeatureFlowFramework.Aspects;
-using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
+﻿using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Workflows;
 using System;
@@ -57,64 +56,118 @@ namespace FeatureFlowFramework.Services.Logging
             return true;
         }
 
-        public static void ALWAYS(object context,
+        public static void ALWAYS(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.ALWAYS, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.ALWAYS, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
-        public static void ERROR(object context,
+        public static void ERROR(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
-        public static void WARNING(object context,
+        public static void WARNING(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
-        public static void INFO(object context,
+        public static void INFO(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
-        public static void DEBUG(object context,
+        public static void DEBUG(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
-        public static void TRACE(object context,
+        public static void TRACE(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, context.GetAspectHandle(), caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+        }
+
+        public static void ALWAYS(string shortText,
+                          string detailText = "",
+                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
+                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        {
+            SendLogMessage(new LogMessage(Loglevel.ALWAYS, shortText, detailText, default, caller, sourceFile, sourceLine));
+        }
+
+        public static void ERROR(string shortText,
+                          string detailText = "",
+                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
+                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        {
+            SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, default, caller, sourceFile, sourceLine));
+        }
+
+        public static void WARNING(string shortText,
+                          string detailText = "",
+                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
+                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        {
+            SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, default, caller, sourceFile, sourceLine));
+        }
+
+        public static void INFO(string shortText,
+                          string detailText = "",
+                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
+                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        {
+            SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, default, caller, sourceFile, sourceLine));
+        }
+
+        public static void DEBUG(string shortText,
+                          string detailText = "",
+                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
+                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        {
+            SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, default, caller, sourceFile, sourceLine));
+        }
+
+        public static void TRACE(string shortText,
+                                 string detailText = "",
+                                 [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+                                 [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
+                                 [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        {
+            SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
     }
 }

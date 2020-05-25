@@ -31,8 +31,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
             serverSender.ConnectTo(server);
             server.ConnectTo(serverReceiver);
 
-            client.ConnectionWaitHandle.Wait(1.Seconds());
-            server.ConnectionWaitHandle.Wait(1.Seconds());
+            Assert.True(client.ConnectionWaitHandle.Wait(1.Seconds()));
+            Assert.True(server.ConnectionWaitHandle.Wait(1.Seconds()));
             Assert.True(client.IsConnectedToServer);
             Assert.Equal(1, server.CountConnectedClients);
 
@@ -72,8 +72,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
             serverSender.ConnectTo(server);
             server.ConnectTo(serverReceiver);
 
-            client.ConnectionWaitHandle.Wait(1.Seconds());
-            server.ConnectionWaitHandle.Wait(1.Seconds());
+            Assert.True(client.ConnectionWaitHandle.Wait(1.Seconds()));
+            Assert.True(server.ConnectionWaitHandle.Wait(1.Seconds()));
             Assert.True(client.IsConnectedToServer);
             Assert.Equal(1, server.CountConnectedClients);
 

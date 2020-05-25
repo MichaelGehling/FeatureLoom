@@ -2,6 +2,7 @@
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -59,7 +60,7 @@ namespace FeatureFlowFramework.Helpers.Data
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR(this, $"Failed deserializing data from distribution! Uri={uri}", e.ToString());
+                    Log.ERROR(this.GetHandle(), $"Failed deserializing data from distribution! Uri={uri}", e.ToString());
                 }
             }
             return false;
@@ -81,7 +82,7 @@ namespace FeatureFlowFramework.Helpers.Data
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this, $"Failed serializing data for distribution! Uri={uri}", e.ToString());
+                    Log.ERROR(this.GetHandle(), $"Failed serializing data for distribution! Uri={uri}", e.ToString());
                 }
             }
             return false;

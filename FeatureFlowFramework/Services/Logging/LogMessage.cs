@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Text;
 using System.Threading;
@@ -10,7 +11,7 @@ namespace FeatureFlowFramework.Services.Logging
         public LogMessage(Loglevel level,
                           string shortText,
                           string detailText = "",
-                          long contextHandle = default,
+                          ObjectHandle contextHandle = default,
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
@@ -31,7 +32,7 @@ namespace FeatureFlowFramework.Services.Logging
         public string shortText;
         public string detailText;
         public Loglevel level;
-        public long contextHandle;
+        public ObjectHandle contextHandle;
         public string caller;
         public string sourceFile;
         public int sourceLine;

@@ -3,6 +3,7 @@ using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -68,7 +69,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch(Exception e)
             {
-                Log.WARNING(this, $"Certificate {uri} could not be loaded", e.ToString());
+                Log.WARNING(this.GetHandle(), $"Certificate {uri} could not be loaded", e.ToString());
             }
 
             return false;
@@ -104,7 +105,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch(Exception e)
             {
-                Log.ERROR(this, "Reading files to retreive Uris failed!", e.ToString());
+                Log.ERROR(this.GetHandle(), "Reading files to retreive Uris failed!", e.ToString());
                 return (false, null);
             }
         }
@@ -116,7 +117,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         public bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink)
         {
-            Log.WARNING(this, "Subscription is currently not supported!");
+            Log.WARNING(this.GetHandle(), "Subscription is currently not supported!");
             return false;
         }
     }

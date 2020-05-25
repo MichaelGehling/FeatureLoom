@@ -8,6 +8,7 @@ using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 
 namespace FeatureFlowFramework.Services.DataStorage
 {
@@ -98,7 +99,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch(Exception e)
             {
-                Log.ERROR(this, $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
                 success = false;
             }
 
@@ -212,7 +213,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             catch(Exception e)
             {
-                Log.ERROR(this, $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
                 success = false;
             }
 
@@ -238,7 +239,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                 }
                 catch(Exception e)
                 {
-                    if(config.logFailedDeserialization) Log.WARNING(this, "Failed on deserializing!", e.ToString());
+                    if(config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!", e.ToString());
                     data = default;
                     return false;
                 }
@@ -261,21 +262,12 @@ namespace FeatureFlowFramework.Services.DataStorage
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this, "Failed serializing persiting object", e.ToString());
+                    Log.ERROR(this.GetHandle(), "Failed serializing persiting object", e.ToString());
                     bytes = default;
                     return false;
                 }
             }
         }
 
-        Task<AsyncOutResult<bool, T>> IStorageReader.TryReadAsync<T>(string uri)
-        {
-            throw new NotImplementedException();
-        }
-
-        Task<AsyncOutResult<bool, string[]>> IStorageReader.TryListUrisAsync(string pattern)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

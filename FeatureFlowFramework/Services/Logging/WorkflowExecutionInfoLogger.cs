@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Workflows;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -35,7 +36,7 @@ namespace FeatureFlowFramework.Services.Logging
             var stateName = state.Name;
             var stepName = state.StepInfos[stepIndex].Description;
 
-            Log.TRACE(wf, $"Workflow {wf.Name}, event: {evnt}, phase: {phase}, state: {stateIndex}({stateName}), step: {stepIndex}({stepName}).");
+            Log.TRACE(wf.GetHandle(), $"Workflow {wf.Name}, event: {evnt}, phase: {phase}, state: {stateIndex}({stateName}), step: {stepIndex}({stepName}).");
         }
     }
 }

@@ -1,9 +1,8 @@
-﻿using FeatureFlowFramework.Aspects;
-using FeatureFlowFramework.Aspects.AppStructure;
-using FeatureFlowFramework.DataFlows;
+﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Services;
+using FeatureFlowFramework.Services.MetaData;
 using Newtonsoft.Json;
 using System;
 using System.Threading;
@@ -11,9 +10,8 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
 {
-    public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext, IUpdateAppStructureAspect
+    public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext
     {                
-        protected long id;
         protected ExecutionState executionState;
         protected ExecutionPhase executionPhase = ExecutionPhase.Prepared;
         protected IWorkflowRunner currentRunner;        
@@ -29,23 +27,11 @@ namespace FeatureFlowFramework.Workflows
 
         protected LazySlim<Sender> executionInfoSender;        
 
-        public virtual bool TryUpdateAppStructureAspects(TimeSpan timeout)
-        {
-            if (executionInfoSender.IsInstantiated)
-            {
-                var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
-                childrenInterface.AddChild(executionInfoSender.Obj);
-            }
-            return true;
-        }
-
         [JsonIgnore]
         public IDataFlowSource ExecutionInfoSource => executionInfoSender.Obj;
 
         [JsonIgnore]
         protected virtual IWorkflowRunner DefaultRunner => WorkflowRunnerService.DefaultRunner;
-
-        public virtual bool AddToAspectRegistry => true;
 
         [JsonIgnore]
         public ExecutionState CurrentExecutionState { get => executionState; set => executionState = value; }
@@ -60,7 +46,7 @@ namespace FeatureFlowFramework.Workflows
         public virtual ExecutionEventList ExecutionEvents => executionEvents;
 
         [JsonIgnore]
-        public string Name => $"{this.GetType().ToString()}_{this.id}";
+        public string Name => $"{this.GetType()}_{this.GetHandle()}";
 
         [JsonIgnore]
         bool IStateMachineContext.PauseRequested
@@ -71,9 +57,6 @@ namespace FeatureFlowFramework.Workflows
 
         [JsonIgnore]
         string IStateMachineContext.ContextName => Name;
-
-        [JsonIgnore]
-        long IStateMachineContext.ContextId => id;
 
         [JsonIgnore]
         ExecutionPhase IStateMachineContext.ExecutionPhase
@@ -158,8 +141,6 @@ namespace FeatureFlowFramework.Workflows
         protected Workflow(string name = null)
         {
             executionState = WorkflowStateMachine.InitialExecutionState;
-            if (AddToAspectRegistry) id = this.GetAspectHandle();
-            else id = RandomGenerator.Int64();
         }
 
         protected static SM stateMachineInstance = new SM();

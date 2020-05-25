@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.Workflows
                                     IAfterWhileStateBuilder<CT>, IAfterConditionedActionStateBuilder<CT>,
                                     IAfterFinalPreconditionStateBuilder<CT>, IAfterActionStateBuilderWithoutTransition<CT>, 
                                     IAfterConditionedStateBuilderWithoutTransition<CT>
-                                    where CT : IStateMachineContext
+                                    where CT : class, IStateMachineContext
     {
         public State<CT> state;
 
@@ -400,13 +400,13 @@ namespace FeatureFlowFramework.Workflows
         }
     }
 
-    public interface IInitialStateBuilder<CT> where CT : IStateMachineContext
+    public interface IInitialStateBuilder<CT> where CT : class, IStateMachineContext
     {
         // Next Step
         IAfterStartStateBuilder<CT> Step(string description = "");
     }
 
-    public interface IAfterStartStateBuilder<CT> where CT : IStateMachineContext
+    public interface IAfterStartStateBuilder<CT> where CT : class, IStateMachineContext
     {
         //Preconditions
         IAfterPreconditionStateBuilder<CT> If(Func<CT, Task<bool>> predicate);
@@ -444,7 +444,7 @@ namespace FeatureFlowFramework.Workflows
         IAfterStartStateBuilder<CT> Step(string description = "");
     }
 
-    public interface IAfterPreconditionStateBuilder<CT> where CT : IStateMachineContext
+    public interface IAfterPreconditionStateBuilder<CT> where CT : class, IStateMachineContext
     {
         //Actions
         IAfterConditionedActionStateBuilder<CT> Do(Func<CT, Task> action);
@@ -470,7 +470,7 @@ namespace FeatureFlowFramework.Workflows
         IAfterConditionedStateBuilderWithoutTransition<CT> Finish();
     }
 
-    public interface IAfterWhileStateBuilder<CT> where CT : IStateMachineContext
+    public interface IAfterWhileStateBuilder<CT> where CT : class, IStateMachineContext
     {
         //Actions
         IAfterActionStateBuilder<CT> Do(Func<CT, Task> action);
@@ -489,7 +489,7 @@ namespace FeatureFlowFramework.Workflows
 
     }
 
-    public interface IAfterFinalPreconditionStateBuilder<CT> where CT : IStateMachineContext
+    public interface IAfterFinalPreconditionStateBuilder<CT> where CT : class, IStateMachineContext
     {
         //Actions
         IAfterActionStateBuilder<CT> Do(Func<CT, Task> action);
@@ -515,7 +515,7 @@ namespace FeatureFlowFramework.Workflows
         IAfterActionStateBuilderWithoutTransition<CT> Finish();
     }
 
-    public interface IAfterConditionedActionStateBuilder<CT> where CT : IStateMachineContext
+    public interface IAfterConditionedActionStateBuilder<CT> where CT : class, IStateMachineContext
     {
         IAfterFinalPreconditionStateBuilder<CT> Else();
 
@@ -550,7 +550,7 @@ namespace FeatureFlowFramework.Workflows
         IAfterStartStateBuilder<CT> Step(string description = "");
     }
 
-    public interface IAfterConditionedStateBuilderWithoutTransition<CT> where CT : IStateMachineContext
+    public interface IAfterConditionedStateBuilderWithoutTransition<CT> where CT : class, IStateMachineContext
     {
         IAfterFinalPreconditionStateBuilder<CT> Else();
 
@@ -578,7 +578,7 @@ namespace FeatureFlowFramework.Workflows
         IAfterStartStateBuilder<CT> Step(string description = "");
     }
 
-    public interface IAfterActionStateBuilder<CT> where CT : IStateMachineContext
+    public interface IAfterActionStateBuilder<CT> where CT : class, IStateMachineContext
     {
         //Descriptions
         IAfterActionStateBuilder<CT> Using(Func<CT, object> resource);
@@ -608,7 +608,7 @@ namespace FeatureFlowFramework.Workflows
         IAfterStartStateBuilder<CT> Step(string description = "");
     }
 
-    public interface IAfterActionStateBuilderWithoutTransition<CT> where CT : IStateMachineContext
+    public interface IAfterActionStateBuilderWithoutTransition<CT> where CT : class, IStateMachineContext
     {
         //Descriptions
         IAfterActionStateBuilder<CT> Using(Func<CT, object> resource);
@@ -630,7 +630,7 @@ namespace FeatureFlowFramework.Workflows
         IAfterStartStateBuilder<CT> Step(string description = "");
     }
 
-    public interface INextStateBuilder<CT> where CT : IStateMachineContext
+    public interface INextStateBuilder<CT> where CT : class, IStateMachineContext
     {
         // Next Step
         IAfterStartStateBuilder<CT> Step(string description = "");

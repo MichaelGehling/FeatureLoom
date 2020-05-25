@@ -4,6 +4,7 @@ using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -149,7 +150,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             if(message is RpcErrorResponse errorResponse)
             {
-                Log.ERROR(this, "String-RPC call failed!", errorResponse.ErrorMessage);
+                Log.ERROR(this.GetHandle(), "String-RPC call failed!", errorResponse.ErrorMessage);
             }
             else if(message is IRpcResponse)
             {

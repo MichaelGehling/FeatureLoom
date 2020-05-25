@@ -9,7 +9,6 @@ namespace FeatureFlowFramework.Workflows
         string ContextName { get; }
         CancellationToken CancellationToken { get; }
         bool PauseRequested { get; set; }
-        long ContextId { get; }
 
         void SendExecutionInfoEvent(string executionEvent, object additionalInfo = null);
 

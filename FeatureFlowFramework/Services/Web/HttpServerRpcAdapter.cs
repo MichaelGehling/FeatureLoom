@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.DataFlows.RPC;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Services.Web;
 using System;
 using System.Net;
@@ -51,12 +52,12 @@ namespace FeatureFlowFramework.Services.Web
             catch(TaskCanceledException cancelException)
             {
                 response.StatusCode = HttpStatusCode.RequestTimeout;
-                Log.WARNING(this, "Web RPC request timed out", cancelException.ToString());
+                Log.WARNING(this.GetHandle(), "Web RPC request timed out", cancelException.ToString());
             }
 
             catch(Exception e)
             {
-                Log.ERROR(this, $"Failed while building response! Route:{route}", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;
             }
             return true;

@@ -1,10 +1,9 @@
-﻿using FeatureFlowFramework.Aspects;
-using FeatureFlowFramework.Aspects.AppStructure;
-using FeatureFlowFramework.Helpers;
+﻿using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.DataStorage;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Workflows;
 using System;
 using System.Collections.Generic;
@@ -175,7 +174,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             var oldConfig = config;
             if (await config.TryUpdateFromStorageAsync(true) || initial)
             {
-                if (!initial) Log.INFO(this, "Loading updated configuration!");
+                if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
 
                 if (initial || ConfigChanged(oldConfig))
                 {
@@ -189,7 +188,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         private void DeactivateServer()
         {
-            Log.INFO(this, $"TCP Server deactivated. {connections.Count} connections will be disconnected!");
+            Log.INFO(this.GetHandle(), $"TCP Server deactivated. {connections.Count} connections will be disconnected!");
             foreach (var connection in connections) connection.Stop();
             connections.Clear();
             connectionForwarder.DisconnectAll();
@@ -207,7 +206,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
                 if (!initial)
                 {
-                    Log.WARNING(this, $"TCP Server reset. {connections.Count} connections will be disconnected!");
+                    Log.WARNING(this.GetHandle(), $"TCP Server reset. {connections.Count} connections will be disconnected!");
                     foreach (var connection in connections) connection.Stop();
                     connections.Clear();
                     connectionForwarder.DisconnectAll();
@@ -215,11 +214,11 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 listner?.Stop();
                 listner = new TcpListener(ipAddress, config.port);
                 listner.Start();
-                Log.TRACE(this, $"TCP server started with hostname {config.hostAddress} and port {config.port}.");
+                Log.TRACE(this.GetHandle(), $"TCP server started with hostname {config.hostAddress} and port {config.port}.");
             }
             catch (Exception e)
             {
-                Log.ERROR(this, $"TcpListner failed to start with hostname {config.hostAddress} and port {config.port}! {connections.Count} connections will be disconnected!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"TcpListner failed to start with hostname {config.hostAddress} and port {config.port}! {connections.Count} connections will be disconnected!", e.ToString());
                 listner?.Stop();
                 listner = null;
                 foreach (var connection in connections) connection.Stop();
@@ -267,22 +266,6 @@ namespace FeatureFlowFramework.DataFlows.TCP
         public Task PostAsync<M>(M message)
         {
             return SendingToTcpSink.PostAsync(message);
-        }
-
-        public override bool TryUpdateAppStructureAspects(TimeSpan timeout)
-        {
-            var childrenInterface = this.GetAspectInterface<IAcceptsChildren, AppStructureAddOn>();
-            childrenInterface.AddChild(config, "TcpServerConfig");
-            childrenInterface.AddChild(encoder, "Encoder");
-            childrenInterface.AddChild(decoder, "Decoder");
-            childrenInterface.AddChild(sendingSink, "SendingSink");
-            childrenInterface.AddChild(receivedMessageSource, "ReceivedMessageSource");
-            childrenInterface.AddChild(messageEncoder, "MessageEncoder");
-            childrenInterface.AddChild(connectionForwarder, "ConnectionForwarder");
-            foreach (var connection in connections) childrenInterface.AddChild(connection, "Connection " + connection.GetAspectHandle());
-
-            base.TryUpdateAppStructureAspects(timeout);
-            return true;
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)

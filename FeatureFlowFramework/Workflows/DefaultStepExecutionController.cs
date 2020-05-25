@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,14 +10,14 @@ namespace FeatureFlowFramework.Workflows
 {
     public interface IStepExecutionController
     {
-        Task ExecuteStepAsync<C>(C context, Step<C> step) where C : IStateMachineContext;
+        Task ExecuteStepAsync<C>(C context, Step<C> step) where C : class, IStateMachineContext;
 
-        void ExecuteStep<C>(C context, Step<C> step) where C : IStateMachineContext;
+        void ExecuteStep<C>(C context, Step<C> step) where C : class, IStateMachineContext;
     }
 
     public class DefaultStepExecutionController : IStepExecutionController
     {
-        public void ExecuteStep<C>(C context, Step<C> step) where C : IStateMachineContext
+        public void ExecuteStep<C>(C context, Step<C> step) where C : class, IStateMachineContext
         {
             var currentExecutionState = context.CurrentExecutionState;
             var nextExecutionState = new Workflow.ExecutionState(currentExecutionState.stateIndex, currentExecutionState.stepIndex + 1);
@@ -60,7 +61,7 @@ namespace FeatureFlowFramework.Workflows
             FinishStepExecution(context, nextExecutionState, nextExecutionPhase, proceedStep, partialStep);
         }
 
-        public async Task ExecuteStepAsync<C>(C context, Step<C> step) where C : IStateMachineContext
+        public async Task ExecuteStepAsync<C>(C context, Step<C> step) where C : class, IStateMachineContext
         {
             var currentExecutionState = context.CurrentExecutionState;
             var nextExecutionState = new Workflow.ExecutionState(currentExecutionState.stateIndex, currentExecutionState.stepIndex + 1);
@@ -104,7 +105,7 @@ namespace FeatureFlowFramework.Workflows
             FinishStepExecution(context, nextExecutionState, nextExecutionPhase, proceedStep, partialStep);
         }
 
-        private static void DoTransition<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, ref Workflow.ExecutionState nextExecutionState, ref Workflow.ExecutionPhase nextExecutionPhase, ref bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
+        private static void DoTransition<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, ref Workflow.ExecutionState nextExecutionState, ref Workflow.ExecutionPhase nextExecutionPhase, ref bool proceed, PartialStep<C> partialStep) where C : class, IStateMachineContext
         {
             if (partialStep.targetState != null)
             {
@@ -121,11 +122,11 @@ namespace FeatureFlowFramework.Workflows
             }
             else
             {
-                Log.WARNING(context, $"Workflow {context.ContextName} reaches state/step \"{step.parentState.Name}\"/\"{step.Description}\" without any defined action!");
+                Log.WARNING(context.GetHandle(), $"Workflow {context.ContextName} reaches state/step \"{step.parentState.Name}\"/\"{step.Description}\" without any defined action!");
             }
         }
 
-        private static bool DoWaiting<C>(C context, Step<C> step, PartialStep<C> partialStep) where C : IStateMachineContext
+        private static bool DoWaiting<C>(C context, Step<C> step, PartialStep<C> partialStep) where C : class, IStateMachineContext
         {
             bool proceed = true;
             context.ExecutionPhase = Workflow.ExecutionPhase.Waiting;
@@ -139,7 +140,7 @@ namespace FeatureFlowFramework.Workflows
                 if(e.InnerOrSelf() is TaskCanceledException)
                 {
                     proceed = false;
-                    Log.DEBUG(context, "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                    Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
                 }
                 else throw e.InnerOrSelf();
             }
@@ -148,7 +149,7 @@ namespace FeatureFlowFramework.Workflows
             return proceed;
         }
 
-        private static Workflow.ExecutionState HandleException<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleException<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : class, IStateMachineContext
         {
             if (!step.hasCatchException)
             {
@@ -181,7 +182,7 @@ namespace FeatureFlowFramework.Workflows
             return nextExecutionState;
         }
 
-        private static Workflow.ExecutionState HandleAsyncExceptionRepeat<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleAsyncExceptionRepeat<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : class, IStateMachineContext
         {
             if (step.onExceptionRepeatConditionAsync(context, e).Result)
             {
@@ -192,7 +193,7 @@ namespace FeatureFlowFramework.Workflows
             return nextExecutionState;
         }
 
-        private static Workflow.ExecutionState HandleExceptionRepeat<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleExceptionRepeat<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : class, IStateMachineContext
         {
             if (step.onExceptionRepeatCondition(context, e))
             {
@@ -203,13 +204,13 @@ namespace FeatureFlowFramework.Workflows
             return nextExecutionState;
         }
 
-        private static void HandleAsyncExceptionAction<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
+        private static void HandleAsyncExceptionAction<C>(C context, Step<C> step, Exception e) where C : class, IStateMachineContext
         {
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
             step.onExceptionAsync(context, e).Wait();
         }
 
-        private static Workflow.ExecutionState HandleExceptionTransition<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleExceptionTransition<C>(C context, Step<C> step, Exception e) where C : class, IStateMachineContext
         {
             Workflow.ExecutionState nextExecutionState;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithTransition, e);
@@ -217,13 +218,13 @@ namespace FeatureFlowFramework.Workflows
             return nextExecutionState;
         }
 
-        private static void HandleExceptionAction<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
+        private static void HandleExceptionAction<C>(C context, Step<C> step, Exception e) where C : class, IStateMachineContext
         {
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
             step.onException(context, e);
         }
 
-        private static void DoAction<C>(C context, PartialStep<C> partialStep) where C : IStateMachineContext
+        private static void DoAction<C>(C context, PartialStep<C> partialStep) where C : class, IStateMachineContext
         {
             if (partialStep.action != null) partialStep.action(context);
             else if (partialStep.actionAsync != null)
@@ -234,7 +235,7 @@ namespace FeatureFlowFramework.Workflows
                 }
                 catch (Exception e)
                 {
-                    if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context, "Async action was cancelled!", e.InnerOrSelf().ToString());
+                    if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context.GetHandle(), "Async action was cancelled!", e.InnerOrSelf().ToString());
                     else throw e.InnerOrSelf();
                 }
             }
@@ -274,7 +275,7 @@ namespace FeatureFlowFramework.Workflows
             }
         }
 
-        private static async Task<bool> DoWaitingAsync<C>(C context, Step<C> step, bool proceed, PartialStep<C> partialStep) where C : IStateMachineContext
+        private static async Task<bool> DoWaitingAsync<C>(C context, Step<C> step, bool proceed, PartialStep<C> partialStep) where C : class, IStateMachineContext
         {
             context.ExecutionPhase = Workflow.ExecutionPhase.Waiting;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.BeginWaiting);
@@ -287,7 +288,7 @@ namespace FeatureFlowFramework.Workflows
                 if(e.InnerOrSelf() is TaskCanceledException)
                 {
                     proceed = false;
-                    Log.DEBUG(context, "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                    Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
                 }
                 else throw e.InnerOrSelf();
             }
@@ -296,7 +297,7 @@ namespace FeatureFlowFramework.Workflows
             return proceed;
         }
 
-        private static async Task<Workflow.ExecutionState> HandleExceptionAsync<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static async Task<Workflow.ExecutionState> HandleExceptionAsync<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : class, IStateMachineContext
         {
             if (!step.hasCatchException)
             {
@@ -333,7 +334,7 @@ namespace FeatureFlowFramework.Workflows
             return nextExecutionState;
         }
 
-        private static Workflow.ExecutionState HandleAsyncExceptionRepeatAsync<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : IStateMachineContext
+        private static Workflow.ExecutionState HandleAsyncExceptionRepeatAsync<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : class, IStateMachineContext
         {
             if (step.onExceptionRepeatConditionAsync(context, e).Result)
             {
@@ -344,13 +345,13 @@ namespace FeatureFlowFramework.Workflows
             return nextExecutionState;
         }
 
-        private static async Task HandleAsyncExceptionActionAsync<C>(C context, Step<C> step, Exception e) where C : IStateMachineContext
+        private static async Task HandleAsyncExceptionActionAsync<C>(C context, Step<C> step, Exception e) where C : class, IStateMachineContext
         {
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
             await step.onExceptionAsync(context, e);
         }
 
-        private static async Task DoActionAsync<C>(C context, PartialStep<C> partialStep) where C : IStateMachineContext
+        private static async Task DoActionAsync<C>(C context, PartialStep<C> partialStep) where C : class, IStateMachineContext
         {
             if (partialStep.action != null) partialStep.action(context);
             else if (partialStep.actionAsync != null)
@@ -361,7 +362,7 @@ namespace FeatureFlowFramework.Workflows
                 }
                 catch (Exception e)
                 {
-                    if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context, "Async action was cancelled!", e.InnerOrSelf().ToString());
+                    if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context.GetHandle(), "Async action was cancelled!", e.InnerOrSelf().ToString());
                     else throw e.InnerOrSelf();
                 }
             }

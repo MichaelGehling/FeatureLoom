@@ -4,6 +4,7 @@ using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 
@@ -62,7 +63,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         {
             if(!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
             {
-                Log.ERROR(this, "Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
+                Log.ERROR(this.GetHandle(), "Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
             }
         }
 
@@ -106,7 +107,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                 try
                 {
                     this.UpdateFromJson(json);
-                    Log.INFO(this, $"Configuration loaded for {Uri}!");
+                    Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");
                 }
                 catch
                 {

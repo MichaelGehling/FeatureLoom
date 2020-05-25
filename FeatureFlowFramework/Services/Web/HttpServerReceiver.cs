@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Services.Web;
 using System;
 using System.Net;
@@ -63,13 +64,13 @@ namespace FeatureFlowFramework.Services.Web
                 }
                 else
                 {
-                    Log.WARNING(this, $"Received message could not be translated. Route:{route}");
+                    Log.WARNING(this.GetHandle(), $"Received message could not be translated. Route:{route}");
                     response.StatusCode = HttpStatusCode.InternalServerError;
                 }
             }
             catch(Exception e)
             {
-                Log.ERROR(this, $"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;
             }
             return true;
