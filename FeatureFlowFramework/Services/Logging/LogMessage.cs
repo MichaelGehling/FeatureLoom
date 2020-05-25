@@ -38,7 +38,7 @@ namespace FeatureFlowFramework.Services.Logging
         public int sourceLine;
         public int threadId;
 
-        public static string defaultFormat = "| {0} | {4} | {1} | {2} | {3} | File: {5} Line: {6} Method: {7} | {8} |";
+        public static string defaultFormat = "| {0} | ctxt{4} | thrd{3} | {1} | {2} | File: {5} Line: {6} Method: {7} | {8} |";
         public static string defaultTimeStampFormat = "yyyy-MM-dd HH:mm:ss.fffffff";
 
         public string Print(string format = null, string timeStampFormat = null)
