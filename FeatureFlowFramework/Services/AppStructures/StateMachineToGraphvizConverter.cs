@@ -1,7 +1,7 @@
 ﻿using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Workflows;
 
-namespace FeatureFlowFramework.Services
+namespace FeatureFlowFramework.Services.AppStructures
 {
     public static class StateMachineToGraphvizConverter
     {
