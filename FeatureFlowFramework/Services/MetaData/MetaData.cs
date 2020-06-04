@@ -8,13 +8,35 @@ using System.Runtime.CompilerServices;
 
 namespace FeatureFlowFramework.Services.MetaData
 {
-    public abstract class MetaData
+    public class MetaData
     {
-        protected static ConditionalWeakTable<object, MetaData> objects = new ConditionalWeakTable<object, MetaData>();
-        protected static Dictionary<long, MetaData> handles = new Dictionary<long, MetaData>();
-        protected static FeatureLock handlesLock = new FeatureLock();
-        protected static long handleIdCounter = 0;
-        protected static Sender<ObjectHandleInfo> updateSender = new Sender<ObjectHandleInfo>();
+        static ConditionalWeakTable<object, MetaData> objects = new ConditionalWeakTable<object, MetaData>();
+        static Dictionary<long, MetaData> handles = new Dictionary<long, MetaData>();
+        static FeatureLock handlesLock = new FeatureLock();
+        static long handleIdCounter = 0;
+        static Sender<ObjectHandleInfo> updateSender = new Sender<ObjectHandleInfo>();
+
+
+        readonly ObjectHandle handle;
+        LazySlim<Dictionary<string, object>> data;
+        readonly WeakReference<object> objRef;
+        FeatureLock objLock = new FeatureLock();
+        Sender<MetaDataUpdateInfo> metaDataUpdateSender;
+
+        public Sender<MetaDataUpdateInfo> MetaDataUpdateSender
+        {
+            get
+            {
+                if(metaDataUpdateSender == null) metaDataUpdateSender = new Sender<MetaDataUpdateInfo>();
+                return metaDataUpdateSender;
+            }
+        }
+
+        public MetaData(object obj)
+        {
+            objRef = new WeakReference<object>(obj);
+            handle = new ObjectHandle(++handleIdCounter);
+        }
 
         public static Sender<ObjectHandleInfo> UpdateSender
         {
@@ -27,10 +49,13 @@ namespace FeatureFlowFramework.Services.MetaData
 
         ~MetaData()
         {
-            FinalizeIt();                        
-        }
+            using(handlesLock.ForWriting())
+            {
+                updateSender?.Send(new ObjectHandleInfo(handle, true));
 
-        protected abstract void FinalizeIt();
+                handles.Remove(handle.id);
+            }
+        }
 
         public static bool TryGetObjectType(ObjectHandle handle, out Type type)
         {
@@ -49,8 +74,6 @@ namespace FeatureFlowFramework.Services.MetaData
             }
         }
 
-        protected abstract bool TryGetObjectType(out Type type);
-
         public readonly struct ObjectHandleInfo
         {
             public readonly ObjectHandle handle;
@@ -63,123 +86,15 @@ namespace FeatureFlowFramework.Services.MetaData
             }
         }
 
-        public static void Register<T>(T obj) where T : class
+        public static void Register(object obj)
         {
-            MetaData<T>.GetHandle(obj);
+            GetHandle(obj);
         }
 
-        public static void Unregister<T>(T obj) where T : class
+        public static void Unregister(object obj)
         {
             objects.Remove(obj);
         }
-    }
-
-    public class MetaData<T> : MetaData where T : class
-    {
-        readonly ObjectHandle handle;
-        LazySlim<Dictionary<string, object>> data;
-        readonly WeakReference<T> objRef;
-        FeatureLock objLock = new FeatureLock();
-        Sender<MetaDataUpdateInfo> metaDataUpdateSender;
-
-        public Sender<MetaDataUpdateInfo> MetaDataUpdateSender
-        {
-            get
-            {
-                if (metaDataUpdateSender == null) metaDataUpdateSender = new Sender<MetaDataUpdateInfo>();
-                return metaDataUpdateSender;
-            }
-        }
-
-        public MetaData(T obj)
-        {
-            objRef = new WeakReference<T>(obj);
-            handle = new ObjectHandle(++handleIdCounter);
-        }
-
-        protected override void FinalizeIt()
-        {
-            using (handlesLock.ForWriting())
-            {
-                updateSender?.Send(new ObjectHandleInfo(handle, true));
-
-                handles.Remove(handle.id);
-            }
-        }
-
-        protected override bool TryGetObjectType(out Type type)
-        {
-            type = default;
-            if (!objRef.TryGetTarget(out T target)) return false;
-            type = target.GetType();
-            return true;
-        }
-
-        #region static
-
-        protected static MetaData<T> GetOrCreate(T obj)
-        {
-            if (objects.TryGetValue(obj, out MetaData untyped) && untyped is MetaData<T> metaData) return metaData;            
-            else
-            {
-                metaData = new MetaData<T>(obj);
-                objects.Add(obj, metaData);
-                using (handlesLock.ForWriting()) handles[metaData.handle.id] = metaData;
-
-                updateSender?.Send(new ObjectHandleInfo(metaData.handle, false));
-
-                return metaData;
-            }
-        }
-
-        public static ObjectHandle GetHandle(T obj)
-        {
-            return GetOrCreate(obj).handle;
-        }
-
-        public static bool TryGetObject(ObjectHandle handle, out T obj)
-        {
-            using (handlesLock.ForReading())
-            {
-                obj = default;
-                return handles.TryGetValue(handle.id, out MetaData untyped) &&
-                       untyped is MetaData<T> metaData &&
-                       metaData.objRef.TryGetTarget(out obj);
-            }
-        }
-
-        public static void SetMetaData<D>(T obj, string key, D data)
-        {
-            var metaData = GetOrCreate(obj);
-            using (metaData.objLock.ForWriting()) metaData.data.Obj[key] = data;
-
-            metaData.metaDataUpdateSender?.Send(new MetaDataUpdateInfo(metaData.handle, key));
-        }
-
-        public static bool TryGetMetaData<D>(T obj, string key, out D data)
-        {
-            data = default;
-            if (!objects.TryGetValue(obj, out MetaData untyped) || !(untyped is MetaData<T> metaData)) return false;
-            using (metaData.objLock.ForReading())
-            {                
-                if (metaData.data.IsInstantiated &&
-                    metaData.data.Obj.TryGetValue(key, out object untypedData) && 
-                    untypedData is D typedData)
-                {
-                    data = typedData;
-                    return true;
-                }
-                else return false;
-            }
-        }
-
-        public static FeatureLock GetLock(T obj)
-        {
-            var metaData = GetOrCreate(obj);
-            return metaData.objLock;
-        }
-
-        #endregion
 
         public readonly struct MetaDataUpdateInfo
         {
@@ -192,5 +107,85 @@ namespace FeatureFlowFramework.Services.MetaData
                 this.updatedKey = updatedKey;
             }
         }
+
+        protected bool TryGetObjectType(out Type type)
+        {
+            type = default;
+            if(!objRef.TryGetTarget(out object target)) return false;
+            type = target.GetType();
+            return true;
+        }
+
+        protected static MetaData GetOrCreate(object obj)
+        {
+            if(objects.TryGetValue(obj, out MetaData metaData)) return metaData;
+            else
+            {
+                metaData = new MetaData(obj);
+                objects.Add(obj, metaData);
+                using(handlesLock.ForWriting()) handles[metaData.handle.id] = metaData;
+
+                updateSender?.Send(new ObjectHandleInfo(metaData.handle, false));
+
+                return metaData;
+            }
+        }
+
+        public static ObjectHandle GetHandle(object obj)
+        {
+            return GetOrCreate(obj).handle;
+        }
+
+        public static bool TryGetObject<T>(ObjectHandle handle, out T obj) where T:class
+        {
+            using(handlesLock.ForReading())
+            {
+                if(handles.TryGetValue(handle.id, out MetaData metaData) &&
+                   metaData.objRef.TryGetTarget(out object untyped) &&
+                   untyped is T typed)
+                {
+                    obj = typed;
+                    return true;
+                }
+                else
+                {
+                    obj = null;
+                    return false;
+                }
+            }
+        }
+
+        public static void SetMetaData<D>(object obj, string key, D data)
+        {
+            var metaData = GetOrCreate(obj);
+            using(metaData.objLock.ForWriting()) metaData.data.Obj[key] = data;
+
+            metaData.metaDataUpdateSender?.Send(new MetaDataUpdateInfo(metaData.handle, key));
+        }
+
+        public static bool TryGetMetaData<D>(object obj, string key, out D data)
+        {
+            data = default;
+            if(!objects.TryGetValue(obj, out MetaData metaData)) return false;
+            using(metaData.objLock.ForReading())
+            {
+                if(metaData.data.IsInstantiated &&
+                    metaData.data.Obj.TryGetValue(key, out object untypedData) &&
+                    untypedData is D typedData)
+                {
+                    data = typedData;
+                    return true;
+                }
+                else return false;
+            }
+        }
+
+        public static FeatureLock GetLock(object obj)
+        {
+            var metaData = GetOrCreate(obj);
+            return metaData.objLock;
+        }
+
     }
+
 }

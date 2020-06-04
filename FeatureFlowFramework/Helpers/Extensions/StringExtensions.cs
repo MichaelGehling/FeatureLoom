@@ -134,13 +134,13 @@ namespace FeatureFlowFramework.Helpers.Extensions
             int endPos = str.Length-1;
             if (!startAfter.EmptyOrNull())
             {
-                startPos = str.IndexOf(startAfter);
+                startPos = str.IndexOf(startAfter) + startAfter.Length;
             }
             if (!endBefore.EmptyOrNull())
             {
                 endPos = str.IndexOf(endBefore, startPos);
             }
-            return str.Substring(startPos, endPos - startPos);
+            return str.Substring(startPos, endPos - startPos + 1);
         }
     }
 }
