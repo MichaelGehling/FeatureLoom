@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Forms
         public bool keepReading = true;
         public bool hideOnClosing = false;
 
-        public LogViewer()
+        public LogViewer(IDataFlowSource logMessageSource = null)
         {
             InitializeComponent();
             FormClosing += (o, e) =>
@@ -28,9 +28,8 @@ namespace FeatureFlowFramework.Forms
                 }
             };
 
-            this.richTextBox1.DoubleClick += (a, b) => keepReading = !keepReading;
-
-            this.workflow = new WritingLogWorkflow(this);
+            this.richTextBox1.DoubleClick += (a, b) => keepReading = !keepReading;            
+            this.workflow = new WritingLogWorkflow(this, logMessageSource ?? Log.LogForwarder);
             Log.logRunner.Run(workflow);
         }
 
@@ -41,12 +40,12 @@ namespace FeatureFlowFramework.Forms
             private MessageTrigger closingTrigger = new MessageTrigger();
             private WaitHandleCollection waitHandles;
 
-            public WritingLogWorkflow(LogViewer logViewer)
+            public WritingLogWorkflow(LogViewer logViewer, IDataFlowSource logMessageSource)
             {
                 this.logViewer = logViewer;
 
                 logViewer.FormClosing += (a, b) => closingTrigger.Post(true);
-                Log.LogForwarderBuffer.ConnectTo(queue);
+                logMessageSource.ConnectTo(queue);
             }
 
             public class SM : StateMachine<WritingLogWorkflow>
