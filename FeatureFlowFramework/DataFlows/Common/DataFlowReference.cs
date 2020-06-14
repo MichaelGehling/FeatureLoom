@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -13,6 +14,7 @@ namespace FeatureFlowFramework.DataFlows
             strongRefSink = weakReference ? null : sink;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetTarget(out IDataFlowSink sink)
         {
             if (weakRefSink == null)

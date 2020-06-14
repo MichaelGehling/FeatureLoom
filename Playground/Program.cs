@@ -19,9 +19,26 @@ namespace Playground
 
     class Program
     {
+
+        static void Test(long i)
+        {
+            i = 0;
+        }
+
         static void Main(string[] args)
         {
-            
+            Sender sender = new Sender();
+            //sender.ConnectTo(new ProcessingEndpoint<long>(i => { i = 0; }));
+            var timeKeeper = AppTime.TimeKeeper;
+            for (long i = 0; i < 100_000_000; i++) Test(i);
+            Console.WriteLine($"Method:{timeKeeper.Elapsed}");
+            timeKeeper.Restart();
+            for (long i = 0; i < 100_000_000; i++) sender.Send(i);
+            Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
+
+
+            Console.ReadKey();
+
             QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
             SharedData<int> sharedInt = new SharedData<int>(42);
             SharedData<string> sharedObj = new SharedData<string>("Hello");

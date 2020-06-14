@@ -4,6 +4,7 @@ using FeatureFlowFramework.Helpers.Synchronization;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
@@ -97,9 +98,10 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Forward<M>(in M message)
         {
-            if(message == null || this.sinks == null) return;
+            if(this.sinks == null) return;
 
             var currentSinks = this.sinks;
 
@@ -133,9 +135,10 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task ForwardAsync<M>(M message)
         {
-            if(message == null || this.sinks == null) return Task.CompletedTask;
+            if(this.sinks == null) return Task.CompletedTask;
 
             var currentSinks = this.sinks;
 
