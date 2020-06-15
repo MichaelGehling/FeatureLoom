@@ -23,6 +23,8 @@
 // DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+// NOTE: The namespace and class name were changed compared to the original source code!
+
 using System.Collections.Generic;
 
 namespace FeatureFlowFramework.Helpers.Extensions
