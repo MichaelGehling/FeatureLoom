@@ -6,6 +6,13 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
+    public class BufferingForwarder : BufferingForwarder<object>
+    {
+        public BufferingForwarder(int bufferSize) : base(bufferSize)
+        {
+        }
+    }
+
     public class BufferingForwarder<T> : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
         private DataFlowSourceHelper sourceHelper;

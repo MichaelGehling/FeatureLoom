@@ -64,7 +64,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             T message = default;
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
-            using (myLock.ForWriting())
+            using (await myLock.ForWritingAsync())
             {
                 if(IsEmpty) return (false, message);
                 message = receivedMessage;

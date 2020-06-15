@@ -2,6 +2,7 @@
 using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureFlowFramework.Helpers.Time;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -111,7 +112,7 @@ namespace FeatureFlowFramework.DataFlows
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
             if(IsEmpty) return (false, default);
-            using (queueLock.ForWriting())
+            using (await queueLock.ForWritingAsync())
             {
                 success = queue.TryDequeue(out message);                
             }

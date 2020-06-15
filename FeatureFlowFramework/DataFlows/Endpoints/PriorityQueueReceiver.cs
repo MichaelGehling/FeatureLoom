@@ -111,7 +111,7 @@ namespace FeatureFlowFramework.DataFlows
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
             if(IsEmpty) return (false, default);
-            using (queueLock.ForWriting())
+            using (await queueLock.ForWritingAsync())
             {
                 success = queue.TryDequeue(out message);
             }
