@@ -114,28 +114,6 @@ namespace FeatureFlowFramework.DataFlows
             Assert.True(waitHandle.WaitingTask.IsCompleted);
         }
 
-        [Theory]
-        [InlineData(80, 0, false)]
-        [InlineData(80, 40, false)]
-        [InlineData(20, 50, true)]
-        public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
-        {
-            TestHelper.PrepareTestContext();
-
-            TimeSpan tolerance = 30.Milliseconds();
-            var sender = new Sender();
-            var receiver = new QueueReceiver<int>();
-            sender.ConnectTo(receiver);
-
-            var timeKeeper = AppTime.TimeKeeper;
-            new Timer(_ => sender.Send(42), null, sendDelayInMs, -1);
-
-            var receivingTask = receiver.TryReceiveAsync(receivingWaitLimitInMs.Milliseconds());
-            Assert.Equal(shouldBeReceived, receivingTask.Result.Out(out int message));
-            var expectedTime = sendDelayInMs.Milliseconds().ClampHigh(receivingWaitLimitInMs.Milliseconds());
-            Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
-        }
-
         [Fact(Skip = "Unstable when run with other tests.")]
         public void MultipleThreadsCanReceiveConcurrently()
         {

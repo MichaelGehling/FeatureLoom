@@ -111,28 +111,5 @@ namespace FeatureFlowFramework.DataFlows
             sender.Send(42);
             Assert.True(waitHandle.WaitingTask.IsCompleted);
         }
-
-        [Theory]
-        [InlineData(200, 0, false)]
-        [InlineData(200, 30, false)]
-        [InlineData(20, 100, true)]
-        public void AllowsAsyncReceiving(int sendDelayInMs, int timeOutInMs, bool shouldBeReceived)
-        {
-            TestHelper.PrepareTestContext();
-
-            var sender = new Sender();
-            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);
-            sender.ConnectTo(receiver);
-
-            var timeKeeper = AppTime.TimeKeeper;
-            Task.Run(() =>
-            {
-                Thread.Sleep(sendDelayInMs);
-                sender.Send(42);
-            });            
-
-            var receivingTask = receiver.TryReceiveAsync(timeOutInMs.Milliseconds());
-            Assert.Equal(shouldBeReceived, receivingTask.Result.Out(out int message));
-        }
     }
 }
