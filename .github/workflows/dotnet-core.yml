@@ -26,4 +26,4 @@ jobs:
     - name: Build
       run: dotnet build ./FeatureFlowFramework/FeatureFlowFramework.csproj --configuration Release --no-restore
     - name: Test
-      run: dotnet test ./FeatureFlowFramework.Tests/FeatureFlowFramework.Tests.csproj --no-restore --verbosity detailed
+      run: dotnet test ./FeatureFlowFramework.Tests/FeatureFlowFramework.Tests.csproj --no-restore --verbosity normal
