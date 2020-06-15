@@ -5,7 +5,7 @@ F3 is a development framework written in C#. It provides a set of features to si
 F3 can be used in many contexts like client, server and mobile applications for various platforms as it is build on .Net Standard 2.0 and actively supports synchronous and asynchronous coding.
 
 F3 is subdivided into **four facets**:
-* **[[DataFlows]]**: Implements a concept to unify communication in a very flexible and performant way
+* **[DataFlows](https://github.com/MichaelGehling/FeatureFlowFramework/wiki/DataFlows)**: Implements a concept to unify communication in a very flexible and performant way
 * **Workflows**: Allows implementation of business logic based on a state machine driven approach
 * **Services**: A collection of common central service components addressing various aspects
 * **Helpers**: A collection of common tool and extension classes addressing various aspects
