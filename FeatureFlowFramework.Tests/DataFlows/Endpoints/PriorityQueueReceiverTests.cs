@@ -89,7 +89,7 @@ namespace FeatureFlowFramework.DataFlows
             }
             else
             {
-                TimeSpan tolerance = 2.Milliseconds();
+                TimeSpan tolerance = 15.Milliseconds();
 
                 var timeKeeper = AppTime.TimeKeeper;
                 sender.Send(42);
