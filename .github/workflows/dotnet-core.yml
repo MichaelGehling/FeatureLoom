@@ -19,7 +19,13 @@ jobs:
         dotnet-version: 3.1.101
     - name: Setup Nuget.exe
       uses: warrenbuckley/Setup-Nuget@v1
+    - uses: actions/cache@v1
+      id: cache
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
     - name: Nuget Restore
+      if: steps.cache.outputs.cache-hit != 'true'
       run: nuget restore
     - name: Install dependencies
       run: dotnet restore
