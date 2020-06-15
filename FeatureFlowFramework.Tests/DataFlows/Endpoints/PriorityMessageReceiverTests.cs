@@ -47,9 +47,9 @@ namespace FeatureFlowFramework.Tests.DataFlows.Endpoints
         }
 
         [Theory]
-        [InlineData(80, 0, false)]
-        [InlineData(80, 40, false)]
-        [InlineData(20, 50, true)]
+        [InlineData(200, 0, false)]
+        [InlineData(200, 30, false)]
+        [InlineData(20, 100, true)]
         public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
         {
             TestHelper.PrepareTestContext();

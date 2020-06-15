@@ -56,14 +56,13 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Theory]
-        [InlineData(80, 0, false)]
-        [InlineData(80, 40, false)]
+        [InlineData(200, 0, false)]
+        [InlineData(200, 30, false)]
         [InlineData(20, 100, true)]
         public void AllowsAsyncReceiving(int sendDelayInMs, int toleranceInMs, bool shouldBeReceived)
         {
             TestHelper.PrepareTestContext();
 
-            TimeSpan tolerance = 20.Milliseconds();
             var sender = new Sender();
             var receiver = new LatestMessageReceiver<int>();
             sender.ConnectTo(receiver);
