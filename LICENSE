@@ -26,5 +26,5 @@ Additionally this project incorperates some source code from third party
 open source projects. Each of those files includes the respective license notice
 and the name of the original creator.
 
-Here is the list of third party sources with their author and License:
+Here is the list of third party sources with their author and license:
 - "WildcardMatch.cs" from "H.A. Sullivan" under MIT license (/FeatureFlowFramework/Helpers/Extensions/WildcardMatchExtension.cs)
