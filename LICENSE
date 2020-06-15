@@ -19,3 +19,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+==============================================================================
+
+Additionally this project incorperates some source code files from third party 
+open source projects. Each of those files includes the respective license notice
+and the name of the original creator.
+Here is the list of third party sources with their author and License:
+- "WildcardMatch.cs" from "H.A. Sullivan" under MIT license (/FeatureFlowFramework/Helpers/Extensions/WildcardMatchExtension.cs)
