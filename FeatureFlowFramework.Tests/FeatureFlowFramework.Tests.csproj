@@ -21,8 +21,4 @@
     <ProjectReference Include="..\FeatureFlowFramework\FeatureFlowFramework.csproj" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-  </PropertyGroup>
-
 </Project>
