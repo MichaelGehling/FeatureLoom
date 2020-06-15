@@ -20,20 +20,61 @@ namespace Playground
     class Program
     {
 
-        static void Test(long i)
+        static void Test1(DateTime i)
         {
-            i = 0;
+            var x = i.ToString();
+        }
+
+        static void Test2(in DateTime i)
+        {
+            var x = i.ToString();
+        }
+
+        static void Test3<T>(T i)
+        {
+            var x = i.ToString();
+        }
+
+        static void Test4<T>(in T i)
+        {
+            var x = i.ToString();
+        }
+
+        static void Test5(object i)
+        {
+            var x = i.ToString();
         }
 
         static void Main(string[] args)
         {
             Sender sender = new Sender();
-            //sender.ConnectTo(new ProcessingEndpoint<long>(i => { i = 0; }));
+            sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i.ToString(); }));
             var timeKeeper = AppTime.TimeKeeper;
-            for (long i = 0; i < 100_000_000; i++) Test(i);
-            Console.WriteLine($"Method:{timeKeeper.Elapsed}");
+
+            var now = AppTime.Now;
+
             timeKeeper.Restart();
-            for (long i = 0; i < 100_000_000; i++) sender.Send(i);
+            for (long i = 0; i < 10_000_000; i++) Test1(now.AddMilliseconds(i));
+            Console.WriteLine($"Test1(long i):{timeKeeper.Elapsed}");
+
+            timeKeeper.Restart();
+            for(long i = 0; i < 10_000_000; i++) Test2(now.AddMilliseconds(i));
+            Console.WriteLine($"Test2(in long i):{timeKeeper.Elapsed}");
+
+            timeKeeper.Restart();
+            for(long i = 0; i < 10_000_000; i++) Test3(now.AddMilliseconds(i));
+            Console.WriteLine($"Test3<T>(T i):{timeKeeper.Elapsed}");
+
+            timeKeeper.Restart();
+            for(long i = 0; i < 10_000_000; i++) Test4(now.AddMilliseconds(i));
+            Console.WriteLine($"Test4<T>(in T i):{timeKeeper.Elapsed}");
+
+            timeKeeper.Restart();
+            for(long i = 0; i < 10_000_000; i++) Test5(now.AddMilliseconds(i));
+            Console.WriteLine($"Test5(object i):{timeKeeper.Elapsed}");
+
+            timeKeeper.Restart();
+            for (long i = 0; i < 10_000_000; i++) sender.Send(now.AddMilliseconds(i));
             Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
 
 

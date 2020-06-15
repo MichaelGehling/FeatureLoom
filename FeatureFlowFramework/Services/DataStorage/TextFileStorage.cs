@@ -428,6 +428,11 @@ namespace FeatureFlowFramework.Services.DataStorage
                 if (cache?.Get(uri) is string cacheString)
                 {
                     success = TryDeserialize(cacheString, out data);
+                    if(!success)
+                    {
+                        Log.WARNING(this.GetHandle(), $"Failed deserializing cached value for URI {uri}. Will removed from cache!");
+                        cache.Remove(uri);
+                    }
                     return (success, data);
                 }
 
@@ -439,13 +444,14 @@ namespace FeatureFlowFramework.Services.DataStorage
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         var fileContent = await stream.ReadToEndAsync();
+                       
+                        success = TryDeserialize(fileContent, out data);
 
-                        if (config.updateCacheOnRead)
+                        if(!success) Log.WARNING(this.GetHandle(), $"Failed deserializing value for URI {uri}! (It will not be cached)");                        
+                        else if(config.updateCacheOnRead)
                         {
                             cache?.Add(uri, fileContent, cacheItemPolicy);
                         }
-
-                        success = TryDeserialize(fileContent, out data);
                     }
                 }
 
