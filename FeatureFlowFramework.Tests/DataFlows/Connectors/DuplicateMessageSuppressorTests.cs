@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             TestHelper.PrepareTestContext();
 
-            var suppressionTime = 50.Milliseconds();
+            var suppressionTime = 100.Milliseconds();
             var sender = new Sender();
             var suppressor = new DuplicateMessageSuppressor(suppressionTime);
             var counter = new CountingForwarder();
@@ -60,7 +60,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             TestHelper.PrepareTestContext();
 
-            var suppressionTime = 50.Milliseconds();
+            var suppressionTime = 100.Milliseconds();
             var sender = new Sender();
             var suppressor = new DuplicateMessageSuppressor(suppressionTime, (a, b) =>
                 {
