@@ -64,8 +64,6 @@ namespace FeatureFlowFramework.Tests.DataFlows.Endpoints
 
             var receivingTask = receiver.TryReceiveAsync(receivingWaitLimitInMs.Milliseconds());
             Assert.Equal(shouldBeReceived, receivingTask.Result.Out(out int message));
-            var expectedTime = sendDelayInMs.Milliseconds().ClampHigh(receivingWaitLimitInMs.Milliseconds());
-            Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
         }
 
     }
