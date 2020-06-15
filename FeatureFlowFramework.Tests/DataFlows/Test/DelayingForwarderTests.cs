@@ -26,9 +26,9 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Theory]
-        [InlineData(20)]
-        [InlineData(0)]
-        public void CanDelayOnForward(int delay)
+        [InlineData(100, 120)]
+        [InlineData(0, 5)]
+        public void CanDelayOnForward(int delay, int maxDuration)
         {
             TestHelper.PrepareTestContext();
 
@@ -39,7 +39,7 @@ namespace FeatureFlowFramework.DataFlows
             var timer = AppTime.TimeKeeper;
             sender.Send(42);
             Assert.True(sink.received);
-            Assert.InRange(timer.Elapsed, delay.Milliseconds(), (delay + 5).Milliseconds());
+            Assert.InRange(timer.Elapsed, delay.Milliseconds(), (delay + maxDuration).Milliseconds());
         }
     }
 }

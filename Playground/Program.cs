@@ -22,33 +22,33 @@ namespace Playground
 
         static void Test1(DateTime i)
         {
-            var x = i.ToString();
+            var x = i;
         }
 
         static void Test2(in DateTime i)
         {
-            var x = i.ToString();
+            var x = i;
         }
 
         static void Test3<T>(T i)
         {
-            var x = i.ToString();
+            var x = i;
         }
 
         static void Test4<T>(in T i)
         {
-            var x = i.ToString();
+            var x = i;
         }
 
         static void Test5(object i)
         {
-            var x = i.ToString();
+            var x = i;
         }
 
         static void Main(string[] args)
         {
             Sender sender = new Sender();
-            sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i.ToString(); }));
+            sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
             var timeKeeper = AppTime.TimeKeeper;
 
             var now = AppTime.Now;

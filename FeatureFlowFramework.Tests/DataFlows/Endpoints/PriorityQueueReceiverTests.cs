@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Xunit;
 using FeatureFlowFramework.Helpers.Extensions;
+using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -112,10 +113,10 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         [Theory]
-        [InlineData(80, 0, false)]
-        [InlineData(80, 40, false)]
-        [InlineData(20, 50, true)]
-        public void AllowsAsyncReceiving(int sendDelayInMs, int receivingWaitLimitInMs, bool shouldBeReceived)
+        [InlineData(100, 0, false)]
+        [InlineData(100, 40, false)]
+        [InlineData(20, 100, true)]
+        public void AllowsAsyncReceiving(int sendDelayInMs, int timeOutInMs, bool shouldBeReceived)
         {
             TestHelper.PrepareTestContext();
 
@@ -125,12 +126,14 @@ namespace FeatureFlowFramework.DataFlows
             sender.ConnectTo(receiver);
 
             var timeKeeper = AppTime.TimeKeeper;
-            new Timer(_ => sender.Send(42), null, sendDelayInMs, -1);
+            Task.Run(() =>
+            {
+                Thread.Sleep(sendDelayInMs);
+                sender.Send(42);
+            });            
 
-            var receivingTask = receiver.TryReceiveAsync(receivingWaitLimitInMs.Milliseconds());
+            var receivingTask = receiver.TryReceiveAsync(timeOutInMs.Milliseconds());
             Assert.Equal(shouldBeReceived, receivingTask.Result.Out(out int message));
-            var expectedTime = sendDelayInMs.Milliseconds().ClampHigh(receivingWaitLimitInMs.Milliseconds());
-            Assert.InRange(timeKeeper.Elapsed, expectedTime - tolerance, expectedTime + tolerance);
         }
     }
 }
