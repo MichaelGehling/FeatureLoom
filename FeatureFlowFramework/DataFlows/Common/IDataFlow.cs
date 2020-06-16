@@ -33,6 +33,26 @@ namespace FeatureFlowFramework.DataFlows
         IDataFlowSink[] GetConnectedSinks();
     }
 
+    public interface IDataFlowSink<T> : IDataFlow
+    {
+        void Post(in T message);
+
+        Task PostAsync(T message);
+    }
+
+    public interface IDataFlowSource<T> : IDataFlow
+    {
+        void ConnectTo(IDataFlowSink<T> sink, bool weakReference = false);
+        
+        void DisconnectFrom(IDataFlowSink<T> sink);
+
+        void DisconnectAll();
+
+        int CountConnectedSinks { get; }
+
+        IDataFlowSink<T>[] GetConnectedSinks();
+    }
+
     public interface IDataFlowConnection : IDataFlowSink, IDataFlowSource
     {
     }
