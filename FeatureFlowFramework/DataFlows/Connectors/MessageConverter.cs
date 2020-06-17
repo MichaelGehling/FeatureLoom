@@ -5,31 +5,22 @@ namespace FeatureFlowFramework.DataFlows
 {
     /// <summary>
     ///     Messages from a dataFlow put to the converter are processed in a converter function and
-    ///     forwarded to connected sinks. Messages that doesn't match the input type are ignored. It
+    ///     forwarded to connected sinks. Messages that doesn't match the input type are forwarded as they are. It
     ///     is thread-safe as long as the provided function is also thread-safe. Avoid long running
     ///     functions to avoid blocking the sender
     /// </summary>
     /// <typeparam name="I"> The input type for the converter function </typeparam>
     /// <typeparam name="O"> The output type for the converter function </typeparam>
-    public class MessageConverter<I, O> : IDataFlowSource, IDataFlowConnection, IAlternativeDataFlow
+    public class MessageConverter<I, O> : IDataFlowSource, IDataFlowConnection
     {
         private DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
         private readonly Func<I, O> convertFunc;
-        private DataFlowSourceHelper alternativeSendingHelper = null;
 
         public MessageConverter(Func<I, O> convertFunc)
         {
             this.convertFunc = convertFunc;
         }
 
-        public IDataFlowSource Else
-        {
-            get
-            {
-                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
-                return alternativeSendingHelper;
-            }
-        }
 
         public int CountConnectedSinks => sendingHelper.CountConnectedSinks;
 
@@ -54,7 +45,7 @@ namespace FeatureFlowFramework.DataFlows
             {
                 sendingHelper.Forward(convertFunc(msgT));
             }
-            else alternativeSendingHelper?.Forward(message);
+            else sendingHelper.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
@@ -63,7 +54,7 @@ namespace FeatureFlowFramework.DataFlows
             {
                 return sendingHelper.ForwardAsync(convertFunc(msgT));
             }
-            else return alternativeSendingHelper?.ForwardAsync(message);
+            else return sendingHelper.ForwardAsync(message);
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
