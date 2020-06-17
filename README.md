@@ -1,7 +1,7 @@
 # The Feature Flow Framework (F3)
 ![F3 Image](https://raw.githubusercontent.com/MichaelGehling/FeatureFlowFramework/master/Resources/f3.png)
 
-F3 is a development framework written in C#. It provides a set of features to simplify and speed-up development while leading to a better structured and extensible architecture. 
+F3 is a development framework written in C#. It provides a set of features to simplify and speed-up development while leading to a better structured and extensible architecture allowing for an iterative development approach. 
 F3 can be used in many contexts like client, server and mobile applications for various platforms as it is build on .Net Standard 2.0 and actively supports synchronous and asynchronous coding.
 
 F3 is subdivided into **four facets**:
