@@ -4,10 +4,9 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class Splitter<T> : IDataFlowConnection, IDataFlowSink, IDataFlowSource, IAlternativeDataFlow
+    public class Splitter<T> : IDataFlowConnection, IDataFlowSink, IDataFlowSource
     {
         private DataFlowSourceHelper sender = new DataFlowSourceHelper();
-        private DataFlowSourceHelper alternativeSender = new DataFlowSourceHelper();
         private readonly Func<T, ICollection> split;
 
         public Splitter(Func<T, ICollection> split)
@@ -28,7 +27,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
             }
 
-            if(alternative) alternativeSender.Forward(message);
+            if(alternative) sender.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
@@ -47,12 +46,10 @@ namespace FeatureFlowFramework.DataFlows
                     return Task.WhenAll(tasks);
                 }
             }
-            return alternativeSender?.ForwardAsync(message) ?? Task.CompletedTask;
+            return sender.ForwardAsync(message);
         }
 
         public int CountConnectedSinks => ((IDataFlowSource)sender).CountConnectedSinks;
-
-        public IDataFlowSource Else => alternativeSender;
 
         public void DisconnectAll()
         {
