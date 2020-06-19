@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Collections;
+using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.Logging;
@@ -23,6 +24,8 @@ namespace FeatureFlowFramework.Services.Web
 
         public HttpServerFetchProvider(string route, IWebMessageTranslator translator, int bufferSize = 100, IWebServer webServer = null)
         {
+            if (!route.StartsWith("/")) route = "/" + route;
+            route = route.TrimEnd("/");
             this.route = route;
             ringBuffer = new CountingRingBuffer<string>(bufferSize);
             this.translator = translator;

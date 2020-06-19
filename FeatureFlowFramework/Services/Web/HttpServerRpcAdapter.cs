@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.DataFlows.RPC;
+using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Services.Web;
@@ -19,6 +20,8 @@ namespace FeatureFlowFramework.Services.Web
 
         public HttpServerRpcAdapter(string route, TimeSpan rpcTimeout, IWebServer webServer = null)
         {
+            if (!route.StartsWith("/")) route = "/" + route;
+            route = route.TrimEnd("/");
             this.rpcTimeout = rpcTimeout;
             rpcCaller = new StringRpcCaller(rpcTimeout);
             this.route = route;

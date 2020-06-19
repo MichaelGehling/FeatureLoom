@@ -6,12 +6,14 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.DataFlows.RPC;
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Data;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.MetaData;
+using FeatureFlowFramework.Services.Web;
 
 namespace Playground
 {
@@ -47,6 +49,28 @@ namespace Playground
 
         static void Main(string[] args)
         {
+
+            HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
+            RpcCallee callee = new RpcCallee();
+            callee.RegisterMethod<int, int, int>("Add", (a, b) =>
+            {
+                int c = a + b;
+                Console.WriteLine($"RPC: {a}+{b}={c}");
+                return c;
+            });
+            callee.RegisterMethod("Kill", () =>
+            {
+                Task.Run(()=> 
+                {
+                    Thread.Sleep(100.Milliseconds());
+                    Environment.Exit(1);
+                });
+            });
+            webRPC.ConnectToAndBack(callee);
+            SharedWebServer.WebServer.Start();
+
+            Console.ReadKey();
+
             Sender sender = new Sender();
             sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
             var timeKeeper = AppTime.TimeKeeper;
