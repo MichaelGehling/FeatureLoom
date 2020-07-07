@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
@@ -119,7 +120,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             return true;
         }
 
-        public async Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null)
+        public async Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null)
         {
             using(await dataSetLock.ForReadingAsync())
             {
@@ -132,7 +133,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
         }
 
-        public async Task<AsyncOutResult<bool, T>> TryReadAsync<T>(string uri)
+        public async Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
         {
             using(await dataSetLock.ForReadingAsync())
             {

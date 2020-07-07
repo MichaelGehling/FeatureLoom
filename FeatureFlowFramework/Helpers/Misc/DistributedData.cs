@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Data
+namespace FeatureFlowFramework.Helpers.Misc
 {
     public class DistributedData<T>
     {

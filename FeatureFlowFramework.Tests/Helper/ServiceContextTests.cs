@@ -4,7 +4,7 @@ using System.Text;
 using Xunit;
 using FeatureFlowFramework.Helpers;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Helpers.Data;
+using FeatureFlowFramework.Helpers.Misc;
 
 namespace FeatureFlowFramework.Tests.Helper
 {

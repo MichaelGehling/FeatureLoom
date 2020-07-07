@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
@@ -75,14 +76,14 @@ namespace FeatureFlowFramework.Services.DataStorage
             return false;
         }
 
-        public async Task<AsyncOutResult<bool, T>> TryReadAsync<T>(string uri)
+        public async Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
         {
             T data = default;
             await Task.Run(() => TryRead<T>(uri, out data));
             return (true, data);
         }
 
-        public async Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null)
+        public async Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null)
         {
             try
             {

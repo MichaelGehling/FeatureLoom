@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Helpers.Data
+﻿namespace FeatureFlowFramework.Helpers.Misc
 {
     public struct LazySlim<T> where T : class, new()
     {

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 
-namespace FeatureFlowFramework.Helpers.Data
+namespace FeatureFlowFramework.Helpers.Misc
 {
 
     public abstract class ServiceContext
@@ -12,6 +12,14 @@ namespace FeatureFlowFramework.Helpers.Data
         static List<ServiceContext> contexts = new List<ServiceContext>();
         static FeatureLock contextsLock = new FeatureLock();
         static bool noContextSeperationPolicy = false;
+
+        /// <summary>
+        /// If set to true, it will remove a small performance overhead for looking up service context.
+        /// This can make sense if an application is performance critical and uses many service calls.
+        /// But then, each service will stick to a single service context instance,
+        /// even if UseCopyOfContext() or UseNewContext() is called. 
+        /// (Default is NoContextSeperationPolicy=false)
+        /// </summary>
         static public bool NoContextSeperationPolicy
         {
             get => noContextSeperationPolicy;

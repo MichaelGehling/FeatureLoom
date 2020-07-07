@@ -1,5 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Data;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using System;
@@ -73,17 +73,17 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        public async Task<AsyncOutResult<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
+        public async Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
         {
             T message = default;
             if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
             using (myLock.ForWriting())
             {
-                if (IsEmpty) return new AsyncOutResult<bool, T>(false, message);
+                if (IsEmpty) return new AsyncOut<bool, T>(false, message);
                 message = receivedMessage;
                 receivedMessage = default;
                 readerWakeEvent.Reset();
-                return new AsyncOutResult<bool, T>(true, message);
+                return new AsyncOut<bool, T>(true, message);
             }
         }
 

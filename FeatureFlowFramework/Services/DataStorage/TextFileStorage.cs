@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.Logging;
@@ -364,7 +365,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
         }
 
-        public async Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null)
+        public async Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null)
         {
             try
             {
@@ -418,7 +419,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             return File.Exists(filePath);
         }
 
-        public async Task<AsyncOutResult<bool, T>> TryReadAsync<T>(string uri)
+        public async Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
         {
             try
             {

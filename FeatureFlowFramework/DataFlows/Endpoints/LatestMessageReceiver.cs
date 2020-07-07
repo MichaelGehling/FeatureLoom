@@ -1,5 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Data;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using System;
@@ -60,7 +60,7 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        public async Task<AsyncOutResult<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
+        public async Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
         {
             T message = default;
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);

@@ -22,5 +22,6 @@ namespace FeatureFlowFramework.Helpers.Extensions
             if(value.CompareTo(max) >= 0) return max;
             return value;
         }
+
     }
 }

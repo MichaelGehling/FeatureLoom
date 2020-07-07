@@ -20,7 +20,7 @@ namespace FeatureFlowFramework.Helpers.Extensions
                     }
                     catch(Exception e)
                     {
-                        if(logOnException) Log.ERROR(null, $"Async function failed with an exception that was caught! ", e.ToString());
+                        if(logOnException) Log.ERROR( $"Async function failed with an exception that was caught! ", e.ToString());
                     }
                 };
             }

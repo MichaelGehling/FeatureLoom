@@ -2,7 +2,7 @@
 using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 
-namespace FeatureFlowFramework.Helpers.Data
+namespace FeatureFlowFramework.Helpers.Misc
 {
     /// <summary>
     /// Shared data can be used in multiple parallel contexts to store and share data.

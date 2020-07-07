@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Data
+namespace FeatureFlowFramework.Services.Serialization
 {
     public interface IJsonSerializationSupport
     {
@@ -43,7 +43,7 @@ namespace FeatureFlowFramework.Helpers.Data
                     default_SerializerSettings.ObjectCreationHandling = ObjectCreationHandling.Replace;
                     /*default_SerializerSettings.Error = (sender, args) =>
                     {
-                        Log.WARNING(null, $"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
+                        Log.WARNING($"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
                         args.ErrorContext.Handled = true;
                     };*/
                 }
@@ -98,7 +98,7 @@ namespace FeatureFlowFramework.Helpers.Data
                     complexObjectsStructure_SerializerSettings.ObjectCreationHandling = ObjectCreationHandling.Replace;
                     complexObjectsStructure_SerializerSettings.Error = (sender, args) =>
                     {
-                        Log.WARNING(null, $"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
+                        Log.WARNING($"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
                         args.ErrorContext.Handled = true;
                     };
                 }

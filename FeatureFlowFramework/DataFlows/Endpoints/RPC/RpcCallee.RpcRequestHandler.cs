@@ -1,6 +1,8 @@
 ﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Data;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Services.Logging;
+using FeatureFlowFramework.Services.MetaData;
+using FeatureFlowFramework.Services.Serialization;
 using System;
 
 namespace FeatureFlowFramework.DataFlows.RPC
@@ -58,7 +60,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 {
                     if(myRequest.noResponse)
                     {
-                        Log.ERROR(null, $"Failed executing RPC call {myRequest.method}", e.ToString());
+                        Log.ERROR(this.GetHandle(), $"Failed executing RPC call {myRequest.method}", e.ToString());
                     }
                     else
                     {

@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 using System.Threading.Tasks;
@@ -14,7 +15,7 @@ namespace FeatureFlowFramework.DataFlows
 
         bool TryReceive(out T message);
 
-        Task<AsyncOutResult<bool, T>> TryReceiveAsync(TimeSpan timeout = default);
+        Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default);
 
         T[] ReceiveAll();
 

@@ -24,6 +24,7 @@ namespace FeatureFlowFramework.Forms
                 if(hideOnClosing)
                 {
                     Hide();
+                    keepReading = true;
                     e.Cancel = true;
                 }
             };

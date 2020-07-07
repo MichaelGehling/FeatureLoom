@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureFlowFramework.Helpers.Misc
 {
     public static class TryHelper
     {
@@ -36,7 +36,7 @@ namespace FeatureFlowFramework.Helpers
             }
         }
 
-        public static async Task<AsyncOutResult<bool, T>> TryAsync<T>(Func<Task<T>> function)
+        public static async Task<AsyncOut<bool, T>> TryAsync<T>(Func<Task<T>> function)
         {
             try
             {

@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 using System.IO;
@@ -13,11 +14,11 @@ namespace FeatureFlowFramework.Services.DataStorage
     {
         string Category { get; }
 
-        Task<AsyncOutResult<bool, T>> TryReadAsync<T>(string uri);
+        Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri);
 
         Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer);
 
-        Task<AsyncOutResult<bool, string[]>> TryListUrisAsync(string pattern = null);
+        Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null);
 
         bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink);
 

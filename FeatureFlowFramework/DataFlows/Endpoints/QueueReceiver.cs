@@ -1,5 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Data;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
@@ -105,7 +105,7 @@ namespace FeatureFlowFramework.DataFlows
             return success;
         }
 
-        public async Task<AsyncOutResult<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
+        public async Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
         {
             T message = default;
             bool success = false;
