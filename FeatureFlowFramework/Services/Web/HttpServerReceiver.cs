@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.DataFlows;
+using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Services.Web;
@@ -19,6 +20,8 @@ namespace FeatureFlowFramework.Services.Web
 
         public HttpServerReceiver(string route, IWebMessageTranslator translator, int bufferSize = 1024 * 128, IWebServer webServer = null)
         {
+            if (!route.StartsWith("/")) route = "/" + route;
+            route = route.TrimEnd("/");
             this.route = route;
             this.translator = translator;
             this.webServer = webServer ?? SharedWebServer.WebServer;

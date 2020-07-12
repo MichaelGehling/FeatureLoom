@@ -33,6 +33,8 @@ namespace FeatureFlowFramework.Services.DataStorage
             this.config = config ?? new Config();
             this.config.TryUpdateFromStorageAsync(false).Wait();
             webServer = webServer ?? SharedWebServer.WebServer;
+            if (!this.config.route.StartsWith("/")) this.config.route = "/" + this.config.route;
+            this.config.route = this.config.route.TrimEnd("/");
             webServer.AddRequestHandler(this);
 
             reader = Storage.GetReader(config.category);
