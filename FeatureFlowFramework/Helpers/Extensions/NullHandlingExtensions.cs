@@ -57,6 +57,16 @@ namespace FeatureFlowFramework.Helpers.Extensions
             return collection == null || collection.Count == 0;
         }
 
+        public static bool EmptyOrNull<T>(this IEnumerable<T> enumarable)
+        {
+            return enumarable == null || !enumarable.Any();
+        }
+
+        public static bool EmptyOrNull(this IEnumerable enumarable)
+        {
+            return enumarable == null || !enumarable.Cast<object>().Any();
+        }
+
         public static void AddIfNotNull<T>(this ICollection<T> list, T item) where T : class
         {
             if(item != null) list?.Add(item);

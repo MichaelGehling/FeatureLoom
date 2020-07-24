@@ -39,6 +39,7 @@ namespace FeatureFlowFramework.Helpers.Forms
 
         public static void AppendText(this RichTextBox box, RichTextBuilder container)
         {
+            if(container == null) return;
             foreach(var section in container.Sections)
             {
                 if(section.color.HasValue && section.style.HasValue) box.AppendText(section.text, section.color.Value, section.style.Value);
