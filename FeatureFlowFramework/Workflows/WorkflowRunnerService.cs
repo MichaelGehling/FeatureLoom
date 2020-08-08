@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public static class WorkflowRunnerService
     {
-        static ServiceContext<Context> context = new ServiceContext<Context>();
+        static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
         public static IWorkflowRunner DefaultRunner
         {
             get
@@ -82,7 +82,7 @@ namespace FeatureFlowFramework.Workflows
             await Task.WhenAll(tasks.ToArray());
         }
 
-        class Context : IServiceContextData
+        class ContextData : IServiceContextData
         {
             public List<IWorkflowRunner> runners = new List<IWorkflowRunner>();
             public FeatureLock runnersLock = new FeatureLock();
@@ -92,7 +92,7 @@ namespace FeatureFlowFramework.Workflows
             {
                 using(runnersLock.ForReading())
                 {
-                    return new Context()
+                    return new ContextData()
                     {
                         defaultRunner = this.defaultRunner,
                         runners = new List<IWorkflowRunner>(this.runners)

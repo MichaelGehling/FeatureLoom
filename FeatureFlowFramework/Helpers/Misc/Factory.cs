@@ -42,14 +42,14 @@ namespace FeatureFlowFramework.Helpers.Misc
 
         private static class OverrideFactory<T>
         {
-            public class Context : IServiceContextData
+            public class ContextData : IServiceContextData
             {
                 public Func<T> create = null;
                 public Dictionary<string, Func<T>> namedFactories = null;
 
                 public IServiceContextData Copy()
                 {
-                    return new Context()
+                    return new ContextData()
                     {
                         create = this.create,
                         namedFactories = namedFactories == null ? null : new Dictionary<string, Func<T>>(namedFactories)
@@ -57,7 +57,7 @@ namespace FeatureFlowFramework.Helpers.Misc
                 }
             };
 
-            static LazySlim<ServiceContext<Context>> context;
+            static LazySlim<ServiceContext<ContextData>> context;
 
             public static void Setup(Func<T> newCreate)
             {

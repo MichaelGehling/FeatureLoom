@@ -19,12 +19,12 @@ namespace FeatureFlowFramework.Services.Logging
             logRunner.Run(defaultFileLogger);
         }
 
-        class Context : IServiceContextData
+        class ContextData : IServiceContextData
         {
             public readonly Sender<LogMessage> logSender = new Sender<LogMessage>();
             public readonly ActiveForwarder logForwarder = new ActiveForwarder(1, 1000, 10, 10000, TimeSpan.Zero, true);          
 
-            public Context()
+            public ContextData()
             {
                 logSender.ConnectTo(logForwarder);
                 logForwarder.ConnectTo(defaultConsoleLogger);
@@ -33,11 +33,11 @@ namespace FeatureFlowFramework.Services.Logging
 
             public IServiceContextData Copy()
             {
-                Context newContext = new Context();
+                ContextData newContext = new ContextData();
                 return newContext;
             }
         }
-        static ServiceContext<Context> context = new ServiceContext<Context>();
+        static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
 
         public static ActiveForwarder LogForwarder => context.Data.logForwarder;
 

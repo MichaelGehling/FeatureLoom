@@ -8,7 +8,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 {
     public static class Storage
     {
-        class Context : IServiceContextData
+        class ContextData : IServiceContextData
         {
             public Dictionary<string, IStorageReader> categoryToReader = new Dictionary<string, IStorageReader>();
             public FeatureLock categoryToReaderLock = new FeatureLock();
@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             public Func<string, IStorageReader> createDefaultReader = category => new TextFileStorage(category);
             public Func<string, IStorageWriter> createDefaultWriter = category => new TextFileStorage(category);
 
-            public Context()
+            public ContextData()
             {
                 var configStorage = new TextFileStorage("config", new TextFileStorage.Config() { fileSuffix = ".json" });
                 categoryToReader[configStorage.Category] = configStorage;
@@ -29,7 +29,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
             public IServiceContextData Copy()
             {
-                Context newContext = new Context()
+                ContextData newContext = new ContextData()
                 {
                     categoryToReader = new Dictionary<string, IStorageReader>(this.categoryToReader),
                     categoryToWriter = new Dictionary<string, IStorageWriter>(this.categoryToWriter),
@@ -39,7 +39,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                 return newContext;
             }
         }
-        static ServiceContext<Context> context = new ServiceContext<Context>();
+        static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
         
 
         public static Func<string, IStorageReader> DefaultReaderFactory { set => context.Data.createDefaultReader = value; }

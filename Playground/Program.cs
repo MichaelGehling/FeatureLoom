@@ -7,13 +7,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.DataFlows.RPC;
-using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Services.Web;
+using FeatureFlowFramework.Workflows;
 
 namespace Playground
 {
@@ -21,6 +22,8 @@ namespace Playground
 
     class Program
     {
+
+        
 
         static void Test1(DateTime i)
         {
@@ -50,7 +53,11 @@ namespace Playground
         static void Main(string[] args)
         {
 
-            HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
+            var guessTheWord = new GuessTheWord();
+            guessTheWord.Run();
+            guessTheWord.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished);
+
+                HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
             RpcCallee callee = new RpcCallee();
             callee.RegisterMethod<int, int, int>("Add", (a, b) =>
             {

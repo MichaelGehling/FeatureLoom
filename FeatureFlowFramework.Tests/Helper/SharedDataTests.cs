@@ -5,6 +5,7 @@ using FeatureFlowFramework.Helpers.Time;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.Helpers
 {
