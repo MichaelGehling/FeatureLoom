@@ -9,8 +9,8 @@ namespace FeatureFlowFramework.Helpers.Misc
     {
         string[] args;        
         Dictionary<string, string> namedArgs = new Dictionary<string, string>();
-        char bullet;
-        char assignment;
+        readonly char bullet;
+        readonly char assignment;
 
         public ArgsHelper(string[] args, char bullet = '-', char assignment = '=')
         {

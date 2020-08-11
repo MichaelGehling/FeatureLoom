@@ -55,8 +55,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             this.config = config ?? new Config();
             config = this.config;
 
-            if (config.configUri == null) config.configUri = "TextFileStorageConfig";
-            config.configUri = config.Uri + "_" + this.category;
+            if (config.IsUriDefault) config.Uri = "TextFileStorageConfig" + "_" + this.category;
 
             if (config.ConfigCategory != this.category) config.TryUpdateFromStorageAsync(false).Wait();            
 

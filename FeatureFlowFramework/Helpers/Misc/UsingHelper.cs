@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.Helpers.Misc
 {
     public class UsingHelper : IDisposable
     {
-        Action after;
+        readonly Action after;
 
         public UsingHelper(Action before, Action after)
         {

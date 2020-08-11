@@ -80,12 +80,11 @@ namespace FeatureFlowFramework.Helpers.Misc
             }
 
             public static bool Create(string factoryName, out T value)
-            {                
-                Func<T> create = null;
+            {
                 value = default;
                 if (!context.IsInstantiated || 
                     context.ObjIfExists.Data.namedFactories == null || 
-                    !context.ObjIfExists.Data.namedFactories.TryGetValue(factoryName, out create)) return false;
+                    !context.ObjIfExists.Data.namedFactories.TryGetValue(factoryName, out Func<T> create)) return false;
 
                 value = create();
                 return true;
