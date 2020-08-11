@@ -18,10 +18,8 @@ namespace FeatureFlowFramework.Services.DataStorage
     {
         public class Config : Configuration
         {
-            public string configUri;
             public bool logFailedDeserialization = true;
             public int bufferSize = 1024;
-            public override string Uri => configUri ?? base.Uri;
         }
 
         private readonly string category;
@@ -236,7 +234,8 @@ namespace FeatureFlowFramework.Services.DataStorage
             {
                 try
                 {
-                    data = Encoding.UTF8.GetString(bytes).FromJson<T>();
+                    string json = Encoding.UTF8.GetString(bytes);
+                    data = json.FromJson<T>();
                     return true;
                 }
                 catch(Exception e)
@@ -259,7 +258,8 @@ namespace FeatureFlowFramework.Services.DataStorage
             {
                 try
                 {
-                    bytes = data.ToJson().ToByteArray(Encoding.UTF8);
+                    string json = data.ToJson();
+                    bytes = json.ToByteArray(Encoding.UTF8);
                     return true;
                 }
                 catch(Exception e)

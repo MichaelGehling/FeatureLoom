@@ -28,8 +28,6 @@ namespace FeatureFlowFramework.Services.DataStorage
             public bool useCategoryFolder = true;
             public string basePath = "";
             public string fileSuffix = ".pfx";
-            public string configUri;
-            public override string Uri => configUri ?? base.Uri;
         }
 
         private Config config;

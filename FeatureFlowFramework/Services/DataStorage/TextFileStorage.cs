@@ -25,7 +25,6 @@ namespace FeatureFlowFramework.Services.DataStorage
             public string fileSuffix = "";
             public bool allowSubscription = true;
             public TimeSpan subscriptionSamplingTime = 5.Seconds();
-            public string configUri;
             public TimeSpan timeout = TimeSpan.Zero;
             public TimeSpan duplicateFileEventSuppressionTime = 100.Milliseconds();
             public bool updateCacheForSubscription = true;
@@ -34,8 +33,6 @@ namespace FeatureFlowFramework.Services.DataStorage
             public TimeSpan cacheSlidingExpiration = 10.Minutes();
             public int cacheSizeInMb = 10;
             public bool logFailedDeserialization = true;
-
-            public override string Uri => configUri ?? base.Uri;
         }
 
         private Config config;

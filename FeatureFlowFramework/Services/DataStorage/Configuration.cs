@@ -13,6 +13,8 @@ namespace FeatureFlowFramework.Services.DataStorage
     public abstract class Configuration
     {
         public static string defaultCategory = "config";
+        [JsonIgnore]
+        public string configUri;
 
         public static async Task DeleteAllConfigAsync()
         {
@@ -25,7 +27,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         }
 
         [JsonIgnore]
-        public virtual string Uri => this.GetType().FullName;
+        public string Uri => configUri ?? this.GetType().FullName;
 
         [JsonIgnore]
         public virtual string ConfigCategory => defaultCategory;
