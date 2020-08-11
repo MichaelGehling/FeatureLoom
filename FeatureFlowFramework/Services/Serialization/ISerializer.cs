@@ -1,13 +1,17 @@
-﻿namespace FeatureFlowFramework.Services.Serialization
+﻿using FeatureFlowFramework.Helpers.Misc;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace FeatureFlowFramework.Services.Serialization
 {
     public interface ISerializer
-    {
-        bool TrySerialize<T>(T obj, out ISerializedObject serializedObject);
-        ISerializedObject AsSerializedObject(byte[] data);
-        ISerializedObject AsSerializedObject(string data);
+    {        
+        bool TrySerialize<T>(T obj, out ISerializedObject serializedObject);        
         bool TryDeserialize<T>(byte[] data, out T obj);
-        bool TryDeserialize<T>(string data, out T obj);
-        int SerializerId { get; }
+        Task<bool> TrySerializeToStreamAsync<T>(T obj, Stream stream, CancellationToken cancellationToken = default);
+        Task<AsyncOut<bool, T>> TryDeserializeFromStreamAsync<T>(Stream stream, CancellationToken cancellationToken = default);
+        Task<AsyncOut<bool, ISerializedObject>> TryReadSerializedObjectFromStreamAsync(Stream stream, CancellationToken cancellationToken = default);
     }
 
 

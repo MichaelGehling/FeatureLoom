@@ -12,29 +12,25 @@ namespace FeatureFlowFramework.Services.Serialization
     {
         class ContextData : IServiceContextData
         {
-            public Dictionary<int, ISerializer> idToSerializer;
-            public Dictionary<Type, ISerializer> typeToSerializer;
-            public FeatureLock myLock = new FeatureLock();
+            public Dictionary<string, ISerializer> serializers;
+            public FeatureLock serializersLock = new FeatureLock();
             public ISerializer defaultSerializer;
 
             public ContextData()
             {
-                idToSerializer = new Dictionary<int, ISerializer>();
-                typeToSerializer = new Dictionary<Type, ISerializer>();                
+                serializers = new Dictionary<string, ISerializer>();               
             }
 
-            public ContextData(Dictionary<int, ISerializer> idToSerializer, Dictionary<Type, ISerializer> typeToSerializer)
+            public ContextData(Dictionary<string, ISerializer> serializers)
             {
-                this.idToSerializer = new Dictionary<int, ISerializer>(idToSerializer);
-                this.typeToSerializer = new Dictionary<Type, ISerializer>(typeToSerializer);
+                this.serializers = new Dictionary<string, ISerializer>(serializers);
             }
 
             public IServiceContextData Copy()
             {
-                
-                using (myLock.ForReading())
+                using (serializersLock.ForReading())
                 {
-                    var newContext = new ContextData(idToSerializer, typeToSerializer);
+                    var newContext = new ContextData(serializers);
                     newContext.defaultSerializer = defaultSerializer;
                     return newContext;
                 }                
@@ -42,58 +38,26 @@ namespace FeatureFlowFramework.Services.Serialization
         }
         static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
 
-        static SerializationService()
+        public static void AddSerializer(ISerializer serializer, string id, bool setAsDefault = false, bool failIfIdExists = true)
         {
-
-        }
-
-        public static void AddSerializer(ISerializer serializer, bool setAsDefault = false, bool failIfIdExists = true)
-        {
-            using (context.Data.myLock.ForWriting())
+            using (context.Data.serializersLock.ForWriting())
             {
-                if (context.Data.idToSerializer.ContainsKey(serializer.SerializerId))
-                {
-                    if (failIfIdExists) throw new Exception($"Serializer with Id {serializer.SerializerId} already exists!");
-                    foreach (var pair in context.Data.typeToSerializer.Where(pair => pair.Value.SerializerId == serializer.SerializerId))
-                    {
-                        context.Data.typeToSerializer[pair.Key] = serializer;
-                    }
-                }
-                context.Data.idToSerializer[serializer.SerializerId] = serializer;
+                if (failIfIdExists && context.Data.serializers.ContainsKey(id)) throw new Exception($"Serializer with Id {id} already exists!");
+
+                context.Data.serializers[id] = serializer;
                 if (setAsDefault) context.Data.defaultSerializer = serializer;
             }
         }
 
-        public static ISerializer GetSerializer<T>()
-        {
-            using (context.Data.myLock.ForReading())
-            {
-                if (context.Data.typeToSerializer.TryGetValue(typeof(T), out var serializer)) return serializer;
-                else return context.Data.defaultSerializer;
-            }
-        }
+        public static ISerializer DefaultSerializer => context.Data.defaultSerializer;
         
 
-        public static bool TryGetSerializerById(int id, out ISerializer serializer)
+        public static bool TryGetSerializerById(string id, out ISerializer serializer)
         {
-            using (context.Data.myLock.ForReading())
+            using (context.Data.serializersLock.ForReading())
             {
-                return context.Data.idToSerializer.TryGetValue(id, out serializer);
+                return context.Data.serializers.TryGetValue(id, out serializer);
             }
-        }
-
-        public static bool TrySerialize<T>(this T obj, out ISerializedObject serializedObject)
-        {
-            var serializer = GetSerializer<T>();
-            if (serializer == null)
-            {
-                serializedObject = null;
-                return false;
-            }
-            else
-            {
-                return serializer.TrySerialize(obj, out serializedObject);
-            }
-        }        
+        }      
     }
 }

@@ -229,6 +229,21 @@ namespace FeatureFlowFramework.Services.DataStorage
                 data = obj;
                 return true;
             }
+            else if (typeof(T) == typeof(string))
+            {
+                try
+                {
+                    string str = bytes.GetString(Encoding.UTF8);
+                    if(str is T strT) data = strT;
+                    return true;
+                }
+                catch(Exception e)
+                {
+                    if(config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing! bytes[] is no proper UTF8 string!", e.ToString());
+                    data = default;
+                    return false;
+                }
+            }
             else
             {
                 try
@@ -251,6 +266,11 @@ namespace FeatureFlowFramework.Services.DataStorage
             if(data is Byte[] byteData)
             {
                 bytes = byteData.Clone() as byte[];
+                return true;
+            }
+            else if (data is string str)
+            {
+                bytes = str.ToByteArray(Encoding.UTF8);
                 return true;
             }
             else
