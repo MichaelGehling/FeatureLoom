@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
     public class FeatureLock
     {
         const int NO_LOCK = 0;
-        const int WRITE_LOCK = NO_LOCK + 1;
+        const int WRITE_LOCK = -1;
 
         public const int NO_SPIN_WAIT = 0;
         public const int ONLY_SPIN_WAIT = int.MaxValue;
@@ -21,49 +21,45 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
-        /// A lockIndicator larger than NO_LOCK (0) implies a write-lock, while a lockIndicator smaller than NO_LOCK implies a read-lock.
-        /// When entering a read-lock, the lockIndicator is decreased and increased when leaving a read-lock.
-        /// When entering a write-lock, a positive lockIndicator (WRITE_LOCK) is set and set back to NO_LOCK when the write-lock is left.
+        /// A lockIndicator of -1 implies a write-lock, while a lockIndicator greater than 0 implies a read-lock.
+        /// When entering a read-lock, the lockIndicator is increased and decreased when leaving a read-lock.
+        /// When entering a write-lock, a WRITE_LOCK(-1) is set and set back to NO_LOCK(0) when the write-lock is left.
         /// </summary>
         volatile int lockIndicator = NO_LOCK;
         volatile bool writePriority = false;
         volatile bool readPriority = false;
-        volatile Thread lockingThread = null;
 
-        bool throwOnDeadlock = true;
         int defaultFullSpinCycles;
 
         AsyncManualResetEvent mreReader = new AsyncManualResetEvent(true);
         AsyncManualResetEvent mreWriter = new AsyncManualResetEvent(true);
 
-        public FeatureLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT, bool throwOnDeadlock = true)
+        public FeatureLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT, bool supportReentrance = true)
         {
             this.defaultFullSpinCycles = defaultFullSpinCycles;
-            this.throwOnDeadlock = throwOnDeadlock;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForReading(out ReadLock readLock, TimeSpan timeout = default)
+        public bool TryForReading(out ActiveLock readLock, TimeSpan timeout = default)
         {
             return TryForReading(defaultFullSpinCycles, out readLock, timeout);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForReading(int fullSpinCyclesBeforeWait, out ReadLock readLock, TimeSpan timeout = default)
+        public bool TryForReading(int fullSpinCyclesBeforeWait, out ActiveLock readLock, TimeSpan timeout = default)
         {
             var timer = new TimeFrame(timeout);
-            readLock = new ReadLock(null);
+            readLock = new ActiveLock();
 
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator - 1;
-            if (lockingThread != null && lockingThread == Thread.CurrentThread) return false;
+            var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (timer.Elapsed) return false;
 
-                if (currentLockIndicator > NO_LOCK) readPriority = true;
+                if (currentLockIndicator < NO_LOCK) readPriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {
@@ -85,36 +81,35 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
 
                 currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator - 1;
+                newLockIndicator = currentLockIndicator + 1;
             }
             readPriority = false;
 
-            readLock = new ReadLock(this);
+            readLock = new ActiveLock(this, false);
             return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForWriting(out WriteLock writeLock, TimeSpan timeout = default)
+        public bool TryForWriting(out ActiveLock writeLock, TimeSpan timeout = default)
         {
             return TryForWriting(defaultFullSpinCycles, out writeLock, timeout);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForWriting(int fullSpinCyclesBeforeWait, out WriteLock writeLock, TimeSpan timeout = default)
+        public bool TryForWriting(int fullSpinCyclesBeforeWait, out ActiveLock writeLock, TimeSpan timeout = default)
         {
             var timer = new TimeFrame(timeout);
-            writeLock = new WriteLock(null);
+            writeLock = new ActiveLock();
 
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
             while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
                 if (timer.Elapsed) return false;
 
-                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
+                if (currentLockIndicator > NO_LOCK || fullSpins > 0) writePriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {
@@ -137,30 +132,28 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 currentLockIndicator = lockIndicator;
             }
-            if(throwOnDeadlock) lockingThread = Thread.CurrentThread;
             writePriority = false;
 
-            writeLock = new WriteLock(this);
+            writeLock = new ActiveLock(this, true);
             return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ReadLock ForReading()
+        public ActiveLock ForReading()
         {
             return ForReading(defaultFullSpinCycles);
         }        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ReadLock ForReading(int fullSpinCyclesBeforeWait)
+        public ActiveLock ForReading(int fullSpinCyclesBeforeWait)
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator - 1;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
+            var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (currentLockIndicator > NO_LOCK) readPriority = true;
+                if (currentLockIndicator < NO_LOCK) readPriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
@@ -182,30 +175,29 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 } 
 
                 currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator - 1;
+                newLockIndicator = currentLockIndicator + 1;
             }
             readPriority = false;
 
-            return new ReadLock(this);
+            return new ActiveLock(this, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<ReadLock> ForReadingAsync()
+        public ValueTask<ActiveLock> ForReadingAsync()
         {
             return ForReadingAsync(defaultFullSpinCycles);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<ReadLock> ForReadingAsync(int fullSpinCyclesBeforeWait)
+        public async ValueTask<ActiveLock> ForReadingAsync(int fullSpinCyclesBeforeWait)
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator - 1;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
+            var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (currentLockIndicator > NO_LOCK) readPriority = true;
+                if (currentLockIndicator < NO_LOCK) readPriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {
@@ -227,23 +219,23 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
 
                 currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator - 1;
+                newLockIndicator = currentLockIndicator + 1;
             }
             readPriority = false;
 
-            return new ReadLock(this);
+            return new ActiveLock(this, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReaderMustWait(int currentLockIndicator)
         {
-            return currentLockIndicator > NO_LOCK || (writePriority && !readPriority);
+            return currentLockIndicator < NO_LOCK || (writePriority && !readPriority);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReadLock()
         {
-            var newLockIndicator = Interlocked.Increment(ref lockIndicator);
+            var newLockIndicator = Interlocked.Decrement(ref lockIndicator);
             if (NO_LOCK == newLockIndicator)
             {
                 if (!mreWriter.Set()) mreReader.Set();               
@@ -251,22 +243,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public WriteLock ForWriting()
+        public ActiveLock ForWriting()
         {
             return ForWriting(defaultFullSpinCycles);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public WriteLock ForWriting(int fullSpinCyclesBeforeWait)
+        public ActiveLock ForWriting(int fullSpinCyclesBeforeWait)
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
             while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
-                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
+                if (currentLockIndicator > NO_LOCK || fullSpins > 0) writePriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
@@ -289,29 +280,27 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 currentLockIndicator = lockIndicator;
             }
-            if (throwOnDeadlock) lockingThread = Thread.CurrentThread;
             writePriority = false;
             
-            return new WriteLock(this);
+            return new ActiveLock(this, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<WriteLock> ForWritingAsync()
+        public ValueTask<ActiveLock> ForWritingAsync()
         {
             return ForWritingAsync(defaultFullSpinCycles);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<WriteLock> ForWritingAsync(int fullSpinCyclesBeforeWait)
+        public async ValueTask<ActiveLock> ForWritingAsync(int fullSpinCyclesBeforeWait)
         {
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
             while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
-                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
+                if (currentLockIndicator > NO_LOCK || fullSpins > 0) writePriority = true;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
@@ -334,9 +323,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 currentLockIndicator = lockIndicator;
             }
-            if (throwOnDeadlock) lockingThread = Thread.CurrentThread;
             writePriority = false;
-            return new WriteLock(this);
+            return new ActiveLock(this, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -349,56 +337,34 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
-            lockingThread = null;
             lockIndicator = NO_LOCK;
             if (!mreReader.Set()) mreWriter.Set();
         }
 
-        public struct ReadLock : IDisposable
+        public struct ActiveLock : IDisposable
         {
             FeatureLock parentLock;
+            readonly bool isWriteLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ReadLock(FeatureLock parentLock)
+            public ActiveLock(FeatureLock parentLock, bool isWriteLock)
             {
                 this.parentLock = parentLock;
+                this.isWriteLock = isWriteLock;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                parentLock?.ExitReadLock();
-                parentLock = null;
+                Exit();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit()
             {
-                Dispose();
-            }
-        }
-
-        public struct WriteLock : IDisposable
-        {
-            FeatureLock parentLock;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public WriteLock(FeatureLock parentLock)
-            {
-                this.parentLock = parentLock;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Dispose()
-            {
-                parentLock?.ExitWriteLock();
+                if (isWriteLock) parentLock?.ExitWriteLock();
+                else parentLock?.ExitReadLock();
                 parentLock = null;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Exit()
-            {
-                Dispose();
             }
         }
 

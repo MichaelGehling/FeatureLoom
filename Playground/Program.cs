@@ -53,107 +53,120 @@ namespace Playground
         static void Main(string[] args)
         {
 
-            var guessTheWord = new GuessTheWord();
-            guessTheWord.Run();
-            guessTheWord.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished);
+            /* var guessTheWord = new GuessTheWord();
+             guessTheWord.Run();
+             guessTheWord.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished);
 
-                HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
-            RpcCallee callee = new RpcCallee();
-            callee.RegisterMethod<int, int, int>("Add", (a, b) =>
+                 HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
+             RpcCallee callee = new RpcCallee();
+             callee.RegisterMethod<int, int, int>("Add", (a, b) =>
+             {
+                 int c = a + b;
+                 Console.WriteLine($"RPC: {a}+{b}={c}");
+                 return c;
+             });
+             callee.RegisterMethod("Kill", () =>
+             {
+                 Task.Run(()=> 
+                 {
+                     Thread.Sleep(100.Milliseconds());
+                     Environment.Exit(1);
+                 });
+             });
+             webRPC.ConnectToAndBack(callee);
+             SharedWebServer.WebServer.Start();
+
+             Console.ReadKey();
+
+             Sender sender = new Sender();
+             sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
+
+             var timeKeeper = AppTime.TimeKeeper;
+
+             var now = AppTime.Now;
+
+             timeKeeper.Restart();
+             for (long i = 0; i < 10_000_000; i++) Test1(now.AddMilliseconds(i));
+             Console.WriteLine($"Test1(long i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test2(now.AddMilliseconds(i));
+             Console.WriteLine($"Test2(in long i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test3(now.AddMilliseconds(i));
+             Console.WriteLine($"Test3<T>(T i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test4(now.AddMilliseconds(i));
+             Console.WriteLine($"Test4<T>(in T i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test5(now.AddMilliseconds(i));
+             Console.WriteLine($"Test5(object i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for (long i = 0; i < 10_000_000; i++) sender.Send(now.AddMilliseconds(i));
+             Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
+
+
+             Console.ReadKey();
+
+             QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
+             SharedData<int> sharedInt = new SharedData<int>(42);
+             SharedData<string> sharedObj = new SharedData<string>("Hello");
+             sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
+
+             using (var myInt = sharedInt.GetReadAccess())
+             using (var myObj = sharedObj.GetWriteAccess(99))
+             {
+                 myObj.SetValue(myObj.Value + myInt.Value);                
+             }            
+
+             if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
+             {
+                 if (update.originatorId == 99 && update.sharedData is SharedData<string> objUpdate)
+                 {
+                     objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
+                 }
+             }            
+
+             var timer = AppTime.TimeKeeper;
+             TimeSpan x;
+             long c1 = 0;
+             while(timer.Elapsed < 1.Seconds())
+             {
+                 x = AppTime.Elapsed;
+                 c1++;
+             }
+
+             timer.Restart();
+             long c2 = 0;
+             DateTime s = AppTime.Now;
+             TimeSpan y;
+             while(timer.Elapsed < 1.Seconds())
+             {
+                 y = AppTime.Now.Subtract(s);
+                 c2++;
+             }
+
+             Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
+ */
+
+            /*
+            FeatureLock myLock = new FeatureLock(0, true);
+
+            using (myLock.ForReading())
             {
-                int c = a + b;
-                Console.WriteLine($"RPC: {a}+{b}={c}");
-                return c;
-            });
-            callee.RegisterMethod("Kill", () =>
-            {
-                Task.Run(()=> 
+                using (myLock.ForWriting())
                 {
-                    Thread.Sleep(100.Milliseconds());
-                    Environment.Exit(1);
-                });
-            });
-            webRPC.ConnectToAndBack(callee);
-            SharedWebServer.WebServer.Start();
-
-            Console.ReadKey();
-
-            Sender sender = new Sender();
-            sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
-            var timeKeeper = AppTime.TimeKeeper;
-
-            var now = AppTime.Now;
-
-            timeKeeper.Restart();
-            for (long i = 0; i < 10_000_000; i++) Test1(now.AddMilliseconds(i));
-            Console.WriteLine($"Test1(long i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test2(now.AddMilliseconds(i));
-            Console.WriteLine($"Test2(in long i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test3(now.AddMilliseconds(i));
-            Console.WriteLine($"Test3<T>(T i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test4(now.AddMilliseconds(i));
-            Console.WriteLine($"Test4<T>(in T i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test5(now.AddMilliseconds(i));
-            Console.WriteLine($"Test5(object i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for (long i = 0; i < 10_000_000; i++) sender.Send(now.AddMilliseconds(i));
-            Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
-
-
-            Console.ReadKey();
-
-            QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
-            SharedData<int> sharedInt = new SharedData<int>(42);
-            SharedData<string> sharedObj = new SharedData<string>("Hello");
-            sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
-
-            using (var myInt = sharedInt.GetReadAccess())
-            using (var myObj = sharedObj.GetWriteAccess(99))
-            {
-                myObj.SetValue(myObj.Value + myInt.Value);                
-            }            
-            
-            if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
-            {
-                if (update.originatorId == 99 && update.sharedData is SharedData<string> objUpdate)
-                {
-                    objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
                 }
-            }            
-
-            var timer = AppTime.TimeKeeper;
-            TimeSpan x;
-            long c1 = 0;
-            while(timer.Elapsed < 1.Seconds())
-            {
-                x = AppTime.Elapsed;
-                c1++;
             }
-
-            timer.Restart();
-            long c2 = 0;
-            DateTime s = AppTime.Now;
-            TimeSpan y;
-            while(timer.Elapsed < 1.Seconds())
-            {
-                y = AppTime.Now.Subtract(s);
-                c2++;
-            }
-
-            Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
-
+            
+            */
             //FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
             Console.WriteLine("--2,2,2,2--");
-            for (int i= 0; i< 5; i++) FunctionTestRWLock(new FeatureLock(FeatureLock.NO_SPIN_WAIT), 1.Seconds(), 2, 2, 2, 2);
+            for (int i= 0; i< 5; i++) FunctionTestRWLock(new FeatureLock(FeatureLock.NO_SPIN_WAIT, false), 1.Seconds(), 2, 2, 2, 2);
             /*Console.WriteLine("--0,0,1,1--");
             for(int i = 0; i < 5; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 1, 1);
             Console.WriteLine("--0,0,0,4--");
@@ -182,8 +195,8 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 1;
-            int numWriteLocks = 1;
+            int numReadLocks = 5;
+            int numWriteLocks = 5;
 
             List<int> dummyList = new List<int>();
             Random rnd = new Random();
@@ -225,6 +238,12 @@ namespace Playground
             dummyList.Clear();
 
             name = "RWLock";
+            Prepare(out gcs);
+            c = RunParallel(new FeatureLock(1, false), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+            dummyList.Clear();
+
+            name = "RWLock Reentrant";
             Prepare(out gcs);
             c = RunParallel(new FeatureLock(), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
@@ -362,6 +381,16 @@ namespace Playground
             name = "RWLock Write";
             Prepare(out gcs);
             c = RWLockWrite(new FeatureLock(), duration, work, slack);
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock Read Reentrant";
+            Prepare(out gcs);
+            c = RWLockRead(new FeatureLock(1, true), duration, work, slack);
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock Write Reentrant";
+            Prepare(out gcs);
+            c = RWLockWrite(new FeatureLock(1, true), duration, work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "RWLock Read Async";

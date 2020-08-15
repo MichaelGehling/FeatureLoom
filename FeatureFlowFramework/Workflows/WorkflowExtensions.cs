@@ -104,5 +104,10 @@ namespace FeatureFlowFramework.Workflows
             }
             return success;
         }
+
+        public static bool WaitUntilFinished(this Workflow workflow, TimeSpan timeout = default)
+        {
+            return workflow.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished, timeout);
+        }
     }
 }
