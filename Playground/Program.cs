@@ -196,8 +196,8 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 3;
-            int numWriteLocks = 3;
+            int numReadLocks = 25;
+            int numWriteLocks = 25;
 
             List<int> dummyList = new List<int>();
             Random rnd = new Random();
@@ -236,6 +236,12 @@ namespace Playground
             //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
             double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
+            dummyList.Clear();
+
+            name = "RWLock";
+            Prepare(out gcs);
+            c = RunParallel(new FeatureLock(1, false), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
             dummyList.Clear();
 
             name = "RWLock";

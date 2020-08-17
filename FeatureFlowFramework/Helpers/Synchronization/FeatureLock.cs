@@ -28,8 +28,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// When entering a read-lock, the lockIndicator is increased and decreased when leaving a read-lock.
         /// When entering a write-lock, a WRITE_LOCK(-1) is set and set back to NO_LOCK(0) when the write-lock is left.
         /// </summary>
-        volatile int lockIndicator = NO_LOCK;
-        volatile bool writerPriority = false;
+        volatile int lockIndicator = NO_LOCK;        
+        volatile int maxWaitingPressure = 0;
 
 
         bool supportReentrance;
@@ -59,13 +59,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var timer = new TimeFrame(timeout);
             readLock = new ActiveLock();
 
+            int waitingPressure = 0;
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            while (ReaderMustWait(currentLockIndicator) || writerPriority || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            while (ReaderMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (timer.Elapsed) return false;
+                if (timer.Elapsed)
+                {
+                    if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+                    return false;
+                }
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {
@@ -75,9 +82,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else
                 {
                     bool didReset = mre.Reset();
-                    if (ReaderMustWait(lockIndicator))
-                    {                        
-                        if (!mre.Wait(timer.Remaining)) return false;                        
+                    if (lockIndicator != NO_LOCK)
+                    {
+                        if (!mre.Wait(timer.Remaining))
+                        {
+                            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+                            return false;
+                        }
                         spinWait.Reset();
                         fullSpins++;
                     }
@@ -87,6 +98,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
+            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
 
             readLock = new ActiveLock(this, false);
             return true;
@@ -104,18 +116,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var timer = new TimeFrame(timeout);
             writeLock = new ActiveLock();
 
+            int waitingPressure = 0;
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
-            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
+            while (WriterMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
                 if (timer.Elapsed)
                 {
-                    writerPriority = false;
+                    if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
                     return false;
                 }
-                if (currentLockIndicator > NO_LOCK) writerPriority = true;
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
 
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {
@@ -125,11 +139,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else
                 {
                     bool didReset = mre.Reset();
-                    if (WriterMustWait(lockIndicator))
+                    if (lockIndicator != NO_LOCK)
                     {
                         if (!mre.Wait(timer.Remaining))
                         {
-                            writerPriority = false;
+                            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
                             return false;
                         }
                         spinWait.Reset();
@@ -140,7 +154,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 currentLockIndicator = lockIndicator;
             }
-            writerPriority = false;
+            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+
             writeLock = new ActiveLock(this, true);
             return true;
         }
@@ -154,12 +169,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ActiveLock ForReading(int fullSpinCyclesBeforeWait)
         {
+            int waitingPressure = 0;
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            while (ReaderMustWait(currentLockIndicator) || writerPriority || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            while (ReaderMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
                     spinWait.SpinOnce();
@@ -168,7 +187,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else
                 {
                     bool didReset = mre.Reset();
-                    if(ReaderMustWait(lockIndicator))
+                    if(lockIndicator != NO_LOCK)
                     {
                         mre.Wait();
                         spinWait.Reset();
@@ -180,6 +199,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
+            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
 
             return new ActiveLock(this, false);
         }
@@ -193,12 +213,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<ActiveLock> ForReadingAsync(int fullSpinCyclesBeforeWait)
         {
+            int waitingPressure = 0;
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            while (ReaderMustWait(currentLockIndicator) || writerPriority || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {                
+            while (ReaderMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            {
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {
                     spinWait.SpinOnce();
@@ -207,7 +231,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else
                 {
                     bool didReset = mre.Reset();
-                    if (ReaderMustWait(lockIndicator))
+                    if (lockIndicator != NO_LOCK)
                     {
                         await mre.WaitAsync();
                         spinWait.Reset();
@@ -219,6 +243,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
+            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+
             return new ActiveLock(this, false);
         }
 
@@ -242,13 +268,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
             }
 
+            int waitingPressure = 0;
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
-            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
+            while (WriterMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
-                if (currentLockIndicator > NO_LOCK) writerPriority = true;
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
                     spinWait.SpinOnce();
@@ -257,7 +286,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else
                 {
                     bool didReset = mre.Reset();
-                    if (WriterMustWait(lockIndicator))
+                    if (lockIndicator != NO_LOCK)
                     {
                         mre.Wait();
                         spinWait.Reset();
@@ -268,7 +297,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 currentLockIndicator = lockIndicator;
             }
-            writerPriority = false;
+            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
 
             if (supportReentrance)
             {
@@ -288,13 +317,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async ValueTask<ActiveLock> ForWritingAsync(int fullSpinCyclesBeforeWait)
         {
+            int waitingPressure = 0;
             int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
-            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
+            while (WriterMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
-                if (currentLockIndicator > NO_LOCK) writerPriority = true;
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+
+
                 if (fullSpins < fullSpinCyclesBeforeWait)
                 {                    
                     spinWait.SpinOnce();
@@ -303,7 +336,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else
                 {
                     bool didReset = mre.Reset();
-                    if (WriterMustWait(lockIndicator))
+                    if (lockIndicator != NO_LOCK)
                     {
                         await mre.WaitAsync();
                         spinWait.Reset();
@@ -314,7 +347,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 currentLockIndicator = lockIndicator;
             }
-            writerPriority = false;
+            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+
             return new ActiveLock(this, true);
         }
 
