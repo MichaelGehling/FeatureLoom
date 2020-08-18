@@ -17,6 +17,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         const int NOT_ENTERED = 0;
         const int WRITE_ENTERED = -1;        
+
         const int SLEEP_WAITING_PRESSURE_EQUIVALENT = 10;
         const int MAX_WAITING_LIMIT_PRESSURE_CORRECTION = 100;
         const int MIN_WAITING_LIMIT_PRESSURE_CORRECTION = -100;
@@ -28,21 +29,27 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// When entering a write-lock, a WRITE_LOCK(-1) is set and set back to NO_LOCK(0) when the write-lock is left.
         /// </summary>
         volatile int lockIndicator = NO_LOCK;        
+
         volatile int maxWaitingPressure = 0;
         int waitingPressureLimitCorrection = 0;
+        int defaultWaitingPressureLimit = 30;
 
         bool supportReentrance;
         AsyncLocal<int> reentranceIndicator;
         int writingReentranceCounter = 0;
-
-        int defaultWaitingPressureLimit = 30;
+        
 
         AsyncManualResetEvent mre = new AsyncManualResetEvent(true);
+
+        Task<AcquiredLock> readLockTask;
+        Task<AcquiredLock> writeLockTask;
 
         public FeatureLock(bool supportReentrance = false)
         {
             this.supportReentrance = supportReentrance;
             if (supportReentrance) reentranceIndicator = new AsyncLocal<int>();
+            readLockTask = Task.FromResult(new AcquiredLock(this, false));
+            writeLockTask = Task.FromResult(new AcquiredLock(this, true));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -213,7 +220,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<AcquiredLock> ForReadingAsync()
+        public Task<AcquiredLock> ForReadingAsync()
+        {
+            if(TryForReading(out _)) return readLockTask;
+            else return ForReadingAsync_();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private async Task<AcquiredLock> ForReadingAsync_()
         {
             bool didSleep = false;
 
@@ -323,7 +337,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<AcquiredLock> ForWritingAsync()
+        public Task<AcquiredLock> ForWritingAsync()
+        {
+            if(TryForWriting(out _)) return writeLockTask;
+            else return ForWritingAsync_();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private async Task<AcquiredLock> ForWritingAsync_()
         {
             bool didSleep = false;
 
@@ -408,7 +429,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public struct AcquiredLock : IDisposable
         {
             FeatureLock parentLock;
-            readonly bool isWriteLock;
+            readonly bool isWriteLock;            
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public AcquiredLock(FeatureLock parentLock, bool isWriteLock)
@@ -420,11 +441,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                Exit();
+                Return();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Exit()
+            public void Return()
             {
                 if (isWriteLock) parentLock?.ExitWriteLock();
                 else parentLock?.ExitReadLock();

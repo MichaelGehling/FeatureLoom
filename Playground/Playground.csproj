@@ -15,10 +15,4 @@
     <ProjectReference Include="..\FeatureFlowFramework\FeatureFlowFramework.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="AsyncReaderWriterLockSlim">
-      <HintPath>..\..\..\AsyncReaderWriterLockSlim\AsyncReaderWriterLockSlim\bin\Release\netstandard2.0\AsyncReaderWriterLockSlim.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-
 </Project>
