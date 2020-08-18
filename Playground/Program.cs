@@ -167,11 +167,11 @@ namespace Playground
             Thread.Sleep(1000);
                        
             int numReader = 1;
-            TimeSpan readerSlack = 0.01.Milliseconds();
+            TimeSpan readerSlack = 0.03.Milliseconds();
             int numWriter = 1;
-            TimeSpan writerSlack = 0.01.Milliseconds();
+            TimeSpan writerSlack = 0.03.Milliseconds();
             TimeSpan executionTime = 0.01.Milliseconds();
-            TimeSpan duration = 3.Seconds();
+            TimeSpan duration = 1.Seconds();
 
 
             var classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
@@ -320,12 +320,13 @@ namespace Playground
                 //Thread.Yield();
             };
 
-            name = "Overhead";
+            /*name = "Overhead";
             Prepare(out gcs);
             //c = RunParallel(new object(), duration, Overhead, numReadLocks, Overhead, numWriteLocks, workRead, workWrite, slack).Sum();
             double overhead = timeFactor / c;
             Console.WriteLine(overhead + " " + (-1) + " " + c + " " + name);
-            dummyList.Clear();
+            dummyList.Clear();*/
+            double overhead = 0;
 
             name = "RWLock";
             Prepare(out gcs);
@@ -498,11 +499,12 @@ namespace Playground
             Action work = null;
             Action slack = null;
 
-            name = "Overhead";
+            /*name = "Overhead";
             Prepare(out gcs);
             c = Overhead(new object(), new TimeFrame(duration), work, slack);
             double time_overhead_ns = timeFactor / c;
-            Console.WriteLine(time_overhead_ns + " " + -1 + " " + name);
+            Console.WriteLine(time_overhead_ns + " " + -1 + " " + name);*/
+            double time_overhead_ns = 0;
 
             name = "RWLock Read";
             Prepare(out gcs);
