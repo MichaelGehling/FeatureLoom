@@ -17,10 +17,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         const int NOT_ENTERED = 0;
         const int WRITE_ENTERED = -1;        
-
-        public const int NO_SPIN_WAIT = 0;
-        public const int ONLY_SPIN_WAIT = int.MaxValue;
-        public const int BALANCED_SPIN_WAIT = 1;
+        const int SLEEP_WAITING_PRESSURE_EQUIVALENT = 10;
+        const int MAX_WAITING_LIMIT_PRESSURE_CORRECTION = 100;
+        const int MIN_WAITING_LIMIT_PRESSURE_CORRECTION = -100;
 
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
@@ -30,37 +29,31 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         volatile int lockIndicator = NO_LOCK;        
         volatile int maxWaitingPressure = 0;
-
+        int waitingPressureLimitCorrection = 0;
 
         bool supportReentrance;
         AsyncLocal<int> reentranceIndicator;
         int writingReentranceCounter = 0;
 
-        int defaultFullSpinCycles;
+        int defaultWaitingPressureLimit = 30;
 
         AsyncManualResetEvent mre = new AsyncManualResetEvent(true);
 
-        public FeatureLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT, bool supportReentrance = false)
+        public FeatureLock(bool supportReentrance = false)
         {
-            this.defaultFullSpinCycles = defaultFullSpinCycles;
             this.supportReentrance = supportReentrance;
             if (supportReentrance) reentranceIndicator = new AsyncLocal<int>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForReading(out ActiveLock readLock, TimeSpan timeout = default)
-        {
-            return TryForReading(defaultFullSpinCycles, out readLock, timeout);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForReading(int fullSpinCyclesBeforeWait, out ActiveLock readLock, TimeSpan timeout = default)
+        public bool TryForReading(out AcquiredLock readLock, TimeSpan timeout = default)
         {
             var timer = new TimeFrame(timeout);
-            readLock = new ActiveLock();
+            readLock = new AcquiredLock();
+            
+            bool didSleep = false;
 
             int waitingPressure = 0;
-            int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
@@ -70,27 +63,35 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
                     return false;
-                }
+                }                
                 if (waitingPressure < int.MaxValue) waitingPressure++;
                 if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
                     bool didReset = mre.Reset();
                     if (lockIndicator != NO_LOCK)
                     {
+
                         if (!mre.Wait(timer.Remaining))
                         {
                             if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
                             return false;
                         }
-                        spinWait.Reset();
-                        fullSpins++;
+                        spinWait.Reset();                        
                     }
                     else if (didReset) mre.Set();
                 }
@@ -98,26 +99,22 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            readLock = new ActiveLock(this, false);
+            readLock = new AcquiredLock(this, false);
             return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForWriting(out ActiveLock writeLock, TimeSpan timeout = default)
-        {
-            return TryForWriting(defaultFullSpinCycles, out writeLock, timeout);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForWriting(int fullSpinCyclesBeforeWait, out ActiveLock writeLock, TimeSpan timeout = default)
+        public bool TryForWriting(out AcquiredLock writeLock, TimeSpan timeout = default)
         {
             var timer = new TimeFrame(timeout);
-            writeLock = new ActiveLock();
+            writeLock = new AcquiredLock();
+
+            bool didSleep = false;
 
             int waitingPressure = 0;
-            int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
@@ -130,14 +127,22 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 if (waitingPressure < int.MaxValue) waitingPressure++;
                 if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
                     bool didReset = mre.Reset();
                     if (lockIndicator != NO_LOCK)
                     {
@@ -147,30 +152,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                             return false;
                         }
                         spinWait.Reset();
-                        fullSpins++;
                     }
                     else if (didReset) mre.Set();
                 }
 
                 currentLockIndicator = lockIndicator;
             }
-            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            writeLock = new ActiveLock(this, true);
+            writeLock = new AcquiredLock(this, true);
             return true;
-        }
+        } 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ActiveLock ForReading()
+        public AcquiredLock ForReading()
         {
-            return ForReading(defaultFullSpinCycles);
-        }        
+            bool didSleep = false;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ActiveLock ForReading(int fullSpinCyclesBeforeWait)
-        {
             int waitingPressure = 0;
-            int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
@@ -178,20 +178,27 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if (waitingPressure < int.MaxValue) waitingPressure++;
                 if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {                    
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
                     bool didReset = mre.Reset();
                     if(lockIndicator != NO_LOCK)
                     {
                         mre.Wait();
                         spinWait.Reset();
-                        fullSpins++;
                     }
                     else if(didReset) mre.Set();
                 } 
@@ -199,22 +206,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            return new ActiveLock(this, false);
+            return new AcquiredLock(this, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<ActiveLock> ForReadingAsync()
+        public async ValueTask<AcquiredLock> ForReadingAsync()
         {
-            return ForReadingAsync(defaultFullSpinCycles);
-        }
+            bool didSleep = false;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<ActiveLock> ForReadingAsync(int fullSpinCyclesBeforeWait)
-        {
             int waitingPressure = 0;
-            int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
@@ -222,20 +225,27 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if (waitingPressure < int.MaxValue) waitingPressure++;
                 if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
                     bool didReset = mre.Reset();
                     if (lockIndicator != NO_LOCK)
                     {
                         await mre.WaitAsync();
                         spinWait.Reset();
-                        fullSpins++;
                     }
                     else if(didReset) mre.Set();
                 }
@@ -243,19 +253,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            return new ActiveLock(this, false);
+            return new AcquiredLock(this, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ActiveLock ForWriting()
-        {
-            return ForWriting(defaultFullSpinCycles);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ActiveLock ForWriting(int fullSpinCyclesBeforeWait)
+        public AcquiredLock ForWriting()
         {
             int currentReentranceIndicator = NOT_ENTERED;
             if (supportReentrance)
@@ -264,12 +269,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (currentReentranceIndicator == WRITE_ENTERED)
                 {
                     writingReentranceCounter++;
-                    return new ActiveLock(this, true);
+                    return new AcquiredLock(this, true);
                 }
             }
 
+            bool didSleep = false;
+
             int waitingPressure = 0;
-            int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
@@ -277,27 +283,35 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if (waitingPressure < int.MaxValue) waitingPressure++;
                 if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {                    
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
                     bool didReset = mre.Reset();
                     if (lockIndicator != NO_LOCK)
                     {
                         mre.Wait();
                         spinWait.Reset();
-                        fullSpins++;
                     }
                     else if(didReset) mre.Set();
                 }
 
                 currentLockIndicator = lockIndicator;
             }
-            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
             if (supportReentrance)
             {
@@ -305,20 +319,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (currentReentranceIndicator != WRITE_ENTERED) reentranceIndicator.Value = WRITE_ENTERED;
             }
 
-            return new ActiveLock(this, true);
+            return new AcquiredLock(this, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<ActiveLock> ForWritingAsync()
+        public async ValueTask<AcquiredLock> ForWritingAsync()
         {
-            return ForWritingAsync(defaultFullSpinCycles);
-        }
+            bool didSleep = false;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<ActiveLock> ForWritingAsync(int fullSpinCyclesBeforeWait)
-        {
             int waitingPressure = 0;
-            int fullSpins = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
@@ -326,30 +335,37 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if (waitingPressure < int.MaxValue) waitingPressure++;
                 if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {                    
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
                     bool didReset = mre.Reset();
                     if (lockIndicator != NO_LOCK)
                     {
                         await mre.WaitAsync();
                         spinWait.Reset();
-                        fullSpins++;
                     }
                     else if(didReset) mre.Set();
                 }
 
                 currentLockIndicator = lockIndicator;
             }
-            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            return new ActiveLock(this, true);
+            return new AcquiredLock(this, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -389,13 +405,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             mre.Set();
         }
 
-        public struct ActiveLock : IDisposable
+        public struct AcquiredLock : IDisposable
         {
             FeatureLock parentLock;
             readonly bool isWriteLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ActiveLock(FeatureLock parentLock, bool isWriteLock)
+            public AcquiredLock(FeatureLock parentLock, bool isWriteLock)
             {
                 this.parentLock = parentLock;
                 this.isWriteLock = isWriteLock;

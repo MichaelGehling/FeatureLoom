@@ -25,7 +25,7 @@ namespace FeatureFlowFramework.DataFlows
         private readonly Action<IDataFlowSink> onConnection;
         private readonly Action<IDataFlowSink> onDisconnection;
 
-        FeatureLock myLock = new FeatureLock(FeatureLock.ONLY_SPIN_WAIT);
+        FeatureLock myLock = new FeatureLock();
 
         public DataFlowSourceHelper(Action<IDataFlowSink> onConnection = null, Action<IDataFlowSink> onDisconnection = null)
         {
