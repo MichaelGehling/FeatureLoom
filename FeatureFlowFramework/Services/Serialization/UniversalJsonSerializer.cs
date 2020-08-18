@@ -6,17 +6,18 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Services.Serialization
 {
-    public class GenericJsonSerializer : ISerializer
+    public class UnivarsalJsonSerializer : ISerializer
     {
         JsonSerializer serializer;        
 
-        public GenericJsonSerializer()
+        public UnivarsalJsonSerializer()
         {
             InitSerializer();
         }
@@ -99,7 +100,7 @@ namespace FeatureFlowFramework.Services.Serialization
                 using(TextReader textReader = new StreamReader(stream))
                 using(JsonReader jsonReader = new JsonTextReader(textReader))
                 {
-                    JObject jObj = await JObject.LoadAsync(jsonReader, cancellationToken);
+                    JToken jObj = await JToken.LoadAsync(jsonReader, cancellationToken);
                     T obj = jObj.ToObject<T>();
                     return (true, obj);
                 }
@@ -120,7 +121,7 @@ namespace FeatureFlowFramework.Services.Serialization
                 using(JsonReader jsonReader = new JsonTextReader(textReader))
                 {
                     //TODO this is a little inefficient... Better directly read the chars from stream, but ensure finding correct JSON object end.
-                    JObject jObj = await JObject.LoadAsync(jsonReader, cancellationToken);
+                    JToken jObj = await JToken.LoadAsync(jsonReader, cancellationToken);
                     string json = jObj.ToString();
 
                     var data = Encoding.UTF8.GetBytes(json);

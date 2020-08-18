@@ -33,6 +33,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             set { configUri = value; }
         }
 
+        [JsonIgnore]
         public bool IsUriDefault => configUri == default;
 
         [JsonIgnore]

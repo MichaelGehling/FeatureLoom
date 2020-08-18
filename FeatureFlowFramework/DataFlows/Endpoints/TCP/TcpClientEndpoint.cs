@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.TCP
 {
-    public class TcpClientEndpoint : Workflow<TcpClientEndpoint.StateMachine>, IDataFlowSink, IDataFlowSource
+    public class TcpClientEndpoint : Workflow<TcpClientEndpoint.StateMachine>, IDataFlowSink, IDataFlowSource, IRequester, IReplier
     {
         public class StateMachine : StateMachine<TcpClientEndpoint>
         {
@@ -160,7 +160,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             {
                 if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
 
-                if (oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.LapsedTime);
+                if (initial || oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.LapsedTime);
 
                 if (initial || ConfigChanged(oldConfig))
                 {
@@ -179,11 +179,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     }
                 }
             }
-            if (connection?.Connected ?? false)
-            {
-                disconnectionAndConfigUpdateWaitHandles[0] = config.SubscriptionWaitHandle;
-                disconnectionAndConfigUpdateWaitHandles[1] = connection.DisconnectionWaitHandle;
-            }
+            
 
             return result;
         }
@@ -218,14 +214,30 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     if (config.serverCertificateName != null) sslUpgrader = new ClientSslStreamUpgrader(config.serverCertificateName, config.ignoreFailedServerAuthentication);
                     connection = new TcpConnection(newClient, decoder, config.receivingBufferSize, false, sslUpgrader);
                     connection.ReceivingSource.ConnectTo(receivedMessageSource);
-                    messageEncoder.ConnectTo(connection.SendingSink);
+                    messageEncoder.ConnectTo(connection.SendingSink, true);
                     connectionWaitEvent.Set();
                 }
             }
+            catch (SocketException e)
+            {
+                Log.INFO(this.GetHandle(), $"TcpConnection could not be established to target hostname {config.hostAddress} and port {config.port}! Connection will be retried!", e.ToString());
+                connection?.Stop();
+            }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"TcpConnection failed to start with target hostname {config.hostAddress} and port {config.port}!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"TcpConnection failed with target hostname {config.hostAddress} and port {config.port}, due to a general problem!", e.ToString());
                 connection?.Stop();
+            }
+
+            if(connection?.Connected ?? false)
+            {
+                disconnectionAndConfigUpdateWaitHandles[0] = config.SubscriptionWaitHandle;
+                disconnectionAndConfigUpdateWaitHandles[1] = connection.DisconnectionWaitHandle;
+            }
+            else
+            {
+                disconnectionAndConfigUpdateWaitHandles[0] = null;
+                disconnectionAndConfigUpdateWaitHandles[1] = null;
             }
             reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime);
         }
@@ -270,6 +282,12 @@ namespace FeatureFlowFramework.DataFlows.TCP
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
             return ReceivingFromTcpSource.ConnectTo(sink, weakReference);
+        }
+
+        public void ConnectToAndBack(IReplier replier, bool weakReference = false)
+        {
+            this.ConnectTo(replier, weakReference);
+            replier.ConnectTo(this, weakReference);
         }
     }
 }

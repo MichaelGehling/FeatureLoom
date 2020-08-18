@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.TCP
 {
-    public class TcpServerEndpoint : Workflow<TcpServerEndpoint.StateMachine>, IDataFlowSink, IDataFlowSource
+    public class TcpServerEndpoint : Workflow<TcpServerEndpoint.StateMachine>, IDataFlowSink, IDataFlowSource, IRequester, IReplier
     {
         public class StateMachine : StateMachine<TcpServerEndpoint>
         {
@@ -67,7 +67,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                 IStreamUpgrader sslUpgrader = null;
                                 if (c.serverCertificate != null) sslUpgrader = new ServerSslStreamUpgrader(c.serverCertificate);
                                 var connection = new TcpConnection(c.awaitedConnectionRequest.Result, c.decoder, c.config.receivingBufferSize, c.config.addRoutingWrapper, sslUpgrader);
-                                c.connectionForwarder.ConnectTo(connection.SendingSink);
+                                c.connectionForwarder.ConnectTo(connection.SendingSink, true);
                                 connection.ReceivingSource.ConnectTo(c.receivedMessageSource);
                                 c.connections.Add(connection);
                                 c.connectionWaitEvent.Set();
@@ -276,6 +276,12 @@ namespace FeatureFlowFramework.DataFlows.TCP
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
             return ReceivingFromTcpSource.ConnectTo(sink, weakReference);
+        }
+
+        public void ConnectToAndBack(IReplier replier, bool weakReference = false)
+        {
+            this.ConnectTo(replier, weakReference);
+            replier.ConnectTo(this, weakReference);
         }
     }
 }

@@ -1,8 +1,9 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helpers.Misc;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Misc
+namespace FeatureFlowFramework.Services
 {
     public static class Factory
     {
@@ -46,6 +47,7 @@ namespace FeatureFlowFramework.Helpers.Misc
             {
                 public Func<T> create = null;
                 public Dictionary<string, Func<T>> namedFactories = null;
+                //TODO lock is missing!
 
                 public IServiceContextData Copy()
                 {
@@ -57,34 +59,33 @@ namespace FeatureFlowFramework.Helpers.Misc
                 }
             };
 
-            static LazySlim<ServiceContext<ContextData>> context;
+            static ServiceContext<ContextData> context;
 
             public static void Setup(Func<T> newCreate)
             {
-                context.Obj.Data.create = newCreate;
+                context.Data.create = newCreate;
             }
 
             public static bool Create(out T value)
             {
                 value = default;
-                if (!context.IsInstantiated || context.Obj.Data.create == null) return false;
+                if (context.Data.create == null) return false;
 
-                value = context.Obj.Data.create();
+                value = context.Data.create();
                 return true;
             }
 
             public static void Setup(string factoryName, Func<T> newCreate)
             {
-                if (context.Obj.Data.namedFactories == null) context.Obj.Data.namedFactories = new Dictionary<string, Func<T>>();
-                context.Obj.Data.namedFactories[factoryName] = newCreate;
+                if (context.Data.namedFactories == null) context.Data.namedFactories = new Dictionary<string, Func<T>>();
+                context.Data.namedFactories[factoryName] = newCreate;
             }
 
             public static bool Create(string factoryName, out T value)
             {
                 value = default;
-                if (!context.IsInstantiated || 
-                    context.ObjIfExists.Data.namedFactories == null || 
-                    !context.ObjIfExists.Data.namedFactories.TryGetValue(factoryName, out Func<T> create)) return false;
+                if (context.Data.namedFactories == null || 
+                    !context.Data.namedFactories.TryGetValue(factoryName, out Func<T> create)) return false;
 
                 value = create();
                 return true;

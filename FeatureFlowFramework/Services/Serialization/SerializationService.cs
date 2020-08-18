@@ -10,6 +10,12 @@ namespace FeatureFlowFramework.Services.Serialization
 {
     public static class SerializationService
     {
+        static SerializationService()
+        {
+            TypeBasedMetaSerializer standardSerializer = new TypeBasedMetaSerializer(new UnivarsalJsonSerializer());            
+            AddSerializer(standardSerializer, "default", true, false);
+        }
+
         class ContextData : IServiceContextData
         {
             public Dictionary<string, ISerializer> serializers;

@@ -89,6 +89,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
             if(!TryFindStartMarker(buffer, bufferFillState, ref bufferReadPosition))
             {
+                bufferReadPosition = restartBufferReadPosition;
                 decodedMessage = null;
                 return DecodingResult.Incomplete;
             }
