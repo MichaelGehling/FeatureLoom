@@ -13,392 +13,422 @@ namespace FeatureFlowFramework.Helpers.Synchronization
     public class FeatureLock
     {
         const int NO_LOCK = 0;
-        const int WRITE_LOCK = NO_LOCK + 1;
+        const int WRITE_LOCK = -1;
 
-        public const int NO_SPIN_WAIT = 0;
-        public const int ONLY_SPIN_WAIT = int.MaxValue;
-        public const int BALANCED_SPIN_WAIT = 1;
+        const int NOT_ENTERED = 0;
+        const int WRITE_ENTERED = -1;        
+        const int SLEEP_WAITING_PRESSURE_EQUIVALENT = 10;
+        const int MAX_WAITING_LIMIT_PRESSURE_CORRECTION = 100;
+        const int MIN_WAITING_LIMIT_PRESSURE_CORRECTION = -100;
 
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
-        /// A lockIndicator larger than NO_LOCK (0) implies a write-lock, while a lockIndicator smaller than NO_LOCK implies a read-lock.
-        /// When entering a read-lock, the lockIndicator is decreased and increased when leaving a read-lock.
-        /// When entering a write-lock, a positive lockIndicator (WRITE_LOCK) is set and set back to NO_LOCK when the write-lock is left.
+        /// A lockIndicator of -1 implies a write-lock, while a lockIndicator greater than 0 implies a read-lock.
+        /// When entering a read-lock, the lockIndicator is increased and decreased when leaving a read-lock.
+        /// When entering a write-lock, a WRITE_LOCK(-1) is set and set back to NO_LOCK(0) when the write-lock is left.
         /// </summary>
-        volatile int lockIndicator = NO_LOCK;
-        volatile bool writePriority = false;
-        volatile bool readPriority = false;
-        volatile Thread lockingThread = null;
+        volatile int lockIndicator = NO_LOCK;        
+        volatile int maxWaitingPressure = 0;
+        int waitingPressureLimitCorrection = 0;
 
-        bool throwOnDeadlock = true;
-        int defaultFullSpinCycles;
+        bool supportReentrance;
+        AsyncLocal<int> reentranceIndicator;
+        int writingReentranceCounter = 0;
 
-        AsyncManualResetEvent mreReader = new AsyncManualResetEvent(true);
-        AsyncManualResetEvent mreWriter = new AsyncManualResetEvent(true);
+        int defaultWaitingPressureLimit = 30;
 
-        public FeatureLock(int defaultFullSpinCycles = BALANCED_SPIN_WAIT, bool throwOnDeadlock = true)
+        AsyncManualResetEvent mre = new AsyncManualResetEvent(true);
+
+        public FeatureLock(bool supportReentrance = false)
         {
-            this.defaultFullSpinCycles = defaultFullSpinCycles;
-            this.throwOnDeadlock = throwOnDeadlock;
+            this.supportReentrance = supportReentrance;
+            if (supportReentrance) reentranceIndicator = new AsyncLocal<int>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForReading(out ReadLock readLock, TimeSpan timeout = default)
-        {
-            return TryForReading(defaultFullSpinCycles, out readLock, timeout);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForReading(int fullSpinCyclesBeforeWait, out ReadLock readLock, TimeSpan timeout = default)
+        public bool TryForReading(out AcquiredLock readLock, TimeSpan timeout = default)
         {
             var timer = new TimeFrame(timeout);
-            readLock = new ReadLock(null);
+            readLock = new AcquiredLock();
+            
+            bool didSleep = false;
 
-            int fullSpins = 0;
+            int waitingPressure = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator - 1;
-            if (lockingThread != null && lockingThread == Thread.CurrentThread) return false;
-            while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            var newLockIndicator = currentLockIndicator + 1;
+            while (ReaderMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (timer.Elapsed) return false;
+                if (timer.Elapsed)
+                {
+                    if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+                    return false;
+                }                
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (currentLockIndicator > NO_LOCK) readPriority = true;
-
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
-                    readPriority = true;
-                    bool didReset = mreReader.Reset();
-                    if (ReaderMustWait(lockIndicator))
-                    {                        
-                        if (!mreReader.Wait(timer.Remaining)) return false;                        
-                        spinWait.Reset();
-                        fullSpins++;
-                        readPriority = true;
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK)
+                    {
+
+                        if (!mre.Wait(timer.Remaining))
+                        {
+                            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+                            return false;
+                        }
+                        spinWait.Reset();                        
                     }
-                    else if (didReset) mreReader.Set();
+                    else if (didReset) mre.Set();
                 }
 
                 currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator - 1;
+                newLockIndicator = currentLockIndicator + 1;
             }
-            readPriority = false;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            readLock = new ReadLock(this);
+            readLock = new AcquiredLock(this, false);
             return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForWriting(out WriteLock writeLock, TimeSpan timeout = default)
-        {
-            return TryForWriting(defaultFullSpinCycles, out writeLock, timeout);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryForWriting(int fullSpinCyclesBeforeWait, out WriteLock writeLock, TimeSpan timeout = default)
+        public bool TryForWriting(out AcquiredLock writeLock, TimeSpan timeout = default)
         {
             var timer = new TimeFrame(timeout);
-            writeLock = new WriteLock(null);
+            writeLock = new AcquiredLock();
 
-            int fullSpins = 0;
+            bool didSleep = false;
+
+            int waitingPressure = 0;
             SpinWait spinWait = new SpinWait();
             var newLockIndicator = WRITE_LOCK;
             var currentLockIndicator = lockIndicator;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
-            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
+            while (WriterMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
-                if (timer.Elapsed) return false;
+                if (timer.Elapsed)
+                {
+                    if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+                    return false;
+                }
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
-
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
-                    writePriority = true;
-                    bool didReset = mreWriter.Reset();
-                    if (WriterMustWait(lockIndicator))
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK)
                     {
-                        if (!mreWriter.Wait(timer.Remaining)) return false;
+                        if (!mre.Wait(timer.Remaining))
+                        {
+                            if (waitingPressure >= maxWaitingPressure) maxWaitingPressure = 0;
+                            return false;
+                        }
                         spinWait.Reset();
-                        fullSpins++;
-                        writePriority = true;
                     }
-                    else if (didReset) mreWriter.Set();
+                    else if (didReset) mre.Set();
                 }
 
                 currentLockIndicator = lockIndicator;
             }
-            if(throwOnDeadlock) lockingThread = Thread.CurrentThread;
-            writePriority = false;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            writeLock = new WriteLock(this);
+            writeLock = new AcquiredLock(this, true);
             return true;
-        }
+        } 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ReadLock ForReading()
+        public AcquiredLock ForReading()
         {
-            return ForReading(defaultFullSpinCycles);
-        }        
+            bool didSleep = false;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ReadLock ForReading(int fullSpinCyclesBeforeWait)
-        {
-            int fullSpins = 0;
+            int waitingPressure = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator - 1;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
-            while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            var newLockIndicator = currentLockIndicator + 1;
+            while (ReaderMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (currentLockIndicator > NO_LOCK) readPriority = true;
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {                    
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
-                    readPriority = true;
-                    bool didReset = mreReader.Reset();
-                    if(ReaderMustWait(lockIndicator))
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
+                    bool didReset = mre.Reset();
+                    if(lockIndicator != NO_LOCK)
                     {
-                        mreReader.Wait();
+                        mre.Wait();
                         spinWait.Reset();
-                        fullSpins++;
-                        readPriority = true;
                     }
-                    else if(didReset) mreReader.Set();
+                    else if(didReset) mre.Set();
                 } 
 
                 currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator - 1;
+                newLockIndicator = currentLockIndicator + 1;
             }
-            readPriority = false;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            return new ReadLock(this);
+            return new AcquiredLock(this, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<ReadLock> ForReadingAsync()
+        public async ValueTask<AcquiredLock> ForReadingAsync()
         {
-            return ForReadingAsync(defaultFullSpinCycles);
-        }
+            bool didSleep = false;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<ReadLock> ForReadingAsync(int fullSpinCyclesBeforeWait)
-        {
-            int fullSpins = 0;
+            int waitingPressure = 0;
             SpinWait spinWait = new SpinWait();
             var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator - 1;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
-            while (ReaderMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            var newLockIndicator = currentLockIndicator + 1;
+            while (ReaderMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (currentLockIndicator > NO_LOCK) readPriority = true;
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
 
-                if (fullSpins < fullSpinCyclesBeforeWait)
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
                 {
                     spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
                 }
                 else
                 {
-                    readPriority = true;
-                    bool didReset = mreReader.Reset();
-                    if (ReaderMustWait(lockIndicator))
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK)
                     {
-                        await mreReader.WaitAsync();
+                        await mre.WaitAsync();
                         spinWait.Reset();
-                        fullSpins++;
-                        readPriority = true;
                     }
-                    else if(didReset) mreReader.Set();
+                    else if(didReset) mre.Set();
                 }
 
                 currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator - 1;
+                newLockIndicator = currentLockIndicator + 1;
             }
-            readPriority = false;
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
 
-            return new ReadLock(this);
+            return new AcquiredLock(this, false);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public AcquiredLock ForWriting()
+        {
+            int currentReentranceIndicator = NOT_ENTERED;
+            if (supportReentrance)
+            {
+                currentReentranceIndicator = reentranceIndicator.Value;
+                if (currentReentranceIndicator == WRITE_ENTERED)
+                {
+                    writingReentranceCounter++;
+                    return new AcquiredLock(this, true);
+                }
+            }
+
+            bool didSleep = false;
+
+            int waitingPressure = 0;
+            SpinWait spinWait = new SpinWait();
+            var newLockIndicator = WRITE_LOCK;
+            var currentLockIndicator = lockIndicator;
+            while (WriterMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
+            {
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
+
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
+                {                    
+                    spinWait.SpinOnce();
+                }
+                else
+                {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK)
+                    {
+                        mre.Wait();
+                        spinWait.Reset();
+                    }
+                    else if(didReset) mre.Set();
+                }
+
+                currentLockIndicator = lockIndicator;
+            }
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
+
+            if (supportReentrance)
+            {
+                writingReentranceCounter++;
+                if (currentReentranceIndicator != WRITE_ENTERED) reentranceIndicator.Value = WRITE_ENTERED;
+            }
+
+            return new AcquiredLock(this, true);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async ValueTask<AcquiredLock> ForWritingAsync()
+        {
+            bool didSleep = false;
+
+            int waitingPressure = 0;
+            SpinWait spinWait = new SpinWait();
+            var newLockIndicator = WRITE_LOCK;
+            var currentLockIndicator = lockIndicator;
+            while (WriterMustWait(currentLockIndicator) || waitingPressure < maxWaitingPressure || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
+            {
+                if (waitingPressure < int.MaxValue) waitingPressure++;
+                if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                if (waitingPressureLimitCorrection < MIN_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MIN_WAITING_LIMIT_PRESSURE_CORRECTION;
+                else if (waitingPressureLimitCorrection > MAX_WAITING_LIMIT_PRESSURE_CORRECTION) waitingPressureLimitCorrection = MAX_WAITING_LIMIT_PRESSURE_CORRECTION;
+
+                int waitingPressureLimit = defaultWaitingPressureLimit + waitingPressureLimitCorrection;
+                if (maxWaitingPressure <= waitingPressureLimit)
+                {                    
+                    spinWait.SpinOnce();
+                }
+                else
+                {
+                    if (int.MaxValue - SLEEP_WAITING_PRESSURE_EQUIVALENT > waitingPressure) waitingPressure += SLEEP_WAITING_PRESSURE_EQUIVALENT;
+                    else waitingPressure = int.MaxValue;
+                    if (waitingPressure > maxWaitingPressure) maxWaitingPressure = waitingPressure;
+                    waitingPressureLimitCorrection++;
+                    didSleep = true;
+
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK)
+                    {
+                        await mre.WaitAsync();
+                        spinWait.Reset();
+                    }
+                    else if(didReset) mre.Set();
+                }
+
+                currentLockIndicator = lockIndicator;
+            }
+            maxWaitingPressure = 0;
+            if (!didSleep) waitingPressureLimitCorrection--;
+
+            return new AcquiredLock(this, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReaderMustWait(int currentLockIndicator)
         {
-            return currentLockIndicator > NO_LOCK || (writePriority && !readPriority);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ExitReadLock()
-        {
-            var newLockIndicator = Interlocked.Increment(ref lockIndicator);
-            if (NO_LOCK == newLockIndicator)
-            {
-                if (!mreWriter.Set()) mreReader.Set();               
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public WriteLock ForWriting()
-        {
-            return ForWriting(defaultFullSpinCycles);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public WriteLock ForWriting(int fullSpinCyclesBeforeWait)
-        {
-            int fullSpins = 0;
-            SpinWait spinWait = new SpinWait();
-            var newLockIndicator = WRITE_LOCK;
-            var currentLockIndicator = lockIndicator;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
-            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
-            {
-                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
-
-                if (fullSpins < fullSpinCyclesBeforeWait)
-                {                    
-                    spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
-                }
-                else
-                {
-                    writePriority = true;
-                    bool didReset = mreWriter.Reset();
-                    if (WriterMustWait(lockIndicator))
-                    {
-                        mreWriter.Wait();
-                        spinWait.Reset();
-                        fullSpins++;
-                        writePriority = true;
-                    }
-                    else if(didReset) mreWriter.Set();
-                }
-
-                currentLockIndicator = lockIndicator;
-            }
-            if (throwOnDeadlock) lockingThread = Thread.CurrentThread;
-            writePriority = false;
-            
-            return new WriteLock(this);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ValueTask<WriteLock> ForWritingAsync()
-        {
-            return ForWritingAsync(defaultFullSpinCycles);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async ValueTask<WriteLock> ForWritingAsync(int fullSpinCyclesBeforeWait)
-        {
-            int fullSpins = 0;
-            SpinWait spinWait = new SpinWait();
-            var newLockIndicator = WRITE_LOCK;
-            var currentLockIndicator = lockIndicator;
-            if (throwOnDeadlock && lockingThread != null && lockingThread == Thread.CurrentThread) throw new Exception("Same thread tries to enter lock twice!");
-            while (WriterMustWait(currentLockIndicator) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
-            {
-                if (currentLockIndicator < NO_LOCK || fullSpins > 0) writePriority = true;
-
-                if (fullSpins < fullSpinCyclesBeforeWait)
-                {                    
-                    spinWait.SpinOnce();
-                    if (spinWait.NextSpinWillYield) fullSpins++;
-                }
-                else
-                {
-                    writePriority = true;
-                    bool didReset = mreWriter.Reset();
-                    if (WriterMustWait(lockIndicator))
-                    {
-                        await mreWriter.WaitAsync();
-                        spinWait.Reset();
-                        fullSpins++;
-                        writePriority = true;
-                    }
-                    else if(didReset) mreWriter.Set();
-                }
-
-                currentLockIndicator = lockIndicator;
-            }
-            if (throwOnDeadlock) lockingThread = Thread.CurrentThread;
-            writePriority = false;
-            return new WriteLock(this);
+            return currentLockIndicator < NO_LOCK;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool WriterMustWait(int currentLockIndicator)
         {
-            return currentLockIndicator != NO_LOCK || (readPriority && !writePriority);
+            return currentLockIndicator != NO_LOCK;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ExitReadLock()
+        {
+            var newLockIndicator = Interlocked.Decrement(ref lockIndicator);
+            if (NO_LOCK == newLockIndicator)
+            {
+                mre.Set();
+            }
         }
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
-            lockingThread = null;
+            if (supportReentrance)
+            {
+                writingReentranceCounter--;
+                if (writingReentranceCounter == 0) reentranceIndicator.Value = NOT_ENTERED;
+                else return;
+            }
+
             lockIndicator = NO_LOCK;
-            if (!mreReader.Set()) mreWriter.Set();
+            mre.Set();
         }
 
-        public struct ReadLock : IDisposable
+        public struct AcquiredLock : IDisposable
         {
             FeatureLock parentLock;
+            readonly bool isWriteLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ReadLock(FeatureLock parentLock)
+            public AcquiredLock(FeatureLock parentLock, bool isWriteLock)
             {
                 this.parentLock = parentLock;
+                this.isWriteLock = isWriteLock;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                parentLock?.ExitReadLock();
-                parentLock = null;
+                Exit();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit()
             {
-                Dispose();
-            }
-        }
-
-        public struct WriteLock : IDisposable
-        {
-            FeatureLock parentLock;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public WriteLock(FeatureLock parentLock)
-            {
-                this.parentLock = parentLock;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Dispose()
-            {
-                parentLock?.ExitWriteLock();
+                if (isWriteLock) parentLock?.ExitWriteLock();
+                else parentLock?.ExitReadLock();
                 parentLock = null;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Exit()
-            {
-                Dispose();
             }
         }
 

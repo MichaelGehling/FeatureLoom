@@ -15,6 +15,7 @@ using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.MetaData;
 using FeatureFlowFramework.Services.Web;
 using FeatureFlowFramework.Workflows;
+using Nito.AsyncEx;
 
 namespace Playground
 {
@@ -23,7 +24,7 @@ namespace Playground
     class Program
     {
 
-        
+
 
         static void Test1(DateTime i)
         {
@@ -53,107 +54,165 @@ namespace Playground
         static void Main(string[] args)
         {
 
-            var guessTheWord = new GuessTheWord();
-            guessTheWord.Run();
-            guessTheWord.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished);
+            /* var guessTheWord = new GuessTheWord();
+             guessTheWord.Run();
+             guessTheWord.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished);
 
-                HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
-            RpcCallee callee = new RpcCallee();
-            callee.RegisterMethod<int, int, int>("Add", (a, b) =>
+                 HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
+             RpcCallee callee = new RpcCallee();
+             callee.RegisterMethod<int, int, int>("Add", (a, b) =>
+             {
+                 int c = a + b;
+                 Console.WriteLine($"RPC: {a}+{b}={c}");
+                 return c;
+             });
+             callee.RegisterMethod("Kill", () =>
+             {
+                 Task.Run(()=> 
+                 {
+                     Thread.Sleep(100.Milliseconds());
+                     Environment.Exit(1);
+                 });
+             });
+             webRPC.ConnectToAndBack(callee);
+             SharedWebServer.WebServer.Start();
+
+             Console.ReadKey();
+
+             Sender sender = new Sender();
+             sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
+
+             var timeKeeper = AppTime.TimeKeeper;
+
+             var now = AppTime.Now;
+
+             timeKeeper.Restart();
+             for (long i = 0; i < 10_000_000; i++) Test1(now.AddMilliseconds(i));
+             Console.WriteLine($"Test1(long i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test2(now.AddMilliseconds(i));
+             Console.WriteLine($"Test2(in long i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test3(now.AddMilliseconds(i));
+             Console.WriteLine($"Test3<T>(T i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test4(now.AddMilliseconds(i));
+             Console.WriteLine($"Test4<T>(in T i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test5(now.AddMilliseconds(i));
+             Console.WriteLine($"Test5(object i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for (long i = 0; i < 10_000_000; i++) sender.Send(now.AddMilliseconds(i));
+             Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
+
+
+             Console.ReadKey();
+
+             QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
+             SharedData<int> sharedInt = new SharedData<int>(42);
+             SharedData<string> sharedObj = new SharedData<string>("Hello");
+             sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
+
+             using (var myInt = sharedInt.GetReadAccess())
+             using (var myObj = sharedObj.GetWriteAccess(99))
+             {
+                 myObj.SetValue(myObj.Value + myInt.Value);                
+             }            
+
+             if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
+             {
+                 if (update.originatorId == 99 && update.sharedData is SharedData<string> objUpdate)
+                 {
+                     objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
+                 }
+             }            
+
+             var timer = AppTime.TimeKeeper;
+             TimeSpan x;
+             long c1 = 0;
+             while(timer.Elapsed < 1.Seconds())
+             {
+                 x = AppTime.Elapsed;
+                 c1++;
+             }
+
+             timer.Restart();
+             long c2 = 0;
+             DateTime s = AppTime.Now;
+             TimeSpan y;
+             while(timer.Elapsed < 1.Seconds())
+             {
+                 y = AppTime.Now.Subtract(s);
+                 c2++;
+             }
+
+             Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
+ */
+
+            /*
+            FeatureLock myLock = new FeatureLock(0, true);
+
+            using (myLock.ForReading())
             {
-                int c = a + b;
-                Console.WriteLine($"RPC: {a}+{b}={c}");
-                return c;
-            });
-            callee.RegisterMethod("Kill", () =>
-            {
-                Task.Run(()=> 
+                using (myLock.ForWriting())
                 {
-                    Thread.Sleep(100.Milliseconds());
-                    Environment.Exit(1);
-                });
-            });
-            webRPC.ConnectToAndBack(callee);
-            SharedWebServer.WebServer.Start();
-
-            Console.ReadKey();
-
-            Sender sender = new Sender();
-            sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
-            var timeKeeper = AppTime.TimeKeeper;
-
-            var now = AppTime.Now;
-
-            timeKeeper.Restart();
-            for (long i = 0; i < 10_000_000; i++) Test1(now.AddMilliseconds(i));
-            Console.WriteLine($"Test1(long i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test2(now.AddMilliseconds(i));
-            Console.WriteLine($"Test2(in long i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test3(now.AddMilliseconds(i));
-            Console.WriteLine($"Test3<T>(T i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test4(now.AddMilliseconds(i));
-            Console.WriteLine($"Test4<T>(in T i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for(long i = 0; i < 10_000_000; i++) Test5(now.AddMilliseconds(i));
-            Console.WriteLine($"Test5(object i):{timeKeeper.Elapsed}");
-
-            timeKeeper.Restart();
-            for (long i = 0; i < 10_000_000; i++) sender.Send(now.AddMilliseconds(i));
-            Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
-
-
-            Console.ReadKey();
-
-            QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
-            SharedData<int> sharedInt = new SharedData<int>(42);
-            SharedData<string> sharedObj = new SharedData<string>("Hello");
-            sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
-
-            using (var myInt = sharedInt.GetReadAccess())
-            using (var myObj = sharedObj.GetWriteAccess(99))
-            {
-                myObj.SetValue(myObj.Value + myInt.Value);                
-            }            
-            
-            if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
-            {
-                if (update.originatorId == 99 && update.sharedData is SharedData<string> objUpdate)
-                {
-                    objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
                 }
-            }            
-
-            var timer = AppTime.TimeKeeper;
-            TimeSpan x;
-            long c1 = 0;
-            while(timer.Elapsed < 1.Seconds())
-            {
-                x = AppTime.Elapsed;
-                c1++;
             }
+            
+            
+            */
+            Thread.Sleep(1000);
+            
+            int numReader = 1;
+            TimeSpan readerSlack = 0.1.Milliseconds();
+            int numWriter = 1;
+            TimeSpan writerSlack = 0.1.Milliseconds();
+            TimeSpan executionTime = 0.1.Milliseconds();
+            TimeSpan duration = 5.Seconds();
 
-            timer.Restart();
-            long c2 = 0;
-            DateTime s = AppTime.Now;
-            TimeSpan y;
-            while(timer.Elapsed < 1.Seconds())
-            {
-                y = AppTime.Now.Subtract(s);
-                c2++;
-            }
 
-            Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
+            var classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (obj, action) => { lock (obj) action(); },
+                (obj, action) => { lock (obj) action(); });
+            Console.WriteLine(classic.Run());
+
+            var FL = new MessageQueueLockTester<FeatureLock>("FeatureLock", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action) => { using (myLock.ForWriting()) action(); },
+                (myLock, action) => { using (myLock.ForWriting()) action(); });
+            Console.WriteLine(FL.Run());
+
+            var FLre = new MessageQueueLockTester<FeatureLock>("FeatureLockRE", new FeatureLock(true), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action) => { using (myLock.ForWriting()) action(); },
+                (myLock, action) => { using (myLock.ForWriting()) action(); });
+            Console.WriteLine(FLre.Run());
+
+            var sema = new MessageQueueLockTester<SemaphoreSlim>("SemaphoreSlim", new SemaphoreSlim(1,1), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action) => { myLock.Wait(); try { action(); } finally { myLock.Release(); }},
+                (myLock, action) => { myLock.Wait(); try { action(); } finally { myLock.Release(); }});
+            Console.WriteLine(sema.Run());
+
+            var asyncEx = new MessageQueueLockTester<AsyncLock>("AsyncEx", new AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action) => { using (myLock.Lock()) action(); },
+                (myLock, action) => { using (myLock.Lock()) action(); });
+            Console.WriteLine(asyncEx.Run());
+
+            Console.WriteLine(classic.Run());
+            Console.WriteLine(FL.Run());
+            Console.WriteLine(FLre.Run());
+            Console.WriteLine(sema.Run());
+            Console.WriteLine(asyncEx.Run());
+
+
+            Console.ReadKey();
 
             //FunctionTestRWLock(new RWLock(RWLock.SpinWaitBehaviour.NoSpinning), 3.Seconds(), 4, 4, 0, 0);
             Console.WriteLine("--2,2,2,2--");
-            for (int i= 0; i< 5; i++) FunctionTestRWLock(new FeatureLock(FeatureLock.NO_SPIN_WAIT), 1.Seconds(), 2, 2, 2, 2);
+            for (int i = 0; i < 5; i++) FunctionTestRWLock(new FeatureLock(), 1.Seconds(), 2, 2, 2, 2);
             /*Console.WriteLine("--0,0,1,1--");
             for(int i = 0; i < 5; i++) FunctionTestRWLock(new RWLock3(RWLock3.SpinWaitBehaviour.NoSpinning), 1.Seconds(), 0, 0, 1, 1);
             Console.WriteLine("--0,0,0,4--");
@@ -174,7 +233,7 @@ namespace Playground
             Console.ReadKey();
         }
 
-     
+
         private static void PerformanceTestParallel()
         {
             var duration = 3.Seconds();
@@ -182,27 +241,27 @@ namespace Playground
             string name;
             long c = 0;
             int gcs = 0;
-            int numReadLocks = 1;
-            int numWriteLocks = 1;
+            int numReadLocks = 0;
+            int numWriteLocks = 10;
 
             List<int> dummyList = new List<int>();
             Random rnd = new Random();
 
             Action workWrite = () =>
             {
-                if(dummyList.Count > 10000) dummyList.Clear();
-                dummyList.Add(dummyList.Count);
-                //TimeFrame tf = new TimeFrame(0.1.Milliseconds());
-                //while(!tf.Elapsed) ;
+                //if(dummyList.Count > 10000) dummyList.Clear();
+                //dummyList.Add(dummyList.Count);
+                TimeFrame tf = new TimeFrame(0.1.Milliseconds());
+                while (!tf.Elapsed) ;// Thread.Yield(); 
                 //Thread.Sleep(1);
                 //Thread.Yield();
             };
             Action workRead = () =>
             {
-                int x;
-                foreach (var d in dummyList) x = d +1;
-                //TimeFrame tf = new TimeFrame(0.1.Milliseconds());
-                //while(!tf.Elapsed) ;
+                //int x;
+                //foreach (var d in dummyList) x = d +1;
+                TimeFrame tf = new TimeFrame(0.1.Milliseconds());
+                while (!tf.Elapsed) ;//Thread.Yield();
                 //Thread.Sleep(1);
                 //Thread.Yield();
             };
@@ -212,9 +271,10 @@ namespace Playground
                 while (!tf.Elapsed) ;*/
                 //Thread.Sleep(1.Milliseconds());
                 //Thread.Sleep(1);
-                TimeFrame tf = new TimeFrame(dummyList.Count * 0.001.Milliseconds());
-                while(!tf.Elapsed) ;
-                Thread.Yield();
+                TimeFrame tf = new TimeFrame(0.1.Milliseconds());
+                while (!tf.Elapsed) Thread.Yield();
+                //Thread.Sleep(1);
+                //Thread.Yield();
             };
 
             name = "Overhead";
@@ -230,27 +290,21 @@ namespace Playground
             Finish(timeFactor, name, c, gcs, overhead);
             dummyList.Clear();
 
+            name = "RWLock";
+            Prepare(out gcs);
+            c = RunParallel(new FeatureLock(), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+            dummyList.Clear();
+
+            name = "RWLock Reentrant";
+            Prepare(out gcs);
+            c = RunParallel(new FeatureLock(true), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+            dummyList.Clear();
+
             name = "RWLock Async";
             Prepare(out gcs);
             c = RunParallelAsync(new FeatureLock(), duration, RWLockReadAsync, numReadLocks, RWLockWriteAsync, numWriteLocks, workRead, workWrite, slack).Sum();
-            Finish(timeFactor, name, c, gcs, overhead);
-            dummyList.Clear();
-
-            name = "RWLock NoSpinning";
-            Prepare(out gcs);
-            c = RunParallel(new FeatureLock(FeatureLock.NO_SPIN_WAIT), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
-            Finish(timeFactor, name, c, gcs, overhead);
-            dummyList.Clear();
-
-            name = "RWLock NoSpinning Async";
-            Prepare(out gcs);
-            c = RunParallelAsync(new FeatureLock(FeatureLock.NO_SPIN_WAIT), duration, RWLockReadAsync, numReadLocks, RWLockWriteAsync, numWriteLocks, workRead, workWrite, slack).Sum();
-            Finish(timeFactor, name, c, gcs, overhead);
-            dummyList.Clear();
-
-            name = "RWLock OnlySpinning";
-            Prepare(out gcs);
-            c = RunParallel(new FeatureLock(FeatureLock.ONLY_SPIN_WAIT), duration, RWLockRead, numReadLocks, RWLockWrite, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
             dummyList.Clear();
 
@@ -269,9 +323,21 @@ namespace Playground
             dummyList.Clear();
              */
 
+            name = "AsyncEx";
+            Prepare(out gcs);
+            c = RunParallel(new AsyncLock(), duration, AsyncEx, numReadLocks, AsyncEx, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+            dummyList.Clear();
+
+            name = "AsyncEx Async";
+            Prepare(out gcs);
+            c = RunParallelAsync(new AsyncLock(), duration, AsyncExAsync, numReadLocks, AsyncExAsync, numWriteLocks, workRead, workWrite, slack).Sum();
+            Finish(timeFactor, name, c, gcs, overhead);
+            dummyList.Clear();
+
             name = "SemaphoreSlim";
             Prepare(out gcs);
-            c = RunParallel(new SemaphoreSlim(1,1), duration, SemaphoreLock, numReadLocks, SemaphoreLock, numWriteLocks, workRead, workWrite, slack).Sum();
+            c = RunParallel(new SemaphoreSlim(1, 1), duration, SemaphoreLock, numReadLocks, SemaphoreLock, numWriteLocks, workRead, workWrite, slack).Sum();
             Finish(timeFactor, name, c, gcs, overhead);
             dummyList.Clear();
 
@@ -294,43 +360,84 @@ namespace Playground
             dummyList.Clear();
         }
 
-        private static List<long> RunParallelAsync<T>(T lockObj, TimeSpan duration, Func<T, TimeSpan, Action, Action, Task<long>> readLock, int numReadLockThreads, Func<T, TimeSpan, Action, Action, Task<long>> writeLock, int numWriteLockThreads, Action workRead, Action workWrite, Action slack)
-        {
-            return RunParallel(lockObj, duration, (a, b, c, d) => readLock(a, b, c, d).Result, numReadLockThreads, (a, b, c, d) => writeLock(a, b, c, d).Result, numWriteLockThreads, workRead, workWrite, slack);
-        }
-
-        private static List<long> RunParallel<T>(T lockObj, TimeSpan duration, Func<T, TimeSpan, Action, Action, long> readLock, int numReadLockThreads, Func<T, TimeSpan, Action, Action, long> writeLock, int numWriteLockThreads, Action workRead, Action workWrite, Action slack)
+        private static List<long> RunParallelAsync<T>(T lockObj, TimeSpan duration, Func<T, TimeFrame, Action, Action, Task<long>> readLock, int numReadLockThreads, Func<T, TimeFrame, Action, Action, Task<long>> writeLock, int numWriteLockThreads, Action workRead, Action workWrite, Action slack)
         {
             List<long> counts = new List<long>();
             List<long> countsW = new List<long>();
             List<long> countsR = new List<long>();
             List<Task> tasks = new List<Task>();
-            TaskCompletionSource<bool> starter = new TaskCompletionSource<bool>();
-            for (int i= 0; i < numWriteLockThreads; i++)
-            {
-                tasks.Add(Task.Run(() =>
-                {
-                    starter.Task.Wait();
-                    var c = writeLock(lockObj, duration, workWrite, slack);
-                    Console.WriteLine("W" + c);
-                    lock(counts) counts.Add(c);
-                    lock (countsW) countsW.Add(c);
-                }));
-            }
 
-            for(int i = 0; i < numReadLockThreads; i++)
+            TaskCompletionSource<bool> starter = new TaskCompletionSource<bool>();
+            Box<TimeFrame> timeBox = new Box<TimeFrame>();
+
+            for (int i = 0; i < numReadLockThreads; i++)
             {
                 tasks.Add(Task.Run(() =>
                 {
                     starter.Task.Wait();
-                    var c = readLock(lockObj, duration, workRead, slack);
+                    var c = readLock(lockObj, timeBox, workRead, slack).Result;
                     Console.WriteLine("R" + c);
                     lock (counts) counts.Add(c);
                     lock (countsR) countsR.Add(c);
                 }));
             }
 
-            Thread.Sleep(100);
+            for (int i = 0; i < numWriteLockThreads; i++)
+            {
+                tasks.Add(Task.Run(() =>
+               {
+                   starter.Task.Wait();
+                   var c = writeLock(lockObj, timeBox, workWrite, slack).Result;
+                   Console.WriteLine("W" + c);
+                   lock (counts) counts.Add(c);
+                   lock (countsW) countsW.Add(c);
+               }));
+            }
+
+            Thread.Sleep(200);
+            timeBox.value = new TimeFrame(duration);
+            starter.SetResult(true);
+            Task.WhenAll(tasks.ToArray()).Wait();
+            //Console.WriteLine("W*R " + (countsR.Min()* countsR.Max() * countsW.Min()*countsW.Max()) / (counts.Sum() * counts.Sum()));
+            return counts;
+        }
+
+        private static List<long> RunParallel<T>(T lockObj, TimeSpan duration, Func<T, TimeFrame, Action, Action, long> readLock, int numReadLockThreads, Func<T, TimeFrame, Action, Action, long> writeLock, int numWriteLockThreads, Action workRead, Action workWrite, Action slack)
+        {
+            List<long> counts = new List<long>();
+            List<long> countsW = new List<long>();
+            List<long> countsR = new List<long>();
+            List<Task> tasks = new List<Task>();
+
+            TaskCompletionSource<bool> starter = new TaskCompletionSource<bool>();
+            Box<TimeFrame> timeBox = new Box<TimeFrame>();
+
+            for (int i = 0; i < numReadLockThreads; i++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    starter.Task.Wait();
+                    var c = readLock(lockObj, timeBox, workRead, slack);
+                    Console.WriteLine("R" + c);
+                    lock (counts) counts.Add(c);
+                    lock (countsR) countsR.Add(c);
+                }));
+            }
+
+            for (int i = 0; i < numWriteLockThreads; i++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    starter.Task.Wait();
+                    var c = writeLock(lockObj, timeBox, workWrite, slack);
+                    Console.WriteLine("W" + c);
+                    lock (counts) counts.Add(c);
+                    lock (countsW) countsW.Add(c);
+                }));
+            }
+
+            Thread.Sleep(200);
+            timeBox.value = new TimeFrame(duration);
             starter.SetResult(true);
             Task.WhenAll(tasks.ToArray()).Wait();
             //Console.WriteLine("W*R " + (countsR.Min()* countsR.Max() * countsW.Min()*countsW.Max()) / (counts.Sum() * counts.Sum()));
@@ -338,8 +445,8 @@ namespace Playground
         }
 
 
-         private static void PerformanceTest()
-         {
+        private static void PerformanceTest()
+        {
             var duration = 0.5.Seconds();
             double timeFactor = duration.TotalMilliseconds * 1_000_000;
             string name;
@@ -350,38 +457,48 @@ namespace Playground
 
             name = "Overhead";
             Prepare(out gcs);
-            c = Overhead(new object(), duration, work, slack);
+            c = Overhead(new object(), new TimeFrame(duration), work, slack);
             double time_overhead_ns = timeFactor / c;
             Console.WriteLine(time_overhead_ns + " " + -1 + " " + name);
-            
+
             name = "RWLock Read";
             Prepare(out gcs);
-            c = RWLockRead(new FeatureLock(), duration, work, slack);
+            c = RWLockRead(new FeatureLock(), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "RWLock Write";
             Prepare(out gcs);
-            c = RWLockWrite(new FeatureLock(), duration, work, slack);
+            c = RWLockWrite(new FeatureLock(), new TimeFrame(duration), work, slack);
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock Read Reentrant";
+            Prepare(out gcs);
+            c = RWLockRead(new FeatureLock(true), new TimeFrame(duration), work, slack);
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "RWLock Write Reentrant";
+            Prepare(out gcs);
+            c = RWLockWrite(new FeatureLock(true), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "RWLock Read Async";
             Prepare(out gcs);
-            c = RWLockReadAsync(new FeatureLock(), duration, work, slack).Result;
+            c = RWLockReadAsync(new FeatureLock(), new TimeFrame(duration), work, slack).Result;
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "RWLock Write Async";
             Prepare(out gcs);
-            c = RWLockWriteAsync(new FeatureLock(), duration, work, slack).Result;
+            c = RWLockWriteAsync(new FeatureLock(), new TimeFrame(duration), work, slack).Result;
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "Classic Lock";
             Prepare(out gcs);
-            c = ClassicLock(new object(), duration, work, slack);
+            c = ClassicLock(new object(), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "Monitor";
             Prepare(out gcs);
-            c = Monitor(new object(), duration, work, slack);
+            c = Monitor(new object(), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             /*name = "Mutex";
@@ -389,29 +506,40 @@ namespace Playground
             c = Mutex(new Mutex(), duration, work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
             */
+
+            name = "AsyncEx";
+            Prepare(out gcs);
+            c = AsyncEx(new AsyncLock(), new TimeFrame(duration), work, slack);
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
+            name = "AsyncEx Async";
+            Prepare(out gcs);
+            c = AsyncExAsync(new AsyncLock(), new TimeFrame(duration), work, slack).Result;
+            Finish(timeFactor, name, c, gcs, time_overhead_ns);
+
             name = "SpinLock";
             Prepare(out gcs);
-            c = SpinLock(new SpinLock(), duration, work, slack);
+            c = SpinLock(new SpinLock(), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "Semaphore Lock";
             Prepare(out gcs);
-            c = SemaphoreLock(new SemaphoreSlim(1,1), duration, work, slack);
+            c = SemaphoreLock(new SemaphoreSlim(1, 1), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "Semaphore Lock Async";
             Prepare(out gcs);
-            c = SemaphoreLockAsync(new SemaphoreSlim(1, 1), duration, work, slack).Result;
+            c = SemaphoreLockAsync(new SemaphoreSlim(1, 1), new TimeFrame(duration), work, slack).Result;
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "RwLock Write (no recursion)";
             Prepare(out gcs);
-            c = ReaderWriterLockWrite(new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion), duration, work, slack);
+            c = ReaderWriterLockWrite(new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
             name = "RwLock Write (with recursion)";
             Prepare(out gcs);
-            c = ReaderWriterLockWrite(new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion), duration, work, slack);
+            c = ReaderWriterLockWrite(new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion), new TimeFrame(duration), work, slack);
             Finish(timeFactor, name, c, gcs, time_overhead_ns);
 
         }
@@ -420,8 +548,9 @@ namespace Playground
         {
             double time = timeFactor / c - time_overhead_ns;
             gcs = (GC.CollectionCount(0) - gcs);
-            long iterationsPerGC = gcs > 0 ? c / gcs : -1;
-            Console.WriteLine(time + " " + iterationsPerGC + " " + c +" " + name);
+            //long iterationsPerGC = gcs > 0 ? c / gcs : -1;
+            double iterationsPerGC = gcs / (((double)c) / 1_000_000);
+            Console.WriteLine(time + " " + iterationsPerGC + " " + c + " " + name);
         }
 
         private static void Prepare(out int gcs)
@@ -430,11 +559,10 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long ReaderWriterLockWrite(ReaderWriterLockSlim rwLock, TimeSpan duration, Action work, Action slack)
+        private static long ReaderWriterLockWrite(ReaderWriterLockSlim rwLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
                 rwLock.EnterWriteLock();
                 try
@@ -453,11 +581,10 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long ReaderWriterLockRead(ReaderWriterLockSlim rwLock, TimeSpan duration, Action work, Action slack)
+        private static long ReaderWriterLockRead(ReaderWriterLockSlim rwLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
                 rwLock.EnterReadLock();
                 try
@@ -476,11 +603,10 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long Mutex(Mutex mutex, TimeSpan duration, Action work, Action slack)
+        private static long Mutex(Mutex mutex, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
                 mutex.WaitOne();
                 try
@@ -499,17 +625,16 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long SpinLock(SpinLock spinLock, TimeSpan duration, Action work, Action slack)
+        private static long SpinLock(SpinLock spinLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
                 bool spinLockTaken = false;
                 try
                 {
                     spinLock.Enter(ref spinLockTaken);
-                    if(spinLockTaken)
+                    if (spinLockTaken)
                     {
                         c++;
                         work?.Invoke();
@@ -526,11 +651,44 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static async Task<long> SemaphoreLockAsync(SemaphoreSlim sema, TimeSpan duration, Action work, Action slack)
+        private static long AsyncEx(AsyncLock asyncLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
+            {
+                using (asyncLock.Lock())
+                {
+                    c++;
+                    work?.Invoke();
+                }
+                slack?.Invoke();
+            }
+
+            return c;
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private static async Task<long> AsyncExAsync(AsyncLock asyncLock, TimeFrame timeFrame, Action work, Action slack)
+        {
+            long c = 0;
+            while (!timeFrame.Elapsed)
+            {
+                using (await asyncLock.LockAsync())
+                {
+                    c++;
+                    work?.Invoke();
+                }
+                slack?.Invoke();
+            }
+
+            return c;
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private static async Task<long> SemaphoreLockAsync(SemaphoreSlim sema, TimeFrame timeFrame, Action work, Action slack)
+        {
+            long c = 0;
+            while (!timeFrame.Elapsed)
             {
                 await sema.WaitAsync();
                 try
@@ -549,11 +707,10 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long SemaphoreLock(SemaphoreSlim sema, TimeSpan duration, Action work, Action slack)
+        private static long SemaphoreLock(SemaphoreSlim sema, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
                 sema.Wait();
                 try
@@ -572,11 +729,10 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long Monitor(object obj, TimeSpan duration, Action work, Action slack)
+        private static long Monitor(object obj, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
                 bool monitorLockTaken = false;
                 try
@@ -587,7 +743,7 @@ namespace Playground
                 }
                 finally
                 {
-                    if(monitorLockTaken)
+                    if (monitorLockTaken)
                         System.Threading.Monitor.Exit(obj);
                 }
                 slack?.Invoke();
@@ -597,13 +753,12 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long ClassicLock(object obj, TimeSpan duration, Action work, Action slack)
+        private static long ClassicLock(object obj, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
-                lock(obj)
+                lock (obj)
                 {
                     c++;
                     work?.Invoke();
@@ -615,13 +770,12 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long RWLockWrite(FeatureLock myLock, TimeSpan duration, Action work, Action slack)
+        private static long RWLockWrite(FeatureLock myLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
-                using(myLock.ForWriting())
+                using (myLock.ForWriting())
                 {
                     c++;
                     work?.Invoke();
@@ -632,13 +786,12 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long RWLockRead(FeatureLock myLock, TimeSpan duration, Action work, Action slack)
+        private static long RWLockRead(FeatureLock myLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
-                using(myLock.ForReading())
+                using (myLock.ForReading())
                 {
                     c++;
                     work?.Invoke();
@@ -649,13 +802,12 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private async static Task<long> RWLockWriteAsync(FeatureLock myLock, TimeSpan duration, Action work, Action slack)
+        private async static Task<long> RWLockWriteAsync(FeatureLock myLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
-                using(await myLock.ForWritingAsync())
+                using (await myLock.ForWritingAsync())
                 {
                     c++;
                     work?.Invoke();
@@ -666,13 +818,12 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private async static Task<long> RWLockReadAsync(FeatureLock myLock, TimeSpan duration, Action work, Action slack)
+        private async static Task<long> RWLockReadAsync(FeatureLock myLock, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
-                using(await myLock.ForReadingAsync())
+                using (await myLock.ForReadingAsync())
                 {
                     c++;
                     work?.Invoke();
@@ -684,11 +835,10 @@ namespace Playground
 
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private static long Overhead(object dummy, TimeSpan duration, Action work, Action slack)
+        private static long Overhead(object dummy, TimeFrame timeFrame, Action work, Action slack)
         {
             long c = 0;
-            TimeFrame tf = new TimeFrame(duration);
-            while(!tf.Elapsed)
+            while (!timeFrame.Elapsed)
             {
                 c++;
                 work?.Invoke();
@@ -714,13 +864,130 @@ namespace Playground
             var t2 = Task.Run(() => RunParallelAsync(myLock, duration, RWLockReadAsync, numReadingAsync, RWLockWriteAsync, numWritingAsync, workRead, workWrite, null));
             Task.WhenAll(t1, t2).Wait();
 
-            foreach(var c in t1.Result)
+            foreach (var c in t1.Result)
             {
                 Console.WriteLine(c);
             }
-            foreach(var c in t2.Result)
+            foreach (var c in t2.Result)
             {
                 Console.WriteLine(c);
+            }
+        }
+
+        class MessageQueueLockTester<T>
+        {
+            T lockObject;
+            Action<T, Action> readLockFrame;
+            Action<T, Action> writeLockFrame;
+            int numReader;
+            int numWriter;
+            TimeSpan duration;
+            TimeSpan executionTime;
+            TimeSpan readerSlack;
+            TimeSpan writerSlack;
+            string name;
+
+            IAsyncManualResetEvent queueItemsAvailable;
+            Queue<long> queue;
+            long writeCounter = 0;
+            long readCounter = 0;
+
+            public MessageQueueLockTester(string name, T lockObject, int numReader, int numWriter, TimeSpan duration, TimeSpan readerSlackTime, TimeSpan writerSlackTime, TimeSpan executionTime, Action<T, Action> readLockFrame, Action<T, Action> writeLockFrame)
+            {
+                this.name = name;
+                this.lockObject = lockObject;
+                this.readLockFrame = readLockFrame;
+                this.writeLockFrame = writeLockFrame;
+                this.numReader = numReader;
+                this.numWriter = numWriter;
+                this.duration = duration;
+                this.readerSlack = readerSlackTime;
+                this.writerSlack = writerSlackTime;
+                this.executionTime = executionTime;
+            }
+
+            public Result Run()
+            {
+                queueItemsAvailable = new FeatureFlowFramework.Helpers.Synchronization.AsyncManualResetEvent();
+                queue = new Queue<long>();
+                writeCounter = 0;
+                readCounter = 0;
+                
+                ManualResetEventSlim starter = new ManualResetEventSlim(false);
+                List<Task> tasks = new List<Task>();
+                Box<TimeFrame> timeBox = new Box<TimeFrame>();
+                for(int i= 0; i < numWriter; i++)
+                {
+                    tasks.Add(Task.Run(() =>
+                    {
+                        starter.Wait();
+                        TimeFrame timeFrame = timeBox;
+                        while (!timeFrame.Elapsed)
+                        {                            
+                            writeLockFrame(lockObject, WriteToQueue);
+                            queueItemsAvailable.Set();
+                            TimeFrame slackTime = new TimeFrame(writerSlack);
+                            while (!slackTime.Elapsed) Thread.Yield();
+                        }
+                    }));
+                }
+
+                for (int i = 0; i < numReader; i++)
+                {
+                    tasks.Add(Task.Run(() =>
+                    {
+                        starter.Wait();
+                        TimeFrame timeFrame = timeBox;
+                        while (!timeFrame.Elapsed)
+                        {
+                            queueItemsAvailable.Wait();
+                            readLockFrame(lockObject, ReadFromQueue);
+                            TimeFrame slackTime = new TimeFrame(readerSlack);
+                            while (!slackTime.Elapsed) Thread.Yield();
+                        }
+                    }));
+                }
+
+                timeBox.value = new TimeFrame(duration);
+                starter.Set();
+                Task.WaitAll(tasks.ToArray());
+
+                return new Result(name, writeCounter, readCounter, duration);
+            }
+
+            void WriteToQueue()
+            {
+                TimeFrame executionTimeFrame = new TimeFrame(executionTime);
+                queue.Enqueue(writeCounter++);
+                while (!executionTimeFrame.Elapsed) ;
+            }
+
+            void ReadFromQueue()
+            {
+                TimeFrame executionTimeFrame = new TimeFrame(executionTime);
+                if (queue.TryDequeue(out _)) readCounter++;
+                while (!executionTimeFrame.Elapsed) ;
+            }
+
+            public readonly struct Result
+            {
+                readonly string name;
+                readonly long writeCounter;
+                readonly long readCounter;
+                readonly TimeSpan duration;
+
+                public Result(string name, long writeCounter, long readCounter, TimeSpan duration)
+                {
+                    this.name = name;
+                    this.writeCounter = writeCounter;
+                    this.readCounter = readCounter;
+                    this.duration = duration;
+                }
+
+                public override string ToString()
+                {
+                    return $"{name}:\tWrittenToQueue:{writeCounter},\tReadFromQueue:{readCounter}\t-> {readCounter/duration.TotalSeconds} per second / {duration.TotalMilliseconds * 1_000_000 / readCounter} ns per msg";
+                }
             }
         }
 

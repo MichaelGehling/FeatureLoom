@@ -1,11 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
+using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Workflows;
 
 namespace Playground
 {
     public class GuessTheWord : Workflow<GuessTheWord.StateMachine>
     {
+
+        static void Main()
+        {
+            var guessTheWord = new GuessTheWord();
+            guessTheWord.ExecutionInfoSource.ConnectTo(new WorkflowExecutionInfoLogger());
+            guessTheWord.Run();
+            guessTheWord.WaitUntilFinished();
+        }
+
         string theWord;
         List<char> guessedChars = new List<char>();
         int counter = 0;
@@ -14,7 +24,7 @@ namespace Playground
         public class StateMachine : StateMachine<GuessTheWord>
         {
             protected override void Init()
-            {
+            {                
                 var entering = State("entering");
                 var guessing = State("guessing");
                 var finished = State("finished");
@@ -69,11 +79,6 @@ namespace Playground
                         .If(c => c.done)
                             .Goto(finished)
                         .Else()
-                            .Do(c => 
-                            {
-                                c.counter = 0;
-                                c.guessedChars.Clear();
-                            })
                             .Loop();
 
                 finished.Build()
@@ -88,6 +93,11 @@ namespace Playground
                         })
                     .Step("Restart if player wants to play again, otherwinse finish")
                         .If(c => !c.done)
+                            .Do(c =>
+                            {
+                                c.counter = 0;
+                                c.guessedChars.Clear();
+                            })
                             .Goto(entering)
                         .Else()
                             .Finish();

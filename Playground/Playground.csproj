@@ -4,10 +4,21 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <LangVersion>7.2</LangVersion>
+    <StartupObject>Playground.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Nito.AsyncEx" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FeatureFlowFramework\FeatureFlowFramework.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="AsyncReaderWriterLockSlim">
+      <HintPath>..\..\..\AsyncReaderWriterLockSlim\AsyncReaderWriterLockSlim\bin\Release\netstandard2.0\AsyncReaderWriterLockSlim.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

@@ -75,7 +75,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         public struct WriteAccess : IDisposable
         {
-            private FeatureLock.WriteLock myLock;
+            private FeatureLock.AcquiredLock myLock;
             private SharedData<T> shared;
             private bool publish;
             private readonly long updateOriginatorId;
@@ -90,7 +90,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             public void SuppressPublishUpdate() => publish = false;
 
-            public WriteAccess(FeatureLock.WriteLock myLock, SharedData<T> shared, long updateOriginatorId)
+            public WriteAccess(FeatureLock.AcquiredLock myLock, SharedData<T> shared, long updateOriginatorId)
             {
                 this.myLock = myLock;
                 this.shared = shared;
@@ -116,7 +116,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         public struct ReadAccess : IDisposable
         {
-            private FeatureLock.ReadLock myLock;
+            private FeatureLock.AcquiredLock myLock;
             private SharedData<T> shared;
 
             public T Value
@@ -124,7 +124,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 get => shared.value;
             }
 
-            public ReadAccess(FeatureLock.ReadLock myLock, SharedData<T> shared)
+            public ReadAccess(FeatureLock.AcquiredLock myLock, SharedData<T> shared)
             {
                 this.myLock = myLock;
                 this.shared = shared;
