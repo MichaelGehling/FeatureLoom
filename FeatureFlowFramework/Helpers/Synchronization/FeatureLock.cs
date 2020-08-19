@@ -60,19 +60,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return false;
                 }
 
+                bool nextInQueue = true;
                 if (waitingPressure < MAX_WAITING_PRESSURE) waitingPressure += 1;
-                if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                else nextInQueue = false;
 
-                bool didReset = mre.Reset();
-                if (lockIndicator != NO_LOCK)
+                if (!nextInQueue)
                 {
-                    if (!mre.Wait(timer.Remaining))
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK)
                     {
-                        if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = 0;
-                        return false;
-                    }                   
+                        if (!mre.Wait(timer.Remaining))
+                        {
+                            if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = 0;
+                            return false;
+                        }
+                    }
+                    else if (didReset) mre.Set();
+                    if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
                 }
-                else if (didReset) mre.Set();
 
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
@@ -98,20 +104,26 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return false;
                 }
 
+                bool nextInQueue = true;
                 if (waitingPressure < MAX_WAITING_PRESSURE) waitingPressure += 1;
-                if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                else nextInQueue = false;
 
-                bool didReset = mre.Reset();
-                if (lockIndicator != NO_LOCK)
+                if (!nextInQueue)
                 {
-                    if (!mre.Wait(timer.Remaining))
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK)
                     {
-                        if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = 0;
-                        writeLock = new AcquiredLock();
-                        return false;
+                        if (!mre.Wait(timer.Remaining))
+                        {
+                            if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = 0;
+                            writeLock = new AcquiredLock();
+                            return false;
+                        }
                     }
+                    else if (didReset) mre.Set();
+                    if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
                 }
-                else if (didReset) mre.Set();
 
                 currentLockIndicator = lockIndicator;
             }
@@ -128,15 +140,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, waitingPressure) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
+                bool nextInQueue = true;
                 if (waitingPressure < MAX_WAITING_PRESSURE) waitingPressure += 1;
-                if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                else nextInQueue = false;
 
-                bool didReset = mre.Reset();
-                if(lockIndicator != NO_LOCK)
+                if (!nextInQueue)
                 {
-                    mre.Wait();
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK) mre.Wait();
+                    else if (didReset) mre.Set();
+                    if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
                 }
-                else if(didReset) mre.Set();
 
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
@@ -160,15 +175,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, waitingPressure) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
+                bool nextInQueue = true;
                 if (waitingPressure < MAX_WAITING_PRESSURE) waitingPressure += 1;
-                if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                else nextInQueue = false;
 
-                bool didReset = mre.Reset();
-                if (lockIndicator != NO_LOCK)
+                if (!nextInQueue)
                 {
-                    await mre.WaitAsync();
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK) await mre.WaitAsync();
+                    else if (didReset) mre.Set();
+                    if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
                 }
-                else if(didReset) mre.Set();
 
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
@@ -191,18 +209,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     writingReentranceCounter++;
                     return new AcquiredLock(this, true);
                 }
-            }
+            }            
             while (WriterMustWait(currentLockIndicator, waitingPressure) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
+                bool nextInQueue = true;
                 if (waitingPressure < MAX_WAITING_PRESSURE) waitingPressure += 1;
-                if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                else nextInQueue = false;
 
-                bool didReset = mre.Reset();
-                if (lockIndicator != NO_LOCK)
+                if (!nextInQueue)
                 {
-                    mre.Wait();
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK) mre.Wait();
+                    else if (didReset) mre.Set();
+                    if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
                 }
-                else if (didReset) mre.Set();
 
                 currentLockIndicator = lockIndicator;
             }
@@ -231,15 +252,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var currentLockIndicator = lockIndicator;
             while (WriterMustWait(currentLockIndicator, waitingPressure) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
+                bool nextInQueue = true;
                 if (waitingPressure < MAX_WAITING_PRESSURE) waitingPressure += 1;
-                if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                else nextInQueue = false;
 
-                bool didReset = mre.Reset();
-                if (lockIndicator != NO_LOCK)
+                if (!nextInQueue)
                 {
-                    await mre.WaitAsync();
+                    bool didReset = mre.Reset();
+                    if (lockIndicator != NO_LOCK) await mre.WaitAsync();
+                    else if (didReset) mre.Set();
+                    if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
                 }
-                else if (didReset) mre.Set();
 
                 currentLockIndicator = lockIndicator;
             }

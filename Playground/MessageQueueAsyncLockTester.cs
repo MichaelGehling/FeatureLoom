@@ -11,8 +11,8 @@ namespace Playground
     class MessageQueueAsyncLockTester<T>
     {
         T lockObject;
-        Func<T, Action, Task> readLockFrame;
-        Func<T, Action, Task> writeLockFrame;
+        Func<T, Action, int, Task> readLockFrame;
+        Func<T, Action, int, Task> writeLockFrame;
         int numReader;
         int numWriter;
         TimeSpan duration;
@@ -25,7 +25,7 @@ namespace Playground
         long writeCounter = 0;
         long readCounter = 0;
 
-        public MessageQueueAsyncLockTester(string name, T lockObject, int numReader, int numWriter, TimeSpan duration, TimeSpan readerSlackTime, TimeSpan writerSlackTime, TimeSpan executionTime, Func<T, Action, Task> readLockFrame, Func<T, Action, Task> writeLockFrame)
+        public MessageQueueAsyncLockTester(string name, T lockObject, int numReader, int numWriter, TimeSpan duration, TimeSpan readerSlackTime, TimeSpan writerSlackTime, TimeSpan executionTime, Func<T, Action, int, Task> readLockFrame, Func<T, Action, int, Task> writeLockFrame)
         {
             this.name = name;
             this.lockObject = lockObject;
@@ -57,7 +57,7 @@ namespace Playground
                     await Task.Yield();
                     while(!timeFrame.Elapsed)
                     {
-                        await writeLockFrame(lockObject, WriteToQueue);
+                        await writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         await Task.Yield();
                         TimeFrame slackTime = new TimeFrame(writerSlack);
                         while(!slackTime.Elapsed) await Task.Yield();
@@ -74,7 +74,7 @@ namespace Playground
                     await Task.Yield();
                     while(!timeFrame.Elapsed)
                     {
-                        await readLockFrame(lockObject, ReadFromQueue);
+                        await readLockFrame(lockObject, ReadFromQueue, queue.Count);
                         await Task.Yield();
                         TimeFrame slackTime = new TimeFrame(readerSlack);
                         while(!slackTime.Elapsed) await Task.Yield();

@@ -11,8 +11,8 @@ namespace Playground
     class MessageQueueLockTester<T>
     {
         T lockObject;
-        Action<T, Action> readLockFrame;
-        Action<T, Action> writeLockFrame;
+        Action<T, Action, int> readLockFrame;
+        Action<T, Action, int> writeLockFrame;
         int numReader;
         int numWriter;
         TimeSpan duration;
@@ -25,7 +25,7 @@ namespace Playground
         long writeCounter = 0;
         long readCounter = 0;
 
-        public MessageQueueLockTester(string name, T lockObject, int numReader, int numWriter, TimeSpan duration, TimeSpan readerSlackTime, TimeSpan writerSlackTime, TimeSpan executionTime, Action<T, Action> readLockFrame, Action<T, Action> writeLockFrame)
+        public MessageQueueLockTester(string name, T lockObject, int numReader, int numWriter, TimeSpan duration, TimeSpan readerSlackTime, TimeSpan writerSlackTime, TimeSpan executionTime, Action<T, Action, int> readLockFrame, Action<T, Action, int> writeLockFrame)
         {
             this.name = name;
             this.lockObject = lockObject;
@@ -56,7 +56,7 @@ namespace Playground
                     TimeFrame timeFrame = timeBox;
                     while (!timeFrame.Elapsed)
                     {                            
-                        writeLockFrame(lockObject, WriteToQueue);
+                        writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(writerSlack);
                         while (!slackTime.Elapsed) Thread.Yield();
                     }
@@ -71,7 +71,7 @@ namespace Playground
                     TimeFrame timeFrame = timeBox;
                     while (!timeFrame.Elapsed)
                     {
-                        readLockFrame(lockObject, ReadFromQueue);
+                        readLockFrame(lockObject, ReadFromQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(readerSlack);
                         while (!slackTime.Elapsed) Thread.Yield();
                     }

@@ -166,89 +166,80 @@ namespace Playground
             */
             Thread.Sleep(1000);
                        
-            int numReader = 10;
-            TimeSpan readerSlack = 0.01.Milliseconds();
+            int numReader = 1;
+            TimeSpan readerSlack = 0.00.Milliseconds();
             int numWriter = 10;
             TimeSpan writerSlack = 0.01.Milliseconds();
-            TimeSpan executionTime = 0.01.Milliseconds();
+            TimeSpan executionTime = 0.0.Milliseconds();
             TimeSpan duration = 1.Seconds();
 
             Console.WriteLine("WARMUP");
 
             var classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (obj, action) => { lock (obj) action(); },
-                (obj, action) => { lock (obj) action(); });
+                (obj, action, qc) => { lock (obj) action(); },
+                (obj, action, qc) => { lock (obj) action(); });
             Console.WriteLine(classic.Run());
 
             var sema = new MessageQueueLockTester<SemaphoreSlim>("SemaphoreSlim", new SemaphoreSlim(1, 1), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } },
-                (myLock, action) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } });
+                (myLock, action, qc) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } },
+                (myLock, action, qc) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } });
             Console.WriteLine(sema.Run());
 
-            var rwl = new MessageQueueLockTester<ReaderWriterLockSlim>("RWLockSlim", new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } },
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } });
-            Console.WriteLine(rwl.Run());
-
             var FL = new MessageQueueLockTester<FeatureLock>("FeatureLock", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using (myLock.ForWriting()) action(); },
-                (myLock, action) => { using (myLock.ForWriting()) action(); });
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); },
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); });
             Console.WriteLine(FL.Run());
 
+            var FLPrio = new MessageQueueLockTester<FeatureLock>("FeatureLock Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action, qc) => { using (myLock.ForWriting((0 + (uint)qc).Clamp<uint>(0,100))) action(); },
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); });
+            Console.WriteLine(FLPrio.Run());
+
+
             var asyncEx = new MessageQueueLockTester<AsyncLock>("AsyncEx", new AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using(myLock.Lock()) action(); },
-                (myLock, action) => { using(myLock.Lock()) action(); });
+                (myLock, action, qc) => { using(myLock.Lock()) action(); },
+                (myLock, action, qc) => { using(myLock.Lock()) action(); });
             Console.WriteLine(asyncEx.Run());
 
-            var asyncExRW = new MessageQueueLockTester<AsyncReaderWriterLock>("AsyncEx RW", new AsyncReaderWriterLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using(myLock.WriterLock()) action(); },
-                (myLock, action) => { using(myLock.WriterLock()) action(); });
-            Console.WriteLine(asyncExRW.Run());
-
-
-
-            var rwlRec = new MessageQueueLockTester<ReaderWriterLockSlim>("RWLockSlim RE", new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } },
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } });
-            Console.WriteLine(rwlRec.Run());
-
             var FLre = new MessageQueueLockTester<FeatureLock>("FeatureLock RE", new FeatureLock(true), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using (myLock.ForWriting()) action(); },
-                (myLock, action) => { using (myLock.ForWriting()) action(); });
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); },
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); });
             Console.WriteLine(FLre.Run());
 
 
 
             var semaAsync = new MessageQueueAsyncLockTester<SemaphoreSlim>("SemaphoreSlim Async", new SemaphoreSlim(1, 1), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } },
-                async (myLock, action) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } });
+                async (myLock, action, qc) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } },
+                async (myLock, action, qc) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } });
             Console.WriteLine(semaAsync.Run());
 
             var FLAsync = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action) => { using(await myLock.ForWritingAsync()) action(); },
-                async (myLock, action) => { using(await myLock.ForWritingAsync()) action(); });
+                async (myLock, action, qc) => { using(await myLock.ForWritingAsync()) action(); },
+                async (myLock, action, qc) => { using(await myLock.ForWritingAsync()) action(); });
             Console.WriteLine(FLAsync.Run());
 
+            var FLAsyncPrio = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using (await myLock.ForWritingAsync((0 + (uint)qc).Clamp<uint>(0, 100))) action(); },
+                async (myLock, action, qc) => { using (await myLock.ForWritingAsync()) action(); });
+            Console.WriteLine(FLAsyncPrio.Run());
+
             var asyncExAsync = new MessageQueueAsyncLockTester<AsyncLock>("AsyncEx Async", new AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action) => { using(await myLock.LockAsync()) action(); },
-                async (myLock, action) => { using(await myLock.LockAsync()) action(); });
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); },
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); });
             Console.WriteLine(asyncExAsync.Run());
 
 
             Console.WriteLine("TEST 1");
             Console.WriteLine(classic.Run());
             Console.WriteLine(sema.Run());
-            Console.WriteLine(rwl.Run());
-            Console.WriteLine(FL.Run());                
-            
+            Console.WriteLine(FL.Run());
+            Console.WriteLine(FLPrio.Run());
             Console.WriteLine(asyncEx.Run());
-            Console.WriteLine(asyncExRW.Run());
-
-            Console.WriteLine(rwlRec.Run());
             Console.WriteLine(FLre.Run());
 
             Console.WriteLine(semaAsync.Run());
             Console.WriteLine(FLAsync.Run());
+            Console.WriteLine(FLAsyncPrio.Run());
             Console.WriteLine(asyncExAsync.Run());
 
 
@@ -262,56 +253,54 @@ namespace Playground
 
 
             classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (obj, action) => { lock (obj) action(); },
-                (obj, action) => { lock (obj) action(); });
+                (obj, action, qc) => { lock (obj) action(); },
+                (obj, action, qc) => { lock (obj) action(); });
             Console.WriteLine(classic.Run());
 
             sema = new MessageQueueLockTester<SemaphoreSlim>("SemaphoreSlim", new SemaphoreSlim(1, 1), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } },
-                (myLock, action) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } });
+                (myLock, action, qc) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } },
+                (myLock, action, qc) => { myLock.Wait(); try { action(); } finally { myLock.Release(); } });
             Console.WriteLine(sema.Run());
 
-            rwl = new MessageQueueLockTester<ReaderWriterLockSlim>("RWLockSlim", new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } },
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } });
-            Console.WriteLine(rwl.Run());
-
             FL = new MessageQueueLockTester<FeatureLock>("FeatureLock", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using (myLock.ForWriting()) action(); },
-                (myLock, action) => { using (myLock.ForWriting()) action(); });
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); },
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); });
             Console.WriteLine(FL.Run());
 
+            FLPrio = new MessageQueueLockTester<FeatureLock>("FeatureLock Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action, qc) => { using (myLock.ForWriting((0 + (uint)qc).Clamp<uint>(0, 100))) action(); },
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); });
+            Console.WriteLine(FLPrio.Run());
+
             asyncEx = new MessageQueueLockTester<AsyncLock>("AsyncEx", new AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using(myLock.Lock()) action(); },
-                (myLock, action) => { using(myLock.Lock()) action(); });
+                (myLock, action, qc) => { using(myLock.Lock()) action(); },
+                (myLock, action, qc) => { using(myLock.Lock()) action(); });
             Console.WriteLine(asyncEx.Run());
 
-            asyncExRW = new MessageQueueLockTester<AsyncReaderWriterLock>("AsyncEx RW", new AsyncReaderWriterLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using(myLock.WriterLock()) action(); },
-                (myLock, action) => { using(myLock.WriterLock()) action(); });
-            Console.WriteLine(asyncExRW.Run());
-
-
-            rwlRec = new MessageQueueLockTester<ReaderWriterLockSlim>("RWLockSlim RE", new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } },
-                (myLock, action) => { myLock.EnterWriteLock(); try { action(); } finally { myLock.ExitWriteLock(); } });
-            Console.WriteLine(rwlRec.Run());
-
             FLre = new MessageQueueLockTester<FeatureLock>("FeatureLock RE", new FeatureLock(true), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action) => { using (myLock.ForWriting()) action(); },
-                (myLock, action) => { using (myLock.ForWriting()) action(); });
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); },
+                (myLock, action, qc) => { using (myLock.ForWriting()) action(); });
             Console.WriteLine(FLre.Run());
 
-
             semaAsync = new MessageQueueAsyncLockTester<SemaphoreSlim>("SemaphoreSlim Async", new SemaphoreSlim(1, 1), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } },
-                async (myLock, action) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } });
+                async (myLock, action, qc) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } },
+                async (myLock, action, qc) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } });
             Console.WriteLine(semaAsync.Run());
 
             FLAsync = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action) => { using(await myLock.ForWritingAsync()) action(); },
-                async (myLock, action) => { using(await myLock.ForWritingAsync()) action(); });
+                async (myLock, action, qc) => { using(await myLock.ForWritingAsync()) action(); },
+                async (myLock, action, qc) => { using(await myLock.ForWritingAsync()) action(); });
             Console.WriteLine(FLAsync.Run());
+
+            FLAsyncPrio = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using (await myLock.ForWritingAsync((0 + (uint)qc).Clamp<uint>(0, 100))) action(); },
+                async (myLock, action, qc) => { using (await myLock.ForWritingAsync()) action(); });
+            Console.WriteLine(FLAsyncPrio.Run());
+
+            asyncExAsync = new MessageQueueAsyncLockTester<AsyncLock>("AsyncEx Async", new AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); },
+                async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); });
+            Console.WriteLine(asyncExAsync.Run());
 
 
 
