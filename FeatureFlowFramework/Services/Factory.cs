@@ -59,7 +59,7 @@ namespace FeatureFlowFramework.Services
                 }
             };
 
-            static ServiceContext<ContextData> context;
+            static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
 
             public static void Setup(Func<T> newCreate)
             {
