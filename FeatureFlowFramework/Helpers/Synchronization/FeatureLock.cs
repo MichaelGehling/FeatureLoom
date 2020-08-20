@@ -13,10 +13,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int FIRST_READ_LOCK = 1;
 
         const int NOT_ENTERED = 0;
-        const int WRITE_ENTERED = -1;        
+        const int FIRST_WRITE_ENTERED = -1;
+        const int FIRST_READ_ENTERED = 1;
 
         const uint MAX_WAITING_PRESSURE = 1500;
         const uint START_WAITING_PRESSURE = 50;
+
+        const int FALSE = 0;
+        const int TRUE = 1;
 
         readonly bool supportReentrance;
         /// <summary>
@@ -27,7 +31,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         volatile int lockIndicator = NO_LOCK;        
         volatile uint highestWaitingPressure = 0;
-        volatile int writingReentranceCounter = 0;                
+        volatile int waitingForUpgrade = FALSE;
         AsyncLocal<int> reentranceIndicator;
 
 
@@ -42,6 +46,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (supportReentrance) reentranceIndicator = new AsyncLocal<int>();
             readLockTask = Task.FromResult(new AcquiredLock(this, false));
             writeLockTask = Task.FromResult(new AcquiredLock(this, true));
+        }
+
+        public void ResetReentranceContext()
+        {
+            reentranceIndicator.Value = NOT_ENTERED;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -136,7 +145,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock ForReading(uint waitingPressure = START_WAITING_PRESSURE)
         {
+            int currentReentranceIndicator = NOT_ENTERED;
             var currentLockIndicator = lockIndicator;
+            if (supportReentrance && currentLockIndicator != NO_LOCK)
+            {
+                currentReentranceIndicator = reentranceIndicator.Value;
+                if (currentReentranceIndicator <= FIRST_WRITE_ENTERED)
+                {
+                    // Already a writeLock in place in this flow, so reenter just reenter as a writeLock
+                    reentranceIndicator.Value = currentReentranceIndicator - 1;
+                    return new AcquiredLock(this, true);
+                }
+                else if (currentReentranceIndicator >= FIRST_READ_ENTERED)
+                {
+                    // Already a readlock in place in this flow, so reenter
+                    reentranceIndicator.Value = currentReentranceIndicator + 1;
+                    return new AcquiredLock(this, false);
+                }
+            }
+
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, waitingPressure) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
@@ -157,6 +184,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 newLockIndicator = currentLockIndicator + 1;
             }
             highestWaitingPressure = 0;
+
+            if (supportReentrance)
+            {
+                reentranceIndicator.Value = FIRST_READ_ENTERED;
+            }
 
             return new AcquiredLock(this, false);
         }
@@ -204,12 +236,26 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (supportReentrance && currentLockIndicator != NO_LOCK)
             {
                 currentReentranceIndicator = reentranceIndicator.Value;
-                if (currentReentranceIndicator == WRITE_ENTERED)
+                if (currentReentranceIndicator <= FIRST_WRITE_ENTERED)
                 {
-                    writingReentranceCounter++;
+                    reentranceIndicator.Value = currentReentranceIndicator - 1;
                     return new AcquiredLock(this, true);
                 }
+                else if (currentReentranceIndicator >= FIRST_READ_ENTERED)
+                {
+                    // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
+                    if (TRUE == Interlocked.CompareExchange(ref waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+                    // Waiting for upgrade to writeLock
+                    while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
+                    {
+                        Thread.Yield(); // Could be more optimized, but it's such a rare case...
+                    }
+                    waitingForUpgrade = FALSE;
+                    reentranceIndicator.Value = -currentReentranceIndicator - 1;
+                    return new AcquiredLock(this, true, true); // ...with downgrade flag set!
+                }
             }            
+
             while (WriterMustWait(currentLockIndicator, waitingPressure) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 bool nextInQueue = true;
@@ -231,8 +277,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (supportReentrance)
             {
-                writingReentranceCounter++;
-                reentranceIndicator.Value = WRITE_ENTERED;
+                reentranceIndicator.Value = FIRST_WRITE_ENTERED;
             }
 
             return new AcquiredLock(this, true);
@@ -275,7 +320,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReaderMustWait(int currentLockIndicator, uint waitingPressure)
         {
-            return currentLockIndicator == WRITE_LOCK || waitingPressure < highestWaitingPressure;
+            return currentLockIndicator == WRITE_LOCK || waitingPressure < highestWaitingPressure || (supportReentrance && waitingForUpgrade == TRUE);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -287,6 +332,23 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReadLock()
         {
+            if (supportReentrance)
+            {
+                var currentReentranceIndicator = reentranceIndicator.Value;
+                currentReentranceIndicator--;
+
+                if (currentReentranceIndicator == NOT_ENTERED)
+                {
+                    reentranceIndicator.Value = NOT_ENTERED;
+                    // go on, unlock...
+                }
+                else
+                {
+                    reentranceIndicator.Value = currentReentranceIndicator;
+                    return; // still a writelock in place
+                }
+            }
+
             var newLockIndicator = Interlocked.Decrement(ref lockIndicator);
             if (NO_LOCK == newLockIndicator)
             {
@@ -296,13 +358,28 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ExitWriteLock()
+        private void ExitWriteLock(bool downgrade)
         {
             if (supportReentrance)
             {
-                writingReentranceCounter--;
-                if (writingReentranceCounter == 0) reentranceIndicator.Value = NOT_ENTERED;
-                else return;
+                var currentReentranceIndicator = reentranceIndicator.Value;
+                currentReentranceIndicator++;
+                if (currentReentranceIndicator == NOT_ENTERED)
+                {
+                    reentranceIndicator.Value = NOT_ENTERED;
+                    // go on, unlock...
+                }
+                else if (downgrade)
+                {
+                    reentranceIndicator.Value = -currentReentranceIndicator;
+                    lockIndicator = FIRST_READ_LOCK;
+                    return; // now it's a readlock again
+                }
+                else
+                {
+                    reentranceIndicator.Value = currentReentranceIndicator;
+                    return; // still a writelock in place
+                }
             }
 
             lockIndicator = NO_LOCK;
@@ -312,13 +389,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public struct AcquiredLock : IDisposable
         {
             FeatureLock parentLock;
-            readonly bool isWriteLock;            
+            readonly bool isWriteLock;
+            readonly bool downgrade;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public AcquiredLock(FeatureLock parentLock, bool isWriteLock)
+            public AcquiredLock(FeatureLock parentLock, bool isWriteLock, bool downgrade = false)
             {
                 this.parentLock = parentLock;
                 this.isWriteLock = isWriteLock;
+                this.downgrade = downgrade;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -330,7 +409,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Return()
             {
-                if (isWriteLock) parentLock?.ExitWriteLock();
+                if (isWriteLock) parentLock?.ExitWriteLock(downgrade);
                 else parentLock?.ExitReadLock();
                 parentLock = null;
             }

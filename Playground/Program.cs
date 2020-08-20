@@ -152,20 +152,17 @@ namespace Playground
              Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
  */
 
-            /*
-            FeatureLock myLock = new FeatureLock(0, true);
+            //FeatureLock reLock = new FeatureLock(true);
+            //using (reLock.ForReading())
+            //{
+            //    using (reLock.ForWriting())
+            //    {
+            //    }
+            //}
+            
 
-            using (myLock.ForReading())
-            {
-                using (myLock.ForWriting())
-                {
-                }
-            }
-            
-            
-            */
-            Thread.Sleep(1000);
-                       
+            //Console.ReadKey();
+
             int numReader = 1;
             TimeSpan readerSlack = 0.00.Milliseconds();
             int numWriter = 10;
@@ -325,7 +322,7 @@ namespace Playground
             Console.WriteLine("----");
             PerformanceTest();
             Console.WriteLine("----");
-            PerformanceTestParallel();
+            //PerformanceTestParallel();
 
             Console.ReadKey();
         }
