@@ -32,6 +32,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         volatile int lockIndicator = NO_LOCK;        
         volatile uint highestWaitingPressure = 0;
+        volatile uint secondHighestWaitingPressure = 0;
         volatile int waitingForUpgrade = FALSE;
         AsyncLocal<int> reentranceIndicator;
 
@@ -305,19 +306,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 bool nextInQueue = true;
                 if (waitingPressure < MAX_WAITING_PRESSURE) waitingPressure += 1;
                 if (waitingPressure >= highestWaitingPressure) highestWaitingPressure = waitingPressure;
+                else if (waitingForUpgrade > secondHighestWaitingPressure)
+                {
+                    secondHighestWaitingPressure = waitingPressure;
+                    nextInQueue = false;
+                }
                 else nextInQueue = false;
 
                 if (!nextInQueue)
                 {
                     bool didReset = mre.Reset();
-                    if (lockIndicator != NO_LOCK) mre.Wait();
+                    if (lockIndicator != NO_LOCK) mre.Wait(/*1.Seconds()*/);
                     else if (didReset) mre.Set();
                     if (waitingPressure > highestWaitingPressure) highestWaitingPressure = waitingPressure;
                 }
 
                 currentLockIndicator = lockIndicator;
             }
-            highestWaitingPressure = 0;
+            highestWaitingPressure = secondHighestWaitingPressure;
+            secondHighestWaitingPressure = 0;
             if (reentranceSupported) reentranceIndicator.Value = FIRST_WRITE_ENTERED;
 
             return new AcquiredLock(this, true);

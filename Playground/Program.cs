@@ -159,16 +159,34 @@ namespace Playground
             //    {
             //    }
             //}
-            
+
 
             //Console.ReadKey();
 
+
+
             int numReader = 1;
-            TimeSpan readerSlack = 0.00.Milliseconds();
-            int numWriter = 10;
-            TimeSpan writerSlack = 0.01.Milliseconds();
+            TimeSpan readerSlack = 0.0.Milliseconds();
+            int numWriter = 1;
+            TimeSpan writerSlack = 0.0.Milliseconds();
             TimeSpan executionTime = 0.0.Milliseconds();
-            TimeSpan duration = 1.Seconds();
+            TimeSpan duration = 3.Seconds();
+
+
+            for (int i = 0; i< 100; i++)
+            {
+                var x = new MessageQueueLockTester<FeatureLock>("FeatureLock Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action, qc) => { using(myLock.Lock((0 + (uint)qc).Clamp<uint>(0, 100))) action(); },
+                (myLock, action, qc) => { using(myLock.Lock()) action(); });
+                Console.WriteLine(x.Run());
+
+                var xx = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (obj, action, qc) => { lock(obj) action(); },
+                (obj, action, qc) => { lock(obj) action(); });
+                Console.WriteLine(xx.Run());
+
+            }
+
 
             Console.WriteLine("WARMUP");
 
@@ -226,6 +244,65 @@ namespace Playground
             Console.WriteLine(asyncExAsync.Run());
 
 
+            Console.WriteLine("TEST FastPath");
+
+            duration = 3.Seconds();
+
+            var FP_NoLock = new FastPathLockTester<object>("FP_NoLock", new object(), duration, null,
+                 (myLock) => {  });
+            var offset = FP_NoLock.Run();
+
+            var FP_FL = new FastPathLockTester<FeatureLock>("FP_FeatureLock", new FeatureLock(), duration, offset,
+                 (myLock) => { using(myLock.Lock()) { } });
+            Console.WriteLine(FP_FL.Run());
+
+            var FP_FLRO = new FastPathLockTester<FeatureLock>("FP_FeatureLock Read", new FeatureLock(), duration, offset,
+                 (myLock) => { using(myLock.LockReadOnly()) { } });
+            Console.WriteLine(FP_FLRO.Run());
+
+            var FP_FLRE = new FastPathLockTester<FeatureLock>("FP_FeatureLock RE", new FeatureLock(true), duration, offset,
+                 (myLock) => { using(myLock.Lock()) { } });
+            Console.WriteLine(FP_FLRE.Run());
+
+            var FP_classic= new FastPathLockTester<object>("FP_ClassicLock", new object(), duration, offset,
+                 (myLock) => { lock(myLock) { } });
+            Console.WriteLine(FP_classic.Run());
+
+            var FP_sema = new FastPathLockTester<SemaphoreSlim>("FP_SemaphoreSlim", new SemaphoreSlim(1,1), duration, offset,
+                 (myLock) => { myLock.Wait(); try {  } finally { myLock.Release(); } });
+            Console.WriteLine(FP_sema.Run());
+
+            var FP_asyncEx = new FastPathLockTester<AsyncLock>("FP_AsyncEx", new AsyncLock(), duration, offset,
+                 (myLock) => { using(myLock.Lock()) { } });
+            Console.WriteLine(FP_asyncEx.Run());
+
+
+            var FP_NoLock_Async = new FastPathAsyncLockTester<object>("FP_NoLock", new object(), duration, null,
+                 async (myLock) => { });
+            var offsetAsync = FP_NoLock_Async.Run();
+
+            var FP_FL_Async = new FastPathAsyncLockTester<FeatureLock>("FP_FeatureLock Async", new FeatureLock(), duration, offsetAsync,
+                 async (myLock) => { using(await myLock.LockAsync()) { } });
+            Console.WriteLine(FP_FL_Async.Run());
+
+            var FP_FLRO_Async = new FastPathAsyncLockTester<FeatureLock>("FP_FeatureLock Read Async", new FeatureLock(), duration, offsetAsync,
+                 async (myLock) => { using(await myLock.LockReadOnlyAsync()) { } });
+            Console.WriteLine(FP_FLRO_Async.Run());
+
+            var FP_FLRE_Async = new FastPathAsyncLockTester<FeatureLock>("FP_FeatureLock Async RE", new FeatureLock(true), duration, offsetAsync,
+                 async (myLock) => { using(await myLock.LockAsync()) { } });
+            Console.WriteLine(FP_FLRE_Async.Run());
+
+            var FP_sema_Async = new FastPathAsyncLockTester<SemaphoreSlim>("FP_SemaphoreSlim Async", new SemaphoreSlim(1, 1), duration, offsetAsync,
+                 async (myLock) => { await myLock.WaitAsync(); try { } finally { myLock.Release(); } });
+            Console.WriteLine(FP_sema_Async.Run());
+
+            var FP_asyncEx_Async = new FastPathLockTester<AsyncLock>("FP_AsyncEx Async", new AsyncLock(), duration, offsetAsync,
+                 async (myLock) => { using(await myLock.LockAsync()) { } });
+            Console.WriteLine(FP_asyncEx_Async.Run());
+
+
+
             Console.WriteLine("TEST 1");
             Console.WriteLine(classic.Run());
             Console.WriteLine(sema.Run());
@@ -246,7 +323,7 @@ namespace Playground
             numWriter = 1;
             writerSlack = 0.01.Milliseconds();
             executionTime = 0.01.Milliseconds();
-            duration = 1.Seconds();
+            duration = 3.Seconds();
 
 
             classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,

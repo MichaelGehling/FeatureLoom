@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.Workflows
     {
         public SuspendingAsyncRunner()
         {
-            this.suspensionTime = 1.Milliseconds();
+            this.suspensionTime = 10.Milliseconds();
             this.suspensionIntervall = 100.Milliseconds();
         }
 
@@ -41,7 +41,11 @@ namespace FeatureFlowFramework.Workflows
                         // If also the suspension intervall is elapsed a suspension has to be performed.
                         if(timer.Elapsed > suspensionIntervall)
                         {
-                            await Task.Delay(suspensionTime);
+                            var syncContext = SynchronizationContext.Current;
+                            if(syncContext != null && syncContext.GetType() != typeof(SynchronizationContext))
+                            {
+                                await Task.Delay(suspensionTime);                                
+                            }
                             timer.Restart(); // When suspension was forced, the suspensionTimer can be reset.
                         }
                     }    

@@ -8,6 +8,7 @@ using FeatureFlowFramework.Helpers.Time;
 
 namespace Playground
 {
+
     class MessageQueueLockTester<T>
     {
         T lockObject;
