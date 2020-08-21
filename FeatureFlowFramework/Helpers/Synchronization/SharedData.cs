@@ -49,9 +49,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             updateSender?.Send(new SharedDataUpdateNotification(this, updateOriginatorId));
         }
 
-        public WriteAccess GetWriteAccess(long updateOriginatorId = -1) => new WriteAccess(myLock.ForWriting(), this, updateOriginatorId);
+        public WriteAccess GetWriteAccess(long updateOriginatorId = -1) => new WriteAccess(myLock.Lock(), this, updateOriginatorId);
 
-        public ReadAccess GetReadAccess() => new ReadAccess(myLock.ForReading(), this);
+        public ReadAccess GetReadAccess() => new ReadAccess(myLock.LockReadOnly(), this);
 
         public void WithWriteAccess(Action<WriteAccess> writeAction, long updateOriginatorId = -1)
         {

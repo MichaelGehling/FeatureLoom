@@ -49,7 +49,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
         {
             if(messageBuffer != null)
             {
-                using (myLock.ForReading())
+                using (myLock.LockReadOnly())
                 {
                     var result = messageBuffer.GetAvailableSince(bufferPosition, out _);
                     bufferPosition = messageBuffer.Counter;
@@ -65,7 +65,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
 
         public DateTime[] GetBufferedTimestamps(ref long bufferPosition)
         {
-            using (myLock.ForReading())
+            using (myLock.LockReadOnly())
             {
                 if (timestampBuffer != null)
                 {
@@ -91,7 +91,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
         {
             if(timeSliceCounterBuffer != null)
             {
-                using (myLock.ForReading())
+                using (myLock.LockReadOnly())
                 {
                     var result = timeSliceCounterBuffer.GetAvailableSince(bufferPosition, out _);
                     bufferPosition = timeSliceCounterBuffer.Counter;
@@ -110,7 +110,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
             if(!(message is T1 msgT1)) return;
             if(!(filter?.Invoke(msgT1) ?? true)) return;
             T2 msgT2 = convert == null ? default : convert(msgT1);
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 counter++;
                 messageBuffer?.Add((AppTime.Now, msgT2));

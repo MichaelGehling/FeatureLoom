@@ -24,7 +24,7 @@ namespace FeatureFlowFramework.Services.Serialization
 
         public void AddSerializer(ISerializer serializer, Type type)
         {
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 typeToSerializer.Add(type, serializer);
             }
@@ -33,7 +33,7 @@ namespace FeatureFlowFramework.Services.Serialization
         private ISerializer GetSerializerByType(Type type)
         {
             ISerializer serializer;
-            using(myLock.ForReading())
+            using(myLock.LockReadOnly())
             {
                 if(!typeToSerializer.TryGetValue(type, out serializer))
                 {

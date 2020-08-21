@@ -32,7 +32,7 @@ namespace FeatureFlowFramework.DataFlows
             (bool ready, object msg, bool enumerate) output = default;
             if(message is T validMessage)
             {
-                using(dataLock.ForWriting())
+                using(dataLock.Lock())
                 {
                     alternative = !aggregate(validMessage, aggregationData);
                     output = aggregationData.TryCreateOutputMessage();
@@ -53,7 +53,7 @@ namespace FeatureFlowFramework.DataFlows
             (bool ready, object msg, bool enumerate) output = default;
             if(message is T validMessage)
             {
-                using (dataLock.ForWriting())
+                using (dataLock.Lock())
                 {
                     alternative = !aggregate(validMessage, aggregationData);
                     output = aggregationData.TryCreateOutputMessage();

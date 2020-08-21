@@ -27,7 +27,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
             {
                 Log.LogForwarder.ConnectTo(new ProcessingEndpoint<LogMessage>(msg =>
                 {
-                    using(context.Data.contextLock.ForWriting())
+                    using(context.Data.contextLock.Lock())
                     {
                         if(msg.level == Loglevel.ERROR) context.Data.errors.Add(msg);
                         else if(msg.level == Loglevel.WARNING) context.Data.warnings.Add(msg);
@@ -38,7 +38,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
 
         public static bool HasAnyLogError(bool includeWarnings = true)
         {
-            using(context.Data.contextLock.ForReading())
+            using(context.Data.contextLock.LockReadOnly())
             {
                 if(includeWarnings) return context.Data.errors.Count > 0 || context.Data.warnings.Count > 0;
                 else return context.Data.errors.Count > 0;
@@ -49,7 +49,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
         {
             get
             {
-                using(context.Data.contextLock.ForReading()) return context.Data.errors.ToArray();
+                using(context.Data.contextLock.LockReadOnly()) return context.Data.errors.ToArray();
             }
         }
 
@@ -57,7 +57,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
         {
             get
             {
-                using(context.Data.contextLock.ForReading()) return context.Data.warnings.ToArray();
+                using(context.Data.contextLock.LockReadOnly()) return context.Data.warnings.ToArray();
             }
         }
 

@@ -38,7 +38,7 @@ namespace FeatureFlowFramework.Services.Web
         {
             if(translator.TryTranslate(message, out string json))
             {
-                using(ringBufferLock.ForWriting())
+                using(ringBufferLock.Lock())
                 {
                     ringBuffer.Add(json);
                 }
@@ -70,7 +70,7 @@ namespace FeatureFlowFramework.Services.Web
                 long next = 0;
                 bool onlyLatest = false;
                 string[] messages = Array.Empty<string>();
-                using (ringBufferLock.ForReading())
+                using (ringBufferLock.LockReadOnly())
                 {
                     next = ringBuffer.Counter;
                     if(requestedStart > next || requestedStart < 0)
@@ -85,7 +85,7 @@ namespace FeatureFlowFramework.Services.Web
                 {
                     if(await ringBuffer.WaitHandle.WaitAsync(maxWait.Milliseconds()))
                     {
-                        using (ringBufferLock.ForReading())
+                        using (ringBufferLock.LockReadOnly())
                         {
                             messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
                             next = ringBuffer.Counter;

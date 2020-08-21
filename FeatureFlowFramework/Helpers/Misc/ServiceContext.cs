@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.Helpers.Misc
         {
             if(NoContextSeperationPolicy) return;
 
-            using(contextsLock.ForWriting())
+            using(contextsLock.Lock())
             {
                 foreach(var context in contexts)
                 {
@@ -43,7 +43,7 @@ namespace FeatureFlowFramework.Helpers.Misc
         {
             if(NoContextSeperationPolicy) return;
 
-            using(contextsLock.ForWriting())
+            using(contextsLock.Lock())
             {
                 foreach(var context in contexts)
                 {
@@ -54,7 +54,7 @@ namespace FeatureFlowFramework.Helpers.Misc
 
         protected static void Register(ServiceContext context)
         {
-            using(contextsLock.ForWriting())
+            using(contextsLock.Lock())
             {
                 contexts.Add(context);
             }

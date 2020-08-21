@@ -70,7 +70,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private void Enqueue(T message)
         {
-            using(queueLock.ForWriting())
+            using(queueLock.Lock())
             {
                 queue.Enqueue(message);
                 EnsureMaxSize();                                
@@ -95,7 +95,7 @@ namespace FeatureFlowFramework.DataFlows
             bool success = false;
 
             if(IsEmpty) return false;
-            using (queueLock.ForWriting())
+            using (queueLock.Lock())
             {
                 success = queue.TryDequeue(out message);                
             }
@@ -111,7 +111,7 @@ namespace FeatureFlowFramework.DataFlows
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
             if(IsEmpty) return (false, default);
-            using (await queueLock.ForWritingAsync())
+            using (await queueLock.LockAsync())
             {
                 success = queue.TryDequeue(out message);
             }
@@ -129,7 +129,7 @@ namespace FeatureFlowFramework.DataFlows
 
             T[] messages;
 
-            using (queueLock.ForWriting())
+            using (queueLock.Lock())
             {
                 messages = queue.ToArray();
                 queue.Clear();
@@ -142,7 +142,7 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
-            using (queueLock.ForReading())
+            using (queueLock.LockReadOnly())
             {
                 if(IsEmpty) return false;
                 nextItem = queue.Peek();
@@ -159,7 +159,7 @@ namespace FeatureFlowFramework.DataFlows
 
             T[] messages;
 
-            using (queueLock.ForReading())
+            using (queueLock.LockReadOnly())
             {
                 messages = queue.ToArray();
             }
@@ -168,7 +168,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Clear()
         {
-            using (queueLock.ForWriting())
+            using (queueLock.Lock())
             {
                 queue.Clear();
             }

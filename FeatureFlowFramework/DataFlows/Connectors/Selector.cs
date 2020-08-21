@@ -81,7 +81,7 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSource InsertOptionAt(Func<T, bool> predicate, int index)
         {
             (Func<T, bool> predicate, DataFlowSourceHelper sender) newOption = (predicate, new DataFlowSourceHelper());
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 var newOptions = new List<(Func<T, bool> predicate, DataFlowSourceHelper sender)>();
                 if(options != null) newOptions.AddRange(options);
@@ -114,7 +114,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public bool RemoveOptionAt(int index)
         {
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 if(options.Count == 1 && index == 0)
                 {
@@ -135,7 +135,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void ClearOptions()
         {
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 options = null;
             }

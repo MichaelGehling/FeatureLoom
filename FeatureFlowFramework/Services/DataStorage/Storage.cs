@@ -48,11 +48,11 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static void RemoveAllReaderAndWriter()
         {
             var contextData = context.Data;
-            using(contextData.categoryToReaderLock.ForWriting())
+            using(contextData.categoryToReaderLock.Lock())
             {
                 contextData.categoryToReader.Clear();
             }
-            using(contextData.categoryToWriterLock.ForWriting())
+            using(contextData.categoryToWriterLock.Lock())
             {
                 contextData.categoryToWriter.Clear();
             }
@@ -61,7 +61,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static IStorageReader GetReader(string category)
         {
             var contextData = context.Data;
-            using(contextData.categoryToReaderLock.ForWriting())
+            using(contextData.categoryToReaderLock.Lock())
             {
                 if(contextData.categoryToReader.TryGetValue(category, out IStorageReader reader)) return reader;
                 else
@@ -79,7 +79,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static IStorageWriter GetWriter(string category)
         {
             var contextData = context.Data;
-            using (contextData.categoryToWriterLock.ForWriting())
+            using (contextData.categoryToWriterLock.Lock())
             {
                 if(contextData.categoryToWriter.TryGetValue(category, out IStorageWriter writer)) return writer;
                 else
@@ -97,7 +97,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static void RegisterReader(IStorageReader reader)
         {
             var contextData = context.Data;
-            using (contextData.categoryToReaderLock.ForWriting())
+            using (contextData.categoryToReaderLock.Lock())
             {
                 contextData.categoryToReader[reader.Category] = reader;
             }
@@ -106,7 +106,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static void RegisterWriter(IStorageWriter writer)
         {
             var contextData = context.Data;
-            using (contextData.categoryToWriterLock.ForWriting())
+            using (contextData.categoryToWriterLock.Lock())
             {
                 contextData.categoryToWriter[writer.Category] = writer;
             }
@@ -121,7 +121,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static bool HasCategoryReader(string category, bool acceptReaderWriter = true)
         {
             var contextData = context.Data;
-            using (contextData.categoryToReaderLock.ForReading())
+            using (contextData.categoryToReaderLock.LockReadOnly())
             {
                 if(contextData.categoryToReader.ContainsKey(category)) return true;
                 else if(acceptReaderWriter && HasCategoryWriter(category, false) && GetWriter(category) is IStorageReader) return true;
@@ -132,7 +132,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static bool HasCategoryWriter(string category, bool acceptReaderWriter = true)
         {
             var contextData = context.Data;
-            using (contextData.categoryToWriterLock.ForReading())
+            using (contextData.categoryToWriterLock.LockReadOnly())
             {
                 if(contextData.categoryToWriter.ContainsKey(category)) return true;
                 else if(acceptReaderWriter && HasCategoryReader(category, false) && GetReader(category) is IStorageWriter) return true;

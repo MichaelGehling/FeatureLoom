@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.Workflows
 
         public static void Register(IWorkflowRunner runner)
         {
-            using(context.Data.runnersLock.ForWriting())
+            using(context.Data.runnersLock.Lock())
             {
                 context.Data.runners.Add(runner);
                 if(context.Data.executionInfoForwarder != null) runner.ExecutionInfoSource.ConnectTo(context.Data.executionInfoForwarder);
@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.Workflows
 
         public static void Unregister(IWorkflowRunner runner)
         {
-            using(context.Data.runnersLock.ForWriting())
+            using(context.Data.runnersLock.Lock())
             {
                 context.Data.runners.Remove(runner);
                 if(context.Data.executionInfoForwarder != null) runner.ExecutionInfoSource.DisconnectFrom(context.Data.executionInfoForwarder);
@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.Workflows
 
         public static IWorkflowRunner[] GetAllRunners()
         {
-            using(context.Data.runnersLock.ForReading())
+            using(context.Data.runnersLock.LockReadOnly())
             {
                 return context.Data.runners.ToArray();
             }
@@ -90,7 +90,7 @@ namespace FeatureFlowFramework.Workflows
             public Forwarder executionInfoForwarder = null;
             public IServiceContextData Copy()
             {
-                using(runnersLock.ForReading())
+                using(runnersLock.LockReadOnly())
                 {
                     return new ContextData()
                     {

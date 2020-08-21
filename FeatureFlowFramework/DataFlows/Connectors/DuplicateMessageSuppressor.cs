@@ -33,7 +33,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void AddSuppressor<M>(M suppressorMessage)
         {
-            using (suppressorsLock.ForWriting())
+            using (suppressorsLock.Lock())
             {
                 DateTime now = AppTime.Now;
                 suppressors.Enqueue((suppressorMessage, now + suppressionTime));
@@ -42,7 +42,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private bool IsSuppressed<M>(M message)
         {
-            using (suppressorsLock.ForWriting())
+            using (suppressorsLock.Lock())
             {
                 DateTime now = AppTime.Now;
                 CleanUpSuppressors(now);

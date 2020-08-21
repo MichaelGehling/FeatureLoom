@@ -15,14 +15,14 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         public int Counter
         {
-            get { using (myLock.ForReading()) return counter; }
+            get { using (myLock.LockReadOnly()) return counter; }
         }
 
         public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
 
         public Task<int> WaitForAsync(int numMessages)
         {
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 var currentCounter = counter;
                 TaskCompletionSource<int> waitingTaskSource = new TaskCompletionSource<int>();
@@ -49,7 +49,7 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         private void Count()
         {
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 counter++;
                 for(int i = waitings.Count - 1; i >= 0; i--)

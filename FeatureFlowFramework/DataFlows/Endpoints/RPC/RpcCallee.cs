@@ -14,7 +14,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         private void AddRpcRequestHandler(IRpcRequestHandler handler)
         {
-            using(requestHandlersLock.ForWriting())
+            using(requestHandlersLock.Lock())
             {
                 var newRequestHandlers = new List<IRpcRequestHandler>(requestHandlers);
                 handler.SetTarget(this.sourceHelper);

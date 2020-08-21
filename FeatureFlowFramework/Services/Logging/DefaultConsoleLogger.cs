@@ -34,7 +34,7 @@ namespace FeatureFlowFramework.Services.Logging
                 if(logMessage.level <= config.logFileLoglevel)
                 {
                     string strMsg;
-                    using(stringBuilderLock.ForWriting())
+                    using(stringBuilderLock.Lock())
                     {
                         strMsg = logMessage.PrintToStringBuilder(stringBuilder).ToString();
                         stringBuilder.Clear();

@@ -73,7 +73,7 @@ namespace FeatureFlowFramework.DataFlows
 
         private void Enqueue(T message)
         {
-            using(queueLock.ForWriting())
+            using(queueLock.Lock())
             {
                 queue.Enqueue(message);
                 EnsureMaxSize();                
@@ -92,11 +92,13 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
+        uint ReadingPriority => (FeatureLock.START_WAITING_PRESSURE + (uint)queue.Count).Clamp(FeatureLock.MIN_WAITING_PRESSURE, FeatureLock.MAX_WAITING_PRESSURE);
+
         public bool TryReceive(out T message)
         {
             message = default;
             bool success = false;
-            using (queueLock.ForWriting())
+            using (queueLock.Lock(ReadingPriority))
             {
                 success = queue.TryDequeue(out message);                
             }
@@ -112,7 +114,7 @@ namespace FeatureFlowFramework.DataFlows
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
             if(IsEmpty) return (false, default);
-            using (await queueLock.ForWritingAsync())
+            using (await queueLock.LockAsync(ReadingPriority))
             {
                 success = queue.TryDequeue(out message);                
             }
@@ -130,7 +132,7 @@ namespace FeatureFlowFramework.DataFlows
 
             T[] messages;
 
-            using (queueLock.ForWriting())
+            using (queueLock.Lock(ReadingPriority))
             {
                 messages = queue.ToArray();
                 queue.Clear();                
@@ -143,7 +145,7 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
-            using (queueLock.ForReading())
+            using (queueLock.Lock())
             {
                 if(IsEmpty) return false;
                 nextItem = queue.Peek();
@@ -160,7 +162,7 @@ namespace FeatureFlowFramework.DataFlows
 
             T[] messages;
 
-            using (queueLock.ForReading())
+            using (queueLock.Lock(ReadingPriority))
             {
                 messages = queue.ToArray();
             }
@@ -169,7 +171,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Clear()
         {
-            using (queueLock.ForWriting())
+            using (queueLock.Lock(FeatureLock.MAX_WAITING_PRESSURE))
             {
                 queue.Clear();
             }

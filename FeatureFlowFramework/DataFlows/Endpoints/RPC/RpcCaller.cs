@@ -27,7 +27,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CheckForTimeouts(object state)
         {
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 for (int i = 0; i < responseHandlers.Count; i++)
                 {
@@ -44,7 +44,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
@@ -55,7 +55,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
@@ -67,7 +67,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
@@ -80,7 +80,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, bool>(requestId, method, parameterTuple);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
@@ -93,7 +93,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
             TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
@@ -106,7 +106,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, bool>(requestId, method, true);
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
@@ -150,7 +150,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
             else if(message is IRpcResponse)
             {
-                using (responseHandlersLock.ForWriting())
+                using (responseHandlersLock.Lock())
                 {
                     for(int i = 0; i < responseHandlers.Count; i++)
                     {

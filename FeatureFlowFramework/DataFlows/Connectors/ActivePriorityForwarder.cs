@@ -84,7 +84,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
             {
-                using (receiverLock.ForWriting()) { numThreads++; }
+                using (receiverLock.Lock()) { numThreads++; }
                 new Task(Run).Start();
             }
         }
@@ -102,7 +102,7 @@ namespace FeatureFlowFramework.DataFlows
                     Log.ERROR(this.GetHandle(), "Exception caught in ActivePriorityForwarder while sending.", e.ToString());
                 }
             }
-            using (receiverLock.ForWriting()) { numThreads--; }
+            using (receiverLock.Lock()) { numThreads--; }
         }
     }
 }

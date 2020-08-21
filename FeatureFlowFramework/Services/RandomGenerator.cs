@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.Services
 
         public static int Int32()
         {
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 return rnd.Next();
             }
@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.Services
 
         public static int Int32(int min, int max)
         {
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 return rnd.Next(min, max);
             }
@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.Services
 
         public static long Int64()
         {
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 return (long)(rnd.NextDouble() * long.MaxValue);
             }
@@ -34,7 +34,7 @@ namespace FeatureFlowFramework.Services
 
         public static double Double()
         {
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 return rnd.NextDouble();
             }

@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         public bool Exists(string uri)
         {
-            using(dataSetLock.ForReading())
+            using(dataSetLock.LockReadOnly())
             {
                 return dataSet.ContainsKey(uri);
             }
@@ -50,7 +50,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         {
             UpdateEvent updateEvent = UpdateEvent.Created; 
             bool success;
-            using(await dataSetLock.ForWritingAsync())
+            using(await dataSetLock.LockAsync())
             {
                 if(TrySerialize(data, out byte[] newData))
                 {
@@ -80,7 +80,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             try
             {
                 var newData = await sourceStream.ReadToByteArrayAsync(config.bufferSize);
-                using(await dataSetLock.ForWritingAsync())
+                using(await dataSetLock.LockAsync())
                 {
                     if(!dataSet.TryGetValue(uri, out byte[] data))
                     {
@@ -109,7 +109,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public async Task<bool> TryDeleteAsync(string uri)
         {
             bool removed;
-            using(await dataSetLock.ForWritingAsync())
+            using(await dataSetLock.LockAsync())
             {
                 removed = dataSet.Remove(uri);                
             }
@@ -119,7 +119,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         public async Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null)
         {
-            using(await dataSetLock.ForReadingAsync())
+            using(await dataSetLock.LockReadOnlyAsync())
             {
                 if (!pattern.EmptyOrNull())
                 {
@@ -132,7 +132,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         public async Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
         {
-            using(await dataSetLock.ForReadingAsync())
+            using(await dataSetLock.LockReadOnlyAsync())
             {
                 if(dataSet.TryGetValue(uri, out byte[] serializedData) &&
                    TryDeserialize(serializedData, out T data))
@@ -145,7 +145,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         public async Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer)
         {
-            using(await dataSetLock.ForReadingAsync())
+            using(await dataSetLock.LockReadOnlyAsync())
             {
                 if(dataSet.TryGetValue(uri, out byte[] serializedData))
                 {
@@ -166,7 +166,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         {
             bool success;
             UpdateEvent updateEvent = UpdateEvent.Created;
-            using(await dataSetLock.ForWritingAsync())
+            using(await dataSetLock.LockAsync())
             {
                 if(TrySerialize(data, out byte[] serializedData))
                 {
@@ -196,7 +196,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             try
             {
                 var data = await sourceStream.ReadToByteArrayAsync(config.bufferSize);
-                using(await dataSetLock.ForWritingAsync())
+                using(await dataSetLock.LockAsync())
                 {
                     if(dataSet.TryAdd(uri, data))
                     {

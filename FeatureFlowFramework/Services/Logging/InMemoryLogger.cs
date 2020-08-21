@@ -21,7 +21,7 @@ namespace FeatureFlowFramework.Services.Logging
 
         public void Post<M>(in M message)
         {
-            using(bufferLock.ForWriting())
+            using(bufferLock.Lock())
             {
                 if(message is LogMessage logMessage) buffer.Add(logMessage);
             }
@@ -29,7 +29,7 @@ namespace FeatureFlowFramework.Services.Logging
 
         public async Task PostAsync<M>(M message)
         {
-            using(await bufferLock.ForWritingAsync())
+            using(await bufferLock.LockAsync())
             {
                 if(message is LogMessage logMessage) buffer.Add(logMessage);
             }
@@ -37,7 +37,7 @@ namespace FeatureFlowFramework.Services.Logging
 
         public LogMessage[] GetAllLogMessages()
         {
-            using(bufferLock.ForReading())
+            using(bufferLock.LockReadOnly())
             {
                 return buffer.GetAvailableSince(0, out _);
             }

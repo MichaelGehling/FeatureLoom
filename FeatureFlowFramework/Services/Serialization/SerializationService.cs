@@ -34,7 +34,7 @@ namespace FeatureFlowFramework.Services.Serialization
 
             public IServiceContextData Copy()
             {
-                using (serializersLock.ForReading())
+                using (serializersLock.LockReadOnly())
                 {
                     var newContext = new ContextData(serializers);
                     newContext.defaultSerializer = defaultSerializer;
@@ -46,7 +46,7 @@ namespace FeatureFlowFramework.Services.Serialization
 
         public static void AddSerializer(ISerializer serializer, string id, bool setAsDefault = false, bool failIfIdExists = true)
         {
-            using (context.Data.serializersLock.ForWriting())
+            using (context.Data.serializersLock.Lock())
             {
                 if (failIfIdExists && context.Data.serializers.ContainsKey(id)) throw new Exception($"Serializer with Id {id} already exists!");
 
@@ -60,7 +60,7 @@ namespace FeatureFlowFramework.Services.Serialization
 
         public static bool TryGetSerializerById(string id, out ISerializer serializer)
         {
-            using (context.Data.serializersLock.ForReading())
+            using (context.Data.serializersLock.LockReadOnly())
             {
                 return context.Data.serializers.TryGetValue(id, out serializer);
             }

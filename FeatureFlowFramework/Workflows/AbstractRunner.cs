@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                using(runningWorkflowsLock.ForReading())
+                using(runningWorkflowsLock.LockReadOnly())
                 {
                     return runningWorkflows.ToArray();
                 }
@@ -59,7 +59,7 @@ namespace FeatureFlowFramework.Workflows
 
         protected void RemoveFromRunningWorkflows(Workflow workflow)
         {
-            using(runningWorkflowsLock.ForWriting())
+            using(runningWorkflowsLock.Lock())
             {
                 runningWorkflows.Remove(workflow);
                 if(executionInfoForwarder != null) workflow.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
@@ -69,7 +69,7 @@ namespace FeatureFlowFramework.Workflows
         protected void AddToRunningWorkflows(Workflow workflow)
         {
             workflow.Runner = this;
-            using(runningWorkflowsLock.ForWriting())
+            using(runningWorkflowsLock.Lock())
             {
                 runningWorkflows.Add(workflow);
                 if(executionInfoForwarder != null) workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);

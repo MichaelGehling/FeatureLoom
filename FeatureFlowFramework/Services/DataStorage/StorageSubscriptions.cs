@@ -17,13 +17,13 @@ namespace FeatureFlowFramework.Services.DataStorage
         {
             get
             {
-                using(subscriptionsLock.ForReading()) return subscriptions.Count;
+                using(subscriptionsLock.LockReadOnly()) return subscriptions.Count;
             }
         }
 
         public void Add(string uriPattern, IDataFlowSink notificationSink)
         {
-            using(subscriptionsLock.ForWriting())
+            using(subscriptionsLock.Lock())
             {
                 if(!subscriptions.TryGetValue(uriPattern, out Subscription subscription))
                 {                    
@@ -38,7 +38,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         {
             bool notified = false;
             List<Subscription> toBeRemoved = null;
-            using(subscriptionsLock.ForReading())
+            using(subscriptionsLock.LockReadOnly())
             {
                 foreach(var subscription in subscriptions.Values)
                 {
@@ -61,7 +61,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
             if(toBeRemoved != null)
             {
-                using(subscriptionsLock.ForWriting())
+                using(subscriptionsLock.Lock())
                 {
                     foreach(var subscription in toBeRemoved)
                     {                    
@@ -75,7 +75,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         public void Remove(string uriPattern, IDataFlowSink notificationSink)
         {
-            using(subscriptionsLock.ForWriting())
+            using(subscriptionsLock.Lock())
             {
                 if(subscriptions.TryGetValue(uriPattern, out Subscription subscription))
                 {

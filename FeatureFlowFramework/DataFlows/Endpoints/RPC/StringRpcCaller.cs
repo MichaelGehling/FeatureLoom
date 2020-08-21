@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CheckForTimeouts(object state)
         {
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 for(int i = 0; i < responseHandlers.Count; i++)
                 {
@@ -47,7 +47,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
             }
@@ -58,7 +58,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
             }
@@ -70,7 +70,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
             TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
-            using (responseHandlersLock.ForWriting())
+            using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler(requestId, tcs, timeout));
             }
@@ -154,7 +154,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
             else if(message is IRpcResponse)
             {
-                using (responseHandlersLock.ForWriting())
+                using (responseHandlersLock.Lock())
                 {
                     for(int i = 0; i < responseHandlers.Count; i++)
                     {

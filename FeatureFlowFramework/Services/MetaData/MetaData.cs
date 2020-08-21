@@ -49,7 +49,7 @@ namespace FeatureFlowFramework.Services.MetaData
 
         ~MetaData()
         {
-            using(handlesLock.ForWriting())
+            using(handlesLock.Lock())
             {
                 updateSender?.Send(new ObjectHandleInfo(handle, true));
 
@@ -59,7 +59,7 @@ namespace FeatureFlowFramework.Services.MetaData
 
         public static bool TryGetObjectType(ObjectHandle handle, out Type type)
         {
-            using (handlesLock.ForReading())
+            using (handlesLock.LockReadOnly())
             {
                 type = default;
                 return handles.TryGetValue(handle.id, out MetaData metaData) && metaData.TryGetObjectType(out type);
@@ -68,7 +68,7 @@ namespace FeatureFlowFramework.Services.MetaData
 
         public static bool Exists(ObjectHandle handle)
         {
-            using (handlesLock.ForReading())
+            using (handlesLock.LockReadOnly())
             {
                 return handles.ContainsKey(handle.id);
             }
@@ -123,7 +123,7 @@ namespace FeatureFlowFramework.Services.MetaData
             {
                 metaData = new MetaData(obj);
                 objects.Add(obj, metaData);
-                using(handlesLock.ForWriting()) handles[metaData.handle.id] = metaData;
+                using(handlesLock.Lock()) handles[metaData.handle.id] = metaData;
 
                 updateSender?.Send(new ObjectHandleInfo(metaData.handle, false));
 
@@ -138,7 +138,7 @@ namespace FeatureFlowFramework.Services.MetaData
 
         public static bool TryGetObject<T>(ObjectHandle handle, out T obj) where T:class
         {
-            using(handlesLock.ForReading())
+            using(handlesLock.LockReadOnly())
             {
                 if(handles.TryGetValue(handle.id, out MetaData metaData) &&
                    metaData.objRef.TryGetTarget(out object untyped) &&
@@ -158,7 +158,7 @@ namespace FeatureFlowFramework.Services.MetaData
         public static void SetMetaData<D>(object obj, string key, D data)
         {
             var metaData = GetOrCreate(obj);
-            using(metaData.objLock.ForWriting()) metaData.data.Obj[key] = data;
+            using(metaData.objLock.Lock()) metaData.data.Obj[key] = data;
 
             metaData.metaDataUpdateSender?.Send(new MetaDataUpdateInfo(metaData.handle, key));
         }
@@ -167,7 +167,7 @@ namespace FeatureFlowFramework.Services.MetaData
         {
             data = default;
             if(!objects.TryGetValue(obj, out MetaData metaData)) return false;
-            using(metaData.objLock.ForReading())
+            using(metaData.objLock.LockReadOnly())
             {
                 if(metaData.data.IsInstantiated &&
                     metaData.data.Obj.TryGetValue(key, out object untypedData) &&

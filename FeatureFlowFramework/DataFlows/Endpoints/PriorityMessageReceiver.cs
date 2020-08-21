@@ -34,7 +34,7 @@ namespace FeatureFlowFramework.DataFlows
             {
                 if (!readerWakeEvent.IsSet || this.priorityComparer.Compare(receivedMessage, typedMessage) <= 0)
                 {
-                    using (myLock.ForWriting())
+                    using (myLock.Lock())
                     {
                         receivedMessage = typedMessage;
                     }
@@ -50,7 +50,7 @@ namespace FeatureFlowFramework.DataFlows
             {
                 if (!readerWakeEvent.IsSet || this.priorityComparer.Compare(receivedMessage, typedMessage) <= 0)
                 {
-                    using (await myLock.ForWritingAsync())
+                    using (await myLock.LockAsync())
                     {
                         receivedMessage = typedMessage;
                     }
@@ -63,7 +63,7 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryReceive(out T message)
         {
             message = default;
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 if (IsEmpty) return false;
                 message = receivedMessage;
@@ -77,7 +77,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             T message = default;
             if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 if (IsEmpty) return new AsyncOut<bool, T>(false, message);
                 message = receivedMessage;
@@ -89,7 +89,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public T[] ReceiveAll()
         {
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 if (IsEmpty) return Array.Empty<T>();
                 T message = receivedMessage;
@@ -102,7 +102,7 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
-            using (myLock.ForReading())
+            using (myLock.LockReadOnly())
             {
                 if (IsEmpty) return false;
                 nextItem = receivedMessage;
@@ -112,7 +112,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public T[] PeekAll()
         {
-            using (myLock.ForReading())
+            using (myLock.LockReadOnly())
             {
                 if (IsEmpty) return Array.Empty<T>();
                 T message = receivedMessage;
@@ -122,7 +122,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Clear()
         {
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 readerWakeEvent.Reset();
                 receivedMessage = default;
@@ -131,7 +131,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public object[] GetQueuedMesssages()
         {
-            using (myLock.ForReading())
+            using (myLock.LockReadOnly())
             {
                 if (IsEmpty) return Array.Empty<object>();
                 T message = receivedMessage;

@@ -179,7 +179,7 @@ namespace FeatureFlowFramework.DataFlows
         private void RemoveInvalidReferences(int invalidReferences)
         {
             if(sinks == null) return;
-            using(myLock.ForWriting())
+            using(myLock.Lock())
             {
                 List<DataFlowReference> validSinks = new List<DataFlowReference>(sinks.Count - invalidReferences);
                 for(int i = sinks.Count - 1; i >= 0; i--)
@@ -197,7 +197,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(sinks == null)
             {
-                using (myLock.ForWriting())
+                using (myLock.Lock())
                 {
                     List<DataFlowReference> newSinks = new List<DataFlowReference>(1);
                     newSinks.Add(new DataFlowReference(sink, weakReference));
@@ -207,7 +207,7 @@ namespace FeatureFlowFramework.DataFlows
             }
             else
             {
-                using (myLock.ForWriting())
+                using (myLock.Lock())
                 {
                     List<DataFlowReference> newSinks = new List<DataFlowReference>(sinks.Count + 1);
                     newSinks.AddRange(sinks);
@@ -233,7 +233,7 @@ namespace FeatureFlowFramework.DataFlows
             }
 
             if(sinks == null || sinks.Count == 0) return;
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 sinks = null;
             }
@@ -243,7 +243,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             onDisconnection?.Invoke(sink);
             if(sinks == null) return;
-            using (myLock.ForWriting())
+            using (myLock.Lock())
             {
                 if(sinks.Count == 1)
                 {
