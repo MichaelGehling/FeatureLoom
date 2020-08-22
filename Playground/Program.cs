@@ -158,12 +158,12 @@ namespace Playground
 
 
 
-            int numReader = 2;
-            TimeSpan readerSlack = 0.0.Milliseconds();
-            int numWriter = 2;
-            TimeSpan writerSlack = 0.0.Milliseconds();
-            TimeSpan executionTime = 0.01.Milliseconds();
-            TimeSpan duration = 1.0.Seconds();
+            int numReader = 1;
+            TimeSpan readerSlack = 0.00.Milliseconds();
+            int numWriter = 7;
+            TimeSpan writerSlack = 0.01.Milliseconds();
+            TimeSpan executionTime = 0.1.Milliseconds();
+            TimeSpan duration = 10.0.Seconds();
 
             for (int i = 0; i< 0; i++)
             {
@@ -196,7 +196,7 @@ namespace Playground
             Console.WriteLine(FL.Run());
 
             var FLPrio = new MessageQueueLockTester<FeatureLock>("FeatureLock Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action, qc) => { using (myLock.Lock((FeatureLock.START_WAITING_PRESSURE - 50 + qc.Clamp(0,10000)))) action(); },
+                (myLock, action, qc) => { using (myLock.Lock((FeatureLock.DEFAULT_PRIORITY - 20 + qc.Clamp(0,10000)))) action(); },
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
             Console.WriteLine(FLPrio.Run());
 
@@ -224,7 +224,7 @@ namespace Playground
             Console.WriteLine(FLAsync.Run());
 
             var FLAsyncPrio = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action, qc) => { using (await myLock.LockAsync((FeatureLock.START_WAITING_PRESSURE - 50 + qc.Clamp(0, 10000)))) action(); },
+                async (myLock, action, qc) => { using (await myLock.LockAsync((FeatureLock.DEFAULT_PRIORITY - 20 + qc.Clamp(0, 10000)))) action(); },
                 async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); });
             Console.WriteLine(FLAsyncPrio.Run());
 
@@ -313,7 +313,7 @@ namespace Playground
             numWriter = 1;
             writerSlack = 0.01.Milliseconds();
             executionTime = 0.01.Milliseconds();
-            duration = 1.Seconds();
+            duration = 10.Seconds();
 
 
             classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
@@ -332,7 +332,7 @@ namespace Playground
             Console.WriteLine(FL.Run());
 
             FLPrio = new MessageQueueLockTester<FeatureLock>("FeatureLock Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action, qc) => { using (myLock.Lock((FeatureLock.START_WAITING_PRESSURE - 50 + qc.Clamp(0, 10000)))) action(); },
+                (myLock, action, qc) => { using (myLock.Lock((FeatureLock.DEFAULT_PRIORITY - 20 + qc.Clamp(0, 10000)))) action(); },
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
             Console.WriteLine(FLPrio.Run());
 
@@ -357,7 +357,7 @@ namespace Playground
             Console.WriteLine(FLAsync.Run());
 
             FLAsyncPrio = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action, qc) => { using (await myLock.LockAsync((FeatureLock.START_WAITING_PRESSURE-50 + qc.Clamp(0, 10000)))) action(); },
+                async (myLock, action, qc) => { using (await myLock.LockAsync((FeatureLock.DEFAULT_PRIORITY-20 + qc.Clamp(0, 10000)))) action(); },
                 async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); });
             Console.WriteLine(FLAsyncPrio.Run());
 

@@ -92,7 +92,7 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        int ReadingPriority => (FeatureLock.START_WAITING_PRESSURE + queue.Count).Clamp(FeatureLock.MIN_WAITING_PRESSURE, FeatureLock.MAX_WAITING_PRESSURE);
+        int ReadingPriority => (FeatureLock.DEFAULT_PRIORITY + queue.Count).Clamp(FeatureLock.MIN_PRIORITY, FeatureLock.MAX_PRIORITY);
 
         public bool TryReceive(out T message)
         {
@@ -171,7 +171,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Clear()
         {
-            using (queueLock.Lock(FeatureLock.MAX_WAITING_PRESSURE))
+            using (queueLock.Lock(FeatureLock.MAX_PRIORITY))
             {
                 queue.Clear();
             }

@@ -58,9 +58,8 @@ namespace Playground
                     while(!timeFrame.Elapsed)
                     {
                         await writeLockFrame(lockObject, WriteToQueue, queue.Count);
-                        await Task.Yield();
                         TimeFrame slackTime = new TimeFrame(writerSlack);
-                        while(!slackTime.Elapsed) await Task.Yield();
+                        await Task.Delay(slackTime.Remaining);
                     }
                 }).Invoke());
             }
@@ -75,9 +74,8 @@ namespace Playground
                     while(!timeFrame.Elapsed)
                     {
                         await readLockFrame(lockObject, ReadFromQueue, queue.Count);
-                        await Task.Yield();
                         TimeFrame slackTime = new TimeFrame(readerSlack);
-                        while(!slackTime.Elapsed) await Task.Yield();
+                        await Task.Delay(slackTime.Remaining);
                     }
                 }).Invoke());
             }

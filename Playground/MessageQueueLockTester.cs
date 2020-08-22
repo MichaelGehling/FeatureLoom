@@ -59,7 +59,7 @@ namespace Playground
                     {                            
                         writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(writerSlack);
-                        while (!slackTime.Elapsed) Thread.Yield();
+                        Thread.Sleep(slackTime.Remaining);
                     }
                 }));
             }
@@ -74,7 +74,7 @@ namespace Playground
                     {
                         readLockFrame(lockObject, ReadFromQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(readerSlack);
-                        while (!slackTime.Elapsed) Thread.Yield();
+                        Thread.Sleep(slackTime.Remaining);
                     }
                 }));
             }

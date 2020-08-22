@@ -34,6 +34,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 });
                 waiter.Wait();
+                Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
             task.Wait();
@@ -59,6 +60,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 });
                 waiter.Wait();
+                Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
             task.Wait();
@@ -85,6 +87,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 });
                 waiter.Wait();
+                Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
             task.Wait();
@@ -110,6 +113,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 });
                 waiter.Wait();
+                Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
             task.Wait();
@@ -130,13 +134,14 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
                 task = Task.Run(() =>
                 {
-                    waiter.Set();
+                    
                     using (myLock.LockReadOnly())
                     {
                         secondLockEntered = true;
+                        waiter.Set();
                     }
                 });
-                waiter.Wait();
+                waiter.Wait(1000);
                 Assert.True(secondLockEntered);
             }
         }
@@ -188,7 +193,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 {
                     task2Started = true;
                     waiter.Set();
-                    using (myLock.Lock(FeatureLock.MAX_WAITING_PRESSURE))
+                    using (myLock.Lock(FeatureLock.MAX_PRIORITY))
                     {
                         Assert.Equal(0, counter++);
                     }
@@ -216,7 +221,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 {
                     int number = outcounter++;
                     task1Started = true;
-                    waiter.Set();
+                    waiter.Set();                    
                     using (myLock.Lock())
                     {
                         Assert.Equal(number, incounter++);
