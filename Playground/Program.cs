@@ -162,8 +162,8 @@ namespace Playground
             TimeSpan readerSlack = 0.00.Milliseconds();
             int numWriter = 7;
             TimeSpan writerSlack = 0.01.Milliseconds();
-            TimeSpan executionTime = 1.Milliseconds();
-            TimeSpan duration = 10.0.Seconds();
+            TimeSpan executionTime = 0.01.Milliseconds();
+            TimeSpan duration = 3.0.Seconds();
 
             for (int i = 0; i< 0; i++)
             {
@@ -236,7 +236,7 @@ namespace Playground
 
             Console.WriteLine("TEST FastPath");
 
-            duration = 10.Seconds();
+            duration = 3.Seconds();
 
             var FP_NoLock = new FastPathLockTester<object>("FP_NoLock", new object(), duration, null,
                  (myLock) => {  });
@@ -312,8 +312,8 @@ namespace Playground
             readerSlack = 0.01.Milliseconds();
             numWriter = 1;
             writerSlack = 0.01.Milliseconds();
-            executionTime = 1.Milliseconds();
-            duration = 10.Seconds();
+            executionTime = 0.01.Milliseconds();
+            duration = 3.Seconds();
 
 
             classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
