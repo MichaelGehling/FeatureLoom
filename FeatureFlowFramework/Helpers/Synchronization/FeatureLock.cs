@@ -114,6 +114,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     else if (didReset) mre.Set();
                     if (!timedOut && priority > highestPriority) highestPriority = priority;
                 }
+                else Thread.Yield();
             }
 
             return timedOut;
@@ -171,6 +172,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     else if (didReset) mre.Set();
                     if (!timedOut && priority > highestPriority) highestPriority = priority;
                 }
+                else Thread.Yield();
             }
 
             return timedOut;
@@ -240,6 +242,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (didReset) mre.Set();
                 if (priority > highestPriority) highestPriority = priority;
             }
+            else Thread.Yield();
 
             currentLockIndicator = lockIndicator;
             newLockIndicator = currentLockIndicator + 1;
@@ -290,6 +293,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     else if (didReset) mre.Set();
                     if (priority > highestPriority) highestPriority = priority;
                 }
+                else await Task.Yield();
 
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
@@ -338,6 +342,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (didReset) mre.Set();
                 if (priority > highestPriority) highestPriority = priority;
             }
+            else Thread.Yield();
 
             currentLockIndicator = lockIndicator;
             return currentLockIndicator;
@@ -347,8 +352,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private int ApplyWaitOrder(int priority, ref int initId)
         {                
             priority -= numWaiting;
-            numWaiting++;
-            initId = globalInitId;            
+            //numWaiting++;
+            //initId = globalInitId;            
             return priority;
         }
 
@@ -381,7 +386,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 // Waiting for upgrade to writeLock
                 while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
                 {
-                    Thread.Yield(); // Could be more optimized, but it's such a rare case...
+                    Thread.Yield();
                 }
                 waitingForUpgrade = FALSE;
                 reentranceIndicator.Value = -currentReentranceIndicator - 1;
@@ -417,6 +422,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     else if (didReset) mre.Set();
                     if (priority > highestPriority) highestPriority = priority;
                 }
+                else Thread.Yield();
 
                 currentLockIndicator = lockIndicator;
             }

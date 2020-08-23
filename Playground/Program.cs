@@ -160,10 +160,10 @@ namespace Playground
 
             int numReader = 1;
             TimeSpan readerSlack = 0.00.Milliseconds();
-            int numWriter = 7;
+            int numWriter = 10;
             TimeSpan writerSlack = 0.01.Milliseconds();
-            TimeSpan executionTime = 0.1.Milliseconds();
-            TimeSpan duration = 10.0.Seconds();
+            TimeSpan executionTime = 0.01.Milliseconds();
+            TimeSpan duration = 1.0.Seconds();
 
             for (int i = 0; i< 0; i++)
             {
@@ -313,7 +313,7 @@ namespace Playground
             numWriter = 1;
             writerSlack = 0.01.Milliseconds();
             executionTime = 0.01.Milliseconds();
-            duration = 10.Seconds();
+            duration = 1.Seconds();
 
 
             classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,

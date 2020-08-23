@@ -208,8 +208,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         public void FirstAttemptSucceedsFirst()
         {
             var myLock = new FeatureLock();
-            int outcounter = 0;
-            int incounter = 0;
+            int counter = 0;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task1;
             Task task2;
@@ -219,22 +218,21 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             {
                 task1 = Task.Run(() =>
                 {
-                    int number = outcounter++;
                     task1Started = true;
                     waiter.Set();                    
                     using (myLock.Lock())
                     {
-                        Assert.Equal(number, incounter++);
+                        Assert.Equal(0, counter++);
                     }
                 });
+                waiter.Wait();
                 task2 = Task.Run(() =>
                 {
-                    int number = outcounter++;
                     task2Started = true;
                     waiter.Set();
                     using (myLock.Lock())
                     {
-                        Assert.Equal(number, incounter++);
+                        Assert.Equal(1, counter++);
                     }
                 });
                 while (!task1Started || !task2Started) waiter.Wait();

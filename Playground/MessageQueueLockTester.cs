@@ -82,6 +82,7 @@ namespace Playground
             timeBox.value = new TimeFrame(duration);
             starter.Set();
             Task.WaitAll(tasks.ToArray());
+            queue = null;
             return new Result(name, writeCounter, readCounter, duration);
         }
 
