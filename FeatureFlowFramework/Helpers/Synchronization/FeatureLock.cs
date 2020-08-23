@@ -36,7 +36,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile int lockIndicator = NO_LOCK;        
         volatile int highestPriority = INTERNAL_MIN_PRIORITY;
         volatile int waitingForUpgrade = FALSE;
-        volatile int globalInitId = int.MaxValue;
         volatile int numWaiting = 0;
 
         AsyncLocal<int> reentranceIndicator;
@@ -63,8 +62,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public bool TryLockReadOnly(out AcquiredLock readLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
             var timer = new TimeFrame(timeout);
-            int initId = 0;
-            priority = ApplyWaitOrder(priority, ref initId);
+            int waitCycles = 0;
+            priority = ApplyWaitOrder(priority);
             var currentLockIndicator = lockIndicator;
             if (reentranceSupported && currentLockIndicator != NO_LOCK)
             {
@@ -78,7 +77,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                bool timedOut = TryLockReadOnlyWaitingLoop(ref priority, ref timer, ref initId);
+                bool timedOut = TryLockReadOnlyWaitingLoop(ref priority, ref timer, ref waitCycles);
 
                 if (timedOut)
                 {
@@ -96,13 +95,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return true;
         }
 
-        private bool TryLockReadOnlyWaitingLoop(ref int priority, ref TimeFrame timer, ref int initId)
+        private bool TryLockReadOnlyWaitingLoop(ref int priority, ref TimeFrame timer, ref int waitCycles)
         {
             bool timedOut = false;
             if (timer.Elapsed) timedOut = true;
             else
             {
-                bool nextInQueue = UpdatePriority(ref priority, ref initId);
+                bool nextInQueue = UpdatePriority(ref priority, ref waitCycles);
 
                 if (!nextInQueue)
                 {
@@ -124,8 +123,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public bool TryLock(out AcquiredLock writeLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
             var timer = new TimeFrame(timeout);
-            int initId = 0;
-            priority = ApplyWaitOrder(priority, ref initId);
+            int waitCycles = 0;
+            priority = ApplyWaitOrder(priority);
 
             var currentLockIndicator = lockIndicator;
             if (reentranceSupported && currentLockIndicator != NO_LOCK)
@@ -137,7 +136,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             while (WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                bool timedOut = TryLockWaitingLoop(ref priority, ref timer, ref initId);
+                bool timedOut = TryLockWaitingLoop(ref priority, ref timer, ref waitCycles);
 
                 if (timedOut)
                 {
@@ -154,13 +153,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return true;
         }
 
-        private bool TryLockWaitingLoop(ref int priority, ref TimeFrame timer, ref int initId)
+        private bool TryLockWaitingLoop(ref int priority, ref TimeFrame timer, ref int waitCycles)
         {
             bool timedOut = false;
             if (timer.Elapsed) timedOut = true;
             else
             {
-                bool nextInQueue = UpdatePriority(ref priority, ref initId);
+                bool nextInQueue = UpdatePriority(ref priority, ref waitCycles);
 
                 if (!nextInQueue)
                 {
@@ -213,13 +212,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (reentered) return acquiredLock;
             }
 
-            int initId = 0;
-            priority = ApplyWaitOrder(priority, ref initId);
+            int waitCycles = 0;
+            priority = ApplyWaitOrder(priority);
             
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                priority = LockReadOnlyWaitingLoop(priority, out currentLockIndicator, out newLockIndicator, ref initId);
+                priority = LockReadOnlyWaitingLoop(priority, out currentLockIndicator, out newLockIndicator, ref waitCycles);
             }
             highestPriority = INTERNAL_MIN_PRIORITY;
 
@@ -228,9 +227,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return new AcquiredLock(this, false);
         }
 
-        private int LockReadOnlyWaitingLoop(int priority, out int currentLockIndicator, out int newLockIndicator, ref int initId)
+        private int LockReadOnlyWaitingLoop(int priority, out int currentLockIndicator, out int newLockIndicator, ref int waitCycles)
         {
-            bool nextInQueue = UpdatePriority(ref priority, ref initId);
+            bool nextInQueue = UpdatePriority(ref priority, ref waitCycles);
 
             if (!nextInQueue)
             {
@@ -277,14 +276,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private async Task<AcquiredLock> LockForReadingAsync(int priority = DEFAULT_PRIORITY)
         {
-            int initId = 0;
-            priority = ApplyWaitOrder(priority, ref initId);
+            int waitCycles = 0;
+            priority = ApplyWaitOrder(priority);
 
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                bool nextInQueue = UpdatePriority(ref priority, ref initId);
+                bool nextInQueue = UpdatePriority(ref priority, ref waitCycles);
 
                 if (!nextInQueue)
                 {
@@ -314,23 +313,26 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (reentered) return acquiredLock;
             }
 
-            int initId = 0;
-            priority = ApplyWaitOrder(priority, ref initId);
+            int waitCycles = 0;
+            priority = ApplyWaitOrder(priority);
 
             while (WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                currentLockIndicator = LockWaitingLoop(ref priority, ref initId);
+                currentLockIndicator = LockWaitingLoop(ref priority, ref waitCycles);
             }
-            highestPriority = INTERNAL_MIN_PRIORITY;
+            UpdateAfterEnter(waitCycles, priority);
+            
             if (reentranceSupported) reentranceIndicator.Value = FIRST_WRITE_ENTERED;
 
             return new AcquiredLock(this, true);
         }
 
-        private int LockWaitingLoop(ref int priority, ref int initId)
+        
+
+        private int LockWaitingLoop(ref int priority, ref int waitCycles)
         {
             int currentLockIndicator;
-            bool nextInQueue = UpdatePriority(ref priority, ref initId);
+            bool nextInQueue = UpdatePriority(ref priority, ref waitCycles);
 
             if (!nextInQueue)
             {
@@ -349,26 +351,35 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int ApplyWaitOrder(int priority, ref int initId)
+        private int ApplyWaitOrder(int priority)
         {                
-            priority -= numWaiting;
-            //numWaiting++;
-            //initId = globalInitId;            
+            priority -= numWaiting;            
             return priority;
         }
 
-        private bool UpdatePriority(ref int priority, ref int initId)
+        private bool UpdatePriority(ref int priority, ref int waitCycles)
         {
-            if (initId != globalInitId)
+            if (waitCycles == 0)
             {
-                priority++;
-                initId = globalInitId;
                 numWaiting++;
             }
+            waitCycles++;
+
             bool nextInQueue = false;
             if (priority > highestPriority) highestPriority = priority;
             if (priority >= highestPriority) nextInQueue = true;
+
+            if (priority < INTERNAL_MAX_PRIORITY)
+            {
+                if (!nextInQueue || waitCycles % 1000 == 0) priority++;
+            }
             return nextInQueue;
+        }
+
+        private void UpdateAfterEnter(int waitCycles, int priority)
+        {
+            if (waitCycles > 0) numWaiting--;
+            highestPriority = INTERNAL_MIN_PRIORITY;
         }
 
         private (bool reentered, AcquiredLock acquiredLock) TryReenterForWriting()
@@ -404,13 +415,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockForWritingAsync(int priority = DEFAULT_PRIORITY)
         {
-            int initId = 0;
-            priority = ApplyWaitOrder(priority, ref initId);
+            int waitCycles = 0;
+            priority = ApplyWaitOrder(priority);
             
             var currentLockIndicator = lockIndicator;
             while (WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                bool nextInQueue = UpdatePriority(ref priority, ref initId);
+                bool nextInQueue = UpdatePriority(ref priority, ref waitCycles);
 
                 if (!nextInQueue)
                 {
@@ -452,9 +463,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 var newLockIndicator = Interlocked.Decrement(ref lockIndicator);
                 if (NO_LOCK == newLockIndicator)
                 {
-                    numWaiting = 0;
-                    globalInitId++;    
-                    
                     mre.Set();
                 }
             }
@@ -483,9 +491,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (!reentranceSupported || !HandleReentranceForWriteExit(downgrade))
             {
-                numWaiting = 0;
-                globalInitId++;
-
                 lockIndicator = NO_LOCK;
                 mre.Set();
             }

@@ -164,6 +164,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 });
                 waiter.Wait();
+                Thread.Sleep(10);
                 Assert.True(secondLockEntered);
             }
         }
