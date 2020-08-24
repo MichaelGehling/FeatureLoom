@@ -63,7 +63,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             var timer = new TimeFrame(timeout);
             bool waited = false;
-            ApplyWaitOrder(ref priority);
             var currentLockIndicator = lockIndicator;
             if (reentranceSupported && currentLockIndicator != NO_LOCK)
             {
@@ -123,7 +122,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             var timer = new TimeFrame(timeout);
             bool waited = false;
-            ApplyWaitOrder(ref priority);
 
             var currentLockIndicator = lockIndicator;
             if (reentranceSupported && currentLockIndicator != NO_LOCK)
@@ -210,7 +208,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (reentered) return acquiredLock;
             }
             bool waited = false;
-            ApplyWaitOrder(ref priority);
 
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
@@ -272,7 +269,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLockForReadingAsync(int priority = DEFAULT_PRIORITY)
         {
-            ApplyWaitOrder(ref priority);
             var currentLockIndicator = lockIndicator;
             if(reentranceSupported && currentLockIndicator != NO_LOCK)
             {
@@ -298,7 +294,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private async Task<AcquiredLock> LockForReadingAsync(int priority = DEFAULT_PRIORITY)
         {
             bool waited = false;
-            ApplyWaitOrder(ref priority);
 
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
@@ -327,7 +322,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock(int priority = DEFAULT_PRIORITY)
-        {
+        {            
             var currentLockIndicator = lockIndicator;
             if (reentranceSupported && currentLockIndicator != NO_LOCK)
             {
@@ -335,7 +330,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (reentered) return acquiredLock;
             }
             bool waited = false;
-            ApplyWaitOrder(ref priority);
 
             while (WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
@@ -370,11 +364,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return currentLockIndicator;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ApplyWaitOrder(ref int priority)
-        {                
-            
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool UpdatePriority(ref int priority)
@@ -382,7 +371,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(priority < INTERNAL_MAX_PRIORITY) priority++;
 
             bool nextInQueue = false;
-            if(priority > highestPriority) highestPriority = priority;
+            if(priority >= highestPriority) highestPriority = priority;
             else if(priority > secondHighestPriority) secondHighestPriority = priority;
             nextInQueue = priority >= highestPriority;
             
@@ -433,8 +422,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLockForWriting(int priority = DEFAULT_PRIORITY)
         {
-            ApplyWaitOrder(ref priority);
-
             var currentLockIndicator = lockIndicator;
             if(reentranceSupported && currentLockIndicator != NO_LOCK)
             {
@@ -456,7 +443,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private async Task<AcquiredLock> LockForWritingAsync(int priority = DEFAULT_PRIORITY)
         {
             bool waited = false;
-            ApplyWaitOrder(ref priority);
 
             // Reentrance was already handled in TryLock, see LockAsync()
 

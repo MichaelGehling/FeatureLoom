@@ -29,7 +29,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if(mre.IsSet) return Task.CompletedTask;
                 else
                 {
-                    taskUsed = true;
+                     taskUsed = true;
                     return tcs.Task;
                 }
             }

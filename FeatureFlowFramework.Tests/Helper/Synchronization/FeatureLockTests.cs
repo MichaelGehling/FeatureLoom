@@ -190,6 +190,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                         Assert.Equal(1, counter++);
                     }
                 });
+                waiter.Wait();
                 task2 = Task.Run(() =>
                 {
                     task2Started = true;
