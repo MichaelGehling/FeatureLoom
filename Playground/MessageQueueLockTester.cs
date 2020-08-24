@@ -42,7 +42,8 @@ namespace Playground
 
         public Result Run()
         {
-            queue = new Queue<long>();
+            GC.Collect();
+            queue = new Queue<long>(10_000_000);
             writeCounter = 0;
             readCounter = 0;
                 
@@ -59,7 +60,7 @@ namespace Playground
                     {                            
                         writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(writerSlack);
-                        Thread.Sleep(slackTime.Remaining);
+                        while (!slackTime.Elapsed) Thread.Yield();
                     }
                 }));
             }
@@ -74,7 +75,7 @@ namespace Playground
                     {
                         readLockFrame(lockObject, ReadFromQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(readerSlack);
-                        Thread.Sleep(slackTime.Remaining);
+                        while(!slackTime.Elapsed) Thread.Yield();
                     }
                 }));
             }
