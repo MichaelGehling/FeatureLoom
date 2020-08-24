@@ -53,11 +53,12 @@ namespace Playground
             {
                 tasks.Add(new Func<Task>(async () =>
                 {
-                    await starter.WaitAsync();
-                    TimeFrame timeFrame = timeBox;
                     await Task.Yield();
+                    await starter.WaitAsync();
+                    TimeFrame timeFrame = timeBox;                    
                     while(!timeFrame.Elapsed)
                     {
+                        if(queue.Count > 1000) await Task.Yield();
                         await writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(writerSlack);
                         while(!slackTime.Elapsed) Thread.Yield();
@@ -69,12 +70,13 @@ namespace Playground
             {
                 tasks.Add(new Func<Task>(async () =>
                 {
-                    await starter.WaitAsync();
-                    TimeFrame timeFrame = timeBox;
                     await Task.Yield();
+                    await starter.WaitAsync();
+                    TimeFrame timeFrame = timeBox;                    
                     while(!timeFrame.Elapsed)
                     {
-                        await readLockFrame(lockObject, ReadFromQueue, queue.Count);
+                        if (queue.Count == 0) await Task.Yield();
+                        await readLockFrame(lockObject, ReadFromQueue, queue.Count);                        
                         TimeFrame slackTime = new TimeFrame(readerSlack);
                         while(!slackTime.Elapsed) Thread.Yield();
                     }
