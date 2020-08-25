@@ -24,7 +24,8 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             Task task;
             using (myLock.Lock())
             {
-                Assert.False(myLock.TryLock(out _));
+                Assert.False(myLock.TryLock(out var writeLock));
+                Assert.False(writeLock.IsActive);
 
                 task = Task.Run(() =>
                 {
@@ -304,6 +305,23 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
             bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining + 100.Milliseconds());
             Assert.True(allFinished);
+        }
+
+        [Fact]
+        public void ReadOnlyAccessIsAllowedSimultaneously()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            using(myLock.LockReadOnly())
+            {
+                Assert.True(myLock.TryLockReadOnly(out var readLock));
+                Assert.True(readLock.IsActive);
+                readLock.Exit();
+                Assert.False(readLock.IsActive);
+
+                Assert.False(myLock.TryLock(out var writeLock));
+                Assert.False(writeLock.IsActive);
+            }
         }
 
 

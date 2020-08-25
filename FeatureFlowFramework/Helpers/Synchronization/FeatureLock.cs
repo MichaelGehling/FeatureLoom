@@ -16,11 +16,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int FIRST_WRITE_ENTERED = -1;
         const int FIRST_READ_ENTERED = 1;
 
-        const int INTERNAL_MAX_PRIORITY = int.MaxValue;        
-        const int INTERNAL_MIN_PRIORITY = int.MinValue;
+        public const int MAX_PRIORITY = int.MaxValue;
+        public const int MIN_PRIORITY = int.MinValue;
         public const int DEFAULT_PRIORITY = 0;
-        public const int MIN_PRIORITY = INTERNAL_MIN_PRIORITY + 10_000;
-        public const int MAX_PRIORITY = INTERNAL_MAX_PRIORITY - 10_000;
         public readonly TimeSpan sleepTime = 1000.Milliseconds();
 
         const int FALSE = 0;
@@ -34,8 +32,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// When entering a write-lock, a WRITE_LOCK(-1) is set and set back to NO_LOCK(0) when the write-lock is left.
         /// </summary>
         volatile int lockIndicator = NO_LOCK;        
-        volatile int highestPriority = INTERNAL_MIN_PRIORITY;
-        volatile int secondHighestPriority = INTERNAL_MIN_PRIORITY;
+        volatile int highestPriority = MIN_PRIORITY;
+        volatile int secondHighestPriority = MIN_PRIORITY;
         volatile int waitingForUpgrade = FALSE;
 
         AsyncLocal<int> reentranceIndicator;
@@ -52,6 +50,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             readLockTask = Task.FromResult(new AcquiredLock(this, false));
             writeLockTask = Task.FromResult(new AcquiredLock(this, true));
         }
+
+        public bool IsLocked => lockIndicator != NO_LOCK;
+        public bool IsWriteLocked => lockIndicator == WRITE_LOCK;
+        public bool IsReadOnlyLocked => lockIndicator >= FIRST_READ_LOCK;
+        public int CountParallelReadLocks => IsReadOnlyLocked ? lockIndicator : 0;
+        public bool IsReentranceSupported => reentranceSupported;
+        public bool IsWriteLockWaitingForUpgrade => waitingForUpgrade == TRUE;
+        public int HighestWaitingPriority => highestPriority;
+        public int SecondHighestWaitingPriority => secondHighestPriority;
 
         public void ResetReentranceContext()
         {
@@ -80,7 +87,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 if (timedOut)
                 {
-                    if (priority >= highestPriority) highestPriority = INTERNAL_MIN_PRIORITY;
+                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
                     readLock = new AcquiredLock();
                     return false;
                 }
@@ -137,7 +144,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 if (timedOut)
                 {
-                    if (priority >= highestPriority) highestPriority = INTERNAL_MIN_PRIORITY;
+                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
                     writeLock = new AcquiredLock();
                     return false;
                 }
@@ -368,7 +375,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool UpdatePriority(ref int priority)
         {
-            if(priority < INTERNAL_MAX_PRIORITY) priority++;
+            if(priority < MAX_PRIORITY) priority++;
 
             bool nextInQueue = false;
             if(priority >= highestPriority) highestPriority = priority;
@@ -384,7 +391,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(waited)
             {
                 highestPriority = secondHighestPriority;
-                secondHighestPriority = INTERNAL_MIN_PRIORITY;
+                secondHighestPriority = MIN_PRIORITY;
             }
         }
 
@@ -575,6 +582,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else parentLock?.ExitReadLock();
                 parentLock = null;
             }
+
+            public bool IsActive => parentLock != null;
         }
 
     }

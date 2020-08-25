@@ -10,6 +10,7 @@ namespace FeatureFlowFramework.Helpers.Collections
         private long counter = 0;
         private bool cycled = false;
         private AsyncManualResetEvent newEntryEvent;
+        FeatureLock myLock = new FeatureLock();
 
         public CountingRingBuffer(int bufferSize)
         {
@@ -33,78 +34,109 @@ namespace FeatureFlowFramework.Helpers.Collections
 
         public long Add(T item)
         {
-            buffer[nextIndex++] = item;
-            if(nextIndex >= buffer.Length)
+            long result;
+            using(myLock.Lock())
             {
-                nextIndex = 0;
-                cycled = true;
+                buffer[nextIndex++] = item;
+                if(nextIndex >= buffer.Length)
+                {
+                    nextIndex = 0;
+                    cycled = true;
+                }
+                result = counter++;
             }
-            long result = counter++;
             newEntryEvent?.Set();
-            newEntryEvent?.Reset();
+            newEntryEvent?.Reset(); // TODO: Setting and directly resetting might fail waking up waiting threads!
             return result;
         }
 
         public void Clear()
         {
-            cycled = false;
-            counter = 0;
-            nextIndex = 0;
+            using(myLock.Lock())
+            {
+                cycled = false;
+                counter = 0;
+                nextIndex = 0;
+            }
         }
 
         public bool Contains(T item)
         {
-            for(int i = 0; i < nextIndex; i++)
+            using(myLock.LockReadOnly())
             {
-                if(buffer[i].Equals(item)) return true;
+                int until = cycled ? buffer.Length : nextIndex;
+                for(int i = 0; i < until; i++)
+                {
+                    if(buffer[i].Equals(item)) return true;
+                }
+                return false;
             }
-            return false;
         }
 
         public T GetLatest()
         {
-            if(nextIndex == 0)
+            using(myLock.LockReadOnly())
             {
-                if(cycled) return buffer[buffer.Length - 1];
-                else throw new ArgumentOutOfRangeException();
+                if(nextIndex == 0)
+                {
+                    if(cycled) return buffer[buffer.Length - 1];
+                    else throw new ArgumentOutOfRangeException();
+                }
+                else return buffer[nextIndex - 1];
             }
-            else return buffer[nextIndex - 1];
         }
 
         public bool TryGetFromNumber(long number, out T result)
         {
-            result = default;
-            if(number >= counter || counter - number > Length) return false;
+            using(myLock.LockReadOnly())
+            {
+                result = default;
+                if(number >= counter || counter - number > Length) return false;
 
-            int offset = (int)(counter - number);
-            if(nextIndex - offset >= 0) result = buffer[nextIndex - offset];
-            else result = buffer[buffer.Length - offset];
-            return true;
+                int offset = (int)(counter - number);
+                if(nextIndex - offset >= 0) result = buffer[nextIndex - offset];
+                else result = buffer[buffer.Length - offset];
+                return true;
+            }
         }
 
         public T[] GetAvailableSince(long startNumber, out long missed)
         {
-            missed = 0;
-            if(startNumber >= counter) return Array.Empty<T>();
-            long numberToCopyLong = counter - startNumber;
-            if(numberToCopyLong > Length)
+            using(myLock.LockReadOnly())
             {
-                missed = numberToCopyLong - Length;
-                numberToCopyLong = Length;
+                missed = 0;
+                if(startNumber >= counter) return Array.Empty<T>();
+                long numberToCopyLong = counter - startNumber;
+                if(numberToCopyLong > Length)
+                {
+                    missed = numberToCopyLong - Length;
+                    numberToCopyLong = Length;
+                }
+                int numberToCopy = (int)numberToCopyLong;
+                T[] result = new T[numberToCopy];
+                CopyToInternal(result, 0, numberToCopy);
+                return result;
             }
-            int numberToCopy = (int)numberToCopyLong;
-            T[] result = new T[numberToCopy];
-            CopyTo(result, 0, numberToCopy);
-            return result;
         }
 
         public void CopyTo(T[] array, int arrayIndex)
         {
-            var leftSpace = array.Length - arrayIndex;
-            CopyTo(array, arrayIndex, leftSpace > Length ? Length : leftSpace);
+            using(myLock.LockReadOnly())
+            {
+                var leftSpace = array.Length - arrayIndex;
+                CopyToInternal(array, arrayIndex, leftSpace > Length ? Length : leftSpace);
+            }
         }
 
         public void CopyTo(T[] array, int arrayIndex, int copyLength)
+        {
+            using(myLock.LockReadOnly())
+            {
+                CopyToInternal(array, arrayIndex, copyLength);
+            }
+        }
+
+        private void CopyToInternal(T[] array, int arrayIndex, int copyLength)
         {
             var leftSpace = array.Length - arrayIndex;
             if(leftSpace < copyLength || copyLength > Length) throw new ArgumentOutOfRangeException();
