@@ -163,7 +163,7 @@ namespace Playground
             int numWriter = 10;
             TimeSpan writerSlack = 0.01.Milliseconds();
             TimeSpan executionTime = 0.01.Milliseconds();
-            TimeSpan duration = 5.0.Seconds();
+            TimeSpan duration = 1.0.Seconds();
 
             Console.WriteLine("WARMUP");
 
@@ -223,7 +223,7 @@ namespace Playground
 
             Console.WriteLine("TEST FastPath");
 
-            duration = 1.Seconds();
+            duration = 10.Seconds();
 
             var FP_NoLock = new FastPathLockTester<object>("FP_NoLock", new object(), duration, null,
                  (myLock) => {  });
@@ -252,6 +252,22 @@ namespace Playground
             var FP_asyncEx = new FastPathLockTester<AsyncLock>("FP_AsyncEx", new AsyncLock(), duration, offset,
                  (myLock) => { using(myLock.Lock()) { } });
             Console.WriteLine(FP_asyncEx.Run());
+
+            var FP_rw = new FastPathLockTester<ReaderWriterLockSlim>("FP_ReaderWriterLockSlim", new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion), duration, offset,
+                  (myLock) => { myLock.EnterWriteLock(); try { } finally { myLock.ExitWriteLock(); } });
+            Console.WriteLine(FP_rw.Run());
+
+            var FP_rwRO = new FastPathLockTester<ReaderWriterLockSlim>("FP_ReaderWriterLockSlim Read", new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion), duration, offset,
+                  (myLock) => { myLock.EnterReadLock(); try { } finally { myLock.ExitReadLock(); } });
+            Console.WriteLine(FP_rwRO.Run());
+
+            var FP_rwRE = new FastPathLockTester<ReaderWriterLockSlim>("FP_ReaderWriterLockSlim RE", new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion), duration, offset,
+                  (myLock) => { myLock.EnterWriteLock(); try { } finally { myLock.ExitWriteLock(); } });
+            Console.WriteLine(FP_rwRE.Run());
+
+            var FP_spin = new FastPathLockTester<SpinLock>("FP_Spinlock", new SpinLock(), duration, offset,
+                  (myLock) => { bool lockTaken = false;  myLock.Enter(ref lockTaken); try { } finally { myLock.Exit(true); } });
+            Console.WriteLine(FP_spin.Run());
 
 
             var FP_NoLock_Async = new FastPathAsyncLockTester<object>("FP_NoLock", new object(), duration, null,
@@ -300,7 +316,7 @@ namespace Playground
             numWriter = 1;
             writerSlack = 0.01.Milliseconds();
             executionTime = 0.0.Milliseconds();
-            duration = 5.Seconds();
+            duration = 1.Seconds();
 
 
             classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
