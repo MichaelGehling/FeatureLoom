@@ -58,7 +58,7 @@ namespace Playground
                     TimeFrame timeFrame = timeBox;                    
                     while(!timeFrame.Elapsed)
                     {
-                        if(queue.Count > 1000) await Task.Yield();
+                        if(queue.Count > 100) await Task.Yield();
                         await writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(writerSlack);
                         while(!slackTime.Elapsed) Thread.Yield();

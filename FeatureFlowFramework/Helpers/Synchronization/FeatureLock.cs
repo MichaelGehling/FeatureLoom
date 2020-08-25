@@ -267,7 +267,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockForReadingAsync(int priority = DEFAULT_PRIORITY)
+        private bool TryLockForReadingAsync(int priority = DEFAULT_PRIORITY)
         {
             var currentLockIndicator = lockIndicator;
             if(reentranceSupported && currentLockIndicator != NO_LOCK)
@@ -322,7 +322,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock(int priority = DEFAULT_PRIORITY)
-        {            
+        { 
             var currentLockIndicator = lockIndicator;
             if (reentranceSupported && currentLockIndicator != NO_LOCK)
             {
@@ -420,7 +420,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockForWriting(int priority = DEFAULT_PRIORITY)
+        private bool TryLockForWriting(int priority = DEFAULT_PRIORITY)
         {
             var currentLockIndicator = lockIndicator;
             if(reentranceSupported && currentLockIndicator != NO_LOCK)

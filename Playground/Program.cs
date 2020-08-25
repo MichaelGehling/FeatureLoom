@@ -159,8 +159,8 @@ namespace Playground
 
 
             int numReader = 1;
-            TimeSpan readerSlack = 0.01.Milliseconds();
-            int numWriter = 5;
+            TimeSpan readerSlack = 0.0.Milliseconds();
+            int numWriter = 10;
             TimeSpan writerSlack = 0.01.Milliseconds();
             TimeSpan executionTime = 0.01.Milliseconds();
             TimeSpan duration = 5.0.Seconds();
@@ -296,9 +296,9 @@ namespace Playground
 
             Console.WriteLine("TEST 2");
             numReader = 1;
-            readerSlack = 0.2.Milliseconds();
+            readerSlack = 0.01.Milliseconds();
             numWriter = 1;
-            writerSlack = 0.2.Milliseconds();
+            writerSlack = 0.01.Milliseconds();
             executionTime = 0.0.Milliseconds();
             duration = 5.Seconds();
 
