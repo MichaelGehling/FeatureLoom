@@ -228,7 +228,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     // Waiting for upgrade to writeLock
                     while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
                     {
-                        if (timer.Elapsed) return (false, true, new AcquiredLock());
+                        if(timer.Elapsed)
+                        {
+                            waitingForUpgrade = FALSE;
+                            return (false, true, new AcquiredLock());
+                        }
                         Thread.Yield();
                     }
                     waitingForUpgrade = FALSE;
