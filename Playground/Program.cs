@@ -152,9 +152,9 @@ namespace Playground
              Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
  */
 
+            //NeoTest().Wait();
 
-
-            //Console.ReadKey();
+              //  Console.ReadKey();
 
 
 
@@ -385,6 +385,42 @@ namespace Playground
             //PerformanceTestParallel();
 
             Console.ReadKey();
+        }
+
+        static FeatureLock featureLock = new FeatureLock(true);
+
+        private async static Task NeoTest()
+        {
+            Task task;
+            using (featureLock.Lock())
+            {
+                task = featureLock.RunDeferredAsync(AsyncCall);
+                await Task.Delay(1000);
+            }
+            await Task.Delay(1000);
+
+            using (featureLock.Lock())
+            {
+                await task;
+            }
+
+
+        }
+
+        private async static Task AsyncCall()
+        {
+            using (featureLock.Lock())
+            {
+                await Task.Delay(30000);
+            }
+        }
+
+        private static void SyncCall()
+        {
+            using (featureLock.Lock())
+            {
+                Task.Delay(100).Wait();
+            }
         }
 
 
