@@ -263,6 +263,18 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 }));
             }
+            for(int i = 0; i < 2; i++)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    while(!executionTime.Elapsed)
+                    {
+                        using(await myLock.LockAsync())
+                        {
+                        }
+                    }
+                }));
+            }
 
             for (int i = 0; i < 2; i++)
             {
@@ -276,20 +288,8 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 }));
             }
-
-            for (int i = 0; i < 2; i++)
-            {
-                tasks.Add(Task.Run(async () =>
-                {
-                    while (!executionTime.Elapsed)
-                    {
-                        using (await myLock.LockAsync())
-                        {
-                        }
-                    }
-                }));
-            }
-
+ 
+            
             for (int i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(async () =>
@@ -302,6 +302,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 }));
             }
+            
 
             bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining + 100.Milliseconds());
             Assert.True(allFinished);

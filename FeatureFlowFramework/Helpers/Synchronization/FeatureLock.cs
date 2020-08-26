@@ -290,7 +290,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (TryLockForReadingAsync(priority, out LockMode mode))
             {
-                if (mode == LockMode.WriteLock) return writeLockTask;
+                if (mode == LockMode.ReadLock) return readLockTask;
                 else return reenteredLockTask;
             }
             else return LockForReadingAsync(priority);
