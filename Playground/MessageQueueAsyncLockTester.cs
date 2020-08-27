@@ -42,6 +42,7 @@ namespace Playground
         public Result Run()
         {
             GC.Collect();
+            GC.WaitForPendingFinalizers();
             queue = new Queue<long>(10_000_000);
             writeCounter = 0;
             readCounter = 0;

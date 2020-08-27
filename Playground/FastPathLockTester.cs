@@ -23,6 +23,10 @@ namespace Playground
 
         public FastPathLockTesterResult Run()
         {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            int gcc = GC.CollectionCount(0);
+
             long counter = 0;
             var timeFrame = new TimeFrame(duration);
             while(!timeFrame.Elapsed)
@@ -33,8 +37,8 @@ namespace Playground
                     counter++;
                 }
             }
-
-            return new FastPathLockTesterResult(name, counter, compareResult, duration);
+            gcc = GC.CollectionCount(0) - gcc;
+            return new FastPathLockTesterResult(name, counter, compareResult, duration, gcc);
         }
 
     }
@@ -58,9 +62,14 @@ namespace Playground
 
         public FastPathLockTesterResult Run()
         {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            int gcc = GC.CollectionCount(0);
+
             long counter = RunAsync().Result;
 
-            return new FastPathLockTesterResult(name, counter, compareResult, duration);
+            gcc = GC.CollectionCount(0) - gcc;
+            return new FastPathLockTesterResult(name, counter, compareResult, duration, gcc);
         }
 
         private async Task<long> RunAsync()
@@ -86,13 +95,15 @@ namespace Playground
         readonly public long counter;
         readonly public FastPathLockTesterResult compareResult;
         readonly public TimeSpan duration;
+        readonly public int gcc;
 
-        public FastPathLockTesterResult(string name, long counter, FastPathLockTesterResult compareResult, TimeSpan duration)
+        public FastPathLockTesterResult(string name, long counter, FastPathLockTesterResult compareResult, TimeSpan duration, int gcc)
         {
             this.name = name;
             this.counter = counter;
             this.duration = duration;
             this.compareResult = compareResult;
+            this.gcc = gcc;
         }
 
         public override string ToString()
@@ -100,8 +111,9 @@ namespace Playground
             double cps = counter / duration.TotalSeconds;
             double nsc = duration.TotalMilliseconds * 1_000_000 / counter;
             double cmp_nsc = 0;
+            double gccmc = (double)gcc / counter * 1_000_000;
             if(compareResult != null) cmp_nsc = compareResult.duration.TotalMilliseconds * 1_000_000 / compareResult.counter;
-            return $"{name}:\t Cycles:{counter},\t-> {cps} c/s / {nsc} ns per cycle / {nsc - cmp_nsc} ns per cycle (compared)";
+            return $"{name}:\t Cycles:{counter},\t-> {cps} c/s / {nsc} ns per cycle / {nsc - cmp_nsc} ns per cycle (compared) / {gccmc} collection per 1mil cycles";
         }
     }
 }
