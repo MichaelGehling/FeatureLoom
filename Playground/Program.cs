@@ -158,7 +158,7 @@ namespace Playground
 
 
 
-            int numReader = 1;
+            int numReader = 5;
             TimeSpan readerSlack = 0.01.Milliseconds();
             int numWriter = 5;
             TimeSpan writerSlack = 0.01.Milliseconds();

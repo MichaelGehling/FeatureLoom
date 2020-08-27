@@ -38,10 +38,10 @@ namespace FeatureFlowFramework.Helpers.Time
         public bool IsInvalid => utcStartTime == default;
         public bool Elapsed => IsZero ? true : AppTime.Now > utcEndTime;
         public TimeSpan Remaining => IsInvalid ? TimeSpan.Zero : utcEndTime - AppTime.Now;
-        public TimeSpan TimeUntilStart => IsInvalid ? TimeSpan.Zero : AppTime.Now - utcStartTime;
-        public TimeSpan LapsedTime => IsInvalid ? TimeSpan.Zero : AppTime.Now - utcStartTime;
-        public TimeSpan Duration => IsInvalid ? TimeSpan.Zero : utcEndTime - utcStartTime;
-        public bool IsZero => Duration == TimeSpan.Zero;
+        public TimeSpan TimeUntilStart => IsInvalid ? TimeSpan.Zero : utcStartTime - AppTime.Now;
+        public TimeSpan TimeSinceStart => IsInvalid ? TimeSpan.Zero : AppTime.Now - utcStartTime;
+        public TimeSpan Duration => IsZero ? TimeSpan.Zero : utcEndTime - utcStartTime;
+        public bool IsZero => utcEndTime == utcStartTime;
 
         public bool IsWithin(TimeFrame otherTimeFrame) => IsInvalid ? false : utcStartTime >= otherTimeFrame.utcStartTime && utcEndTime <= otherTimeFrame.utcEndTime;
 

@@ -160,7 +160,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             {
                 if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
 
-                if (initial || oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.LapsedTime);
+                if (initial || oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.TimeSinceStart);
 
                 if (initial || ConfigChanged(oldConfig))
                 {
