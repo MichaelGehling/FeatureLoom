@@ -4,7 +4,14 @@
     <!--TargetFramework>netcoreapp2.0</TargetFramework-->
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>7.3</LangVersion>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Authors>Michael Gehling</Authors>
+    <PackageLicenseUrl>https://github.com/MichaelGehling/FeatureFlowFramework/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/MichaelGehling/FeatureFlowFramework</PackageProjectUrl>
+    <PackageIconUrl>https://github.com/MichaelGehling/FeatureFlowFramework/blob/master/Resources/f3.png</PackageIconUrl>
+    <RepositoryUrl>https://github.com/MichaelGehling/FeatureFlowFramework</RepositoryUrl>
+    <Description>FeatureFlowFramework is a development framework written in C#. It provides a set of features to simplify and speed-up development while leading to a better structured and extensible architecture allowing for an iterative development approach. F3 can be used in many contexts like client, server and mobile applications for various platforms as it is build on .Net Standard 2.0 and actively supports synchronous and asynchronous coding.</Description>
+    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
   <ItemGroup>

@@ -152,18 +152,18 @@ namespace Playground
              Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
  */
 
-            //NeoTest().Wait();
+            NeoTest().Wait();
 
               //  Console.ReadKey();
 
 
 
             int numReader = 1;
-            TimeSpan readerSlack = 0.0.Milliseconds();
-            int numWriter = 10;
+            TimeSpan readerSlack = 0.01.Milliseconds();
+            int numWriter = 5;
             TimeSpan writerSlack = 0.01.Milliseconds();
             TimeSpan executionTime = 0.01.Milliseconds();
-            TimeSpan duration = 1.0.Seconds();
+            TimeSpan duration = 5.Seconds();
 
             Console.WriteLine("WARMUP");
 
@@ -182,6 +182,11 @@ namespace Playground
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
             Console.WriteLine(FL.Run());
 
+            var FLAsync = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); },
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); });
+            Console.WriteLine(FLAsync.Run());
+
             var FLPrio = new MessageQueueLockTester<FeatureLock>("FeatureLock Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
                 (myLock, action, qc) => { using (myLock.Lock(FeatureLock.DEFAULT_PRIORITY -20 + qc)) action(); },
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
@@ -198,6 +203,10 @@ namespace Playground
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
             Console.WriteLine(FLre.Run());
 
+            var NeoSmart = new MessageQueueLockTester<NeoSmart.AsyncLock.AsyncLock>("NeoSmart", new NeoSmart.AsyncLock.AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action, qc) => { using(myLock.Lock()) action(); },
+                (myLock, action, qc) => { using(myLock.Lock()) action(); });
+            Console.WriteLine(NeoSmart.Run());
 
 
             var semaAsync = new MessageQueueAsyncLockTester<SemaphoreSlim>("SemaphoreSlim Async", new SemaphoreSlim(1, 1), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
@@ -205,10 +214,7 @@ namespace Playground
                 async (myLock, action, qc) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } });
             Console.WriteLine(semaAsync.Run());
 
-            var FLAsync = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); },
-                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); });
-            Console.WriteLine(FLAsync.Run());
+            
 
             var FLAsyncPrio = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
                 async (myLock, action, qc) => { using (await myLock.LockAsync(FeatureLock.DEFAULT_PRIORITY-20 + qc)) action(); },
@@ -220,10 +226,20 @@ namespace Playground
                 async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); });
             Console.WriteLine(asyncExAsync.Run());
 
+            var BmbsqdAsync = new MessageQueueAsyncLockTester<Bmbsqd.Async.AsyncLock>("Bmbsqd Async", new Bmbsqd.Async.AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using(await myLock) action(); },
+                async (myLock, action, qc) => { using(await myLock) action(); });
+            Console.WriteLine(BmbsqdAsync.Run());
+
+            var neoAsync = new MessageQueueAsyncLockTester<NeoSmart.AsyncLock.AsyncLock>("NeoSmart Async", new NeoSmart.AsyncLock.AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); },
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); });
+            Console.WriteLine(neoAsync.Run());
+
 
             Console.WriteLine("TEST FastPath");
 
-            duration = 10.Seconds();
+            duration = 3.Seconds();
 
             var FP_NoLock = new FastPathLockTester<object>("FP_NoLock", new object(), duration, null,
                  (myLock) => {  });
@@ -269,6 +285,11 @@ namespace Playground
                   (myLock) => { bool lockTaken = false;  myLock.Enter(ref lockTaken); try { } finally { myLock.Exit(true); } });
             Console.WriteLine(FP_spin.Run());
 
+            var FP_neo = new FastPathLockTester<NeoSmart.AsyncLock.AsyncLock>("FP_NeoSmart", new NeoSmart.AsyncLock.AsyncLock(), duration, offset,
+                  (myLock) => { using(myLock.Lock()) { } });
+            Console.WriteLine(FP_neo.Run());
+
+
 
             var FP_NoLock_Async = new FastPathAsyncLockTester<object>("FP_NoLock", new object(), duration, null,
                  async (myLock) => { });
@@ -294,6 +315,14 @@ namespace Playground
                  async (myLock) => { using(await myLock.LockAsync()) { } });
             Console.WriteLine(FP_asyncEx_Async.Run());
 
+            var FP_Bmbsqd_Async = new FastPathLockTester<Bmbsqd.Async.AsyncLock>("FP_Bmbsqd Async", new Bmbsqd.Async.AsyncLock(), duration, offsetAsync,
+                 async (myLock) => { using(await myLock) { } });
+            Console.WriteLine(FP_Bmbsqd_Async.Run());
+
+            var FP_neo_Async = new FastPathLockTester<NeoSmart.AsyncLock.AsyncLock>("FP_NeoSmart Async", new NeoSmart.AsyncLock.AsyncLock(), duration, offsetAsync,
+                 async (myLock) => { using(await myLock.LockAsync()) { } });
+            Console.WriteLine(FP_neo_Async.Run());
+
 
 
             Console.WriteLine("TEST 1");
@@ -303,11 +332,14 @@ namespace Playground
             Console.WriteLine(FLPrio.Run());
             Console.WriteLine(asyncEx.Run());
             Console.WriteLine(FLre.Run());
+            Console.WriteLine(NeoSmart.Run());
 
             Console.WriteLine(semaAsync.Run());
             Console.WriteLine(FLAsync.Run());
             Console.WriteLine(FLAsyncPrio.Run());
             Console.WriteLine(asyncExAsync.Run());
+            Console.WriteLine(BmbsqdAsync.Run());
+            Console.WriteLine(neoAsync.Run());
 
 
             Console.WriteLine("TEST 2");
@@ -316,7 +348,7 @@ namespace Playground
             numWriter = 1;
             writerSlack = 0.01.Milliseconds();
             executionTime = 0.0.Milliseconds();
-            duration = 1.Seconds();
+            duration = 5.Seconds();
 
 
             classic = new MessageQueueLockTester<object>("ClassicLock", new object(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
@@ -344,6 +376,13 @@ namespace Playground
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
             Console.WriteLine(FLre.Run());
 
+            NeoSmart = new MessageQueueLockTester<NeoSmart.AsyncLock.AsyncLock>("NeoSmart", new NeoSmart.AsyncLock.AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                (myLock, action, qc) => { using(myLock.Lock()) action(); },
+                (myLock, action, qc) => { using(myLock.Lock()) action(); });
+            Console.WriteLine(NeoSmart.Run());
+
+
+
             semaAsync = new MessageQueueAsyncLockTester<SemaphoreSlim>("SemaphoreSlim Async", new SemaphoreSlim(1, 1), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
                 async (myLock, action, qc) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } },
                 async (myLock, action, qc) => { await myLock.WaitAsync(); try { action(); } finally { myLock.Release(); } });
@@ -358,6 +397,14 @@ namespace Playground
                 async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); },
                 async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); });
             Console.WriteLine(asyncExAsync.Run());
+
+            FP_Bmbsqd_Async = new FastPathLockTester<Bmbsqd.Async.AsyncLock>("FP_Bmbsqd Async", new Bmbsqd.Async.AsyncLock(), duration, offsetAsync,
+                 async (myLock) => { using(await myLock) { } });
+            Console.WriteLine(FP_Bmbsqd_Async.Run());
+
+            FP_neo_Async = new FastPathLockTester<NeoSmart.AsyncLock.AsyncLock>("FP_NeoSmart Async", new NeoSmart.AsyncLock.AsyncLock(), duration, offsetAsync,
+                 async (myLock) => { using(await myLock.LockAsync()) { } });
+            Console.WriteLine(FP_neo_Async.Run());
 
 
 
@@ -394,35 +441,23 @@ namespace Playground
             Task task;
             using (featureLock.Lock())
             {
-                task = featureLock.RunDeferredAsync(AsyncCall);
-                await Task.Delay(1000);
+                using(featureLock.Lock())
+                {
+
+                }
             }
-            await Task.Delay(1000);
 
             using (featureLock.Lock())
             {
-                await task;
-            }
+                using(featureLock.Lock())
+                {
 
-
-        }
-
-        private async static Task AsyncCall()
-        {
-            using (featureLock.Lock())
-            {
-                await Task.Delay(30000);
+                }
             }
         }
 
-        private static void SyncCall()
-        {
-            using (featureLock.Lock())
-            {
-                Task.Delay(100).Wait();
-            }
-        }
 
+        
 
         private static void PerformanceTestParallel()
         {
