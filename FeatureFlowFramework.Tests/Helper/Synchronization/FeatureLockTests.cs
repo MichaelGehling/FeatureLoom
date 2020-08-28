@@ -230,6 +230,83 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 });
                 waiter.Wait();
+                Thread.Sleep(10);
+                task2 = Task.Run(() =>
+                {
+                    task2Started = true;
+                    waiter.Set();
+                    using(myLock.Lock())
+                    {
+                        Assert.Equal(1, counter++);
+                    }
+                });
+                while(!task1Started || !task2Started) waiter.Wait();
+                Thread.Sleep(10);
+            }
+            Task.WaitAll(task1, task2);
+        }
+
+        [Fact]
+        public void FirstAttemptSucceedsFirstAsync()
+        {
+            var myLock = new FeatureLock();
+            int counter = 0;
+            ManualResetEventSlim waiter = new ManualResetEventSlim(false);
+            Task task1;
+            Task task2;
+            bool task1Started = false;
+            bool task2Started = false;
+            using(myLock.Lock())
+            {
+                task1 = Task.Run(async () =>
+                {
+                    task1Started = true;
+                    waiter.Set();
+                    using(await myLock.LockAsync())
+                    {
+                        Assert.Equal(0, counter++);
+                    }
+                });
+                waiter.Wait();
+                Thread.Sleep(10);
+                task2 = Task.Run(async () =>
+                {
+                    task2Started = true;
+                    waiter.Set();
+                    using(await myLock.LockAsync())
+                    {
+                        Assert.Equal(1, counter++);
+                    }
+                });
+                while(!task1Started || !task2Started) waiter.Wait();
+                Thread.Sleep(10);
+            }
+            Task.WaitAll(task1, task2);
+        }
+
+        [Fact]
+        public void FirstAttemptSucceedsFirstMixed()
+        {
+            var myLock = new FeatureLock();
+            int counter = 0;
+            ManualResetEventSlim waiter = new ManualResetEventSlim(false);
+            Task task1;
+            Task task2;
+            bool task1Started = false;
+            bool task2Started = false;
+            using(myLock.Lock())
+            {
+                task1 = Task.Run(async () =>
+                {
+                    task1Started = true;
+                    waiter.Set();
+                    using(await myLock.LockAsync())
+                    {
+                        Assert.Equal(0, counter++);
+                    }
+                });
+                waiter.Wait();
+                Thread.Sleep(10);
                 task2 = Task.Run(() =>
                 {
                     task2Started = true;

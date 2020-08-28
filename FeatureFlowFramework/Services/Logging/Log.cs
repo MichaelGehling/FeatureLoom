@@ -46,12 +46,6 @@ namespace FeatureFlowFramework.Services.Logging
             context.Data.logSender.Send(msg);
         }
 
-        public static bool IsEnabledFor(Loglevel level, string contextName = null)
-        {
-            // TODO
-            return true;
-        }
-
         public static void ALWAYS(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",

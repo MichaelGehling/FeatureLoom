@@ -8,16 +8,26 @@ namespace FeatureFlowFramework.Helpers.Synchronization
     public class AsyncManualResetEvent : IAsyncManualResetEvent
     {
         private volatile bool taskUsed = false;
-        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+        private volatile TaskCompletionSource<bool> tcs;
         private ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
+        TaskCreationOptions taskCreationOptions = TaskCreationOptions.None;
 
         public AsyncManualResetEvent()
         {
+            tcs = new TaskCompletionSource<bool>(taskCreationOptions);
         }
 
-        public AsyncManualResetEvent(bool initialState)
+        public AsyncManualResetEvent(bool initialState = false, bool runContinuationsAsynchronously = false)
         {
+            if(runContinuationsAsynchronously) taskCreationOptions = TaskCreationOptions.RunContinuationsAsynchronously;
+            tcs = new TaskCompletionSource<bool>(taskCreationOptions);
             if(initialState) Set();
+        }
+
+        public bool RunContinuationsAsynchronously
+        {
+            get => taskCreationOptions == TaskCreationOptions.RunContinuationsAsynchronously;
+            set => taskCreationOptions = value ? TaskCreationOptions.RunContinuationsAsynchronously : TaskCreationOptions.None;
         }
 
         public bool IsSet => mre.IsSet;
@@ -127,7 +137,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             mre.Set();
             if(taskUsed)
             {
-                tcs.TrySetResult(true);
+                taskUsed = false;                
+                tcs.TrySetResult(true);                
             }
             return true;
         }
@@ -141,7 +152,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var oldTcs = this.tcs;
             if(oldTcs.Task.IsCompleted)
             {
-                Interlocked.CompareExchange(ref this.tcs, new TaskCompletionSource<bool>(), oldTcs);
+                Interlocked.CompareExchange(ref this.tcs, new TaskCompletionSource<bool>(taskCreationOptions), oldTcs);                
             }
             return true;
         }

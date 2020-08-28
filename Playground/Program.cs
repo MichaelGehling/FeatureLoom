@@ -158,9 +158,9 @@ namespace Playground
 
 
 
-            int numReader = 5;
+            int numReader = 1000;
             TimeSpan readerSlack = 0.01.Milliseconds();
-            int numWriter = 5;
+            int numWriter = 1000;
             TimeSpan writerSlack = 0.01.Milliseconds();
             TimeSpan executionTime = 0.01.Milliseconds();
             TimeSpan duration = 5.Seconds();
@@ -182,6 +182,7 @@ namespace Playground
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
             Console.WriteLine(FL.Run());
 
+            
             var FLAsync = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
                 async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); },
                 async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); });
@@ -398,13 +399,15 @@ namespace Playground
                 async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); });
             Console.WriteLine(asyncExAsync.Run());
 
-            FP_Bmbsqd_Async = new FastPathLockTester<Bmbsqd.Async.AsyncLock>("FP_Bmbsqd Async", new Bmbsqd.Async.AsyncLock(), duration, offsetAsync,
-                 async (myLock) => { using(await myLock) { } });
-            Console.WriteLine(FP_Bmbsqd_Async.Run());
+            BmbsqdAsync = new MessageQueueAsyncLockTester<Bmbsqd.Async.AsyncLock>("Bmbsqd Async", new Bmbsqd.Async.AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using(await myLock) action(); },
+                async (myLock, action, qc) => { using(await myLock) action(); });
+            Console.WriteLine(BmbsqdAsync.Run());
 
-            FP_neo_Async = new FastPathLockTester<NeoSmart.AsyncLock.AsyncLock>("FP_NeoSmart Async", new NeoSmart.AsyncLock.AsyncLock(), duration, offsetAsync,
-                 async (myLock) => { using(await myLock.LockAsync()) { } });
-            Console.WriteLine(FP_neo_Async.Run());
+            neoAsync = new MessageQueueAsyncLockTester<NeoSmart.AsyncLock.AsyncLock>("NeoSmart Async", new NeoSmart.AsyncLock.AsyncLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); },
+                async (myLock, action, qc) => { using(await myLock.LockAsync()) action(); });
+            Console.WriteLine(neoAsync.Run());
 
 
 
