@@ -12,18 +12,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
 
-        const int CYCLE_LIMIT = 10_000;
+        const int CYCLE_LIMIT_1 = 1_000;
+        const int CYCLE_LIMIT_2 = CYCLE_LIMIT_1 - 200;
 
         public const int MAX_PRIORITY = int.MaxValue;
         public const int MIN_PRIORITY = int.MinValue;
         public const int DEFAULT_PRIORITY = 0;
-        public const int HIGH_PRIORITY = CYCLE_LIMIT + 1;
-        public const int LOW_PRIORITY = -CYCLE_LIMIT - 1;
-        public readonly TimeSpan sleepTime = 1000.Milliseconds(); 
+        public const int HIGH_PRIORITY = CYCLE_LIMIT_1 + 1;
+        public const int LOW_PRIORITY = -CYCLE_LIMIT_1 - 1;
+        public TimeSpan wakeUpTime = 30.Seconds();
 
         const int FALSE = 0;
         const int TRUE = 1;
-        
+
+        readonly bool reentranceSupported;
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
         /// A lockIndicator of -1 implies a write-lock, while a lockIndicator greater than 0 implies a read-lock.
@@ -33,25 +35,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile int lockIndicator = NO_LOCK;        
         volatile int highestPriority = MIN_PRIORITY;
         volatile int secondHighestPriority = MIN_PRIORITY;
+        volatile int waitingForUpgrade = FALSE;
         volatile int reentranceId = 0;
-        volatile int waitingForUpgrade = FALSE;              
 
-        bool reentranceSupported;
         AsyncLocal<int> reentranceIndicator;
+
         AsyncManualResetEvent mre = new AsyncManualResetEvent(true);
+        Timer wakeUpTimer;
 
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> writeLockTask;
         Task<AcquiredLock> upgradedLockTask;
         Task<AcquiredLock> reenteredLockTask;
 
-        /// <summary>
-        /// Creates a FeatureLock object that can be used to synchronize access to resources that do not support concurrency.
-        /// It provides several mechanisms to cover all kind of usage-scenarios:
-        /// syncronous and asynchronous access, parallel read-only, reentrance (if activated), and prioritization.
-        /// The lock can be used with the using statement: using(myLock.Lock()){ ... }
-        /// </summary>
-        /// <param name="supportReentrance">Set to true if reentrancy (nested access) is needed.</param>
         public FeatureLock(bool supportReentrance = false)
         {
             this.reentranceSupported = supportReentrance;
@@ -60,6 +56,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             writeLockTask = Task.FromResult(new AcquiredLock(this, LockMode.WriteLock));
             upgradedLockTask = Task.FromResult(new AcquiredLock(this, LockMode.Upgraded));
             reenteredLockTask = Task.FromResult(new AcquiredLock(this, LockMode.Reenterd));
+
+            wakeUpTimer = new Timer((myLock) =>
+            {
+                if(lockIndicator == NO_LOCK && !mre.IsSet) mre.Set();
+            }, this, wakeUpTime, wakeUpTime);
+
         }        
 
         public bool IsLocked => lockIndicator != NO_LOCK;
@@ -86,9 +88,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             await Task.Yield();
             // Invalidate reentrance indicator
             if (reentranceSupported) reentranceIndicator.Value = reentranceId - 1;
-            await asyncCall();
+            await asyncCall().ConfigureAwait(false);
         }
-
         /// <summary>
         /// When an new task is executed in parallel and not awaited before an acquired lock is exited, 
         /// reentrancy may lead to collisions. 
@@ -106,23 +107,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return Task.Run(syncCall);
         }
 
-        /// <summary>
-        /// Acquires the lock. If the lock is already acquired, the execution will be blocked until it was released first.
-        /// 
-        /// The lock is roughly fair, meaning that the first in line will acquire the lock next. Though, if multiple start waiting
-        /// for a release at the same time, they will have the same priority, but once it was released, the priority is increased and 
-        /// candidates coming later to the party will have to wait longer, due to a lower priority.     
-        /// 
-        /// If the lock needs to be acquired multiple times in nested code, the supportReentrance flag from the constructor must be set to true to avoid a deadlock.
-        /// </summary>
-        /// <example>
-        /// using(myLock.Lock())
-        /// {
-        ///   // do your worked on the restricted resource
-        /// }
-        /// </example>
-        /// <param name="priority">The lock attempt can start with a lower or higher priority to change the waiting behaviour.</param>
-        /// <returns>The AcquiredLock object wich must be exited or disposed when the job is done (otherwise the lock will stay forever)</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock(int priority = DEFAULT_PRIORITY)
         {
@@ -146,26 +130,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return new AcquiredLock(this, LockMode.WriteLock);
         }
 
-        /// <summary>
-        /// Acquires the lock for read-only. If the lock is already acquired for writing, the execution will be blocked until it was released first.
-        /// If it was already acquired in read-only mode, the lock can be acquired again for parallel reading.
-        /// 
-        /// The lock is roughly fair, meaning that the first in line will acquire the lock next. Though, if multiple start waiting
-        /// for a release at the same time, they will have the same priority, but once it was released, the priority is increased and 
-        /// candidates coming later to the party will have to wait longer, due to a lower priority.     
-        /// 
-        /// If the lock needs to be re-acquired also for writing in nested code, the supportReentrance flag from the constructor must be set to true to avoid a deadlock.
-        /// If a read-only lock is reentered for writing, it will temporarily be upgraded and downgraded again after releasing the write-lock. 
-        /// If the lock is acquired in read-only mode by multiple in parallel, an upgrading attempt will have to wait until only the last read-only lock owner is left.
-        /// </summary>
-        /// <example>
-        /// using(myLock.LockReadOnly())
-        /// {
-        ///   // do your worked on the restricted resource
-        /// }
-        /// </example>
-        /// <param name="priority">The lock attempt can start with a lower or higher priority to change the waiting behaviour.</param>
-        /// <returns>The AcquiredLock object wich must be exited or disposed when the job is done (otherwise the lock will stay forever)</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReadOnly(int priority = DEFAULT_PRIORITY)
         {
@@ -193,28 +157,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return new AcquiredLock(this, LockMode.ReadLock);
         }
 
-        /// <summary>
-        /// Acquires the lock. If the lock is already acquired, the execution will be awaited (suspended without blocking the thread) until it was released first.
-        /// 
-        /// The lock is roughly fair, meaning that the first in line will acquire the lock next. Though, if multiple start waiting
-        /// for a release at the same time, they will have the same priority, but once it was released, the priority is increased and 
-        /// candidates coming later to the party will have to wait longer, due to a lower priority.     
-        /// 
-        /// If the lock needs to be acquired multiple times in nested code, the supportReentrance flag from the constructor must be set to true to avoid a deadlock.
-        /// Then it is possible to reenter the lock for reading and writing.
-        /// </summary>
-        /// <example>
-        /// using(await myLock.LockAsync())
-        /// {
-        ///   // do your worked on the restricted resource
-        /// }
-        /// </example>
-        /// <param name="priority">The lock attempt can start with a lower or higher priority to change the waiting behaviour.</param>
-        /// <returns>The AcquiredLock object wich must be exited or disposed when the job is done (otherwise the lock will stay forever)</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockAsync(int priority = DEFAULT_PRIORITY)
         {
-            if(TryLockForWriting(priority, out LockMode mode))
+            if(TryLockForWritingAsync(priority, out LockMode mode))
             {
                 if(mode == LockMode.WriteLock) return writeLockTask;
                 else if(mode == LockMode.Reenterd) return reenteredLockTask;
@@ -223,120 +169,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else return LockForWritingAsync(priority);
         }
 
-        /// <summary>
-        /// Acquires the lock for read-only. If the lock is already acquired for writing, the execution will be awaited (suspended without blocking the thread) 
-        /// until it was released first. If it was already acquired in read-only mode, the lock can be acquired again for parallel reading.
-        /// 
-        /// The lock is roughly fair, meaning that the first in line will acquire the lock next. Though, if multiple start waiting
-        /// for a release at the same time, they will have the same priority, but once it was released, the priority is increased and 
-        /// candidates coming later to the party will have to wait longer, due to a lower priority.
-        /// 
-        /// If the lock needs to be re-acquired also for writing in nested code, the supportReentrance flag from the constructor must be set to true to avoid a deadlock.
-        /// If a read-only lock is reentered for writing, it will temporarily be upgraded and downgraded again after releasing the write-lock. 
-        /// If the lock is acquired in read-only mode by multiple in parallel, an upgrading attempt will have to wait until only the last read-only lock owner is left.
-        /// </summary>
-        /// <example>
-        /// using(await myLock.LockReadOnlyAsync())
-        /// {
-        ///   // do your worked on the restricted resource
-        /// }
-        /// </example>
-        /// <param name="priority">The lock attempt can start with a lower or higher priority to change the waiting behaviour.</param>
-        /// <returns>The AcquiredLock object wich must be exited or disposed when the job is done (otherwise the lock will stay forever)</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockReadOnlyAsync(int priority = DEFAULT_PRIORITY)
         {
-            if(TryLockForReadingAsync(priority, out LockMode mode))
+            if (TryLockForReadingAsync(priority, out LockMode mode))
             {
-                if(mode == LockMode.ReadLock) return readLockTask;
+                if (mode == LockMode.ReadLock) return readLockTask;
                 else return reenteredLockTask;
             }
             else return LockForReadingAsync(priority);
         }
 
-        /// <summary>
-        /// Tries to acquires the lock. If the lock is already acquired, the execution will be blocked for the defined timeout (or return immediatly in case of no timeout) 
-        /// or until it was released. If the attempt failed it will return false, otherwise true and the acquiredLock is returned as an out parameter.
-        /// It must be released after usage by calling Exit on it. Alternatively, it can be used with a using statement:
-        /// if (myLock.TryLock(out writeLock) using(writeLock) { ... }
-        /// 
-        /// The lock is roughly fair, meaning that the first in line will acquire the lock next. Though, if multiple start waiting
-        /// for a release at the same time, they will have the same priority, but once it was released, the priority is increased and 
-        /// candidates coming later to the party will have to wait longer, due to a lower priority.     
-        /// 
-        /// If the lock needs to be acquired multiple times in nested code, the supportReentrance flag from the constructor must be set to true to avoid a deadlock.
-        /// </summary>
-        /// <example>
-        /// if (myLock.TryLock(out writeLock) using(writeLock)
-        /// {
-        ///   // do your worked on the restricted resource
-        /// }
-        /// </example>
-        /// <param name="writeLock">The AcquiredLock object which must be exited or disposed when the job is done (otherwise the lock will stay forever).</param>
-        /// <param name="timeout">The timeout after which the lock attempt is cancelled.</param>
-        /// <param name="priority">The lock attempt can start with a lower or higher priority to change the waiting behaviour.</param>
-        /// <returns>True if lock was acquired, otherwise false.</returns>        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out AcquiredLock writeLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            var timer = new TimeFrame(timeout);
-            bool waited = false;
-            int cycleCount = 0;
-            var currentLockIndicator = lockIndicator;
-            if(reentranceSupported && currentLockIndicator != NO_LOCK)
-            {
-                var (reentered, timedOut, acquiredLock) = TryReenterForWritingWithTimeout(currentLockIndicator, timer);
-                writeLock = acquiredLock;
-                if(reentered) return true;
-                else if(timedOut) return false;
-            }
-            while(WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
-                bool timedOut = TryLockWaitingLoop(ref priority, ref timer, ref cycleCount);
-
-                if(timedOut)
-                {
-                    if(priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                    writeLock = new AcquiredLock();
-                    return false;
-                }
-                currentLockIndicator = lockIndicator;
-                waited = true;
-            }
-            UpdateAfterEnter(priority, waited);
-            if(reentranceSupported) reentranceIndicator.Value = ++reentranceId;
-
-            writeLock = new AcquiredLock(this, LockMode.WriteLock);
-            return true;
-        }
-
-        /// <summary>
-        /// Tries to acquires the lock for read-only. If the lock is already acquired for writing, the execution will be blocked for the defined timeout 
-        /// (or return immediatly in case of no timeout) or until it was released. 
-        /// If it was already acquired in read-only mode, the lock can be acquired again for parallel reading. 
-        /// If the attempt failed it will return false, otherwise true and the acquiredLock is returned as an out parameter.
-        /// It must be released after usage by calling Exit on it. Alternatively, it can be used with a using statement:
-        /// if (myLock.TryLock(out writeLock) using(writeLock) { ... }
-        /// 
-        /// The lock is roughly fair, meaning that the first in line will acquire the lock next. Though, if multiple start waiting
-        /// for a release at the same time, they will have the same priority, but once it was released, the priority is increased and 
-        /// candidates coming later to the party will have to wait longer, due to a lower priority.     
-        /// 
-        /// If the lock needs to be re-acquired also for writing in nested code, the supportReentrance flag from the constructor must be set to true to avoid a deadlock 
-        /// (or constantly failing TryLock-attempts).
-        /// If a read-only lock is reentered for writing, it will temporarily be upgraded and downgraded again after releasing the write-lock. 
-        /// If the lock is acquired in read-only mode by multiple in parallel, an upgrading attempt will have to wait until only the last read-only lock owner is left.
-        /// </summary>
-        /// <example>
-        /// if (myLock.TryLockReadOnly(out writeLock) using(writeLock)
-        /// {
-        ///   // do your worked on the restricted resource
-        /// }
-        /// </example>
-        /// <param name="writeLock">The AcquiredLock object which must be exited or disposed when the job is done (otherwise the lock will stay forever).</param>
-        /// <param name="timeout">The timeout after which the lock attempt is cancelled.</param>
-        /// <param name="priority">The lock attempt can start with a lower or higher priority to change the waiting behaviour.</param>
-        /// <returns>True if lock was acquired, otherwise false.</returns>   
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLockReadOnly(out AcquiredLock readLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
@@ -378,6 +221,40 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryLock(out AcquiredLock writeLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
+        {
+            var timer = new TimeFrame(timeout);
+            bool waited = false;
+            int cycleCount = 0;
+            var currentLockIndicator = lockIndicator;
+            if (reentranceSupported && currentLockIndicator != NO_LOCK)
+            {
+                var (reentered, timedOut , acquiredLock) = TryReenterForWritingWithTimeout(currentLockIndicator, timer);
+                writeLock = acquiredLock;
+                if (reentered) return true;                
+                else if (timedOut) return false;                
+            }            
+            while (WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {
+                bool timedOut = TryLockWaitingLoop(ref priority, ref timer, ref cycleCount);
+
+                if (timedOut)
+                {
+                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
+                    writeLock = new AcquiredLock();
+                    return false;
+                }
+                currentLockIndicator = lockIndicator;
+                waited = true;
+            }
+            UpdateAfterEnter(priority, waited);
+            if (reentranceSupported) reentranceIndicator.Value = ++reentranceId;
+
+            writeLock = new AcquiredLock(this, LockMode.WriteLock);
+            return true;
+        }
+
 
 
 
@@ -390,16 +267,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT)
+                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
                 {
-                    cycleCount = 0;
+                    cycleCount = 1;
                     bool didReset = mre.Reset();
                     if(lockIndicator != NO_LOCK)
                     {
                         if(!mre.Wait(timer.Remaining)) timedOut = true;
                     }
-                    else if(didReset) mre.Set();
+                    if (didReset) mre.Set();
                 }
+                else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
             }
 
             return timedOut;
@@ -413,9 +291,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT)
+                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
                 {
-                    cycleCount = 0;
+                    cycleCount = 1;
                     bool didReset = mre.Reset();
                     if (lockIndicator != NO_LOCK)
                     {
@@ -423,6 +301,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     else if (didReset) mre.Set();
                 }
+                else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
             }
 
             return timedOut;
@@ -461,16 +340,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             bool nextInQueue = UpdatePriority(ref priority);
 
-            if(!nextInQueue || ++cycleCount > CYCLE_LIMIT)
+            if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
             {
-                cycleCount = 0;
+                cycleCount = 1;
                 bool didReset = mre.Reset();
                 if (lockIndicator != NO_LOCK)
                 {
-                    mre.Wait(sleepTime);
+                    mre.Wait();
                 }
                 else if (didReset) mre.Set();
             }
+            else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
 
             currentLockIndicator = lockIndicator;
             newLockIndicator = currentLockIndicator + 1;
@@ -487,7 +367,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 return reentranceIndicator.Value == reentranceId;
             }
             var newLockIndicator = currentLockIndicator + 1;
-            if(ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            if(ReaderMustWait(currentLockIndicator, priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
             {
                 mode = LockMode.ReadLock;
                 return false;
@@ -516,16 +396,22 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT)
+                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
                 {
-                    cycleCount = 0;
+                    cycleCount = 1;
                     bool didReset = mre.Reset();
                     if(lockIndicator != NO_LOCK)
                     {
-                        await mre.WaitAsync(sleepTime);
+                        await mre.WaitAsync().ConfigureAwait(false);
                     }
-                    else if(didReset) mre.Set();
+                    if (didReset) mre.Set();
                 }
+                else if (cycleCount > CYCLE_LIMIT_2)
+                {
+                    if (cycleCount % 10 == 9) await Task.Yield();
+                    else Thread.Yield();
+                }
+
                 waited = true;
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
@@ -545,17 +431,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int currentLockIndicator;
             bool nextInQueue = UpdatePriority(ref priority);
 
-            if(!nextInQueue || ++cycleCount > CYCLE_LIMIT)
+            if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
             {
-                cycleCount = 0;
+                cycleCount = 1;
 
                 bool didReset = mre.Reset();
-                if(lockIndicator != NO_LOCK)
+                if (lockIndicator != NO_LOCK)
                 {
-                    mre.Wait(sleepTime);
+                    mre.Wait();
                 }
-                else if(didReset) mre.Set();
-            }                   
+                else if (didReset) mre.Set();
+            }
+            else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
 
             currentLockIndicator = lockIndicator;
             return currentLockIndicator;
@@ -570,7 +457,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(priority >= highestPriority) highestPriority = priority;
             else if(priority > secondHighestPriority) secondHighestPriority = priority;
             nextInQueue = priority >= highestPriority;
-            
+
             return nextInQueue;
         }
 
@@ -609,25 +496,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryLockForWriting(int priority, out LockMode mode)
+        private bool TryLockForWritingAsync(int priority, out LockMode mode)
         {
             var currentLockIndicator = lockIndicator;
             if(reentranceSupported && currentLockIndicator != NO_LOCK)
             {
                 var (reentered, timedOut, acquiredLock) = TryReenterForWritingWithTimeout(currentLockIndicator, new TimeFrame());
-                mode = acquiredLock.Mode;
+                mode = acquiredLock.mode;
                 if (reentered) return true;
                 else if(timedOut) return false;
             }
-            if(WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            if(WriterMustWait(currentLockIndicator, priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 mode = LockMode.WriteLock;
                 return false;
             }
             else
             {
-                mode = LockMode.WriteLock;
                 if (reentranceSupported) reentranceIndicator.Value = ++reentranceId;
+                mode = LockMode.WriteLock;                
                 return true;
             }
         }
@@ -643,17 +530,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT)
+                if (!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
                 {
-                    cycleCount = 0;
-                    if(highestPriority > HIGH_PRIORITY*10) mre.RunContinuationsAsynchronously = true;
+                    cycleCount = 1;
                     bool didReset = mre.Reset();
                     if (lockIndicator != NO_LOCK)
                     {
-                        if(nextInQueue) mre.Wait(sleepTime);
-                        else await mre.WaitAsync(sleepTime);
+                        await mre.WaitAsync().ConfigureAwait(false);
                     }
                     else if (didReset) mre.Set();
+                }
+                else if (cycleCount > CYCLE_LIMIT_2)
+                {
+                    if (cycleCount % 10 == 9) await Task.Yield();
+                    else Thread.Yield();
                 }
 
                 waited = true;
@@ -663,6 +553,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (reentranceSupported) reentranceIndicator.Value = ++reentranceId;
 
             return new AcquiredLock(this, LockMode.WriteLock);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void ResetMRE()
+        {
+            if (lockIndicator != NO_LOCK)
+            {
+                mre.Reset();
+                if (lockIndicator == NO_LOCK) mre.Set();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -689,7 +589,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
-        {
+        {            
             lockIndicator = NO_LOCK;
             mre.Set();
         }
@@ -713,7 +613,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public struct AcquiredLock : IDisposable
         {
             FeatureLock parentLock;
-            LockMode mode;        
+            internal readonly LockMode mode;        
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal AcquiredLock(FeatureLock parentLock, LockMode mode)
@@ -737,10 +637,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (mode == LockMode.Upgraded) parentLock?.ExitAndDowngrade();
                 parentLock = null;
             }
+
             public bool IsActive => parentLock != null;
-
-            internal LockMode Mode => mode;
-
         }
 
     }

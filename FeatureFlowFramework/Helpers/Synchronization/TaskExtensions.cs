@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             cts.CancelAfter(timeout);
             var cancellationToken = cts.Token;
 
-            var tcs = new TaskCompletionSource<bool>();
+            var tcs = new TaskCompletionSource<bool>();            
             var registration = cancellationToken.Register(s =>
             {
                 var source = (TaskCompletionSource<bool>)s;

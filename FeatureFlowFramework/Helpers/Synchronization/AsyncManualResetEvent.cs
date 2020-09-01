@@ -7,98 +7,43 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 {
     public class AsyncManualResetEvent : IAsyncManualResetEvent
     {
-        private volatile bool taskUsed = false;
-        private volatile TaskCompletionSource<bool> tcs;
+        const int BARRIER_OPEN = 0;
+        const int BARRIER_CLOSED = 1;        
+
+        private volatile bool isSet = false;
+        private volatile int barrier = BARRIER_OPEN;
+        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
-        TaskCreationOptions taskCreationOptions = TaskCreationOptions.None;
 
         public AsyncManualResetEvent()
         {
-            tcs = new TaskCompletionSource<bool>(taskCreationOptions);
         }
 
-        public AsyncManualResetEvent(bool initialState = false, bool runContinuationsAsynchronously = false)
+        public AsyncManualResetEvent(bool initialState)
         {
-            if(runContinuationsAsynchronously) taskCreationOptions = TaskCreationOptions.RunContinuationsAsynchronously;
-            tcs = new TaskCompletionSource<bool>(taskCreationOptions);
             if(initialState) Set();
         }
 
-        public bool RunContinuationsAsynchronously
-        {
-            get => taskCreationOptions == TaskCreationOptions.RunContinuationsAsynchronously;
-            set => taskCreationOptions = value ? TaskCreationOptions.RunContinuationsAsynchronously : TaskCreationOptions.None;
-        }
-
-        public bool IsSet => mre.IsSet;
+        public bool IsSet => isSet;
 
         public Task WaitingTask
         {
             get
             {
-                if(mre.IsSet) return Task.CompletedTask;
-                else
-                {
-                     taskUsed = true;
-                    return tcs.Task;
-                }
+                if(isSet) return Task.CompletedTask;
+                return tcs.Task;
+
             }
         }
 
         public IAsyncWaitHandle AsyncWaitHandle => this;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync()
-        {
-            if(mre.IsSet) return Task.FromResult(true);
-            else
-            {
-                taskUsed = true;
-                return tcs.Task.WaitAsync();
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync(TimeSpan timeout)
-        {
-            if(timeout <= TimeSpan.Zero) return Task.FromResult(false);
-            if(mre.IsSet) return Task.FromResult(true);
-            else
-            {
-                taskUsed = true;
-                return tcs.Task.WaitAsync(timeout);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync(CancellationToken cancellationToken)
-        {
-            if(cancellationToken.IsCancellationRequested) return Task.FromResult(false);
-            if(mre.IsSet) return Task.FromResult(true);
-            else
-            {
-                taskUsed = true;
-                return tcs.Task.WaitAsync(cancellationToken);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
-        {
-            if(timeout <= TimeSpan.Zero) return Task.FromResult(false);
-            if(cancellationToken.IsCancellationRequested) return Task.FromResult(false);
-            if(mre.IsSet) return Task.FromResult(true);
-            else
-            {
-                taskUsed = true;
-                return tcs.Task.WaitAsync(timeout, cancellationToken);
-            }
-        }
+        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait()
         {
-            if(mre.IsSet) return true;
+            if(isSet) return true;
             mre.Wait();
             return true;
         }
@@ -106,7 +51,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout)
         {
-            if(mre.IsSet) return true;
+            if(isSet) return true;
             if(timeout <= TimeSpan.Zero) return false;
             return mre.Wait(timeout);
         }
@@ -114,8 +59,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(CancellationToken cancellationToken)
         {
-            if(mre.IsSet) return true;
-            if(cancellationToken.IsCancellationRequested) return false;
+            if (cancellationToken.IsCancellationRequested) return false;
+            if (isSet) return true;            
             mre.Wait(cancellationToken);
             return !cancellationToken.IsCancellationRequested;
         }
@@ -123,43 +68,92 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout, CancellationToken cancellationToken)
         {
-            if(mre.IsSet) return true;
-            if(cancellationToken.IsCancellationRequested) return false;
-            if(timeout <= TimeSpan.Zero) return false;
+            if (cancellationToken.IsCancellationRequested) return false;
+            if (isSet) return true;            
+            if (timeout <= TimeSpan.Zero) return false;
             return mre.Wait(timeout, cancellationToken);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync()
+        {
+            if (isSet) return Task.FromResult(true);
+
+            return tcs.Task;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync(TimeSpan timeout)
+        {
+            if (isSet) return Task.FromResult(true);
+            if (timeout <= TimeSpan.Zero) return Task.FromResult(false);
+
+            return tcs.Task.WaitAsync(timeout);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync(CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
+            if (isSet) return Task.FromResult(true);
+
+            return tcs.Task.WaitAsync(cancellationToken);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+
+            if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
+            if (isSet) return Task.FromResult(true);
+            if (timeout <= TimeSpan.Zero) return Task.FromResult(false);
+            
+            return tcs.Task.WaitAsync(timeout, cancellationToken);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Set()
         {
-            if(mre.IsSet) return false;
+            if (isSet) return false;
+            while (barrier == BARRIER_CLOSED || Interlocked.CompareExchange(ref barrier, BARRIER_CLOSED, BARRIER_OPEN) != BARRIER_OPEN) Thread.Yield();
+            if (isSet)
+            {
+                barrier = BARRIER_OPEN;
+                return false;
+            }
+
+            isSet = true;
 
             mre.Set();
-            if(taskUsed)
-            {
-                taskUsed = false;                
-                tcs.TrySetResult(true);                
-            }
+            tcs.SetResult(true);
+
+            barrier = BARRIER_OPEN;
             return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Reset()
         {
-            if(!mre.IsSet) return false;
+            if (!isSet) return false;
+            while (barrier == BARRIER_CLOSED || Interlocked.CompareExchange(ref barrier, BARRIER_CLOSED, BARRIER_OPEN) != BARRIER_OPEN) Thread.Yield();
+            if (!isSet)
+            {
+                barrier = BARRIER_OPEN;
+                return false;
+            }
 
             mre.Reset();
-            var oldTcs = this.tcs;
-            if(oldTcs.Task.IsCompleted)
-            {
-                Interlocked.CompareExchange(ref this.tcs, new TaskCompletionSource<bool>(taskCreationOptions), oldTcs);                
-            }
+            tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            isSet = false;
+
+            barrier = BARRIER_OPEN;
             return true;
         }
 
         public bool WouldWait()
         {
-            return !mre.IsSet;
+            return !isSet;
         }
 
         public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
