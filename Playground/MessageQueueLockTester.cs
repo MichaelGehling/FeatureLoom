@@ -51,43 +51,47 @@ namespace Playground
             ManualResetEventSlim starter = new ManualResetEventSlim(false);
             List<Task> tasks = new List<Task>();
             Box<TimeFrame> timeBox = new Box<TimeFrame>();
-            for(int i= 0; i < numWriter; i++)
+            int max = Math.Max(numWriter, numReader);
+            for(int i= 0; i < max; i++)
             {
-                tasks.Add(Task.Run(() =>
+                if (i < numWriter)
                 {
-                    starter.Wait();
-                    TimeFrame timeFrame = timeBox;
-                    while (!timeFrame.Elapsed)
+                    tasks.Add(Task.Run(() =>
                     {
-                        if(queue.Count > 10000) Thread.Yield();
-                        writeLockFrame(lockObject, WriteToQueue, queue.Count);
-                        TimeFrame slackTime = new TimeFrame(writerSlack);
-                        while (!slackTime.Elapsed) Thread.Yield();
-                    }
-                }));
-            }
+                        starter.Wait();
+                        TimeFrame timeFrame = timeBox;
+                        while (!timeFrame.Elapsed)
+                        {
+                            if (queue.Count > 10000) Thread.Yield();
+                            writeLockFrame(lockObject, WriteToQueue, queue.Count);
+                            TimeFrame slackTime = new TimeFrame(writerSlack);
+                            while (!slackTime.Elapsed) Thread.Yield();
+                        }
+                    }));
+                }
 
-            for (int i = 0; i < numReader; i++)
-            {
-                tasks.Add(Task.Run(() =>
+                if (i < numReader)
                 {
-                    starter.Wait();
-                    TimeFrame timeFrame = timeBox;
-                    while (!timeFrame.Elapsed)
+                    tasks.Add(Task.Run(() =>
                     {
-                        if(queue.Count == 0) Thread.Yield();
-                        readLockFrame(lockObject, ReadFromQueue, queue.Count);
-                        TimeFrame slackTime = new TimeFrame(readerSlack);
-                        while(!slackTime.Elapsed) Thread.Yield();
-                    }
-                }));
+                        starter.Wait();
+                        TimeFrame timeFrame = timeBox;
+                        while (!timeFrame.Elapsed)
+                        {
+                            if (queue.Count == 0) Thread.Yield();
+                            readLockFrame(lockObject, ReadFromQueue, queue.Count);
+                            TimeFrame slackTime = new TimeFrame(readerSlack);
+                            while (!slackTime.Elapsed) Thread.Yield();
+                        }
+                    }));
+                }
             }
 
             timeBox.value = new TimeFrame(duration);
             starter.Set();
             Task.WaitAll(tasks.ToArray());
             queue = null;
-            return new Result(name, writeCounter, readCounter, duration);
+            return new Result(name, writeCounter, readCounter, timeBox.value.TimeSinceStart);
         }
 
         void WriteToQueue()

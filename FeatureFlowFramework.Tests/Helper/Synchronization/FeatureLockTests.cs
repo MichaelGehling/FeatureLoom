@@ -230,6 +230,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 });
                 waiter.Wait();
+                Thread.Sleep(10);
                 task2 = Task.Run(() =>
                 {
                     task2Started = true;
