@@ -367,7 +367,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 return reentranceIndicator.Value == reentranceId;
             }
             var newLockIndicator = currentLockIndicator + 1;
-            if(ReaderMustWait(currentLockIndicator, priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, NO_LOCK))
+            if(ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 mode = LockMode.ReadLock;
                 return false;
