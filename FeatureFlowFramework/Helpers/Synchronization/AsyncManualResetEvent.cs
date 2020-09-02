@@ -11,6 +11,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int BARRIER_CLOSED = 1;        
 
         private volatile bool isSet = false;
+        private volatile bool isTaskUsed = false;
         private volatile int barrier = BARRIER_OPEN;
         private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
@@ -31,8 +32,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             get
             {
                 if(isSet) return Task.CompletedTask;
-                return tcs.Task;
 
+                isTaskUsed = true;
+                Thread.MemoryBarrier();
+                if (isSet) return Task.CompletedTask;
+
+                return tcs.Task;                
             }
         }
 
@@ -79,6 +84,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (isSet) return Task.FromResult(true);
 
+            isTaskUsed = true;
+            Thread.MemoryBarrier();
+            if (isSet) return Task.FromResult(true);
+
             return tcs.Task;
         }
 
@@ -88,6 +97,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (isSet) return Task.FromResult(true);
             if (timeout <= TimeSpan.Zero) return Task.FromResult(false);
 
+            isTaskUsed = true;
+            Thread.MemoryBarrier();
+            if (isSet) return Task.FromResult(true);
+
             return tcs.Task.WaitAsync(timeout);
         }
 
@@ -95,6 +108,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public Task<bool> WaitAsync(CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
+            if (isSet) return Task.FromResult(true);
+
+            isTaskUsed = true;
+            Thread.MemoryBarrier();
             if (isSet) return Task.FromResult(true);
 
             return tcs.Task.WaitAsync(cancellationToken);
@@ -107,7 +124,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
             if (isSet) return Task.FromResult(true);
             if (timeout <= TimeSpan.Zero) return Task.FromResult(false);
-            
+
+            isTaskUsed = true;
+            Thread.MemoryBarrier();
+            if (isSet) return Task.FromResult(true);
+
             return tcs.Task.WaitAsync(timeout, cancellationToken);
         }
 
@@ -123,9 +144,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             isSet = true;
+            Thread.MemoryBarrier();
 
             mre.Set();
-            tcs.SetResult(true);
+            if (isTaskUsed) tcs.SetResult(true);
 
             barrier = BARRIER_OPEN;
             return true;
@@ -143,7 +165,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             mre.Reset();
-            tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (tcs.Task.IsCompleted)
+            {
+                isTaskUsed = false;
+                Thread.MemoryBarrier();
+                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
 
             isSet = false;
 
