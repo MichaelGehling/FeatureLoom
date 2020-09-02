@@ -158,11 +158,11 @@ namespace Playground
 
 
 
-            int numReader = 1;
+            int numReader = 100;
             TimeSpan readerSlack = 0.01.Milliseconds();
-            int numWriter = 1;
+            int numWriter = 100;
             TimeSpan writerSlack = 0.01.Milliseconds();
-            TimeSpan executionTime = 1.Milliseconds();
+            TimeSpan executionTime = 0.01.Milliseconds();
             TimeSpan duration = 3.Seconds();
 
             Console.WriteLine("WARMUP");

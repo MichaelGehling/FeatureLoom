@@ -11,10 +11,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int BARRIER_CLOSED = 1;        
 
         private volatile bool isSet = false;
-        private volatile bool isTaskUsed = false;
+        private volatile bool isTaskUsed = false;        
         private volatile int barrier = BARRIER_OPEN;
         private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
+        private ManualResetEventSlim mre_backup = new ManualResetEventSlim(false, 0);
 
         public AsyncManualResetEvent()
         {
@@ -145,9 +146,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             isSet = true;
             Thread.MemoryBarrier();
-
-            mre.Set();
+            
             if (isTaskUsed) tcs.SetResult(true);
+
+            var mreTemp = mre;
+            mre = mre_backup;
+            mre_backup = mreTemp;
+
+            mre_backup.Set();
 
             barrier = BARRIER_OPEN;
             return true;
@@ -165,6 +171,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             mre.Reset();
+
             if (tcs.Task.IsCompleted)
             {
                 isTaskUsed = false;
@@ -176,6 +183,44 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             barrier = BARRIER_OPEN;
             return true;
+        }
+
+        /// <summary>
+        /// Averyone waiting for this event is woken up, by setting and resetting in one step.
+        /// If the AsyncManualResetEvent was already set, nothing happens.        
+        /// Note: Avoid calling PulseAll twice directly after each other, because it might happen, that not all are woken up.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void PulseAll()
+        {
+            if(isSet) return;
+            while(barrier == BARRIER_CLOSED || Interlocked.CompareExchange(ref barrier, BARRIER_CLOSED, BARRIER_OPEN) != BARRIER_OPEN) Thread.Yield();
+            if(isSet)
+            {
+                barrier = BARRIER_OPEN;
+                return;
+            }
+
+            //SET
+            isSet = true;
+            Thread.MemoryBarrier();
+            if(isTaskUsed) tcs.SetResult(true);
+            var mreTemp = mre;
+            mre = mre_backup;
+            mre_backup = mreTemp;
+            mre_backup.Set();
+
+            //RESET
+            mre.Reset();
+            if(tcs.Task.IsCompleted)
+            {
+                isTaskUsed = false;
+                Thread.MemoryBarrier();
+                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+            isSet = false;
+
+            barrier = BARRIER_OPEN;
         }
 
         public bool WouldWait()
