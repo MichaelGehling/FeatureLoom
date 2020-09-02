@@ -179,6 +179,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
+            Thread.MemoryBarrier();
             isSet = false;
 
             barrier = BARRIER_OPEN;
@@ -218,6 +219,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 Thread.MemoryBarrier();
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
+            Thread.MemoryBarrier();
             isSet = false;
 
             barrier = BARRIER_OPEN;

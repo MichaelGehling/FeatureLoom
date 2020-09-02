@@ -9,10 +9,6 @@ using Xunit;
 
 namespace FeatureFlowFramework.Tests.Helper.Synchronization
 {
-    [CollectionDefinition("SerializedCollection", DisableParallelization = true)]
-    public class SerializedCollection { }
-
-    [Collection("SerializedCollection")]
     public class FeatureLockTests
     {
         [Fact]
