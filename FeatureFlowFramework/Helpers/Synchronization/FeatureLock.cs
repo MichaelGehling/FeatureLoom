@@ -12,14 +12,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
 
-        const int CYCLE_LIMIT_1 = 1_000;
-        const int CYCLE_LIMIT_2 = CYCLE_LIMIT_1 - 200;
+        const int SLEEP_CYCLE_LIMIT = 500;
+        const int YIELD_CYCLE_LIMIT = 400;
+        const int TASK_YIELD_FREQ = 10;
 
         public const int MAX_PRIORITY = int.MaxValue;
         public const int MIN_PRIORITY = int.MinValue;
         public const int DEFAULT_PRIORITY = 0;
-        public const int HIGH_PRIORITY = CYCLE_LIMIT_1 + 1;
-        public const int LOW_PRIORITY = -CYCLE_LIMIT_1 - 1;
+        public const int HIGH_PRIORITY = SLEEP_CYCLE_LIMIT + 1;
+        public const int LOW_PRIORITY = -SLEEP_CYCLE_LIMIT - 1;
         public TimeSpan wakeUpTime = 30.Seconds();
 
         const int FALSE = 0;
@@ -267,7 +268,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
+                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -277,7 +278,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     if (didReset) mre.Set();
                 }
-                else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
+                else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
             }
 
             return timedOut;
@@ -291,7 +292,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
+                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -301,7 +302,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     else if (didReset) mre.Set();
                 }
-                else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
+                else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
             }
 
             return timedOut;
@@ -340,7 +341,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             bool nextInQueue = UpdatePriority(ref priority);
 
-            if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
+            if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
             {
                 cycleCount = 1;
                 bool didReset = mre.Reset();
@@ -350,7 +351,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 else if (didReset) mre.Set();
             }
-            else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
+            else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
 
             currentLockIndicator = lockIndicator;
             newLockIndicator = currentLockIndicator + 1;
@@ -396,7 +397,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
+                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -406,9 +407,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     if (didReset) mre.Set();
                 }
-                else if (cycleCount > CYCLE_LIMIT_2)
+                else if (cycleCount > YIELD_CYCLE_LIMIT)
                 {
-                    if (cycleCount % 10 == 9) await Task.Yield();
+                    if (cycleCount % TASK_YIELD_FREQ == TASK_YIELD_FREQ-1) await Task.Yield();
                     else Thread.Yield();
                 }
 
@@ -431,7 +432,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int currentLockIndicator;
             bool nextInQueue = UpdatePriority(ref priority);
 
-            if(!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
+            if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
             {
                 cycleCount = 1;
 
@@ -442,7 +443,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 else if (didReset) mre.Set();
             }
-            else if (cycleCount > CYCLE_LIMIT_2) Thread.Yield();
+            else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
 
             currentLockIndicator = lockIndicator;
             return currentLockIndicator;
@@ -530,7 +531,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if (!nextInQueue || ++cycleCount > CYCLE_LIMIT_1)
+                if (!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -540,9 +541,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     else if (didReset) mre.Set();
                 }
-                else if (cycleCount > CYCLE_LIMIT_2)
+                else if (cycleCount > YIELD_CYCLE_LIMIT)
                 {
-                    if (cycleCount % 10 == 9) await Task.Yield();
+                    if (cycleCount % TASK_YIELD_FREQ == TASK_YIELD_FREQ-1) await Task.Yield();
                     else Thread.Yield();
                 }
 
