@@ -73,15 +73,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// This method will remove the reentrancy context, so that an locking attempt
         /// will be delayed until the already aquired lock is exited.
         /// IMPORTANT: If the async call is awaited before the acquired lock is exited, DO NOT use this method,
-        /// otherwise it will lead to a deadlock if the called method tries to attempt the already acquired lock!
+        /// otherwise it will lead to a deadlock if the called method tries to acquire the already acquired lock!
         /// </summary>
         /// <param name="asyncCall">An async method that is not awaited while the lock is acquired</param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task RunDeferredAsync(Func<Task> asyncCall)
-        {
-            await Task.Yield();
-            // Invalidate reentrancy indicator
-            if (reentrancySupported) reentrancyIndicator.Value = reentrancyId - 1;
+        {            
+            RemoveReentrancyContext();
             await asyncCall().ConfigureAwait(false);
         }
         /// <summary>
@@ -89,16 +88,32 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// reentrancy may lead to collisions. 
         /// This method will runs the passed action in a new Task and remove the reentrancy context before, 
         /// so that an locking attempt will be delayed until the already aquired lock is exited.
-        /// IMPORTANT: If the parallel task is awaited BEFORE the acquired lock is exited, DO NOT use this method,
-        /// otherwise it will lead to a deadlock if the called method tries to attempt the already acquired lock!
+        /// IMPORTANT: If the task is awaited BEFORE the acquired lock is exited, DO NOT use this method,
+        /// otherwise it will lead to a deadlock if the called method tries to acquire the already acquired lock!
         /// </summary>
         /// <param name="syncCall">An synchronous method that should run in a parallel task which is not awaited while the lock is acquired</param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task RunDeferredTask(Action syncCall)
+        {
+            RemoveReentrancyContext();
+            await Task.Run(syncCall);
+        }
+
+        /// <summary>
+        /// When an new task is executed in parallel and not awaited before an acquired lock is exited or
+        /// when an async call is awaited AFTER an acquired lock is exited (or not awaited at all),
+        /// reentrancy may lead to collisions.
+        /// This method will remove the reentrancy context FROM WITHIN the new task or async call,
+        /// so that an locking attempt will be delayed until the already aquired lock is exited.
+        /// IMPORTANT: If the task or async call is awaited BEFORE the acquired lock is exited, DO NOT use this method,
+        /// otherwise it will lead to a deadlock if the called method tries to acquire the already acquired lock!
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveReentrancyContext()
         {
             // Invalidate reentrancy indicator
             if (reentrancySupported) reentrancyIndicator.Value = reentrancyId - 1;
-            await Task.Run(syncCall);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
