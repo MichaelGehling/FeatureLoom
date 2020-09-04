@@ -522,6 +522,9 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     deferredLock.Exit();
                 });
 
+                Assert.True(myLock.TryLock(out var innerLock));
+                innerLock.Exit();
+
                 signal1.Wait(timer.Remaining);
                 Assert.False(timer.Elapsed);
                 exited = true;
@@ -548,10 +551,58 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     deferredLock.Exit();
                 });
 
+                Assert.True(myLock.TryLock(out var innerLock));
+                innerLock.Exit();
+
                 signal1.Wait(timer.Remaining);
                 Assert.False(timer.Elapsed);
                 exited = true;
             }
+        }
+
+        [Fact]
+        public void CanUpgradeAndDowngradeLocks()
+        {
+            FeatureLock myLock = new FeatureLock(false);
+
+            using (var acquiredLock = myLock.LockReadOnly())
+            {
+                Assert.False(myLock.IsWriteLocked);
+                Assert.True(acquiredLock.TryUpgradeToWriteMode());
+                Assert.True(myLock.IsWriteLocked);
+                Assert.True(acquiredLock.TryDowngradeToReadOnlyMode());
+                Assert.False(myLock.IsWriteLocked);
+
+                Assert.False(acquiredLock.TryDowngradeToReadOnlyMode());
+            }
+
+            using (var acquiredLock = myLock.Lock())
+            {
+                Assert.True(myLock.IsWriteLocked);
+                Assert.True(acquiredLock.TryDowngradeToReadOnlyMode());
+                Assert.False(myLock.IsWriteLocked);
+                Assert.True(acquiredLock.TryUpgradeToWriteMode());
+                Assert.True(myLock.IsWriteLocked);
+
+                Assert.False(acquiredLock.TryUpgradeToWriteMode());
+            }
+            Assert.False(myLock.IsLocked);
+
+            myLock = new FeatureLock(true);
+
+            using (var outerLock = myLock.LockReadOnly())
+            {
+                Assert.False(myLock.IsWriteLocked);
+                using (var innerLock = myLock.Lock())
+                {
+                    Assert.True(myLock.IsWriteLocked);
+                    Assert.False(outerLock.TryDowngradeToReadOnlyMode());
+                    Assert.True(innerLock.TryDowngradeToReadOnlyMode());
+                    Assert.False(myLock.IsWriteLocked);
+                }
+                Assert.False(myLock.IsWriteLocked);
+            }
+            Assert.False(myLock.IsLocked);
         }
 
 
