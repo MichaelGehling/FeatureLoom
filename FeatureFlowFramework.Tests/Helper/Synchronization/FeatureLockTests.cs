@@ -558,6 +558,37 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 Assert.False(timer.Elapsed);
                 exited = true;
             }
+            await task.WaitAsync(timer.Remaining);
+            Assert.False(timer.Elapsed);
+
+            // Check again for removing context from within the task
+            signal1.Reset();
+            exited = false;
+            task = null;
+            using (myLock.Lock())
+            {
+                task = Task.Run(() =>
+                {
+                    myLock.RemoveReentrancyContext();
+
+                    Assert.False(myLock.TryLock(out _));
+                    Assert.False(exited);
+
+                    signal1.Set();
+                    Assert.True(myLock.TryLock(out var deferredLock, timer.Remaining));
+                    Assert.True(exited);
+                    deferredLock.Exit();
+                });
+
+                Assert.True(myLock.TryLock(out var innerLock));
+                innerLock.Exit();
+
+                signal1.Wait(timer.Remaining);
+                Assert.False(timer.Elapsed);
+                exited = true;
+            }
+            await task.WaitAsync(timer.Remaining);
+            Assert.False(timer.Elapsed);
         }
 
         [Fact]
