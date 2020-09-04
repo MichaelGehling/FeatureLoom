@@ -21,7 +21,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public const int DEFAULT_PRIORITY = 0;
         public const int HIGH_PRIORITY = SLEEP_CYCLE_LIMIT + 1;
         public const int LOW_PRIORITY = -SLEEP_CYCLE_LIMIT - 1;
-        public TimeSpan wakeUpTime = 30.Seconds();
 
         const int FALSE = 0;
         const int TRUE = 1;
