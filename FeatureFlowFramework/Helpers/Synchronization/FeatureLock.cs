@@ -192,12 +192,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLockReadOnly(out AcquiredLock readLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
-            var timer = new TimeFrame(timeout);
+            TimeFrame timer = new TimeFrame();
             bool waited = false;
             int cycleCount = 0;
             var currentLockIndicator = lockIndicator;
             if (reentrancySupported && currentLockIndicator != NO_LOCK)
             {
+                if (timer.IsInvalid) timer = new TimeFrame(timeout);
                 if (reentrancyIndicator.Value == reentrancyId)
                 {
                     readLock = new AcquiredLock(this, LockMode.Reentered);
@@ -207,6 +208,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
+                if (timer.IsInvalid) timer = new TimeFrame(timeout);
                 bool timedOut = TryLockReadOnlyWaitingLoop(ref priority, ref timer, ref cycleCount);
 
                 if (timedOut)
@@ -233,12 +235,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLock(out AcquiredLock writeLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
-            var timer = new TimeFrame(timeout);
+            TimeFrame timer = new TimeFrame();
             bool waited = false;
             int cycleCount = 0;
             var currentLockIndicator = lockIndicator;
             if (reentrancySupported && currentLockIndicator != NO_LOCK)
             {
+                if (timer.IsInvalid) timer = new TimeFrame(timeout);
                 var (reentered, timedOut , acquiredLock) = TryReenterForWritingWithTimeout(currentLockIndicator, timer);
                 writeLock = acquiredLock;
                 if (reentered) return true;                
@@ -246,6 +249,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }            
             while (WriterMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
+                if (timer.IsInvalid) timer = new TimeFrame(timeout);
                 bool timedOut = TryLockWaitingLoop(ref priority, ref timer, ref cycleCount);
 
                 if (timedOut)
