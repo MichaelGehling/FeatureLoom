@@ -14,8 +14,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private volatile bool isTaskUsed = false;        
         private volatile int barrier = BARRIER_OPEN;
         private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private ManualResetEventSlim mre = new ManualResetEventSlim(false, 0);
-        private ManualResetEventSlim mre_backup = new ManualResetEventSlim(false, 0);
+        private ManualResetEventSlim mre_active = new ManualResetEventSlim(false, 0);
+        private ManualResetEventSlim mre_wakingUp = new ManualResetEventSlim(false, 0);
 
         public AsyncManualResetEvent()
         {
@@ -50,7 +50,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public bool Wait()
         {
             if(isSet) return true;
-            mre.Wait();
+            mre_active.Wait();
             return true;
         }
 
@@ -59,7 +59,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if(isSet) return true;
             if(timeout <= TimeSpan.Zero) return false;
-            return mre.Wait(timeout);
+            return mre_active.Wait(timeout);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -67,7 +67,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (cancellationToken.IsCancellationRequested) return false;
             if (isSet) return true;            
-            mre.Wait(cancellationToken);
+            mre_active.Wait(cancellationToken);
             return !cancellationToken.IsCancellationRequested;
         }
 
@@ -77,7 +77,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (cancellationToken.IsCancellationRequested) return false;
             if (isSet) return true;            
             if (timeout <= TimeSpan.Zero) return false;
-            return mre.Wait(timeout, cancellationToken);
+            return mre_active.Wait(timeout, cancellationToken);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -149,11 +149,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             
             if (isTaskUsed) tcs.SetResult(true);
 
-            var mreTemp = mre;
-            mre = mre_backup;
-            mre_backup = mreTemp;
+            var mreTemp = mre_active;
+            mre_active = mre_wakingUp;
+            mre_wakingUp = mreTemp;
 
-            mre_backup.Set();
+            mre_wakingUp.Set();
 
             barrier = BARRIER_OPEN;
             return true;
@@ -170,7 +170,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 return false;
             }
 
-            mre.Reset();
+            mre_active.Reset();
 
             if (tcs.Task.IsCompleted)
             {
@@ -206,13 +206,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             isSet = true;
             Thread.MemoryBarrier();
             if(isTaskUsed) tcs.SetResult(true);
-            var mreTemp = mre;
-            mre = mre_backup;
-            mre_backup = mreTemp;
-            mre_backup.Set();
+            var mreTemp = mre_active;
+            mre_active = mre_wakingUp;
+            mre_wakingUp = mreTemp;
+            mre_wakingUp.Set();
 
             //RESET
-            mre.Reset();
+            mre_active.Reset();
             if(tcs.Task.IsCompleted)
             {
                 isTaskUsed = false;
@@ -232,7 +232,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
         {
-            waitHandle = mre.WaitHandle;
+            waitHandle = mre_active.WaitHandle;
             return true;
         }
     }
