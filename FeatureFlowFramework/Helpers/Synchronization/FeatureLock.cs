@@ -513,10 +513,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var currentLockIndicator = lockIndicator;
             if(reentrancySupported && currentLockIndicator != NO_LOCK)
             {
-                var (reentered, timedOut, acquiredLock) = TryReenterForWritingWithTimeout(currentLockIndicator, new TimeFrame());
-                mode = acquiredLock.mode;
-                if (reentered) return true;
-                else if(timedOut) return false;
+                var (reentered, acquiredLock) = TryReenterForWriting(currentLockIndicator);
+                if (reentered)
+                {
+                    mode = acquiredLock.mode;
+                    return true;
+                }
             }
             if(WriterMustWait(currentLockIndicator, priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
@@ -596,6 +598,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (NO_LOCK == newLockIndicator)
             {
                 mre.Set();
+            }
+            else
+            {
+                RemoveReentrancyContext();
             }
         }
 
