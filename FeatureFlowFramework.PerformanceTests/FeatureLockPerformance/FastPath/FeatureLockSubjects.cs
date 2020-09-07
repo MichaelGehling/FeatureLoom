@@ -11,7 +11,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
     public class FeatureLockSubjects
     {
         FeatureLock myLock = new FeatureLock();
-        FeatureLock reentrantLock = new FeatureLock(true);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
@@ -70,7 +69,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLock()
         {
-            using (reentrantLock.Lock())
+            using (myLock.LockReentrant())
             {
 
             }
@@ -79,7 +78,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task ReentrantLockAsync()
         {
-            using (await reentrantLock.LockAsync())
+            using (await myLock.LockReentrantAsync())
             {
 
             }
@@ -88,7 +87,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLockReadOnly()
         {
-            using (reentrantLock.LockReadOnly())
+            using (myLock.LockReadOnlyReentrant())
             {
 
             }
@@ -97,7 +96,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task ReentrantLockReadOnlyAsync()
         {
-            using (await reentrantLock.LockReadOnlyAsync())
+            using (await myLock.LockReadOnlyReentrantAsync())
             {
 
             }
@@ -106,7 +105,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantTryLock()
         {
-            if (reentrantLock.TryLock(out var acquiredLock)) using (acquiredLock)
+            if (myLock.TryLockReentrant(out var acquiredLock)) using (acquiredLock)
                 {
 
                 }
@@ -115,7 +114,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantTryLockReadOnly()
         {
-            if (reentrantLock.TryLockReadOnly(out var acquiredLock)) using (acquiredLock)
+            if (myLock.TryLockReadOnlyReentrant(out var acquiredLock)) using (acquiredLock)
             {
 
             }
