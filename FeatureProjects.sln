@@ -25,6 +25,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlowFramework.Forms"
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlowFramework.PerformanceTests", "FeatureFlowFramework.PerformanceTests\FeatureFlowFramework.PerformanceTests.csproj", "{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}"
+	ProjectSection(ProjectDependencies) = postProject
+		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +56,10 @@ Global
 		{6ABB1FCC-6E5A-4934-9782-7381B2F492B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6ABB1FCC-6E5A-4934-9782-7381B2F492B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6ABB1FCC-6E5A-4934-9782-7381B2F492B6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
