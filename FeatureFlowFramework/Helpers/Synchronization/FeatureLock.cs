@@ -36,7 +36,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile int highestPriority = MIN_PRIORITY;
         volatile int secondHighestPriority = MIN_PRIORITY;
         volatile int waitingForUpgrade = FALSE;
-        volatile int reentrancyId = 0;
+        volatile int reentrancyId = 1;
 
         AsyncLocal<int> reentrancyIndicator;
 
@@ -319,6 +319,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return timedOut;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool HasValidReentrancyContext() => reentrancyId == reentrancyIndicator.Value;
+
         private (bool reentered, bool timedOut, AcquiredLock acquiredLock) TryReenterForWritingWithTimeout(int currentLockIndicator, TimeFrame timer)
         {
             if (reentrancyIndicator.Value == reentrancyId)
@@ -570,16 +573,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void ResetMRE()
-        {
-            if (lockIndicator != NO_LOCK)
-            {
-                mre.Reset();
-                if (lockIndicator == NO_LOCK) mre.Set();
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReaderMustWait(int currentLockIndicator, int priority)
         {
             return currentLockIndicator == WRITE_LOCK || priority < highestPriority || (reentrancySupported && waitingForUpgrade == TRUE);
@@ -597,6 +590,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = Interlocked.Decrement(ref lockIndicator);
             if (NO_LOCK == newLockIndicator)
             {
+                if (reentrancySupported) reentrancyId++;
                 mre.Set();
             }
             else
@@ -607,7 +601,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
-        {            
+        {
+            if (reentrancySupported) reentrancyId++;
             lockIndicator = NO_LOCK;
             mre.Set();
         }
