@@ -14,7 +14,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         const int SLEEP_CYCLE_LIMIT = 500;
         const int YIELD_CYCLE_LIMIT = 400;
-        const int TASK_YIELD_FREQ = 10;
 
         public const int MAX_PRIORITY = int.MaxValue;
         public const int MIN_PRIORITY = int.MinValue;
@@ -404,7 +403,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
+                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -414,11 +413,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     if (didReset) mre.Set();
                 }
-                else if (cycleCount > YIELD_CYCLE_LIMIT)
-                {
-                    if (cycleCount % TASK_YIELD_FREQ == TASK_YIELD_FREQ-1) await Task.Yield();
-                    else Thread.Yield();
-                }
+                else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
 
                 waited = true;
                 currentLockIndicator = lockIndicator;
@@ -538,7 +533,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if (!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT)
+                if (!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -548,11 +543,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     else if (didReset) mre.Set();
                 }
-                else if (cycleCount > YIELD_CYCLE_LIMIT)
-                {
-                    if (cycleCount % TASK_YIELD_FREQ == TASK_YIELD_FREQ-1) await Task.Yield();
-                    else Thread.Yield();
-                }
+                else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
 
                 waited = true;
                 currentLockIndicator = lockIndicator;
@@ -564,13 +555,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void ResetMRE()
+        private bool IsThreadPoolCloseToStarving()
         {
-            if (lockIndicator != NO_LOCK)
-            {
-                mre.Reset();
-                if (lockIndicator == NO_LOCK) mre.Set();
-            }
+            ThreadPool.GetAvailableThreads(out int availableThreads, out _);
+            return availableThreads == 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
