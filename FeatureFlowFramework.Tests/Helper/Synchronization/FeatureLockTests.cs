@@ -168,6 +168,22 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         }
 
         [Fact]
+        public async void CanTryLockAsync()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            using(myLock.Lock())
+            {
+                Assert.False((await myLock.TryLockAsync()).Out(out var notAcquiredLock));
+                Assert.False(notAcquiredLock.IsActive);
+            }
+
+            Assert.True((await myLock.TryLockAsync()).Out(out var acquiredLock));
+            Assert.True(acquiredLock.IsActive);
+            acquiredLock.Exit();
+        }
+
+        [Fact]
         public void PriotizedAttemptSucceedsFirst()
         {
             var myLock = new FeatureLock();
