@@ -313,6 +313,56 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<AsyncOut<bool, AcquiredLock>> TryLockReadOnlyAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
+        {
+            if(TryLockForReadingAsync(priority)) return acquiredReadLockTask;
+            else return TryLockForReadingAsync(timeout, priority);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private async Task<AsyncOut<bool, AcquiredLock>> TryLockForReadingAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
+        {
+            TimeFrame timer = new TimeFrame();
+            int cycleCount = 0;
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator + 1;
+            while(ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            {
+                if(timer.IsInvalid) timer = new TimeFrame(timeout);
+
+                bool timedOut = false;
+                if(timer.Elapsed) timedOut = true;
+                else
+                {
+                    bool nextInQueue = UpdatePriority(ref priority);
+                    cycleCount++;
+                    if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+                    {
+                        cycleCount = 1;
+                        bool didReset = mre.Reset();
+                        if(lockIndicator != NO_LOCK)
+                        {
+                            if(!await mre.WaitAsync(timer.Remaining)) timedOut = true;
+                        }
+                        else if(didReset) mre.Set();
+                    }
+                    else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                }
+
+                if(timedOut)
+                {
+                    if(priority >= highestPriority) highestPriority = MIN_PRIORITY;
+                    return (false, new AcquiredLock());
+                }
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator + 1;
+            }
+            UpdateAfterEnter(priority, cycleCount != 0);
+
+            return (true, new AcquiredLock(this, LockMode.ReadLock));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AsyncOut<bool, AcquiredLock>> TryLockAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
             if(TryLockForWritingAsync(priority)) return acquiredWriteLockTask;

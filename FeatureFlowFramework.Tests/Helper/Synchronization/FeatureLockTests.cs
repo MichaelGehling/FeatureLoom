@@ -184,6 +184,22 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         }
 
         [Fact]
+        public async void CanTryLockReadOnlyAsync()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            using(myLock.Lock())
+            {
+                Assert.False((await myLock.TryLockReadOnlyAsync()).Out(out var notAcquiredLock));
+                Assert.False(notAcquiredLock.IsActive);
+            }
+
+            Assert.True((await myLock.TryLockReadOnlyAsync()).Out(out var acquiredLock));
+            Assert.True(acquiredLock.IsActive);
+            acquiredLock.Exit();
+        }
+
+        [Fact]
         public void PriotizedAttemptSucceedsFirst()
         {
             var myLock = new FeatureLock();
