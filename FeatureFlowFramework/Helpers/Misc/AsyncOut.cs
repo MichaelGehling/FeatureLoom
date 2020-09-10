@@ -2,7 +2,7 @@
 
 namespace FeatureFlowFramework.Helpers.Misc
 {
-    public struct AsyncOut<T, OUT>
+    public readonly struct AsyncOut<T, OUT>
     {
         private readonly T returnValue;
         private readonly OUT result;
@@ -20,6 +20,8 @@ namespace FeatureFlowFramework.Helpers.Misc
         }
 
         public T ReturnValue => returnValue;
+
+        public OUT OutResult => result;
 
         public static implicit operator AsyncOut<T, OUT>((T returnValue ,OUT result) tuple) => new AsyncOut<T, OUT>(tuple.returnValue, tuple.result);        
     }
