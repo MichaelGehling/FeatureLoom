@@ -409,7 +409,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         {
             var myLock = new FeatureLock();
             List<Task> tasks = new List<Task>();
-            TimeFrame executionTime = new TimeFrame(2.Seconds());
+            TimeFrame executionTime = new TimeFrame(1.Seconds());
             for(int i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(() =>
