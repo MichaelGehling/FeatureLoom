@@ -168,6 +168,80 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         }
 
         [Fact]
+        public async void CanTryLockAsync()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            using(myLock.Lock())
+            {
+                Assert.False((await myLock.TryLockAsync()).Succeeded(out var notAcquiredLock));
+                Assert.False(notAcquiredLock.IsActive);
+            }
+
+            Assert.True((await myLock.TryLockAsync()).Succeeded(out var acquiredLock));
+            Assert.True(acquiredLock.IsActive);
+            acquiredLock.Exit();
+        }
+
+        [Fact]
+        public async void CanTryLockReentrantAsync()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            if((await myLock.TryLockReentrantAsync()).Succeeded(out var outerLock))
+                using(outerLock)
+                {
+                    Assert.True(outerLock.IsActive);
+                    Assert.True((await myLock.TryLockReentrantAsync()).Succeeded(out var innerLock));
+                    Assert.True(innerLock.IsActive);
+                    Assert.True(myLock.IsWriteLocked);
+                    innerLock.Exit();
+                    Assert.True(myLock.IsWriteLocked);
+                }
+            Assert.False(myLock.IsLocked);
+        }
+
+        [Fact]
+        public async void CanTryLockReadOnlyReentrantAsync()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            if((await myLock.TryLockReadOnlyReentrantAsync()).Succeeded(out var outerLock))
+                using(outerLock)
+                {
+                    Assert.True(outerLock.IsActive);
+                    Assert.True((await myLock.TryLockReadOnlyReentrantAsync()).Succeeded(out var innerLock));
+                    Assert.True(innerLock.IsActive);
+                    Assert.True(myLock.IsReadOnlyLocked);
+                    innerLock.Exit();
+                    Assert.True(myLock.IsReadOnlyLocked);
+
+                    Assert.True((await myLock.TryLockReentrantAsync()).Succeeded(out var upgradedLock));
+                    Assert.True(upgradedLock.IsActive);
+                    Assert.True(myLock.IsWriteLocked);
+                    upgradedLock.Exit();
+                    Assert.False(myLock.IsWriteLocked);
+                }
+            Assert.False(myLock.IsLocked);
+        }
+
+        [Fact]
+        public async void CanTryLockReadOnlyAsync()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            using(myLock.Lock())
+            {
+                Assert.False((await myLock.TryLockReadOnlyAsync()).Succeeded(out var notAcquiredLock));
+                Assert.False(notAcquiredLock.IsActive);
+            }
+
+            Assert.True((await myLock.TryLockReadOnlyAsync()).Succeeded(out var acquiredLock));
+            Assert.True(acquiredLock.IsActive);
+            acquiredLock.Exit();
+        }
+
+        [Fact]
         public void PriotizedAttemptSucceedsFirst()
         {
             var myLock = new FeatureLock();
