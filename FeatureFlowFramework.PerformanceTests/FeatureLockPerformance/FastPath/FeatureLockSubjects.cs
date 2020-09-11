@@ -120,5 +120,23 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task ReentrantTryLockAsync()
+        {
+            if((await myLock.TryLockReentrantAsync()).Succeeded(out var acquiredLock)) using(acquiredLock)
+                {
+
+                }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task ReentrantTryLockReadOnlyAsync()
+        {
+            if((await myLock.TryLockReadOnlyReentrantAsync()).Succeeded(out var acquiredLock)) using(acquiredLock)
+                {
+
+                }
+        }
+
     }
 }

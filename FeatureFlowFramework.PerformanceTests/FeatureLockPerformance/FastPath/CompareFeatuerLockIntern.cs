@@ -50,5 +50,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
 
         [Benchmark]
         public void FeatureLock_ReentrantTryLockReadOnly() => featureLockSubjects.ReentrantTryLockReadOnly();
+
+        [Benchmark]
+        public void FeatureLock_ReentrantTryLockReadOnlyAsync() => featureLockSubjects.ReentrantTryLockReadOnlyAsync().Wait();
+
+        [Benchmark]
+        public void FeatureLock_ReentrantTryLockAsync() => featureLockSubjects.ReentrantTryLockAsync().Wait();
     }
 }
