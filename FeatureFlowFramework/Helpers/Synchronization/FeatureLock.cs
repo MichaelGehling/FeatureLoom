@@ -987,6 +987,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ExitReenteredLock()
+        {
+            // Nothing to do!
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DowngradeReentering()
         {
             lockIndicator = FIRST_READ_LOCK;
@@ -1049,7 +1055,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
 
-
         internal enum LockMode
         {
             WriteLock,
@@ -1081,28 +1086,27 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit()
             {
-                if(parentLock == null) throw new Exception("Lock was already released or wasn't successfully acquired!");
+                // This check is removed, because the *possible* exception nearly doubles run time for the optimal fast-path.
+                // Anyway, an NULL-exception will be thrown, in case of re-exit, because the parentlock cannot be accessed.
+                //if (parentLock == null) throw new Exception("Lock was already released or wasn't successfully acquired!");
 
-                if(mode == LockMode.WriteLock) parentLock.ExitWriteLock();
-                else if(mode == LockMode.ReadLock) parentLock.ExitReadLock();
-                else if(mode == LockMode.WriteLockReenterable) parentLock.ExitReentrantWriteLock();
-                else if(mode == LockMode.ReadLockReenterable) parentLock.ExitReentrantReadLock();
-                else if(mode == LockMode.Reentered) { /* do nothing, the lock will stay */ }
-                else if(mode == LockMode.Upgraded) parentLock.DowngradeReentering();
+                if (mode == LockMode.WriteLock) parentLock.ExitWriteLock();
+                else if (mode == LockMode.ReadLock) parentLock.ExitReadLock();
+                else if (mode == LockMode.WriteLockReenterable) parentLock.ExitReentrantWriteLock();
+                else if (mode == LockMode.ReadLockReenterable) parentLock.ExitReentrantReadLock();
+                else if (mode == LockMode.Reentered) parentLock.ExitReenteredLock();
+                else if (mode == LockMode.Upgraded) parentLock.DowngradeReentering();                                
+
                 parentLock = null;
             }
 
             public bool TryUpgradeToWriteMode()
             {
-                if(parentLock == null) throw new Exception("Lock was already released or wasn't successfully acquired!");
-
                 return parentLock?.TryUpgrade(ref mode) ?? false;
             }
 
             public bool TryDowngradeToReadOnlyMode()
             {
-                if(parentLock == null) throw new Exception("Lock was already released or wasn't successfully acquired!");
-
                 return parentLock?.TryDowngrade(ref mode) ?? false;
             }
 
