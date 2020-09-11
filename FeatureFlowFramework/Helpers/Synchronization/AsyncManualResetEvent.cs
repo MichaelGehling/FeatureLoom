@@ -181,6 +181,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             Thread.MemoryBarrier();
             isSet = false;
+            Thread.MemoryBarrier();
 
             barrier = BARRIER_OPEN;
             return true;
