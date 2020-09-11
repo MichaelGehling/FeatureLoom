@@ -5,6 +5,7 @@ using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.MetaData;
 using Newtonsoft.Json;
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -86,18 +87,16 @@ namespace FeatureFlowFramework.Workflows
         [JsonIgnore]
         protected abstract StateMachine WorkflowStateMachine { get; }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task<bool> ExecuteNextStepAsync(IStepExecutionController controller)
         {
-            bool result = true;
-            result = await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
-            return result;
+            return await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ExecuteNextStep(IStepExecutionController controller)
         {
-            bool result = true;
-            result = WorkflowStateMachine.ExecuteNextStep(this, controller);
-            return result;
+            return WorkflowStateMachine.ExecuteNextStep(this, controller);
         }
 
         public void Run(IWorkflowRunner runner = null)

@@ -4,6 +4,7 @@ using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Workflows
@@ -190,13 +191,22 @@ namespace FeatureFlowFramework.Workflows
         public override bool ExecuteNextStep<C>(C context, IStepExecutionController controller)
         {
             if (context is CT ct) return ExecuteNextStep(ct, controller);
-            else throw new Exception("Wrong context object used for this Statemachine!");
+            else
+            {
+                Log.ERROR(context.GetHandle(), $"Wrong context object used for this Statemachine! ({typeof(C)} instead of {typeof(CT)})");
+                return false;
+            }
         }
 
-        public override async Task<bool> ExecuteNextStepAsync<C>(C context, IStepExecutionController controller)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override Task<bool> ExecuteNextStepAsync<C>(C context, IStepExecutionController controller)
         {
-            if (context is CT ct) return await ExecuteNextStepAsync(ct, controller);
-            else throw new Exception("Wrong context object used for this Statemachine!");
+            if(context is CT ct) return ExecuteNextStepAsync(ct, controller);
+            else
+            {
+                Log.ERROR(context.GetHandle(), $"Wrong context object used for this Statemachine! ({typeof(C)} instead of {typeof(CT)})");
+                return Task.FromResult(false);
+            }
         }
 
         public virtual Workflow.ExecutionState HandleException(CT context, Exception e, Workflow.ExecutionState nextExecutionState)
@@ -258,8 +268,8 @@ namespace FeatureFlowFramework.Workflows
             Name = GetType().FullName;
         }
 
-        public abstract Task<bool> ExecuteNextStepAsync<CT>(CT context, IStepExecutionController controller = null);
+        public abstract Task<bool> ExecuteNextStepAsync<CT>(CT context, IStepExecutionController controller = null) where CT : class;
 
-        public abstract bool ExecuteNextStep<CT>(CT context, IStepExecutionController controller = null);
+        public abstract bool ExecuteNextStep<CT>(CT context, IStepExecutionController controller = null) where CT : class;
     }
 }
