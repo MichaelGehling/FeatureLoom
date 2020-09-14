@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using FeatureFlowFramework.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
 
     public class FeatureLockSubjects
@@ -64,6 +64,24 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
             {
 
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task TryLockAsync()
+        {
+            if((await myLock.TryLockAsync()).Succeeded(out var acquiredLock)) using(acquiredLock)
+                {
+
+                }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task TryLockReadOnlyAsync()
+        {
+            if((await myLock.TryLockReadOnlyAsync()).Succeeded(out var acquiredLock)) using(acquiredLock)
+                {
+
+                }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1,7 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
     //[SimpleJob(RuntimeMoniker.Net472, baseline: true)]
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
     //[SimpleJob(RuntimeMoniker.Mono)]
-    public class CompareSyncLock
+    public class FastPath_CompareSyncLock
     {
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
         MonitorSubjects monitorSubjects = new MonitorSubjects();

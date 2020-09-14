@@ -15,10 +15,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private volatile int barrier = BARRIER_OPEN;
         private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private ManualResetEventSlim mre_active = new ManualResetEventSlim(false, 0);
-        private ManualResetEventSlim mre_wakingUp = new ManualResetEventSlim(false, 0);
+        private ManualResetEventSlim mre_wakingUp = new ManualResetEventSlim(true, 0);
 
         public AsyncManualResetEvent()
         {
+
         }
 
         public AsyncManualResetEvent(bool initialState)
@@ -144,6 +145,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 return false;
             }
 
+            Thread.MemoryBarrier();
             isSet = true;
             Thread.MemoryBarrier();
             
@@ -204,6 +206,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             //SET
+            Thread.MemoryBarrier();
             isSet = true;
             Thread.MemoryBarrier();
             if(isTaskUsed) tcs.SetResult(true);
@@ -222,6 +225,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             Thread.MemoryBarrier();
             isSet = false;
+            Thread.MemoryBarrier();
 
             barrier = BARRIER_OPEN;
         }

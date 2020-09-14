@@ -1,7 +1,8 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
 
     public class AsyncExSubjects
@@ -9,20 +10,20 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         Nito.AsyncEx.AsyncLock myLock = new Nito.AsyncEx.AsyncLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Lock()
+        public void Lock(Action action)
         {
             using (myLock.Lock())
             {
-
+                action();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task LockAsync()
+        public async Task LockAsync(Action action)
         {
             using (await myLock.LockAsync())
             {
-
+                action();
             }
         }
     }

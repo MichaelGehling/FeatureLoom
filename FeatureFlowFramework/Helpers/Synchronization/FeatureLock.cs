@@ -46,7 +46,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         Task<AcquiredLock> reenterableWriteLockTask;
         Task<AcquiredLock> upgradedLockTask;
         Task<AcquiredLock> reenteredLockTask;
-        Task<LockAttempt> failedAttemtTask;
+        Task<LockAttempt> failedAttemptTask;
         Task<LockAttempt> readLockAttemptTask;
         Task<LockAttempt> reenterableReadLockAttemptTask;
         Task<LockAttempt> writeLockAttemptTask;
@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             upgradedLockTask = Task.FromResult(new AcquiredLock(this, LockMode.Upgraded));
             reenteredLockTask = Task.FromResult(new AcquiredLock(this, LockMode.Reentered));
 
-            failedAttemtTask = Task.FromResult(new LockAttempt(new AcquiredLock()));
+            failedAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock()));
             readLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.ReadLock)));
             reenterableReadLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.ReadLockReenterable)));
             writeLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.WriteLock)));
@@ -782,9 +782,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(priority < MAX_PRIORITY) priority++;
 
             bool nextInQueue = false;
-            if(priority >= highestPriority) highestPriority = priority;
-            else if(priority > secondHighestPriority) secondHighestPriority = priority;
-            nextInQueue = priority >= highestPriority;
+            if(priority >= highestPriority)
+            {
+                highestPriority = priority;
+                nextInQueue = true;
+            }
+            else if(priority > secondHighestPriority)
+            {
+                secondHighestPriority = priority;
+            }
 
             return nextInQueue;
         }

@@ -1,7 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
     //[SimpleJob(RuntimeMoniker.Net472, baseline: true)]
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
     //[SimpleJob(RuntimeMoniker.Mono)]
-    public class CompareSyncReadLock
+    public class FastPath_CompareSyncReadLock
     {
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
         ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();

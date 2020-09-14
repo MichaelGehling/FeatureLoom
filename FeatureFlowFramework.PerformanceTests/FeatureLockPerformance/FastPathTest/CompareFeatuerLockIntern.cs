@@ -1,7 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
 
     [MemoryDiagnoser]
@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
     //[SimpleJob(RuntimeMoniker.Net472, baseline: true)]
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
     //[SimpleJob(RuntimeMoniker.Mono)]
-    public class CompareFeatuerLockIntern
+    public class FastPath_CompareFeatuerLockIntern
     {
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
 
@@ -34,6 +34,12 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         public void FeatureLock_TryLockReadOnly() => featureLockSubjects.TryLockReadOnly();
 
         [Benchmark]
+        public void FeatureLock_TryLockAsync() => featureLockSubjects.TryLockAsync().Wait();
+
+        [Benchmark]
+        public void FeatureLock_TryLockReadOnlyAsync() => featureLockSubjects.TryLockReadOnlyAsync().Wait();
+
+        [Benchmark]
         public void FeatureLock_ReentrantLock() => featureLockSubjects.ReentrantLock();
 
         [Benchmark]
@@ -52,9 +58,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
         public void FeatureLock_ReentrantTryLockReadOnly() => featureLockSubjects.ReentrantTryLockReadOnly();
 
         [Benchmark]
-        public void FeatureLock_ReentrantTryLockReadOnlyAsync() => featureLockSubjects.ReentrantTryLockReadOnlyAsync().Wait();
+        public void FeatureLock_ReentrantTryLockAsync() => featureLockSubjects.ReentrantTryLockAsync().Wait();
 
         [Benchmark]
-        public void FeatureLock_ReentrantTryLockAsync() => featureLockSubjects.ReentrantTryLockAsync().Wait();
+        public void FeatureLock_ReentrantTryLockReadOnlyAsync() => featureLockSubjects.ReentrantTryLockReadOnlyAsync().Wait();
     }
 }

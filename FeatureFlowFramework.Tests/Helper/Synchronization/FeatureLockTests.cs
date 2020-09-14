@@ -410,10 +410,14 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             var myLock = new FeatureLock();
             List<Task> tasks = new List<Task>();
             TimeFrame executionTime = new TimeFrame(1.Seconds());
+
+            AsyncManualResetEvent starter = new AsyncManualResetEvent();
+
             for(int i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(() =>
                 {
+                    starter.Wait();
                     while(!executionTime.Elapsed)
                     {
                         using(myLock.Lock())
@@ -427,6 +431,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             {
                 tasks.Add(Task.Run(async () =>
                 {
+                    starter.Wait();
                     while(!executionTime.Elapsed)
                     {
                         using(await myLock.LockAsync())
@@ -440,6 +445,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             {
                 tasks.Add(Task.Run(() =>
                 {
+                    starter.Wait();
                     while(!executionTime.Elapsed)
                     {
                         using(myLock.LockReadOnly())
@@ -453,6 +459,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             {
                 tasks.Add(Task.Run(async () =>
                 {
+                    starter.Wait();
                     while(!executionTime.Elapsed)
                     {
                         using(await myLock.LockReadOnlyAsync())
@@ -462,7 +469,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 }));
             }
 
-
+            starter.Set();
             bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining + 100.Milliseconds());
             Assert.True(allFinished);
         }

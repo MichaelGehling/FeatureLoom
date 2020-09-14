@@ -342,10 +342,10 @@ namespace Playground
 
             Console.WriteLine("TEST 2");
             numReader = 1;
-            readerSlack = 0.01.Milliseconds();
+            readerSlack = 0.00.Milliseconds();
             numWriter = 1;
-            writerSlack = 0.01.Milliseconds();
-            executionTime = 0.01.Milliseconds();
+            writerSlack = 0.00.Milliseconds();
+            executionTime = 0.00.Milliseconds();
             duration = 3.Seconds();
 
 

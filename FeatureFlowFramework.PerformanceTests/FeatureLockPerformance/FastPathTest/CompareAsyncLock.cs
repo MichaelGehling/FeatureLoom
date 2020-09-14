@@ -3,7 +3,7 @@ using BenchmarkDotNet.Exporters;
 using BenchmarkDotNet.Exporters.Csv;
 using BenchmarkDotNet.Jobs;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPath
     //[SimpleJob(RuntimeMoniker.Net472, baseline: true)]
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
     //[SimpleJob(RuntimeMoniker.Mono)]
-    public class CompareAsyncLock
+    public class FastPath_CompareAsyncLock
     {
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
         SemaphoreSlimSubjects semaphoreSlimSubjects = new SemaphoreSlimSubjects();
