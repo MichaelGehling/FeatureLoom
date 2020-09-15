@@ -12,8 +12,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
 
-        const int SLEEP_CYCLE_LIMIT = 500;
-        const int YIELD_CYCLE_LIMIT = 400;
+        const int SLEEP_CYCLE_LIMIT = 0;
+        const int YIELD_CYCLE_LIMIT = 0;
 
         public const int MAX_PRIORITY = int.MaxValue;
         public const int MIN_PRIORITY = int.MinValue;
@@ -136,15 +136,23 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock(int priority = DEFAULT_PRIORITY)
-        {            
+        {
+            if (FirstTryLockForWriting(priority)) return new AcquiredLock(this, LockMode.WriteLock);
+            else return SecondTryLockForWriting(priority);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public AcquiredLock SecondTryLockForWriting(int priority = DEFAULT_PRIORITY)
+        {
             int cycleCount = 0;
-            while(WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 priority = LockWaitingLoop(priority, ref cycleCount);
             }
             UpdateAfterEnter(priority, cycleCount != 0);
             return new AcquiredLock(this, LockMode.WriteLock);
         }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReentrant(int priority = DEFAULT_PRIORITY)
@@ -208,7 +216,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockAsync(int priority = DEFAULT_PRIORITY)
         {
-            if(TryLockForWritingAsync(priority)) return writeLockTask;
+            if(FirstTryLockForWriting(priority)) return writeLockTask;
             else return LockForWritingAsync(priority);
         }
 
@@ -336,7 +344,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
-                        if(lockIndicator != NO_LOCK)
+                        if (lockIndicator != NO_LOCK)
                         {
                             if(!await mre.WaitAsync(timer.Remaining)) timedOut = true;
                         }
@@ -361,7 +369,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<LockAttempt> TryLockAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
-            if(TryLockForWritingAsync(priority)) return writeLockAttemptTask;
+            if(FirstTryLockForWriting(priority)) return writeLockAttemptTask;
             else return TryLockForWritingAsync(timeout, priority);
         }
 
@@ -384,7 +392,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
-                        if(lockIndicator != NO_LOCK)
+                        if (lockIndicator != NO_LOCK)
                         {
                             if(!await mre.WaitAsync(timer.Remaining)) timedOut = true;
                         }
@@ -461,7 +469,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
-                        if(lockIndicator != NO_LOCK)
+                        if (lockIndicator != NO_LOCK)
                         {
                             if(!await mre.WaitAsync(timer.Remaining)) timedOut = true;
                         }
@@ -520,7 +528,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
-                        if(lockIndicator != NO_LOCK)
+                        if (lockIndicator != NO_LOCK)
                         {
                             if(!await mre.WaitAsync(timer.Remaining)) timedOut = true;
                         }
@@ -640,7 +648,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 cycleCount = 1;
 
                 bool didReset = mre.Reset();
-                if(lockIndicator != NO_LOCK)
+                if (lockIndicator != NO_LOCK)
                 {
                     mre.Wait();
                 }
@@ -723,7 +731,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
-                    if(lockIndicator != NO_LOCK)
+                    if (lockIndicator != NO_LOCK)
                     {
                         await mre.WaitAsync().ConfigureAwait(false);
                     }
@@ -756,7 +764,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
-                    if(lockIndicator != NO_LOCK)
+                    if (lockIndicator != NO_LOCK)
                     {
                         await mre.WaitAsync().ConfigureAwait(false);
                     }
@@ -830,7 +838,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryLockForWritingAsync(int priority)
+        private bool FirstTryLockForWriting(int priority)
         {
             if(WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {

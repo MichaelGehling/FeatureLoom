@@ -122,7 +122,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
-
             if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
             if (isSet) return Task.FromResult(true);
             if (timeout <= TimeSpan.Zero) return Task.FromResult(false);
@@ -148,7 +147,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             Thread.MemoryBarrier();
             isSet = true;
             Thread.MemoryBarrier();
-            
+
             if (isTaskUsed) tcs.SetResult(true);
 
             var mreTemp = mre_active;
@@ -176,7 +175,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (tcs.Task.IsCompleted)
             {
-                isTaskUsed = false;
+                //isTaskUsed = false; // TODO: Still in some cases it seems that the task completion source is not renewed when it should.
                 Thread.MemoryBarrier();
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
@@ -219,7 +218,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             mre_active.Reset();
             if(tcs.Task.IsCompleted)
             {
-                isTaskUsed = false;
+                //isTaskUsed = false;  // TODO: Still in some cases it seems that the task completion source is not renewed when it should.
                 Thread.MemoryBarrier();
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
