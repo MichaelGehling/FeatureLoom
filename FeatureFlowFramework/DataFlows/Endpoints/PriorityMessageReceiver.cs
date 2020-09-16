@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class PriorityMessageReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
+    public class PriorityMessageReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         FeatureLock myLock = new FeatureLock();

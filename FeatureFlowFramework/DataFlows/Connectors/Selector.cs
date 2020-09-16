@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class Selector<T> : IDataFlowSink, IAlternativeDataFlow
+    public class Selector<T> : IDataFlowSink<T>, IAlternativeDataFlow
     {
         private volatile bool multiMatch = false;
         private List<(Func<T, bool> predicate, DataFlowSourceHelper sender)> options = null;

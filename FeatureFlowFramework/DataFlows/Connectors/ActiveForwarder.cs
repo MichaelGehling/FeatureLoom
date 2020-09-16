@@ -28,7 +28,7 @@ namespace FeatureFlowFramework.DataFlows
     ///     scaling parameters can be configured.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
-    public class ActiveForwarder<T> : Forwarder
+    public class ActiveForwarder<T> : Forwarder, IDataFlowConnection<T>
     {
         private readonly QueueReceiver<T> receiver;
         FeatureLock receiverLock = new FeatureLock();

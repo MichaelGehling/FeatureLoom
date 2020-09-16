@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Synchronization;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -68,6 +69,8 @@ namespace FeatureFlowFramework.Workflows
 
         protected void AddToRunningWorkflows(Workflow workflow)
         {
+            if(workflow.IsRunning) throw new Exception("Workflow is already running!");
+
             workflow.Runner = this;
             using(runningWorkflowsLock.Lock())
             {

@@ -24,17 +24,44 @@ namespace FeatureFlowFramework.DataFlows
 
         private readonly Action<IDataFlowSink> onConnection;
         private readonly Action<IDataFlowSink> onDisconnection;
+        private readonly Action<IDataFlowSink> connectionCheck;
 
         FeatureLock myLock = new FeatureLock();
 
-        public DataFlowSourceHelper(Action<IDataFlowSink> onConnection = null, Action<IDataFlowSink> onDisconnection = null)
+        public DataFlowSourceHelper(Action<IDataFlowSink> onConnection = null, Action<IDataFlowSink> onDisconnection = null, Action<IDataFlowSink> connectionCheck = null)
         {
             this.onConnection = onConnection;
             this.onDisconnection = onDisconnection;
+            this.connectionCheck = connectionCheck;
         }
 
         public DataFlowSourceHelper()
         {
+        }
+
+        public DataFlowSourceHelper(Action<IDataFlowSink> connectionCheck)
+        {
+            this.connectionCheck = connectionCheck;
+        }
+
+        public DataFlowSourceHelper(Type typeConnectionRestriction)
+        {
+            this.connectionCheck = CreateTypeConnectionRestriction(typeConnectionRestriction);
+        }
+
+        public static Action<IDataFlowSink> CreateTypeConnectionRestriction(Type typeConnectionRestriction)
+        {
+            Type genericSinkType = typeof(IDataFlowSink<>);
+            Type allowedSinkType = genericSinkType.MakeGenericType(typeConnectionRestriction);
+
+            return sink =>
+            {
+                Type sinkType = sink.GetType();
+                if(sinkType.ImplementsGenericInterface(genericSinkType) && !sinkType.GetFirstTypeParamOfGenericInterface(genericSinkType).IsAssignableFrom(typeConnectionRestriction))
+                {
+                    throw new Exception($"Type restriction of DataFlowSource and DataFlowSource not fulfilled. {typeConnectionRestriction.Name} cannot be assigned to {sinkType.GetFirstTypeParamOfGenericInterface(genericSinkType).Name}. Connection not allowed!");
+                }
+            };
         }
 
         public IDataFlowSink[] GetConnectedSinks()
@@ -196,6 +223,8 @@ namespace FeatureFlowFramework.DataFlows
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
             if(sink == null) throw new Exception("The sink to be connected is NULL!");
+            connectionCheck?.Invoke(sink);
+
             if(sinks == null)
             {
                 using (myLock.Lock())

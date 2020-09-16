@@ -14,7 +14,7 @@ namespace FeatureFlowFramework.DataFlows
     ///     blocking the sender.
     /// </summary>
     /// <typeparam name="T"> </typeparam>
-    public class ProcessingEndpoint<T> : IDataFlowSink, IAlternativeDataFlow
+    public class ProcessingEndpoint<T> : IDataFlowSink<T>, IAlternativeDataFlow
     {
         private readonly Func<T, bool> processing;
         private readonly Func<T, Task<bool>> processingAsync;

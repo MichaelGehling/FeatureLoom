@@ -32,9 +32,9 @@ namespace FeatureFlowFramework.DataFlows
             sendingHelper.Forward(message);
         }
 
-        public virtual async Task PostAsync<M>(M message)
+        public virtual Task PostAsync<M>(M message)
         {
-            await sendingHelper.ForwardAsync(message);
+            return sendingHelper.ForwardAsync(message);            
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
@@ -45,6 +45,20 @@ namespace FeatureFlowFramework.DataFlows
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
             return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+        }
+    }
+
+    public class Forwarder<T>: Forwarder, IDataFlowConnection<T>
+    {
+        public override void Post<M>(in M message)
+        {
+            if (message is T) sendingHelper.Forward(message);
+        }
+
+        public override Task PostAsync<M>(M message)
+        {
+            if(message is T) return sendingHelper.ForwardAsync(message);
+            else return Task.CompletedTask;
         }
     }
 }

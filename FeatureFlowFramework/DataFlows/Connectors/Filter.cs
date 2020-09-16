@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
     ///     also thread-safe. Avoid long running functions to avoid blocking the sender
     /// </summary>
     /// <typeparam name="T"> The input type for the filter function </typeparam>
-    public class Filter<T> : IDataFlowSource, IDataFlowConnection, IAlternativeDataFlow
+    public class Filter<T> : IDataFlowConnection<T>, IAlternativeDataFlow
     {
         protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
         protected Func<T, bool> predicate;

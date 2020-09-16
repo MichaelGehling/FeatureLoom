@@ -1,10 +1,29 @@
 ﻿using System;
+using System.Linq;
 
 namespace FeatureFlowFramework.Helpers.Extensions
 {
     public static class TypeExtensions
     {
         public static bool IsNullable(this Type type) => Nullable.GetUnderlyingType(type) != null;
+
+
+        public static bool ImplementsGenericInterface(this Type typeToCheck, Type genericInterfaceType)
+        {
+            return typeToCheck.GetInterfaces().Any(x => x.IsGenericType && x.GetGenericTypeDefinition() == genericInterfaceType);
+        }
+
+        public static Type GetFirstTypeParamOfGenericInterface(this Type typeToCheck, Type genericInterfaceType)
+        {
+            foreach(var type in typeToCheck.GetInterfaces())
+            {
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
+                {
+                    return type.GetGenericArguments()[0];
+                }
+            }            
+            return null;
+        }
 
         public static bool IsOfGenericType(this Type typeToCheck, Type genericType)
         {

@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
     /// </summary>
     /// <typeparam name="I"> The input type for the converter function </typeparam>
     /// <typeparam name="O"> The output type for the converter function </typeparam>
-    public class MessageConverter<I, O> : IDataFlowSource, IDataFlowConnection
+    public class MessageConverter<I, O> : IDataFlowConnection<I, O>
     {
         private DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
         private readonly Func<I, O> convertFunc;

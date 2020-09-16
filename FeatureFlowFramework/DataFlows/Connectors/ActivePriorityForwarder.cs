@@ -19,7 +19,7 @@ namespace FeatureFlowFramework.DataFlows
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
     /// <typeparam name="T"> The supported message type </typeparam>
-    public class ActivePriorityForwarder<T> : Forwarder
+    public class ActivePriorityForwarder<T> : Forwarder, IDataFlowConnection<T>
     {
         private PriorityQueueReceiver<T> receiver;
         FeatureLock receiverLock = new FeatureLock();

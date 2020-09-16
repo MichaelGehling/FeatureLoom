@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class LatestMessageReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
+    public class LatestMessageReceiver<T> : IDataFlowQueue, IDataFlowSink<T>, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         FeatureLock myLock = new FeatureLock();

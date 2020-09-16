@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows
         }
     }
 
-    public class BufferingForwarder<T> : IDataFlowSink, IDataFlowSource, IDataFlowConnection
+    public class BufferingForwarder<T> : IDataFlowConnection<T>
     {
         private DataFlowSourceHelper sourceHelper;
         private CountingRingBuffer<T> buffer;

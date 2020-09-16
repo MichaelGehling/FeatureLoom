@@ -124,15 +124,15 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
         public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent.AsyncWaitHandle;
 
-        public TcpClientEndpoint(Config config = null, ITcpMessageEncoder encoder = null, ITcpMessageDecoder decoder = null)
+        public TcpClientEndpoint(Config config = null, ITcpMessageEncoder encoder = null, ITcpMessageDecoder decoder = null, bool autoRun = true)
         {
-            if (config == null) config = new Config();
+            if(config == null) config = new Config();
             this.config = config;
-            if (encoder == null || decoder == null)
+            if(encoder == null || decoder == null)
             {
                 DefaultTcpMessageEncoderDecoder defaultEncoderDecoder = new DefaultTcpMessageEncoderDecoder();
-                if (encoder == null) encoder = defaultEncoderDecoder;
-                if (decoder == null) decoder = defaultEncoderDecoder;
+                if(encoder == null) encoder = defaultEncoderDecoder;
+                if(decoder == null) decoder = defaultEncoderDecoder;
                 this.encoder = encoder;
                 this.decoder = decoder;
             }
@@ -140,7 +140,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
             messageEncoder = new MessageConverter<object, byte[]>(msg => encoder.Encode(msg));
             sendingSink.ConnectTo(messageEncoder);
 
-            this.Run();
+            if(autoRun) this.Run();
         }
 
         public void DisconnectFromTcpServer()

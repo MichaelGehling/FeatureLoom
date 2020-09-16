@@ -19,7 +19,7 @@ namespace FeatureFlowFramework.DataFlows
     /// Uses a normal queue plus locking instead of a concurrent queue because of better performance
     /// in usual scenarios.
     /// <typeparam name="T"> The expected message type </typeparam>
-    public class QueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
+    public class QueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private Queue<T> queue = new Queue<T>();
         FeatureLock queueLock = new FeatureLock();

@@ -54,9 +54,9 @@ namespace FeatureFlowFramework.DataFlows
     }
 
     /// <summary> Used to send messages of a specific type to all connected sinks. It is thread safe. <summary>
-    public class Sender<T> : IDataFlowSource, ISender
+    public class Sender<T> : ISender, IDataFlowSource<T>
     {
-        protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
+        protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper(typeof(T));
 
         public int CountConnectedSinks => sendingHelper.CountConnectedSinks;
 

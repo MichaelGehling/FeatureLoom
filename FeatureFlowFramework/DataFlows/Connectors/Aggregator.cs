@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class Aggregator<T, A> : IDataFlowSource, IDataFlowConnection, IAlternativeDataFlow where A : IAggregationData, new()
+    public class Aggregator<T, A> : IDataFlowSink<T>, IDataFlowConnection, IAlternativeDataFlow where A : IAggregationData, new()
     {
         private DataFlowSourceHelper sender = new DataFlowSourceHelper();
         private DataFlowSourceHelper alternativeSender = new DataFlowSourceHelper();

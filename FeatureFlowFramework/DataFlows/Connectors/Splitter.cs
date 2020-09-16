@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
 {
-    public class Splitter<T> : IDataFlowConnection, IDataFlowSink, IDataFlowSource
+    public class Splitter<T> : IDataFlowConnection, IDataFlowSink<T>
     {
         private DataFlowSourceHelper sender = new DataFlowSourceHelper();
         private readonly Func<T, ICollection> split;
