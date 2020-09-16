@@ -12,8 +12,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
 
-        const int SLEEP_CYCLE_LIMIT = 0;
-        const int YIELD_CYCLE_LIMIT = 0;
+        const int SLEEP_CYCLE_LIMIT = 500;
+        const int YIELD_CYCLE_LIMIT = 400;
 
         public const int MAX_PRIORITY = int.MaxValue;
         public const int MIN_PRIORITY = int.MinValue;

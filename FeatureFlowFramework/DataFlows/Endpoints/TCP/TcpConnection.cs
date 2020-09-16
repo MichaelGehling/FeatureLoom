@@ -22,17 +22,19 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 var closing = State("Closing");
 
                 receivingAndDecoding.Build()
-                    .Step("On disconnection goto closing")
-                        .If(c => !c.client.Connected)
-                            .Goto(closing)
                     .Step("Await more data from stream if all data was processed or last message was incomplete")
                         .If(c => c.decodingResult == DecodingResult.Incomplete || c.bufferReadPosition == c.bufferFillState)
                             .Do(async c =>
                             {
                                 var bytesRead = await c.stream.ReadAsync(c.buffer, c.bufferFillState, c.bufferSize - c.bufferFillState, c.CancellationToken);
-                                c.bufferFillState += bytesRead;
+                                // Client may not recognize diconnection, so when stream is exhausted, connection is closed
+                                if(bytesRead == 0) c.client.Close();
+                                else c.bufferFillState += bytesRead;
                             })
                         .CatchAndGoto(closing)
+                    .Step("On disconnection goto closing")
+                        .If(c => !c.client.Connected)
+                            .Goto(closing)
                     .Step("Try to decode message from received data")
                         .Do(c =>
                         {

@@ -195,6 +195,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
+            if(sink == null) throw new Exception("The sink to be connected is NULL!");
             if(sinks == null)
             {
                 using (myLock.Lock())

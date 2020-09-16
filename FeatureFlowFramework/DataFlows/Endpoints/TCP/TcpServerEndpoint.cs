@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.DataStorage;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
@@ -11,6 +12,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows.TCP
@@ -49,6 +51,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                 c.awaitedConnectionRequest = c.listner.AcceptTcpClientAsync();
                                 c.awaited.Add(AsyncWaitHandle.FromTask(c.awaitedConnectionRequest));
                             }
+                            else c.awaited.Add(AsyncWaitHandle.FromTask(c.awaitedConnectionRequest));
+
                             c.awaited.Add(c.config.SubscriptionWaitHandle);
                             foreach(var con in c.connections)
                             {
@@ -71,6 +75,9 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                 connection.ReceivingSource.ConnectTo(c.receivedMessageSource);
                                 c.connections.Add(connection);
                                 c.connectionWaitEvent.Set();
+
+                                if(c.connections.Count == 1) c.connectionEventSender.Send(ConnectionEvents.FirstConnected);
+                                c.connectionEventSender.Send(ConnectionEvents.Connected);
                             })
                     .Step("Stop and remove disconnected clients if timer expired")
                         .If(c =>
@@ -89,17 +96,21 @@ namespace FeatureFlowFramework.DataFlows.TCP
                                     {
                                         connection.Stop();
                                         c.connectionForwarder.DisconnectFrom(connection.SendingSink);
+                                        c.connectionEventSender.Send(ConnectionEvents.Disconnected);
                                         return true;
                                     }
                                     return false;
                                 });
-                                if (c.connections.Count == 0) c.connectionWaitEvent.Reset();
+                                if(c.connections.Count == 0)
+                                {
+                                    c.connectionWaitEvent.Reset();
+                                    c.connectionEventSender.Send(ConnectionEvents.LastDisconnected);
+                                }
                             })
                     .Step("Continue waiting for next events")
                         .Loop();
             }
         }
-
         public class Config : Configuration
         {
             public bool resolveByDns = true;
@@ -131,6 +142,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
 
         private Task<TcpClient> awaitedConnectionRequest;
         private List<IAsyncWaitHandle> awaited = new List<IAsyncWaitHandle>();
+
+        private Sender connectionEventSender = new Sender();
 
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
         public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent.AsyncWaitHandle;
@@ -189,9 +202,14 @@ namespace FeatureFlowFramework.DataFlows.TCP
         private void DeactivateServer()
         {
             Log.INFO(this.GetHandle(), $"TCP Server deactivated. {connections.Count} connections will be disconnected!");
-            foreach (var connection in connections) connection.Stop();
+            foreach(var connection in connections)
+            {
+                connection.Stop();
+                connectionEventSender.Send(ConnectionEvents.Disconnected);
+            }
             connections.Clear();
             connectionForwarder.DisconnectAll();
+            connectionEventSender.Send(ConnectionEvents.LastDisconnected);
             listner?.Stop();
             listner = null;
         }
@@ -207,9 +225,14 @@ namespace FeatureFlowFramework.DataFlows.TCP
                 if (!initial)
                 {
                     Log.WARNING(this.GetHandle(), $"TCP Server reset. {connections.Count} connections will be disconnected!");
-                    foreach (var connection in connections) connection.Stop();
+                    foreach(var connection in connections)
+                    {
+                        connection.Stop();
+                        connectionEventSender.Send(ConnectionEvents.Disconnected);
+                    }
                     connections.Clear();
                     connectionForwarder.DisconnectAll();
+                    connectionEventSender.Send(ConnectionEvents.LastDisconnected);
                 }
                 listner?.Stop();
                 listner = new TcpListener(ipAddress, config.port);
@@ -242,6 +265,8 @@ namespace FeatureFlowFramework.DataFlows.TCP
         public int CountConnectedClients => connections.Count;
 
         public int CountConnectedSinks => ReceivingFromTcpSource.CountConnectedSinks;
+
+        public IDataFlowSource ConnectionEventSource => connectionEventSender;
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
@@ -282,6 +307,14 @@ namespace FeatureFlowFramework.DataFlows.TCP
         {
             this.ConnectTo(replier, weakReference);
             replier.ConnectTo(this, weakReference);
+        }
+
+        public enum ConnectionEvents
+        {
+            FirstConnected,
+            LastDisconnected,
+            Connected,
+            Disconnected
         }
     }
 }
