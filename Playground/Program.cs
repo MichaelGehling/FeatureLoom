@@ -49,8 +49,42 @@ namespace Playground
             var x = i;
         }
 
+        public static bool TestMRE(FeatureFlowFramework.Helpers.Synchronization.AsyncManualResetEvent mre)
+        {
+            
+
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+
+            bool started = false;
+            bool done = false;
+
+            var task1 = Task.Run(() =>
+            {
+                started = true;
+                mre.Wait();
+                done = true;
+            });
+
+            while (!started) Thread.Yield();
+            mre.Set();
+
+            while(!done && sw.ElapsedMilliseconds < 1000) Thread.Yield();
+            return done;
+        }
+
         static void Main(string[] args)
         {
+            var mre = new FeatureFlowFramework.Helpers.Synchronization.AsyncManualResetEvent(false);
+            for(long i = 0; i < long.MaxValue; i++)
+            {
+                if (i % 1_000_000 == 0) Console.WriteLine($"Iteration {i}");
+                if(!TestMRE(mre)) Console.WriteLine($"************ Failed at iteration {i}! ************");
+            }
+
+            Console.ReadKey();
+
+
 
             
             /* var guessTheWord = new GuessTheWord();

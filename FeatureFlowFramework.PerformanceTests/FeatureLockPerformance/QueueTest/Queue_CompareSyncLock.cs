@@ -22,13 +22,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
-        [Params(1)]
+        [Params(1, 1000)]
         public int numProducers
         {
             set => queueTest.numProducers = value;
         }
 
-        [Params(1)]
+        [Params(1, 1000)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -41,21 +41,21 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         }
 
         [Benchmark(Baseline = true)]
-        public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Lock);        
+        public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Lock);
 
         [Benchmark]
         public void Monitor_Lock() => queueTest.Run(monitorSubjects.Lock);
 
-        [Benchmark]
+        //[Benchmark]
         public void SemaphoreSlim_Lock() => queueTest.Run(semaphoreSlimSubjects.Lock);
 
-        [Benchmark]
+        //[Benchmark]
         public void ReaderWriterLockSlim_Lock() => queueTest.Run(readerWriterLockSlimSubjects.Lock);
 
-        [Benchmark]
+        //[Benchmark]
         public void AsyncEx_Lock() => queueTest.Run(asyncExSubjects.Lock);
 
-        [Benchmark]
+        //[Benchmark]
         public void NeoSmart_Lock() => queueTest.Run(neoSmartSubjects.Lock);
 
 
