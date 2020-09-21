@@ -15,7 +15,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numOverallMessages = 1_000_000;
 
         public void Run(Action<Action> producerLock, Action<Action> consumerLock = null)
-        {
+        {            
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
@@ -36,6 +36,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             queue.Enqueue(count++);
                         });
                     }
+                    //var timer = AppTime.TimeKeeper;
+                    //while(timer.Elapsed < 0.01.Milliseconds()) ;
                 }));
             }
             for(int i = 0; i < numConsumers; i++)
@@ -54,6 +56,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             }
                         });
                         if(empty) Thread.Yield();
+                        //var timer = AppTime.TimeKeeper;
+                        //while(timer.Elapsed < 0.01.Milliseconds()) ;
                     }
                 }));
             }

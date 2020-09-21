@@ -12,14 +12,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
 
-        const int SLEEP_CYCLE_LIMIT = 500;
-        const int YIELD_CYCLE_LIMIT = 400;
+        const int CYCLES_BEFORE_YIELDING = 200;
+        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + CYCLES_BEFORE_YIELDING/20;        
+
+        //const int CYCLES_BEFORE_YIELDING = 0;
+        //const int CYCLES_BEFORE_SLEEPING = 0;
 
         public const int MAX_PRIORITY = int.MaxValue;
         public const int MIN_PRIORITY = int.MinValue;
         public const int DEFAULT_PRIORITY = 0;
-        public const int HIGH_PRIORITY = SLEEP_CYCLE_LIMIT + 1;
-        public const int LOW_PRIORITY = -SLEEP_CYCLE_LIMIT - 1;
+        public const int HIGH_PRIORITY = CYCLES_BEFORE_SLEEPING + 5;
+        public const int LOW_PRIORITY = -CYCLES_BEFORE_SLEEPING - 5;
 
         const int FALSE = 0;
         const int TRUE = 1;
@@ -39,6 +42,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         AsyncLocal<int> reentrancyIndicator;
 
         AsyncManualResetEvent mre = new AsyncManualResetEvent(true);
+
+
+        object monitor = new object();
+        volatile int syncSleeping = 0;
+        volatile int asyncSleeping = 0;
+        volatile bool anySleeping = false;        
 
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> reenterableReadLockTask;
@@ -137,21 +146,74 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock(int priority = DEFAULT_PRIORITY)
         {
-            if (FirstTryLockForWriting(priority)) return new AcquiredLock(this, LockMode.WriteLock);
-            else return SecondTryLockForWriting(priority);
+            int cycleCount = 0;
+            while(lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {
+                cycleCount++;
+                if(anySleeping || cycleCount > CYCLES_BEFORE_SLEEPING)
+                {
+                    cycleCount = 0;
+                    Sleep();                    
+                }
+                else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
+            }
+            return new AcquiredLock(this, LockMode.WriteLock);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock SecondTryLockForWriting(int priority = DEFAULT_PRIORITY)
+        private void Sleep()
+        {
+            anySleeping = true;
+            Thread.MemoryBarrier();
+            if(lockIndicator != NO_LOCK)
+            {
+                Monitor.Enter(monitor);
+                if(lockIndicator != NO_LOCK)
+                {
+                    syncSleeping++;
+                    anySleeping = true;
+                    Monitor.Wait(monitor);
+                }
+                Monitor.Exit(monitor);
+            }
+        }
+
+        public void WaitForWritingLock(int priority = DEFAULT_PRIORITY)
         {
             int cycleCount = 0;
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            do
             {
-                priority = LockWaitingLoop(priority, ref cycleCount);
+                bool nextInQueue = UpdatePriority(ref priority);
+
+                cycleCount++;
+                if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
+                {
+                    cycleCount = 1;
+
+                    mre.Reset();
+                    if(lockIndicator != NO_LOCK)
+                    {
+                        mre.Wait();
+                    }
+                    else mre.Set();
+                }
+                else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
-            return new AcquiredLock(this, LockMode.WriteLock);
+            while(WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+
+            highestPriority = secondHighestPriority;
+            secondHighestPriority = MIN_PRIORITY;
         }
+
+
+
+
+
+
+
+
+
+
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -168,7 +230,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 priority = LockWaitingLoop(priority, ref cycleCount);
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
             reentrancyIndicator.Value = ++reentrancyId;
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
         }
@@ -185,7 +247,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
             return new AcquiredLock(this, LockMode.ReadLock);
         }
 
@@ -205,7 +267,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
             reentrancyIndicator.Value = reentrancyId;
@@ -216,7 +278,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockAsync(int priority = DEFAULT_PRIORITY)
         {
-            if(FirstTryLockForWriting(priority)) return writeLockTask;
+            if(TryGetWritingLock(priority)) return writeLockTask;
             else return LockForWritingAsync(priority);
         }
 
@@ -271,7 +333,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             readLock = new AcquiredLock(this, LockMode.ReadLock);
             return true;
@@ -307,7 +369,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
             reentrancyIndicator.Value = reentrancyId;
@@ -340,7 +402,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     bool nextInQueue = UpdatePriority(ref priority);
                     cycleCount++;
-                    if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+                    if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
@@ -350,7 +412,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                         else if(didReset) mre.Set();
                     }
-                    else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                    else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
                 }
 
                 if(timedOut)
@@ -361,7 +423,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             return new LockAttempt(new AcquiredLock(this, LockMode.ReadLock));
         }
@@ -369,7 +431,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<LockAttempt> TryLockAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
         {
-            if(FirstTryLockForWriting(priority)) return writeLockAttemptTask;
+            if(TryGetWritingLock(priority)) return writeLockAttemptTask;
             else return TryLockForWritingAsync(timeout, priority);
         }
 
@@ -388,7 +450,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     bool nextInQueue = UpdatePriority(ref priority);
                     cycleCount++;
-                    if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+                    if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
@@ -398,7 +460,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                         else if(didReset) mre.Set();
                     }
-                    else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                    else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
                 }
 
                 if(timedOut)
@@ -407,7 +469,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return new LockAttempt(new AcquiredLock());
                 }
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             return new LockAttempt(new AcquiredLock(this, LockMode.WriteLock));
         }
@@ -429,7 +491,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return false;
                 }
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             writeLock = new AcquiredLock(this, LockMode.WriteLock);
             return true;
@@ -465,7 +527,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     bool nextInQueue = UpdatePriority(ref priority);
                     cycleCount++;
-                    if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+                    if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
@@ -475,7 +537,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                         else if(didReset) mre.Set();
                     }
-                    else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                    else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
                 }
 
                 if(timedOut)
@@ -486,7 +548,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
             reentrancyIndicator.Value = reentrancyId;
@@ -524,7 +586,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     bool nextInQueue = UpdatePriority(ref priority);
                     cycleCount++;
-                    if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+                    if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
                     {
                         cycleCount = 1;
                         bool didReset = mre.Reset();
@@ -534,7 +596,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                         else if(didReset) mre.Set();
                     }
-                    else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                    else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
                 }
 
                 if(timedOut)
@@ -543,7 +605,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return new LockAttempt(new AcquiredLock());
                 }
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
             reentrancyIndicator.Value = ++reentrancyId;
 
             return new LockAttempt(new AcquiredLock(this, LockMode.WriteLockReenterable));
@@ -575,7 +637,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return false;
                 }
             }
-            UpdateAfterEnter(priority, cycleCount != 0);
+            UpdateAfterEnter(cycleCount != 0);
 
             reentrancyIndicator.Value = ++reentrancyId;
 
@@ -593,7 +655,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
                 cycleCount++;
-                if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+                if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -603,7 +665,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     else if (didReset) mre.Set();
                 }
-                else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
             }
 
             return timedOut;
@@ -638,12 +700,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return (false, false, new AcquiredLock());
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int LockWaitingLoop(int priority, ref int cycleCount)
         {
             bool nextInQueue = UpdatePriority(ref priority);
 
             cycleCount++;
-            if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+            if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
             {
                 cycleCount = 1;
 
@@ -654,7 +717,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 else if(didReset) mre.Set();
             }
-            else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+            else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
             return priority;
         }
 
@@ -662,7 +725,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             bool nextInQueue = UpdatePriority(ref priority);
             cycleCount++;
-            if(!nextInQueue || cycleCount > SLEEP_CYCLE_LIMIT)
+            if(!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
             {
                 cycleCount = 1;
                 bool didReset = mre.Reset();
@@ -672,7 +735,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 else if (didReset) mre.Set();
             }
-            else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+            else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
             return priority;
         }
 
@@ -727,7 +790,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT || IsThreadPoolCloseToStarving())
+                if(!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -737,13 +800,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     if (didReset) mre.Set();
                 }
-                else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
                 waited = true;
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, waited);
+            UpdateAfterEnter(waited);
 
             return new AcquiredLock(this, LockMode.ReadLock);
         }
@@ -760,7 +823,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT || IsThreadPoolCloseToStarving())
+                if(!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -770,13 +833,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     if(didReset) mre.Set();
                 }
-                else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
                 waited = true;
                 currentLockIndicator = lockIndicator;
                 newLockIndicator = currentLockIndicator + 1;
             }
-            UpdateAfterEnter(priority, waited);
+            UpdateAfterEnter(waited);
 
             if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
             reentrancyIndicator.Value = reentrancyId;
@@ -804,7 +867,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void UpdateAfterEnter(int priority, bool waited)
+        private void UpdateAfterEnter(bool waited)
         {
             if(waited)
             {
@@ -838,7 +901,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool FirstTryLockForWriting(int priority)
+        private bool TryGetWritingLock(int priority)
         {
             if(WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
@@ -886,7 +949,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if (!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT || IsThreadPoolCloseToStarving())
+                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -896,11 +959,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     else if (didReset) mre.Set();
                 }
-                else if (cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
                 waited = true;
             }
-            UpdateAfterEnter(priority, waited);
+            UpdateAfterEnter(waited);
 
             return new AcquiredLock(this, LockMode.WriteLock);
         }
@@ -915,7 +978,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if(!nextInQueue || ++cycleCount > SLEEP_CYCLE_LIMIT || IsThreadPoolCloseToStarving())
+                if(!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -925,11 +988,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                     else if(didReset) mre.Set();
                 }
-                else if(cycleCount > YIELD_CYCLE_LIMIT) Thread.Yield();
+                else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
                 waited = true;
             }
-            UpdateAfterEnter(priority, waited);
+            UpdateAfterEnter(waited);
             reentrancyIndicator.Value = ++reentrancyId;
 
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
@@ -973,8 +1036,34 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
-            lockIndicator = NO_LOCK;
-            mre.Set();
+            lockIndicator = NO_LOCK;                        
+            //mre.Set();
+
+            Thread.MemoryBarrier();
+            if(anySleeping)
+            {
+                WakeUp();
+            }
+        }
+
+        private void WakeUp()
+        {
+            Monitor.Enter(monitor);         
+            
+            anySleeping = false;
+            if(syncSleeping > 0)
+            {
+                syncSleeping = 0;
+                Monitor.PulseAll(monitor);
+            }
+
+            if (asyncSleeping > 0)
+            {
+                asyncSleeping = 0;
+                // WakeUpAsync
+            }
+
+            Monitor.Exit(monitor);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

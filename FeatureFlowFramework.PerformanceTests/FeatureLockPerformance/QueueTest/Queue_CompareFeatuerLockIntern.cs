@@ -40,11 +40,5 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void FeatureLock_LockAsync() => queueTest.AsyncRun(featureLockSubjects.LockAsync);
 
-        [Benchmark]
-        public void FeatureLock_TryLock() => queueTest.Run(featureLockSubjects.TryLock);
-
-        [Benchmark]
-        public void FeatureLock_TryLockAsync() => queueTest.AsyncRun(featureLockSubjects.TryLockAsync);
-
     }
 }

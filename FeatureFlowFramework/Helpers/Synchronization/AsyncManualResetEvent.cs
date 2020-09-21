@@ -50,8 +50,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait()
         {
+            var mre = mre_active;
+            Thread.MemoryBarrier();
             if(isSet) return true;
-            mre_active.Wait();
+            Thread.MemoryBarrier();
+            mre.Wait();
             return true;
         }
 
@@ -153,9 +156,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var mreTemp = mre_active;
             mre_active = mre_wakingUp;
             mre_wakingUp = mreTemp;
-
+            Thread.MemoryBarrier();
             mre_wakingUp.Set();
-
+            Thread.MemoryBarrier();
             barrier = BARRIER_OPEN;
             return true;
         }
