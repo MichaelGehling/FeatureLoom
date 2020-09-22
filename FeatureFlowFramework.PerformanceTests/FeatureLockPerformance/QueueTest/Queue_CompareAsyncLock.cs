@@ -20,19 +20,19 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
-        [Params(1)]
+        [Params(1, 100)]
         public int numProducers
         {
             set => queueTest.numProducers = value;
         }
 
-        [Params(1)]
+        [Params(1, 100)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
         }
 
-        [Params(1_000_000)]
+        [Params(100_000)]
         public int numMessages
         {
             set => queueTest.numOverallMessages = value;
@@ -44,10 +44,10 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void SemaphoreSlim_LockAsync() => queueTest.AsyncRun(semaphoreSlimSubjects.LockAsync);
 
-        [Benchmark]
+        //[Benchmark]
         public void AsyncEx_LockAsync() => queueTest.AsyncRun(asyncExSubjects.LockAsync);
 
-        [Benchmark]
+        //[Benchmark]
         public void NeoSmart_LockAsync() => queueTest.AsyncRun(neoSmartSubjects.LockAsync);
 
 

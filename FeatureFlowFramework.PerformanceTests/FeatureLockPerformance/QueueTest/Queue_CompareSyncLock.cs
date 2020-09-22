@@ -22,13 +22,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
-        [Params(1, 1000)]
+        [Params(1000)]
         public int numProducers
         {
             set => queueTest.numProducers = value;
         }
 
-        [Params(1, 1000)]
+        [Params(1)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -46,7 +46,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void Monitor_Lock() => queueTest.Run(monitorSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void SemaphoreSlim_Lock() => queueTest.Run(semaphoreSlimSubjects.Lock);
 
         //[Benchmark]
