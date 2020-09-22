@@ -6,7 +6,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
     public class NeoSmartSubjects
     {
-        NeoSmart.AsyncLock.AsyncLock myLock = new NeoSmart.AsyncLock.AsyncLock();
+        NeoSmart.AsyncLock.AsyncLock myLock;
+
+        public void Init() => myLock = new NeoSmart.AsyncLock.AsyncLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)

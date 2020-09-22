@@ -14,8 +14,10 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numConsumers = 1;
         public int numOverallMessages = 1_000_000;
 
-        public void Run(Action<Action> producerLock, Action<Action> consumerLock = null)
-        {            
+        public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)
+        {
+            init();
+
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
@@ -67,8 +69,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             if(!Task.WhenAll(consumerTasks.ToArray()).Wait(5000)) Console.Write("!XXX!");
         }
 
-        public void AsyncRun(Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
+        public void AsyncRun(Action init, Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
         {
+            init();
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
             AsyncManualResetEvent starter = new AsyncManualResetEvent();

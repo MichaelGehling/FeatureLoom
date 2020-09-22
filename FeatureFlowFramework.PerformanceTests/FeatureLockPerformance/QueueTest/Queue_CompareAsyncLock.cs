@@ -39,16 +39,16 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         }
 
         [Benchmark(Baseline = true)]
-        public void FeatureLock_LockAsync() => queueTest.AsyncRun(featureLockSubjects.LockAsync);        
+        public void FeatureLock_LockAsync() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockAsync);        
 
         [Benchmark]
-        public void SemaphoreSlim_LockAsync() => queueTest.AsyncRun(semaphoreSlimSubjects.LockAsync);
+        public void SemaphoreSlim_LockAsync() => queueTest.AsyncRun(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.LockAsync);
 
         //[Benchmark]
-        public void AsyncEx_LockAsync() => queueTest.AsyncRun(asyncExSubjects.LockAsync);
+        public void AsyncEx_LockAsync() => queueTest.AsyncRun(asyncExSubjects.Init, asyncExSubjects.LockAsync);
 
         //[Benchmark]
-        public void NeoSmart_LockAsync() => queueTest.AsyncRun(neoSmartSubjects.LockAsync);
+        public void NeoSmart_LockAsync() => queueTest.AsyncRun(neoSmartSubjects.Init, neoSmartSubjects.LockAsync);
 
 
     }

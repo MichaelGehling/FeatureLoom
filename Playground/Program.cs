@@ -222,12 +222,12 @@ namespace Playground
             Console.WriteLine(FLAsync.Run());
 
             var FLPrio = new MessageQueueLockTester<FeatureLock>("FeatureLock Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                (myLock, action, qc) => { using (myLock.Lock(FeatureLock.DEFAULT_PRIORITY + qc)) action(); },
+                (myLock, action, qc) => { using (myLock.Lock()) action(); },
                 (myLock, action, qc) => { using (myLock.Lock()) action(); });
             Console.WriteLine(FLPrio.Run());
 
             var FLAsyncPrio = new MessageQueueAsyncLockTester<FeatureLock>("FeatureLock Async Prio", new FeatureLock(), numReader, numWriter, duration, readerSlack, writerSlack, executionTime,
-                async (myLock, action, qc) => { using (await myLock.LockAsync(FeatureLock.DEFAULT_PRIORITY + qc)) action(); },
+                async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); },
                 async (myLock, action, qc) => { using (await myLock.LockAsync()) action(); });
             Console.WriteLine(FLAsyncPrio.Run());
 

@@ -92,13 +92,11 @@ namespace FeatureFlowFramework.DataFlows
             }
         }
 
-        int ReadingPriority => (FeatureLock.DEFAULT_PRIORITY + queue.Count).Clamp(FeatureLock.MIN_PRIORITY, FeatureLock.MAX_PRIORITY);
-
         public bool TryReceive(out T message)
         {
             message = default;
             bool success = false;
-            using (queueLock.Lock(ReadingPriority))
+            using (queueLock.Lock())
             {
                 success = queue.TryDequeue(out message);                
             }
@@ -114,7 +112,7 @@ namespace FeatureFlowFramework.DataFlows
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
             if(IsEmpty) return (false, default);
-            using (await queueLock.LockAsync(ReadingPriority))
+            using (await queueLock.LockAsync())
             {
                 success = queue.TryDequeue(out message);                
             }
@@ -132,7 +130,7 @@ namespace FeatureFlowFramework.DataFlows
 
             T[] messages;
 
-            using (queueLock.Lock(ReadingPriority))
+            using (queueLock.Lock())
             {
                 messages = queue.ToArray();
                 queue.Clear();                
@@ -162,7 +160,7 @@ namespace FeatureFlowFramework.DataFlows
 
             T[] messages;
 
-            using (queueLock.Lock(ReadingPriority))
+            using (queueLock.Lock())
             {
                 messages = queue.ToArray();
             }
@@ -171,7 +169,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public void Clear()
         {
-            using (queueLock.Lock(FeatureLock.MAX_PRIORITY))
+            using (queueLock.Lock())
             {
                 queue.Clear();
             }
