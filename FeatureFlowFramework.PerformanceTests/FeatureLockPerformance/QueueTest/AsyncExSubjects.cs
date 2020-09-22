@@ -7,7 +7,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
     public class AsyncExSubjects
     {
-        Nito.AsyncEx.AsyncLock myLock = new Nito.AsyncEx.AsyncLock();
+        Nito.AsyncEx.AsyncLock myLock;
+
+        public void Init() => myLock = new Nito.AsyncEx.AsyncLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)

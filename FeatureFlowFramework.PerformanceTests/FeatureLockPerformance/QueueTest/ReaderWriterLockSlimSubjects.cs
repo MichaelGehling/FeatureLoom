@@ -7,8 +7,14 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
     public class ReaderWriterLockSlimSubjects
     {
-        ReaderWriterLockSlim myLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
-        ReaderWriterLockSlim reentrantLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+        ReaderWriterLockSlim myLock;
+        ReaderWriterLockSlim reentrantLock;
+
+        public void Init()
+        {
+            myLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
+            reentrantLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)

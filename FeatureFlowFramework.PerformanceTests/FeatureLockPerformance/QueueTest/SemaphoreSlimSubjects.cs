@@ -7,7 +7,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
     public class SemaphoreSlimSubjects
     {
-        SemaphoreSlim semaphore = new SemaphoreSlim(1);
+        SemaphoreSlim semaphore;
+
+        public void Init() => semaphore = new SemaphoreSlim(1);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)

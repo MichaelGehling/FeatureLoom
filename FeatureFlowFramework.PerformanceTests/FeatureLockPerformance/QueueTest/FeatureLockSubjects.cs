@@ -7,7 +7,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
     public class FeatureLockSubjects
     {
-        FeatureLock myLock = new FeatureLock();
+        FeatureLock myLock;
+
+        public void Init() => myLock = new FeatureLock();
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -20,9 +22,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Lock_HighPrio(Action action)
+        public void LockPrio(Action action)
         {
-            using(myLock.Lock(FeatureLock.HIGH_PRIORITY))
+            using (myLock.LockPrioritized())
             {
                 action();
             }

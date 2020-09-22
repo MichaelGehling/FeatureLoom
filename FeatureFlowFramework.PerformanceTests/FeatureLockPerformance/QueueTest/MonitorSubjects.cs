@@ -7,7 +7,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
     public class MonitorSubjects
     {
 
-        object lockObj = new object();
+        object lockObj;
+
+        public void Init() => lockObj = new object();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)
