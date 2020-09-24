@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
@@ -11,6 +12,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
     //[SimpleJob(RuntimeMoniker.Net472, baseline: true)]
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
     //[SimpleJob(RuntimeMoniker.Mono)]
+    //[HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)]
     public class Queue_CompareSyncLock
     {
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
@@ -28,7 +30,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numProducers = value;
         }
 
-        [Params(100)]
+        [Params(1, 100)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -40,13 +42,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numOverallMessages = value;
         }
 
-        //[Benchmark(Baseline = true)]
+        [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Init, featureLockSubjects.Lock);
 
         [Benchmark]
         public void FeatureLock_LockPrio() => queueTest.Run(featureLockSubjects.Init, featureLockSubjects.LockPrio, featureLockSubjects.Lock);
 
-        [Benchmark]
+        //[Benchmark]
         public void Monitor_Lock() => queueTest.Run(monitorSubjects.Init, monitorSubjects.Lock);
 
         //[Benchmark]
