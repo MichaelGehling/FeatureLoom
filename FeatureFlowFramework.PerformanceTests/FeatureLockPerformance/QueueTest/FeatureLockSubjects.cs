@@ -40,6 +40,15 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task LockPrioAsync(Action action)
+        {
+            using (await myLock.LockPrioritizedAsync())
+            {
+                action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockReadOnly(Action action)
         {
             using(myLock.LockReadOnly())
