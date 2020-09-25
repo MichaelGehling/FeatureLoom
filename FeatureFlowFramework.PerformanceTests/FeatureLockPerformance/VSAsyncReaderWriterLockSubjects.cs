@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class VSAsyncReaderWriterLockSubjects
     {

@@ -5,6 +5,7 @@ using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
+    [MaxIterationCount(40)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [RPlotExporter]
@@ -23,24 +24,24 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
         [Benchmark(Baseline = true)]
-        public void FeatureLock_LockAsync() => featureLockSubjects.LockAsync().Wait();
+        public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().Wait();
 
         [Benchmark]
-        public void SemaphoreSlim_LockAsync() => semaphoreSlimSubjects.LockAsync().Wait();
+        public void SemaphoreSlim_LockAsync_() => semaphoreSlimSubjects.LockAsync().Wait();
 
         [Benchmark]
-        public void VSAsyncReaderWriterLock_LockAsync() => vSAsyncReaderWriterLockSubjects.LockAsync().Wait();
+        public void VSAsyncReaderWriterLock_LockAsync_() => vSAsyncReaderWriterLockSubjects.LockAsync().Wait();
 
         [Benchmark]
-        public void AsyncEx_LockAsync() => asyncExSubjects.LockAsync().Wait();
+        public void AsyncEx_LockAsync_() => asyncExSubjects.LockAsync().Wait();
 
         [Benchmark]
-        public void AsyncExRW_LockAsync() => asyncExRWSubjects.LockAsync().Wait();
+        public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockAsync().Wait();
 
         [Benchmark]
-        public void Bmbsqd_LockAsync() => bmbsqdSubjects.LockAsync().Wait();
+        public void Bmbsqd_LockAsync_() => bmbsqdSubjects.LockAsync().Wait();
 
         [Benchmark]
-        public void NeoSmart_LockAsync() => neoSmartSubjects.LockAsync().Wait();
+        public void NeoSmart_LockAsync_() => neoSmartSubjects.LockAsync().Wait();
     }
 }

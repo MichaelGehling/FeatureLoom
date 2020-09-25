@@ -3,6 +3,7 @@ using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
+    [MaxIterationCount(40)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [RPlotExporter]

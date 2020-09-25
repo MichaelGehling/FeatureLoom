@@ -3,6 +3,7 @@ using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
+    [MaxIterationCount(40)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [RPlotExporter]
@@ -17,13 +18,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         AsyncExRWSubjects asyncExRWSubjects = new AsyncExRWSubjects();
 
         [Benchmark(Baseline = true)]
-        public void FeatureLock_LockReadOnlyAsync() => featureLockSubjects.LockReadOnlyAsync().Wait();
+        public void FeatureLock_LockReadOnlyAsync_() => featureLockSubjects.LockReadOnlyAsync().Wait();
 
         [Benchmark]
-        public void VSAsyncReaderWriterLock_LockReadOnlyAsync() => vSAsyncReaderWriterLockSubjects.LockReadOnlyAsync().Wait();
+        public void VSAsyncReaderWriterLock_LockReadOnlyAsync_() => vSAsyncReaderWriterLockSubjects.LockReadOnlyAsync().Wait();
 
         [Benchmark]
-        public void AsyncExRW_LockReadOnlyAsync() => asyncExRWSubjects.LockReadOnlyAsync().Wait();
+        public void AsyncExRW_LockReadOnlyAsync_() => asyncExRWSubjects.LockReadOnlyAsync().Wait();
 
     }
 }

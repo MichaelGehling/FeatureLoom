@@ -3,7 +3,7 @@ using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
-
+    [MaxIterationCount(20)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [RPlotExporter]

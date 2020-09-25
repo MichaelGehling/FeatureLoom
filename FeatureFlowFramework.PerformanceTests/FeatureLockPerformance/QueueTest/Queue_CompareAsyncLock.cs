@@ -3,7 +3,7 @@ using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
-
+    [MaxIterationCount(20)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [RPlotExporter]
@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numProducers = value;
         }
 
-        [Params(100)]
+        [Params(1, 100)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -39,19 +39,19 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         }
 
         [Benchmark(Baseline = true)]
-        public void FeatureLock_LockAsync() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockAsync);
+        public void FeatureLock_LockAsync_() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockAsync);
 
         [Benchmark]
-        public void FeatureLock_LockPrioAsync() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockPrioAsync, featureLockSubjects.LockAsync);
+        public void FeatureLock_LockPrioAsync_() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockPrioAsync, featureLockSubjects.LockAsync);
 
         [Benchmark]
-        public void SemaphoreSlim_LockAsync() => queueTest.AsyncRun(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.LockAsync);
+        public void SemaphoreSlim_LockAsync_() => queueTest.AsyncRun(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.LockAsync);
 
         //[Benchmark]
-        public void AsyncEx_LockAsync() => queueTest.AsyncRun(asyncExSubjects.Init, asyncExSubjects.LockAsync);
+        public void AsyncEx_LockAsync_() => queueTest.AsyncRun(asyncExSubjects.Init, asyncExSubjects.LockAsync);
 
         //[Benchmark]
-        public void NeoSmart_LockAsync() => queueTest.AsyncRun(neoSmartSubjects.Init, neoSmartSubjects.LockAsync);
+        public void NeoSmart_LockAsync_() => queueTest.AsyncRun(neoSmartSubjects.Init, neoSmartSubjects.LockAsync);
 
 
     }

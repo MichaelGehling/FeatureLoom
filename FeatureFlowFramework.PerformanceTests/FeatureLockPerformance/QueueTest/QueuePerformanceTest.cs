@@ -1,6 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services;
-using FeatureFlowFramework.Helpers.Time;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -8,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
+
     public class QueuePerformanceTest
     {
         public int numProducers = 1;
@@ -64,9 +64,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                 }));
             }
             starter.Set();
-            if (!Task.WhenAll(producerTasks.ToArray()).Wait(5000)) Console.Write("!XXX!");
+            if (!Task.WhenAll(producerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
             producersDone = true;
-            if(!Task.WhenAll(consumerTasks.ToArray()).Wait(5000)) Console.Write("!XXX!");
+            if(!Task.WhenAll(consumerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
         }
 
         public void AsyncRun(Action init, Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
@@ -114,9 +114,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                 }).Invoke());
             }
             starter.Set();
-            if(!Task.WhenAll(producerTasks.ToArray()).Wait(5000)) Console.Write("!XXX!");
+            if(!Task.WhenAll(producerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
             producersDone = true;
-            if(!Task.WhenAll(consumerTasks.ToArray()).Wait(5000)) Console.Write("!XXX!");
+            if(!Task.WhenAll(consumerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
         }
     }
 }

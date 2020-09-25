@@ -3,6 +3,7 @@ using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
+    [MaxIterationCount(40)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [RPlotExporter]
@@ -16,10 +17,10 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
 
         [Benchmark(Baseline = true)]
-        public void ReentrantFeatureLock_LockAsync() => featureLockSubjects.ReentrantLockAsync().Wait();
+        public void ReentrantFeatureLock_LockAsync_() => featureLockSubjects.ReentrantLockAsync().Wait();
 
         [Benchmark]
-        public void ReentrantNeoSmart_LockAsync() => neoSmartSubjects.LockAsync().Wait();
+        public void ReentrantNeoSmart_LockAsync_() => neoSmartSubjects.LockAsync().Wait();
 
     }
 }

@@ -1,7 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class SpinLockSubjects
     {
