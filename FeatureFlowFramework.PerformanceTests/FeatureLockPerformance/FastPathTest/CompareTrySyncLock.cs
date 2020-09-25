@@ -17,9 +17,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         SemaphoreSlimSubjects semaphoreSlimSubjects = new SemaphoreSlimSubjects();
         ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
+        FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_TryLock() => featureLockSubjects.TryLock();
+
+        [Benchmark]
+        public void FastSpinLock_TryLock() => fastSpinLockSubjects.TryLock();
 
         [Benchmark]
         public void Monitor_TryLock() => monitorSubjects.TryLock();

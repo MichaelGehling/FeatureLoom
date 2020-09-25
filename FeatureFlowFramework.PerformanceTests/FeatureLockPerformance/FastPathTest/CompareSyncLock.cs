@@ -20,9 +20,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
         NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
+        FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();
+
+        [Benchmark]
+        public void FastSpinLock_Lock() => fastSpinLockSubjects.Lock();
 
         [Benchmark]
         public void Monitor_Lock() => monitorSubjects.Lock();
