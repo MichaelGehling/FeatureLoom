@@ -21,6 +21,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
         NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
+        FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
 
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
@@ -46,9 +47,12 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Init, featureLockSubjects.Lock);
 
         [Benchmark]
-        public void FeatureLock_LockPrio() => queueTest.Run(featureLockSubjects.Init, featureLockSubjects.LockPrio, featureLockSubjects.Lock);
+        public void FastSpinLock_Lock() => queueTest.Run(fastSpinLockSubjects.Init, fastSpinLockSubjects.Lock);
 
         //[Benchmark]
+        public void FeatureLock_LockPrio() => queueTest.Run(featureLockSubjects.Init, featureLockSubjects.LockPrio, featureLockSubjects.Lock);
+
+        [Benchmark]
         public void Monitor_Lock() => queueTest.Run(monitorSubjects.Init, monitorSubjects.Lock);
 
         //[Benchmark]

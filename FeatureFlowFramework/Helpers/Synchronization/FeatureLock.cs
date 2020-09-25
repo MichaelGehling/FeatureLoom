@@ -49,15 +49,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int BARRIER_OPEN = 0;
         const int BARRIER_SLEEP = 1;
         const int BARRIER_WAKEUP = 2;
-        int sleepBarrier = BARRIER_OPEN;
+        FastSpinLock sleepLock = new FastSpinLock();
 
-        Queue<TaskCompletionSource<bool>> asyncWriterQueue = new Queue<TaskCompletionSource<bool>>();
-        Queue<TaskCompletionSource<bool>> prioAsyncWriterQueue = new Queue<TaskCompletionSource<bool>>();
+        Queue<TaskCompletionSource<bool>> asyncWriterQueue = new Queue<TaskCompletionSource<bool>>(16);
+        Queue<TaskCompletionSource<bool>> prioAsyncWriterQueue = new Queue<TaskCompletionSource<bool>>(5);
+        TaskCompletionSource<bool> readersTcs;
         object priorityMonitor = new object();
         object writerMonitor = new object();
         object readerMonitor = new object();
         volatile int numPrioSleeping = 0;
-        volatile int numSyncWriterSleeping = 0;
+        volatile int numSyncWritersSleeping = 0;
+        volatile int numReadersSleeping = 0;        
         volatile bool anySleeping = false;
 
         Task<AcquiredLock> readLockTask;
@@ -186,17 +188,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             anySleeping = true;
             Thread.MemoryBarrier();
 
-            if (lockIndicator != NO_LOCK && Interlocked.CompareExchange(ref sleepBarrier, BARRIER_SLEEP, BARRIER_OPEN) == BARRIER_OPEN)
+            if (lockIndicator != NO_LOCK && sleepLock.TryLock(out var acquiredLock))
             {
                 Monitor.Enter(writerMonitor);
                 if (lockIndicator != NO_LOCK)
                 {
-                    numSyncWriterSleeping++;
+                    numSyncWritersSleeping++;
                     anySleeping = true;
-                    Thread.VolatileWrite(ref sleepBarrier, BARRIER_OPEN); // reopen before sleeping
+                    acquiredLock.Exit(); // reopen before sleeping
                     Monitor.Wait(writerMonitor);
                 }
-                else Thread.VolatileWrite(ref sleepBarrier, BARRIER_OPEN);
+                else acquiredLock.Exit();
                 Monitor.Exit(writerMonitor);
             }
             else Thread.Yield();
@@ -236,14 +238,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             anySleeping = true;
             Thread.MemoryBarrier();
 
-            if (lockIndicator != NO_LOCK && Interlocked.CompareExchange(ref sleepBarrier, BARRIER_SLEEP, BARRIER_OPEN) == BARRIER_OPEN)
+            if (lockIndicator != NO_LOCK && sleepLock.TryLock(out var acquiredLock))
             {
                 anySleeping = true;
                 var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 asyncWriterQueue.Enqueue(tcs);
                 var task = tcs.Task;
 
-                Thread.VolatileWrite(ref sleepBarrier, BARRIER_OPEN);
+                acquiredLock.Exit();
                 await task.ConfigureAwait(false);
             }
             else if (lockIndicator != NO_LOCK)
@@ -286,17 +288,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             anySleeping = true;
             Thread.MemoryBarrier();
 
-            if (lockIndicator != NO_LOCK && Interlocked.CompareExchange(ref sleepBarrier, BARRIER_SLEEP, BARRIER_OPEN) == BARRIER_OPEN)
+            if (lockIndicator != NO_LOCK && sleepLock.TryLock(out var acquiredLock))
             {
                 Monitor.Enter(priorityMonitor);
                 if (lockIndicator != NO_LOCK)
                 {
                     numPrioSleeping++;
                     anySleeping = true;
-                    Thread.VolatileWrite(ref sleepBarrier, BARRIER_OPEN); // reopen before sleeping
+                    acquiredLock.Exit(); // reopen before sleeping
                     Monitor.Wait(priorityMonitor);
                 }
-                else Thread.VolatileWrite(ref sleepBarrier, BARRIER_OPEN);
+                else acquiredLock.Exit();
                 Monitor.Exit(priorityMonitor);
             }
             else Thread.Yield();
@@ -337,14 +339,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             anySleeping = true;
             Thread.MemoryBarrier();
 
-            if (lockIndicator != NO_LOCK && Interlocked.CompareExchange(ref sleepBarrier, BARRIER_SLEEP, BARRIER_OPEN) == BARRIER_OPEN)
+            if (lockIndicator != NO_LOCK && sleepLock.TryLock(out var acquiredLock))
             {
                 anySleeping = true;
                 var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 prioAsyncWriterQueue.Enqueue(tcs);
                 var task = tcs.Task;
 
-                Thread.VolatileWrite(ref sleepBarrier, BARRIER_OPEN);
+                acquiredLock.Exit();
                 await task.ConfigureAwait(false);
             }
             else if (lockIndicator != NO_LOCK)
@@ -355,6 +357,66 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         #endregion LockPrioritizedAsync
+
+        #region LockReadOnly
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public AcquiredLock LockReadOnly()
+        {
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator + 1;
+            if(newLockIndicator < FIRST_READ_LOCK || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait();
+            return new AcquiredLock(this, LockMode.ReadLock);
+        }
+
+        private void LockReadOnly_Wait()
+        {
+            int currentLockIndicator;
+            int newLockIndicator;
+            int cycleCount = 0;
+            do
+            {
+                cycleCount++;
+                if(anySleeping || cycleCount > CYCLES_BEFORE_SLEEPING)
+                {
+                    cycleCount = 0;
+                    SleepReadOnly();
+                }
+                else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
+
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator + 1;
+
+            } while(newLockIndicator < FIRST_READ_LOCK|| waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator));
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private void SleepReadOnly()
+        {
+            anySleeping = true;
+            Thread.MemoryBarrier();
+
+            if(lockIndicator == WRITE_LOCK && sleepLock.TryLock(out var acquiredLock))
+            {
+                Monitor.Enter(readerMonitor);
+                if(lockIndicator == WRITE_LOCK)
+                {
+                    numReadersSleeping++;
+                    anySleeping = true;
+                    acquiredLock.Exit(); // reopen before sleeping
+                    Monitor.Wait(readerMonitor);
+                }
+                else acquiredLock.Exit();
+                Monitor.Exit(readerMonitor);
+            }
+            else Thread.Yield();
+        }
+        #endregion LockReadOnly
+
+
+
+
+
 
 
 
@@ -406,7 +468,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             reentrancyIndicator.Value = ++reentrancyId;
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
         }
-
+        /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReadOnly(int priority = DEFAULT_PRIORITY)
         {
@@ -422,6 +484,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             UpdateAfterEnter(cycleCount != 0);
             return new AcquiredLock(this, LockMode.ReadLock);
         }
+        */
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReadOnlyReentrant(int priority = DEFAULT_PRIORITY)
@@ -1198,7 +1261,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region Exit
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
         private void ExitReadLock()
         {
             var newLockIndicator = Interlocked.Decrement(ref lockIndicator);
@@ -1208,7 +1270,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
         private void ExitWriteLock()
         {
             lockIndicator = NO_LOCK;
@@ -1216,41 +1277,51 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (anySleeping) WakeUp();
         }
 
+        volatile bool wakingUp = false;
         
         private void WakeUp()
         {
-            if (lockIndicator != NO_LOCK || Thread.VolatileRead(ref sleepBarrier) == BARRIER_WAKEUP) return;
+            if (lockIndicator != NO_LOCK || wakingUp) return;
 
-            while (Interlocked.CompareExchange(ref sleepBarrier, BARRIER_WAKEUP, BARRIER_OPEN) != BARRIER_OPEN) /*spinwait*/;
+            using(sleepLock.Lock())
+            {
+                wakingUp = true;
 
-            if (numPrioSleeping > 0)
-            {
-                Monitor.Enter(priorityMonitor);
-                numPrioSleeping--;
-                Monitor.Pulse(priorityMonitor);
-                Monitor.Exit(priorityMonitor);
-            }
-            else if (prioAsyncWriterQueue.Count > 0)
-            {
-                var tcs = prioAsyncWriterQueue.Dequeue();
-                tcs.SetResult(true);
-            }
-            else if (numSyncWriterSleeping > 0)
-            {
-                Monitor.Enter(writerMonitor);
-                numSyncWriterSleeping--;
-                Monitor.Pulse(writerMonitor);
-                Monitor.Exit(writerMonitor);
-            }
-            else if (asyncWriterQueue.Count > 0)
-            {
-                var tcs = asyncWriterQueue.Dequeue();
-                tcs.SetResult(true);
-            }
+                if(numPrioSleeping > 0)
+                {
+                    Monitor.Enter(priorityMonitor);
+                    numPrioSleeping--;
+                    Monitor.Pulse(priorityMonitor);
+                    Monitor.Exit(priorityMonitor);
+                }
+                else if(prioAsyncWriterQueue.Count > 0)
+                {
+                    var tcs = prioAsyncWriterQueue.Dequeue();
+                    tcs.SetResult(true);
+                }
+                else if(numSyncWritersSleeping > 0)
+                {
+                    Monitor.Enter(writerMonitor);
+                    numSyncWritersSleeping--;
+                    Monitor.Pulse(writerMonitor);
+                    Monitor.Exit(writerMonitor);
+                }
+                else if(asyncWriterQueue.Count > 0)
+                {
+                    var tcs = asyncWriterQueue.Dequeue();
+                    tcs.SetResult(true);
+                }
+                else if(numReadersSleeping > 0)
+                {
+                    Monitor.Enter(readerMonitor);
+                    numReadersSleeping = 0;
+                    Monitor.PulseAll(readerMonitor);
+                    Monitor.Exit(readerMonitor);
+                }
 
-            anySleeping = numPrioSleeping + numSyncWriterSleeping + asyncWriterQueue.Count + prioAsyncWriterQueue.Count > 0;
-
-            Thread.VolatileWrite(ref sleepBarrier, BARRIER_OPEN);
+                anySleeping = numPrioSleeping + prioAsyncWriterQueue.Count + numSyncWritersSleeping + asyncWriterQueue.Count + numReadersSleeping > 0;
+                wakingUp = false;
+            }
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
