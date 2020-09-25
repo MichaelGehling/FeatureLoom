@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class AsyncExRWSubjects
     {

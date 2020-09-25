@@ -2,12 +2,11 @@
 using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
+namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class MonitorSubjects
     {
-
-        object lockObj;
+        object lockObj = new object();
 
         public void Init() => lockObj = new object();
 
@@ -23,11 +22,37 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock(Action action)
         {
-            if (Monitor.TryEnter(lockObj))
+            if(Monitor.TryEnter(lockObj))
             {
                 try
                 {
                     action();
+                }
+                finally
+                {
+                    Monitor.Exit(lockObj);
+                }
+            }
+        }
+
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock()
+        {
+            lock(lockObj)
+            {
+
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void TryLock()
+        {
+            if (Monitor.TryEnter(lockObj))
+            {
+                try
+                {
                 }
                 finally
                 {
