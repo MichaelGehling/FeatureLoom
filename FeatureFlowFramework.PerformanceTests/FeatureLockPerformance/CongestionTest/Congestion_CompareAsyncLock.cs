@@ -32,7 +32,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
         [Benchmark]
         public void AsyncEx_LockAsync_() => congestionTest.AsyncRun(asyncExSubjects.Init, asyncExSubjects.LockAsync);
 
-        [Benchmark]
+        //[Benchmark]
         public void NeoSmart_LockAsync_() => congestionTest.AsyncRun(neoSmartSubjects.Init, neoSmartSubjects.LockAsync);
 
 

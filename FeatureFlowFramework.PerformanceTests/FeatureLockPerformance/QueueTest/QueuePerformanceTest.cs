@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services;
 using System;
 using System.Collections.Generic;
@@ -38,8 +39,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             queue.Enqueue(count++);
                         });
                     }
-                    //var timer = AppTime.TimeKeeper;
-                    //while(timer.Elapsed < 0.01.Milliseconds()) ;
+                    var timer = AppTime.TimeKeeper;                    
+                    while(timer.Elapsed < 0.001.Milliseconds()) ;
                 }));
             }
             for(int i = 0; i < numConsumers; i++)
@@ -58,8 +59,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             }
                         });
                         if(empty) Thread.Yield();
-                        //var timer = AppTime.TimeKeeper;
-                        //while(timer.Elapsed < 0.01.Milliseconds()) ;
+                        var timer = AppTime.TimeKeeper;
+                        while (timer.Elapsed < 0.001.Milliseconds()) ;
                     }
                 }));
             }
