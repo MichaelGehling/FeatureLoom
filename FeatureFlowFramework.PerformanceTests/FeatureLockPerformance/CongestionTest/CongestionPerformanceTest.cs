@@ -91,7 +91,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                 }).Invoke());
             }
 
-            hotPathTask = Task.Run(async () =>
+            hotPathTask = new Func<Task>(async () =>
             {
                 await starter.WaitAsync();
                 int count = 0;
@@ -104,7 +104,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                     });
                 }
                 hotPathDone = true;
-            });
+            }).Invoke();
 
             starter.Set();
 

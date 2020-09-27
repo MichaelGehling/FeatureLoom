@@ -1,4 +1,5 @@
-﻿using FeatureFlowFramework.Helpers.Time;
+﻿using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Time;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -14,11 +15,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int FIRST_READ_LOCK = 1;
 
         const int CYCLES_BEFORE_YIELDING = 200;
-        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + CYCLES_BEFORE_YIELDING / 20;
+        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + 50;
         const int PRIO_CYCLE_FACTOR = 3;
 
-        //const int CYCLES_BEFORE_YIELDING = 0;
-        //const int CYCLES_BEFORE_SLEEPING = 0;
+        const int NUM_PARALLEL_IDLE = 2;
 
         public const int MAX_PRIORITY = int.MaxValue;
         public const int MIN_PRIORITY = int.MinValue;
@@ -61,6 +61,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile int numSyncWritersSleeping = 0;
         volatile int numReadersSleeping = 0;        
         volatile bool anySleeping = false;
+
+        volatile int ticketCounter = 0;
+        volatile int nextTicket = 0;
 
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> reenterableReadLockTask;
@@ -156,6 +159,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             reentrancyIndicator.Value = reentrancyId - 1;
         }
 
+        private bool MustTryToSleep(int ticket, int cycleCount)
+        {
+            bool backInLine = (ticket >= nextTicket + NUM_PARALLEL_IDLE); //At nextTicket overFlow this will fail -> Ignore as it has no severe consequence and is only for short.
+            return (backInLine && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING;
+        }
+
+        private bool MustAsyncTryToSleep(int ticket, int cycleCount, int minThreadPoolThreads)
+        {
+            bool backInLine = (ticket >= nextTicket + NUM_PARALLEL_IDLE); //At nextTicket overFlow this will fail -> Ignore as it has no severe consequence and is only for short.
+            return (backInLine && (anySleeping || IsThreadPoolCloseToStarving(minThreadPoolThreads))) || cycleCount > CYCLES_BEFORE_SLEEPING;
+        }
+
 
         #region Lock
 
@@ -167,24 +182,32 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         private void Lock_Wait()
-        {
+        {            
+            int ticket = Interlocked.Increment(ref ticketCounter);
             int cycleCount = 0;
             do
             {
                 cycleCount++;
-                if (anySleeping || cycleCount > CYCLES_BEFORE_SLEEPING)
-                {
-                    cycleCount = 0;
-                    Sleep();
+                if (MustTryToSleep(ticket, cycleCount))
+                {                    
+                    if (Sleep())
+                    {
+                        cycleCount = 0;
+                    }
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+            Interlocked.Increment(ref nextTicket);
+            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
+
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private void Sleep()
+        private bool Sleep()
         {
+            bool slept = false;
+
             anySleeping = true;
             Thread.MemoryBarrier();
 
@@ -197,11 +220,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     anySleeping = true;
                     acquiredLock.Exit(); // reopen before sleeping
                     Monitor.Wait(writerMonitor);
+                    slept = true;
                 }
                 else acquiredLock.Exit();
                 Monitor.Exit(writerMonitor);
             }
             else Thread.Yield();
+
+            return slept;
         }
         #endregion Lock
 
@@ -216,25 +242,33 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockAsync_Wait()
         {
+            int ticket = Interlocked.Increment(ref ticketCounter);
             int cycleCount = 0;
             do
             {
                 cycleCount++;
-                if (anySleeping || cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving(1))
+                if (MustAsyncTryToSleep(ticket, cycleCount, 1))
                 {
-                    cycleCount = 0;
-                    await SleepAsync();
+                    if (await SleepAsync())
+                    {
+                        cycleCount = 0;
+                    }
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
 
+            Interlocked.Increment(ref nextTicket);
+            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
+
             return new AcquiredLock(this, LockMode.WriteLock);
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private async Task SleepAsync()
+        private async Task<bool> SleepAsync()
         {
+            bool slept = false;
+
             anySleeping = true;
             Thread.MemoryBarrier();
 
@@ -247,12 +281,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 acquiredLock.Exit();
                 await task.ConfigureAwait(false);
+                slept = true;
             }
             else if (lockIndicator != NO_LOCK)
             {
                 if (IsThreadPoolCloseToStarving(1)) await Task.Yield();
                 else Thread.Yield();
             }
+            return slept;
         }
 
         #endregion LockAsync
@@ -268,6 +304,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private void LockPrioritized_Wait()
         {
+            int ticket = Interlocked.Increment(ref ticketCounter);
             int cycleCount = 0;
             do
             {
@@ -280,6 +317,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (cycleCount > CYCLES_BEFORE_YIELDING * PRIO_CYCLE_FACTOR) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+            Interlocked.Increment(ref nextTicket);
+            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -317,6 +356,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockPrioritizedAsync_Wait()
         {
+            int ticket = Interlocked.Increment(ref ticketCounter);
             int cycleCount = 0;
             do
             {
@@ -329,6 +369,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+
+            Interlocked.Increment(ref nextTicket);
+            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
 
             return new AcquiredLock(this, LockMode.WriteLock);
         }
@@ -371,16 +414,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private void LockReadOnly_Wait()
         {
+            int ticket = Interlocked.Increment(ref ticketCounter);
+
             int currentLockIndicator;
             int newLockIndicator;
             int cycleCount = 0;
             do
             {
                 cycleCount++;
-                if(anySleeping || cycleCount > CYCLES_BEFORE_SLEEPING)
-                {
-                    cycleCount = 0;
-                    SleepReadOnly();
+                if((ticket > nextTicket && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING)
+                {                    
+                    if (SleepReadOnly())
+                    {
+                        cycleCount = 0;
+                    }
                 }
                 else if(cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
@@ -388,11 +435,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 newLockIndicator = currentLockIndicator + 1;
 
             } while(newLockIndicator < FIRST_READ_LOCK|| waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator));
+
+            Interlocked.Increment(ref nextTicket);
+            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        private void SleepReadOnly()
+        private bool SleepReadOnly()
         {
+            bool slept = false;
+
             anySleeping = true;
             Thread.MemoryBarrier();
 
@@ -405,11 +457,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     anySleeping = true;
                     acquiredLock.Exit(); // reopen before sleeping
                     Monitor.Wait(readerMonitor);
+                    slept = true;
                 }
                 else acquiredLock.Exit();
                 Monitor.Exit(readerMonitor);
             }
             else Thread.Yield();
+
+            return slept;
         }
         #endregion LockReadOnly
 
@@ -1287,40 +1342,62 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 wakingUp = true;
 
-                if(numPrioSleeping > 0)
+                int numSleeping = numPrioSleeping + prioAsyncWriterQueue.Count + numSyncWritersSleeping + asyncWriterQueue.Count + numReadersSleeping;
+                if (numSleeping > 0)
                 {
-                    Monitor.Enter(priorityMonitor);
-                    numPrioSleeping--;
-                    Monitor.Pulse(priorityMonitor);
-                    Monitor.Exit(priorityMonitor);
-                }
-                else if(prioAsyncWriterQueue.Count > 0)
-                {
-                    var tcs = prioAsyncWriterQueue.Dequeue();
-                    tcs.SetResult(true);
-                }
-                else if(numSyncWritersSleeping > 0)
-                {
-                    Monitor.Enter(writerMonitor);
-                    numSyncWritersSleeping--;
-                    Monitor.Pulse(writerMonitor);
-                    Monitor.Exit(writerMonitor);
-                }
-                else if(asyncWriterQueue.Count > 0)
-                {
-                    var tcs = asyncWriterQueue.Dequeue();
-                    tcs.SetResult(true);
-                }
-                else if(numReadersSleeping > 0)
-                {
-                    Monitor.Enter(readerMonitor);
-                    numReadersSleeping = 0;
-                    Monitor.PulseAll(readerMonitor);
-                    Monitor.Exit(readerMonitor);
-                }
 
-                anySleeping = numPrioSleeping + prioAsyncWriterQueue.Count + numSyncWritersSleeping + asyncWriterQueue.Count + numReadersSleeping > 0;
+                    long numWaiting = ticketCounter - nextTicket;
+                    long numIdleing = numWaiting - numSleeping;
+                    //Console.WriteLine($"ticketCounte={ticketCounter}, nextTicket={nextTicket}, numWaiting={numWaiting}, numSleeping={numSleeping}, numIdleing={numIdleing}");
+                    //if (numIdleing >= NUM_PARALLEL_IDLE) Console.Write("*");
+
+                    while (numSleeping > 0 && numIdleing < NUM_PARALLEL_IDLE)
+                    {
+                        WakeUpOne();
+                        numIdleing++;
+                        numSleeping--;
+                    };
+
+                    anySleeping = numPrioSleeping + prioAsyncWriterQueue.Count + numSyncWritersSleeping + asyncWriterQueue.Count + numReadersSleeping > 0;
+                }
+                else anySleeping = false;
+
                 wakingUp = false;
+            }
+        }
+
+        private void WakeUpOne()
+        {
+            if (numPrioSleeping > 0)
+            {
+                Monitor.Enter(priorityMonitor);
+                numPrioSleeping--;
+                Monitor.Pulse(priorityMonitor);
+                Monitor.Exit(priorityMonitor);
+            }
+            else if (prioAsyncWriterQueue.Count > 0)
+            {
+                var tcs = prioAsyncWriterQueue.Dequeue();
+                tcs.SetResult(true);
+            }
+            else if (numSyncWritersSleeping > 0)
+            {
+                Monitor.Enter(writerMonitor);
+                numSyncWritersSleeping--;
+                Monitor.Pulse(writerMonitor);
+                Monitor.Exit(writerMonitor);
+            }
+            else if (asyncWriterQueue.Count > 0)
+            {
+                var tcs = asyncWriterQueue.Dequeue();
+                tcs.SetResult(true);
+            }
+            else if (numReadersSleeping > 0)
+            {
+                Monitor.Enter(readerMonitor);
+                numReadersSleeping = 0;
+                Monitor.PulseAll(readerMonitor);
+                Monitor.Exit(readerMonitor);
             }
         }
 
