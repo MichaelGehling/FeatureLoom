@@ -61,7 +61,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static IStorageReader GetReader(string category)
         {
             var contextData = context.Data;
-            using(contextData.categoryToReaderLock.Lock())
+            using(var acquiredLock = contextData.categoryToReaderLock.LockReadOnly())
             {
                 if(contextData.categoryToReader.TryGetValue(category, out IStorageReader reader)) return reader;
                 else
@@ -70,6 +70,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                     {
                         newReader = contextData.createDefaultReader(category);
                     }
+                    acquiredLock.TryUpgradeToWriteMode(); // can not fail
                     contextData.categoryToReader[category] = newReader;
                     return newReader;
                 };
@@ -79,7 +80,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public static IStorageWriter GetWriter(string category)
         {
             var contextData = context.Data;
-            using (contextData.categoryToWriterLock.Lock())
+            using (var acquiredLock = contextData.categoryToWriterLock.Lock())
             {
                 if(contextData.categoryToWriter.TryGetValue(category, out IStorageWriter writer)) return writer;
                 else
@@ -88,6 +89,7 @@ namespace FeatureFlowFramework.Services.DataStorage
                     {
                         newWriter = contextData.createDefaultWriter(category);
                     }
+                    acquiredLock.TryUpgradeToWriteMode(); // can not fail
                     contextData.categoryToWriter[category] = newWriter;
                     return newWriter;
                 };

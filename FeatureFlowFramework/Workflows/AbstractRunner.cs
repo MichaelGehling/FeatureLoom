@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public abstract class AbstractRunner : IWorkflowRunner
     {
-        private FeatureLock runningWorkflowsLock = new FeatureLock();
+        private FastSpinLock runningWorkflowsLock = new FastSpinLock();
         protected List<Workflow> runningWorkflows = new List<Workflow>();
         protected readonly IStepExecutionController executionController = new DefaultStepExecutionController();
         protected Forwarder executionInfoForwarder = null;
@@ -23,7 +23,7 @@ namespace FeatureFlowFramework.Workflows
         {
             get
             {
-                using(runningWorkflowsLock.LockReadOnly())
+                using(runningWorkflowsLock.Lock())
                 {
                     return runningWorkflows.ToArray();
                 }

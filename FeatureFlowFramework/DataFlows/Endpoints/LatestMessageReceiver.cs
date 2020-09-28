@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
     public class LatestMessageReceiver<T> : IDataFlowQueue, IDataFlowSink<T>, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
-        FeatureLock myLock = new FeatureLock();
+        FastSpinLock myLock = new FastSpinLock();
         private T receivedMessage;
         private LazySlim<DataFlowSourceHelper> alternativeSendingHelper;
         public IDataFlowSource Else => alternativeSendingHelper.Obj;
@@ -64,7 +64,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             T message = default;
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
-            using (await myLock.LockAsync())
+            using (myLock.Lock())
             {
                 if(IsEmpty) return (false, message);
                 message = receivedMessage;
@@ -89,7 +89,7 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
-            using (myLock.LockReadOnly())
+            using (myLock.Lock())
             {
                 if(IsEmpty) return false;
                 nextItem = receivedMessage;
@@ -99,7 +99,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public T[] PeekAll()
         {
-            using (myLock.LockReadOnly())
+            using (myLock.Lock())
             {
                 if(IsEmpty) return Array.Empty<T>();
                 T message = receivedMessage;
@@ -118,7 +118,7 @@ namespace FeatureFlowFramework.DataFlows
 
         public object[] GetQueuedMesssages()
         {
-            using (myLock.LockReadOnly())
+            using (myLock.Lock())
             {
                 if(IsEmpty) return Array.Empty<object>();
                 T message = receivedMessage;

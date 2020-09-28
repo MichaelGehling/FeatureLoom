@@ -4,6 +4,7 @@ using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
@@ -31,7 +32,6 @@ namespace FeatureFlowFramework.DataFlows
     public class ActiveForwarder<T> : Forwarder, IDataFlowConnection<T>
     {
         private readonly QueueReceiver<T> receiver;
-        FeatureLock receiverLock = new FeatureLock();
         public volatile int threadLimit;
         public volatile int spawnThreshold;
         public volatile int maxIdleMilliseconds;
@@ -86,10 +86,7 @@ namespace FeatureFlowFramework.DataFlows
         {
             if(numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
             {
-                using(receiverLock.Lock())
-                {
-                    numThreads++;
-                }
+                Interlocked.Increment(ref numThreads);
                 new Task(Run).Start();
             }
         }
@@ -114,10 +111,8 @@ namespace FeatureFlowFramework.DataFlows
                     Log.ERROR(this.GetHandle(), "Exception caught in ActiveForwarder while sending.", e.ToString());
                 }
             }
-            using (receiverLock.Lock())
-            {
-                numThreads--;
-            }
+
+            Interlocked.Decrement(ref numThreads);
         }
     }
 }

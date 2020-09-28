@@ -16,7 +16,6 @@ namespace FeatureFlowFramework.Services.Web
     public class HttpServerFetchProvider : IDataFlowSink, IWebRequestHandler
     {
         private CountingRingBuffer<string> ringBuffer;
-        FeatureLock ringBufferLock = new FeatureLock();
         private readonly string route;
         private IWebMessageTranslator translator;
         private readonly IWebServer webServer;
@@ -38,10 +37,7 @@ namespace FeatureFlowFramework.Services.Web
         {
             if(translator.TryTranslate(message, out string json))
             {
-                using(ringBufferLock.Lock())
-                {
-                    ringBuffer.Add(json);
-                }
+                ringBuffer.Add(json);
             }
         }
 
@@ -70,26 +66,22 @@ namespace FeatureFlowFramework.Services.Web
                 long next = 0;
                 bool onlyLatest = false;
                 string[] messages = Array.Empty<string>();
-                using (ringBufferLock.LockReadOnly())
+
+                next = ringBuffer.Counter;
+                if(requestedStart > next || requestedStart < 0)
                 {
-                    next = ringBuffer.Counter;
-                    if(requestedStart > next || requestedStart < 0)
-                    {
-                        onlyLatest = true;
-                        requestedStart = next < 0 ? 0 : next - 1;
-                    }
-                    messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
+                    onlyLatest = true;
+                    requestedStart = next < 0 ? 0 : next - 1;
                 }
+                messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
+
 
                 if(messages.Length == 0 && maxWait > 0)
                 {
                     if(await ringBuffer.WaitHandle.WaitAsync(maxWait.Milliseconds()))
                     {
-                        using (ringBufferLock.LockReadOnly())
-                        {
-                            messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
-                            next = ringBuffer.Counter;
-                        }
+                        messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
+                        next = ringBuffer.Counter;
                     }
                 }
 
