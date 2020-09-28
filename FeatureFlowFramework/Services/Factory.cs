@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers.Misc;
+using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -47,15 +48,18 @@ namespace FeatureFlowFramework.Services
             {
                 public Func<T> create = null;
                 public Dictionary<string, Func<T>> namedFactories = null;
-                //TODO lock is missing!
+                public FastSpinLock myLock = new FastSpinLock();
 
                 public IServiceContextData Copy()
                 {
-                    return new ContextData()
+                    using(myLock.Lock())
                     {
-                        create = this.create,
-                        namedFactories = namedFactories == null ? null : new Dictionary<string, Func<T>>(namedFactories)
-                    };
+                        return new ContextData()
+                        {
+                            create = this.create,
+                            namedFactories = namedFactories == null ? null : new Dictionary<string, Func<T>>(namedFactories)
+                        };
+                    }
                 }
             };
 
@@ -77,17 +81,23 @@ namespace FeatureFlowFramework.Services
 
             public static void Setup(string factoryName, Func<T> newCreate)
             {
-                if (context.Data.namedFactories == null) context.Data.namedFactories = new Dictionary<string, Func<T>>();
-                context.Data.namedFactories[factoryName] = newCreate;
+                using(context.Data.myLock.Lock())
+                {
+                    if(context.Data.namedFactories == null) context.Data.namedFactories = new Dictionary<string, Func<T>>();
+                    context.Data.namedFactories[factoryName] = newCreate;
+                }
             }
 
             public static bool Create(string factoryName, out T value)
             {
                 value = default;
-                if (context.Data.namedFactories == null || 
+                using(context.Data.myLock.Lock())
+                {
+                    if(context.Data.namedFactories == null ||
                     !context.Data.namedFactories.TryGetValue(factoryName, out Func<T> create)) return false;
 
-                value = create();
+                    value = create();
+                }
                 return true;
             }
         }
