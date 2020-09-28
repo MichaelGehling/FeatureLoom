@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -28,6 +29,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         const int FALSE = 0;
         const int TRUE = 1;
+
+        const long EARLY_SLEEP_THRESHOLD = 500; //in ticks (1 tick = 100ns, 10_000 ticks = 1 ms)
+        long meanSleepTime = EARLY_SLEEP_THRESHOLD;
 
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
@@ -61,9 +65,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile int numSyncWritersSleeping = 0;
         volatile int numReadersSleeping = 0;        
         volatile bool anySleeping = false;
-
-        volatile int ticketCounter = 0;
-        volatile int nextTicket = 0;
 
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> reenterableReadLockTask;
@@ -159,16 +160,22 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             reentrancyIndicator.Value = reentrancyId - 1;
         }
 
-        private bool MustTryToSleep(int ticket, int cycleCount)
+        private bool MustTryToSleep(int cycleCount, bool didSleep)
         {
-            bool backInLine = (ticket >= nextTicket + NUM_PARALLEL_IDLE); //At nextTicket overFlow this will fail -> Ignore as it has no severe consequence and is only for short.
-            return (backInLine && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING;
+            //if (meanSleepTime > EARLY_SLEEP_THRESHOLD) Console.Write("*");
+            return cycleCount > CYCLES_BEFORE_SLEEPING || (!didSleep && meanSleepTime > EARLY_SLEEP_THRESHOLD);
         }
 
-        private bool MustAsyncTryToSleep(int ticket, int cycleCount, int minThreadPoolThreads)
+        private bool MustAsyncTryToSleep(int cycleCount, int minThreadPoolThreads, bool didSleep)
         {
-            bool backInLine = (ticket >= nextTicket + NUM_PARALLEL_IDLE); //At nextTicket overFlow this will fail -> Ignore as it has no severe consequence and is only for short.
-            return (backInLine && (anySleeping || IsThreadPoolCloseToStarving(minThreadPoolThreads))) || cycleCount > CYCLES_BEFORE_SLEEPING;
+            //if (meanSleepTime > EARLY_SLEEP_THRESHOLD) Console.Write("*");
+            return IsThreadPoolCloseToStarving(minThreadPoolThreads) || cycleCount > CYCLES_BEFORE_SLEEPING || (!didSleep && meanSleepTime > EARLY_SLEEP_THRESHOLD);
+        }
+
+        void updateMeanSleepTime(long sleepTime)
+        {
+            meanSleepTime = (meanSleepTime * 3 + sleepTime) / 4;
+            //meanSleepTime = 0;
         }
 
 
@@ -182,24 +189,23 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         private void Lock_Wait()
-        {            
-            int ticket = Interlocked.Increment(ref ticketCounter);
+        {
+            bool didSleep = false;
             int cycleCount = 0;
             do
             {
                 cycleCount++;
-                if (MustTryToSleep(ticket, cycleCount))
+                if (MustTryToSleep(cycleCount, didSleep))
                 {                    
                     if (Sleep())
                     {
                         cycleCount = 0;
+                        didSleep = true;
                     }
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
-            Interlocked.Increment(ref nextTicket);
-            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
 
         }
 
@@ -217,9 +223,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (lockIndicator != NO_LOCK)
                 {
                     numSyncWritersSleeping++;
-                    anySleeping = true;
+                    anySleeping = true;                    
                     acquiredLock.Exit(); // reopen before sleeping
+                    var timer = AppTime.TimeKeeper;
                     Monitor.Wait(writerMonitor);
+                    updateMeanSleepTime(timer.Elapsed.Ticks);
                     slept = true;
                 }
                 else acquiredLock.Exit();
@@ -242,24 +250,22 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockAsync_Wait()
         {
-            int ticket = Interlocked.Increment(ref ticketCounter);
+            bool didSleep = false;
             int cycleCount = 0;
             do
             {
                 cycleCount++;
-                if (MustAsyncTryToSleep(ticket, cycleCount, 1))
+                if (MustAsyncTryToSleep(cycleCount, 1, didSleep))
                 {
                     if (await SleepAsync())
                     {
                         cycleCount = 0;
+                        didSleep = true;
                     }
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
-
-            Interlocked.Increment(ref nextTicket);
-            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
 
             return new AcquiredLock(this, LockMode.WriteLock);
         }
@@ -280,7 +286,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 var task = tcs.Task;
 
                 acquiredLock.Exit();
+                var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
+                updateMeanSleepTime(timer.Elapsed.Ticks);
                 slept = true;
             }
             else if (lockIndicator != NO_LOCK)
@@ -304,7 +312,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private void LockPrioritized_Wait()
         {
-            int ticket = Interlocked.Increment(ref ticketCounter);
             int cycleCount = 0;
             do
             {
@@ -317,8 +324,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (cycleCount > CYCLES_BEFORE_YIELDING * PRIO_CYCLE_FACTOR) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
-            Interlocked.Increment(ref nextTicket);
-            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -335,7 +340,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     numPrioSleeping++;
                     anySleeping = true;
                     acquiredLock.Exit(); // reopen before sleeping
+                    var timer = AppTime.TimeKeeper;
                     Monitor.Wait(priorityMonitor);
+                    updateMeanSleepTime(timer.Elapsed.Ticks);
                 }
                 else acquiredLock.Exit();
                 Monitor.Exit(priorityMonitor);
@@ -356,7 +363,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockPrioritizedAsync_Wait()
         {
-            int ticket = Interlocked.Increment(ref ticketCounter);
             int cycleCount = 0;
             do
             {
@@ -369,10 +375,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
-
-            Interlocked.Increment(ref nextTicket);
-            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
-
             return new AcquiredLock(this, LockMode.WriteLock);
         }
 
@@ -390,7 +392,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 var task = tcs.Task;
 
                 acquiredLock.Exit();
+                var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
+                updateMeanSleepTime(timer.Elapsed.Ticks);
             }
             else if (lockIndicator != NO_LOCK)
             {
@@ -414,15 +418,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private void LockReadOnly_Wait()
         {
-            int ticket = Interlocked.Increment(ref ticketCounter);
-
             int currentLockIndicator;
             int newLockIndicator;
             int cycleCount = 0;
             do
             {
                 cycleCount++;
-                if((ticket > nextTicket && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING)
+                if(cycleCount > CYCLES_BEFORE_SLEEPING)
                 {                    
                     if (SleepReadOnly())
                     {
@@ -435,9 +437,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 newLockIndicator = currentLockIndicator + 1;
 
             } while(newLockIndicator < FIRST_READ_LOCK|| waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator));
-
-            Interlocked.Increment(ref nextTicket);
-            //if (ticketCounter < nextTicket) ticketCounter = nextTicket;
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -456,7 +455,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     numReadersSleeping++;
                     anySleeping = true;
                     acquiredLock.Exit(); // reopen before sleeping
-                    Monitor.Wait(readerMonitor);
+                    var timer = AppTime.TimeKeeper;
+                    Monitor.Wait(writerMonitor);
+                    updateMeanSleepTime(timer.Elapsed.Ticks);
                     slept = true;
                 }
                 else acquiredLock.Exit();
@@ -1342,25 +1343,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 wakingUp = true;
 
-                int numSleeping = numPrioSleeping + prioAsyncWriterQueue.Count + numSyncWritersSleeping + asyncWriterQueue.Count + numReadersSleeping;
-                if (numSleeping > 0)
-                {
-
-                    long numWaiting = ticketCounter - nextTicket;
-                    long numIdleing = numWaiting - numSleeping;
-                    //Console.WriteLine($"ticketCounte={ticketCounter}, nextTicket={nextTicket}, numWaiting={numWaiting}, numSleeping={numSleeping}, numIdleing={numIdleing}");
-                    //if (numIdleing >= NUM_PARALLEL_IDLE) Console.Write("*");
-
-                    while (numSleeping > 0 && numIdleing < NUM_PARALLEL_IDLE)
-                    {
-                        WakeUpOne();
-                        numIdleing++;
-                        numSleeping--;
-                    };
-
-                    anySleeping = numPrioSleeping + prioAsyncWriterQueue.Count + numSyncWritersSleeping + asyncWriterQueue.Count + numReadersSleeping > 0;
-                }
-                else anySleeping = false;
+                WakeUpOne();
+                anySleeping = numPrioSleeping + prioAsyncWriterQueue.Count + numSyncWritersSleeping + asyncWriterQueue.Count + numReadersSleeping > 0;
 
                 wakingUp = false;
             }
