@@ -15,6 +15,12 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numConsumers = 1;
         public int numOverallMessages = 1_000_000;
 
+        private void Slack()
+        {
+            var timer = AppTime.TimeKeeper;
+            while(timer.Elapsed < 0.0001.Milliseconds()) ;
+        }
+
         public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)
         {
             init();
@@ -38,9 +44,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                         });
-                    }
-                    var timer = AppTime.TimeKeeper;                    
-                    while(timer.Elapsed < 0.001.Milliseconds()) ;
+                        Slack();
+                    }                    
                 }));
             }
             for(int i = 0; i < numConsumers; i++)
@@ -59,8 +64,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             }
                         });
                         if(empty) Thread.Yield();
-                        var timer = AppTime.TimeKeeper;
-                        while (timer.Elapsed < 0.001.Milliseconds()) ;
+                        Slack();
                     }
                 }));
             }
@@ -92,7 +96,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                         });
+                        Slack();
                     }
+                    
                 }).Invoke());
             }
             for(int i = 0; i < numConsumers; i++)
@@ -111,6 +117,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             }
                         });
                         if(empty) await Task.Yield();
+                        Slack();
                     }
                 }).Invoke());
             }

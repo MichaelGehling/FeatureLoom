@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numProducers = value;
         }
 
-        [Params(10)]
+        [Params(1, 10)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -41,16 +41,16 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark(Baseline = true)]
         public void FeatureLock_LockAsync_() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockAsync);
 
-        [Benchmark]
+        //[Benchmark]
         public void FeatureLock_LockPrioAsync_() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockPrioAsync, featureLockSubjects.LockAsync);
 
         [Benchmark]
         public void SemaphoreSlim_LockAsync_() => queueTest.AsyncRun(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.LockAsync);
 
-        [Benchmark]
+        //[Benchmark]
         public void AsyncEx_LockAsync_() => queueTest.AsyncRun(asyncExSubjects.Init, asyncExSubjects.LockAsync);
 
-        [Benchmark]
+        //[Benchmark]
         public void NeoSmart_LockAsync_() => queueTest.AsyncRun(neoSmartSubjects.Init, neoSmartSubjects.LockAsync);
 
 
