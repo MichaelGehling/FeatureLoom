@@ -1,8 +1,10 @@
 ﻿using BenchmarkDotNet.Attributes;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.CongestionTest
@@ -10,10 +12,16 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
     
     public class CongestionPerformanceTest
     {
-        public int numCongestors = 10;
+        public int numCongestors = 20;
         public int numHotPathRuns = 1000;
         public TimeSpan hotPathExecutionTime = 0.01.Milliseconds();
         public TimeSpan congestionExecutionTime = 0.01.Milliseconds();
+
+        private void Slack()
+        {
+            var timer = AppTime.TimeKeeper;
+            while(timer.Elapsed < 0.001.Milliseconds()) ;
+        }
 
         public void Run(Action init, Action<Action> hotpathLock, Action<Action> congestingLock = null)
         {
@@ -25,11 +33,10 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
             
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);            
             Task hotPathTask;
-            List<Task> congesterTasks = new List<Task>();
            
             for(int i = 0; i < numCongestors; i++)
             {
-                congesterTasks.Add(Task.Run(() =>
+                var thread = new Thread(() =>
                 {
                     starter.Wait();
                     while(!hotPathDone)
@@ -39,11 +46,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                             var timer = new TimeFrame(congestionExecutionTime);
                             while(!timer.Elapsed && !hotPathDone) /* work */;
                         });
+                        Slack();
                     }
-                }));
+                });
+                thread.Start();
             }
 
-            hotPathTask = Task.Run(() =>
+            var hotPathThread = new Thread(() =>
             {
                 starter.Wait();
                 int count = 0;
@@ -54,13 +63,15 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                         var timer = new TimeFrame(hotPathExecutionTime);
                         while(!timer.Elapsed) /* work */;
                     });
+                    Slack();
                 }
                 hotPathDone = true;
             });
+            hotPathThread.Start();
 
             starter.Set();
-
-            if (!hotPathTask.Wait(10000)) Console.Write("! TIMEOUT !");
+            
+            if (!hotPathThread.Join(10000)) Console.Write("! TIMEOUT !");
         }
 
         public void AsyncRun(Action init, Func<Action, Task> hotpathLock, Func<Action, Task> congestingLock = null)
@@ -87,6 +98,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                             var timer = new TimeFrame(congestionExecutionTime);
                             while(!timer.Elapsed && !hotPathDone) /* work */;
                         });
+                        Slack();
                     }
                 }).Invoke());
             }
@@ -102,6 +114,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                         var timer = new TimeFrame(hotPathExecutionTime);
                         while(!timer.Elapsed) /* work */;
                     });
+                    Slack();
                 }
                 hotPathDone = true;
             }).Invoke();

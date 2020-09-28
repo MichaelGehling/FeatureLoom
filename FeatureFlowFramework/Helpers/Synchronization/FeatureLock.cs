@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int FIRST_READ_LOCK = 1;
 
         const int CYCLES_BEFORE_YIELDING = 200;
-        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + 50;
+        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + 20;
         const int PRIO_CYCLE_FACTOR = 3;
 
         const int NUM_PARALLEL_IDLE = 2;
