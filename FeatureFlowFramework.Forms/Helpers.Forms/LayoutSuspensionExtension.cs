@@ -15,6 +15,7 @@ namespace FeatureFlowFramework.Helpers.Forms
 
             control.SuspendLayout();
             List<Control> suspendedChildren = null;
+            if(control is TreeView tree) tree.BeginUpdate();
             if(recursive)
             {
                 suspendedChildren = new List<Control>();
@@ -36,6 +37,7 @@ namespace FeatureFlowFramework.Helpers.Forms
                     else childControl.SetMetaData("LayoutSuspensionActive", true);
 
                     childControl.SuspendLayout();
+                    if(childControl is TreeView tree) tree.BeginUpdate();
                     suspendedChildren.Add(childControl);
                     SuspendChildren(childControl, suspendedChildren);
                 }
@@ -56,11 +58,13 @@ namespace FeatureFlowFramework.Helpers.Forms
 
             public void Dispose()
             {
+                if(control is TreeView tree) tree.EndUpdate();
                 control?.ResumeLayout();
                 control?.SetMetaData("LayoutSuspensionActive", false);
 
                 foreach(var child in children.EmptyIfNull())
                 {
+                    if(child is TreeView treeChild) treeChild.EndUpdate();
                     child?.ResumeLayout();
                     child?.SetMetaData("LayoutSuspensionActive", false);
                 }
