@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.Services.Logging
     public class InMemoryLogger : IDataFlowSink
     {       
         CountingRingBuffer<LogMessage> buffer;
-        FeatureLock bufferLock = new FeatureLock();
+        FastSpinLock bufferLock = new FastSpinLock();
 
         public InMemoryLogger(int bufferSize)
         {
@@ -21,23 +21,18 @@ namespace FeatureFlowFramework.Services.Logging
 
         public void Post<M>(in M message)
         {
-            using(bufferLock.Lock())
-            {
-                if(message is LogMessage logMessage) buffer.Add(logMessage);
-            }
+            if(message is LogMessage logMessage) using(bufferLock.Lock()) buffer.Add(logMessage);
         }
 
-        public async Task PostAsync<M>(M message)
+        public Task PostAsync<M>(M message)
         {
-            using(await bufferLock.LockAsync())
-            {
-                if(message is LogMessage logMessage) buffer.Add(logMessage);
-            }
+            if(message is LogMessage logMessage) using(bufferLock.Lock()) buffer.Add(logMessage);
+            return Task.CompletedTask;
         }
 
         public LogMessage[] GetAllLogMessages()
         {
-            using(bufferLock.LockReadOnly())
+            using(bufferLock.Lock())
             {
                 return buffer.GetAvailableSince(0, out _);
             }

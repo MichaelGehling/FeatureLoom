@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.DataFlows
     public class PriorityQueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private PriorityQueue<T> queue;
-        FeatureLock queueLock = new FeatureLock();
+        FastSpinLock queueLock = new FastSpinLock();
 
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;
@@ -111,7 +111,7 @@ namespace FeatureFlowFramework.DataFlows
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
             if(IsEmpty) return (false, default);
-            using (await queueLock.LockAsync())
+            using (queueLock.Lock())
             {
                 success = queue.TryDequeue(out message);
             }
@@ -142,7 +142,7 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
-            using (queueLock.LockReadOnly())
+            using (queueLock.Lock())
             {
                 if(IsEmpty) return false;
                 nextItem = queue.Peek();
@@ -159,7 +159,7 @@ namespace FeatureFlowFramework.DataFlows
 
             T[] messages;
 
-            using (queueLock.LockReadOnly())
+            using (queueLock.Lock())
             {
                 messages = queue.ToArray();
             }

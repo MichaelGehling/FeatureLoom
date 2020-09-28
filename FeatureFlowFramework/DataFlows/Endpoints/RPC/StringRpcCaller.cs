@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
-        FeatureLock responseHandlersLock = new FeatureLock();
+        FastSpinLock responseHandlersLock = new FastSpinLock();
         private readonly TimeSpan timeout;
         private readonly Timer timeoutTimer;
 

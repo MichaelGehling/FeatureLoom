@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.DataFlows
     public class QueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private Queue<T> queue = new Queue<T>();
-        FeatureLock queueLock = new FeatureLock();
+        FastSpinLock queueLock = new FastSpinLock();
 
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;
@@ -112,7 +112,7 @@ namespace FeatureFlowFramework.DataFlows
 
             if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
             if(IsEmpty) return (false, default);
-            using (await queueLock.LockAsync())
+            using (queueLock.Lock())
             {
                 success = queue.TryDequeue(out message);                
             }
