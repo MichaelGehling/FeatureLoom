@@ -35,6 +35,7 @@ namespace FeatureFlowFramework.Workflows
                 do
                 {
                     Task<bool> stepTask = workflow.ExecuteNextStepAsync(executionController);
+
                     // If step is already completed, it was executed synchronously.                  
                     if (stepTask.IsCompleted)
                     {
@@ -44,13 +45,23 @@ namespace FeatureFlowFramework.Workflows
                             var syncContext = SynchronizationContext.Current;
                             if(syncContext != null && syncContext.GetType() != typeof(SynchronizationContext))
                             {
-                                await Task.Delay(suspensionTime);                                
+                                if(suspensionTime == TimeSpan.Zero) await Task.Yield();
+                                else await Task.Delay(suspensionTime);                                
+                            }
+                            else
+                            {
+                                ThreadPool.GetAvailableThreads(out int availableThreads, out _);
+                                if(availableThreads == 0)
+                                {
+                                    if(suspensionTime == TimeSpan.Zero) await Task.Yield();
+                                    else await Task.Delay(suspensionTime);
+                                }
                             }
                             timer.Restart(); // When suspension was forced, the suspensionTimer can be reset.
                         }
                     }    
                     else timer.Restart(); // When step ran async the suspensionTimer can be reset.
-
+                    
                     running = await stepTask;
                 } while (running);                
             }
