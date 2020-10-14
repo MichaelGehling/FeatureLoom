@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Services.Serialization;
+using System;
 
 namespace FeatureFlowFramework.Helpers.Extensions
 {
@@ -23,6 +24,66 @@ namespace FeatureFlowFramework.Helpers.Extensions
         public static Exception InnerOrSelf(this Exception e)
         {
             return e.InnerException ?? e;
+        }
+
+        public static bool TrySetValue<T, V>(this T obj, string fieldOrPropertyName, V value) where T : class
+        {
+            var property = obj.GetType().GetProperty(fieldOrPropertyName);
+            if(property != null)
+            {
+                if(!property.CanWrite) return false;
+
+                if(property.PropertyType.IsAssignableFrom(typeof(V)))
+                {
+                    property.SetValue(obj, value);
+                }
+                else if(value is IConvertible convertible && convertible.TryConvertTo(property.PropertyType, out object converted))
+                {
+                    property.SetValue(obj, converted);
+                }
+                else return false;
+            }
+            else
+            {
+                var field = obj.GetType().GetField(fieldOrPropertyName);
+                if(field == null) return false;
+
+                if(field.FieldType.IsAssignableFrom(typeof(V)))
+                {
+                    field.SetValue(obj, value);
+                }
+                else if(value is IConvertible convertible && convertible.TryConvertTo(field.FieldType, out object converted))
+                {
+                    field.SetValue(obj, converted);
+                }
+                else return false;
+            }
+
+            return true;
+        }
+
+        public static bool TryConvertTo<T>(this T obj, Type type, out object converted) where T : IConvertible
+        {
+            converted = null;
+            try
+            {
+                converted = Convert.ChangeType(obj, type);
+            }
+            catch
+            {
+                try
+                {
+                    if (obj is string str)
+                    {
+                        converted = Json.DeserializeFromJson(str, type);
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return converted != null;
         }
     }
 }

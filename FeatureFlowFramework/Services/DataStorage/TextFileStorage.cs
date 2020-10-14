@@ -21,7 +21,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public class Config : Configuration
         {
             public bool useCategoryFolder = true;
-            public string basePath = "";
+            public string basePath = ".";
             public string fileSuffix = "";
             public bool allowSubscription = true;
             public TimeSpan subscriptionSamplingTime = 5.Seconds();
@@ -125,16 +125,16 @@ namespace FeatureFlowFramework.Services.DataStorage
 
                 if (!directoryInfo.Attributes.HasFlag(FileAttributes.Directory))
                 {
-                    ProcessChangeNotification_Directory(notification);
+                    ProcessChangeNotification_File(notification);
                 }
                 else
                 {
-                    ProcessChangeNotification_File(notification, directoryInfo);
+                    ProcessChangeNotification_Directory(notification, directoryInfo);
                 }
             }
         }
 
-        private void ProcessChangeNotification_File(FileSystemObserver.ChangeNotification notification, DirectoryInfo directoryInfo)
+        private void ProcessChangeNotification_Directory(FileSystemObserver.ChangeNotification notification, DirectoryInfo directoryInfo)
         {
             if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
             {
@@ -166,13 +166,16 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
         }
 
-        private void ProcessChangeNotification_Directory(FileSystemObserver.ChangeNotification notification)
+        private void ProcessChangeNotification_File(FileSystemObserver.ChangeNotification notification)
         {
             if (notification.changeType.HasFlag(WatcherChangeTypes.Changed))
             {
                 string uri = FilePathToUri(notification.path);
-                cache?.Remove(uri);
-                NotifySubscriptions(uri, UpdateEvent.Updated);
+                if(uri != null)
+                {
+                    cache?.Remove(uri);
+                    NotifySubscriptions(uri, UpdateEvent.Updated);
+                }
             }
             else if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
             {
@@ -181,7 +184,10 @@ namespace FeatureFlowFramework.Services.DataStorage
                     fileSet.Add(notification.path);
                 }
                 string uri = FilePathToUri(notification.path);
-                NotifySubscriptions(uri, UpdateEvent.Created);
+                if(uri != null)
+                {
+                    NotifySubscriptions(uri, UpdateEvent.Created);
+                }
             }
             else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
             {
@@ -191,10 +197,16 @@ namespace FeatureFlowFramework.Services.DataStorage
                     fileSet.Add(notification.path);
                 }
                 string oldUri = FilePathToUri(notification.oldPath);
-                cache?.Remove(oldUri);
-                NotifySubscriptions(oldUri, UpdateEvent.Removed);
+                if(oldUri != null)
+                {
+                    cache?.Remove(oldUri);
+                    NotifySubscriptions(oldUri, UpdateEvent.Removed);
+                }
                 string newUri = FilePathToUri(notification.path);
-                NotifySubscriptions(newUri, UpdateEvent.Created);
+                if(newUri != null)
+                {
+                    NotifySubscriptions(newUri, UpdateEvent.Created);
+                }
             }
         }
 
