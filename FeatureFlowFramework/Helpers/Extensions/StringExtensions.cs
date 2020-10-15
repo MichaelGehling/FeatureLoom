@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using FeatureFlowFramework.Services.Serialization;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -131,7 +133,7 @@ namespace FeatureFlowFramework.Helpers.Extensions
         public static string Substring(this string str, string startAfter, string endBefore = null)
         {
             int startPos = 0;
-            int endPos = str.Length-1;
+            int endPos = str.Length;
             if (!startAfter.EmptyOrNull())
             {
                 startPos = str.IndexOf(startAfter) + startAfter.Length;
@@ -140,7 +142,63 @@ namespace FeatureFlowFramework.Helpers.Extensions
             {
                 endPos = str.IndexOf(endBefore, startPos);
             }
-            return str.Substring(startPos, endPos - startPos + 1);
+            return str.Substring(startPos, endPos - startPos);
         }
+
+        public static string ReplaceBetween(this string str, string startAfter, string endBefore, string replacement, bool removeAlsoSearchStrings = false)
+        {
+            int startPos = 0;
+            int endPos = str.Length;
+            if(!startAfter.EmptyOrNull())
+            {
+                startPos = str.IndexOf(startAfter) + (removeAlsoSearchStrings ? 0 : startAfter.Length);
+            }
+            if(!endBefore.EmptyOrNull())
+            {
+                endPos = str.IndexOf(endBefore, startPos) + (removeAlsoSearchStrings ? endBefore.Length : 0);
+            }
+            return str.Substring(0, startPos) + replacement + str.Substring(endPos);
+        }
+
+        public static string InsertBefore(this string str, string marker, string insertion, bool backwardSearch = false)
+        {
+            int startPos = 0;
+            if(!marker.EmptyOrNull())
+            {
+                if(backwardSearch) startPos = str.LastIndexOf(marker);
+                else startPos = str.IndexOf(marker);
+            }            
+            return str.Insert(startPos, insertion);            
+        }
+
+        public static string InsertAfter(this string str, string marker, string insertion, bool backwardSearch = false)
+        {
+            int startPos = 0;
+            if(!marker.EmptyOrNull())
+            {
+                if(backwardSearch) startPos = str.LastIndexOf(marker) + marker.Length;
+                else startPos = str.IndexOf(marker) + marker.Length;
+            }
+            return str.Insert(startPos, insertion);
+        }
+
+        public static bool ContainsBefore(this string str, string searchStr, string endBefore)
+        {
+            int endPos = 0;
+            if(!endBefore.EmptyOrNull())
+            {        
+                endPos = str.IndexOf(endBefore);                
+            }
+
+            return str.IndexOf(searchStr, 0, endPos) >= 0;
+                        
+        }
+
+        public static T ConvertTo<T>(this string str) where T : IConvertible
+        {
+            return (T)Convert.ChangeType(str, typeof(T));
+        }
+
+
     }
 }

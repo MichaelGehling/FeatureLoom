@@ -88,9 +88,9 @@ namespace FeatureFlowFramework.Workflows
         protected abstract StateMachine WorkflowStateMachine { get; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task<bool> ExecuteNextStepAsync(IStepExecutionController controller)
+        public Task<bool> ExecuteNextStepAsync(IStepExecutionController controller)
         {
-            return await WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
+            return WorkflowStateMachine.ExecuteNextStepAsync(this, controller);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

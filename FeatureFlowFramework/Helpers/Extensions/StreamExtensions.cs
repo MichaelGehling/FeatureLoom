@@ -19,8 +19,9 @@ namespace FeatureFlowFramework.Helpers.Extensions
             return reader.ReadToEndAsync();
         }
 
-        public static Stream ToStream(this string str, Encoding encoding)
+        public static Stream ToStream(this string str, Encoding encoding = null)
         {
+            if(encoding == null) encoding = Encoding.UTF8;
             return new MemoryStream(encoding.GetBytes(str));
         }
 
