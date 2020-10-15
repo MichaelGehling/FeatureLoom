@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
     public class CongestionPerformanceTest
     {
         public int numCongestors = 20;
-        public int numHotPathRuns = 1000;
+        public int numHotPathRuns = 200;
         public TimeSpan hotPathExecutionTime = 0.01.Milliseconds();
         public TimeSpan congestionExecutionTime = 0.01.Milliseconds();
 
@@ -98,6 +98,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                             var timer = new TimeFrame(congestionExecutionTime);
                             while(!timer.Elapsed && !hotPathDone) /* work */;
                         });
+                        await Task.Yield();
                         Slack();
                     }
                 }).Invoke());
@@ -114,6 +115,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                         var timer = new TimeFrame(hotPathExecutionTime);
                         while(!timer.Elapsed) /* work */;
                     });
+                    await Task.Yield();
                     Slack();
                 }
                 hotPathDone = true;

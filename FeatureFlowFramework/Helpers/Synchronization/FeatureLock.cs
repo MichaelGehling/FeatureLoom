@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int FIRST_READ_LOCK = 1;
 
         const int CYCLES_BEFORE_YIELDING = 200;
-        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + 20;
+        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + 200;
         const int PRIO_CYCLE_FACTOR = 3;
 
         const int NUM_PARALLEL_IDLE = 2;
@@ -30,7 +30,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int FALSE = 0;
         const int TRUE = 1;
 
-        const long EARLY_SLEEP_THRESHOLD = 500; //in ticks (1 tick = 100ns, 10_000 ticks = 1 ms)
+        const long EARLY_SLEEP_THRESHOLD = 100; //in ticks (1 tick = 100ns, 10_000 ticks = 1 ms)
         long meanSleepTime = EARLY_SLEEP_THRESHOLD;
 
         /// <summary>
@@ -65,6 +65,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile int numSyncWritersSleeping = 0;
         volatile int numReadersSleeping = 0;        
         volatile bool anySleeping = false;
+
+        volatile bool nextFound = false;
 
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> reenterableReadLockTask;
@@ -160,16 +162,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             reentrancyIndicator.Value = reentrancyId - 1;
         }
 
-        private bool MustTryToSleep(int cycleCount, bool didSleep)
+        private bool MustTryToSleep(int cycleCount, bool prioritized)
         {
             //if (meanSleepTime > EARLY_SLEEP_THRESHOLD) Console.Write("*");
-            return cycleCount > CYCLES_BEFORE_SLEEPING || (!didSleep && meanSleepTime > EARLY_SLEEP_THRESHOLD);
+            return cycleCount > CYCLES_BEFORE_SLEEPING || (!prioritized && meanSleepTime > EARLY_SLEEP_THRESHOLD);
         }
 
-        private bool MustAsyncTryToSleep(int cycleCount, int minThreadPoolThreads, bool didSleep)
+        private bool MustAsyncTryToSleep(int cycleCount, bool prioritized)
         {
             //if (meanSleepTime > EARLY_SLEEP_THRESHOLD) Console.Write("*");
-            return IsThreadPoolCloseToStarving(minThreadPoolThreads) || cycleCount > CYCLES_BEFORE_SLEEPING || (!didSleep && meanSleepTime > EARLY_SLEEP_THRESHOLD);
+            return cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving() || ( !prioritized && meanSleepTime > EARLY_SLEEP_THRESHOLD);
         }
 
         void updateMeanSleepTime(long sleepTime)
@@ -190,22 +192,30 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private void Lock_Wait()
         {
-            bool didSleep = false;
+            bool prioritized = false;
             int cycleCount = 0;
             do
             {
+                if (!nextFound)
+                {
+                    nextFound = true;
+                    prioritized = true;
+                }
+
                 cycleCount++;
-                if (MustTryToSleep(cycleCount, didSleep))
+                if (MustTryToSleep(cycleCount, prioritized))
                 {                    
                     if (Sleep())
                     {
                         cycleCount = 0;
-                        didSleep = true;
+                        prioritized = true;
                     }
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+
+            nextFound = false;
 
         }
 
@@ -250,22 +260,30 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockAsync_Wait()
         {
-            bool didSleep = false;
+            bool prioritized = false;
             int cycleCount = 0;
             do
             {
+                if (!nextFound)
+                {
+                    nextFound = true;
+                    prioritized = true;
+                }
+
                 cycleCount++;
-                if (MustAsyncTryToSleep(cycleCount, 1, didSleep))
+                if (MustAsyncTryToSleep(cycleCount, prioritized))
                 {
                     if (await SleepAsync())
                     {
                         cycleCount = 0;
-                        didSleep = true;
+                        prioritized = true;
                     }
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+
+            nextFound = false;
 
             return new AcquiredLock(this, LockMode.WriteLock);
         }
@@ -293,7 +311,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             else if (lockIndicator != NO_LOCK)
             {
-                if (IsThreadPoolCloseToStarving(1)) await Task.Yield();
+                if (IsThreadPoolCloseToStarving()) await Task.Yield();
                 else Thread.Yield();
             }
             return slept;
@@ -367,7 +385,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             do
             {
                 cycleCount++;
-                if (cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving(0))
+                if (cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 0;
                     await SleepPrioritizedAsync();
@@ -398,7 +416,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             else if (lockIndicator != NO_LOCK)
             {
-                if (IsThreadPoolCloseToStarving(0)) await Task.Yield();
+                if (IsThreadPoolCloseToStarving()) await Task.Yield();
                 else Thread.Yield();
             }
         }
@@ -469,6 +487,49 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
         #endregion LockReadOnly
 
+        #region LockReentrant
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public AcquiredLock LockReentrant()
+        {
+            if (TryReenter(out AcquiredLock acquiredLock)) return acquiredLock;
+            if (NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) Lock_Wait();
+            reentrancyIndicator.Value = ++reentrancyId;
+            return new AcquiredLock(this, LockMode.WriteLockReenterable);
+        }
+
+        private bool TryReenter(out AcquiredLock acquiredLock)
+        {
+            var currentLockIndicator = lockIndicator;
+            if (currentLockIndicator != NO_LOCK && reentrancyIndicator.Value == reentrancyId)
+            {
+                if (currentLockIndicator == WRITE_LOCK)
+                {
+                    acquiredLock = new AcquiredLock(this, LockMode.Reentered);
+                    return true;
+                }
+                else if (currentLockIndicator >= FIRST_READ_LOCK)
+                {
+                    // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
+                    if (TRUE == Interlocked.CompareExchange(ref waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+                    // Waiting for upgrade to writeLock
+                    while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
+                    {
+                        Thread.Yield();
+                    }
+                    waitingForUpgrade = FALSE;
+
+                    acquiredLock = new AcquiredLock(this, LockMode.Upgraded);
+                    return true;
+                }
+            }
+            acquiredLock = new AcquiredLock();
+            return false;
+        }
+
+        #endregion LockReentrant
+
+
 
 
 
@@ -505,7 +566,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
 
-
+        /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReentrant(int priority = DEFAULT_PRIORITY)
         {
@@ -523,7 +584,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             UpdateAfterEnter(cycleCount != 0);
             reentrancyIndicator.Value = ++reentrancyId;
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
-        }
+        }*/
         /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReadOnly(int priority = DEFAULT_PRIORITY)
@@ -1081,7 +1142,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving(0))
+                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -1114,7 +1175,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving(0))
+                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -1240,7 +1301,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving(0))
+                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -1269,7 +1330,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool nextInQueue = UpdatePriority(ref priority);
 
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving(0))
+                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
                     cycleCount = 1;
                     bool didReset = mre.Reset();
@@ -1290,10 +1351,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsThreadPoolCloseToStarving(int minAvailableThreads)
+        private bool IsThreadPoolCloseToStarving()
         {
             ThreadPool.GetAvailableThreads(out int availableThreads, out _);
-            return availableThreads == minAvailableThreads;
+            return availableThreads == 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
