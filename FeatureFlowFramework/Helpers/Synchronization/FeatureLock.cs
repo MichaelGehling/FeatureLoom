@@ -174,7 +174,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving() || ( !prioritized && meanSleepTime > EARLY_SLEEP_THRESHOLD);
         }
 
-        void updateMeanSleepTime(long sleepTime)
+        void UpdateMeanSleepTime(long sleepTime)
         {
             meanSleepTime = (meanSleepTime * 3 + sleepTime) / 4;
             //meanSleepTime = 0;
@@ -237,7 +237,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     acquiredLock.Exit(); // reopen before sleeping
                     var timer = AppTime.TimeKeeper;
                     Monitor.Wait(writerMonitor);
-                    updateMeanSleepTime(timer.Elapsed.Ticks);
+                    UpdateMeanSleepTime(timer.Elapsed.Ticks);
                     slept = true;
                 }
                 else acquiredLock.Exit();
@@ -285,6 +285,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             nextFound = false;
 
+            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;            
             return new AcquiredLock(this, mode);
         }
 
@@ -306,7 +307,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 acquiredLock.Exit();
                 var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
-                updateMeanSleepTime(timer.Elapsed.Ticks);
+                UpdateMeanSleepTime(timer.Elapsed.Ticks);
                 slept = true;
             }
             else if (lockIndicator != NO_LOCK)
@@ -360,7 +361,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     acquiredLock.Exit(); // reopen before sleeping
                     var timer = AppTime.TimeKeeper;
                     Monitor.Wait(priorityMonitor);
-                    updateMeanSleepTime(timer.Elapsed.Ticks);
+                    UpdateMeanSleepTime(timer.Elapsed.Ticks);
                 }
                 else acquiredLock.Exit();
                 Monitor.Exit(priorityMonitor);
@@ -392,7 +393,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
-            } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+            } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));            
+
+            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;
             return new AcquiredLock(this, mode);
         }
 
@@ -412,7 +415,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 acquiredLock.Exit();
                 var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
-                updateMeanSleepTime(timer.Elapsed.Ticks);
+                UpdateMeanSleepTime(timer.Elapsed.Ticks);
             }
             else if (lockIndicator != NO_LOCK)
             {
@@ -479,7 +482,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     acquiredLock.Exit(); // reopen before sleeping
                     var timer = AppTime.TimeKeeper;
                     Monitor.Wait(readerMonitor);
-                    updateMeanSleepTime(timer.Elapsed.Ticks);
+                    UpdateMeanSleepTime(timer.Elapsed.Ticks);
                     slept = true;
                 }
                 else acquiredLock.Exit();
@@ -530,6 +533,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             nextFound = false;
 
+            if (mode == LockMode.ReadLockReenterable)
+            {
+                if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                reentrancyIndicator.Value = reentrancyId;
+            }
+
             return new AcquiredLock(this, mode);
         }
 
@@ -550,7 +559,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 acquiredLock.Exit();
                 var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
-                updateMeanSleepTime(timer.Elapsed.Ticks);
+                UpdateMeanSleepTime(timer.Elapsed.Ticks);
                 slept = true;
             }
             else if(lockIndicator == WRITE_LOCK)
@@ -577,7 +586,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool TryReenter(out AcquiredLock acquiredLock)
         {
             var currentLockIndicator = lockIndicator;
-            if (currentLockIndicator != NO_LOCK && reentrancyIndicator.Value == reentrancyId)
+            if (currentLockIndicator != NO_LOCK && HasValidReentrancyContext())
             {
                 if (currentLockIndicator == WRITE_LOCK)
                 {
@@ -615,7 +624,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if(acquiredLock.mode == LockMode.Reentered) return reenteredLockTask;
                 else return upgradedLockTask;
             }
-            if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) return reenterableWriteLockTask;
+            if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {                
+                reentrancyIndicator.Value = ++reentrancyId;
+                return reenterableWriteLockTask;
+            }
             else return LockAsync_Wait(LockMode.WriteLockReenterable);
         }
 
@@ -644,7 +657,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if(acquiredLock.mode == LockMode.Reentered) return reenteredLockTask;
                 else return upgradedLockTask;
             }
-            if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) return reenterableWriteLockTask;
+            if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {                
+                reentrancyIndicator.Value = ++reentrancyId;
+                return reenterableWriteLockTask;
+            }
             else return LockPrioritizedAsync_Wait(LockMode.WriteLockReenterable);
         }
 
@@ -656,16 +673,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public AcquiredLock LockReentrantReadOnly()
         {
             if(TryReenterReadOnly()) return new AcquiredLock(this, LockMode.Reentered);
+
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
             if(newLockIndicator < FIRST_READ_LOCK || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait();
+
+            if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+            reentrancyIndicator.Value = reentrancyId;
             return new AcquiredLock(this, LockMode.ReadLock);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReenterReadOnly()
         {
-            return lockIndicator != NO_LOCK && reentrancyIndicator.Value == reentrancyId;
+            return lockIndicator != NO_LOCK && HasValidReentrancyContext();
         }
 
         #endregion LockReentrantReadOnly
@@ -678,7 +699,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(TryReenterReadOnly()) return reenteredLockTask;
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            if(newLockIndicator >= FIRST_READ_LOCK && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) return reenterableReadLockTask;
+            if(newLockIndicator >= FIRST_READ_LOCK && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            {
+                if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                reentrancyIndicator.Value = reentrancyId;
+                return reenterableReadLockTask;
+            }
             else return LockReadOnlyAsync_Wait(LockMode.ReadLockReenterable);
         }
 
@@ -729,7 +755,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(TryReenter(out acquiredLock)) return true;
 
             if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
+            {                
+                reentrancyIndicator.Value = ++reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
             }
@@ -756,6 +783,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if(currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
                 {
+                    if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                    reentrancyIndicator.Value = reentrancyId;
                     acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                     return true;
                 }
@@ -1269,7 +1298,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private (bool reentered, bool timedOut, AcquiredLock acquiredLock) TryReenterForWritingWithTimeout(int currentLockIndicator, TimeFrame timer)
         {
-            if (reentrancyIndicator.Value == reentrancyId)
+            if (HasValidReentrancyContext())
             {
                 if (currentLockIndicator == WRITE_LOCK)
                 {
@@ -1358,7 +1387,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (currentLockIndicator != NO_LOCK)
             {
                 mode = LockMode.Reentered;
-                return reentrancyIndicator.Value == reentrancyId;
+                return HasValidReentrancyContext();
             }
             var newLockIndicator = currentLockIndicator + 1;
             if (ReentrantReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
@@ -1475,7 +1504,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private (bool reentered, AcquiredLock acquiredLock) TryReenterForWriting(int currentLockIndicator)
         {
-            if (reentrancyIndicator.Value == reentrancyId)
+            if (HasValidReentrancyContext())
             {
                 if (currentLockIndicator == WRITE_LOCK)
                 {
