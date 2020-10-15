@@ -126,7 +126,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLockReadOnly(Action action)
         {
-            using(myLock.LockReadOnlyReentrant())
+            using(myLock.LockReentrantReadOnly())
             {
                 action();
             }
@@ -135,7 +135,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task ReentrantLockReadOnlyAsync(Action action)
         {
-            using(await myLock.LockReadOnlyReentrantAsync())
+            using(await myLock.LockReentrantReadOnlyAsync())
             {
                 action();
             }
@@ -153,7 +153,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantTryLockReadOnly(Action action)
         {
-            if(myLock.TryLockReadOnlyReentrant(out var acquiredLock)) using(acquiredLock)
+            if(myLock.TryLockReentrantReadOnly(out var acquiredLock)) using(acquiredLock)
                 {
                     action();
                 }
@@ -272,7 +272,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLockReadOnly()
         {
-            using (myLock.LockReadOnlyReentrant())
+            using (myLock.LockReentrantReadOnly())
             {
 
             }
@@ -281,7 +281,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task ReentrantLockReadOnlyAsync()
         {
-            using (await myLock.LockReadOnlyReentrantAsync())
+            using (await myLock.LockReentrantReadOnlyAsync())
             {
 
             }
@@ -299,7 +299,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantTryLockReadOnly()
         {
-            if (myLock.TryLockReadOnlyReentrant(out var acquiredLock)) using (acquiredLock)
+            if (myLock.TryLockReentrantReadOnly(out var acquiredLock)) using (acquiredLock)
             {
 
             }

@@ -516,9 +516,9 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.LockReadOnlyReentrant())
+            using(myLock.LockReentrantReadOnly())
             {
-                Assert.True(myLock.TryLockReadOnlyReentrant(out var readLock));
+                Assert.True(myLock.TryLockReentrantReadOnly(out var readLock));
                 Assert.Equal(1, myLock.CountParallelReadLocks);
                 Assert.True(readLock.IsActive);
                 readLock.Exit();
@@ -536,7 +536,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.LockReadOnlyReentrant())
+            using(myLock.LockReentrantReadOnly())
             {
                 Assert.Equal(1, myLock.CountParallelReadLocks);
                 Assert.False(myLock.IsWriteLocked);
@@ -563,7 +563,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             AsyncManualResetEvent signal = new AsyncManualResetEvent(false);
             Task task = Task.Run(() =>
             {
-                using(myLock.LockReadOnlyReentrant())
+                using(myLock.LockReentrantReadOnly())
                 {
                     while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed) ;
                     Assert.False(timer.Elapsed);
@@ -574,7 +574,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 }
             });
 
-            using(myLock.LockReadOnlyReentrant())
+            using(myLock.LockReentrantReadOnly())
             {
                 while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed) ;
                 Assert.False(timer.Elapsed);
@@ -719,7 +719,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             }
             Assert.False(myLock.IsLocked);
 
-            using (var outerLock = myLock.LockReadOnlyReentrant())
+            using (var outerLock = myLock.LockReentrantReadOnly())
             {
                 Assert.False(myLock.IsWriteLocked);
                 using (var innerLock = myLock.LockReentrant())
