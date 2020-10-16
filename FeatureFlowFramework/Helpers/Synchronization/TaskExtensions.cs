@@ -22,6 +22,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(task.IsCanceled || task.IsFaulted) return false;
             else if(task.IsCompleted) return true;
 
+            await Task.WhenAny(task, Task.Delay(timeout));
+
+            if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
+            else return true;
+
+            /*
             var cts = new CancellationTokenSource();
             cts.CancelAfter(timeout);
             var cancellationToken = cts.Token;
@@ -63,13 +69,29 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
+            */
         }
 
         public async static Task<bool> WaitAsync(this Task task, CancellationToken cancellationToken)
         {
             if(task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested) return false;
             else if(task.IsCompleted) return true;
+            try
+            {
+                using(var cancelRegistration = cancellationToken.Register(() => throw new TaskCanceledException(task), true))
+                {
+                    await task;
+                }
+            }    
+            catch(TaskCanceledException)
+            {
+                return false;
+            }
 
+            if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
+            else return true;
+
+            /*
             var tcs = new TaskCompletionSource<bool>();
             var registration = cancellationToken.Register(s =>
             {
@@ -107,6 +129,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
+            */
         }
 
         public async static Task<bool> WaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken)
@@ -114,6 +137,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested) return false;
             else if(task.IsCompleted) return true;
 
+            try
+            {
+                await Task.WhenAny(task, Task.Delay(timeout, cancellationToken));
+            }
+            catch (TaskCanceledException)
+            {                
+                return false;
+            }
+
+            if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
+            else return true;
+
+            /*
             var linkedCTS = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             linkedCTS.CancelAfter(timeout);
             var linkedToken = linkedCTS.Token;
@@ -155,6 +191,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
+            */
         }
     }
 }
