@@ -55,6 +55,52 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int BARRIER_WAKEUP = 2;
         FastSpinLock sleepLock = new FastSpinLock();
 
+        interface IWakeOrder
+        {
+            bool TryWakeUp();
+        }
+
+        class SyncSleepHandle : IWakeOrder
+        {
+            FeatureLock parent;
+
+            public SyncSleepHandle(FeatureLock parent)
+            {
+                this.parent = parent;
+            }
+
+            public bool TryWakeUp()
+            {
+                Monitor.Enter(this);                
+                Monitor.Pulse(this);                
+                Monitor.Exit(this);
+                return true;
+            }
+
+            public bool TrySleep()
+            {
+                bool slept = false;
+                parent.anySleeping = true;
+                Thread.MemoryBarrier();
+                if (parent.lockIndicator != NO_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
+                {
+                    if (parent.lockIndicator != NO_LOCK)
+                    {
+                        parent.anySleeping = true;
+                        // QUEUE                        
+                        Monitor.Enter(this);
+                        acquiredLock.Exit(); // reopen before sleeping
+                        Monitor.Wait(this);
+                        Monitor.Exit(this);
+                        slept = true;
+                    }
+                    else acquiredLock.Exit();
+                }
+                else Thread.Yield();
+                return slept;
+            }
+        }
+
         enum WakeOrder
         {
             Undefined,
@@ -1847,8 +1893,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             Monitor.Enter(readerMonitor);
             numReadersSleeping = 0;
             // wake asny readers
-            readersTcs.TrySetResult(true);
-            readersTcs = null;
+            if (readersTcs != null)
+            {
+                readersTcs.TrySetResult(true);
+                readersTcs = null;
+            }
             // wake sync readers
             Monitor.PulseAll(readerMonitor);
 
