@@ -30,9 +30,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int FALSE = 0;
         const int TRUE = 1;
 
-        const long EARLY_SLEEP_THRESHOLD = 100; //in ticks (1 tick = 100ns, 10_000 ticks = 1 ms)
-        long meanSleepTime = EARLY_SLEEP_THRESHOLD;
-
         /// <summary>
         /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
         /// A lockIndicator of -1 implies a write-lock, while a lockIndicator greater than 0 implies a read-lock.
@@ -122,8 +119,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile int numSyncWritersSleeping = 0;
         volatile int numReadersSleeping = 0;        
         volatile bool anySleeping = false;
-
-        volatile bool nextFound = false;
 
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> reenterableReadLockTask;
@@ -221,22 +216,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private bool MustTryToSleep(int cycleCount, bool prioritized)
         {
-            //if (meanSleepTime > EARLY_SLEEP_THRESHOLD) Console.Write("*");
-            return cycleCount > CYCLES_BEFORE_SLEEPING || (!prioritized && meanSleepTime > EARLY_SLEEP_THRESHOLD);
+            return (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING;
         }
 
         private bool MustAsyncTryToSleep(int cycleCount, bool prioritized)
-        {
-            //if (meanSleepTime > EARLY_SLEEP_THRESHOLD) Console.Write("*");
-            return cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving() || ( !prioritized && meanSleepTime > EARLY_SLEEP_THRESHOLD);
+        {            
+            return (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving();            
         }
-
-        void UpdateMeanSleepTime(long sleepTime)
-        {
-            meanSleepTime = (meanSleepTime * 3 + sleepTime) / 4;
-            //meanSleepTime = 0;
-        }
-
 
         #region Lock
 
@@ -253,12 +239,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int cycleCount = 0;
             do
             {
-                if (!nextFound)
-                {
-                    nextFound = true;
-                    prioritized = true;
-                }
-
                 cycleCount++;
                 if (MustTryToSleep(cycleCount, prioritized))
                 {                    
@@ -271,9 +251,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
-
-            nextFound = false;
-
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -293,10 +270,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     anySleeping = true;
                     wakeOrderQueue.Enqueue(WakeOrder.Writer);
                     acquiredLock.Exit(); // reopen before sleeping
-                    var timer = AppTime.TimeKeeper;
                     Monitor.Wait(writerMonitor);
-
-                    UpdateMeanSleepTime(timer.Elapsed.Ticks);
                     slept = true;
                 }
                 else acquiredLock.Exit();
@@ -323,12 +297,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int cycleCount = 0;
             do
             {
-                if (!nextFound)
-                {
-                    nextFound = true;
-                    prioritized = true;
-                }
-
                 cycleCount++;
                 if (MustAsyncTryToSleep(cycleCount, prioritized))
                 {
@@ -341,8 +309,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
-
-            nextFound = false;
 
             if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;            
             return new AcquiredLock(this, mode);
@@ -364,9 +330,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 var task = tcs.Task;
                 wakeOrderQueue.Enqueue(WakeOrder.AsyncWriter);
                 acquiredLock.Exit();
-                var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
-                UpdateMeanSleepTime(timer.Elapsed.Ticks);
                 slept = true;
             }
             else if (lockIndicator != NO_LOCK)
@@ -418,9 +382,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     numPrioSleeping++;
                     anySleeping = true;
                     acquiredLock.Exit(); // reopen before sleeping
-                    var timer = AppTime.TimeKeeper;
                     Monitor.Wait(priorityMonitor);
-                    UpdateMeanSleepTime(timer.Elapsed.Ticks);
                 }
                 else acquiredLock.Exit();
                 Monitor.Exit(priorityMonitor);
@@ -472,9 +434,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 var task = tcs.Task;
 
                 acquiredLock.Exit();
-                var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
-                UpdateMeanSleepTime(timer.Elapsed.Ticks);
             }
             else if (lockIndicator != NO_LOCK)
             {
@@ -539,9 +499,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     anySleeping = true;
                     if (numReadersSleeping == 1) wakeOrderQueue.Enqueue(WakeOrder.Readers);
                     acquiredLock.Exit(); // reopen before sleeping
-                    var timer = AppTime.TimeKeeper;
                     Monitor.Wait(readerMonitor);
-                    UpdateMeanSleepTime(timer.Elapsed.Ticks);
                     slept = true;
                 }
                 else acquiredLock.Exit();
@@ -589,8 +547,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             } while(newLockIndicator < FIRST_READ_LOCK || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator));
 
-            nextFound = false;
-
             if (mode == LockMode.ReadLockReenterable)
             {
                 if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
@@ -616,10 +572,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if(numReadersSleeping == 1) wakeOrderQueue.Enqueue(WakeOrder.Readers);
                 var task = readersTcs.Task;                
                 acquiredLock.Exit();
-
-                var timer = AppTime.TimeKeeper;
                 await task.ConfigureAwait(false);
-                UpdateMeanSleepTime(timer.Elapsed.Ticks);
                 slept = true;
             }
             else if(lockIndicator == WRITE_LOCK)
