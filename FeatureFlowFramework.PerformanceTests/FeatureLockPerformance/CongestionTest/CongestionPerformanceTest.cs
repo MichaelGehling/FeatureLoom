@@ -32,7 +32,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
             if(congestingLock == null) congestingLock = hotpathLock;
             
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);            
-            Task hotPathTask;
            
             for(int i = 0; i < numCongestors; i++)
             {
