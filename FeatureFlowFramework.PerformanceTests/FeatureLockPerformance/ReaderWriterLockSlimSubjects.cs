@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             }
             finally
             {
-                myLock.ExitWriteLock();
+                if (myLock.IsWriteLockHeld) myLock.ExitWriteLock();
             }
         }
 
