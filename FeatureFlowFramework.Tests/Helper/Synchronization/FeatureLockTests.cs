@@ -206,11 +206,11 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            if((await myLock.TryLockReadOnlyReentrantAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
+            if((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
                 using(outerLock)
                 {
                     Assert.True(outerLock.IsActive);
-                    Assert.True((await myLock.TryLockReadOnlyReentrantAsync(TimeSpan.Zero)).Succeeded(out var innerLock));
+                    Assert.True((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var innerLock));
                     Assert.True(innerLock.IsActive);
                     Assert.True(myLock.IsReadOnlyLocked);
                     innerLock.Exit();
@@ -585,7 +585,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
                 signal.Set();
                 // The other readlock will be exited in 10 ms. So long TryLock will wait and then perform the upgrade.
-                Assert.True(myLock.TryLockReentrant(out var writeLock, timer.Remaining));
+                Assert.True(myLock.TryLockReentrant(timer.Remaining, out var writeLock));
                 Assert.False(timer.Elapsed);
                 Assert.Equal(0, myLock.CountParallelReadLocks);
                 Assert.True(myLock.IsWriteLocked);
@@ -617,7 +617,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.False(exited);
 
                     signal1.Set();
-                    Assert.True(myLock.TryLockReentrant(out var deferredLock, timer.Remaining));
+                    Assert.True(myLock.TryLockReentrant(timer.Remaining, out var deferredLock));
                     Assert.True(exited);
                     deferredLock.Exit();
                 });
@@ -646,7 +646,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.False(exited);
                     
                     signal1.Set();
-                    Assert.True(myLock.TryLockReentrant(out var deferredLock, timer.Remaining));  // TODO TryLockAsync needed
+                    Assert.True(myLock.TryLockReentrant(timer.Remaining, out var deferredLock));  // TODO TryLockAsync needed
                     Assert.True(exited);
                     deferredLock.Exit();
                 });
@@ -675,7 +675,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.False(exited);
 
                     signal1.Set();
-                    Assert.True(myLock.TryLockReentrant(out var deferredLock, timer.Remaining));
+                    Assert.True(myLock.TryLockReentrant(timer.Remaining, out var deferredLock));
                     Assert.True(exited);
                     deferredLock.Exit();
                 });
