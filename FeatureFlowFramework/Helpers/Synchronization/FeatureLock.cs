@@ -30,9 +30,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         volatile int lockIndicator = NO_LOCK;
         volatile int waitingForUpgrade = FALSE;
-        volatile int reentrancyId = 1;
-        volatile bool anySleeping = false;
+        volatile int reentrancyId = 1;        
         AsyncLocal<int> reentrancyIndicator;
+        volatile bool anySleeping = false;
         FastSpinLock sleepLock = new FastSpinLock();
         SleepHandle sharedSleepHandle = new SleepHandle();
         SleepHandle sharedPrioSleepHandle = new SleepHandle();
@@ -53,7 +53,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         Task<LockAttempt> reenterableWriteLockAttemptTask;
         Task<LockAttempt> upgradedLockAttemptTask;
         Task<LockAttempt> reenteredLockAttemptTask;
-
 
         public FeatureLock()
         {
@@ -83,6 +82,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool HasValidReentrancyContext() => reentrancyId == reentrancyIndicator.Value;
 
+        #region ReentrancyContext
         /// <summary>
         /// When an async call is awaited AFTER an acquired lock is exited (or not awaited at all),
         /// it may be executed on another thread and reentrancy may lead to collisions. 
@@ -131,16 +131,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             // Invalidate reentrancy indicator
             reentrancyIndicator.Value = reentrancyId - 1;
         }
+        #endregion ReentrancyContext
+
 
         private bool MustTryToSleep(int cycleCount, bool prioritized)
         {
-            return (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING;
+            return (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING || waitingForUpgrade == TRUE;
         }
 
         private bool MustAsyncTryToSleep(int cycleCount, bool prioritized)
         {            
-            return (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving();            
+            return (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving() || waitingForUpgrade == TRUE;
         }
+
 
         #region Lock
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -266,7 +269,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            if(newLockIndicator < FIRST_READ_LOCK || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait();
+            if(newLockIndicator < FIRST_READ_LOCK || anySleeping || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait();
             return new AcquiredLock(this, LockMode.ReadLock);
         }
 
@@ -302,7 +305,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            if(newLockIndicator >= FIRST_READ_LOCK && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) return readLockTask;
+            if(newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) return readLockTask;
             else return LockReadOnlyAsync_Wait(LockMode.ReadLock);
         }
 
@@ -516,18 +519,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            while(currentLockIndicator != WRITE_LOCK && waitingForUpgrade == FALSE)
+            if (newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-                {
-                    acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
-                    return true;
-                }
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
+                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
+                return true;
             }
-            acquiredLock = new AcquiredLock();
-            return false;
+            else
+            {
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
         }
         #endregion TryLockReadOnly
 
@@ -583,7 +584,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLock(TimeSpan timeout, out AcquiredLock acquiredLock)
         {
-            if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK) || (timeout > TimeSpan.Zero && TryLock_Wait(timeout)))
+            if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {
+                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                return true;
+            }
+            else if(timeout > TimeSpan.Zero && TryLock_Wait(timeout))
             {
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
@@ -665,823 +671,434 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
         #endregion TryLock_Timeout
 
-
-
-
-
-        
-
-       /*
-        public void WaitForWritingLock(int priority = DEFAULT_PRIORITY)
+        #region TryLockPrioritized_Timeout
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryLockPrioritized(TimeSpan timeout, out AcquiredLock acquiredLock)
         {
+            if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {
+                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                return true;
+            }
+            else if (timeout > TimeSpan.Zero && TryLockPrioritized_Wait(timeout))
+            {
+                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                return true;
+            }
+            else
+            {
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
+        }
+
+        private bool TryLockPrioritized_Wait(TimeSpan timeout)
+        {
+            TimeFrame timer = new TimeFrame(timeout);
             int cycleCount = 0;
             do
             {
-                bool nextInQueue = UpdatePriority(ref priority);
+                // only check time every 10th cycle until start yieldig or sleeping
+                if (cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
+                {
+                    if (timer.Elapsed) return false;
+                }
 
                 cycleCount++;
-                if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
+                if (cycleCount > CYCLES_BEFORE_SLEEPING * PRIO_CYCLE_FACTOR)
                 {
-                    cycleCount = 1;
-
-                    mre.Reset();
-                    if (lockIndicator != NO_LOCK)
+                    if (TimeOutSleepHandle.TrySleep(this, timer, true))
                     {
-                        mre.Wait();
+                        cycleCount = 0;
                     }
-                    else mre.Set();
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-            }
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
 
-            highestPriority = secondHighestPriority;
-            secondHighestPriority = MIN_PRIORITY;
-        }
+            } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock LockReentrant(int priority = DEFAULT_PRIORITY)
-        {
-            var currentLockIndicator = lockIndicator;
-            if (currentLockIndicator != NO_LOCK)
-            {
-                var (reentered, acquiredLock) = TryReenterForWriting(currentLockIndicator);
-                if (reentered) return acquiredLock;
-            }
-            int cycleCount = 0;
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
-                priority = LockWaitingLoop(priority, ref cycleCount);
-            }
-            UpdateAfterEnter(cycleCount != 0);
-            reentrancyIndicator.Value = ++reentrancyId;
-            return new AcquiredLock(this, LockMode.WriteLockReenterable);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock LockReadOnly(int priority = DEFAULT_PRIORITY)
-        {
-            int cycleCount = 0;
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                priority = LockReadOnlyWaitingLoop(priority, ref cycleCount);
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            UpdateAfterEnter(cycleCount != 0);
-            return new AcquiredLock(this, LockMode.ReadLock);
-        }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public AcquiredLock LockReadOnlyReentrant(int priority = DEFAULT_PRIORITY)
-    {
-        var currentLockIndicator = lockIndicator;
-        if (currentLockIndicator != NO_LOCK)
-        {
-            if (reentrancyIndicator.Value == reentrancyId) return new AcquiredLock(this, LockMode.Reentered);
-        }
-        int cycleCount = 0;
-        var newLockIndicator = currentLockIndicator + 1;
-        while (ReentrantReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-        {
-            priority = LockReadOnlyWaitingLoop(priority, ref cycleCount);
-            currentLockIndicator = lockIndicator;
-            newLockIndicator = currentLockIndicator + 1;
-        }
-        UpdateAfterEnter(cycleCount != 0);
-
-        if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
-        reentrancyIndicator.Value = reentrancyId;
-
-        return new AcquiredLock(this, LockMode.ReadLockReenterable);
-    }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockAsync(int priority = DEFAULT_PRIORITY)
-        {
-            if(TryGetWritingLock(priority)) return writeLockTask;
-            else return LockForWritingAsync(priority);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockReentrantAsync(int priority = DEFAULT_PRIORITY)
-        {
-            if (TryLockForWritingReentrantAsync(priority, out LockMode mode))
-            {
-                if (mode == LockMode.WriteLockReenterable) return reenterableWriteLockTask;
-                else if (mode == LockMode.Reentered) return reenteredLockTask;
-                else return upgradedLockTask;
-            }
-            else return LockForWritingReentrantAsync(priority);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockReadOnlyAsync(int priority = DEFAULT_PRIORITY)
-        {
-            if (TryLockForReadingAsync(priority)) return readLockTask;
-            else return LockForReadingAsync(priority);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockReadOnlyReentrantAsync(int priority = DEFAULT_PRIORITY)
-        {
-            if (TryLockForReadingReentrantAsync(priority, out LockMode mode))
-            {
-                if (mode == LockMode.ReadLockReenterable) return reenterableReadLockTask;
-                else return reenteredLockTask;
-            }
-            else return LockForReadingReentrantAsync(priority);
-        }
-
-         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-         public bool TryLockReadOnly(out AcquiredLock readLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-         {
-             TimeFrame timer = new TimeFrame();
-             int cycleCount = 0;
-             var currentLockIndicator = lockIndicator;
-             var newLockIndicator = currentLockIndicator + 1;
-             while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-             {
-                 if (timer.IsInvalid) timer = new TimeFrame(timeout);
-                 bool timedOut = TryLockWaitingLoop(ref priority, timer, ref cycleCount);
-
-                 if (timedOut)
-                 {
-                     if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                     readLock = new AcquiredLock();
-                     return false;
-                 }
-                 currentLockIndicator = lockIndicator;
-                 newLockIndicator = currentLockIndicator + 1;
-             }
-             UpdateAfterEnter(cycleCount != 0);
-
-             readLock = new AcquiredLock(this, LockMode.ReadLock);
-             return true;
-         }
-
-         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-         public bool TryLockReadOnlyReentrant(out AcquiredLock readLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-         {
-             TimeFrame timer = new TimeFrame();
-             int cycleCount = 0;
-             var currentLockIndicator = lockIndicator;
-             if (currentLockIndicator != NO_LOCK)
-             {
-                 if (timer.IsInvalid) timer = new TimeFrame(timeout);
-                 if (reentrancyIndicator.Value == reentrancyId)
-                 {
-                     readLock = new AcquiredLock(this, LockMode.Reentered);
-                     return true;
-                 }
-             }
-             var newLockIndicator = currentLockIndicator + 1;
-             while (ReentrantReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-             {
-                 if (timer.IsInvalid) timer = new TimeFrame(timeout);
-                 bool timedOut = TryLockWaitingLoop(ref priority, timer, ref cycleCount);
-
-                 if (timedOut)
-                 {
-                     if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                     readLock = new AcquiredLock();
-                     return false;
-                 }
-                 currentLockIndicator = lockIndicator;
-                 newLockIndicator = currentLockIndicator + 1;
-             }
-             UpdateAfterEnter(cycleCount != 0);
-
-             if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
-             reentrancyIndicator.Value = reentrancyId;
-
-             readLock = new AcquiredLock(this, LockMode.ReadLockReenterable);
-             return true;
-         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<LockAttempt> TryLockReadOnlyAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            if (TryLockForReadingAsync(priority)) return readLockAttemptTask;
-            else return TryLockForReadingAsync(timeout, priority);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private async Task<LockAttempt> TryLockForReadingAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            TimeFrame timer = new TimeFrame();
-            int cycleCount = 0;
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                if (timer.IsInvalid) timer = new TimeFrame(timeout);
-
-                bool timedOut = false;
-                if (timer.Elapsed) timedOut = true;
-                else
-                {
-                    bool nextInQueue = UpdatePriority(ref priority);
-                    cycleCount++;
-                    if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
-                    {
-                        cycleCount = 1;
-                        bool didReset = mre.Reset();
-                        if (lockIndicator != NO_LOCK)
-                        {
-                            if (!await mre.WaitAsync(timer.Remaining)) timedOut = true;
-                        }
-                        else if (didReset) mre.Set();
-                    }
-                    else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-                }
-
-                if (timedOut)
-                {
-                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                    return new LockAttempt(new AcquiredLock());
-                }
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            UpdateAfterEnter(cycleCount != 0);
-
-            return new LockAttempt(new AcquiredLock(this, LockMode.ReadLock));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<LockAttempt> TryLockAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            if (TryGetWritingLock(priority)) return writeLockAttemptTask;
-            else return TryLockForWritingAsync(timeout, priority);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private async Task<LockAttempt> TryLockForWritingAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            TimeFrame timer = new TimeFrame();
-            int cycleCount = 0;
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
-                if (timer.IsInvalid) timer = new TimeFrame(timeout);
-
-                bool timedOut = false;
-                if (timer.Elapsed) timedOut = true;
-                else
-                {
-                    bool nextInQueue = UpdatePriority(ref priority);
-                    cycleCount++;
-                    if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
-                    {
-                        cycleCount = 1;
-                        bool didReset = mre.Reset();
-                        if (lockIndicator != NO_LOCK)
-                        {
-                            if (!await mre.WaitAsync(timer.Remaining)) timedOut = true;
-                        }
-                        else if (didReset) mre.Set();
-                    }
-                    else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-                }
-
-                if (timedOut)
-                {
-                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                    return new LockAttempt(new AcquiredLock());
-                }
-            }
-            UpdateAfterEnter(cycleCount != 0);
-
-            return new LockAttempt(new AcquiredLock(this, LockMode.WriteLock));
-        }
-
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out AcquiredLock writeLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            TimeFrame timer = new TimeFrame();
-            int cycleCount = 0;
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
-                if (timer.IsInvalid) timer = new TimeFrame(timeout);
-                bool timedOut = TryLockWaitingLoop(ref priority, timer, ref cycleCount);
-
-                if (timedOut)
-                {
-                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                    writeLock = new AcquiredLock();
-                    return false;
-                }
-            }
-            UpdateAfterEnter(cycleCount != 0);
-
-            writeLock = new AcquiredLock(this, LockMode.WriteLock);
             return true;
         }
-        
+        #endregion TryLockPrioritized_Timeout
+
+        #region TryLockPrioritizedAsync_Timeout
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<LockAttempt> TryLockReadOnlyReentrantAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
+        public Task<LockAttempt> TryLockPrioritizedAsync(TimeSpan timeout)
         {
-            if (TryLockForReadingReentrantAsync(priority, out var lockMode))
-            {
-                if (lockMode == LockMode.ReadLockReenterable) return reenterableReadLockAttemptTask;
-                else return reenteredLockAttemptTask;
-            }
-            else return TryLockForReadingReentrantAsync(timeout, priority);
+            if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) return writeLockAttemptTask;
+            else if (timeout > TimeSpan.Zero) return TryLockPrioritizedAsync_Wait(LockMode.WriteLock, timeout);
+            else return failedAttemptTask;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private async Task<LockAttempt> TryLockForReadingReentrantAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
+        private async Task<LockAttempt> TryLockPrioritizedAsync_Wait(LockMode mode, TimeSpan timeout)
         {
-            // Reentrance check was already done on first try
-
-            TimeFrame timer = new TimeFrame();
+            TimeFrame timer = new TimeFrame(timeout);
             int cycleCount = 0;
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            do
             {
-                if (timer.IsInvalid) timer = new TimeFrame(timeout);
-
-                bool timedOut = false;
-                if (timer.Elapsed) timedOut = true;
-                else
+                // only check time every 10th cycle until start yieldig or sleeping
+                if (cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
                 {
-                    bool nextInQueue = UpdatePriority(ref priority);
-                    cycleCount++;
-                    if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
-                    {
-                        cycleCount = 1;
-                        bool didReset = mre.Reset();
-                        if (lockIndicator != NO_LOCK)
-                        {
-                            if (!await mre.WaitAsync(timer.Remaining)) timedOut = true;
-                        }
-                        else if (didReset) mre.Set();
-                    }
-                    else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
+                    if (timer.Elapsed) return new LockAttempt(new AcquiredLock());
                 }
 
-                if (timedOut)
-                {
-                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                    return new LockAttempt(new AcquiredLock());
-                }
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            UpdateAfterEnter(cycleCount != 0);
-
-            if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
-            reentrancyIndicator.Value = reentrancyId;
-
-            return new LockAttempt(new AcquiredLock(this, LockMode.ReadLockReenterable));
-        }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<LockAttempt> TryLockReentrantAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            if (TryLockForWritingReentrantAsync(priority, out var lockMode))
-            {
-                if (lockMode == LockMode.WriteLockReenterable) return reenterableWriteLockAttemptTask;
-                else if (lockMode == LockMode.Reentered) return reenteredLockAttemptTask;
-                else return upgradedLockAttemptTask;
-            }
-            else return TryLockForWritingReentrantAsync(timeout, priority);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private async Task<LockAttempt> TryLockForWritingReentrantAsync(TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            // Reentrance was already handled in TryLock, see LockAsync()
-
-            TimeFrame timer = new TimeFrame();
-            int cycleCount = 0;
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
-                if (timer.IsInvalid) timer = new TimeFrame(timeout);
-
-                bool timedOut = false;
-                if (timer.Elapsed) timedOut = true;
-                else
-                {
-                    bool nextInQueue = UpdatePriority(ref priority);
-                    cycleCount++;
-                    if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
-                    {
-                        cycleCount = 1;
-                        bool didReset = mre.Reset();
-                        if (lockIndicator != NO_LOCK)
-                        {
-                            if (!await mre.WaitAsync(timer.Remaining)) timedOut = true;
-                        }
-                        else if (didReset) mre.Set();
-                    }
-                    else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-                }
-
-                if (timedOut)
-                {
-                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                    return new LockAttempt(new AcquiredLock());
-                }
-            }
-            UpdateAfterEnter(cycleCount != 0);
-            reentrancyIndicator.Value = ++reentrancyId;
-
-            return new LockAttempt(new AcquiredLock(this, LockMode.WriteLockReenterable));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockReentrant(out AcquiredLock writeLock, TimeSpan timeout = default, int priority = DEFAULT_PRIORITY)
-        {
-            TimeFrame timer = new TimeFrame();
-            int cycleCount = 0;
-            var currentLockIndicator = lockIndicator;
-            if (currentLockIndicator != NO_LOCK)
-            {
-                if (timer.IsInvalid) timer = new TimeFrame(timeout);
-                var (reentered, timedOut, acquiredLock) = TryReenterForWritingWithTimeout(currentLockIndicator, timer);
-                writeLock = acquiredLock;
-                if (reentered) return true;
-                else if (timedOut) return false;
-            }
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
-                if (timer.IsInvalid) timer = new TimeFrame(timeout);
-                bool timedOut = TryLockWaitingLoop(ref priority, timer, ref cycleCount);
-
-                if (timedOut)
-                {
-                    if (priority >= highestPriority) highestPriority = MIN_PRIORITY;
-                    writeLock = new AcquiredLock();
-                    return false;
-                }
-            }
-            UpdateAfterEnter(cycleCount != 0);
-
-            reentrancyIndicator.Value = ++reentrancyId;
-
-            writeLock = new AcquiredLock(this, LockMode.WriteLockReenterable);
-            return true;
-        }
-
-
-
-        private bool TryLockWaitingLoop(ref int priority, TimeFrame timer, ref int cycleCount)
-        {
-            bool timedOut = false;
-            if (timer.Elapsed) timedOut = true;
-            else
-            {
-                bool nextInQueue = UpdatePriority(ref priority);
                 cycleCount++;
-                if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
+                if (cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
                 {
-                    cycleCount = 1;
-                    bool didReset = mre.Reset();
-                    if (lockIndicator != NO_LOCK)
+                    if (await AsyncTimeoutSleepHandle.TrySleepAsync(this, timer, true))
                     {
-                        if (!mre.Wait(timer.Remaining)) timedOut = true;
+                        cycleCount = 0;
                     }
-                    else if (didReset) mre.Set();
                 }
                 else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-            }
 
-            return timedOut;
+            } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+
+            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;
+            return new LockAttempt(new AcquiredLock(this, mode));
         }
+        #endregion TryLock_Timeout
 
-        private (bool reentered, bool timedOut, AcquiredLock acquiredLock) TryReenterForWritingWithTimeout(int currentLockIndicator, TimeFrame timer)
-        {
-            if (HasValidReentrancyContext())
-            {
-                if (currentLockIndicator == WRITE_LOCK)
-                {
-                    return (true, false, new AcquiredLock(this, LockMode.Reentered));
-                }
-                else if (currentLockIndicator >= FIRST_READ_LOCK)
-                {
-                    // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
-                    if (TRUE == Interlocked.CompareExchange(ref waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
-                    // Waiting for upgrade to writeLock
-                    while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
-                    {
-                        if (timer.Elapsed)
-                        {
-                            waitingForUpgrade = FALSE;
-                            return (false, true, new AcquiredLock());
-                        }
-                        Thread.Yield();
-                    }
-                    waitingForUpgrade = FALSE;
-                    return (true, false, new AcquiredLock(this, LockMode.Upgraded));
-                }
-            }
-            return (false, false, new AcquiredLock());
-        }
-
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int LockWaitingLoop(int priority, ref int cycleCount)
-        {
-            bool nextInQueue = UpdatePriority(ref priority);
-
-            cycleCount++;
-            if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
-            {
-                cycleCount = 1;
-
-                bool didReset = mre.Reset();
-                if (lockIndicator != NO_LOCK)
-                {
-                    mre.Wait();
-                }
-                else if (didReset) mre.Set();
-            }
-            else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-            return priority;
-        }
-        
-        private int LockReadOnlyWaitingLoop(int priority, ref int cycleCount)
-        {
-            bool nextInQueue = UpdatePriority(ref priority);
-            cycleCount++;
-            if (!nextInQueue || cycleCount > CYCLES_BEFORE_SLEEPING)
-            {
-                cycleCount = 1;
-                bool didReset = mre.Reset();
-                if (lockIndicator != NO_LOCK)
-                {
-                    mre.Wait();
-                }
-                else if (didReset) mre.Set();
-            }
-            else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-            return priority;
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryLockForReadingAsync(int priority)
+        #region TryLockReadOnly_Timeout
+        public bool TryLockReadOnly(TimeSpan timeout, out AcquiredLock acquiredLock)
         {
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            if (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            if (newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                return false;
-            }
-            else
-            {
+                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                 return true;
             }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryLockForReadingReentrantAsync(int priority, out LockMode mode)
-        {
-            var currentLockIndicator = lockIndicator;
-            if (currentLockIndicator != NO_LOCK)
+            else if (timeout > TimeSpan.Zero && TryLockReadOnly_Wait(timeout))
             {
-                mode = LockMode.Reentered;
-                return HasValidReentrancyContext();
-            }
-            var newLockIndicator = currentLockIndicator + 1;
-            if (ReentrantReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                mode = LockMode.ReadLockReenterable;
-                return false;
+                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
+                return true;
             }
             else
+            {
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
+        }
+
+        private bool TryLockReadOnly_Wait(TimeSpan timeout)
+        {
+            TimeFrame timer = new TimeFrame(timeout);
+            int currentLockIndicator;
+            int newLockIndicator;
+            bool prioritized = false;
+            int cycleCount = 0;
+            do
+            {
+                // only check time every 10th cycle until start yieldig or sleeping
+                if (cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
+                {
+                    if (timer.Elapsed) return false;
+                }
+
+                cycleCount++;
+                if (MustTryToSleep(cycleCount, prioritized))
+                {
+                    if (TimeOutSleepHandle.TrySleep(this, timer, prioritized))
+                    {
+                        cycleCount = 0;
+                        prioritized = true;
+                    }
+                }
+                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
+
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator + 1;
+
+            } while (newLockIndicator < FIRST_READ_LOCK || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator));
+
+            return true;
+        }
+        #endregion TryLockReadOnly_Timeout
+
+        #region TryLockReadOnlyAsync_Timeout
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<LockAttempt> TryLockReadOnlyAsync(TimeSpan timeout)
+        {
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator + 1;
+            if (newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) return readLockAttemptTask;
+            else if (timeout > TimeSpan.Zero) return TryLockReadOnlyAsync_Wait(LockMode.ReadLock, timeout);
+            else return failedAttemptTask;
+        }
+
+        private async Task<LockAttempt> TryLockReadOnlyAsync_Wait(LockMode mode, TimeSpan timeout)
+        {
+            TimeFrame timer = new TimeFrame(timeout);
+            int currentLockIndicator;
+            int newLockIndicator;
+            bool prioritized = false;
+            int cycleCount = 0;
+            do
+            {
+                // only check time every 10th cycle until start yieldig or sleeping
+                if (cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
+                {
+                    if (timer.Elapsed) return new LockAttempt(new AcquiredLock());
+                }
+
+                cycleCount++;
+                if (MustAsyncTryToSleep(cycleCount, prioritized))
+                {
+                    if (await AsyncTimeoutSleepHandle.TrySleepAsync(this, timer, prioritized))
+                    {
+                        cycleCount = 0;
+                        prioritized = true;
+                    }
+                }
+                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
+
+                currentLockIndicator = lockIndicator;
+                newLockIndicator = currentLockIndicator + 1;
+
+            } while (newLockIndicator < FIRST_READ_LOCK || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator));
+
+            if (mode == LockMode.ReadLockReenterable)
             {
                 if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
                 reentrancyIndicator.Value = reentrancyId;
-                mode = LockMode.ReadLockReenterable;
-                return true;
             }
+
+            return new LockAttempt(new AcquiredLock(this, mode));
         }
-        
-        private async Task<AcquiredLock> LockForReadingAsync(int priority = DEFAULT_PRIORITY)
-        {
-            // Reentrance was already handled in TryLockReadOnly, see LockReadOnlyAsync()
+        #endregion TryLockReadOnlyAsync_Timeout
 
-            bool waited = false;
-            int cycleCount = 0;
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            while (ReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                bool nextInQueue = UpdatePriority(ref priority);
-
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
-                {
-                    cycleCount = 1;
-                    bool didReset = mre.Reset();
-                    if (lockIndicator != NO_LOCK)
-                    {
-                        await mre.WaitAsync().ConfigureAwait(false);
-                    }
-                    if (didReset) mre.Set();
-                }
-                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-
-                waited = true;
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            UpdateAfterEnter(waited);
-
-            return new AcquiredLock(this, LockMode.ReadLock);
-        }
-        
-        private async Task<AcquiredLock> LockForReadingReentrantAsync(int priority = DEFAULT_PRIORITY)
-        {
-            // Reentrance was already handled in TryLockReadOnly, see LockReadOnlyAsync()
-
-            bool waited = false;
-            int cycleCount = 0;
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            while (ReentrantReaderMustWait(currentLockIndicator, priority) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                bool nextInQueue = UpdatePriority(ref priority);
-
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
-                {
-                    cycleCount = 1;
-                    bool didReset = mre.Reset();
-                    if (lockIndicator != NO_LOCK)
-                    {
-                        await mre.WaitAsync().ConfigureAwait(false);
-                    }
-                    if (didReset) mre.Set();
-                }
-                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-
-                waited = true;
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            UpdateAfterEnter(waited);
-
-            if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
-            reentrancyIndicator.Value = reentrancyId;
-
-            return new AcquiredLock(this, LockMode.ReadLockReenterable);
-        }
-        
+        #region TryLockReentrant_Timeout
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool UpdatePriority(ref int priority)
+        public bool TryLockReentrant(TimeSpan timeout, out AcquiredLock acquiredLock)
         {
-            if (priority < MAX_PRIORITY) priority++;
-
-            bool nextInQueue = false;
-            if (priority >= highestPriority)
+            if (TryReenter(out acquiredLock, false, out bool upgradePossible)) return true;
+            else if (upgradePossible)
             {
-                highestPriority = priority;
-                nextInQueue = true;
-            }
-            else if (priority > secondHighestPriority)
-            {
-                secondHighestPriority = priority;
-            }
-
-            return nextInQueue;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void UpdateAfterEnter(bool waited)
-        {
-            if (waited)
-            {
-                highestPriority = secondHighestPriority;
-                secondHighestPriority = MIN_PRIORITY;
-            }
-        }
-
-        private (bool reentered, AcquiredLock acquiredLock) TryReenterForWriting(int currentLockIndicator)
-        {
-            if (HasValidReentrancyContext())
-            {
-                if (currentLockIndicator == WRITE_LOCK)
+                if (timeout > TimeSpan.Zero && WaitForUpgrade(timeout))
                 {
-                    return (true, new AcquiredLock(this, LockMode.Reentered));
-                }
-                else if (currentLockIndicator >= FIRST_READ_LOCK)
-                {
-                    // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
-                    if (TRUE == Interlocked.CompareExchange(ref waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
-                    // Waiting for upgrade to writeLock
-                    while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
-                    {
-                        Thread.Yield();
-                    }
-                    waitingForUpgrade = FALSE;
-                    return (true, new AcquiredLock(this, LockMode.Upgraded));
-                }
-            }
-            return (false, new AcquiredLock());
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryGetWritingLock(int priority)
-        {
-            if (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
-            {
-                return false;
-            }
-            else
-            {
-                return true;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryLockForWritingReentrantAsync(int priority, out LockMode mode)
-        {
-            var currentLockIndicator = lockIndicator;
-            if (currentLockIndicator != NO_LOCK)
-            {
-                var (reentered, acquiredLock) = TryReenterForWriting(currentLockIndicator);
-                if (reentered)
-                {
-                    mode = acquiredLock.mode;
+                    acquiredLock = new AcquiredLock(this, LockMode.Upgraded);
                     return true;
                 }
+                else
+                {
+                    acquiredLock = new AcquiredLock();
+                    return false;
+                }
             }
-            if (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+
+            if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                mode = LockMode.WriteLockReenterable;
-                return false;
+                reentrancyIndicator.Value = ++reentrancyId;
+                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                return true;
+            }
+            else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout))
+            {
+                reentrancyIndicator.Value = ++reentrancyId;
+                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                return true;
             }
             else
             {
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
+        }
+
+        private bool WaitForUpgrade(TimeSpan timeout)
+        {
+            TimeFrame timer = new TimeFrame(timeout);
+            // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
+            if (TRUE == Interlocked.CompareExchange(ref waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+
+            int cycleCount = 0;
+            // Waiting for upgrade to writeLock
+            while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
+            {
+                // only check time every 10th cycle until start yieldig or sleeping
+                if (++cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
+                {
+                    if (timer.Elapsed)
+                    {
+                        waitingForUpgrade = FALSE;
+                        return false;
+                    }
+                }
+
+                Thread.Yield();
+            }
+            waitingForUpgrade = FALSE;
+            return true;
+        }
+        #endregion TryLockReentrant_Timeout
+
+        #region TryLockReentrantAsync_Timeout
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<LockAttempt> TryLockReentrantAsync(TimeSpan timeout)
+        {
+            if (TryReenter(out AcquiredLock acquiredLock, false, out bool upgradePossible))
+            {
+                if (acquiredLock.mode == LockMode.Reentered) return reenteredLockAttemptTask;
+                else return upgradedLockAttemptTask;
+            }
+            else if (upgradePossible)
+            {
+                if (timeout > TimeSpan.Zero) return WaitForUpgradeAttemptAsync(timeout);
+                else return failedAttemptTask;
+            }
+
+            if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {
                 reentrancyIndicator.Value = ++reentrancyId;
-                mode = LockMode.WriteLockReenterable;
+                return writeLockAttemptTask;
+            }
+            else if (timeout > TimeSpan.Zero) return TryLockAsync_Wait(LockMode.WriteLockReenterable, timeout);
+            else return failedAttemptTask;
+        }
+
+        private async Task<LockAttempt> WaitForUpgradeAttemptAsync(TimeSpan timeout)
+        {
+            TimeFrame timer = new TimeFrame(timeout);
+            // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
+            if (TRUE == Interlocked.CompareExchange(ref waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+
+            int cycleCount = 0;
+            // Waiting for upgrade to writeLock
+            while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
+            {
+                // only check time every 10th cycle until start yieldig or sleeping
+                if (++cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
+                {
+                    if (timer.Elapsed)
+                    {
+                        waitingForUpgrade = FALSE;
+                        return new LockAttempt(new AcquiredLock());
+                    }
+                }
+
+                await Task.Yield();
+            }
+            waitingForUpgrade = FALSE;
+            return new LockAttempt(new AcquiredLock(this, LockMode.Upgraded));
+        }
+        #endregion TryLock_Timeout
+
+        #region TryLockReentrantPrioritized_Timeout
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryLockReentrantPrioritized(TimeSpan timeout, out AcquiredLock acquiredLock)
+        {
+            if (TryReenter(out acquiredLock, false, out bool upgradePossible)) return true;
+            else if (upgradePossible)
+            {
+                if (timeout > TimeSpan.Zero && WaitForUpgrade(timeout))
+                {
+                    acquiredLock = new AcquiredLock(this, LockMode.Upgraded);
+                    return true;
+                }
+                else
+                {
+                    acquiredLock = new AcquiredLock();
+                    return false;
+                }
+            }
+
+            if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {
+                reentrancyIndicator.Value = ++reentrancyId;
+                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
             }
-        }
-        
-        private async Task<AcquiredLock> LockForWritingAsync(int priority = DEFAULT_PRIORITY)
-        {
-            bool waited = false;
-
-            // Reentrance was already handled in TryLock, see LockAsync()
-            int cycleCount = 0;
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            else if (timeout > TimeSpan.Zero && TryLockPrioritized_Wait(timeout))
             {
-                bool nextInQueue = UpdatePriority(ref priority);
-
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
-                {
-                    cycleCount = 1;
-                    bool didReset = mre.Reset();
-                    if (lockIndicator != NO_LOCK)
-                    {
-                        await mre.WaitAsync().ConfigureAwait(false);
-                    }
-                    else if (didReset) mre.Set();
-                }
-                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-
-                waited = true;
+                reentrancyIndicator.Value = ++reentrancyId;
+                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                return true;
             }
-            UpdateAfterEnter(waited);
-
-            return new AcquiredLock(this, LockMode.WriteLock);
-        }
-        
-        private async Task<AcquiredLock> LockForWritingReentrantAsync(int priority = DEFAULT_PRIORITY)
-        {
-            bool waited = false;
-
-            // Reentrance was already handled in TryLock, see LockAsync()
-            int cycleCount = 0;
-            while (WriterMustWait(priority) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            else
             {
-                bool nextInQueue = UpdatePriority(ref priority);
-
-                if (!nextInQueue || ++cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving())
-                {
-                    cycleCount = 1;
-                    bool didReset = mre.Reset();
-                    if (lockIndicator != NO_LOCK)
-                    {
-                        await mre.WaitAsync().ConfigureAwait(false);
-                    }
-                    else if (didReset) mre.Set();
-                }
-                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
-
-                waited = true;
+                acquiredLock = new AcquiredLock();
+                return false;
             }
-            UpdateAfterEnter(waited);
-            reentrancyIndicator.Value = ++reentrancyId;
-
-            return new AcquiredLock(this, LockMode.WriteLockReenterable);
         }
-        */
+        #endregion TryLockReentrantPrioritized_Timeout
+
+        #region TryLockReentrantPrioritizedAsync_Timeout
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<LockAttempt> TryLockReentrantPrioritizedAsync(TimeSpan timeout)
+        {
+            if (TryReenter(out AcquiredLock acquiredLock, false, out bool upgradePossible))
+            {
+                if (acquiredLock.mode == LockMode.Reentered) return reenteredLockAttemptTask;
+                else return upgradedLockAttemptTask;
+            }
+            else if (upgradePossible)
+            {
+                if (timeout > TimeSpan.Zero) return WaitForUpgradeAttemptAsync(timeout);
+                else return failedAttemptTask;
+            }
+
+            if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            {
+                reentrancyIndicator.Value = ++reentrancyId;
+                return writeLockAttemptTask;
+            }
+            else if (timeout > TimeSpan.Zero) return TryLockPrioritizedAsync_Wait(LockMode.WriteLockReenterable, timeout);
+            else return failedAttemptTask;
+        }
+        #endregion TryLockReentrantPriotirizedAsync_Timeout
+
+        #region TryLockReentrantReadOnly_Timeout
+        public bool TryLockReentrantReadOnly(TimeSpan timeout, out AcquiredLock acquiredLock)
+        {
+            if (TryReenterReadOnly())
+            {
+                acquiredLock = new AcquiredLock(this, LockMode.Reentered);
+                return true;
+            }
+
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator + 1;
+            if (newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            {
+                if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                reentrancyIndicator.Value = reentrancyId;
+                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
+                return true;
+            }
+            else if (timeout > TimeSpan.Zero && TryLockReadOnly_Wait(timeout))
+            {
+                if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                reentrancyIndicator.Value = reentrancyId;
+                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
+                return true;
+            }
+            else
+            {
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
+        }
+
+        #endregion TryLockReadOnly_Timeout
+
+        #region TryLockReentrantReadOnlyAsync_Timeout
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<LockAttempt> TryLockReentrantReadOnlyAsync(TimeSpan timeout)
+        {
+            if (TryReenterReadOnly()) return reenteredLockAttemptTask;
+
+            var currentLockIndicator = lockIndicator;
+            var newLockIndicator = currentLockIndicator + 1;
+            if (newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            {
+                if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                reentrancyIndicator.Value = reentrancyId;
+                return readLockAttemptTask;
+            }
+            else if (timeout > TimeSpan.Zero) return TryLockReadOnlyAsync_Wait(LockMode.ReadLockReenterable, timeout);
+            else return failedAttemptTask;
+        }
+        #endregion TryLockReadOnlyAsync_Timeout
 
         #region Exit
         private void ExitReadLock()

@@ -171,7 +171,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task ReentrantTryLockReadOnlyAsync(Action action)
         {
-            if((await myLock.TryLockReadOnlyReentrantAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
+            if((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
                 {
                     action();
                 }
@@ -317,7 +317,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task ReentrantTryLockReadOnlyAsync()
         {
-            if((await myLock.TryLockReadOnlyReentrantAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
+            if((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
                 {
 
                 }
