@@ -174,11 +174,11 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
             using(myLock.Lock())
             {
-                Assert.False((await myLock.TryLockAsync()).Succeeded(out var notAcquiredLock));
+                Assert.False((await myLock.TryLockAsync(10.Milliseconds())).Succeeded(out var notAcquiredLock));
                 Assert.False(notAcquiredLock.IsActive);
             }
 
-            Assert.True((await myLock.TryLockAsync()).Succeeded(out var acquiredLock));
+            Assert.True((await myLock.TryLockAsync(10.Milliseconds())).Succeeded(out var acquiredLock));
             Assert.True(acquiredLock.IsActive);
             acquiredLock.Exit();
         }
@@ -188,11 +188,11 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            if((await myLock.TryLockReentrantAsync()).Succeeded(out var outerLock))
+            if((await myLock.TryLockReentrantAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
                 using(outerLock)
                 {
                     Assert.True(outerLock.IsActive);
-                    Assert.True((await myLock.TryLockReentrantAsync()).Succeeded(out var innerLock));
+                    Assert.True((await myLock.TryLockReentrantAsync(TimeSpan.Zero)).Succeeded(out var innerLock));
                     Assert.True(innerLock.IsActive);
                     Assert.True(myLock.IsWriteLocked);
                     innerLock.Exit();
@@ -206,17 +206,17 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            if((await myLock.TryLockReadOnlyReentrantAsync()).Succeeded(out var outerLock))
+            if((await myLock.TryLockReadOnlyReentrantAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
                 using(outerLock)
                 {
                     Assert.True(outerLock.IsActive);
-                    Assert.True((await myLock.TryLockReadOnlyReentrantAsync()).Succeeded(out var innerLock));
+                    Assert.True((await myLock.TryLockReadOnlyReentrantAsync(TimeSpan.Zero)).Succeeded(out var innerLock));
                     Assert.True(innerLock.IsActive);
                     Assert.True(myLock.IsReadOnlyLocked);
                     innerLock.Exit();
                     Assert.True(myLock.IsReadOnlyLocked);
 
-                    Assert.True((await myLock.TryLockReentrantAsync()).Succeeded(out var upgradedLock));
+                    Assert.True((await myLock.TryLockReentrantAsync(TimeSpan.Zero)).Succeeded(out var upgradedLock));
                     Assert.True(upgradedLock.IsActive);
                     Assert.True(myLock.IsWriteLocked);
                     upgradedLock.Exit();
@@ -232,11 +232,11 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
             using(myLock.Lock())
             {
-                Assert.False((await myLock.TryLockReadOnlyAsync()).Succeeded(out var notAcquiredLock));
+                Assert.False((await myLock.TryLockReadOnlyAsync(10.Milliseconds())).Succeeded(out var notAcquiredLock));
                 Assert.False(notAcquiredLock.IsActive);
             }
 
-            Assert.True((await myLock.TryLockReadOnlyAsync()).Succeeded(out var acquiredLock));
+            Assert.True((await myLock.TryLockReadOnlyAsync(10.Milliseconds())).Succeeded(out var acquiredLock));
             Assert.True(acquiredLock.IsActive);
             acquiredLock.Exit();
         }

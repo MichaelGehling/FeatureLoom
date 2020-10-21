@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         public void FeatureLock_LockReadOnly() => featureLockSubjects.LockReadOnly();
 
         [Benchmark]
-        public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().Wait();
+        public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().GetAwaiter().GetResult();
 
         [Benchmark]
         public void FeatureLock_LockReadOnlyAsync_() => featureLockSubjects.LockReadOnlyAsync().Wait();
