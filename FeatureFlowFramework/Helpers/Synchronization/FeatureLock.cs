@@ -950,7 +950,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 reentrancyIndicator.Value = ++reentrancyId;
-                return writeLockAttemptTask;
+                return reenterableWriteLockAttemptTask;
             }
             else if (timeout > TimeSpan.Zero) return TryLockAsync_Wait(LockMode.WriteLockReenterable, timeout);
             else return failedAttemptTask;
@@ -1040,7 +1040,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 reentrancyIndicator.Value = ++reentrancyId;
-                return writeLockAttemptTask;
+                return reenterableWriteLockAttemptTask;
             }
             else if (timeout > TimeSpan.Zero) return TryLockPrioritizedAsync_Wait(LockMode.WriteLockReenterable, timeout);
             else return failedAttemptTask;
@@ -1093,7 +1093,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
                 reentrancyIndicator.Value = reentrancyId;
-                return readLockAttemptTask;
+                return reenterableReadLockAttemptTask;
             }
             else if (timeout > TimeSpan.Zero) return TryLockReadOnlyAsync_Wait(LockMode.ReadLockReenterable, timeout);
             else return failedAttemptTask;
