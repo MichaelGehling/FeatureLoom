@@ -7,11 +7,6 @@ namespace FeatureFlowFramework.Helpers.Extensions
 {
     public static class NullHandlingExtensions
     {
-        public static T CreateIfNull<T>(this T obj) where T : class, new()
-        {
-            return obj ?? new T();
-        }
-
         public static IEnumerable<T> EmptyIfNull<T>(this IEnumerable<T> enumarable)
         {
             return enumarable ?? Enumerable.Empty<T>();

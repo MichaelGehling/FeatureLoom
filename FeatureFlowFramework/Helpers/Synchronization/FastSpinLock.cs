@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace FeatureFlowFramework.Helpers.Synchronization
 {
-    public class FastSpinLock
+    public sealed class FastSpinLock
     {
         const int CYCLES_BEFORE_YIELDING = 200;
         const int NO_LOCK = 0;
@@ -15,7 +15,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         int lockIndicator = NO_LOCK;
 
-        public bool IsLocked => Thread.VolatileRead(ref lockIndicator) == LOCKED;
+        public bool IsLocked => Volatile.Read(ref lockIndicator) == LOCKED;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock()
@@ -27,7 +27,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     if(cycleCounter >= CYCLES_BEFORE_YIELDING) Thread.Yield();
                     else cycleCounter++;
-                } while(Thread.VolatileRead(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
+                } while(Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
             }
             return new AcquiredLock(this);
         }
@@ -69,7 +69,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if(cycleCounter >= CYCLES_BEFORE_YIELDING) Thread.Yield();
                 else cycleCounter++;
 
-            } while(Thread.VolatileRead(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
+            } while(Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
 
             acquiredLock = new AcquiredLock(this);
             return true;
@@ -79,7 +79,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Exit()
         {
-            Thread.VolatileWrite(ref lockIndicator, NO_LOCK);
+            Volatile.Write(ref lockIndicator, NO_LOCK);            
         }
 
         public struct AcquiredLock : IDisposable

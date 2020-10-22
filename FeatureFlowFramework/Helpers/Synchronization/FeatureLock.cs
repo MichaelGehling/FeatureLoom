@@ -1,6 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -9,8 +8,9 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Helpers.Synchronization
 {
-    public class FeatureLock
+    public sealed class FeatureLock
     {
+        #region Constants
         const int NO_LOCK = 0;
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
@@ -21,25 +21,51 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         const int FALSE = 0;
         const int TRUE = 1;
+        #endregion Constants
 
-        /// <summary>
-        /// Multiple read-locks are allowed in parallel while write-locks are always exclusive.
-        /// A lockIndicator of -1 implies a write-lock, while a lockIndicator greater than 0 implies a read-lock.
-        /// When entering a read-lock, the lockIndicator is increased and decreased when leaving a read-lock.
-        /// When entering a write-lock, a WRITE_LOCK(-1) is set and set back to NO_LOCK(0) when the write-lock is left.
-        /// </summary>
+        #region Variables
+        // the main lock variable, indicating current locking state:
+        // 0 means no lock
+        // -1 means write lock
+        // >=1 means read lock (number implies the count of parallel readers)
         volatile int lockIndicator = NO_LOCK;
+        // If true, indicates that a reentrant write lock tries to upgrade an existing reentrant read lock,
+        // but more than one reader is active, the upgrade must wait until only one reader is left
         volatile int waitingForUpgrade = FALSE;
-        volatile int reentrancyId = 1;        
-        AsyncLocal<int> reentrancyIndicator;
+        // Keeps the last reentrancyId of the "logical thread". 
+        // A value that differes from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
+        // though it must be acquired and cannot simply be reentered.
+        AsyncLocal<int> reentrancyIndicator = new AsyncLocal<int>();
+        // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
+        volatile int reentrancyId = 1;
+        // Indicates that (probably) one or more other waiting candidates need to be waked up after the lock was exited.
+        // It may happen that anySleeping is true, though actually no one needs to be awaked, but it will never happen that it is false if someone needs to be awaked.
         volatile bool anySleeping = false;
-        FastSpinLock sleepLock = new FastSpinLock();
-        SleepHandle sharedSleepHandle = new SleepHandle();
-        SleepHandle sharedPrioSleepHandle = new SleepHandle();
-        ReadOnlySleepHandle sharedReadOnlySleepHandle = new ReadOnlySleepHandle();        
+        // Used to synchronize sleeping and waking up code sections
+        FastSpinLock sleepLock = new FastSpinLock();        
+        // If a candidate must wait and the spinning-phase is over, it will go to sleep using a sleep handle.
+        // The sleep handle will be enqueued to respect the waiting order and after the lock was exited,
+        // the first sleep handle from the queue will be waked up.
+        Queue<IWakeOrder> wakeOrderQueue = new Queue<IWakeOrder>(0);
+        // If a waiter is prioritized its sleep handle is enqueued in the prioritizedWakeOrderQueue, because this
+        // will always be preferred over the normal wakeOrderQueue when the next candidate has to be waked up.
         Queue<IWakeOrder> prioritizedWakeOrderQueue = new Queue<IWakeOrder>(0);
-        Queue<IWakeOrder> wakeOrderQueue = new Queue<IWakeOrder>(0);        
-        
+        // A sleep handle for standard synchronous writing lock acquiring. 
+        // It can be shared by multiple candidates (it then will be enqueued multiple timed), 
+        // because it internally uses monitor and pulse to enqueue threads and only wake up the next one.
+        SleepHandle sharedSleepHandle = new SleepHandle();
+        // Like sharedSleepHandle, but for prioritized waiters.
+        SleepHandle sharedPrioSleepHandle = new SleepHandle();
+        // A sleep handle for synchronous read-only lock acquiring. 
+        // It can be shared by multiple candidates (it will only be enqueued once at a time), 
+        // because it internally uses monitor and pulseAll to wake up all waiting threads at once.
+        ReadOnlySleepHandle sharedReadOnlySleepHandle = new ReadOnlySleepHandle();
+        #endregion Variables
+
+        #region PreparedTasks
+        // These variables keep already completed task objects are prepared in advance for reuse,
+        // in order to reduce garbage and improve performance by handling async calls synchronously,
+        // if they don't require any waiting
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> reenterableReadLockTask;
         Task<AcquiredLock> writeLockTask;
@@ -53,11 +79,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         Task<LockAttempt> reenterableWriteLockAttemptTask;
         Task<LockAttempt> upgradedLockAttemptTask;
         Task<LockAttempt> reenteredLockAttemptTask;
+        #endregion PreparedTasks
 
+        /// <summary>
+        /// A multi-purpose high-performance lock object that can be used in synchronous and asynchronous contexts.
+        /// It supports reentrancy, prioritized lock acquiring, trying for lock acquiring with timeout and 
+        /// read-only locking for parallel access (incl. automatic upgrading/downgrading in conjunction with reentrancy).
+        /// When the lock is acquired it returns a handle that can be used with a using statement for simple and clean usage.
+        /// Example: using(myLock.Lock()) { ... }
+        /// </summary>
         public FeatureLock()
         {
-            reentrancyIndicator = new AsyncLocal<int>();
-
             readLockTask = Task.FromResult(new AcquiredLock(this, LockMode.ReadLock));
             reenterableReadLockTask = Task.FromResult(new AcquiredLock(this, LockMode.ReadLockReenterable));
             writeLockTask = Task.FromResult(new AcquiredLock(this, LockMode.WriteLock));
@@ -74,6 +106,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             reenteredLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Reentered)));
         }
 
+        
         public bool IsLocked => lockIndicator != NO_LOCK;
         public bool IsWriteLocked => lockIndicator == WRITE_LOCK;
         public bool IsReadOnlyLocked => lockIndicator >= FIRST_READ_LOCK;
@@ -84,9 +117,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region ReentrancyContext
         /// <summary>
-        /// When an async call is awaited AFTER an acquired lock is exited (or not awaited at all),
-        /// it may be executed on another thread and reentrancy may lead to collisions. 
-        /// This method will remove the reentrancy context, so that an locking attempt
+        /// When an async call is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// reentrancy may lead to collisions, because a parallel executed call will keep its reentrancy context until finished.
+        /// This method will remove the reentrancy context before calling the async method, so that a possible locking attempt
         /// will be delayed until the already aquired lock is exited.
         /// IMPORTANT: If the async call is awaited before the acquired lock is exited, DO NOT use this method,
         /// otherwise it will lead to a deadlock if the called method tries to acquire the already acquired lock!
@@ -99,11 +132,29 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             RemoveReentrancyContext();
             await asyncCall().ConfigureAwait(false);
         }
+
         /// <summary>
-        /// When an new task is executed in parallel and not awaited before an acquired lock is exited, 
-        /// reentrancy may lead to collisions. 
-        /// This method will runs the passed action in a new Task and remove the reentrancy context before, 
-        /// so that an locking attempt will be delayed until the already aquired lock is exited.
+        /// When an async call is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// reentrancy may lead to collisions, because the parallel executed call will keep its reentrancy context until finished.
+        /// This method will remove the reentrancy context before calling the async method, so that a possible locking attempt
+        /// will be delayed until the already aquired lock is exited.
+        /// IMPORTANT: If the async call is awaited before the acquired lock is exited, DO NOT use this method,
+        /// otherwise it will lead to a deadlock if the called method tries to acquire the already acquired lock!
+        /// </summary>
+        /// <param name="asyncCall">An async method that is not awaited while the lock is acquired</param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task<T> RunDeferredAsync<T>(Func<Task<T>> asyncCall)
+        {
+            RemoveReentrancyContext();
+            return await asyncCall().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// When a new task is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// reentrancy may lead to collisions, because the parallel executed task will keep its reentrancy context until finished.
+        /// This method will run the passed action in a new Task and remove the reentrancy context before, 
+        /// so that a possible locking attempt will be delayed until the already aquired lock is exited.
         /// IMPORTANT: If the task is awaited BEFORE the acquired lock is exited, DO NOT use this method,
         /// otherwise it will lead to a deadlock if the called method tries to acquire the already acquired lock!
         /// </summary>
@@ -117,11 +168,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         /// <summary>
-        /// When an new task is executed in parallel and not awaited before an acquired lock is exited or
-        /// when an async call is awaited AFTER an acquired lock is exited (or not awaited at all),
-        /// reentrancy may lead to collisions.
+        /// When a new task or an async call is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// reentrancy may lead to collisions, because the parallel executed task/call will keep its reentrancy context until finished.
         /// This method will remove the reentrancy context FROM WITHIN the new task or async call,
-        /// so that an locking attempt will be delayed until the already aquired lock is exited.
+        /// so that a possible locking attempt will be delayed until the already aquired lock is exited.
+        /// Alternatively, you can remove the reentrancy context from caller's side by using RunDeferredAsync or RunDeferredTask().
         /// IMPORTANT: If the task or async call is awaited BEFORE the acquired lock is exited, DO NOT use this method,
         /// otherwise it will lead to a deadlock if the called method tries to acquire the already acquired lock!
         /// </summary>
@@ -129,7 +180,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public void RemoveReentrancyContext()
         {
             // Invalidate reentrancy indicator
-            reentrancyIndicator.Value = reentrancyId - 1;
+            reentrancyIndicator.Value = 0;
         }
         #endregion ReentrancyContext
 
@@ -143,6 +194,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {            
             return (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving() || waitingForUpgrade == TRUE;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int NewReentrancyId() => ++reentrancyId == 0 ? ++reentrancyId : reentrancyId;
 
 
         #region Lock
@@ -201,7 +255,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
 
-            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;            
+            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = NewReentrancyId();            
             return new AcquiredLock(this, mode);
         }
         #endregion LockAsync
@@ -258,7 +312,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));            
 
-            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;
+            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = NewReentrancyId();
             return new AcquiredLock(this, mode);
         }
         #endregion LockPrioritizedAsync
@@ -335,7 +389,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (mode == LockMode.ReadLockReenterable)
             {
-                if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                if(newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
                 reentrancyIndicator.Value = reentrancyId;
             }
 
@@ -349,7 +403,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (TryReenter(out AcquiredLock acquiredLock, true, out _)) return acquiredLock;
             if (NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) Lock_Wait();
-            reentrancyIndicator.Value = ++reentrancyId;
+            reentrancyIndicator.Value = NewReentrancyId();
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
         }
 
@@ -406,7 +460,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {                
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 return reenterableWriteLockTask;
             }
             else return LockAsync_Wait(LockMode.WriteLockReenterable);
@@ -432,7 +486,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if(TryReenter(out AcquiredLock acquiredLock, true, out _)) return acquiredLock;
             if(NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) LockPrioritized_Wait();
-            reentrancyIndicator.Value = ++reentrancyId;
+            reentrancyIndicator.Value = NewReentrancyId();
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
         }
         #endregion LockReentrantPrioritized
@@ -450,7 +504,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {                
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 return reenterableWriteLockTask;
             }
             else return LockPrioritizedAsync_Wait(LockMode.WriteLockReenterable);
@@ -467,7 +521,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             if(newLockIndicator < FIRST_READ_LOCK || waitingForUpgrade == TRUE || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait();
 
-            if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+            if(newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
             reentrancyIndicator.Value = reentrancyId;
             return new AcquiredLock(this, LockMode.ReadLockReenterable);
         }
@@ -489,7 +543,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             if(newLockIndicator >= FIRST_READ_LOCK && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                if(newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
                 reentrancyIndicator.Value = reentrancyId;
                 return reenterableReadLockTask;
             }
@@ -540,7 +594,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {                
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
             }
@@ -567,7 +621,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if(currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
                 {
-                    if(newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                    if(newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
                     reentrancyIndicator.Value = reentrancyId;
                     acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                     return true;
@@ -666,7 +720,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             } while(lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
 
-            if(mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;
+            if(mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = NewReentrancyId();
             return new LockAttempt(new AcquiredLock(this, mode));
         }
         #endregion TryLock_Timeout
@@ -753,7 +807,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
 
-            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = ++reentrancyId;
+            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = NewReentrancyId();
             return new LockAttempt(new AcquiredLock(this, mode));
         }
         #endregion TryLock_Timeout
@@ -859,7 +913,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (mode == LockMode.ReadLockReenterable)
             {
-                if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                if (newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
                 reentrancyIndicator.Value = reentrancyId;
             }
 
@@ -888,13 +942,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout))
             {
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
             }
@@ -949,7 +1003,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 return reenterableWriteLockAttemptTask;
             }
             else if (timeout > TimeSpan.Zero) return TryLockAsync_Wait(LockMode.WriteLockReenterable, timeout);
@@ -1004,13 +1058,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLockPrioritized_Wait(timeout))
             {
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
             }
@@ -1039,7 +1093,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
-                reentrancyIndicator.Value = ++reentrancyId;
+                reentrancyIndicator.Value = NewReentrancyId();
                 return reenterableWriteLockAttemptTask;
             }
             else if (timeout > TimeSpan.Zero) return TryLockPrioritizedAsync_Wait(LockMode.WriteLockReenterable, timeout);
@@ -1060,14 +1114,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             if (newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                if (newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
                 reentrancyIndicator.Value = reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLockReadOnly_Wait(timeout))
             {
-                if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                if (newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
                 reentrancyIndicator.Value = reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                 return true;
@@ -1091,7 +1145,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = currentLockIndicator + 1;
             if (newLockIndicator >= FIRST_READ_LOCK && !anySleeping && waitingForUpgrade == FALSE && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
-                if (newLockIndicator == FIRST_READ_LOCK) reentrancyId++;
+                if (newLockIndicator == FIRST_READ_LOCK) NewReentrancyId();
                 reentrancyIndicator.Value = reentrancyId;
                 return reenterableReadLockAttemptTask;
             }
@@ -1149,7 +1203,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var newLockIndicator = Interlocked.Decrement(ref lockIndicator);
             if (NO_LOCK == newLockIndicator)
             {
-                reentrancyId++;
+                NewReentrancyId();
                 if (anySleeping) WakeUp();
             }
             else
@@ -1161,7 +1215,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.NoOptimization)]
         private void ExitReentrantWriteLock()
         {
-            reentrancyId++;
+            NewReentrancyId();
             lockIndicator = NO_LOCK;
             Thread.MemoryBarrier();
             if (anySleeping) WakeUp();
