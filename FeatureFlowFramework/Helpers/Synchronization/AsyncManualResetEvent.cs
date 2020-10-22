@@ -192,7 +192,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         /// <summary>
-        /// Averyone waiting for this event is woken up, by setting and resetting in one step.
+        /// Everyone waiting for this event is woken up, by setting and resetting in one step.
         /// If the AsyncManualResetEvent was already set, nothing happens.        
         /// Note: Avoid calling PulseAll twice directly after each other, because it might happen, that not all are woken up.
         /// </summary>

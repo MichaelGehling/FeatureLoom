@@ -27,7 +27,7 @@ namespace Playground
         {
             FeatureLock myLck = new FeatureLock();
 
-            using(myLck.Lock())
+            using (myLck.Lock())
             {
 
                 Task.Run(() =>
