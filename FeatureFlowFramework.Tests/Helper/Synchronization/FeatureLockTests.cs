@@ -504,11 +504,11 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 Assert.True(writeLock.IsActive);
                 writeLock.Exit();
 
-                Assert.True(myLock.HasValidReentrancyContext());
+                Assert.True(myLock.HasValidReentrancyContext);
                 Assert.True(myLock.IsLocked);                
             }
             Assert.False(myLock.IsLocked);
-            Assert.False(myLock.HasValidReentrancyContext());
+            Assert.False(myLock.HasValidReentrancyContext);
         }
 
         [Fact]
@@ -524,11 +524,11 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 readLock.Exit();
                 Assert.Equal(1, myLock.CountParallelReadLocks);
 
-                Assert.True(myLock.HasValidReentrancyContext());
+                Assert.True(myLock.HasValidReentrancyContext);
                 Assert.True(myLock.IsLocked);                
             }
             Assert.False(myLock.IsLocked);
-            Assert.False(myLock.HasValidReentrancyContext());
+            Assert.False(myLock.HasValidReentrancyContext);
         }
 
         [Fact]
