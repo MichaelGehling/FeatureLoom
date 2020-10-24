@@ -15,15 +15,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numConsumers = 1;
         public int numOverallMessages = 1_000_000;
 
-        private void Slack()
-        {
-            var timer = AppTime.TimeKeeper;
-            while(timer.Elapsed < 0.0001.Milliseconds()) ;
-        }
-
         public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)
         {
-            init();
+            //init();
 
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
@@ -44,7 +38,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                         });
-                        Slack();
                     }                    
                 }));
             }
@@ -64,7 +57,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             }
                         });
                         if(empty) Thread.Yield();
-                        Slack();
                     }
                 }));
             }
@@ -76,7 +68,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         public void AsyncRun(Action init, Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
         {
-            init();
+            //init();
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
             AsyncManualResetEvent starter = new AsyncManualResetEvent();
@@ -96,7 +88,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                         });
-                        Slack();
                     }
                     
                 }).Invoke());
@@ -117,7 +108,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             }
                         });
                         if(empty) await Task.Yield();
-                        Slack();
                     }
                 }).Invoke());
             }

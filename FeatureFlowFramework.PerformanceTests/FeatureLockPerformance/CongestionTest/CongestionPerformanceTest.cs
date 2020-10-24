@@ -20,7 +20,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
         private void Slack()
         {
             var timer = AppTime.TimeKeeper;
-            while(timer.Elapsed < 0.001.Milliseconds()) ;
+            while(timer.Elapsed < 0.01.Milliseconds()) ;           
         }
 
         public void Run(Action init, Action<Action> hotpathLock, Action<Action> congestingLock = null)
@@ -31,9 +31,26 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
 
             if(congestingLock == null) congestingLock = hotpathLock;
             
-            AsyncManualResetEvent starter = new AsyncManualResetEvent(false);            
-           
-            for(int i = 0; i < numCongestors; i++)
+            AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
+
+            var hotPathThread = new Thread(() =>
+            {
+                starter.Wait();
+                int count = 0;
+                while (count++ < numHotPathRuns)
+                {
+                    hotpathLock(() =>
+                    {
+                        var timer = new TimeFrame(hotPathExecutionTime);
+                        while (!timer.Elapsed) /* work */;
+                    });
+                    Slack();
+                }
+                hotPathDone = true;
+            });
+            hotPathThread.Start();
+
+            for (int i = 0; i < numCongestors; i++)
             {
                 var thread = new Thread(() =>
                 {
@@ -49,24 +66,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                     }
                 });
                 thread.Start();
-            }
-
-            var hotPathThread = new Thread(() =>
-            {
-                starter.Wait();
-                int count = 0;
-                while(count++ < numHotPathRuns)
-                {
-                    hotpathLock(() =>
-                    {
-                        var timer = new TimeFrame(hotPathExecutionTime);
-                        while(!timer.Elapsed) /* work */;
-                    });
-                    Slack();
-                }
-                hotPathDone = true;
-            });
-            hotPathThread.Start();
+            } 
 
             starter.Set();
             
@@ -85,7 +85,24 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
             Task hotPathTask;
             List<Task> congesterTasks = new List<Task>();
 
-            for(int i = 0; i < numCongestors; i++)
+            hotPathTask = new Func<Task>(async () =>
+            {
+                await starter.WaitAsync();
+                int count = 0;
+                while (count++ < numHotPathRuns)
+                {
+                    await hotpathLock(() =>
+                    {
+                        var timer = new TimeFrame(hotPathExecutionTime);
+                        while (!timer.Elapsed) /* work */;
+                    });
+                    //await Task.Yield();
+                    Slack();
+                }
+                hotPathDone = true;
+            }).Invoke();
+
+            for (int i = 0; i < numCongestors; i++)
             {
                 congesterTasks.Add(new Func<Task>(async () =>
                 {
@@ -97,28 +114,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                             var timer = new TimeFrame(congestionExecutionTime);
                             while(!timer.Elapsed && !hotPathDone) /* work */;
                         });
-                        await Task.Yield();
+                        //await Task.Yield();
                         Slack();
                     }
                 }).Invoke());
             }
-
-            hotPathTask = new Func<Task>(async () =>
-            {
-                await starter.WaitAsync();
-                int count = 0;
-                while(count++ < numHotPathRuns)
-                {
-                    await hotpathLock(() =>
-                    {
-                        var timer = new TimeFrame(hotPathExecutionTime);
-                        while(!timer.Elapsed) /* work */;
-                    });
-                    await Task.Yield();
-                    Slack();
-                }
-                hotPathDone = true;
-            }).Invoke();
 
             starter.Set();
 

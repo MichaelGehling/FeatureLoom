@@ -25,36 +25,6 @@ namespace Playground
 
         static void Main(string[] args)
         {
-            FeatureLock myLck = new FeatureLock();
-
-            using (myLck.Lock())
-            {
-
-                Task.Run(() =>
-                {
-                    using(myLck.LockReadOnly())
-                    {
-                        Thread.Sleep(13000);
-                    }
-                });
-
-                Task.Run(() =>
-                {
-                    using(myLck.LockReadOnly())
-                    {
-                        Thread.Sleep(13000);
-                    }
-                });
-
-                Thread.Sleep(1000);
-
-            }
-
-            Thread.Sleep(1000);
-
-            using(myLck.Lock())
-            {
-            }
 
 
 

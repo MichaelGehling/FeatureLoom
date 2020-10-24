@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
@@ -6,6 +7,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
     public class SpinLockSubjects
     {
         SpinLock myLock = new SpinLock();
+
+        public void Init() => myLock = new SpinLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
@@ -16,6 +19,24 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             {
                 try
                 {
+                }
+                finally
+                {
+                    myLock.Exit();
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock(Action action)
+        {
+            bool lockTaken = false;
+            myLock.Enter(ref lockTaken);
+            if (lockTaken)
+            {
+                try
+                {
+                    action();
                 }
                 finally
                 {
