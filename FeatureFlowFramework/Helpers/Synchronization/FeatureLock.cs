@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
     /// Example: using(myLock.Lock()) { ... }
     /// In many scenarios the FeatureLock is faster than the build-in locks (e.g. Monitor/ReaderWriterLock for synchronous contexts 
     /// and SemaphoreSlim for asynchronous contexts). Though reentrant locking in synchronous contexts using FeatureLock 
-    /// is slower than with Monitor/ReaderWriterLock, it also allows reentrancy for asynchronous contexts or even mixed contexts.
+    /// is slower than with Monitor/ReaderWriterLock, it also allows reentrancy for asynchronous contexts and even mixed contexts.
     /// </summary>
     public sealed class FeatureLock
     {
@@ -1228,7 +1228,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private void ExitWriteLock()
         {
             lockIndicator = NO_LOCK;
-            Thread.MemoryBarrier();
+            //Thread.MemoryBarrier(); // Problem without memoryBarrier can not be reproduced anymore... keep watching 
             if (anySleeping) WakeUp();
         }
 
@@ -1278,7 +1278,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             NewReentrancyId();
             lockIndicator = NO_LOCK;
-            Thread.MemoryBarrier();
+            //Thread.MemoryBarrier(); // Problem without memoryBarrier can not be reproduced anymore... keep watching 
             if (anySleeping) WakeUp();
         }
 

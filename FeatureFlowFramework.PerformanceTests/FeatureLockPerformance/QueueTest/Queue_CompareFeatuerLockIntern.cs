@@ -28,7 +28,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numConsumers = value;
         }
 
-        [Params(1_000_000)]
+        [Params(100_000)]
         public int numMessages
         {
             set => queueTest.numOverallMessages = value;

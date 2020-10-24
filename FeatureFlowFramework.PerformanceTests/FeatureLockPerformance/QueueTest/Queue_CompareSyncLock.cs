@@ -22,16 +22,17 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
         NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
         FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
+        SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
 
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
-        [Params(1, 10)]
+        [Params(1)]
         public int numProducers
         {
             set => queueTest.numProducers = value;
         }
 
-        [Params(1, 10)]
+        [Params(1)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -49,22 +50,22 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void FastSpinLock_Lock() => queueTest.Run(fastSpinLockSubjects.Init, fastSpinLockSubjects.Lock);
 
-        //[Benchmark]
-        public void FeatureLock_LockPrio() => queueTest.Run(featureLockSubjects.Init, featureLockSubjects.LockPrio, featureLockSubjects.Lock);
-
         [Benchmark]
         public void Monitor_Lock() => queueTest.Run(monitorSubjects.Init, monitorSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void SemaphoreSlim_Lock() => queueTest.Run(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void ReaderWriterLockSlim_Lock() => queueTest.Run(readerWriterLockSlimSubjects.Init, readerWriterLockSlimSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
+        public void SpinLock_Lock() => queueTest.Run(spinLockSubjects.Init, spinLockSubjects.Lock);
+
+        [Benchmark]
         public void AsyncEx_Lock() => queueTest.Run(asyncExSubjects.Init, asyncExSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void NeoSmart_Lock() => queueTest.Run(neoSmartSubjects.Init, neoSmartSubjects.Lock);
 
 

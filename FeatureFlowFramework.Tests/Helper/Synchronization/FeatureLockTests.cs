@@ -241,7 +241,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             acquiredLock.Exit();
         }
 
-        /*
+        
         [Fact]
         public void PriotizedAttemptSucceedsFirst()
         {
@@ -281,7 +281,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             thread1.Join(1.Seconds());
             thread2.Join(1.Seconds());
         }
-        */
+        
 
         [Fact]
         public void FirstAttemptSucceedsFirst()
