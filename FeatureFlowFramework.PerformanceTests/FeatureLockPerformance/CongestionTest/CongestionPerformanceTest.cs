@@ -19,8 +19,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
 
         private void Slack()
         {
-            var timer = AppTime.TimeKeeper;
-            while(timer.Elapsed < 0.01.Milliseconds()) ;           
+            //var timer = AppTime.TimeKeeper;
+            //while(timer.Elapsed < 0.01.Milliseconds()) ;           
         }
 
         public void Run(Action init, Action<Action> hotpathLock, Action<Action> congestingLock = null)

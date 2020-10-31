@@ -199,6 +199,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.True(myLock.IsWriteLocked);
                 }
             Assert.False(myLock.IsLocked);
+            Assert.False(myLock.HasValidReentrancyContext);
         }
 
         [Fact]
@@ -223,6 +224,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.False(myLock.IsWriteLocked);
                 }
             Assert.False(myLock.IsLocked);
+            Assert.False(myLock.HasValidReentrancyContext);
         }
 
         [Fact]
@@ -414,7 +416,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             TimeFrame executionTime = new TimeFrame(1.Seconds());
 
             AsyncManualResetEvent starter = new AsyncManualResetEvent();
-
+            
             for(int i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(() =>
@@ -428,7 +430,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 }));
             }
-
+            
             for(int i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(async () =>
@@ -442,7 +444,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 }));
             }
-
+            
             for(int i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(() =>
@@ -456,7 +458,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 }));
             }
-
+            
             for(int i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(async () =>
@@ -470,7 +472,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     }
                 }));
             }
-
+            
             starter.Set();
             bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining + 100.Milliseconds());
             Assert.True(allFinished);
