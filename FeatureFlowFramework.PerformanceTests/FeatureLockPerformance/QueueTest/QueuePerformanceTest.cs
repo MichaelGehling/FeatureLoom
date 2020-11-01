@@ -17,8 +17,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)
         {
-            //init();
-
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
@@ -56,7 +54,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                                 empty = true;
                             }
                         });
-                        if(empty) Thread.Yield();
                     }
                 }));
             }
@@ -68,7 +65,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         public void AsyncRun(Action init, Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
         {
-            //init();
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
             AsyncManualResetEvent starter = new AsyncManualResetEvent();
@@ -107,7 +103,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                                 empty = true;
                             }
                         });
-                        if(empty) await Task.Yield();
                     }
                 }).Invoke());
             }

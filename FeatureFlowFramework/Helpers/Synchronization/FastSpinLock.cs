@@ -20,16 +20,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock()
         {
-            int cycleCounter = 0;
-            if(Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK)
-            {
-                do
-                {
-                    if(cycleCounter >= CYCLES_BEFORE_YIELDING) Thread.Yield();
-                    else cycleCounter++;
-                } while(Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
-            }
+            
+            if(Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK) Lock_Wait();
             return new AcquiredLock(this);
+        }
+
+        private void Lock_Wait()
+        {
+            int cycleCounter = 0;
+            do
+            {
+                if (cycleCounter >= CYCLES_BEFORE_YIELDING) Thread.Yield();
+                else cycleCounter++;
+            } while (Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1388,10 +1388,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool slept = false;
                 parent.anySleeping = true;
-                Thread.MemoryBarrier();
-                if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
+                //Thread.MemoryBarrier();
+
+                int currentLockIndicator = parent.lockIndicator;
+                if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
                 {
-                    if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK)
+                    currentLockIndicator = parent.lockIndicator;
+                    if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK)
                     {
                         var handle = prioritized ? parent.sharedPrioSleepHandle : parent.sharedSleepHandle;
                         parent.anySleeping = true;
@@ -1427,11 +1430,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool slept = false;
                 parent.anySleeping = true;
-                Thread.MemoryBarrier();
+                //Thread.MemoryBarrier();
 
-                if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
+                int currentLockIndicator = parent.lockIndicator;
+                if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
                 {
-                    if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK)
+                    currentLockIndicator = parent.lockIndicator;
+                    if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK)
                     {
                         var handle = new AsyncSleepHandle();
                         parent.anySleeping = true;
@@ -1489,10 +1494,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool slept = false;
                 parent.anySleeping = true;
-                Thread.MemoryBarrier();
-                if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock)) // TODO also sleep if lockIndicator implies readOnlyLock?
+                //Thread.MemoryBarrier();
+
+                int currentLockIndicator = parent.lockIndicator;
+                if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock)) // TODO also sleep if lockIndicator implies readOnlyLock?
                 {
-                    if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK)
+                    currentLockIndicator = parent.lockIndicator;
+                    if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK)
                     {
                         parent.anySleeping = true;
 
@@ -1523,11 +1531,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool slept = false;
                 parent.anySleeping = true;
-                Thread.MemoryBarrier();
+                //Thread.MemoryBarrier();
 
-                if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock)) // TODO also sleep if lockIndicator implies readOnlyLock?
+                int currentLockIndicator = parent.lockIndicator;
+                if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock)) // TODO also sleep if lockIndicator implies readOnlyLock?
                 {
-                    if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK)
+                    if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK)
                     {
                         parent.anySleeping = true;
 
@@ -1592,10 +1601,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 lockAcquired = false;
                 bool slept = false;
                 parent.anySleeping = true;
-                Thread.MemoryBarrier();
-                if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
+                //Thread.MemoryBarrier();
+
+                int currentLockIndicator = parent.lockIndicator;
+                if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
                 {
-                    if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK)
+                    currentLockIndicator = parent.lockIndicator;
+                    if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK)
                     {
                         var handle = new TimeOutSleepHandle(readOnly);
                         parent.anySleeping = true;
@@ -1652,11 +1664,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 bool lockAcquired = false;
                 bool slept = false;
                 parent.anySleeping = true;
-                Thread.MemoryBarrier();
+                //Thread.MemoryBarrier();
 
-                if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
+                int currentLockIndicator = parent.lockIndicator;
+                if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK && parent.sleepLock.TryLock(out var acquiredLock))
                 {
-                    if (parent.lockIndicator != NO_LOCK && parent.lockIndicator != EXIT_LOCK)
+                    currentLockIndicator = parent.lockIndicator;
+                    if (currentLockIndicator != NO_LOCK && currentLockIndicator != EXIT_LOCK)
                     {
                         var handle = new AsyncTimeoutSleepHandle(readOnly);
                         parent.anySleeping = true;
@@ -1762,6 +1776,5 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         #endregion LockHandles
-
     }
 }

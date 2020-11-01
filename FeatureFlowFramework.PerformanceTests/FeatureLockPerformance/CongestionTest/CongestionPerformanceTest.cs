@@ -12,43 +12,19 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
     
     public class CongestionPerformanceTest
     {
-        public int numCongestors = 20;
-        public int numHotPathRuns = 200;
+        public int numCongestors = 19;
+        public int numHotPathRuns = 100;
         public TimeSpan hotPathExecutionTime = 0.01.Milliseconds();
         public TimeSpan congestionExecutionTime = 0.01.Milliseconds();
 
-        private void Slack()
-        {
-            //var timer = AppTime.TimeKeeper;
-            //while(timer.Elapsed < 0.01.Milliseconds()) ;           
-        }
 
         public void Run(Action init, Action<Action> hotpathLock, Action<Action> congestingLock = null)
         {
             bool hotPathDone = false;
 
-            init();
-
             if(congestingLock == null) congestingLock = hotpathLock;
             
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
-
-            var hotPathThread = new Thread(() =>
-            {
-                starter.Wait();
-                int count = 0;
-                while (count++ < numHotPathRuns)
-                {
-                    hotpathLock(() =>
-                    {
-                        var timer = new TimeFrame(hotPathExecutionTime);
-                        while (!timer.Elapsed) /* work */;
-                    });
-                    Slack();
-                }
-                hotPathDone = true;
-            });
-            hotPathThread.Start();
 
             for (int i = 0; i < numCongestors; i++)
             {
@@ -62,11 +38,26 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                             var timer = new TimeFrame(congestionExecutionTime);
                             while(!timer.Elapsed && !hotPathDone) /* work */;
                         });
-                        Slack();
                     }
                 });
                 thread.Start();
-            } 
+            }
+
+            var hotPathThread = new Thread(() =>
+            {
+                starter.Wait();
+                int count = 0;
+                while (count++ < numHotPathRuns)
+                {
+                    hotpathLock(() =>
+                    {
+                        var timer = new TimeFrame(hotPathExecutionTime);
+                        while (!timer.Elapsed) /* work */;
+                    });
+                }
+                hotPathDone = true;
+            });
+            hotPathThread.Start();
 
             starter.Set();
             
@@ -77,30 +68,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
         {
             bool hotPathDone = false;
 
-            init();
-
             if(congestingLock == null) congestingLock = hotpathLock;
 
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
             Task hotPathTask;
             List<Task> congesterTasks = new List<Task>();
-
-            hotPathTask = new Func<Task>(async () =>
-            {
-                await starter.WaitAsync();
-                int count = 0;
-                while (count++ < numHotPathRuns)
-                {
-                    await hotpathLock(() =>
-                    {
-                        var timer = new TimeFrame(hotPathExecutionTime);
-                        while (!timer.Elapsed) /* work */;
-                    });
-                    //await Task.Yield();
-                    Slack();
-                }
-                hotPathDone = true;
-            }).Invoke();
 
             for (int i = 0; i < numCongestors; i++)
             {
@@ -114,11 +86,24 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                             var timer = new TimeFrame(congestionExecutionTime);
                             while(!timer.Elapsed && !hotPathDone) /* work */;
                         });
-                        //await Task.Yield();
-                        Slack();
                     }
                 }).Invoke());
             }
+
+            hotPathTask = new Func<Task>(async () =>
+            {
+                await starter.WaitAsync();
+                int count = 0;
+                while (count++ < numHotPathRuns)
+                {
+                    await hotpathLock(() =>
+                    {
+                        var timer = new TimeFrame(hotPathExecutionTime);
+                        while (!timer.Elapsed) /* work */;
+                    });
+                }
+                hotPathDone = true;
+            }).Invoke();
 
             starter.Set();
 
