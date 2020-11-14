@@ -299,21 +299,41 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockAsync_Wait(LockMode mode)
         {
-            int cycleCount = 0;
+            Interlocked.Increment(ref waitCount);
+            bool mustSleep = anySleeping || waitCount - sleepCount > batchSize * 2;
             do
             {
-                cycleCount++;
-                if (MustAsyncTryToSleep(cycleCount, false))
+                if (mustSleep && await AsyncSleepWakeOrder.TrySleepAsync(this, false))
                 {
-                    if (await AsyncSleepWakeOrder.TrySleepAsync(this, false))
-                    {
-                        if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = reentrancyId;
-                        return new AcquiredLock(this, mode);
-                    }
+                    mustSleep = false;
                 }
-                else if (cycleCount > CYCLES_BEFORE_YIELDING) Thread.Yield();
+                else if (IsThreadPoolCloseToStarving()) await Task.Yield(); 
+                else Thread.Yield();
+
+                if (anySleeping && (waitCount - sleepCount < batchSize || waitCount - sleepCount == 1)) WakeUp();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+
+            Interlocked.Decrement(ref waitCount);
+
+            if (anySleeping && waitCount - sleepCount == 0) WakeUp();
+            //if (anySleeping && waitCount - sleepCount <= 1) WakeUp();
+
+            if (batchWeight > 300)
+            {
+                batchWeight = 0;
+                batchSize++;
+                //Console.WriteLine($"BatchSize = {batchSize}");
+            }
+            else if (batchWeight < -300)
+            {
+                batchWeight = 0;
+                if (batchSize > 1)
+                {
+                    batchSize--;
+                    //Console.WriteLine($"BatchSize = {batchSize}");
+                }
+            }
 
             if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = reentrancyId;            
             return new AcquiredLock(this, mode);
@@ -1538,10 +1558,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 bool acquiredLock = false;
 
+                Interlocked.Increment(ref parent.sleepCount);
                 if (TryPrepareSleep(parent, out var sleepLock))
                 {
-                    
-                    var wakeOrder = current != null && current.count < parent.batchSize && !current.acquiredLock? current : new SleepWakeOrder(prioritized);
+                    var wakeOrder = current != null && current.count < parent.batchSize && !current.acquiredLock? current : new SleepWakeOrder(prioritized);                    
                     wakeOrder.count++;
                     wakeOrder.maxCount++;
                     if (wakeOrder != current)
@@ -1550,12 +1570,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         parent.EnqueueWakeOrder(wakeOrder);
                     }                    
                     sleepLock.Exit(); // exit before sleeping                    
-
-                    Interlocked.Increment(ref parent.sleepCount);
+                    
                     Monitor.Enter(wakeOrder);                    
                     if (!wakeOrder.acquiredLock) Monitor.Wait(wakeOrder);
-                    Monitor.Exit(wakeOrder);                    
-                    Interlocked.Decrement(ref parent.sleepCount);
+                    Monitor.Exit(wakeOrder);                                        
 
                     if (--wakeOrder.count == 0)
                     {
@@ -1565,6 +1583,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                     acquiredLock = wakeOrder.acquiredLock;
                 }
+
+                Interlocked.Decrement(ref parent.sleepCount);
                 return acquiredLock;
             }
             
@@ -1573,6 +1593,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         class AsyncSleepWakeOrder : WakeOrder
         {            
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            static AsyncSleepWakeOrder current = null;
+            int count = 0;
+            int maxCount = 0;
 
             public AsyncSleepWakeOrder(bool prioritized) : base(prioritized)
             {
@@ -1593,27 +1617,31 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             public static async Task<bool> TrySleepAsync(FeatureLock parent, bool prioritized)
             {
                 bool acquiredLock = false;
-
+                Interlocked.Increment(ref parent.sleepCount);
                 if (TryPrepareSleep(parent, out var sleepLock))
-                {
-                    var wakeOrder = new AsyncSleepWakeOrder(prioritized);
-                    parent.EnqueueWakeOrder(wakeOrder);
-                    sleepLock.Exit(); // exit before sleeping
+                {                    
+                    var wakeOrder = current != null && current.count < parent.batchSize && !current.acquiredLock ? current : new AsyncSleepWakeOrder(prioritized);
+                    wakeOrder.count++;
+                    wakeOrder.maxCount++;
+                    if (wakeOrder != current)
+                    {
+                        current = wakeOrder;
+                        parent.EnqueueWakeOrder(wakeOrder);
+                    }
+                    sleepLock.Exit(); // exit before sleeping                    
 
-                    if (!wakeOrder.acquiredLock) await wakeOrder.tcs.Task.ConfigureAwait(false);
+                    
+                    if (!wakeOrder.acquiredLock) await wakeOrder.tcs.Task.ConfigureAwait(false);                    
 
-                    await wakeOrder.SpinWaitingAsync();
-                    //Console.Write($"WAK {parent.timer.Elapsed.Ticks}; ");
-                    //parent.timer = AppTime.TimeKeeper;
+                    if (--wakeOrder.count == 0)
+                    {
+                        if (parent.waitCount - parent.sleepCount <= wakeOrder.maxCount) parent.batchWeight += 30;
+                        else if (parent.waitCount - parent.sleepCount > wakeOrder.maxCount + (parent.batchSize * 0.8) + 1) parent.batchWeight -= 1;
+                    }
 
                     acquiredLock = wakeOrder.acquiredLock;
                 }
-
-                if (!acquiredLock)
-                {
-                    if (IsThreadPoolCloseToStarving()) await Task.Yield();
-                    else Thread.Yield();
-                }
+                Interlocked.Decrement(ref parent.sleepCount);
                 return acquiredLock;
             }
         }
