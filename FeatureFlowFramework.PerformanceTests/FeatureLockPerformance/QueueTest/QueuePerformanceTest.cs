@@ -15,6 +15,12 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numConsumers = 1;
         public int numOverallMessages = 1_000_000;
 
+        void WorkSomething()
+        {
+            var timer = new TimeFrame(0.0001.Milliseconds());
+            while (!timer.Elapsed) /* work */;
+        }
+
         public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)
         {
             if(consumerLock == null) consumerLock = producerLock;
@@ -24,18 +30,14 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             int messagesPerProducer = numOverallMessages / numProducers;
             List<Task> producerTasks = new List<Task>();
             List<Task> consumerTasks = new List<Task>();
-            //List<long> producerCounter = new List<long>();
-            //List<long> consumerCounter = new List<long>();
             for (int i = 0; i < numConsumers; i++)
             {
                 consumerTasks.Add(Task.Run(() =>
                 {
-                    //long counter = 0;
                     starter.Wait();
                     bool empty = false;
                     while (!empty || !producersDone)
                     {
-                        //counter++;
                         consumerLock(() =>
                         {
                             if (!queue.TryDequeue(out _))
@@ -43,8 +45,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                                 empty = true;
                             }                            
                         });
+                        //WorkSomething();
                     }
-                    //consumerCounter.Add(counter);
+
                 }));
             }
 
@@ -52,18 +55,16 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             {
                 producerTasks.Add(Task.Run(() =>
                 {
-                    //long counter = 0;
                     starter.Wait();
                     int count = 0;
                     while(count < messagesPerProducer)
                     {
-                        //counter++;
                         producerLock(() =>
                         {
                             queue.Enqueue(count++);
                         });
+                        //WorkSomething();
                     }
-                    //producerCounter.Add(counter);
                 }));
             }
             
@@ -71,9 +72,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             if (!Task.WhenAll(producerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
             producersDone = true;
             if(!Task.WhenAll(consumerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
-
-            //foreach (var counter in producerCounter) Console.Write($"P{counter} ");
-            //foreach (var counter in consumerCounter) Console.Write($"C{counter} ");
         }
 
         public void AsyncRun(Action init, Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
@@ -99,8 +97,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             if (!queue.TryDequeue(out _))
                             {
                                 empty = true;
-                            }
+                            }                            
                         });
+                        //WorkSomething();
                     }
                 }).Invoke());
             }
@@ -117,6 +116,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                         });
+                        //WorkSomething();
                     }
                     
                 }).Invoke());

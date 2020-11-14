@@ -28,7 +28,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => congestionTest.Run(featureLockSubjects.Init, featureLockSubjects.Lock);
 
-        [Benchmark]
+        //[Benchmark]
         public void FastSpinLock_Lock() => congestionTest.Run(fastSpinLockSubjects.Init, fastSpinLockSubjects.Lock);
 
         [Benchmark]
@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
         //[Benchmark]
         public void SemaphoreSlim_Lock() => congestionTest.Run(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.Lock);
 
-        [Benchmark]
+        //[Benchmark]
         public void ReaderWriterLockSlim_Lock() => congestionTest.Run(readerWriterLockSlimSubjects.Init, readerWriterLockSlimSubjects.Lock);
 
         //[Benchmark]
