@@ -260,7 +260,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (mustSleep && SleepWakeOrder.TrySleep(this, false))
                 {
                     mustSleep = false;
-                }                
+                }
                 else Thread.Yield();
 
                 if (anySleeping && (waitCount - sleepCount < batchSize || waitCount - sleepCount == 1)) WakeUp();
@@ -271,13 +271,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (anySleeping && waitCount - sleepCount == 0) WakeUp();
 
-            if (batchWeight > 100)
+            if (batchWeight > 200)
             {
                 batchWeight = 0;
                 batchSize++;
                 //Console.WriteLine($"BatchSize = {batchSize}");
             }
-            else if (batchWeight < -100)
+            else if (batchWeight < -200)
             {
                 batchWeight = 0;
                 if (batchSize > 1) batchSize--;
@@ -1557,7 +1557,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     if (--wakeOrder.count == 0)
                     {
                         if (parent.waitCount - parent.sleepCount <= wakeOrder.maxCount) parent.batchWeight += 30;
-                        else if (parent.waitCount - parent.sleepCount > wakeOrder.maxCount + parent.batchSize) parent.batchWeight -= 1;
+                        else if (parent.waitCount - parent.sleepCount > wakeOrder.maxCount + (parent.batchSize * 0.25)+1) parent.batchWeight -= 1;
                     }
 
                     acquiredLock = wakeOrder.acquiredLock;
