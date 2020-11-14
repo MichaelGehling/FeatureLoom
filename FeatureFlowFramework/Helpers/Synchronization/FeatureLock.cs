@@ -263,23 +263,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }                
                 else Thread.Yield();
 
-                if (anySleeping && waitCount - sleepCount < batchSize) WakeUp();
+                if (anySleeping && (waitCount - sleepCount < batchSize || waitCount - sleepCount == 1)) WakeUp();
 
             } while (lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));            
 
             Interlocked.Decrement(ref waitCount);
 
-            if (anySleeping && waitCount == sleepCount) WakeUp();
+            if (anySleeping && waitCount - sleepCount == 0) WakeUp();
 
             if (batchWeight > 100)
             {
                 batchWeight = 0;
                 batchSize++;
+                //Console.WriteLine($"BatchSize = {batchSize}");
             }
             else if (batchWeight < -100)
             {
                 batchWeight = 0;
-                if (batchSize > 2) batchSize--;
+                if (batchSize > 1) batchSize--;
+                //Console.WriteLine($"BatchSize = {batchSize}");
             }
         }
         #endregion Lock
@@ -1554,8 +1556,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                     if (--wakeOrder.count == 0)
                     {
-                        if (parent.waitCount - parent.sleepCount <= wakeOrder.maxCount) parent.batchWeight += 10;
-                        else if (parent.waitCount - parent.sleepCount > wakeOrder.maxCount + parent.batchSize) parent.batchWeight -= 2;
+                        if (parent.waitCount - parent.sleepCount <= wakeOrder.maxCount) parent.batchWeight += 30;
+                        else if (parent.waitCount - parent.sleepCount > wakeOrder.maxCount + parent.batchSize) parent.batchWeight -= 1;
                     }
 
                     acquiredLock = wakeOrder.acquiredLock;
