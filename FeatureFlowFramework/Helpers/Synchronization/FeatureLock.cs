@@ -63,7 +63,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         WakeOrder queueHead = null;
 
         volatile int waitCount = 0;
-        volatile int batchSize = 3;
+        volatile int batchSize = 2;
         volatile int sleepCount = 0;
 
         volatile int batchWeight = 0;
@@ -271,17 +271,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (anySleeping && waitCount - sleepCount == 0) WakeUp();
 
-            if (batchWeight > 200)
+            if (batchWeight > 300)
             {
                 batchWeight = 0;
                 batchSize++;
                 //Console.WriteLine($"BatchSize = {batchSize}");
             }
-            else if (batchWeight < -200)
+            else if (batchWeight < -300)
             {
                 batchWeight = 0;
-                if (batchSize > 1) batchSize--;
-                //Console.WriteLine($"BatchSize = {batchSize}");
+                if (batchSize > 1)
+                {
+                    batchSize--;
+                    //Console.WriteLine($"BatchSize = {batchSize}");
+                }
             }
         }
         #endregion Lock
@@ -1557,7 +1560,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     if (--wakeOrder.count == 0)
                     {
                         if (parent.waitCount - parent.sleepCount <= wakeOrder.maxCount) parent.batchWeight += 30;
-                        else if (parent.waitCount - parent.sleepCount > wakeOrder.maxCount + (parent.batchSize * 0.25)+1) parent.batchWeight -= 1;
+                        else if (parent.waitCount - parent.sleepCount > wakeOrder.maxCount + (parent.batchSize*0.8)+1) parent.batchWeight -= 1;
                     }
 
                     acquiredLock = wakeOrder.acquiredLock;
