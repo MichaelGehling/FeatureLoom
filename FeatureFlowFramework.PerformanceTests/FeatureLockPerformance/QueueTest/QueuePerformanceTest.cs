@@ -67,7 +67,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                     }
                 }));
             }
-            
+
             starter.Set();
             if (!Task.WhenAll(producerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
             producersDone = true;
