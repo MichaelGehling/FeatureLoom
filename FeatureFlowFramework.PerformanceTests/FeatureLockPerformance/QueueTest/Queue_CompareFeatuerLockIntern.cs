@@ -16,13 +16,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
-        [Params(1)]
+        [Params(1, 10)]
         public int numProducers
         {
             set => queueTest.numProducers = value;
         }
 
-        [Params(1)]
+        [Params(10)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;

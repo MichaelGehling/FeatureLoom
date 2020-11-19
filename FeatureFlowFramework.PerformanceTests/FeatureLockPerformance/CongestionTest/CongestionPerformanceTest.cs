@@ -35,8 +35,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                     {
                         congestingLock(() =>
                         {
-                            var timer = new TimeFrame(congestionExecutionTime);
-                            while(!timer.Elapsed && !hotPathDone) /* work */;
+                            var timer = AppTime.TimeKeeper;
+                            while(timer.Elapsed < congestionExecutionTime && !hotPathDone) /* work */;
                         });
                     }
                 });
@@ -51,8 +51,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                 {
                     hotpathLock(() =>
                     {
-                        var timer = new TimeFrame(hotPathExecutionTime);
-                        while (!timer.Elapsed) /* work */;
+                        var timer = AppTime.TimeKeeper;
+                        while (timer.Elapsed < hotPathExecutionTime) /* work */;
                     });
                 }
                 hotPathDone = true;
@@ -83,8 +83,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                     {
                         await congestingLock(() =>
                         {
-                            var timer = new TimeFrame(congestionExecutionTime);
-                            while(!timer.Elapsed && !hotPathDone) /* work */;
+                            var timer = AppTime.TimeKeeper;
+                            while (timer.Elapsed < congestionExecutionTime && !hotPathDone) /* work */;
                         });
                     }
                 }).Invoke());
@@ -98,8 +98,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                 {
                     await hotpathLock(() =>
                     {
-                        var timer = new TimeFrame(hotPathExecutionTime);
-                        while (!timer.Elapsed) /* work */;
+                        var timer = AppTime.TimeKeeper;
+                        while (timer.Elapsed < hotPathExecutionTime) /* work */;
                     });
                 }
                 hotPathDone = true;
