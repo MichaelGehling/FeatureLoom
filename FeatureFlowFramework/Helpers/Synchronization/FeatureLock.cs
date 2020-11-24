@@ -64,7 +64,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         WakeOrder queueHead = null;
 
         volatile int waitCount = 0;
-        int maxBatchSize = 6;
+        int maxBatchSize = 20;
         volatile int batchSize = 2;
         volatile int batchWeight = 0;
         volatile uint nextTicket = 0;
@@ -120,7 +120,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             //Process.GetCurrentProcess().ProcessorAffinity = (IntPtr)0b1111;
 
-            maxBatchSize = 20;
             int numCores = 0;
             var affinity = (long) Process.GetCurrentProcess().ProcessorAffinity;   
             while(affinity > 0)
@@ -130,7 +129,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             if (numCores == 0) numCores = Environment.ProcessorCount;
 
-            if (numCores == 1) maxBatchSize = 4;                        
+            if (numCores == 1) maxBatchSize = 4;
+            else maxBatchSize = 20;
             sleepLock = new FastSpinLock(numCores > 1 ? 200 : 0);                        
         }
         #endregion PreparedTasks
@@ -217,14 +217,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool MustTryToSleep(int cycleCount, bool prioritized)
         {
             int factor = prioritized ? PRIO_CYCLE_FACTOR : 1;
-            //return prioritizedWakeOrderQueue.Count > 0 || (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING || waitingForUpgrade == TRUE;
             return anySleeping || cycleCount > CYCLES_BEFORE_SLEEPING * factor || waitingForUpgrade == TRUE;
         }
 
         private bool MustAsyncTryToSleep(int cycleCount, bool prioritized)
         {
             int factor = prioritized ? PRIO_CYCLE_FACTOR : 1;
-            //return prioritizedWakeOrderQueue.Count > 0 || (!prioritized && anySleeping) || cycleCount > CYCLES_BEFORE_SLEEPING || IsThreadPoolCloseToStarving() || waitingForUpgrade == TRUE;
             return anySleeping || cycleCount > CYCLES_BEFORE_SLEEPING * factor || IsThreadPoolCloseToStarving() || waitingForUpgrade == TRUE;
         }
 
@@ -309,7 +307,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (batchSize < maxBatchSize)
                 {
                     batchSize++;
-                    Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");
+                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");
                 }
             }
             else if (batchWeight < -1000)
@@ -318,7 +316,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (batchSize > 2)
                 {
                     batchSize--;
-                    Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");                    
+                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");                    
                 }
             }            
         }
@@ -375,15 +373,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else if (MustWakeUp()) WakeUp();
 
             Interlocked.Increment(ref waitCount);
-            do
+            while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
+                if (MayElevateToPrioritized(ticket)) prioritized = true;
                 if (prioritized) prioritizedWaiting = true;
-                if (IsThreadPoolCloseToStarving()) await Task.Yield();
-                else Thread.Yield();
-
-                if (anySleeping && (waitCount < batchSize)) WakeUp();
-
-            } while ((!prioritized && prioritizedWaiting) || lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+                if (MustYield(prioritized))
+                {
+                    if (IsThreadPoolCloseToStarving()) await Task.Yield();
+                    else Thread.Sleep(0);
+                }
+                if (MustWakeUp()) WakeUp();
+            } 
             Interlocked.Decrement(ref waitCount);
 
             FinishWaiting(ticket, prioritized);
@@ -398,37 +398,43 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (MustWakeUp()) WakeUp();
 
             Interlocked.Increment(ref waitCount);
-            do
+            while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
+                if (MayElevateToPrioritized(ticket)) prioritized = true;
                 if (prioritized) prioritizedWaiting = true;
-                if (IsThreadPoolCloseToStarving()) return LockAsync_Wait_ContinueNoSleepWithYielding(mode, ticket, prioritized);
-                else Thread.Yield();
-
-                if (anySleeping && (waitCount < batchSize)) WakeUp();
-
-            } while ((!prioritized && prioritizedWaiting) || lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+                if (MustYield(prioritized))
+                {
+                    if (IsThreadPoolCloseToStarving()) return LockAsync_Wait_ContinueNoSleepWithYielding(mode, ticket, prioritized);
+                    else Thread.Sleep(0);
+                }
+                if (MustWakeUp()) WakeUp();
+            }
             Interlocked.Decrement(ref waitCount);
 
-            FinishWaiting(ticket, prioritized);
+            FinishWaiting(ticket, prioritized);            
 
-            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = reentrancyId;
-
-
-            if (mode == LockMode.WriteLockReenterable) return reenterableWriteLockTask;
+            if (mode == LockMode.WriteLockReenterable)
+            {
+                reentrancyIndicator.Value = reentrancyId;
+                return reenterableWriteLockTask;
+            }
             else return writeLockTask;
         }
 
         private async Task<AcquiredLock> LockAsync_Wait_ContinueNoSleepWithYielding(LockMode mode, uint ticket, bool prioritized)
         {
-            do
+            while ((!prioritized && prioritizedWaiting) || lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
+                if (MayElevateToPrioritized(ticket)) prioritized = true;
                 if (prioritized) prioritizedWaiting = true;
-                if (IsThreadPoolCloseToStarving()) await Task.Yield();
-                else Thread.Yield();
+                if (MustYield(prioritized))
+                {
+                    if (IsThreadPoolCloseToStarving()) await Task.Yield();
+                    else Thread.Sleep(0);
+                }
+                if (MustWakeUp()) WakeUp();
 
-                if (anySleeping && (waitCount < batchSize)) WakeUp();
-
-            } while ((!prioritized && prioritizedWaiting) || lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+            } 
             Interlocked.Decrement(ref waitCount);
 
             FinishWaiting(ticket, prioritized);
@@ -454,7 +460,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) return writeLockTask;
             else return LockAsync_Wait(LockMode.WriteLock, true);
         }
-
         #endregion LockPrioritizedAsync
 
         #region LockReadOnly
@@ -1353,7 +1358,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             lockIndicator = NO_LOCK;
 
-            if (anySleeping && waitCount == 0) WakeUp();
+            //if (anySleeping && waitCount == 0) WakeUp();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]

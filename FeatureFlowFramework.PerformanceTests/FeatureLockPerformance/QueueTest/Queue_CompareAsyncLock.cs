@@ -48,13 +48,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void SemaphoreSlim_LockAsync_() => queueTest.AsyncRun(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void AsyncEx_LockAsync_() => queueTest.AsyncRun(asyncExSubjects.Init, asyncExSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void NeoSmart_LockAsync_() => queueTest.AsyncRun(neoSmartSubjects.Init, neoSmartSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void Bmbsqd_LockAsync_() => queueTest.AsyncRun(bmbsqdSubjects.Init, bmbsqdSubjects.LockAsync);
 
 
