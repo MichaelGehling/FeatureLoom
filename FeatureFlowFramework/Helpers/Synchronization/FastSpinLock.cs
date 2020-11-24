@@ -8,12 +8,17 @@ using System.Threading;
 namespace FeatureFlowFramework.Helpers.Synchronization
 {
     public sealed class FastSpinLock
-    {
-        const int CYCLES_BEFORE_YIELDING = 200;
+    {        
         const int NO_LOCK = 0;
         const int LOCKED = 1;
 
+        int cyclesBeforeYielding = 200;
         int lockIndicator = NO_LOCK;
+
+        public FastSpinLock(int cyclesBeforeYielding = 200)
+        {
+            this.cyclesBeforeYielding = cyclesBeforeYielding;
+        }
 
         public bool IsLocked => Volatile.Read(ref lockIndicator) == LOCKED;
 
@@ -30,7 +35,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int cycleCounter = 0;
             do
             {
-                if (cycleCounter >= CYCLES_BEFORE_YIELDING) Thread.Yield();
+                if (cycleCounter >= cyclesBeforeYielding) Thread.Yield();
                 else cycleCounter++;
             } while (Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
         }
@@ -69,7 +74,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return false;
                 }
 
-                if(cycleCounter >= CYCLES_BEFORE_YIELDING) Thread.Yield();
+                if(cycleCounter >= cyclesBeforeYielding) Thread.Yield();
                 else cycleCounter++;
 
             } while(Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);

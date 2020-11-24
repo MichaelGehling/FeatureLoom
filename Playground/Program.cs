@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,8 +20,17 @@ using Nito.AsyncEx;
 
 namespace Playground
 {
+
+    public static class SocketExtensions
+    {
+        public static void SetBlocking(this Socket socket, bool blocking)
+        {
+            if (socket != null) socket.Blocking = blocking;
+        }
+    }
     partial class Program
     {
+        
         
 
         static void Main(string[] args)
