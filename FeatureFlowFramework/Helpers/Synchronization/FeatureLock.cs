@@ -118,19 +118,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             upgradedLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Upgraded)));
             reenteredLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Reentered)));
 
+            //Process.GetCurrentProcess().ProcessorAffinity = (IntPtr)0b1111;
+
             maxBatchSize = 20;
-            
+            int numCores = 0;
             var affinity = (long) Process.GetCurrentProcess().ProcessorAffinity;   
             while(affinity > 0)
             {
-                if ((affinity & (long)1) > 0) maxBatchSize++;
+                if ((affinity & (long)1) > 0) numCores++;
                 affinity = affinity >> 1;
             }
-            if (maxBatchSize == 0) maxBatchSize = Environment.ProcessorCount;
-            maxBatchSize = (maxBatchSize).ClampLow(20);
-            batchSize = batchSize.ClampHigh(maxBatchSize);
-            
-            sleepLock = new FastSpinLock(maxBatchSize > 3 ? 200 : 0);                        
+            if (numCores == 0) numCores = Environment.ProcessorCount;
+
+            if (numCores == 1) maxBatchSize = 4;                        
+            sleepLock = new FastSpinLock(numCores > 1 ? 200 : 0);                        
         }
         #endregion PreparedTasks
 
@@ -308,7 +309,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (batchSize < maxBatchSize)
                 {
                     batchSize++;
-                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");
+                    Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");
                 }
             }
             else if (batchWeight < -1000)
@@ -317,7 +318,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (batchSize > 2)
                 {
                     batchSize--;
-                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");                    
+                    Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize}");                    
                 }
             }            
         }
