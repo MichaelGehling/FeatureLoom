@@ -417,7 +417,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
             AsyncManualResetEvent starter = new AsyncManualResetEvent();
             
-            for(int i = 0; i < 40; i++)
+            for(int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(() =>
                 {
@@ -431,7 +431,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 }));
             }
             
-            for(int i = 0; i < 0; i++)
+            for(int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(async () =>
                 {
@@ -446,7 +446,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             }
             
             
-            for(int i = 0; i < 0; i++)
+            for(int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(() =>
                 {
@@ -461,7 +461,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             }
             
             
-            for(int i = 0; i < 0; i++)
+            for(int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(async () =>
                 {
