@@ -638,7 +638,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     // Waiting for upgrade to writeLock
                     while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
                     {
-                        if (waitForUpgrade) Thread.Yield();
+                        if (waitForUpgrade)
+                        {
+                            prioritizedWaiting = true;
+                            Thread.Sleep(0);
+                        }
                         else
                         {
                             waitingForUpgrade = FALSE;
@@ -648,6 +652,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }                        
                     }
                     waitingForUpgrade = FALSE;
+                    prioritizedWaiting = false;
 
                     upgradePossible = false;
                     acquiredLock = new AcquiredLock(this, LockMode.Upgraded);
@@ -686,9 +691,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             // Waiting for upgrade to writeLock
             while(FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
-                await Task.Yield();                
+                prioritizedWaiting = true;
+                if (IsThreadPoolCloseToStarving()) await Task.Yield();
+                else Thread.Sleep(0);
             }
             waitingForUpgrade = FALSE;
+            prioritizedWaiting = false;
             return new AcquiredLock(this, LockMode.Upgraded);            
         }
         #endregion LockReentrantAsync
@@ -855,6 +863,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #endregion TryLockReentrantPrioritized
 
         #region TryLockReentrantReadOnly
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLockReentrantReadOnly(out AcquiredLock acquiredLock)
         {
             if(TryReenterReadOnly())
@@ -896,6 +905,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 return false;
             }
         }
+
+
+        /*
+         * 
+         * 
+         * CONTINUE REFACTORING HERE
+         * 
+         * */
 
         private bool TryLock_Wait(TimeSpan timeout)
         {
