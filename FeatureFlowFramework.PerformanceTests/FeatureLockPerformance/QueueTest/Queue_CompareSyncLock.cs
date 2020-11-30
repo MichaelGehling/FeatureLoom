@@ -32,7 +32,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numProducers = value;
         }
 
-        [Params(1, 10)]
+        [Params(1, 3, 10)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;

@@ -6,6 +6,29 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 {
     public static class TaskExtensions
     {
+        public static SynchronizationContextRestorer Suspend(this SynchronizationContext syncContext)
+        {
+            SynchronizationContext context = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(null);
+            return new SynchronizationContextRestorer(context);
+        }
+
+        public struct SynchronizationContextRestorer : IDisposable
+        {
+            SynchronizationContext context;
+
+            public SynchronizationContextRestorer(SynchronizationContext context)
+            {
+                this.context = context;
+            }
+
+            public void Dispose()
+            {
+                SynchronizationContext.SetSynchronizationContext(context);
+            }
+        }
+
+
         public async static Task<bool> WaitAsync(this Task task)
         {
             if(task.IsCanceled || task.IsFaulted) return false;
