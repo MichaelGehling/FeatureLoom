@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         void WorkSomething()
         {
-            var timer = new TimeFrame(0.0001.Milliseconds());
+            var timer = new TimeFrame(0.001.Milliseconds());
             while (!timer.Elapsed) /* work */;
         }
 
@@ -28,11 +28,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
             bool producersDone = false;
             int messagesPerProducer = numOverallMessages / numProducers;
-            List<Task> producerTasks = new List<Task>();
-            List<Task> consumerTasks = new List<Task>();
+            List<Thread> producerThreads = new List<Thread>();
+            List<Thread> consumerThreads = new List<Thread>();
+
+
             for (int i = 0; i < numConsumers; i++)
             {
-                consumerTasks.Add(Task.Run(() =>
+                var thread = new Thread(() =>
                 {
                     starter.Wait();
                     bool empty = false;
@@ -43,21 +45,22 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                             if (!queue.TryDequeue(out _))
                             {
                                 empty = true;
-                            }                            
+                            }
                         });
                         //WorkSomething();
                     }
-
-                }));
+                });
+                thread.Start();
+                consumerThreads.Add(thread);
             }
 
-            for (int i=0; i < numProducers; i++)
+            for (int i = 0; i < numProducers; i++)
             {
-                producerTasks.Add(Task.Run(() =>
+                var thread = new Thread(() =>
                 {
                     starter.Wait();
                     int count = 0;
-                    while(count < messagesPerProducer)
+                    while (count < messagesPerProducer)
                     {
                         producerLock(() =>
                         {
@@ -65,13 +68,18 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         });
                         //WorkSomething();
                     }
-                }));
+                });
+                thread.Start();
+                producerThreads.Add(thread);
             }
 
+
             starter.Set();
-            if (!Task.WhenAll(producerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
+            foreach (var t in producerThreads) t.Join();
+            //if (!Task.WhenAll(producerThreads.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
             producersDone = true;
-            if(!Task.WhenAll(consumerTasks.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
+            foreach (var t in consumerThreads) t.Join();
+            //if(!Task.WhenAll(consumerThreads.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
         }
 
         public void AsyncRun(Action init, Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
