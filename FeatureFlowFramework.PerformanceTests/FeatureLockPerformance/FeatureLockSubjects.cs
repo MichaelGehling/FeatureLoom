@@ -27,7 +27,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockPrio(Action action)
         {
-            using(myLock.LockPrioritized())
+            using(myLock.Lock(true))
             {
                 action();
             }
@@ -45,7 +45,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockPrioAsync(Action action)
         {
-            using(await myLock.LockPrioritizedAsync())
+            using(await myLock.LockAsync(true))
             {
                 action();
             }

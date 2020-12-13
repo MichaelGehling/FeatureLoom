@@ -271,7 +271,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 {
                     task2Started = true;
                     waiter.Set();
-                    using(myLock.LockPrioritized())
+                    using(myLock.Lock(true))
                     {
                         Assert.Equal(0, counter++);
                     }
