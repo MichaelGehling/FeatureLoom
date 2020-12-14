@@ -27,7 +27,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int NO_LOCK = 0;
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
-        const int EXIT_LOCK = -2;
 
         const int CYCLES_BEFORE_YIELDING = 0;
         const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + 10_000;
@@ -262,9 +261,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustYield(bool prioritized)
+        private bool MustYield(bool prioritized, bool readOnly)
         {
-            return lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting);
+            return (!readOnly && lockIndicator != NO_LOCK) || (readOnly && lockIndicator == WRITE_LOCK) || (!prioritized && prioritizedWaiting);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -362,7 +361,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {                
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized)) Thread.Sleep(0);
+                if (MustYield(prioritized, false)) Thread.Sleep(0);
                 if (MustTrySleepWhileWaiting(prioritized, false))
                 {
                     Interlocked.Decrement(ref waitCount);
@@ -403,7 +402,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized))
+                if (MustYield(prioritized, false))
                 {
                     if (MustYieldAsyncThread()) await Task.Yield();
                     else Thread.Sleep(0);
@@ -434,7 +433,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized))
+                if (MustYield(prioritized, false))
                 {
                     if (MustYieldAsyncThread()) return LockAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
                     else Thread.Sleep(0);
@@ -461,7 +460,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while ((!prioritized && prioritizedWaiting) || lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized))
+                if (MustYield(prioritized, false))
                 {
                     if (MustYieldAsyncThread()) await Task.Yield();
                     else Thread.Sleep(0);
@@ -487,11 +486,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region LockReadOnly
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock LockReadOnly()
+        public AcquiredLock LockReadOnly(bool prioritized = false)
         {
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            if(MustWait(false) || newLockIndicator < FIRST_READ_LOCK || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait(false);
+            if(MustWait(prioritized) || newLockIndicator < FIRST_READ_LOCK || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait(prioritized);
             return new AcquiredLock(this, LockMode.ReadLock);
         }
 
@@ -507,7 +506,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized)) Thread.Sleep(0);
+                if (MustYield(prioritized, true)) Thread.Sleep(0);
                 if (MustTrySleepWhileWaiting(prioritized, true)) ReadOnlySleepWakeOrder.TrySleep(this);
                 if (MustWakeUp()) WakeUp();
                 if (MayElevateToPrioritized(ticket)) prioritized = true;
@@ -523,19 +522,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region LockReadOnlyAsync
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockReadOnlyAsync()
+        public Task<AcquiredLock> LockReadOnlyAsync(bool prioritized = false)
         {
             var currentLockIndicator = lockIndicator;
             var newLockIndicator = currentLockIndicator + 1;
-            if(!MustWait(false) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) return readLockTask;
-            else return LockReadOnlyAsync_Wait(LockMode.ReadLock, false);
+            if(!MustWait(prioritized) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) return readLockTask;
+            else return LockReadOnlyAsync_Wait(LockMode.ReadLock, prioritized);
         }
 
         private Task<AcquiredLock> LockReadOnlyAsync_Wait(LockMode mode, bool prioritized)
         {
             if (MustTrySleepBeforeWaiting(prioritized, false)) return LockReadOnlyAsync_Wait_Sleep(mode, prioritized);
             else return LockReadOnlyAsync_Wait_NoSleep(mode, prioritized);
-
         }
 
         private async Task<AcquiredLock> LockReadOnlyAsync_Wait_Sleep(LockMode mode, bool prioritized)
@@ -550,7 +548,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized))
+                if (MustYield(prioritized, true))
                 {
                     if (MustYieldAsyncThread()) await Task.Yield();
                     else Thread.Sleep(0);
@@ -586,7 +584,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized))
+                if (MustYield(prioritized, true))
                 {
                     if (MustYieldAsyncThread()) return LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
                     else Thread.Sleep(0);
@@ -618,7 +616,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized))
+                if (MustYield(prioritized, true))
                 {
                     if (MustYieldAsyncThread()) await Task.Yield();
                     else Thread.Sleep(0);
@@ -829,7 +827,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
         #endregion TryLockReentrant
 
-
         #region TryLockReentrantReadOnly
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLockReentrantReadOnly(out AcquiredLock acquiredLock)
@@ -894,7 +891,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     return false;
                 }
                 if (prioritized) prioritizedWaiting = true;
-                if (MustYield(prioritized)) Thread.Sleep(0);
+                if (MustYield(prioritized, false)) Thread.Sleep(0);
                 if (MustTrySleepWhileWaiting(prioritized, false))
                 {
                     Interlocked.Decrement(ref waitCount);
@@ -960,10 +957,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return new LockAttempt(new AcquiredLock(this, mode));
         }
         #endregion TryLockAsync_Timeout
-
-
-
-
 
         #region TryLockReadOnly_Timeout
         public bool TryLockReadOnly(TimeSpan timeout, out AcquiredLock acquiredLock)
