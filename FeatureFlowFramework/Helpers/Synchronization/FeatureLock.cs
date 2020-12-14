@@ -275,8 +275,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWakeUp()
         {
-            //return anySleeping && (waitCount <= (batchSize / 2).ClampLow(1));
-            return anySleeping && (waitCount <= batchSize.ClampLow(1));
+            return anySleeping && (waitCount <= (batchSize + 1) / 2);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
