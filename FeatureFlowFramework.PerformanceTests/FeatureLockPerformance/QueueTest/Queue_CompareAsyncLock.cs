@@ -27,7 +27,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numProducers = value;
         }
 
-        [Params(3, 10, 20)]
+        [Params(1, 5, 10, 20)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -42,7 +42,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark(Baseline = true)]
         public void FeatureLock_LockAsync_() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockAsync);
 
-        [Benchmark]
+        //[Benchmark]
         public void FeatureLock_LockPrioAsync_() => queueTest.AsyncRun(featureLockSubjects.Init, featureLockSubjects.LockPrioAsync, featureLockSubjects.LockAsync);
 
         [Benchmark]

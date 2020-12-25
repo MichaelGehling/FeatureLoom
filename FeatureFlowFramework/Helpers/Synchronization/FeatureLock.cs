@@ -122,7 +122,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             //if (numCores == 1) maxBatchSize = 4;
             //else maxBatchSize = Environment.ProcessorCount;
 
-            maxBatchSize = Environment.ProcessorCount;
+            //maxBatchSize = (Environment.ProcessorCount-1).ClampLow(2)*2;
+            maxBatchSize = 1000;            
 
             sleepLock = new FastSpinLock(numCores > 1 ? 200 : 0);
         }
@@ -238,12 +239,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool MustYieldAsyncThread()
-        {
+        private static bool MustYieldAsyncThread(bool prioritized, int cycleCounter)
+        {            
             if (SynchronizationContext.Current == null)
             {
-                ThreadPool.GetAvailableThreads(out int availableThreads, out _);
-                return availableThreads == 0;
+                ThreadPool.GetAvailableThreads(out int availableThreads, out int availableIoThreads);
+                ThreadPool.GetMaxThreads(out int maxThreads, out int maxIoThreads);
+                ThreadPool.GetMinThreads(out int minThreads, out _);
+                var usedThreads = maxThreads - availableThreads;
+                if (usedThreads >= minThreads)
+                {
+                    int asyncYieldCycle = (minThreads * minThreads) / (usedThreads * (prioritized ? 1 : 2));
+                    return cycleCounter % asyncYieldCycle == 0;
+                }
+                else return false;
             }
             else return true;
         }
@@ -251,13 +260,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustTrySleepBeforeWaiting(bool prioritized, bool readOnly)
         {
-            return !prioritized && (anySleeping || waitCount >= batchSize) && (!readOnly || lockIndicator >= FIRST_READ_LOCK);
+            return !prioritized && (anySleeping || waitCount >= batchSize);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustTrySleepWhileWaiting(bool prioritized, bool readOnly)
         {
-            return !prioritized && waitCount > batchSize && (!readOnly || lockIndicator >= FIRST_READ_LOCK);
+            return false;
+            return !prioritized && waitCount > batchSize;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -298,29 +308,34 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if (anySleeping && waitCount == 0)
             {
-                batchWeight += (batchSize - 1).ClampLow(0) * 50;
+                //batchWeight += (batchSize - 1).ClampLow(0) * 50;
                 WakeUp();
             }
+            if (!anySleeping && ticket % 100 == 0) batchWeight -= 1;
 
-            if (ticket % 1000 == 0) batchWeight -= 1;
+
             //if (ticket % 10000 == 0) Console.Write($"|{waitCount}-{batchSize}-{maxBatchSize}|");
+            //if (waitCount > batchSize) Console.Write($"|{waitCount}-{batchSize}-{maxBatchSize}|");
 
-            if (batchWeight > 10000)
+            //if (anySleeping && waitCount <= 1) batchWeight += 100;
+            //if (ticket % 100 == 0) batchWeight -= 1;
+
+            if (batchWeight > 1000)
             {
                 batchWeight = 0;
                 if (batchSize < maxBatchSize)
                 {
                     batchSize++;
-                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize} WC{waitCount}");
+                    Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize} WC{waitCount}");
                 }
             }
-            else if (batchWeight < -10000)
+            else if (batchWeight < -1000)
             {
                 batchWeight = 0;
-                if (batchSize > 2)
+                if (batchSize > 1)
                 {
                     batchSize--;
-                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize} WC{waitCount}");                    
+                    Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize} WC{waitCount}");                    
                 }
             }
         }
@@ -397,13 +412,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             uint ticket = nextTicket++;
             await SleepWakeOrder.TrySleepAsync(this);
 
+            int counter = 0;
             Interlocked.Increment(ref waitCount);
             while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 if (prioritized) prioritizedWaiting = true;
                 if (MustYield(prioritized, false))
                 {
-                    if (MustYieldAsyncThread()) await Task.Yield();
+                    //Console.Write("-");
+                    if (MustYieldAsyncThread(prioritized, ++counter))
+                    {
+                        //Console.Write("|");
+                        await Task.Yield();
+                    }
                     else Thread.Sleep(0);
                 }
                 if (MustTrySleepWhileWaiting(prioritized, false))
@@ -427,14 +448,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             uint ticket = nextTicket++;
             if (MustWakeUp()) WakeUp();
-
+            int counter = 0;
             Interlocked.Increment(ref waitCount);
             while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 if (prioritized) prioritizedWaiting = true;
                 if (MustYield(prioritized, false))
                 {
-                    if (MustYieldAsyncThread()) return LockAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
+                    //Console.Write("-");
+                    if (MustYieldAsyncThread(prioritized, ++counter)) return LockAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
                     else Thread.Sleep(0);
                 }
                 if (MustTrySleepWhileWaiting(prioritized, false)) return LockAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
@@ -455,13 +477,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockAsync_Wait_ContinueNoSleepWithAwaiting(LockMode mode, uint ticket, bool prioritized)
         {
+            int counter = 0;
             SynchronizationContext.SetSynchronizationContext(null);
             while ((!prioritized && prioritizedWaiting) || lockIndicator != NO_LOCK || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 if (prioritized) prioritizedWaiting = true;
                 if (MustYield(prioritized, false))
                 {
-                    if (MustYieldAsyncThread()) await Task.Yield();
+                    //Console.Write("-");
+                    if (MustYieldAsyncThread(prioritized, ++counter))
+                    {
+                        //Console.Write("|");
+                        await Task.Yield();
+                    }
                     else Thread.Sleep(0);
                 }
                 if (MustTrySleepWhileWaiting(prioritized, false))
@@ -540,7 +568,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             SynchronizationContext.SetSynchronizationContext(null);
             uint ticket = nextTicket++;
             await ReadOnlySleepWakeOrder.TrySleepAsync(this);
-
+            int counter = 0;
             Interlocked.Increment(ref waitCount);
             int currentLockIndicator = lockIndicator;
             int newLockIndicator = currentLockIndicator + 1;
@@ -549,7 +577,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (prioritized) prioritizedWaiting = true;
                 if (MustYield(prioritized, true))
                 {
-                    if (MustYieldAsyncThread()) await Task.Yield();
+                    if (MustYieldAsyncThread(prioritized, ++counter)) await Task.Yield();
                     else Thread.Sleep(0);
                 }
                 if (MustTrySleepWhileWaiting(prioritized, true))
@@ -576,7 +604,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             uint ticket = nextTicket++;
             if (MustWakeUp()) WakeUp();
-
+            int counter = 0;
             Interlocked.Increment(ref waitCount);
             int currentLockIndicator = lockIndicator;
             int newLockIndicator = currentLockIndicator + 1;
@@ -585,7 +613,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (prioritized) prioritizedWaiting = true;
                 if (MustYield(prioritized, true))
                 {
-                    if (MustYieldAsyncThread()) return LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
+                    if (MustYieldAsyncThread(prioritized, ++counter)) return LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
                     else Thread.Sleep(0);
                 }
                 if (MustTrySleepWhileWaiting(prioritized, true)) return LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
@@ -609,6 +637,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(LockMode mode, uint ticket, bool prioritized)
         {
+            int counter = 0;
             SynchronizationContext.SetSynchronizationContext(null);
             int currentLockIndicator = lockIndicator;
             int newLockIndicator = currentLockIndicator + 1;
@@ -617,7 +646,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (prioritized) prioritizedWaiting = true;
                 if (MustYield(prioritized, true))
                 {
-                    if (MustYieldAsyncThread()) await Task.Yield();
+                    if (MustYieldAsyncThread(prioritized, ++counter)) await Task.Yield();
                     else Thread.Sleep(0);
                 }
                 if (MustTrySleepWhileWaiting(prioritized, true))
@@ -717,6 +746,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private async Task<AcquiredLock> WaitForUpgradeAsync()
         {
+            int counter = 0;
             SynchronizationContext.SetSynchronizationContext(null);
             // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
             if (TRUE == Interlocked.CompareExchange(ref waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
@@ -724,7 +754,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while(FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
                 prioritizedWaiting = true;
-                if (MustYieldAsyncThread()) await Task.Yield();
+                if (MustYieldAsyncThread(true, ++counter)) await Task.Yield();
                 else Thread.Sleep(0);
             }
             waitingForUpgrade = FALSE;
@@ -1175,7 +1205,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     }
                 }
 
-                if (MustYieldAsyncThread()) await Task.Yield();
+                //if (MustYieldAsyncThread(false, ++counter)) await Task.Yield();
                 else Thread.Sleep(0);
             }
             waitingForUpgrade = FALSE;
@@ -1437,12 +1467,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 if (count-- == maxCount)
                 {
-                    if (parent.waitCount < (parent.batchSize - 1).ClampLow(1)) parent.batchWeight += 10;
-                    else if (parent.waitCount > parent.batchSize) parent.batchWeight -= 10;
+                    //if (parent.waitCount < (parent.batchSize - 1).ClampLow(1)) parent.batchWeight += 10;
+                    //else if (parent.waitCount > parent.batchSize) parent.batchWeight -= 10;
 
-                    //if (parent.waitCount == 0) parent.batchWeight += 100;              
-                    //else if (parent.waitCount == 1) parent.batchWeight += 10;
-                    //else if (parent.waitCount + maxCount > parent.batchSize) parent.batchWeight -= 1;
+                    parent.batchWeight += (parent.batchSize - (int)(parent.waitCount*1.4));
 
                 }
             }

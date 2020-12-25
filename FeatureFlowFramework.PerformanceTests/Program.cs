@@ -1,6 +1,7 @@
 ﻿using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
 using System;
+using System.Diagnostics;
 
 namespace FeatureFlowFramework.PerformanceTests
 {
@@ -8,7 +9,7 @@ namespace FeatureFlowFramework.PerformanceTests
     {
         static void Main(string[] args)
         {
-            //Process.GetCurrentProcess().ProcessorAffinity = (IntPtr)0b1;
+            Process.GetCurrentProcess().ProcessorAffinity = (IntPtr)0b11;
             BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new DebugInProcessConfig());
         }
     }
