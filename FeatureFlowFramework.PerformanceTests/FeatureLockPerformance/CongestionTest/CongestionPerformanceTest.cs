@@ -20,6 +20,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
 
         public void Run(Action init, Action<Action> hotpathLock, Action<Action> congestingLock = null)
         {
+            //init();
             bool hotPathDone = false;
 
             if(congestingLock == null) congestingLock = hotpathLock;
@@ -36,7 +37,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                         congestingLock(() =>
                         {
                             var timer = AppTime.TimeKeeper;
-                            while(timer.Elapsed < congestionExecutionTime && !hotPathDone) /* work */;
+                            while(timer.Elapsed < congestionExecutionTime && !hotPathDone) /* work */ ;
                         });
                     }
                 });
@@ -52,7 +53,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                     hotpathLock(() =>
                     {
                         var timer = AppTime.TimeKeeper;
-                        while (timer.Elapsed < hotPathExecutionTime) /* work */;
+                        while (timer.Elapsed < hotPathExecutionTime) /* work */ ;
                     });
                 }
                 hotPathDone = true;

@@ -4,7 +4,7 @@ using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.CongestionTest
 {
-    [MaxIterationCount(20)]
+    [MaxIterationCount(50)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [RPlotExporter]

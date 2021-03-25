@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.PerformanceTests
     {
         static void Main(string[] args)
         {
-            Process.GetCurrentProcess().ProcessorAffinity = (IntPtr)0b11;
+            //Process.GetCurrentProcess().ProcessorAffinity = (IntPtr)0b1111;
             BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new DebugInProcessConfig());
         }
     }
