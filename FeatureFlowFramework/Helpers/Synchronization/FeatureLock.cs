@@ -37,6 +37,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #endregion Constants
 
         #region Variables
+
+        int padding;
+
         // the main lock variable, indicating current locking state:
         // 0 means no lock
         // -1 means write lock
@@ -55,15 +58,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // It may happen that anySleeping is true, though actually no one needs to be awaked but is just spin-waiting, 
         // but it will never happen that it is false if someone needs to be awaked.
         volatile bool anySleeping = false;
-        // Used to synchronize sleeping and waking up code sections
-        FastSpinLock sleepLock;
+
+        volatile int nextTicket = 0;
+        volatile bool prioritizedWaiting = false;
+        volatile int stayAwakeTicket = 0;        
+        volatile int sleepPressure = 0;
+
 
         volatile WakeOrder queueHead = null;
 
-        volatile int nextTicket = 0;
-        volatile int stayAwakeTicket = 0;
-        volatile bool prioritizedWaiting = false;
-        volatile int sleepPressure = 0;
+        // Used to synchronize sleeping and waking up code sections
+        FastSpinLock sleepLock;
 
         #endregion Variables
 
@@ -110,8 +115,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             reenteredLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Reentered)));
 
             int numCores = CalculateAvailableCores();
+
             sleepLock = new FastSpinLock(numCores > 1 ? 200 : 0);
         }
+
 
         private static int CalculateAvailableCores()
         {
