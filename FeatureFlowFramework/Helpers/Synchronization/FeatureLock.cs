@@ -28,10 +28,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int WRITE_LOCK = -1;
         const int FIRST_READ_LOCK = 1;
 
-        const int CYCLES_BEFORE_YIELDING = 0;
-        const int CYCLES_BEFORE_SLEEPING = CYCLES_BEFORE_YIELDING + 10_000;
-        const int PRIO_CYCLE_FACTOR = 1;
-
         const int FALSE = 0;
         const int TRUE = 1;
 
@@ -239,7 +235,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (++reentrancyId == 0) ++reentrancyId;
         }
 
-       // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustYieldAsyncThread(int ticket, bool prioritized)
         {
             if (SynchronizationContext.Current == null)
@@ -267,18 +263,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustTrySleepBeforeWaiting(bool prioritized, bool readOnly)
-        {
-            return !prioritized && (anySleeping || waitCount >= batchSize);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustTrySleepWhileWaiting(bool prioritized, bool readOnly)
-        {
-            return !prioritized && waitCount > batchSize;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustTrySleep(bool prioritized, bool readOnly, int ticket)
         {
             if (ticket == stayAwakeTicket || prioritized || sleepLock.IsLocked || !MustStillWait(prioritized, readOnly)) return false; // prioritized and designated waiter will not sleep
@@ -296,25 +280,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool MaySleep()
         {
             return stayAwakeTicket != 0;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustWakeUp()
-        {
-            return anySleeping && sleepPressure < CYCLES_BEFORE_FIRST_SLEEP && !sleepLock.IsLocked;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MayElevateToPrioritized(int ticket)
-        {
-            if (ticket < nextTicket)
-            {
-                return (nextTicket - ticket) > (batchSize * 2);
-            }
-            else
-            {
-                return (((long)nextTicket + int.MaxValue) - ticket) > (long)(batchSize * 2);
-            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -343,44 +308,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             sleepPressure = 0;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void FinishWaiting(int ticket, bool prioritized)
-        {            
-            if (prioritized) prioritizedWaiting = false;
 
-            if (anySleeping && waitCount == 0)
-            {
-                //batchWeight += (batchSize - 1).ClampLow(0) * 50;
-                WakeUp();
-            }
-            if (!anySleeping && ticket % 100 == 0) batchWeight -= 1;
-
-
-            //if (ticket % 10000 == 0) Console.Write($"|{waitCount}-{batchSize}-{maxBatchSize}|");
-            //if (waitCount > batchSize) Console.Write($"|{waitCount}-{batchSize}-{maxBatchSize}|");
-
-            //if (anySleeping && waitCount <= 1) batchWeight += 100;
-            //if (ticket % 100 == 0) batchWeight -= 1;
-
-            if (batchWeight > 1000)
-            {
-                batchWeight = 0;
-                if (batchSize < maxBatchSize)
-                {
-                    batchSize++;
-                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize} WC{waitCount}");
-                }
-            }
-            else if (batchWeight < -1000)
-            {
-                batchWeight = 0;
-                if (batchSize > 1)
-                {
-                    batchSize--;
-                    //Console.WriteLine($"BatchSize = {batchSize}/{maxBatchSize} WC{waitCount}");
-                }
-            }
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WakeUp()
@@ -428,42 +356,63 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryAcquire(bool readOnly)
+        {
+            if (readOnly)
+            {
+                int currentLockIndicator = lockIndicator;
+                int newLockIndicator = currentLockIndicator + 1;
+                return newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator);
+            }
+            else
+            {
+                return NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK);
+            }
+        }
+
+        private void AwakeSleeper(int ticket)
+        {
+            if (ticket != stayAwakeTicket && anySleeping)
+            {
+                var sleeper = queueHead;
+                if (sleeper != null && lockIndicator != NO_LOCK && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
+            }
+        }
+
         #endregion HelperMethods
 
         #region Lock
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock(bool prioritized = false)
         {
-            if (MustWait(prioritized) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) Lock_Wait(prioritized);
+            //if (MustWait(prioritized) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) Lock_Wait(prioritized, false);
+            if (MustWait(prioritized) || !TryAcquire(false)) Lock_Wait(prioritized, false);
             return new AcquiredLock(this, LockMode.WriteLock);
         }
 
-        private void Lock_Wait(bool prioritized)
+        private void Lock_Wait(bool prioritized, bool readOnly)
         {
             int ticket = GetTicket();
             do
-            {                
+            {
                 if (prioritized) prioritizedWaiting = true;
                 UpdateStayAwakeTicket(ticket);
 
                 bool longCycle = false;
-                if (MustStillWait(prioritized, false)) longCycle = Thread.Yield();
+                if (MustStillWait(prioritized, readOnly)) longCycle = Thread.Yield();
                 CountCycle(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
-                if (MustTrySleep(prioritized, false, ticket))
+                if (MustTrySleep(prioritized, readOnly, ticket))
                 {
                     WakeOrder.TrySleep(this, ticket);
                     UpdateStayAwakeTicket(ticket);
                 }
 
-                if (ticket != stayAwakeTicket && anySleeping)
-                {
-                    var sleeper = queueHead;
-                    if (sleeper != null && lockIndicator != NO_LOCK && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
-                }
+                AwakeSleeper(ticket);
             }
-            while (MustStillWait(prioritized, false) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
 
             ResetCycleCount();
             if (prioritized) prioritizedWaiting = false;
@@ -474,17 +423,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (anySleeping) WakeUp();
             }                       
         }
+
         #endregion Lock
 
         #region LockAsync
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockAsync(bool prioritized = false)
         {
-            if (!MustWait(prioritized) && NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) return writeLockTask;
-            else return LockAsync_Wait(LockMode.WriteLock, prioritized);
+            if (!MustWait(prioritized) && TryAcquire(false)) return writeLockTask;
+            else return LockAsync_Wait(LockMode.WriteLock, prioritized, false);
         }
 
-        private Task<AcquiredLock> LockAsync_Wait(LockMode mode, bool prioritized)
+        private Task<AcquiredLock> LockAsync_Wait(LockMode mode, bool prioritized, bool readOnly)
         {
             int ticket = GetTicket();
             do
@@ -493,29 +443,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 UpdateStayAwakeTicket(ticket);
 
                 bool longCycle = false;
-                if (MustStillWait(prioritized, false))
+                if (MustStillWait(prioritized, readOnly))
                 {
                     if (MustYieldAsyncThread(ticket, prioritized))
                     {
-                        return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, true);
+                        return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, true, readOnly);
                     }
                     else longCycle = Thread.Yield();
                 }
                 CountCycle(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
-                if (MustTrySleep(prioritized, false, ticket))
+                if (MustTrySleep(prioritized, readOnly, ticket))
                 {
-                    return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, false);
+                    return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, false, readOnly);
                 }
 
-                if (ticket != stayAwakeTicket && anySleeping)
-                {
-                    var sleeper = queueHead;
-                    if (sleeper != null && lockIndicator != NO_LOCK && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
-                }
+                AwakeSleeper(ticket);
             }
-            while (MustStillWait(prioritized, false) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
 
             ResetCycleCount();
             if (prioritized) prioritizedWaiting = false;
@@ -525,16 +471,27 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 stayAwakeTicket = 0;
                 if (anySleeping) WakeUp();
             }
-
-            if (mode == LockMode.WriteLockReenterable)
+            if (readOnly)
             {
-                reentrancyIndicator.Value = reentrancyId;
-                return reenterableWriteLockTask;
+                if (mode == LockMode.ReadLockReenterable)
+                {
+                    reentrancyIndicator.Value = reentrancyId;
+                    return reenterableReadLockTask;
+                }
+                else return readLockTask;
             }
-            else return writeLockTask;
+            else
+            {
+                if (mode == LockMode.WriteLockReenterable)
+                {
+                    reentrancyIndicator.Value = reentrancyId;
+                    return reenterableWriteLockTask;
+                }
+                else return writeLockTask;
+            }
         }
 
-        private async Task<AcquiredLock> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool yieldAsyncNow)
+        private async Task<AcquiredLock> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool yieldAsyncNow, bool readOnly)
         {
             if (yieldAsyncNow) await Task.Yield();
 
@@ -544,7 +501,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 UpdateStayAwakeTicket(ticket);
 
                 bool longCycle = false;
-                if (MustStillWait(prioritized, false))
+                if (MustStillWait(prioritized, readOnly))
                 {
                     if (MustYieldAsyncThread(ticket, prioritized))
                     {
@@ -556,19 +513,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 CountCycle(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
-                if (MustTrySleep(prioritized, false, ticket))
+                if (MustTrySleep(prioritized, readOnly, ticket))
                 {
                     await WakeOrder.TrySleepAsync(this, ticket);
                     UpdateStayAwakeTicket(ticket);
                 }
 
-                if (ticket != stayAwakeTicket && anySleeping)
-                {
-                    var sleeper = queueHead;
-                    if (sleeper != null && lockIndicator != NO_LOCK && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
-                }
+                AwakeSleeper(ticket);
             }
-            while (MustStillWait(prioritized, false) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK));
+            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
 
             ResetCycleCount();
             if (prioritized) prioritizedWaiting = false;
@@ -579,8 +532,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (anySleeping) WakeUp();
             }
 
-            if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = reentrancyId;
-            return new AcquiredLock(this, mode);
+            if (readOnly)
+            {
+                if (mode == LockMode.ReadLockReenterable) reentrancyIndicator.Value = reentrancyId;
+                return new AcquiredLock(this, mode);
+            }
+            else
+            {
+                if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = reentrancyId;
+                return new AcquiredLock(this, mode);
+            }
         }
         #endregion LockAsync
 
@@ -588,35 +549,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReadOnly(bool prioritized = false)
         {
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            if (MustWait(prioritized) || newLockIndicator < FIRST_READ_LOCK || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait(prioritized);
+            if (MustWait(prioritized) || !TryAcquire(true)) Lock_Wait(prioritized, true);
             return new AcquiredLock(this, LockMode.ReadLock);
-        }
-
-        private void LockReadOnly_Wait(bool prioritized)
-        {        
-            int ticket = nextTicket++;
-            //if (MustTrySleepBeforeWaiting(prioritized, true)) ReadOnlySleepWakeOrder.TrySleep(this);
-            //else if (MustWakeUp()) WakeUp();
-
-            Interlocked.Increment(ref waitCount);
-            int currentLockIndicator = lockIndicator;
-            int newLockIndicator = currentLockIndicator + 1;
-            while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                if (prioritized) prioritizedWaiting = true;
-                if (MustStillWait(prioritized, true)) Thread.Sleep(0);
-            //    if (MustTrySleepWhileWaiting(prioritized, true)) ReadOnlySleepWakeOrder.TrySleep(this);
-                if (MustWakeUp()) WakeUp();
-                if (MayElevateToPrioritized(ticket)) prioritized = true;
-
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            Interlocked.Decrement(ref waitCount);
-
-            FinishWaiting(ticket, prioritized);
         }
         #endregion LockReadOnly
 
@@ -624,122 +558,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockReadOnlyAsync(bool prioritized = false)
         {
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            if (!MustWait(prioritized) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) return readLockTask;
-            else return LockReadOnlyAsync_Wait(LockMode.ReadLock, prioritized);
-        }
-
-        private Task<AcquiredLock> LockReadOnlyAsync_Wait(LockMode mode, bool prioritized)
-        {
-            if (MustTrySleepBeforeWaiting(prioritized, false)) return LockReadOnlyAsync_Wait_Sleep(mode, prioritized);
-            else return LockReadOnlyAsync_Wait_NoSleep(mode, prioritized);
-        }
-
-        private async Task<AcquiredLock> LockReadOnlyAsync_Wait_Sleep(LockMode mode, bool prioritized)
-        {
-            SynchronizationContext.SetSynchronizationContext(null);
-            int ticket = nextTicket++;
-           // await ReadOnlySleepWakeOrder.TrySleepAsync(this);
-            int counter = 0;
-            Interlocked.Increment(ref waitCount);
-            int currentLockIndicator = lockIndicator;
-            int newLockIndicator = currentLockIndicator + 1;
-            while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                if (prioritized) prioritizedWaiting = true;
-                if (MustStillWait(prioritized, true))
-                {
-                  //  if (MustYieldAsyncThread(prioritized, ++counter)) await Task.Yield();
-                  //  else Thread.Sleep(0);
-                }
-                if (MustTrySleepWhileWaiting(prioritized, true))
-                {
-                    Interlocked.Decrement(ref waitCount);
-             //       await ReadOnlySleepWakeOrder.TrySleepAsync(this);
-                    Interlocked.Increment(ref waitCount);
-                }
-                if (MustWakeUp()) WakeUp();
-                if (MayElevateToPrioritized(ticket)) prioritized = true;
-
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            Interlocked.Decrement(ref waitCount);
-
-            FinishWaiting(ticket, prioritized);
-
-            if (mode == LockMode.ReadLockReenterable) reentrancyIndicator.Value = reentrancyId;
-            return new AcquiredLock(this, mode);
-        }
-
-        private Task<AcquiredLock> LockReadOnlyAsync_Wait_NoSleep(LockMode mode, bool prioritized)
-        {
-            int ticket = nextTicket++;
-            if (MustWakeUp()) WakeUp();
-            int counter = 0;
-            Interlocked.Increment(ref waitCount);
-            int currentLockIndicator = lockIndicator;
-            int newLockIndicator = currentLockIndicator + 1;
-            while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                if (prioritized) prioritizedWaiting = true;
-                if (MustStillWait(prioritized, true))
-                {
-                  //  if (MustYieldAsyncThread(prioritized, ++counter)) return LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
-                   // else Thread.Sleep(0);
-                }
-                if (MustTrySleepWhileWaiting(prioritized, true)) return LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(mode, ticket, prioritized);
-                if (MustWakeUp()) WakeUp();
-                if (MayElevateToPrioritized(ticket)) prioritized = true;
-
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            Interlocked.Decrement(ref waitCount);
-
-            FinishWaiting(ticket, prioritized);
-
-            if (mode == LockMode.ReadLockReenterable)
-            {
-                reentrancyIndicator.Value = reentrancyId;
-                return reenterableReadLockTask;
-            }
-            else return readLockTask;
-        }
-
-        private async Task<AcquiredLock> LockReadOnlyAsync_Wait_ContinueNoSleepWithAwaiting(LockMode mode, int ticket, bool prioritized)
-        {
-            int counter = 0;
-            SynchronizationContext.SetSynchronizationContext(null);
-            int currentLockIndicator = lockIndicator;
-            int newLockIndicator = currentLockIndicator + 1;
-            while (newLockIndicator < FIRST_READ_LOCK || (!prioritized && prioritizedWaiting) || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
-            {
-                if (prioritized) prioritizedWaiting = true;
-                if (MustStillWait(prioritized, true))
-                {
-                  //  if (MustYieldAsyncThread(prioritized, ++counter)) await Task.Yield();
-                  //  else Thread.Sleep(0);
-                }
-                if (MustTrySleepWhileWaiting(prioritized, true))
-                {
-                    Interlocked.Decrement(ref waitCount);
-                    //await ReadOnlySleepWakeOrder.TrySleepAsync(this);
-                    Interlocked.Increment(ref waitCount);
-                }
-                if (MustWakeUp()) WakeUp();
-                if (MayElevateToPrioritized(ticket)) prioritized = true;
-
-                currentLockIndicator = lockIndicator;
-                newLockIndicator = currentLockIndicator + 1;
-            }
-            Interlocked.Decrement(ref waitCount);
-
-            FinishWaiting(ticket, prioritized);
-
-            if (mode == LockMode.ReadLockReenterable) reentrancyIndicator.Value = reentrancyId;
-            return new AcquiredLock(this, mode);
+            if (!MustWait(prioritized) && TryAcquire(true)) return readLockTask;
+            else return LockAsync_Wait(LockMode.ReadLock, prioritized, true);
         }
         #endregion LockReadOnlyAsync
 
@@ -748,7 +568,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public AcquiredLock LockReentrant(bool prioritized = false)
         {
             if (TryReenter(out AcquiredLock acquiredLock, true, out _)) return acquiredLock;
-            if (MustWait(prioritized) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK)) Lock_Wait(prioritized);
+            if (MustWait(prioritized) || !TryAcquire(false)) Lock_Wait(prioritized, false);
             reentrancyIndicator.Value = reentrancyId;
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
         }
@@ -774,7 +594,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         if (waitForUpgrade)
                         {
                             prioritizedWaiting = true;
-                            Thread.Sleep(0);
+                            Thread.Yield();
                         }
                         else
                         {
@@ -809,12 +629,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             else if (upgradePossible) return WaitForUpgradeAsync();
 
-            if (!MustWait(prioritized) && NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            if (!MustWait(prioritized) && TryAcquire(false))
             {
                 reentrancyIndicator.Value = reentrancyId;
                 return reenterableWriteLockTask;
             }
-            else return LockAsync_Wait(LockMode.WriteLockReenterable, prioritized);
+            else return LockAsync_Wait(LockMode.WriteLockReenterable, prioritized, false);
         }
 
         private async Task<AcquiredLock> WaitForUpgradeAsync()
@@ -827,12 +647,31 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
                 prioritizedWaiting = true;
-              //  if (MustYieldAsyncThread(true, ++counter)) await Task.Yield();
-              //  else Thread.Sleep(0);
+                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await Task.Yield();
+                else Thread.Sleep(0);
             }
             waitingForUpgrade = FALSE;
             prioritizedWaiting = false;
             return new AcquiredLock(this, LockMode.Upgraded);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool MustYieldAsyncThread_ForReentranceUpgrade(int counter)
+        {
+            if (SynchronizationContext.Current == null)
+            {
+                ThreadPool.GetAvailableThreads(out int availableThreads, out _);
+                ThreadPool.GetMaxThreads(out int maxThreads, out _);
+                ThreadPool.GetMinThreads(out int minThreads, out _);
+                var usedThreads = maxThreads - availableThreads;
+                if (usedThreads >= minThreads)
+                {
+                    return (counter % 100) == 0;
+
+                }
+                else return false;
+            }
+            else return true;
         }
         #endregion LockReentrantAsync
 
@@ -841,10 +680,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public AcquiredLock LockReentrantReadOnly()
         {
             if (TryReenterReadOnly()) return new AcquiredLock(this, LockMode.Reentered);
-
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            if (MustWait(false) || newLockIndicator < FIRST_READ_LOCK || currentLockIndicator != Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator)) LockReadOnly_Wait(false);
+            
+            if (MustWait(false) || !TryAcquire(true)) Lock_Wait(false, true);
 
             reentrancyIndicator.Value = reentrancyId;
             return new AcquiredLock(this, LockMode.ReadLockReenterable);
@@ -863,14 +700,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public Task<AcquiredLock> LockReentrantReadOnlyAsync()
         {
             if (TryReenterReadOnly()) return reenteredLockTask;
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            if (!MustWait(false) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+
+            if (!MustWait(false) && TryAcquire(true))
             {
                 reentrancyIndicator.Value = reentrancyId;
                 return reenterableReadLockTask;
             }
-            else return LockReadOnlyAsync_Wait(LockMode.ReadLockReenterable, false);
+            else return LockAsync_Wait(LockMode.ReadLockReenterable, false, true);
         }
         #endregion LockReentrantReadOnlyAsync
 
@@ -878,7 +714,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLock(out AcquiredLock acquiredLock, bool prioritized = false)
         {
-            if (!MustWait(prioritized) && NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            if (!MustWait(prioritized) && TryAcquire(false))
             {
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
@@ -894,9 +730,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLockReadOnly
         public bool TryLockReadOnly(out AcquiredLock acquiredLock)
         {
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            if (!MustWait(false) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            if (!MustWait(false) && TryAcquire(true))
             {
                 acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                 return true;
@@ -915,7 +749,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (TryReenter(out acquiredLock, false, out _)) return true;
 
-            if (!MustWait(prioritized) && NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
+            if (!MustWait(prioritized) && TryAcquire(false))
             {
                 reentrancyIndicator.Value = reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLockReenterable);
@@ -939,9 +773,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 return true;
             }
 
-            var currentLockIndicator = lockIndicator;
-            var newLockIndicator = currentLockIndicator + 1;
-            if (!MustWait(false) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
+            if (!MustWait(false) && TryAcquire(true))
             {
                 reentrancyIndicator.Value = reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.ReadLockReenterable);
@@ -978,11 +810,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             TimeFrame timer = new TimeFrame(timeout);
 
             int ticket = nextTicket++;
-            if (MustTrySleepBeforeWaiting(prioritized, false))
+            //if (MustTrySleepBeforeWaiting(prioritized, false))
             {
                 //if (SleepWakeOrder.TrySleepUntilTimeout(this, timer)) return false;
             }
-            else if (MustWakeUp()) WakeUp();
+          //  else if (MustWakeUp()) WakeUp();
 
             Interlocked.Increment(ref waitCount);
             while (lockIndicator != NO_LOCK || (!prioritized && prioritizedWaiting) || NO_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
@@ -994,18 +826,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 if (prioritized) prioritizedWaiting = true;
                 if (MustStillWait(prioritized, false)) Thread.Sleep(0);
-                if (MustTrySleepWhileWaiting(prioritized, false))
+            //    if (MustTrySleepWhileWaiting(prioritized, false))
                 {
                     Interlocked.Decrement(ref waitCount);
                     //if (SleepWakeOrder.TrySleepUntilTimeout(this, timer)) return false;
                     Interlocked.Increment(ref waitCount);
                 }
-                if (MustWakeUp()) WakeUp();
-                if (MayElevateToPrioritized(ticket)) prioritized = true;
+             //   if (MustWakeUp()) WakeUp();
+             //   if (MayElevateToPrioritized(ticket)) prioritized = true;
             }
             Interlocked.Decrement(ref waitCount);
 
-            FinishWaiting(ticket, prioritized);
+         //   FinishWaiting(ticket, prioritized);
             return true;
         }
         #endregion TryLock_Timeout
@@ -1217,7 +1049,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
                 // only check time every 10th cycle until start yieldig or sleeping
-                if (++cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
+                //if (++cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
                 {
                     if (timer.Elapsed)
                     {
@@ -1269,14 +1101,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
                 // only check time every 10th cycle until start yieldig or sleeping
-                if (++cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
-                {
+               // if (++cycleCount > CYCLES_BEFORE_YIELDING || cycleCount % 10 == 9)
+                //{
                     if (timer.Elapsed)
                     {
                         waitingForUpgrade = FALSE;
                         return new LockAttempt(new AcquiredLock());
                     }
-                }
+                //}
 
                 //if (MustYieldAsyncThread(false, ++counter)) await Task.Yield();
                 else Thread.Sleep(0);
