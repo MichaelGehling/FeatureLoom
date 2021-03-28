@@ -15,22 +15,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
     /// A multi-purpose high-performance lock object that can be used in synchronous and asynchronous contexts.
     /// It supports reentrancy, prioritized lock acquiring, trying for lock acquiring with timeout and 
     /// read-only locking for parallel access (incl. automatic upgrading/downgrading in conjunction with reentrancy).
-    /// When the lock is acquired it returns a handle that can be used with a using statement for simple and clean usage.
+    /// When the lock is acquired, it returns a handle that can be used with a using statement for simple and clean usage.
     /// Example: using(myLock.Lock()) { ... }
-    /// In many scenarios the FeatureLock is faster than the build-in locks (e.g. Monitor/ReaderWriterLock for synchronous contexts 
+    /// In most scenarios the FeatureLock is faster than the build-in locks (e.g. Monitor/ReaderWriterLock for synchronous contexts 
     /// and SemaphoreSlim for asynchronous contexts). Though reentrant locking in synchronous contexts using FeatureLock 
     /// is slower than with Monitor/ReaderWriterLock, it also allows reentrancy for asynchronous contexts and even mixed contexts.
     /// </summary>
     public sealed class FeatureLock
     {
         #region Constants
+        // Are set to lockIndicator if the lock is not acquired, acquired for writing, cquired for reading (further readers increase this value, each by one)
         const int NO_LOCK = 0;
-        const int WRITE_LOCK = -1;
-        const int FIRST_READ_LOCK = 1;
+        const int WRITE_LOCK = NO_LOCK - 1;
+        const int FIRST_READ_LOCK = NO_LOCK + 1;
 
+        // Booleans cannot be used in CompareExchange, so ints are used.
         const int FALSE = 0;
         const int TRUE = 1;
 
+        // Some values that are used to be compared with the sleepPressure variable
         const int LONG_YIELD_CYCLE_COUNT = 100;
         const int CYCLES_BEFORE_FIRST_SLEEP = 5000;
         const int CYCLES_BETWEEN_SLEEPS = 500;
@@ -38,44 +41,60 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region Variables
 
-        int padding;
+        int padding; // In some test this seems to improve performance (at least on my Ryzen 1600X, don't know why)
 
         // the main lock variable, indicating current locking state:
         // 0 means no lock
         // -1 means write lock
         // >=1 means read lock (number implies the count of parallel readers)
         volatile int lockIndicator = NO_LOCK;
+
         // If true, indicates that a reentrant write lock tries to upgrade an existing reentrant read lock,
         // but more than one reader is active, the upgrade must wait until only one reader is left
         volatile int waitingForUpgrade = FALSE;
-        // Keeps the last reentrancyId of the "logical thread". 
-        // A value that differes from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
-        // though it must be acquired and cannot simply be reentered.
+
+        // Keeps the last reentrancyId of the "logical thread".
+        // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
+        // so it must be acquired and cannot simply be reentered.
         AsyncLocal<int> reentrancyIndicator = new AsyncLocal<int>();
+
         // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
         volatile int reentrancyId = 1;
-        // Indicates that (probably) one or more other waiting candidates need to be waked up after the lock was exited.
-        // It may happen that anySleeping is true, though actually no one needs to be awaked but is just spin-waiting, 
+
+        // Indicates that (probably) one or more other waiting candidates are sleeping and need to be waked up.
+        // It may happen that anySleeping is true, though actually no one needs to be awaked, 
         // but it will never happen that it is false if someone needs to be awaked.
         volatile bool anySleeping = false;
 
-        volatile int nextTicket = 0;
+        // Will be true if a lock is to be acquied with priority, so the other candidates know that they have to stay back.
+        // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate waits,
+        // it must set it back to true. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
         volatile bool prioritizedWaiting = false;
+
+        // The next ticket number that will be provided. A ticket number must never be 0, so if nextTicket turns to be 0, it must be incremented, again.
+        volatile int nextTicket = 1;
+
+        // Contains the oldest ticket number that is currently waiting. That candidate will never sleep and also ensures to wake up the others.
+        // Will be reset to 0 when the currently oldest candidate acquired the lock. For a short time, it is possible that some newer ticket number
+        // is set until the oldest one reaches the pooint to update.
         volatile int stayAwakeTicket = 0;        
+
+        // Will be counted up by the waiting candidates that are not sleeping yet.
+        // Is used to set the candidates to sleep, one after another, starting with the youngest ticket.
         volatile int sleepPressure = 0;
 
-
+        // If any candidate is sleeping, its wake order is added to the queue.
+        // the queue head references the candidates wake order with the oldest ticket.
         volatile WakeOrder queueHead = null;
 
-        // Used to synchronize sleeping and waking up code sections
+        // Used to synchronize sleeping and waking up code sections.
         FastSpinLock sleepLock;
 
         #endregion Variables
 
         #region PreparedTasks
-        // These variables keep already completed task objects, prepared in advance for reuse in the constructor,
-        // in order to reduce garbage and improve performance by handling async calls synchronously,
-        // if no asynchronous waiting is required
+        // These variables hold already completed task objects, prepared in advance in the constructor for later reuse,
+        // in order to reduce garbage and improve performance by handling async calls synchronously, if no asynchronous sleeping/yielding is required
         Task<AcquiredLock> readLockTask;
         Task<AcquiredLock> reenterableReadLockTask;
         Task<AcquiredLock> writeLockTask;
@@ -114,12 +133,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             upgradedLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Upgraded)));
             reenteredLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Reentered)));
 
-            int numCores = CalculateAvailableCores();
-
+            // If we have only one core, the FastSpinLock must not do any spinning before yielding 
+            // This will only be checked once, so if CPU affinity changes after the first FeatureLock was created, it will not change behaviour
             sleepLock = new FastSpinLock(numCores > 1 ? 200 : 0);
         }
 
-
+        private static readonly int numCores = CalculateAvailableCores();
         private static int CalculateAvailableCores()
         {
             int numCores = 0;
@@ -133,14 +152,33 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (numCores == 0) numCores = Environment.ProcessorCount;
             return numCores;
         }
+
         #endregion PreparedTasks
 
-        #region PublicProperties
+        #region PublicProperties        
+        /// <summary>
+        /// True when the lock is currently taken
+        /// </summary>
         public bool IsLocked => lockIndicator != NO_LOCK;
+        /// <summary>
+        /// True if the lock is currently exclusively taken for writing
+        /// </summary>
         public bool IsWriteLocked => lockIndicator == WRITE_LOCK;
+        /// <summary>
+        /// True if the lock is currently taken for shared reading
+        /// </summary>
         public bool IsReadOnlyLocked => lockIndicator >= FIRST_READ_LOCK;
+        /// <summary>
+        /// In case of read-lock, it indicates the number of parallel readers
+        /// </summary>
         public int CountParallelReadLocks => IsReadOnlyLocked ? lockIndicator : 0;
+        /// <summary>
+        /// True if a reentrant write lock attempt is waiting for upgrading a former reentrant read lock, but other readlocks are in place
+        /// </summary>
         public bool IsWriteLockWaitingForUpgrade => waitingForUpgrade == TRUE;
+        /// <summary>
+        /// Lock was already taken reentrantly in the same context
+        /// </summary>
         public bool HasValidReentrancyContext => reentrancyId == reentrancyIndicator.Value;
         #endregion PublicProperties
 
@@ -214,44 +252,57 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #endregion ReentrancyContext
 
         #region HelperMethods
-
+        
+        // Used to check if a candidate is allowed trying to acquire the lock without going into the waiting cycle
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWait(bool prioritized)
         {
             return !prioritized && (prioritizedWaiting || stayAwakeTicket != 0);
         }
 
+        // Invalidates the current reentrancyIndicator by changing the reentrancy ID to compare 
+        // without changing the AsyncLocal reentrancyIndicator itself, which would be expensive.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RenewReentrancyId()
         {
             if (++reentrancyId == 0) ++reentrancyId;
         }
 
+        // Yielding a task is very expensive, but must be done to avoid block the thread pool threads.
+        // This method checks if the task should be yielded or the thread can still be blocked.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustYieldAsyncThread(int ticket, bool prioritized)
         {
-            if (SynchronizationContext.Current == null)
-            {
-                ThreadPool.GetAvailableThreads(out int availableThreads, out _);
-                ThreadPool.GetMaxThreads(out int maxThreads, out _);
-                ThreadPool.GetMinThreads(out int minThreads, out _);
-                var usedThreads = maxThreads - availableThreads;
-                if (usedThreads >= minThreads)
-                {
-                    var ticketAge = GetTicketAge(ticket);
-                    if (sleepPressure < ticketAge * 1000) return false;
-                    int fullYieldCycle = (10 / ticketAge.ClampLow(1)).ClampLow(1);
-                    if (prioritizedWaiting)
-                    {
-                        if (prioritized) fullYieldCycle *= 20;
-                    }
-                    else if (ticket == stayAwakeTicket) fullYieldCycle *= 2;
-                    return (sleepPressure % fullYieldCycle) == 0;
+            // If a special synchronization context is set (e.g. UI-Thread) the task must always be yielded to avoid blocking
+            if (SynchronizationContext.Current != null) return true;
+                        
+            ThreadPool.GetAvailableThreads(out int availableThreads, out _);
+            ThreadPool.GetMaxThreads(out int maxThreads, out _);
+            ThreadPool.GetMinThreads(out int minThreads, out _);
+            var usedThreads = maxThreads - availableThreads;
+            // If less thread pool threads are used than minimum available, we must never yield the task
+            if (usedThreads >= minThreads)
+            {                
+                var ticketAge = GetTicketAge(ticket);
+                // Only yield if we waited long enough for the specific ticket age
+                if (sleepPressure < ticketAge * 1000) return false;
 
+                // Otherwise we yield every now and then, less often for older tickets that should be preferred and less often the more threads we have in the thread pool
+                int fullYieldCycle = (usedThreads / ticketAge.ClampLow(1)).ClampLow(1);
+                if (prioritizedWaiting)
+                {
+                    // prioritized waiters should yield the task very rarely, because it takes so much time
+                    if (prioritized) fullYieldCycle *= 20;
                 }
-                else return false;
+                else
+                {
+                    // if no priorized waiter is there, the oldest ticket should yield a task less
+                    if (ticket == stayAwakeTicket) fullYieldCycle *= 2;
+                }
+                return (sleepPressure % fullYieldCycle) == 0;
+
             }
-            else return true;
+            else return false;            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -290,7 +341,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void CountCycle(bool longCycle)
         {
-            int addition = longCycle ? LONG_YIELD_CYCLE_COUNT+1 : 1;
+            int addition = longCycle ? LONG_YIELD_CYCLE_COUNT + 1 : 1;
             sleepPressure += addition;            
         }
 
@@ -309,12 +360,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int GetTicket()
         {
-            /*var ticket = nextTicket++;
+            var ticket = nextTicket++;
             if (ticket == 0) ticket = nextTicket++;
-            return ticket;*/
-
-            var ticket = Interlocked.Increment(ref nextTicket);
-            if (ticket == 0) ticket = Interlocked.Increment(ref nextTicket);
             return ticket;
         }
 
@@ -1185,13 +1232,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #endregion TryLockReadOnlyAsync_Timeout
 
         #region Exit        
-        [MethodImpl(MethodImplOptions.NoOptimization)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReadLock()
         {
             int newLockIndicator = Interlocked.Decrement(ref lockIndicator);
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
             lockIndicator = NO_LOCK;            
@@ -1208,7 +1255,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReentrantWriteLock()
         {
             lockIndicator = NO_LOCK;
@@ -1228,7 +1275,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             lockIndicator = FIRST_READ_LOCK;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         private bool TryUpgrade(ref LockMode currentLockMode)
         {
             if (lockIndicator == FIRST_READ_LOCK)
@@ -1256,7 +1303,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else return false;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         private bool TryDowngrade(ref LockMode currentLockMode)
         {
             if (lockIndicator == WRITE_LOCK)
