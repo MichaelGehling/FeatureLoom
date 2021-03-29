@@ -39,14 +39,21 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                     bool empty = false;
                     while (!empty || !producersDone)
                     {
-                        consumerLock(() =>
+                        if (queue.Count > 0)
                         {
-                            if (!queue.TryDequeue(out _))
+                            consumerLock(() =>
                             {
-                                empty = true;
-                            }
-                        });
-                        //WorkSomething();
+                                if (!queue.TryDequeue(out _))
+                                {
+                                    empty = true;
+                                }
+                            });
+                        }
+                        else
+                        {
+                            empty = true;
+                            Thread.Sleep(0);
+                        }
                     }
                 });
                 thread.Start();
@@ -98,14 +105,21 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                     bool empty = false;
                     while (!empty || !producersDone)
                     {
-                        await consumerLock(() =>
+                        if (queue.Count > 0)
                         {
-                            if (!queue.TryDequeue(out _))
+                            await consumerLock(() =>
                             {
-                                empty = true;
-                            }                            
-                        });
-                        //WorkSomething();
+                                if (!queue.TryDequeue(out _))
+                                {
+                                    empty = true;
+                                }
+                            });
+                        }
+                        else
+                        {
+                            empty = true;
+                            await Task.Yield();
+                        }
                     }
                 }).Invoke());
             }

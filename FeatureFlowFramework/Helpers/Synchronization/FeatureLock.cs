@@ -83,6 +83,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // Is used to set the candidates to sleep, one after another, starting with the youngest ticket.
         volatile int sleepPressure = 0;
 
+
+        volatile int numSleeping = 0;
+        volatile int numSleepingReadOnly = 0;
+
         // If any candidate is sleeping, its wake order is added to the queue.
         // the queue head references the candidates wake order with the oldest ticket.
         volatile WakeOrder queueHead = null;
@@ -180,6 +184,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// Lock was already taken reentrantly in the same context
         /// </summary>
         public bool HasValidReentrancyContext => reentrancyId == reentrancyIndicator.Value;
+        /// <summary>
+        /// The number of candidates in the sleeping queue
+        /// </summary>
+        public int NumSleeping => numSleeping;        
+        /// <summary>
+        /// The number of readOnly candidates in the sleeping queue
+        /// </summary>
+        public int NumSleepingReadOnly => numSleepingReadOnly;
         #endregion PublicProperties
 
         #region ReentrancyContext                
@@ -358,6 +370,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WakeUpNextReadOnly()
+        {
+            WakeOrder wakeOrder = null;
+            using (sleepLock.Lock())
+            {
+                wakeOrder = PickNextReadOnlyWakeOrder();
+                anySleeping = queueHead != null;
+            }
+            wakeOrder?.WakeUp(this);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int GetTicket()
         {
             var ticket = nextTicket++;
@@ -408,16 +432,22 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (ticket != stayAwakeTicket && anySleeping)
             {
                 var sleeper = queueHead;
-                if (sleeper != null && lockIndicator != NO_LOCK && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
+                if (sleeper != null && !sleepLock.IsLocked && lockIndicator != NO_LOCK && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
+            }
+
+            while (lockIndicator == FIRST_READ_LOCK && numSleepingReadOnly > 0 && !sleepLock.IsLocked)
+            {
+                WakeUpNextReadOnly();
             }
         }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void FinishWaiting(bool prioritized, int ticket, bool acquired)
         {
             if (acquired) sleepPressure = 0;
             if (prioritized) prioritizedWaiting = false;
-            if (ticket == stayAwakeTicket)
+            if (ticket == stayAwakeTicket || stayAwakeTicket == 0)
             {
                 stayAwakeTicket = 0;
                 if (anySleeping) WakeUp();
@@ -457,7 +487,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
                 {
-                    WakeOrder.TrySleep(this, ticket);
+                    WakeOrder.TrySleep(this, ticket, readOnly);
                     UpdateStayAwakeTicket(ticket);
                 }
 
@@ -568,7 +598,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
                 {
-                    await WakeOrder.TrySleepAsync(this, ticket);
+                    await WakeOrder.TrySleepAsync(this, ticket, readOnly);
                     UpdateStayAwakeTicket(ticket);
                 }
 
@@ -882,7 +912,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
                 {
-                    if (WakeOrder.TrySleepUntilTimeout(this, timer, ticket))
+                    if (WakeOrder.TrySleepUntilTimeout(this, timer, ticket, readOnly))
                     {
                         FinishWaiting(prioritized, ticket, false);
                         return false;
@@ -1015,7 +1045,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
                 {
-                    if (await WakeOrder.TrySleepUntilTimeoutAsync(this, timer, ticket))
+                    if (await WakeOrder.TrySleepUntilTimeoutAsync(this, timer, ticket, readOnly))
                     {
                         FinishWaiting(prioritized, ticket, false);
                         return new LockAttempt(new AcquiredLock());
@@ -1357,34 +1387,90 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     node.Next = wakeOrder;
                 }
             }
+
+            numSleeping++;
+            if (wakeOrder.isReadOnly) numSleepingReadOnly++;
         }
 
         WakeOrder DequeueWakeOrder()
         {
             while (queueHead != null && !queueHead.IsValid)
             {
-                queueHead = queueHead.Next;
+                numSleeping--;
+                if (queueHead.isReadOnly) numSleepingReadOnly--;
+
+                queueHead = queueHead.Next;                
             }
 
             WakeOrder wakeOrder = null;
             if (queueHead != null)
             {
+                numSleeping--;
+                if (queueHead.isReadOnly) numSleepingReadOnly--;
+
                 wakeOrder = queueHead;
-                queueHead = queueHead.Next;
+                queueHead = queueHead.Next;                
+            }
+            return wakeOrder;
+        }
+
+        WakeOrder PickNextReadOnlyWakeOrder()
+        {
+            while (queueHead != null && !queueHead.IsValid)
+            {
+                numSleeping--;
+                if (queueHead.isReadOnly) numSleepingReadOnly--;
+
+                queueHead = queueHead.Next;                
+            }
+
+            WakeOrder wakeOrder = null;
+            if (queueHead != null && queueHead.isReadOnly)
+            {
+                numSleeping--;
+                if (queueHead.isReadOnly) numSleepingReadOnly--;
+
+                wakeOrder = queueHead;
+                queueHead = queueHead.Next;                
+            }
+            else
+            {
+                var prev = queueHead;
+                while (numSleepingReadOnly > 0 && prev != null && wakeOrder == null)
+                {
+                    if (!prev.Next.IsValid)
+                    {
+                        numSleeping--;
+                        if (prev.Next.isReadOnly) numSleepingReadOnly--;
+
+                        prev.Next = prev.Next.Next;                        
+                    }
+                    else if (prev.Next.isReadOnly)
+                    {
+                        numSleeping--;
+                        numSleepingReadOnly--;
+
+                        wakeOrder = prev.Next;
+                        prev.Next = wakeOrder.Next;                        
+                    }
+                    prev = prev.Next;
+                }
             }
             return wakeOrder;
         }
 
         internal class WakeOrder
         {
-            internal WakeOrder(int ticket, bool sleepsAsync)
+            internal WakeOrder(int ticket, bool sleepsAsync, bool readOnly)
             {
+                this.isReadOnly = readOnly;
                 this.ticket = ticket;
                 if (sleepsAsync) tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
             TaskCompletionSource<bool> tcs = null;
-            public int ticket = 0;
+            public readonly int ticket = 0;
+            public readonly bool isReadOnly = false;
             volatile public WakeOrder Next;            
             public bool IsValid => sleeping;
             volatile protected bool sleeping = true;            
@@ -1422,11 +1508,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static void TrySleep(FeatureLock parent, int ticket)
+            public static void TrySleep(FeatureLock parent, int ticket, bool readOnly)
             {
                 if (TryPrepareSleep(parent, out var sleepLock))
                 {
-                    var wakeOrder = new WakeOrder(ticket, false);
+                    var wakeOrder = new WakeOrder(ticket, false, readOnly);
                     parent.EnqueueWakeOrder(wakeOrder);
                     sleepLock.Exit(); // exit before sleeping                    
 
@@ -1441,12 +1527,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static async Task TrySleepAsync(FeatureLock parent, int ticket)
+            public static async Task TrySleepAsync(FeatureLock parent, int ticket, bool readOnly)
             {
                 SynchronizationContext.SetSynchronizationContext(null);
                 if (TryPrepareSleep(parent, out var sleepLock))
                 {
-                    var wakeOrder = new WakeOrder(ticket, true);
+                    var wakeOrder = new WakeOrder(ticket, true, readOnly);
                     parent.EnqueueWakeOrder(wakeOrder);
                     sleepLock.Exit(); // exit before sleeping                    
 
@@ -1459,13 +1545,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             
             [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static bool TrySleepUntilTimeout(FeatureLock parent, TimeFrame timer, int ticket)
+            public static bool TrySleepUntilTimeout(FeatureLock parent, TimeFrame timer, int ticket, bool readOnly)
             {
                 if (timer.Elapsed) return true;
 
                 if (TryPrepareSleep(parent, out var sleepLock))
                 {
-                    var wakeOrder = new WakeOrder(ticket, false);
+                    var wakeOrder = new WakeOrder(ticket, false, readOnly);
                     parent.EnqueueWakeOrder(wakeOrder);
                     sleepLock.Exit(); // exit before sleeping                    
 
@@ -1485,14 +1571,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static async Task<bool> TrySleepUntilTimeoutAsync(FeatureLock parent, TimeFrame timer, int ticket)
+            public static async Task<bool> TrySleepUntilTimeoutAsync(FeatureLock parent, TimeFrame timer, int ticket, bool readOnly)
             {
                 if (timer.Elapsed) return true;
 
                 SynchronizationContext.SetSynchronizationContext(null);
                 if (TryPrepareSleep(parent, out var sleepLock))
                 {
-                    var wakeOrder = new WakeOrder(ticket, true);
+                    var wakeOrder = new WakeOrder(ticket, true, readOnly);
                     parent.EnqueueWakeOrder(wakeOrder);
                     sleepLock.Exit(); // exit before sleeping                    
 
