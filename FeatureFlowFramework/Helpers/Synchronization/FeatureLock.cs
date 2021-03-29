@@ -39,9 +39,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int CYCLES_BETWEEN_SLEEPS = 500;
         #endregion Constants
 
-        #region Variables
+        #region Variables               
 
-        int padding; // In some test this seems to improve performance (at least on my Ryzen 1600X, don't know why)
+
+        // Used to synchronize sleeping and waking up code sections.
+        FastSpinLock sleepLock;
+
+        // If any candidate is sleeping, its wake order is added to the queue.
+        // the queue head references the candidates wake order with the oldest ticket.
+        // (only write under sleepLock!)
+        volatile WakeOrder queueHead = null;
+
+        // Counting sleepers (only write under sleepLock!)
+        volatile int numSleeping = 0;
+        // Counting readonly sleepers (only write under sleepLock!)
+        volatile int numSleepingReadOnly = 0;
 
         // the main lock variable, indicating current locking state:
         // 0 means no lock
@@ -72,7 +84,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         volatile bool prioritizedWaiting = false;
 
         // The next ticket number that will be provided. A ticket number must never be 0, so if nextTicket turns to be 0, it must be incremented, again.
-        volatile int nextTicket = 1;
+        volatile int nextTicket = 1;        
 
         // Contains the oldest ticket number that is currently waiting. That candidate will never sleep and also ensures to wake up the others.
         // Will be reset to 0 when the currently oldest candidate acquired the lock. For a short time, it is possible that some newer ticket number
@@ -82,18 +94,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // Will be counted up by the waiting candidates that are not sleeping yet.
         // Is used to set the candidates to sleep, one after another, starting with the youngest ticket.
         volatile int sleepPressure = 0;
-
-
-        volatile int numSleeping = 0;
-        volatile int numSleepingReadOnly = 0;
-
-        // If any candidate is sleeping, its wake order is added to the queue.
-        // the queue head references the candidates wake order with the oldest ticket.
-        volatile WakeOrder queueHead = null;
-
-        // Used to synchronize sleeping and waking up code sections.
-        FastSpinLock sleepLock;
-
+        
         #endregion Variables
 
         #region PreparedTasks
