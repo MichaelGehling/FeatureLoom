@@ -34,16 +34,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int TRUE = 1;
 
         // Some values that are used to be compared with the sleepPressure variable
-        const int LONG_YIELD_CYCLE_COUNT = 100;
-        const int CYCLES_BEFORE_FIRST_SLEEP = 5000;
-        const int CYCLES_BETWEEN_SLEEPS = 500;
+        const int LONG_YIELD_CYCLE_COUNT = 50;
+        const int CYCLES_BEFORE_FIRST_SLEEP = 10_000;
+        const int CYCLES_BETWEEN_SLEEPS = 2000;
         #endregion Constants
 
         #region Variables               
-
+        
+        // This static variable will only be checked once, so if CPU affinity changes after the first FeatureLock was created, it will not change behaviour, anymore
+        private static readonly int numCores = CalculateAvailableCores();
 
         // Used to synchronize sleeping and waking up code sections.
-        FastSpinLock sleepLock;
+        // If we have only one core, the FastSpinLock must not do any spinning before yielding to avoid blocking the only thread.
+        FastSpinLock sleepLock = new FastSpinLock(numCores > 1 ? 50 : 0);
 
         // If any candidate is sleeping, its wake order is added to the queue.
         // the queue head references the candidates wake order with the oldest ticket.
@@ -137,27 +140,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             reenterableWriteLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.WriteLockReenterable)));
             upgradedLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Upgraded)));
             reenteredLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Reentered)));
-
-            // If we have only one core, the FastSpinLock must not do any spinning before yielding 
-            // This will only be checked once, so if CPU affinity changes after the first FeatureLock was created, it will not change behaviour
-            sleepLock = new FastSpinLock(numCores > 1 ? 200 : 0);
         }
-
-        private static readonly int numCores = CalculateAvailableCores();
-        private static int CalculateAvailableCores()
-        {
-            int numCores = 0;
-            var affinity = (long)Process.GetCurrentProcess().ProcessorAffinity;
-            while (affinity > 0)
-            {
-                if ((affinity & (long)1) > 0) numCores++;
-                affinity = affinity >> 1;
-            }
-
-            if (numCores == 0) numCores = Environment.ProcessorCount;
-            return numCores;
-        }
-
         #endregion PreparedTasks
 
         #region PublicProperties        
@@ -266,6 +249,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region HelperMethods
         
+        // calculates the number of logical cores that are assigned to the process
+        private static int CalculateAvailableCores()
+        {
+            int numCores = 0;
+            var affinity = (long)Process.GetCurrentProcess().ProcessorAffinity;
+            while (affinity > 0)
+            {
+                if ((affinity & (long)1) > 0) numCores++;
+                affinity = affinity >> 1;
+            }
+
+            if (numCores == 0) numCores = Environment.ProcessorCount;
+            return numCores;
+        }
+
         // Used to check if a candidate is allowed trying to acquire the lock without going into the waiting cycle
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWait(bool prioritized)
@@ -318,26 +316,34 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else return false;            
         }
 
+        // Checks on every waiting cylce if the candidate must go to sleep
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustTrySleep(bool prioritized, bool readOnly, int ticket)
         {
-            if (ticket == stayAwakeTicket || prioritized || sleepLock.IsLocked || !MustStillWait(prioritized, readOnly)) return false; // prioritized and designated waiter will not sleep
+            // In some cases the candidate will not go to sleep at all...
+            if (ticket == stayAwakeTicket || prioritized || sleepLock.IsLocked || !MustStillWait(prioritized, readOnly)) return false; 
+
+            // Otherwise it depends on the age of the ticket and the cycles that all candidates have done together since the last time the lock was acquired
             var ticketAge = GetTicketAge(ticket);
             return sleepPressure > CYCLES_BEFORE_FIRST_SLEEP + (ticketAge * CYCLES_BETWEEN_SLEEPS);
         }
 
+        // Checks if a candidate must still remain in the waiting queue or if acquiring would be possible
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustStillWait(bool prioritized, bool readOnly)
         {
             return (!readOnly && lockIndicator != NO_LOCK) || (readOnly && lockIndicator == WRITE_LOCK) || (!prioritized && prioritizedWaiting);
         }
 
+        // Checks if it currently allowed to go to sleep.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MaySleep()
         {
+            // If we don't have anyone who stays awake we could deadlock, so do not sleep in that case
             return stayAwakeTicket != 0;
         }
 
+        // Calculates the age of the current ticket, where age means how many other tickets were provided since the own one
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int GetTicketAge(int ticket)
         {
@@ -347,17 +353,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             else
             {
+                // covers the wrap around case
                 return (int)(((long)nextTicket + int.MaxValue) - ticket);
             }
         }
 
+        // Increases the overall sleep pressure variable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void CountCycle(bool longCycle)
+        private void UpdateSleepPressure(bool longCycle)
         {
             int addition = longCycle ? LONG_YIELD_CYCLE_COUNT + 1 : 1;
             sleepPressure += addition;            
         }
 
+        // Wakes up the sleeper at the top of the sleeping queue which is the oldest one (or none if not available)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WakeUp()
         {
@@ -370,6 +379,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             wakeOrder?.WakeUp(this);
         }
 
+        // Wakes up the first readOnly sleeper in the queue and removes it from the queue (or none if not available)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WakeUpNextReadOnly()
         {
@@ -382,14 +392,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             wakeOrder?.WakeUp(this);
         }
 
+        // Creates the a new ticket for a new waiting candidate.
+        // It will ensure to never provide the 0, because it is reserved to indicate when no one has the stayAwakeTicket.        
+        // GetTicket() might be called concurrently and we don't use interlocked, so it might happen that a ticket is provided multiple times,
+        // but that is acceptable and will not cause any trouble.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int GetTicket()
-        {
+        {            
             var ticket = nextTicket++;
             if (ticket == 0) ticket = nextTicket++;
             return ticket;
         }
 
+        // If the candidates ticket is older than the current stayAwakeTicket, it will take its place
+        // UpdateStayAwakeTicket() might be called concurrently and it might happen that the younger ticket wins,
+        // but that is acceptable and will not cause any trouble, because in the next cycle it will try again.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void UpdateStayAwakeTicket(int ticket)
         {            
@@ -397,45 +414,65 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (otherTicket == 0 || IsTicketOlder(ticket, otherTicket)) stayAwakeTicket = ticket;
         }
 
+        // Checks if the one ticket is older than the other one
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsTicketOlder(int ticket, int otherTicket)
         {            
             if (ticket < otherTicket)
             {
+                // handle the wrap-around case
                 if ((otherTicket - ticket) < (int.MaxValue / 2)) return true;
             }
             else if (ticket > otherTicket)
             {
+                // handle the wrap-around case
                 if ((ticket - otherTicket) > (int.MaxValue / 2)) return true;
             }
 
             return false;
         }
 
+        // Actually tries to acquire the lock.                
+        // Uses Interlocked.CompareExchange to ensure that only one candidate can change the lockIndicator at a time.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryAcquire(bool readOnly)
         {
             if (readOnly)
             {
+                // It is allowed for multiple candidates to acquire the lock for readOnly in parallel.
+                // The number of candidates that acquired under readOnly restriction is counted in the lockIndicator, starting with FIRST_READ_LOCK,
+                // so we take the current lockIndicator and increase it by try and check if it would be a proper readOnly-value (newLockIndicator >= FIRST_READ_LOCK)
+                // If it is the case we try to actually set the new value to the lockIndicator variable
                 int currentLockIndicator = lockIndicator;
                 int newLockIndicator = currentLockIndicator + 1;
                 return newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator);
             }
             else
             {
+                // Only allow setting the write lock if the lockIndicator was set to NO_LOCK before
                 return NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK);
             }
         }
 
+        // May wake up sleeping candidates if approriate. Is called cyclically from the waiting loop.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AwakeSleeper(int ticket)
         {
-            if (ticket != stayAwakeTicket && anySleeping)
+            // Cancel if no one is sleeping or if the sleepLock is already locked (we may try later in the next cycle)
+            // We don't want to slow down the designated waiter, let the others do the job
+            if (!anySleeping || ticket == stayAwakeTicket || sleepLock.IsLocked) return;
+
+            // Don't wake up anyboy if the lock could be taken
+            if (lockIndicator != NO_LOCK)
             {
+                // Only wake up a candidate with an older ticket
                 var sleeper = queueHead;
-                if (sleeper != null && !sleepLock.IsLocked && lockIndicator != NO_LOCK && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
+                if (sleeper != null && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
             }
 
+            // If recently the lock was taken for read only, wake up all the readOnly sleepers
+            // If lockIndicator indicates that there already more than one candidates have taken the lock,
+            // we are too late. Otherwise it could happen that non-readOnly candidates must wait too long.
             while (lockIndicator == FIRST_READ_LOCK && numSleepingReadOnly > 0 && !sleepLock.IsLocked)
             {
                 WakeUpNextReadOnly();
@@ -483,7 +520,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         longCycle = true;
                     }
                 }
-                CountCycle(longCycle);
+                UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
@@ -533,7 +570,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                     }
                 }
-                CountCycle(longCycle);
+                UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
@@ -594,7 +631,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                     }
                 }
-                CountCycle(longCycle);
+                UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
@@ -908,7 +945,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         longCycle = true;
                     }
                 }
-                CountCycle(longCycle);
+                UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
@@ -974,7 +1011,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                     }
                 }
-                CountCycle(longCycle);
+                UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
@@ -1041,7 +1078,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         }
                     }
                 }
-                CountCycle(longCycle);
+                UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
@@ -1474,8 +1511,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             public readonly bool isReadOnly = false;
             volatile public WakeOrder Next;            
             public bool IsValid => sleeping;
-            volatile protected bool sleeping = true;            
+            volatile protected bool sleeping = true;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WakeUp(FeatureLock parent)
             {
                 sleeping = false;                
@@ -1492,6 +1530,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static protected bool TryPrepareSleep(FeatureLock parent, out FastSpinLock.AcquiredLock acquiredSleepLock)
             {
                 parent.anySleeping = true;

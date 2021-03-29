@@ -35,7 +35,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int cycleCounter = 0;
             do
             {
-                if (cycleCounter >= cyclesBeforeYielding) Thread.Yield();
+                if (cycleCounter >= cyclesBeforeYielding) Thread.Sleep(0);
                 else cycleCounter++;
             } while (Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
         }
