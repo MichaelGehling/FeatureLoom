@@ -1,4 +1,5 @@
 ﻿using Nito.AsyncEx;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
@@ -18,6 +19,15 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock(Action action)
+        {
+            using (myLock.WriterLock())
+            {
+                action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockReadOnly()
         {
             using (myLock.ReaderLock())
@@ -31,7 +41,16 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (await myLock.WriterLockAsync())
             {
+                
+            }
+        }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task LockAsync(Func<Task> action)
+        {
+            using (await myLock.WriterLockAsync())
+            {
+                await action();
             }
         }
 

@@ -34,20 +34,20 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task LockAsync(Action action)
+        public async Task LockAsync(Func<Task> action)
         {
             using(await myLock.LockAsync())
             {
-                action();
+                await action();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task LockPrioAsync(Action action)
+        public async Task LockPrioAsync(Func<Task> action)
         {
             using(await myLock.LockAsync(true))
             {
-                action();
+                await action();
             }
         }
 
@@ -61,11 +61,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task LockReadOnlyAsync(Action action)
+        public async Task LockReadOnlyAsync(Func<Task> action)
         {
             using(await myLock.LockReadOnlyAsync())
             {
-                action();
+                await action();
             }
         }
 
@@ -88,20 +88,20 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task TryLockAsync(Action action)
+        public async Task TryLockAsync(Func<Task> action)
         {
             if((await myLock.TryLockAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
                 {
-                    action();
+                    await action();
                 }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task TryLockReadOnlyAsync(Action action)
+        public async Task TryLockReadOnlyAsync(Func<Task> action)
         {
             if((await myLock.TryLockReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
                 {
-                    action();
+                    await action();
                 }
         }
 
@@ -115,11 +115,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task ReentrantLockAsync(Action action)
+        public async Task ReentrantLockAsync(Func<Task> action)
         {
             using(await myLock.LockReentrantAsync())
             {
-                action();
+                await action();
             }
         }
 
@@ -133,11 +133,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task ReentrantLockReadOnlyAsync(Action action)
+        public async Task ReentrantLockReadOnlyAsync(Func<Task> action)
         {
             using(await myLock.LockReentrantReadOnlyAsync())
             {
-                action();
+                await action();
             }
         }
 
@@ -160,20 +160,20 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task ReentrantTryLockAsync(Action action)
+        public async Task ReentrantTryLockAsync(Func<Task> action)
         {
             if((await myLock.TryLockReentrantAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
                 {
-                    action();
+                    await action();
                 }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task ReentrantTryLockReadOnlyAsync(Action action)
+        public async Task ReentrantTryLockReadOnlyAsync(Func<Task> action)
         {
             if((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using(acquiredLock)
                 {
-                    action();
+                    await action();
                 }
         }
         #endregion EmbracingLock

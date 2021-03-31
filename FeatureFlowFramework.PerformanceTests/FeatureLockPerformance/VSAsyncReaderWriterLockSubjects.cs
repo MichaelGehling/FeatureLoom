@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 
@@ -15,6 +16,15 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             {
 
             }                
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task LockAsync(Func<Task> action)
+        {
+            using (await myLock.WriteLockAsync())
+            {
+                await action();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

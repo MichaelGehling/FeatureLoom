@@ -20,11 +20,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task LockAsync(Action action)
+        public async Task LockAsync(Func<Task> action)
         {
             using(await myLock.LockAsync())
             {
-                action();
+                await action();
             }
         }
 

@@ -87,7 +87,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             //if(!Task.WhenAll(consumerThreads.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
         }
 
-        public void AsyncRun(Action init, Func<Action, Task> producerLock, Func<Action, Task> consumerLock = null)
+        public void AsyncRun(Action init, Func<Func<Task>, Task> producerLock, Func<Func<Task>, Task> consumerLock = null)
         {
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
@@ -113,6 +113,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                                 {
                                     empty = true;
                                 }
+                                return Task.CompletedTask;
                             });
                         }
                         else
@@ -135,8 +136,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         await producerLock(() =>
                         {
                             queue.Enqueue(count++);
+                            return Task.CompletedTask;
                         });
-                        //WorkSomething();
+                        //WorkSomething();                        
                     }
 
                 }).Invoke());

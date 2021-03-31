@@ -65,7 +65,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
             if (!hotPathThread.Join(10000)) Console.Write("! TIMEOUT !");
         }
 
-        public void AsyncRun(Action init, Func<Action, Task> hotpathLock, Func<Action, Task> congestingLock = null)
+        public void AsyncRun(Action init, Func<Func<Task>, Task> hotpathLock, Func<Func<Task>, Task> congestingLock = null)
         {
             bool hotPathDone = false;
 
@@ -86,6 +86,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                         {
                             var timer = AppTime.TimeKeeper;
                             while (timer.Elapsed < congestionExecutionTime && !hotPathDone) /* work */;
+                            return Task.CompletedTask;
                         });
                     }
                 }).Invoke());
@@ -101,6 +102,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.Congestio
                     {
                         var timer = AppTime.TimeKeeper;
                         while (timer.Elapsed < hotPathExecutionTime) /* work */;
+                        return Task.CompletedTask;
                     });
                 }
                 hotPathDone = true;

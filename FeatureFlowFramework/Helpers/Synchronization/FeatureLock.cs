@@ -34,7 +34,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int TRUE = 1;
 
         // Some values that are used to be compared with the sleepPressure variable
-        const int LONG_YIELD_CYCLE_COUNT = 50;
+        const int LONG_YIELD_CYCLE_COUNT = 100;
         const int CYCLES_BEFORE_FIRST_SLEEP = 10_000;
         const int CYCLES_BETWEEN_SLEEPS = 2000;
         #endregion Constants
@@ -505,21 +505,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private void Lock_Wait(bool prioritized, bool readOnly)
         {
             int ticket = GetTicket();
+            UpdateStayAwakeTicket(ticket);
             do
             {
-                if (prioritized) prioritizedWaiting = true;
-                UpdateStayAwakeTicket(ticket);
+                if (prioritized) prioritizedWaiting = true;                
 
-                bool longCycle = false;
-                if (MustStillWait(prioritized, readOnly))
-                {
-                    if (ticket == stayAwakeTicket) longCycle = Thread.Yield();
-                    else
-                    {
-                        Thread.Sleep(0);
-                        longCycle = true;
-                    }
-                }
+                bool longCycle = true;
+                if (MustStillWait(prioritized, readOnly)) Thread.Sleep(0);
+                else longCycle = false;
+                
                 UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 
@@ -548,30 +542,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private Task<AcquiredLock> LockAsync_Wait(LockMode mode, bool prioritized, bool readOnly)
         {
             int ticket = GetTicket();
+            UpdateStayAwakeTicket(ticket);
             do
             {
                 if (prioritized) prioritizedWaiting = true;
-                UpdateStayAwakeTicket(ticket);
 
-                bool longCycle = false;
+                bool longCycle = true;
                 if (MustStillWait(prioritized, readOnly))
                 {
-                    if (MustYieldAsyncThread(ticket, prioritized))
-                    {
-                        return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, true, readOnly);
-                    }
-                    else
-                    {
-                        if (ticket == stayAwakeTicket) longCycle = Thread.Yield();
-                        else
-                        {
-                            Thread.Sleep(0);
-                            longCycle = true;
-                        }
-                    }
+                    if (MustYieldAsyncThread(ticket, prioritized)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, true, readOnly);
+                    else Thread.Sleep(0);
                 }
+                else longCycle = false;
+
                 UpdateSleepPressure(longCycle);
-                if (longCycle) UpdateStayAwakeTicket(ticket);
+                if(longCycle) UpdateStayAwakeTicket(ticket);
 
                 if (MustTrySleep(prioritized, readOnly, ticket))
                 {
@@ -611,26 +596,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             do
             {
                 if (prioritized) prioritizedWaiting = true;
-                UpdateStayAwakeTicket(ticket);
 
-                bool longCycle = false;
+                bool longCycle = true;
                 if (MustStillWait(prioritized, readOnly))
                 {
-                    if (MustYieldAsyncThread(ticket, prioritized))
-                    {
-                        await Task.Yield();
-                        longCycle = true;
-                    }
-                    else
-                    {
-                        if (ticket == stayAwakeTicket) longCycle = Thread.Yield();
-                        else
-                        {
-                            Thread.Sleep(0);
-                            longCycle = true;
-                        }
-                    }
+                    if (MustYieldAsyncThread(ticket, prioritized)) await Task.Yield();
+                    else Thread.Sleep(0);
                 }
+                else longCycle = false;
+
                 UpdateSleepPressure(longCycle);
                 if (longCycle) UpdateStayAwakeTicket(ticket);
 

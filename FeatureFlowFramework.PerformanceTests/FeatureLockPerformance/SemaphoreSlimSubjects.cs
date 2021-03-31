@@ -26,12 +26,12 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task LockAsync(Action action)
+        public async Task LockAsync(Func<Task> action)
         {
             await semaphore.WaitAsync();
             try
             {
-                action();
+                await action();
             }
             finally
             {
