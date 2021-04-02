@@ -37,6 +37,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         const int LONG_YIELD_CYCLE_COUNT = 100;
         const int CYCLES_BEFORE_FIRST_SLEEP = 10_000;
         const int CYCLES_BETWEEN_SLEEPS = 2000;
+        const int MIN_CYCLES_BEFORE_ASYNC_YIELD = 1000;
         #endregion Constants
 
         #region Variables               
@@ -296,10 +297,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {                
                 var ticketAge = GetTicketAge(ticket);
                 // Only yield if we waited long enough for the specific ticket age
-                if (sleepPressure < ticketAge * 1000) return false;
+                if (sleepPressure < ticketAge * MIN_CYCLES_BEFORE_ASYNC_YIELD) return false;
 
                 // Otherwise we yield every now and then, less often for older tickets that should be preferred and less often the more threads we have in the thread pool
-                int fullYieldCycle = (usedThreads / ticketAge.ClampLow(1)).ClampLow(1);
+                int fullYieldCycle = 3 * (usedThreads / ticketAge.ClampLow(1)).ClampLow(1);
                 if (prioritizedWaiting)
                 {
                     // prioritized waiters should yield the task very rarely, because it takes so much time
@@ -307,8 +308,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
                 else
                 {
-                    // if no priorized waiter is there, the oldest ticket should yield a task less
-                    if (ticket == stayAwakeTicket) fullYieldCycle *= 2;
+                    // if no priorized waiter is there, the oldest ticket should yield a task even less
+                    if (ticket == stayAwakeTicket) fullYieldCycle *= 3;
                 }
                 return (sleepPressure % fullYieldCycle) == 0;
 
@@ -459,15 +460,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private void AwakeSleeper(int ticket)
         {
             // Cancel if no one is sleeping or if the sleepLock is already locked (we may try later in the next cycle)
-            // We don't want to slow down the designated waiter, let the others do the job
-            if (!anySleeping || ticket == stayAwakeTicket || sleepLock.IsLocked) return;
+            if (!anySleeping || sleepLock.IsLocked) return;
 
             // Don't wake up anyboy if the lock could be taken
             if (lockIndicator != NO_LOCK)
             {
                 // Only wake up a candidate with an older ticket
                 var sleeper = queueHead;
-                if (sleeper != null && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
+                //if (sleeper != null && IsTicketOlder(sleeper.ticket, ticket)) WakeUp();
+                if (sleeper != null && IsTicketOlder(sleeper.ticket, (stayAwakeTicket + 3))) WakeUp();
             }
 
             // If recently the lock was taken for read only, wake up all the readOnly sleepers
