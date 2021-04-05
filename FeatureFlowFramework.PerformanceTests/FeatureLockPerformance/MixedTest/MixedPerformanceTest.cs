@@ -12,19 +12,22 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
 
         public MixedPerformanceTest(int numThreads)
         {
+            var x = numThreads - 1;
             for (int i = 0; i < numThreads; i++)
             {
                 collection.AddSequence(new LockingSequence()
+                    .AddInLockTime(1.0.Milliseconds(), 5)
+                    .AddWaitingTime(x * 1.0.Milliseconds(), 5)
                     .AddInLockTime(0.1.Milliseconds(), 10)
-                    .AddWaitingTime(0.2.Milliseconds(), 10)
+                    .AddWaitingTime(x * 0.1.Milliseconds(), 10)
                     .AddInLockTime(0.01.Milliseconds(), 50)
-                    .AddWaitingTime(0.02.Milliseconds(), 50)
+                    .AddWaitingTime(x * 0.01.Milliseconds(), 50)
                     .AddInLockTime(0.001.Milliseconds(), 500)
-                    .AddWaitingTime(0.002.Milliseconds(), 500)
+                    .AddWaitingTime(x * 0.001.Milliseconds(), 500)
                     .AddInLockTime(0.0001.Milliseconds(), 5000)
-                    .AddWaitingTime(0.0002.Milliseconds(), 5000)
-                    .AddInLockTime(0.Milliseconds(), 10_000)
-                    .AddWaitingTime(0.Milliseconds(), 10_000)
+                    .AddWaitingTime(x * 0.0001.Milliseconds(), 5000)
+                    .AddInLockTime(0.Milliseconds(), 20_000)
+                    .AddWaitingTime(0.Milliseconds(), 20_000)
                     .RandomizeSequences(i));
             }
         }
