@@ -35,8 +35,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #endregion Constants
 
         #region Variables               
-
+        // The lower this value, the earlier async threads start yielding
         int asyncYieldThreshold = 300;
+
+        // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
         int passiveWaitThreshold = 50;
 
         // Keeps the last reentrancyId of the "logical thread".
@@ -51,9 +53,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
         int reentrancyId = 1;
 
-        // Will be true if a lock is to be acquied with priority, so the other candidates know that they have to stay back.
-        // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate waits,
-        // it must set it back to true. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
+        // Will be true if a candidate tries to acquire the lock with priority, so the other candidates know that they have to stay back.
+        // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate already waits,
+        // it must set it back to true in its next cycle. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
         bool prioritizedWaiting = false;
 
         // the main lock variable, indicating current locking state:
@@ -62,15 +64,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // >=1 means read lock (number implies the count of parallel readers)
         int lockIndicator = NO_LOCK;
 
-        // The next ticket number that will be provided. A ticket number must never be 0, so if nextTicket turns to be 0, it must be incremented, again.
+        // The next ticket number that will be provided. A ticket number must never be 0, so if nextTicket turns to be 0, it must be incremented, again.        
         int nextTicket = 1;
 
-        // Contains the oldest ticket number that is currently waiting. That candidate will never sleep and also ensures to wake up the others.
+        // Contains the oldest ticket number that is currently waiting and therefor has the rank 0. The rank of the other tickets is calculated relative to this one.
         // Will be reset to 0 when the currently oldest candidate acquired the lock. For a short time, it is possible that some newer ticket number
         // is set until the oldest one reaches the pooint to update.
         int firstRankTicket = 0;
 
+        // Is used to measure how long it takes until the lock is released again.
+        // It is incremented in every waiting cycle by the candidate with the firstRankTicket (rank 0).
+        // When the lock is acquired again, it is reset to 0.
         int waitCounter = 0;
+
+        // After the lock was acquired, the average is updated by including the last waitCounter.
         int averageWaitCount = 10;
 
         #endregion Variables
@@ -144,11 +151,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         public bool HasValidReentrancyContext => reentrancyId == reentrancyIndicator.Value;
         /// <summary>
-        /// 
+        /// The lower this value, the earlier async threads start yielding
         /// </summary>
         public int AsyncYieldThreshold { get => asyncYieldThreshold; set => asyncYieldThreshold = value; }
         /// <summary>
-        /// 
+        /// The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
         /// </summary>
         public int PassiveWaitThreshold { get => passiveWaitThreshold; set => passiveWaitThreshold = value; }        
         #endregion PublicProperties
