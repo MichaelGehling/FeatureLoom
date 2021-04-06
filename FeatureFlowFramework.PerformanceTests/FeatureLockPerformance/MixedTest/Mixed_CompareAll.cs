@@ -24,7 +24,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();        
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
-        MixedPerformanceTest test = new MixedPerformanceTest(10);
+        MixedPerformanceTest test = new MixedPerformanceTest(20);
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);
@@ -38,19 +38,19 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         [Benchmark]
         public void SemaphoreSlim_Lock() => test.Run(semaphoreSlimSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void RWLockSlim_Lock() => test.Run(readerWriterLockSlimSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void AsyncEx_Lock() => test.Run(asyncExSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void AsyncExRW_Lock() => test.Run(asyncExRwSubjects.Lock);
 
-        //[Benchmark]
+        [Benchmark]
         public void NeoSmart_Lock() => test.Run(neoSmartSubjects.Lock);
        
-        //[Benchmark]
+        [Benchmark]
         public void SpinLock_Lock() => test.Run(spinLockSubjects.Lock);
 
 
@@ -61,31 +61,31 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         [Benchmark]
         public void SemaphoreSlim_LockAsync_() => test.Run(semaphoreSlimSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void AsyncEx_LockAsync_() => test.Run(asyncExSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void AsyncExRW_LockAsync_() => test.Run(asyncExRwSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void NeoSmart_LockAsync_() => test.Run(neoSmartSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void bmbsqd_LockAsync_() => test.Run(bmbsqdSubjects.LockAsync);
 
-        //[Benchmark]
+        [Benchmark]
         public void vSRWLock_LockAsync_() => test.Run(vSAsyncReaderWriterLockSubjects.LockAsync);
 
 
 
-        //[Benchmark]
+        [Benchmark]
         public void FeatureLock_LockReentrant() => test.Run(featureLockSubjects.ReentrantLock);
 
-        //[Benchmark]
+        [Benchmark]
         public void RWLockSlim_LockReentrant() => test.Run(readerWriterLockSlimSubjects.ReentrantLock);
 
 
-        //[Benchmark]
+        [Benchmark]
         public void FeatureLock_LockReentrantAsync_() => test.Run(featureLockSubjects.ReentrantLockAsync);
 
 

@@ -242,13 +242,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // Yielding a task is very expensive, but must be done to avoid block the thread pool threads.
         // This method checks if the task should be yielded or the thread can still be blocked.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustYieldAsyncThread(int rank, bool prioritized)
+        private bool MustYieldAsyncThread(int rank, bool prioritized, int counter)
         {
             // If a special synchronization context is set (e.g. UI-Thread) the task must always be yielded to avoid blocking
             if (SynchronizationContext.Current != null) return true;
 
-            int counter = waitCounter;
-                        
             ThreadPool.GetAvailableThreads(out int availableThreads, out _);
             ThreadPool.GetMaxThreads(out int maxThreads, out _);
             ThreadPool.GetMinThreads(out int minThreads, out _);
@@ -267,7 +265,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     if (prioritized) fullYieldCycle *= 20;
                 }
                 else if (rank == 0) fullYieldCycle *= 2;
-                //Console.Write($"|{waitCounter}|");
+                
                 return counter % (fullYieldCycle) == 0;
 
             }
@@ -341,35 +339,50 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryAcquire(bool readOnly)
         {
-            if (readOnly)
-            {
-                // It is allowed for multiple candidates to acquire the lock for readOnly in parallel.
-                // The number of candidates that acquired under readOnly restriction is counted in the lockIndicator, starting with FIRST_READ_LOCK,
-                // so we take the current lockIndicator and increase it by try and check if it would be a proper readOnly-value (newLockIndicator >= FIRST_READ_LOCK)
-                // If it is the case we try to actually set the new value to the lockIndicator variable
-                int currentLockIndicator = lockIndicator;
-                int newLockIndicator = currentLockIndicator + 1;
-                return newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator);
-            }
-            else
-            {
-                // Only allow setting the write lock if the lockIndicator was set to NO_LOCK before
-                return NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK);
-            }
+            if (readOnly) return TryAcquireForReading();
+            else return TryAcquireForWriting();            
         }
 
-      
+        // Actually tries to acquire the lock.                
+        // Uses Interlocked.CompareExchange to ensure that only one candidate can change the lockIndicator at a time.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryAcquireForWriting()
+        {
+            // Only allow setting the write lock if the lockIndicator was set to NO_LOCK before
+            return NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK);
+        }
+
+        // Actually tries to acquire the lock.                
+        // Uses Interlocked.CompareExchange to ensure that only one candidate can change the lockIndicator at a time.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryAcquireForReading()
+        {
+            // It is allowed for multiple candidates to acquire the lock for readOnly in parallel.
+            // The number of candidates that acquired under readOnly restriction is counted in the lockIndicator, starting with FIRST_READ_LOCK,
+            // so we take the current lockIndicator and increase it by try and check if it would be a proper readOnly-value (newLockIndicator >= FIRST_READ_LOCK)
+            // If it is the case we try to actually set the new value to the lockIndicator variable
+            int currentLockIndicator = lockIndicator;
+            int newLockIndicator = currentLockIndicator + 1;
+            return newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator);         
+        }
+
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void FinishWaiting(bool prioritized, bool acquired, int rank)
         {
+            if (rank == 0) firstRankTicket = 0;
+            if (prioritized) prioritizedWaiting = false;            
             if (acquired)
             {
-                averageWaitCount = (averageWaitCount * 4 + waitCounter) / 5;
+                averageWaitCount = (averageWaitCount * 9 + waitCounter + 1) / 10;
                 waitCounter = 0;
-            }
+            }            
+        }
 
-            if (prioritized) prioritizedWaiting = false;
-            if (rank == 0) firstRankTicket = 0;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool MustWaitPassive(bool prioritized, int rank)
+        {
+            return !prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold;
         }
 
         #endregion HelperMethods
@@ -378,7 +391,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock Lock(bool prioritized = false)
         {
-            if (MustWait(prioritized) || !TryAcquire(false)) Lock_Wait(prioritized, false);
+            if (MustWait(prioritized) || !TryAcquireForWriting()) Lock_Wait(prioritized, false);
             return new AcquiredLock(this, LockMode.WriteLock);
         }
 
@@ -389,24 +402,24 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int rank;
             bool skip;
             do
-            {               
-                rank = UpdateRank(ticket);                
-                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
+            {
+                rank = UpdateRank(ticket);
+                if (MustWaitPassive(prioritized, rank))
                 {
                     skip = true;
-                    Thread.Sleep(0);                    
+                    Thread.Sleep(0);
                 }
                 else
                 {
                     skip = false;
-                    if (prioritized) prioritizedWaiting = true;                    
+                    if (prioritized) prioritizedWaiting = true;
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) waitCounter++;
                         Thread.Sleep(0);
                         skip = MustStillWait(prioritized, readOnly);
-                    }                    
-                }                                                       
+                    }
+                }
             }
             while (skip || !TryAcquire(readOnly));
 
@@ -418,7 +431,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockAsync(bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(false)) return writeLockTask;
+            if (!MustWait(prioritized) && TryAcquireForWriting()) return writeLockTask;
             else return LockAsync_Wait(LockMode.WriteLock, prioritized, false);
         }
 
@@ -427,16 +440,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
             int rank;
+            int counter = 0;
             bool skip;
             do
             {
                 rank = UpdateRank(ticket);
-                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
+                if (MustWaitPassive(prioritized, rank))
                 {
                     skip = true;
-                    if (MustYieldAsyncThread(rank, prioritized)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, true, readOnly);
 
-                    Thread.Sleep(0);
+                    if (MustYieldAsyncThread(rank, prioritized, counter++)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter);
+                    else Thread.Sleep(0);
                 }
                 else
                 {
@@ -445,7 +459,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) waitCounter++;
-                        Thread.Sleep(0);
+
+                        if (MustYieldAsyncThread(rank, prioritized, counter++)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter);
+                        else Thread.Sleep(0);
+
                         skip = MustStillWait(prioritized, readOnly);
                     }                    
                 }
@@ -474,19 +491,22 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        private async Task<AcquiredLock> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool yieldAsyncNow, bool readOnly)
+        private async Task<AcquiredLock> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool readOnly, int counter)
         {
             if (prioritized) prioritizedWaiting = true;
-            if (yieldAsyncNow) await Task.Yield();
+
+            await Task.Yield();
+
             int rank;
             bool skip;
             do
             {
                 rank = UpdateRank(ticket);
-                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
+                if (MustWaitPassive(prioritized, rank))
                 {
                     skip = true;
-                    if (MustYieldAsyncThread(rank, prioritized)) await Task.Yield();
+
+                    if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
                     else Thread.Sleep(0);
                 }
                 else
@@ -496,7 +516,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) waitCounter++;
-                        Thread.Sleep(0);
+
+                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
+                        else Thread.Sleep(0);
+
                         skip = MustStillWait(prioritized, readOnly);
                     }                    
                 }
@@ -522,7 +545,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public AcquiredLock LockReadOnly(bool prioritized = false)
         {
-            if (MustWait(prioritized) || !TryAcquire(true)) Lock_Wait(prioritized, true);
+            if (MustWait(prioritized) || !TryAcquireForReading()) Lock_Wait(prioritized, true);
             return new AcquiredLock(this, LockMode.ReadLock);
         }
         #endregion LockReadOnly
@@ -531,7 +554,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<AcquiredLock> LockReadOnlyAsync(bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(true)) return readLockTask;
+            if (!MustWait(prioritized) && TryAcquireForReading()) return readLockTask;
             else return LockAsync_Wait(LockMode.ReadLock, prioritized, true);
         }
         #endregion LockReadOnlyAsync
@@ -541,7 +564,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         public AcquiredLock LockReentrant(bool prioritized = false)
         {
             if (TryReenter(out AcquiredLock acquiredLock, true, out _)) return acquiredLock;
-            if (MustWait(prioritized) || !TryAcquire(false)) Lock_Wait(prioritized, false);
+            if (MustWait(prioritized) || !TryAcquireForWriting()) Lock_Wait(prioritized, false);
             reentrancyIndicator.Value = reentrancyId;
             return new AcquiredLock(this, LockMode.WriteLockReenterable);
         }
@@ -602,7 +625,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             else if (upgradePossible) return WaitForUpgradeAsync();
 
-            if (!MustWait(prioritized) && TryAcquire(false))
+            if (!MustWait(prioritized) && TryAcquireForWriting())
             {
                 reentrancyIndicator.Value = reentrancyId;
                 return reenterableWriteLockTask;
@@ -654,7 +677,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (TryReenterReadOnly()) return new AcquiredLock(this, LockMode.Reentered);
             
-            if (MustWait(prioritized) || !TryAcquire(true)) Lock_Wait(prioritized, true);
+            if (MustWait(prioritized) || !TryAcquireForReading()) Lock_Wait(prioritized, true);
 
             reentrancyIndicator.Value = reentrancyId;
             return new AcquiredLock(this, LockMode.ReadLockReenterable);
@@ -674,7 +697,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (TryReenterReadOnly()) return reenteredLockTask;
 
-            if (!MustWait(prioritized) && TryAcquire(true))
+            if (!MustWait(prioritized) && TryAcquireForReading())
             {
                 reentrancyIndicator.Value = reentrancyId;
                 return reenterableReadLockTask;
@@ -687,7 +710,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLock(out AcquiredLock acquiredLock, bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(false))
+            if (!MustWait(prioritized) && TryAcquireForWriting())
             {
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
@@ -703,7 +726,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLockReadOnly
         public bool TryLockReadOnly(out AcquiredLock acquiredLock, bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(true))
+            if (!MustWait(prioritized) && TryAcquireForReading())
             {
                 acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                 return true;
@@ -722,7 +745,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (TryReenter(out acquiredLock, false, out _)) return true;
 
-            if (!MustWait(prioritized) && TryAcquire(false))
+            if (!MustWait(prioritized) && TryAcquireForWriting())
             {
                 reentrancyIndicator.Value = reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLockReenterable);
@@ -746,7 +769,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 return true;
             }
 
-            if (!MustWait(prioritized) && TryAcquire(true))
+            if (!MustWait(prioritized) && TryAcquireForReading())
             {
                 reentrancyIndicator.Value = reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.ReadLockReenterable);
@@ -761,7 +784,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryLock(TimeSpan timeout, out AcquiredLock acquiredLock, bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(false))
+            if (!MustWait(prioritized) && TryAcquireForWriting())
             {
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
                 return true;
@@ -785,6 +808,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
             int rank;
+            bool skip;
             do
             {
                 rank = UpdateRank(ticket);
@@ -793,23 +817,24 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     FinishWaiting(prioritized, false, rank);
                     return false;
                 }                
-                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
+                if (MustWaitPassive(prioritized, rank))
                 {
+                    skip = true;
                     Thread.Sleep(0);
-                    continue;
                 }
                 else
                 {
+                    skip = false;
                     if (prioritized) prioritizedWaiting = true;
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) waitCounter++;
                         Thread.Sleep(0);
-                        continue;
+                        skip = MustStillWait(prioritized, readOnly);
                     }
                 }
             }
-            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
+            while (skip || !TryAcquire(readOnly));
 
             FinishWaiting(prioritized, true, rank);
             return true;
@@ -821,7 +846,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<LockAttempt> TryLockAsync(TimeSpan timeout, bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(false)) return writeLockAttemptTask;
+            if (!MustWait(prioritized) && TryAcquireForWriting()) return writeLockAttemptTask;
             else if (timeout > TimeSpan.Zero) return TryLockAsync_Wait(LockMode.WriteLock, timeout, prioritized, false);
             else return failedAttemptTask;
         }
@@ -833,6 +858,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
             int rank;
+            bool skip;
+            int counter = 0;
             do
             {
                 rank = UpdateRank(ticket);
@@ -841,25 +868,29 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     FinishWaiting(prioritized, false, rank);
                     return failedAttemptTask;
                 }
-                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
-                {
-                    if (MustYieldAsyncThread(rank, prioritized)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, true, readOnly);
 
-                    Thread.Sleep(0);
-                    continue;
+                if (MustWaitPassive(prioritized, rank))
+                {
+                    skip = true;
+                    if (MustYieldAsyncThread(rank, prioritized, counter++)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter);
+                    else Thread.Sleep(0);                    
                 }
                 else
                 {
+                    skip = false;
                     if (prioritized) prioritizedWaiting = true;
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) waitCounter++;
-                        Thread.Sleep(0);
-                        continue;
+
+                        if (MustYieldAsyncThread(rank, prioritized, counter++)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter);
+                        else Thread.Sleep(0);
+
+                        skip = MustStillWait(prioritized, readOnly);
                     }
                 }
             }
-            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
+            while (skip || !TryAcquire(readOnly));
 
             FinishWaiting(prioritized, true, rank);
 
@@ -883,11 +914,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        private async Task<LockAttempt> TryLockAsync_Wait_ContinueWithAwaiting(LockMode mode, TimeFrame timer, int ticket, bool prioritized, bool yieldAsyncNow, bool readOnly)
+        private async Task<LockAttempt> TryLockAsync_Wait_ContinueWithAwaiting(LockMode mode, TimeFrame timer, int ticket, bool prioritized, bool readOnly, int counter)
         {
             if (prioritized) prioritizedWaiting = true;
-            if (yieldAsyncNow) await Task.Yield();
+            await Task.Yield();
+
             int rank;
+            bool skip;
             do
             {
                 rank = UpdateRank(ticket);
@@ -896,24 +929,29 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     FinishWaiting(prioritized, false, rank);
                     return new LockAttempt(new AcquiredLock());
                 }
-                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
+
+                if (MustWaitPassive(prioritized, rank))
                 {
-                    if (MustYieldAsyncThread(rank, prioritized)) await Task.Yield();
+                    skip = true;
+                    if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
                     else Thread.Sleep(0);
-                    continue;
                 }
                 else
                 {
+                    skip = false;
                     if (prioritized) prioritizedWaiting = true;
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) waitCounter++;
-                        Thread.Sleep(0);
-                        continue;
+
+                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
+                        else Thread.Sleep(0);
+
+                        skip = MustStillWait(prioritized, readOnly);
                     }
                 }
             }
-            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
+            while (skip || !TryAcquire(readOnly));
 
             FinishWaiting(prioritized, true, rank);
 
@@ -933,7 +971,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLockReadOnly_Timeout
         public bool TryLockReadOnly(TimeSpan timeout, out AcquiredLock acquiredLock, bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(true))
+            if (!MustWait(prioritized) && TryAcquireForReading())
             {
                 acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
                 return true;
@@ -956,7 +994,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<LockAttempt> TryLockReadOnlyAsync(TimeSpan timeout, bool prioritized = false)
         {
-            if (!MustWait(prioritized) && TryAcquire(true)) return readLockAttemptTask;
+            if (!MustWait(prioritized) && TryAcquireForReading()) return readLockAttemptTask;
             else if (timeout > TimeSpan.Zero) return TryLockAsync_Wait(LockMode.ReadLock, timeout, prioritized, true);
             else return failedAttemptTask;
         }
@@ -981,7 +1019,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
             }
 
-            if (!MustWait(prioritized) && TryAcquire(false))
+            if (!MustWait(prioritized) && TryAcquireForWriting())
             {
                 reentrancyIndicator.Value = reentrancyId;
                 acquiredLock = new AcquiredLock(this, LockMode.WriteLockReenterable);
