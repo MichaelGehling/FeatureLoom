@@ -245,10 +245,11 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
         
         [Fact]
-        public void PriotizedAttemptSucceedsFirst()
+        public void PrioritizedAttemptSucceedsFirst()
         {
             var myLock = new FeatureLock();
             int counter = 0;
+            bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Thread thread1;
             Thread thread2;
@@ -262,7 +263,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     waiter.Set();
                     using(myLock.Lock())
                     {
-                        Assert.Equal(1, counter++);
+                        rightOrder = 1 == counter++;
                     }
                 });
                 thread1.Start();
@@ -273,23 +274,27 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     waiter.Set();
                     using(myLock.Lock(true))
                     {
-                        Assert.Equal(0, counter++);
+                        rightOrder = 0 == counter++;
                     }
                 });
+                waiter.Reset();
                 thread2.Start();
-                while(!task1Started || !task2Started) waiter.Wait();
+                waiter.Wait();
                 Thread.Sleep(10);
             }
-            thread1.Join(1.Seconds());
-            thread2.Join(1.Seconds());
+            Assert.True(thread1.Join(1.Seconds()));
+            Assert.True(thread2.Join(1.Seconds()));
+            Assert.True(rightOrder);
         }
         
-
+        
         [Fact]
         public void FirstAttemptSucceedsFirst()
         {
             var myLock = new FeatureLock();
+            myLock.PassiveWaitThreshold = 1;
             int counter = 0;
+            bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Thread thread1;
             Thread thread2;
@@ -303,7 +308,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     waiter.Set();
                     using(myLock.Lock())
                     {
-                        Assert.Equal(0, counter++);
+                        rightOrder = 0 == counter++;
                     }
                 });
                 thread1.Start();
@@ -314,23 +319,26 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     task2Started = true;
                     waiter.Set();
                     using(myLock.Lock())
-                    {
-                        Assert.Equal(1, counter++);
+                    {                        
+                        rightOrder = 1 == counter++;
                     }
                 });
                 thread2.Start();
                 while(!task1Started || !task2Started) waiter.Wait();
                 Thread.Sleep(10);
             }
-            thread1.Join(1.Seconds());
-            thread2.Join(1.Seconds());
+            Assert.True(thread1.Join(1.Seconds()));
+            Assert.True(thread2.Join(1.Seconds()));
+            Assert.True(rightOrder);
         }
 
         [Fact]
         public void FirstAttemptSucceedsFirstAsync()
         {
             var myLock = new FeatureLock();
+            myLock.PassiveWaitThreshold = 1;
             int counter = 0;
+            bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Thread thread1;
             Thread thread2;
@@ -344,7 +352,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     waiter.Set();
                     using(await myLock.LockAsync())
                     {
-                        Assert.Equal(0, counter++);
+                        rightOrder = 0 == counter++;
                     }
                 });
                 thread1.Start();
@@ -356,22 +364,25 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     waiter.Set();
                     using(await myLock.LockAsync())
                     {
-                        Assert.Equal(1, counter++);
+                        rightOrder = 1 == counter++;
                     }
                 });
                 thread2.Start();
                 while(!task1Started || !task2Started) waiter.Wait();
                 Thread.Sleep(10);
             }
-            thread1.Join(1.Seconds());
-            thread2.Join(1.Seconds());
+            Assert.True(thread1.Join(1.Seconds()));
+            Assert.True(thread2.Join(1.Seconds()));
+            Assert.True(rightOrder);
         }
-
+        
         [Fact]
         public void FirstAttemptSucceedsFirstMixed()
         {
             var myLock = new FeatureLock();
+            myLock.PassiveWaitThreshold = 1;
             int counter = 0;
+            bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Thread thread1;
             Thread thread2;
@@ -385,7 +396,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     waiter.Set();
                     using(await myLock.LockAsync())
                     {
-                        Assert.Equal(0, counter++);
+                        rightOrder = 0 == counter++;
                     }
                 });
                 thread1.Start();
@@ -397,16 +408,18 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     waiter.Set();
                     using(myLock.Lock())
                     {
-                        Assert.Equal(1, counter++);
+                        rightOrder = 1 == counter++;
                     }
                 });
                 thread2.Start();
                 while(!task1Started || !task2Started) waiter.Wait();
                 Thread.Sleep(10);
             }
-            thread1.Join(1.Seconds());
-            thread2.Join(1.Seconds());
+            Assert.True(thread1.Join(1.Seconds()));
+            Assert.True(thread2.Join(1.Seconds()));
+            Assert.True(rightOrder);
         }
+
 
         [Fact]
         public void ManyParallelLockAttemptsWillAllFinish()

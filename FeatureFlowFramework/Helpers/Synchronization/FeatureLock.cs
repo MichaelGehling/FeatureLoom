@@ -32,77 +32,47 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // Booleans cannot be used in CompareExchange, so ints are used.
         const int FALSE = 0;
         const int TRUE = 1;
-
-        // Some values that are used to be compared with the sleepPressure variable
-        const int LONG_YIELD_CYCLE_COUNT = 100;
-        const int CYCLES_BEFORE_FIRST_SLEEP = 30_000;
-        const int CYCLES_BETWEEN_SLEEPS = 2000;
-        const int MIN_CYCLES_BEFORE_ASYNC_YIELD = 2_000;
         #endregion Constants
 
         #region Variables               
-        
-        // This static variable will only be checked once, so if CPU affinity changes after the first FeatureLock was created, it will not change behaviour, anymore
-        private static readonly int numCores = CalculateAvailableCores();
 
-        // Used to synchronize sleeping and waking up code sections.
-        // If we have only one core, the FastSpinLock must not do any spinning before yielding to avoid blocking the only thread.
-        FastSpinLock sleepLock = new FastSpinLock(numCores > 1 ? 50 : 0);
-
-        // If any candidate is sleeping, its wake order is added to the queue.
-        // the queue head references the candidates wake order with the oldest ticket.
-        // (only write under sleepLock!)
-        volatile WakeOrder queueHead = null;
-
-        // Counting sleepers (only write under sleepLock!)
-        volatile int numSleeping = 0;
-        // Counting readonly sleepers (only write under sleepLock!)
-        volatile int numSleepingReadOnly = 0;
-
-        // the main lock variable, indicating current locking state:
-        // 0 means no lock
-        // -1 means write lock
-        // >=1 means read lock (number implies the count of parallel readers)
-        volatile int lockIndicator = NO_LOCK;
-
-        // If true, indicates that a reentrant write lock tries to upgrade an existing reentrant read lock,
-        // but more than one reader is active, the upgrade must wait until only one reader is left
-        volatile int waitingForUpgrade = FALSE;
+        int asyncYieldThreshold = 300;
+        int passiveWaitThreshold = 50;
 
         // Keeps the last reentrancyId of the "logical thread".
         // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
         // so it must be acquired and cannot simply be reentered.
         AsyncLocal<int> reentrancyIndicator = new AsyncLocal<int>();
 
-        // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
-        volatile int reentrancyId = 1;
+        // If true, indicates that a reentrant write lock tries to upgrade an existing reentrant read lock,
+        // but more than one reader is active, the upgrade must wait until only one reader is left
+        int waitingForUpgrade = FALSE;
 
-        // Indicates that (probably) one or more other waiting candidates are sleeping and need to be waked up.
-        // It may happen that anySleeping is true, though actually no one needs to be awaked, 
-        // but it will never happen that it is false if someone needs to be awaked.
-        volatile bool anySleeping = false;
+        // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
+        int reentrancyId = 1;
 
         // Will be true if a lock is to be acquied with priority, so the other candidates know that they have to stay back.
         // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate waits,
         // it must set it back to true. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
-        volatile bool prioritizedWaiting = false;
+        bool prioritizedWaiting = false;
+
+        // the main lock variable, indicating current locking state:
+        // 0 means no lock
+        // -1 means write lock
+        // >=1 means read lock (number implies the count of parallel readers)
+        int lockIndicator = NO_LOCK;
 
         // The next ticket number that will be provided. A ticket number must never be 0, so if nextTicket turns to be 0, it must be incremented, again.
-        volatile int nextTicket = 1;        
+        int nextTicket = 1;
 
         // Contains the oldest ticket number that is currently waiting. That candidate will never sleep and also ensures to wake up the others.
         // Will be reset to 0 when the currently oldest candidate acquired the lock. For a short time, it is possible that some newer ticket number
         // is set until the oldest one reaches the pooint to update.
-        volatile int firstRankTicket = 0;
-        volatile int secondRankTicket = 0;
+        int firstRankTicket = 0;
 
-        // Will be counted up by the waiting candidates that are not sleeping yet.
-        // Is used to set the candidates to sleep, one after another, starting with the youngest ticket.
-        volatile int sleepPressure = 0;
+        int waitCounter = 0;
+        int averageWaitCount = 10;
 
-        volatile int waitCounter = 0;
-        volatile int averageWaitCount = 0;
-        
         #endregion Variables
 
         #region PreparedTasks
@@ -174,13 +144,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         public bool HasValidReentrancyContext => reentrancyId == reentrancyIndicator.Value;
         /// <summary>
-        /// The number of candidates in the sleeping queue
+        /// 
         /// </summary>
-        public int NumSleeping => numSleeping;        
+        public int AsyncYieldThreshold { get => asyncYieldThreshold; set => asyncYieldThreshold = value; }
         /// <summary>
-        /// The number of readOnly candidates in the sleeping queue
+        /// 
         /// </summary>
-        public int NumSleepingReadOnly => numSleepingReadOnly;
+        public int PassiveWaitThreshold { get => passiveWaitThreshold; set => passiveWaitThreshold = value; }        
         #endregion PublicProperties
 
         #region ReentrancyContext                
@@ -253,21 +223,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #endregion ReentrancyContext
 
         #region HelperMethods
-        
-        // calculates the number of logical cores that are assigned to the process
-        private static int CalculateAvailableCores()
-        {
-            int numCores = 0;
-            var affinity = (long)Process.GetCurrentProcess().ProcessorAffinity;
-            while (affinity > 0)
-            {
-                if ((affinity & (long)1) > 0) numCores++;
-                affinity = affinity >> 1;
-            }
-
-            if (numCores == 0) numCores = Environment.ProcessorCount;
-            return numCores;
-        }
 
         // Used to check if a candidate is allowed trying to acquire the lock without going into the waiting cycle
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -287,10 +242,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // Yielding a task is very expensive, but must be done to avoid block the thread pool threads.
         // This method checks if the task should be yielded or the thread can still be blocked.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustYieldAsyncThread(int ticket, bool prioritized, int localCounter)
+        private bool MustYieldAsyncThread(int rank, bool prioritized)
         {
             // If a special synchronization context is set (e.g. UI-Thread) the task must always be yielded to avoid blocking
             if (SynchronizationContext.Current != null) return true;
+
+            int counter = waitCounter;
                         
             ThreadPool.GetAvailableThreads(out int availableThreads, out _);
             ThreadPool.GetMaxThreads(out int maxThreads, out _);
@@ -298,34 +255,23 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var usedThreads = maxThreads - availableThreads;
             // If less thread pool threads are used than minimum available, we must never yield the task
             if (usedThreads >= minThreads)
-            {
-                var rank = GetRank(ticket).ClampLow(1);                
+            {             
                 // Only yield if we waited long enough for the specific ticket age
-                if (rank * localCounter < MIN_CYCLES_BEFORE_ASYNC_YIELD) return false;
+                if (rank.ClampLow(1) * counter < asyncYieldThreshold) return false;
 
                 // Otherwise we yield every now and then, less often for older tickets that should be preferred and less often the more threads we have in the thread pool
-                int fullYieldCycle = (100 / rank) + 5;
+                int fullYieldCycle = (100 / (rank + 1)) + 1;
                 if (prioritizedWaiting)
                 {
                     // prioritized waiters should yield the task very rarely, because it takes so much time
                     if (prioritized) fullYieldCycle *= 20;
                 }
+                else if (rank == 0) fullYieldCycle *= 2;
                 //Console.Write($"|{waitCounter}|");
-                return localCounter % (fullYieldCycle) == 0;
+                return counter % (fullYieldCycle) == 0;
 
             }
             else return false;            
-        }
-
-        // Checks on every waiting cylce if the candidate must go to sleep
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustTrySleep(bool prioritized, bool readOnly, int ticket)
-        {
-            // In some cases the candidate will not go to sleep at all...
-            if (firstRankTicket == 0 || secondRankTicket == 0 || ticket == firstRankTicket || ticket == secondRankTicket || prioritized || sleepLock.IsLocked || !MustStillWait(prioritized, readOnly)) return false;
-
-            var rank = GetRank(ticket);            
-            return averageWaitCount * (rank+3) > CYCLES_BEFORE_FIRST_SLEEP;
         }
 
         // Checks if a candidate must still remain in the waiting queue or if acquiring would be possible
@@ -333,81 +279,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool MustStillWait(bool prioritized, bool readOnly)
         {
             return (!readOnly && lockIndicator != NO_LOCK) || (readOnly && lockIndicator == WRITE_LOCK) || (!prioritized && prioritizedWaiting);
-        }
-
-        // Checks if it currently allowed to go to sleep.
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MaySleep()
-        {
-            // If we don't have anyone who stays awake we could deadlock, so do not sleep in that case
-            return firstRankTicket != 0 && secondRankTicket != 0;
-        }
-
-        // Calculates the age of the current ticket, where age means how many other tickets were provided since the own one
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int GetTicketAge(int ticket)
-        {
-            if (ticket < nextTicket)
-            {
-                return nextTicket - ticket;
-            }
-            else
-            {
-                // covers the wrap around case
-                return (int)(((long)nextTicket + int.MaxValue) - ticket);
-            }
-        }
-
-        // Calculates the own number in the waiting line
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int GetRank(int ticket)
-        {
-            var oldestTicket = firstRankTicket;
-
-            if (ticket >= oldestTicket)
-            {
-                return ticket - oldestTicket + 1;
-            }
-            else
-            {
-                // covers the wrap around case
-                return (int)(((long)ticket + int.MaxValue) - firstRankTicket);
-            }
-        }
-
-
-        // Increases the overall sleep pressure variable
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void UpdateSleepPressure(bool longCycle)
-        {
-            int addition = longCycle ? LONG_YIELD_CYCLE_COUNT + 1 : 1;
-            sleepPressure += addition;       
-        }
-
-        // Wakes up the sleeper at the top of the sleeping queue which is the oldest one (or none if not available)
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void WakeUp()
-        {
-            WakeOrder wakeOrder = null;
-            using (sleepLock.Lock())
-            {
-                wakeOrder = DequeueWakeOrder();
-                anySleeping = queueHead != null;
-            }
-            wakeOrder?.WakeUp(this);
-        }
-
-        // Wakes up the first readOnly sleeper in the queue and removes it from the queue (or none if not available)
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void WakeUpNextReadOnly()
-        {
-            WakeOrder wakeOrder = null;
-            using (sleepLock.Lock())
-            {
-                wakeOrder = PickNextReadOnlyWakeOrder();
-                anySleeping = queueHead != null;
-            }
-            wakeOrder?.WakeUp(this);
         }
 
         // Creates the a new ticket for a new waiting candidate.
@@ -422,24 +293,28 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return ticket;
         }
 
-        // If the candidates ticket is older than the current stayAwakeTicket, it will take its place
-        // UpdateStayAwakeTicket() might be called concurrently and it might happen that the younger ticket wins,
-        // but that is acceptable and will not cause any trouble, because in the next cycle it will try again.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void UpdateHighRankTickets(int ticket)
-        {                       
+        private int UpdateRank(int ticket)
+        {
             var first = firstRankTicket;
-            if (ticket == first) return;
+            if (ticket == first) return 0;
 
-            var second = secondRankTicket;
             if (first == 0 || IsTicketOlder(ticket, first))
             {
                 firstRankTicket = ticket;
-                if (secondRankTicket == ticket) secondRankTicket = 0;
+                return 0;
             }
-            else if (second == 0 || IsTicketOlder(ticket, second))
-            {                
-                 secondRankTicket = ticket;
+            else
+            {
+                if (ticket >= first)
+                {
+                    return ticket - first;
+                }
+                else
+                {
+                    // covers the wrap around case
+                    return (int)(((long)ticket + int.MaxValue) - first);
+                }
             }
         }
 
@@ -483,58 +358,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        // May wake up sleeping candidates if approriate. Is called cyclically from the waiting loop.
+      
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AwakeSleeper(int ticket)
-        {
-            // Cancel if no one is sleeping or if the sleepLock is already locked (we may try later in the next cycle)
-            if (!anySleeping || sleepLock.IsLocked) return;
-
-            // Don't wake up anyboy if the lock could be taken
-            if (lockIndicator != NO_LOCK)
-            {
-                var sleeper = queueHead;
-                if (sleeper != null)
-                {
-                    var rank = GetRank(sleeper.ticket);
-                    if (secondRankTicket == 0 || IsTicketOlder(sleeper.ticket, secondRankTicket) || averageWaitCount * (rank+3) < CYCLES_BEFORE_FIRST_SLEEP) WakeUp();
-                }
-            }
-
-            // If recently the lock was taken for read only, wake up all the readOnly sleepers
-            // If lockIndicator indicates that there already more than one candidates have taken the lock,
-            // we are too late. Otherwise it could happen that non-readOnly candidates must wait too long.
-            while (lockIndicator == FIRST_READ_LOCK && numSleepingReadOnly > 0 && !sleepLock.IsLocked)
-            {
-                WakeUpNextReadOnly();
-            }
-        }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void FinishWaiting(bool prioritized, int ticket, bool acquired)
+        private void FinishWaiting(bool prioritized, bool acquired, int rank)
         {
             if (acquired)
             {
-                averageWaitCount = (averageWaitCount * 99 + waitCounter) / 100;
+                averageWaitCount = (averageWaitCount * 4 + waitCounter) / 5;
                 waitCounter = 0;
-
-                //if (numSleeping == 0) Console.Write("*"); else Console.Write("-");
             }
 
             if (prioritized) prioritizedWaiting = false;
-            if (ticket == firstRankTicket || firstRankTicket == 0)
-            {
-                //if (secondRankTicket == 0) Console.Write("*"); else Console.Write("-");
-
-                if (anySleeping && secondRankTicket == 0)
-                {
-                    WakeUp();                    
-                }                
-                firstRankTicket = 0;
-                secondRankTicket = 0;
-            }
-            else if (ticket == secondRankTicket) secondRankTicket = 0;
+            if (rank == 0) firstRankTicket = 0;
         }
 
         #endregion HelperMethods
@@ -549,35 +384,33 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private void Lock_Wait(bool prioritized, bool readOnly)
         {
+            if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
-            UpdateHighRankTickets(ticket);
+            int rank;
+            bool skip;
             do
-            {
-                if (prioritized) prioritizedWaiting = true;                
-
-                bool longCycle = true;
-                if (MustStillWait(prioritized, readOnly)) Thread.Sleep(0);
-                else longCycle = false;
-                       
-                if (longCycle) UpdateHighRankTickets(ticket);
-                if (ticket == firstRankTicket)
+            {               
+                rank = UpdateRank(ticket);                
+                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
                 {
-                    waitCounter += 1 + (longCycle ? LONG_YIELD_CYCLE_COUNT : 0);
-                    if (!prioritized && GetTicketAge(ticket) * averageWaitCount > 5_000) prioritized = true;
+                    skip = true;
+                    Thread.Sleep(0);                    
                 }
-
-                if (MustTrySleep(prioritized, readOnly, ticket))
+                else
                 {
-                    WakeOrder.TrySleep(this, ticket, readOnly);
-                    UpdateHighRankTickets(ticket);
-                }
-
-                AwakeSleeper(ticket);
-                
+                    skip = false;
+                    if (prioritized) prioritizedWaiting = true;                    
+                    if (MustStillWait(prioritized, readOnly))
+                    {
+                        if (rank == 0) waitCounter++;
+                        Thread.Sleep(0);
+                        skip = MustStillWait(prioritized, readOnly);
+                    }                    
+                }                                                       
             }
-            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
+            while (skip || !TryAcquire(readOnly));
 
-            FinishWaiting(prioritized, ticket, true);
+            FinishWaiting(prioritized, true, rank);
         }
         #endregion Lock
 
@@ -591,40 +424,35 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private Task<AcquiredLock> LockAsync_Wait(LockMode mode, bool prioritized, bool readOnly)
         {
-            int localCounter = 0;
-
+            if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
-            UpdateHighRankTickets(ticket);
+            int rank;
+            bool skip;
             do
             {
-                if (prioritized) prioritizedWaiting = true;
-
-                bool longCycle = true;
-                if (MustStillWait(prioritized, readOnly))
+                rank = UpdateRank(ticket);
+                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
                 {
-                    if (MustYieldAsyncThread(ticket, prioritized, localCounter++)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, true, readOnly, localCounter);
-                    else Thread.Sleep(0);
+                    skip = true;
+                    if (MustYieldAsyncThread(rank, prioritized)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, true, readOnly);
+
+                    Thread.Sleep(0);
                 }
-                else longCycle = false;
-
-                if (longCycle) UpdateHighRankTickets(ticket);
-                if (ticket == firstRankTicket)
+                else
                 {
-                    waitCounter += 1 + (longCycle ? LONG_YIELD_CYCLE_COUNT : 0);
-                    if (!prioritized && GetTicketAge(ticket) * averageWaitCount > 5_000) prioritized = true;
+                    skip = false;
+                    if (prioritized) prioritizedWaiting = true;
+                    if (MustStillWait(prioritized, readOnly))
+                    {
+                        if (rank == 0) waitCounter++;
+                        Thread.Sleep(0);
+                        skip = MustStillWait(prioritized, readOnly);
+                    }                    
                 }
-
-                if (MustTrySleep(prioritized, readOnly, ticket))
-                {
-                    return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, false, readOnly, localCounter);
-                }                
-
-                AwakeSleeper(ticket);
-                
             }
-            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
+            while (skip || !TryAcquire(readOnly));
 
-            FinishWaiting(prioritized, ticket, true);
+            FinishWaiting(prioritized, true, rank);
 
             if (readOnly)
             {
@@ -646,41 +474,36 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        private async Task<AcquiredLock> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool yieldAsyncNow, bool readOnly, int localCounter)
+        private async Task<AcquiredLock> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool yieldAsyncNow, bool readOnly)
         {
+            if (prioritized) prioritizedWaiting = true;
             if (yieldAsyncNow) await Task.Yield();
-
+            int rank;
+            bool skip;
             do
             {
-                if (prioritized) prioritizedWaiting = true;
-
-                bool longCycle = true;
-                if (MustStillWait(prioritized, readOnly))
+                rank = UpdateRank(ticket);
+                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
                 {
-                    if (MustYieldAsyncThread(ticket, prioritized, localCounter++)) await Task.Yield();
+                    skip = true;
+                    if (MustYieldAsyncThread(rank, prioritized)) await Task.Yield();
                     else Thread.Sleep(0);
                 }
-                else longCycle = false;
-
-                if (longCycle) UpdateHighRankTickets(ticket);
-                if (ticket == firstRankTicket)
+                else
                 {
-                    waitCounter += 1 + (longCycle ? LONG_YIELD_CYCLE_COUNT : 0);
-                    if (!prioritized && GetTicketAge(ticket) * averageWaitCount > 5_000) prioritized = true;
+                    skip = false;
+                    if (prioritized) prioritizedWaiting = true;
+                    if (MustStillWait(prioritized, readOnly))
+                    {
+                        if (rank == 0) waitCounter++;
+                        Thread.Sleep(0);
+                        skip = MustStillWait(prioritized, readOnly);
+                    }                    
                 }
-
-                if (MustTrySleep(prioritized, readOnly, ticket))
-                {
-                    await WakeOrder.TrySleepAsync(this, ticket, readOnly);
-                    UpdateHighRankTickets(ticket);
-                }
-
-                AwakeSleeper(ticket);
-                
             }
-            while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
+            while (skip || !TryAcquire(readOnly));
 
-            FinishWaiting(prioritized, ticket, true);
+            FinishWaiting(prioritized, true, rank);
 
             if (readOnly)
             {
@@ -959,47 +782,36 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             TimeFrame timer = new TimeFrame(timeout);
 
+            if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
+            int rank;
             do
             {
-                if (prioritized) prioritizedWaiting = true;
-                UpdateHighRankTickets(ticket);
-
+                rank = UpdateRank(ticket);
                 if (timer.Elapsed)
                 {
-                    FinishWaiting(prioritized, ticket, false);
+                    FinishWaiting(prioritized, false, rank);
                     return false;
-                }
-
-                bool longCycle = false;
-                if (MustStillWait(prioritized, readOnly))
+                }                
+                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
                 {
-                    if (ticket == firstRankTicket) longCycle = Thread.Yield();
-                    else
+                    Thread.Sleep(0);
+                    continue;
+                }
+                else
+                {
+                    if (prioritized) prioritizedWaiting = true;
+                    if (MustStillWait(prioritized, readOnly))
                     {
+                        if (rank == 0) waitCounter++;
                         Thread.Sleep(0);
-                        longCycle = true;
+                        continue;
                     }
                 }
-                UpdateSleepPressure(longCycle);
-                if (longCycle) UpdateHighRankTickets(ticket);
-
-                if (MustTrySleep(prioritized, readOnly, ticket))
-                {
-                    if (WakeOrder.TrySleepUntilTimeout(this, timer, ticket, readOnly))
-                    {
-                        FinishWaiting(prioritized, ticket, false);
-                        return false;
-                    }
-                    UpdateHighRankTickets(ticket);
-                }
-
-                AwakeSleeper(ticket);
             }
             while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
 
-            FinishWaiting(prioritized, ticket, true);
-
+            FinishWaiting(prioritized, true, rank);
             return true;
         }  
         #endregion TryLock_Timeout
@@ -1016,51 +828,40 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         private Task<LockAttempt> TryLockAsync_Wait(LockMode mode, TimeSpan timeout, bool prioritized, bool readOnly)
         {
-            int localCounter = 0;
             TimeFrame timer = new TimeFrame(timeout);
 
+            if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
+            int rank;
             do
             {
-                if (prioritized) prioritizedWaiting = true;
-                UpdateHighRankTickets(ticket);
-
+                rank = UpdateRank(ticket);
                 if (timer.Elapsed)
                 {
-                    FinishWaiting(prioritized, ticket, false);
+                    FinishWaiting(prioritized, false, rank);
                     return failedAttemptTask;
                 }
-
-                bool longCycle = false;
-                if (MustStillWait(prioritized, readOnly))
+                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
                 {
-                    if (MustYieldAsyncThread(ticket, prioritized, localCounter++))
+                    if (MustYieldAsyncThread(rank, prioritized)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, true, readOnly);
+
+                    Thread.Sleep(0);
+                    continue;
+                }
+                else
+                {
+                    if (prioritized) prioritizedWaiting = true;
+                    if (MustStillWait(prioritized, readOnly))
                     {
-                        return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, true, readOnly, localCounter);
-                    }
-                    else
-                    {
-                        if (ticket == firstRankTicket) longCycle = Thread.Yield();
-                        else
-                        {
-                            Thread.Sleep(0);
-                            longCycle = true;
-                        }
+                        if (rank == 0) waitCounter++;
+                        Thread.Sleep(0);
+                        continue;
                     }
                 }
-                UpdateSleepPressure(longCycle);
-                if (longCycle) UpdateHighRankTickets(ticket);
-
-                if (MustTrySleep(prioritized, readOnly, ticket))
-                {
-                    return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, false, readOnly, localCounter);
-                }
-
-                AwakeSleeper(ticket);
             }
             while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
 
-            FinishWaiting(prioritized, ticket, true);
+            FinishWaiting(prioritized, true, rank);
 
             if (readOnly)
             {
@@ -1082,57 +883,39 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        private async Task<LockAttempt> TryLockAsync_Wait_ContinueWithAwaiting(LockMode mode, TimeFrame timer, int ticket, bool prioritized, bool yieldAsyncNow, bool readOnly, int localCounter)
+        private async Task<LockAttempt> TryLockAsync_Wait_ContinueWithAwaiting(LockMode mode, TimeFrame timer, int ticket, bool prioritized, bool yieldAsyncNow, bool readOnly)
         {
+            if (prioritized) prioritizedWaiting = true;
             if (yieldAsyncNow) await Task.Yield();
-
+            int rank;
             do
             {
-                if (prioritized) prioritizedWaiting = true;
-                UpdateHighRankTickets(ticket);
-
+                rank = UpdateRank(ticket);
                 if (timer.Elapsed)
                 {
-                    FinishWaiting(prioritized, ticket, false);
+                    FinishWaiting(prioritized, false, rank);
                     return new LockAttempt(new AcquiredLock());
                 }
-
-                bool longCycle = false;
-                if (MustStillWait(prioritized, readOnly))
+                if (!prioritized && rank * Math.Max(averageWaitCount, waitCounter) > passiveWaitThreshold)
                 {
-                    if (MustYieldAsyncThread(ticket, prioritized, localCounter++))
+                    if (MustYieldAsyncThread(rank, prioritized)) await Task.Yield();
+                    else Thread.Sleep(0);
+                    continue;
+                }
+                else
+                {
+                    if (prioritized) prioritizedWaiting = true;
+                    if (MustStillWait(prioritized, readOnly))
                     {
-                        await Task.Yield();
-                        longCycle = true;
-                    }
-                    else
-                    {
-                        if (ticket == firstRankTicket) longCycle = Thread.Yield();
-                        else
-                        {
-                            Thread.Sleep(0);
-                            longCycle = true;
-                        }
+                        if (rank == 0) waitCounter++;
+                        Thread.Sleep(0);
+                        continue;
                     }
                 }
-                UpdateSleepPressure(longCycle);
-                if (longCycle) UpdateHighRankTickets(ticket);
-
-                if (MustTrySleep(prioritized, readOnly, ticket))
-                {
-                    if (await WakeOrder.TrySleepUntilTimeoutAsync(this, timer, ticket, readOnly))
-                    {
-                        FinishWaiting(prioritized, ticket, false);
-                        return new LockAttempt(new AcquiredLock());
-                    }
-                    UpdateHighRankTickets(ticket);
-                }
-
-                AwakeSleeper(ticket);
             }
             while (MustStillWait(prioritized, readOnly) || !TryAcquire(readOnly));
 
-            FinishWaiting(prioritized, ticket, true);
+            FinishWaiting(prioritized, true, rank);
 
             if (readOnly)
             {
@@ -1438,241 +1221,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #endregion Exit
 
-        #region WakeOrder
-
-        void EnqueueWakeOrder(WakeOrder wakeOrder)
-        {
-            if (queueHead == null)
-            {
-                queueHead = wakeOrder;
-                wakeOrder.Next = null;
-            }
-            else
-            {
-                if (IsTicketOlder(wakeOrder.ticket, queueHead.ticket))
-                {
-                    wakeOrder.Next = queueHead;
-                    queueHead = wakeOrder;
-                }
-                else
-                {
-                    var node = queueHead;
-                    while (node.Next != null && IsTicketOlder(node.Next.ticket, wakeOrder.ticket)) node = node.Next;
-                    wakeOrder.Next = node.Next;
-                    node.Next = wakeOrder;
-                }
-            }
-
-            numSleeping++;
-            if (wakeOrder.isReadOnly) numSleepingReadOnly++;
-        }
-
-        WakeOrder DequeueWakeOrder()
-        {
-            while (queueHead != null && !queueHead.IsValid)
-            {
-                numSleeping--;
-                if (queueHead.isReadOnly) numSleepingReadOnly--;
-
-                queueHead = queueHead.Next;                
-            }
-
-            WakeOrder wakeOrder = null;
-            if (queueHead != null)
-            {
-                numSleeping--;
-                if (queueHead.isReadOnly) numSleepingReadOnly--;
-
-                wakeOrder = queueHead;
-                queueHead = queueHead.Next;                
-            }
-            return wakeOrder;
-        }
-
-        WakeOrder PickNextReadOnlyWakeOrder()
-        {
-            while (queueHead != null && !queueHead.IsValid)
-            {
-                numSleeping--;
-                if (queueHead.isReadOnly) numSleepingReadOnly--;
-
-                queueHead = queueHead.Next;                
-            }
-
-            WakeOrder wakeOrder = null;
-            if (queueHead != null && queueHead.isReadOnly)
-            {
-                numSleeping--;
-                if (queueHead.isReadOnly) numSleepingReadOnly--;
-
-                wakeOrder = queueHead;
-                queueHead = queueHead.Next;                
-            }
-            else
-            {
-                var prev = queueHead;
-                while (numSleepingReadOnly > 0 && prev != null && wakeOrder == null)
-                {
-                    if (!prev.Next.IsValid)
-                    {
-                        numSleeping--;
-                        if (prev.Next.isReadOnly) numSleepingReadOnly--;
-
-                        prev.Next = prev.Next.Next;                        
-                    }
-                    else if (prev.Next.isReadOnly)
-                    {
-                        numSleeping--;
-                        numSleepingReadOnly--;
-
-                        wakeOrder = prev.Next;
-                        prev.Next = wakeOrder.Next;                        
-                    }
-                    prev = prev.Next;
-                }
-            }
-            return wakeOrder;
-        }
-
-        internal class WakeOrder
-        {
-            internal WakeOrder(int ticket, bool sleepsAsync, bool readOnly)
-            {
-                this.isReadOnly = readOnly;
-                this.ticket = ticket;
-                if (sleepsAsync) tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
-
-            TaskCompletionSource<bool> tcs = null;
-            public readonly int ticket = 0;
-            public readonly bool isReadOnly = false;
-            volatile public WakeOrder Next;            
-            public bool IsValid => sleeping;
-            volatile protected bool sleeping = true;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WakeUp(FeatureLock parent)
-            {
-                sleeping = false;                
-
-                if (tcs == null)
-                {
-                    Monitor.Enter(this);
-                    Monitor.PulseAll(this);
-                    Monitor.Exit(this);
-                }
-                else
-                {
-                    tcs.TrySetResult(true);
-                }
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static protected bool TryPrepareSleep(FeatureLock parent, out FastSpinLock.AcquiredLock acquiredSleepLock)
-            {
-                parent.anySleeping = true;
-                acquiredSleepLock = parent.sleepLock.Lock();
-                if (parent.MaySleep())
-                {
-                    parent.anySleeping = true;
-                    return true;
-                }
-                else
-                {
-                    acquiredSleepLock.Exit();
-                    return false;
-                }
-            }
-
-            [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static void TrySleep(FeatureLock parent, int ticket, bool readOnly)
-            {
-                if (TryPrepareSleep(parent, out var sleepLock))
-                {
-                    var wakeOrder = new WakeOrder(ticket, false, readOnly);
-                    parent.EnqueueWakeOrder(wakeOrder);
-                    sleepLock.Exit(); // exit before sleeping                    
-
-                    Monitor.Enter(wakeOrder);
-                    if (parent.MaySleep() && wakeOrder.sleeping)
-                    {
-                        Monitor.Wait(wakeOrder);
-                    }
-                    else wakeOrder.sleeping = false; //Invalidate, so wakeOrder will be skipped when waking up
-                    Monitor.Exit(wakeOrder);
-                }
-            }
-
-            [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static async Task TrySleepAsync(FeatureLock parent, int ticket, bool readOnly)
-            {
-                SynchronizationContext.SetSynchronizationContext(null);
-                if (TryPrepareSleep(parent, out var sleepLock))
-                {
-                    var wakeOrder = new WakeOrder(ticket, true, readOnly);
-                    parent.EnqueueWakeOrder(wakeOrder);
-                    sleepLock.Exit(); // exit before sleeping                    
-
-                    if (parent.MaySleep() && wakeOrder.sleeping)
-                    {
-                        await wakeOrder.tcs.Task.ConfigureAwait(false);
-                    }
-                    else wakeOrder.sleeping = false; //Invalidate, so wakeOrder will be skipped when waking up
-                }
-            }
-            
-            [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static bool TrySleepUntilTimeout(FeatureLock parent, TimeFrame timer, int ticket, bool readOnly)
-            {
-                if (timer.Elapsed) return true;
-
-                if (TryPrepareSleep(parent, out var sleepLock))
-                {
-                    var wakeOrder = new WakeOrder(ticket, false, readOnly);
-                    parent.EnqueueWakeOrder(wakeOrder);
-                    sleepLock.Exit(); // exit before sleeping                    
-
-                    bool elapsed = false;
-                    Monitor.Enter(wakeOrder);
-                    if (parent.MaySleep() && wakeOrder.sleeping)
-                    {
-                        elapsed = !Monitor.Wait(wakeOrder, timer.Remaining);
-                    }
-
-                    wakeOrder.sleeping = false; //Invalidate, so wakeOrder will be skipped when waking up
-                    Monitor.Exit(wakeOrder);
-
-                    return elapsed;
-                }
-                else return false;
-            }
-
-            [MethodImpl(MethodImplOptions.NoOptimization)]
-            public static async Task<bool> TrySleepUntilTimeoutAsync(FeatureLock parent, TimeFrame timer, int ticket, bool readOnly)
-            {
-                if (timer.Elapsed) return true;
-
-                SynchronizationContext.SetSynchronizationContext(null);
-                if (TryPrepareSleep(parent, out var sleepLock))
-                {
-                    var wakeOrder = new WakeOrder(ticket, true, readOnly);
-                    parent.EnqueueWakeOrder(wakeOrder);
-                    sleepLock.Exit(); // exit before sleeping                    
-
-                    bool elapsed = false;
-                    if (parent.MaySleep() && wakeOrder.sleeping)
-                    {
-                        elapsed = !await wakeOrder.tcs.Task.WaitAsync(timer.Remaining).ConfigureAwait(false);
-                    }
-
-                    wakeOrder.sleeping = false; //Invalidate, so wakeOrder will be skipped when waking up             
-                    return elapsed;
-                }
-                else return false;
-            }
-        }
-
-        #endregion WakeOrder
 
         #region LockHandles
 
