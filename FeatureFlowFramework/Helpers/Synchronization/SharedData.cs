@@ -49,31 +49,31 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             updateSender?.Send(new SharedDataUpdateNotification(this, updateOriginatorId));
         }
 
-        public WriteAccess GetWriteAccess(long updateOriginatorId = -1) => new WriteAccess(myLock.Lock(), this, updateOriginatorId);
+        public WriteHandle GetWriteAccess(long updateOriginatorId = -1) => new WriteHandle(myLock.Lock(), this, updateOriginatorId);
 
-        public ReadAccess GetReadAccess() => new ReadAccess(myLock.LockReadOnly(), this);
+        public ReadHandle GetReadAccess() => new ReadHandle(myLock.LockReadOnly(), this);
 
-        public void WithWriteAccess(Action<WriteAccess> writeAction, long updateOriginatorId = -1)
+        public void WithWriteAccess(Action<WriteHandle> writeAction, long updateOriginatorId = -1)
         {
             using(var writer = this.GetWriteAccess(updateOriginatorId)) writeAction(writer);
         }
 
-        public void WithReadAccess(Action<ReadAccess> readAction)
+        public void WithReadAccess(Action<ReadHandle> readAction)
         {
             using(var reader = this.GetReadAccess()) readAction(reader);
         }
 
         /// <summary>
         /// Provides read and write access to the shared data.
-        /// The WriteAccess must be used in a using block, so it will be disposed afterwards.
-        /// IMPORTANT: If the WriteAccess is not disposed, the access to the shared data is permanently blocked!
-        /// By default the SharedData will send a notification when the WriteAccess is disposed,
+        /// The WriteHandle must be used in a using block, so it will be disposed afterwards.
+        /// IMPORTANT: If the WriteHandle is not disposed, the access to the shared data is permanently blocked!
+        /// By default the SharedData will send a notification when the WriteHandle is disposed,
         /// which can be suppressed by calling SuppressPublishUpdate() inside the using block;
         /// 
         /// That problem could be reduced by using a class instead of a struct (a finalizer could call the dispose),
         /// but creating a new object each time a variable is accessed would be quite costly on the GC.
         /// </summary>
-        public struct WriteAccess : IDisposable
+        public struct WriteHandle : IDisposable
         {
             private FeatureLock.LockHandle myLock;
             private SharedData<T> shared;
@@ -90,7 +90,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             public void SuppressPublishUpdate() => publish = false;
 
-            public WriteAccess(FeatureLock.LockHandle myLock, SharedData<T> shared, long updateOriginatorId)
+            public WriteHandle(FeatureLock.LockHandle myLock, SharedData<T> shared, long updateOriginatorId)
             {
                 this.myLock = myLock;
                 this.shared = shared;
@@ -108,13 +108,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         /// <summary>
         /// Provides only read access to the shared data.
-        /// The ReadAccess must be used in a using block, so it will be disposed afterwards.
-        /// IMPORTANT: If the ReadAccess is not disposed, the access to the shared data is permanently blocked!
+        /// The ReadHandle must be used in a using block, so it will be disposed afterwards.
+        /// IMPORTANT: If the ReadHandle is not disposed, the access to the shared data is permanently blocked!
         ///
         /// That problem could be reduced by using a class instead of a struct (a finalizer could call the dispose),
         /// but creating a new object each time a variable is accessed would be quite costly on the GC.
         /// </summary>
-        public struct ReadAccess : IDisposable
+        public struct ReadHandle : IDisposable
         {
             private FeatureLock.LockHandle myLock;
             private SharedData<T> shared;
@@ -124,7 +124,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 get => shared.value;
             }
 
-            public ReadAccess(FeatureLock.LockHandle myLock, SharedData<T> shared)
+            public ReadHandle(FeatureLock.LockHandle myLock, SharedData<T> shared)
             {
                 this.myLock = myLock;
                 this.shared = shared;
