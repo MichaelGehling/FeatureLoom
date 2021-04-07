@@ -18,6 +18,32 @@ namespace FeatureFlowFramework.Helpers.Synchronization
     /// </summary>
     public sealed class FeatureLock
     {
+        #region ObjectLock
+        // Stores FeatureLocks associated with objects, for the lifetime of the object
+        static ConditionalWeakTable<object, FeatureLock> lockObjects = new ConditionalWeakTable<object, FeatureLock>();
+
+        /// <summary>
+        /// Provides a FeatureLock object that is associated with the given object.
+        /// When called the first time for an object a new FeatureLock is created.
+        /// Can be used directly in a using statement: 
+        /// using(FeatureLock.GetLockFor(myObj).Lock()) {...}
+        /// But using GetLockFor requires some extra CPU time, so in performance critical sections, better store the
+        /// lock as a member variable and use this one in the using statement.        
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public static FeatureLock GetLockFor(object obj)
+        {
+            if (!lockObjects.TryGetValue(obj, out FeatureLock featureLock))
+            {
+                featureLock = new FeatureLock();
+                lockObjects.Add(obj, featureLock);
+            }
+
+            return featureLock;
+        }
+        #endregion ObjectLock
+
         #region Constants
 
         // Are set to lockIndicator if the lock is not acquired, acquired for writing, cquired for reading (further readers increase this value, each by one)
@@ -89,13 +115,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         // These variables hold already completed task objects, prepared in advance in the constructor for later reuse,
         // in order to reduce garbage and improve performance by handling async calls synchronously, if no asynchronous sleeping/yielding is required
-        private Task<AcquiredLock> readLockTask;
+        private Task<LockHandle> readLockTask;
 
-        private Task<AcquiredLock> reenterableReadLockTask;
-        private Task<AcquiredLock> writeLockTask;
-        private Task<AcquiredLock> reenterableWriteLockTask;
-        private Task<AcquiredLock> upgradedLockTask;
-        private Task<AcquiredLock> reenteredLockTask;
+        private Task<LockHandle> reenterableReadLockTask;
+        private Task<LockHandle> writeLockTask;
+        private Task<LockHandle> reenterableWriteLockTask;
+        private Task<LockHandle> upgradedLockTask;
+        private Task<LockHandle> reenteredLockTask;
         private Task<LockAttempt> failedAttemptTask;
         private Task<LockAttempt> readLockAttemptTask;
         private Task<LockAttempt> reenterableReadLockAttemptTask;
@@ -113,20 +139,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         public FeatureLock()
         {
-            readLockTask = Task.FromResult(new AcquiredLock(this, LockMode.ReadLock));
-            reenterableReadLockTask = Task.FromResult(new AcquiredLock(this, LockMode.ReadLockReenterable));
-            writeLockTask = Task.FromResult(new AcquiredLock(this, LockMode.WriteLock));
-            reenterableWriteLockTask = Task.FromResult(new AcquiredLock(this, LockMode.WriteLockReenterable));
-            upgradedLockTask = Task.FromResult(new AcquiredLock(this, LockMode.Upgraded));
-            reenteredLockTask = Task.FromResult(new AcquiredLock(this, LockMode.Reentered));
+            readLockTask = Task.FromResult(new LockHandle(this, LockMode.ReadLock));
+            reenterableReadLockTask = Task.FromResult(new LockHandle(this, LockMode.ReadLockReenterable));
+            writeLockTask = Task.FromResult(new LockHandle(this, LockMode.WriteLock));
+            reenterableWriteLockTask = Task.FromResult(new LockHandle(this, LockMode.WriteLockReenterable));
+            upgradedLockTask = Task.FromResult(new LockHandle(this, LockMode.Upgraded));
+            reenteredLockTask = Task.FromResult(new LockHandle(this, LockMode.Reentered));
 
-            failedAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock()));
-            readLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.ReadLock)));
-            reenterableReadLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.ReadLockReenterable)));
-            writeLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.WriteLock)));
-            reenterableWriteLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.WriteLockReenterable)));
-            upgradedLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Upgraded)));
-            reenteredLockAttemptTask = Task.FromResult(new LockAttempt(new AcquiredLock(this, LockMode.Reentered)));
+            failedAttemptTask = Task.FromResult(new LockAttempt(new LockHandle()));
+            readLockAttemptTask = Task.FromResult(new LockAttempt(new LockHandle(this, LockMode.ReadLock)));
+            reenterableReadLockAttemptTask = Task.FromResult(new LockAttempt(new LockHandle(this, LockMode.ReadLockReenterable)));
+            writeLockAttemptTask = Task.FromResult(new LockAttempt(new LockHandle(this, LockMode.WriteLock)));
+            reenterableWriteLockAttemptTask = Task.FromResult(new LockAttempt(new LockHandle(this, LockMode.WriteLockReenterable)));
+            upgradedLockAttemptTask = Task.FromResult(new LockAttempt(new LockHandle(this, LockMode.Upgraded)));
+            reenteredLockAttemptTask = Task.FromResult(new LockAttempt(new LockHandle(this, LockMode.Reentered)));
         }
 
         #endregion PreparedTasks
@@ -419,13 +445,26 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region Lock
 
+        /// <summary>
+        /// Waits until the lock is acquired exclusively and then returns the LockHandle.
+        /// The LockHandle must be disposed to release the lock, most convenient with the using statement:
+        /// using(myLock.Lock()) {...}
+        /// </summary>
+        /// <param name="prioritized">When true the caller will be preferred if multiple candidates wait for the lock</param>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock Lock(bool prioritized = false)
+        public LockHandle Lock(bool prioritized = false)
         {
             if (MustGoToWaiting(prioritized) || !TryAcquireForWriting()) Lock_Wait(prioritized, false);
-            return new AcquiredLock(this, LockMode.WriteLock);
+            return new LockHandle(this, LockMode.WriteLock);
         }
 
+        // If the lock couldn't be acquired immediatly, this method is called to let the candidate wait until the lock is finally acquired
+        // In case of a higher rank and longer waiting time the candidate doesn't get the chance to acquire the lock, yet, 
+        // but simply sleeps and checks the rank again later.
+        // If the rank is low enough, the candidate will first check if the lock is potentially acquireable, if yes, it tries to get it,
+        // otherwise it also sleeps and tries later, again.
+        // The candidate with the lowest rank (rank==0) is responsible to count the global waitCounter as an indicator how long the lock is currently acquired.
         private void Lock_Wait(bool prioritized, bool readOnly)
         {
             if (prioritized) prioritizedWaiting = true;
@@ -433,8 +472,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int rank;
             bool skip;
             do
-            {
-                rank = UpdateRank(ticket);
+            {                
+                rank = UpdateRank(ticket);                
                 if (MustWaitPassive(prioritized, rank))
                 {
                     skip = true;
@@ -462,13 +501,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LockAsync
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockAsync(bool prioritized = false)
+        public Task<LockHandle> LockAsync(bool prioritized = false)
         {
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting()) return writeLockTask;
             else return LockAsync_Wait(LockMode.WriteLock, prioritized, false);
         }
 
-        private Task<AcquiredLock> LockAsync_Wait(LockMode mode, bool prioritized, bool readOnly)
+        private Task<LockHandle> LockAsync_Wait(LockMode mode, bool prioritized, bool readOnly)
         {
             if (prioritized) prioritizedWaiting = true;
             int ticket = GetTicket();
@@ -524,7 +563,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        private async Task<AcquiredLock> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool readOnly, int counter)
+        private async Task<LockHandle> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, int ticket, bool prioritized, bool readOnly, int counter)
         {
             if (prioritized) prioritizedWaiting = true;
 
@@ -564,12 +603,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (readOnly)
             {
                 if (mode == LockMode.ReadLockReenterable) reentrancyIndicator.Value = reentrancyId;
-                return new AcquiredLock(this, mode);
+                return new LockHandle(this, mode);
             }
             else
             {
                 if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = reentrancyId;
-                return new AcquiredLock(this, mode);
+                return new LockHandle(this, mode);
             }
         }
 
@@ -578,10 +617,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LockReadOnly
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock LockReadOnly(bool prioritized = false)
+        public LockHandle LockReadOnly(bool prioritized = false)
         {
             if (MustGoToWaiting(prioritized) || !TryAcquireForReading()) Lock_Wait(prioritized, true);
-            return new AcquiredLock(this, LockMode.ReadLock);
+            return new LockHandle(this, LockMode.ReadLock);
         }
 
         #endregion LockReadOnly
@@ -589,7 +628,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LockReadOnlyAsync
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockReadOnlyAsync(bool prioritized = false)
+        public Task<LockHandle> LockReadOnlyAsync(bool prioritized = false)
         {
             if (!MustGoToWaiting(prioritized) && TryAcquireForReading()) return readLockTask;
             else return LockAsync_Wait(LockMode.ReadLock, prioritized, true);
@@ -600,15 +639,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LockReentrant
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock LockReentrant(bool prioritized = false)
+        public LockHandle LockReentrant(bool prioritized = false)
         {
-            if (TryReenter(out AcquiredLock acquiredLock, true, out _)) return acquiredLock;
+            if (TryReenter(out LockHandle acquiredLock, true, out _)) return acquiredLock;
             if (MustGoToWaiting(prioritized) || !TryAcquireForWriting()) Lock_Wait(prioritized, false);
             reentrancyIndicator.Value = reentrancyId;
-            return new AcquiredLock(this, LockMode.WriteLockReenterable);
+            return new LockHandle(this, LockMode.WriteLockReenterable);
         }
 
-        private bool TryReenter(out AcquiredLock acquiredLock, bool waitForUpgrade, out bool upgradePossible)
+        private bool TryReenter(out LockHandle acquiredLock, bool waitForUpgrade, out bool upgradePossible)
         {
             var currentLockIndicator = lockIndicator;
             if (currentLockIndicator != NO_LOCK && HasValidReentrancyContext)
@@ -616,7 +655,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (currentLockIndicator == WRITE_LOCK)
                 {
                     upgradePossible = false;
-                    acquiredLock = new AcquiredLock(this, LockMode.Reentered);
+                    acquiredLock = new LockHandle(this, LockMode.Reentered);
                     return true;
                 }
                 else if (currentLockIndicator >= FIRST_READ_LOCK)
@@ -635,7 +674,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         {
                             waitingForUpgrade = FALSE;
                             upgradePossible = true;
-                            acquiredLock = new AcquiredLock();
+                            acquiredLock = new LockHandle();
                             return false;
                         }
                     }
@@ -643,12 +682,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     prioritizedWaiting = false;
 
                     upgradePossible = false;
-                    acquiredLock = new AcquiredLock(this, LockMode.Upgraded);
+                    acquiredLock = new LockHandle(this, LockMode.Upgraded);
                     return true;
                 }
             }
             upgradePossible = false;
-            acquiredLock = new AcquiredLock();
+            acquiredLock = new LockHandle();
             return false;
         }
 
@@ -657,9 +696,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LockReentrantAsync
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockReentrantAsync(bool prioritized = false)
+        public Task<LockHandle> LockReentrantAsync(bool prioritized = false)
         {
-            if (TryReenter(out AcquiredLock acquiredLock, false, out bool upgradePossible))
+            if (TryReenter(out LockHandle acquiredLock, false, out bool upgradePossible))
             {
                 if (acquiredLock.mode == LockMode.Reentered) return reenteredLockTask;
                 else return upgradedLockTask;
@@ -674,7 +713,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else return LockAsync_Wait(LockMode.WriteLockReenterable, prioritized, false);
         }
 
-        private async Task<AcquiredLock> WaitForUpgradeAsync()
+        private async Task<LockHandle> WaitForUpgradeAsync()
         {
             int counter = 0;
             SynchronizationContext.SetSynchronizationContext(null);
@@ -689,7 +728,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             waitingForUpgrade = FALSE;
             prioritizedWaiting = false;
-            return new AcquiredLock(this, LockMode.Upgraded);
+            return new LockHandle(this, LockMode.Upgraded);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -715,14 +754,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LockReentrantReadOnly
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock LockReentrantReadOnly(bool prioritized = false)
+        public LockHandle LockReentrantReadOnly(bool prioritized = false)
         {
-            if (TryReenterReadOnly()) return new AcquiredLock(this, LockMode.Reentered);
+            if (TryReenterReadOnly()) return new LockHandle(this, LockMode.Reentered);
 
             if (MustGoToWaiting(prioritized) || !TryAcquireForReading()) Lock_Wait(prioritized, true);
 
             reentrancyIndicator.Value = reentrancyId;
-            return new AcquiredLock(this, LockMode.ReadLockReenterable);
+            return new LockHandle(this, LockMode.ReadLockReenterable);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -736,7 +775,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LockReentrantReadOnlyAsync
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<AcquiredLock> LockReentrantReadOnlyAsync(bool prioritized = false)
+        public Task<LockHandle> LockReentrantReadOnlyAsync(bool prioritized = false)
         {
             if (TryReenterReadOnly()) return reenteredLockTask;
 
@@ -753,16 +792,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLock
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLock(out LockHandle acquiredLock, bool prioritized = false)
         {
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting())
             {
-                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                acquiredLock = new LockHandle(this, LockMode.WriteLock);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                acquiredLock = new LockHandle();
                 return false;
             }
         }
@@ -771,16 +810,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region TryLockReadOnly
 
-        public bool TryLockReadOnly(out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLockReadOnly(out LockHandle acquiredLock, bool prioritized = false)
         {
             if (!MustGoToWaiting(prioritized) && TryAcquireForReading())
             {
-                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
+                acquiredLock = new LockHandle(this, LockMode.ReadLock);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                acquiredLock = new LockHandle();
                 return false;
             }
         }
@@ -790,19 +829,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLockReentrant
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockReentrant(out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLockReentrant(out LockHandle acquiredLock, bool prioritized = false)
         {
             if (TryReenter(out acquiredLock, false, out _)) return true;
 
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting())
             {
                 reentrancyIndicator.Value = reentrancyId;
-                acquiredLock = new AcquiredLock(this, LockMode.WriteLockReenterable);
+                acquiredLock = new LockHandle(this, LockMode.WriteLockReenterable);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                acquiredLock = new LockHandle();
                 return false;
             }
         }
@@ -812,21 +851,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLockReentrantReadOnly
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockReentrantReadOnly(out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLockReentrantReadOnly(out LockHandle acquiredLock, bool prioritized = false)
         {
             if (TryReenterReadOnly())
             {
-                acquiredLock = new AcquiredLock(this, LockMode.Reentered);
+                acquiredLock = new LockHandle(this, LockMode.Reentered);
                 return true;
             }
 
             if (!MustGoToWaiting(prioritized) && TryAcquireForReading())
             {
                 reentrancyIndicator.Value = reentrancyId;
-                acquiredLock = new AcquiredLock(this, LockMode.ReadLockReenterable);
+                acquiredLock = new LockHandle(this, LockMode.ReadLockReenterable);
                 return true;
             }
-            acquiredLock = new AcquiredLock();
+            acquiredLock = new LockHandle();
             return false;
         }
 
@@ -835,21 +874,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLock_Timeout
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(TimeSpan timeout, out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLock(TimeSpan timeout, out LockHandle acquiredLock, bool prioritized = false)
         {
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting())
             {
-                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                acquiredLock = new LockHandle(this, LockMode.WriteLock);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout, prioritized, false))
             {
-                acquiredLock = new AcquiredLock(this, LockMode.WriteLock);
+                acquiredLock = new LockHandle(this, LockMode.WriteLock);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                acquiredLock = new LockHandle();
                 return false;
             }
         }
@@ -981,7 +1020,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (timer.Elapsed)
                 {
                     FinishWaiting(prioritized, false, rank);
-                    return new LockAttempt(new AcquiredLock());
+                    return new LockAttempt(new LockHandle());
                 }
 
                 if (MustWaitPassive(prioritized, rank))
@@ -1012,12 +1051,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (readOnly)
             {
                 if (mode == LockMode.ReadLockReenterable) reentrancyIndicator.Value = reentrancyId;
-                return new LockAttempt(new AcquiredLock(this, mode));
+                return new LockAttempt(new LockHandle(this, mode));
             }
             else
             {
                 if (mode == LockMode.WriteLockReenterable) reentrancyIndicator.Value = reentrancyId;
-                return new LockAttempt(new AcquiredLock(this, mode));
+                return new LockAttempt(new LockHandle(this, mode));
             }
         }
 
@@ -1025,21 +1064,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region TryLockReadOnly_Timeout
 
-        public bool TryLockReadOnly(TimeSpan timeout, out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLockReadOnly(TimeSpan timeout, out LockHandle acquiredLock, bool prioritized = false)
         {
             if (!MustGoToWaiting(prioritized) && TryAcquireForReading())
             {
-                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
+                acquiredLock = new LockHandle(this, LockMode.ReadLock);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout, prioritized, true))
             {
-                acquiredLock = new AcquiredLock(this, LockMode.ReadLock);
+                acquiredLock = new LockHandle(this, LockMode.ReadLock);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                acquiredLock = new LockHandle();
                 return false;
             }
         }
@@ -1061,19 +1100,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region TryLockReentrant_Timeout
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockReentrant(TimeSpan timeout, out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLockReentrant(TimeSpan timeout, out LockHandle acquiredLock, bool prioritized = false)
         {
             if (TryReenter(out acquiredLock, false, out bool upgradePossible)) return true;
             else if (upgradePossible)
             {
                 if (timeout > TimeSpan.Zero && WaitForUpgrade(timeout))
                 {
-                    acquiredLock = new AcquiredLock(this, LockMode.Upgraded);
+                    acquiredLock = new LockHandle(this, LockMode.Upgraded);
                     return true;
                 }
                 else
                 {
-                    acquiredLock = new AcquiredLock();
+                    acquiredLock = new LockHandle();
                     return false;
                 }
             }
@@ -1081,18 +1120,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting())
             {
                 reentrancyIndicator.Value = reentrancyId;
-                acquiredLock = new AcquiredLock(this, LockMode.WriteLockReenterable);
+                acquiredLock = new LockHandle(this, LockMode.WriteLockReenterable);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout, prioritized, false))
             {
                 reentrancyIndicator.Value = reentrancyId;
-                acquiredLock = new AcquiredLock(this, LockMode.WriteLockReenterable);
+                acquiredLock = new LockHandle(this, LockMode.WriteLockReenterable);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                acquiredLock = new LockHandle();
                 return false;
             }
         }
@@ -1124,7 +1163,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<LockAttempt> TryLockReentrantAsync(TimeSpan timeout, bool prioritized = false)
         {
-            if (TryReenter(out AcquiredLock acquiredLock, false, out bool upgradePossible))
+            if (TryReenter(out LockHandle acquiredLock, false, out bool upgradePossible))
             {
                 if (acquiredLock.mode == LockMode.Reentered) return reenteredLockAttemptTask;
                 else return upgradedLockAttemptTask;
@@ -1158,25 +1197,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 if (timer.Elapsed)
                 {
                     waitingForUpgrade = FALSE;
-                    return new LockAttempt(new AcquiredLock());
+                    return new LockAttempt(new LockHandle());
                 }
 
                 if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await Task.Yield();
                 else Thread.Sleep(0);
             }
             waitingForUpgrade = FALSE;
-            return new LockAttempt(new AcquiredLock(this, LockMode.Upgraded));
+            return new LockAttempt(new LockHandle(this, LockMode.Upgraded));
         }
 
         #endregion TryLockReentrantAsync_Timeout
 
         #region TryLockReentrantReadOnly_Timeout
 
-        public bool TryLockReentrantReadOnly(TimeSpan timeout, out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLockReentrantReadOnly(TimeSpan timeout, out LockHandle acquiredLock, bool prioritized = false)
         {
             if (TryReenterReadOnly())
             {
-                acquiredLock = new AcquiredLock(this, LockMode.Reentered);
+                acquiredLock = new LockHandle(this, LockMode.Reentered);
                 return true;
             }
 
@@ -1185,18 +1224,18 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (!MustGoToWaiting(false) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 reentrancyIndicator.Value = reentrancyId;
-                acquiredLock = new AcquiredLock(this, LockMode.ReadLockReenterable);
+                acquiredLock = new LockHandle(this, LockMode.ReadLockReenterable);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout, prioritized, true))
             {
                 reentrancyIndicator.Value = reentrancyId;
-                acquiredLock = new AcquiredLock(this, LockMode.ReadLockReenterable);
+                acquiredLock = new LockHandle(this, LockMode.ReadLockReenterable);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                acquiredLock = new LockHandle();
                 return false;
             }
         }
@@ -1326,7 +1365,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #endregion Exit
 
-        #region LockHandles
+        #region LockHandle
 
         internal enum LockMode
         {
@@ -1338,13 +1377,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             Upgraded
         }
 
-        public struct AcquiredLock : IDisposable
+        public struct LockHandle : IDisposable
         {
             private FeatureLock parentLock;
             internal LockMode mode;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal AcquiredLock(FeatureLock parentLock, LockMode mode)
+            internal LockHandle(FeatureLock parentLock, LockMode mode)
             {
                 this.parentLock = parentLock;
                 this.mode = mode;
@@ -1388,20 +1427,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         public struct LockAttempt
         {
-            private AcquiredLock acquiredLock;
+            private LockHandle acquiredLock;
 
-            internal LockAttempt(AcquiredLock acquiredLock)
+            internal LockAttempt(LockHandle acquiredLock)
             {
                 this.acquiredLock = acquiredLock;
             }
 
-            public bool Succeeded(out AcquiredLock acquiredLock)
+            public bool Succeeded(out LockHandle acquiredLock)
             {
                 acquiredLock = this.acquiredLock;
                 return acquiredLock.IsActive;
             }
         }
 
-        #endregion LockHandles
+        #endregion LockHandle         
     }
+
 }
