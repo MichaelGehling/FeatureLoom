@@ -115,9 +115,27 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ReentrantPrioLock(Action action)
+        {
+            using (myLock.LockReentrant(true))
+            {
+                action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task ReentrantLockAsync(Func<Task> action)
         {
             using(await myLock.LockReentrantAsync())
+            {
+                await action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task ReentrantPrioLockAsync(Func<Task> action)
+        {
+            using (await myLock.LockReentrantAsync(true))
             {
                 await action();
             }

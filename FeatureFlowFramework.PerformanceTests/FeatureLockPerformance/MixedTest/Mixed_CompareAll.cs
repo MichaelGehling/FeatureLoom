@@ -30,6 +30,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);
 
         [Benchmark]
+        public void FeatureLock_LockPrio() => test.Run(featureLockSubjects.LockPrio);
+
+        [Benchmark]
         public void FastSpinLock_Lock() => test.Run(fastSpinLockSubjects.Lock);          
 
         [Benchmark]

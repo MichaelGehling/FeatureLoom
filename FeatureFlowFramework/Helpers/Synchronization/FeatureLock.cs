@@ -61,14 +61,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         #region Variables
 
+        // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
+        private int passiveWaitThreshold = 100;
+
         // The lower this value, the earlier async threads start yielding
         private int asyncYieldThreshold = 300;
 
         // The lower this value, the more often async threads yield
-        private int asyncYieldBaseFrequency = 100;
-
-        // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
-        private int passiveWaitThreshold = 50;
+        private int asyncYieldBaseFrequency = 100;        
 
         // Keeps the last reentrancyId of the "logical thread".
         // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
@@ -1279,20 +1279,15 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.NoOptimization)]
         private void ExitReentrantReadLock()
         {
-            int newLockIndicator = Interlocked.Decrement(ref lockIndicator);
-
-            if (NO_LOCK == newLockIndicator)
-            {
-                RenewReentrancyId();
-            }
+            if (FIRST_READ_LOCK == lockIndicator) RenewReentrancyId();
+            Interlocked.Decrement(ref lockIndicator);            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReentrantWriteLock()
         {
-            lockIndicator = NO_LOCK;
-
             RenewReentrancyId();
+            lockIndicator = NO_LOCK;            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
