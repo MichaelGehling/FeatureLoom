@@ -1276,19 +1276,21 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             lockIndicator = NO_LOCK;
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
-        private void ExitReentrantReadLock()
-        {
-            if (FIRST_READ_LOCK == lockIndicator) RenewReentrancyId();
-            Interlocked.Decrement(ref lockIndicator);            
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReentrantWriteLock()
         {
+            // We simply change the reentrancyId and keep the ReentrancyContext as it is wich also invalidates it. That is a lot cheaper.
             RenewReentrancyId();
-            lockIndicator = NO_LOCK;            
+            lockIndicator = NO_LOCK;
         }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private void ExitReentrantReadLock()
+        {
+            // We must clear the ReentrancyContext, because the lock might be used by multiple reader, so we can't change the current reentrancyId, though it would be cheaper.
+            RemoveReentrancyContext();
+            Interlocked.Decrement(ref lockIndicator);            
+        }        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReenteredLock()
