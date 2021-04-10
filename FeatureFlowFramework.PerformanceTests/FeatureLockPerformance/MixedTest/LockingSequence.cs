@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -199,23 +200,40 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         {
             if (time == TimeSpan.Zero) return;
 
+            Work(time);
+            return;
+
             var timer = new TimeFrame(time);
             while (!timer.Elapsed)
             {
                 //if (!abortWaitHandle.WouldWait()) return;
                 if (timer.Remaining < 0.002.Milliseconds()) /* do nothing */;
-                else if (timer.Remaining < 16.Milliseconds())  Thread.Sleep(0);
+                else if (timer.Remaining < 16.Milliseconds()) Thread.Sleep(0);
                 else Thread.Sleep(timer.Remaining);
+            }
+        }
+
+        private static void Work(TimeSpan time)
+        {
+            for (long i = 0; i < time.Ticks; i++)
+            {
+                for (int j = 0; j < 500; j++)
+                {
+                    double x = Math.Sin((double)i*j);
+                }
             }
         }
 
         protected async Task WaitAsync(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {
             if (time == TimeSpan.Zero) return;
+            await Task.Yield();
+            Work(time);
+            return;
 
             var timer = new TimeFrame(time);
             while (!timer.Elapsed)
-            {
+            {                
                 //if (!abortWaitHandle.WouldWait()) return;
                 if (timer.Remaining < 0.002.Milliseconds()) /* do nothing */;
                 else if (timer.Remaining < 0.02.Milliseconds()) Thread.Sleep(0);

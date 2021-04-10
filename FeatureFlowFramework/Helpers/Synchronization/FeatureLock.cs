@@ -68,7 +68,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private int asyncYieldThreshold = 300;
 
         // The lower this value, the more often async threads yield
-        private int asyncYieldBaseFrequency = 100;        
+        private int asyncYieldBaseFrequency = 300;        
 
         // Keeps the last reentrancyId of the "logical thread".
         // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
