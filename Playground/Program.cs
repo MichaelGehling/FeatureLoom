@@ -30,121 +30,177 @@ namespace Playground
     }
     partial class Program
     {
-        
-        
+
+        volatile static bool done = false;
 
         static void Main(string[] args)
         {
+            DateTime baseTime = DateTime.UtcNow;
+            int baseTicks = Environment.TickCount;
+            
+            while (true)
+            {
+
+                DateTime now = DateTime.UtcNow;
+                DateTime tickNow = baseTime + (Environment.TickCount - baseTicks).Milliseconds();
+                TimeSpan diff = now - tickNow;
+
+                Console.WriteLine($"{diff.Milliseconds}");
+            }
+
+            new TimeSpan((long)Environment.TickCount * 1000);
 
 
 
+            Console.ReadKey();
 
-                /* var guessTheWord = new GuessTheWord();
-                 guessTheWord.Run();
-                 guessTheWord.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished);
 
-                     HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
-                 RpcCallee callee = new RpcCallee();
-                 callee.RegisterMethod<int, int, int>("Add", (a, b) =>
+            ManualResetEventSlim mre = new ManualResetEventSlim(false);
+            
+            int count = 0;
+            new Thread(() =>
+            {
+                Thread.Sleep(100);
+                mre.Set();
+                var ticks = new TimeSpan((long)Environment.TickCount * 1000);                
+                done = true;
+            }).Start();
+            mre.Wait();
+            while (!done) count++;
+            Console.WriteLine($"{count}");
+            Console.ReadKey();
+
+            int a = 0;
+            Supervision.Supervise(() =>
+            {
+                Console.WriteLine($"a{a++}");
+                return (a < 10, TimeSpan.Zero);
+            });
+
+            int b = 0;
+            Supervision.Supervise(() =>
+            {
+                Console.WriteLine($"b{b++}");
+                return (b < 10, TimeSpan.Zero);
+            });
+
+            int c = 0;
+            Supervision.Supervise(() =>
+            {
+                Console.WriteLine($"c{c++}");
+                return (c < 10, TimeSpan.Zero);
+            });
+
+
+            Console.ReadKey();
+
+
+            /* var guessTheWord = new GuessTheWord();
+             guessTheWord.Run();
+             guessTheWord.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished);
+
+                 HttpServerRpcAdapter webRPC = new HttpServerRpcAdapter("rpc/a/", 1.Seconds());
+             RpcCallee callee = new RpcCallee();
+             callee.RegisterMethod<int, int, int>("Add", (a, b) =>
+             {
+                 int c = a + b;
+                 Console.WriteLine($"RPC: {a}+{b}={c}");
+                 return c;
+             });
+             callee.RegisterMethod("Kill", () =>
+             {
+                 Task.Run(()=> 
                  {
-                     int c = a + b;
-                     Console.WriteLine($"RPC: {a}+{b}={c}");
-                     return c;
+                     Thread.Sleep(100.Milliseconds());
+                     Environment.Exit(1);
                  });
-                 callee.RegisterMethod("Kill", () =>
+             });
+             webRPC.ConnectToAndBack(callee);
+             SharedWebServer.WebServer.Start();
+
+             Console.ReadKey();
+
+             Sender sender = new Sender();
+             sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
+
+             var timeKeeper = AppTime.TimeKeeper;
+
+             var now = AppTime.Now;
+
+             timeKeeper.Restart();
+             for (long i = 0; i < 10_000_000; i++) Test1(now.AddMilliseconds(i));
+             Console.WriteLine($"Test1(long i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test2(now.AddMilliseconds(i));
+             Console.WriteLine($"Test2(in long i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test3(now.AddMilliseconds(i));
+             Console.WriteLine($"Test3<T>(T i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test4(now.AddMilliseconds(i));
+             Console.WriteLine($"Test4<T>(in T i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for(long i = 0; i < 10_000_000; i++) Test5(now.AddMilliseconds(i));
+             Console.WriteLine($"Test5(object i):{timeKeeper.Elapsed}");
+
+             timeKeeper.Restart();
+             for (long i = 0; i < 10_000_000; i++) sender.Send(now.AddMilliseconds(i));
+             Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
+
+
+             Console.ReadKey();
+
+             QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
+             SharedData<int> sharedInt = new SharedData<int>(42);
+             SharedData<string> sharedObj = new SharedData<string>("Hello");
+             sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
+
+             using (var myInt = sharedInt.GetReadAccess())
+             using (var myObj = sharedObj.GetWriteAccess(99))
+             {
+                 myObj.SetValue(myObj.Value + myInt.Value);                
+             }            
+
+             if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
+             {
+                 if (update.originatorId == 99 && update.sharedData is SharedData<string> objUpdate)
                  {
-                     Task.Run(()=> 
-                     {
-                         Thread.Sleep(100.Milliseconds());
-                         Environment.Exit(1);
-                     });
-                 });
-                 webRPC.ConnectToAndBack(callee);
-                 SharedWebServer.WebServer.Start();
-
-                 Console.ReadKey();
-
-                 Sender sender = new Sender();
-                 sender.ConnectTo(new ProcessingEndpoint<DateTime>(i => { var xy = i; }), weakReference:true);
-
-                 var timeKeeper = AppTime.TimeKeeper;
-
-                 var now = AppTime.Now;
-
-                 timeKeeper.Restart();
-                 for (long i = 0; i < 10_000_000; i++) Test1(now.AddMilliseconds(i));
-                 Console.WriteLine($"Test1(long i):{timeKeeper.Elapsed}");
-
-                 timeKeeper.Restart();
-                 for(long i = 0; i < 10_000_000; i++) Test2(now.AddMilliseconds(i));
-                 Console.WriteLine($"Test2(in long i):{timeKeeper.Elapsed}");
-
-                 timeKeeper.Restart();
-                 for(long i = 0; i < 10_000_000; i++) Test3(now.AddMilliseconds(i));
-                 Console.WriteLine($"Test3<T>(T i):{timeKeeper.Elapsed}");
-
-                 timeKeeper.Restart();
-                 for(long i = 0; i < 10_000_000; i++) Test4(now.AddMilliseconds(i));
-                 Console.WriteLine($"Test4<T>(in T i):{timeKeeper.Elapsed}");
-
-                 timeKeeper.Restart();
-                 for(long i = 0; i < 10_000_000; i++) Test5(now.AddMilliseconds(i));
-                 Console.WriteLine($"Test5(object i):{timeKeeper.Elapsed}");
-
-                 timeKeeper.Restart();
-                 for (long i = 0; i < 10_000_000; i++) sender.Send(now.AddMilliseconds(i));
-                 Console.WriteLine($"DataFlow:{timeKeeper.Elapsed}");
-
-
-                 Console.ReadKey();
-
-                 QueueReceiver<SharedDataUpdateNotification> updateReceiver = new QueueReceiver<SharedDataUpdateNotification>();
-                 SharedData<int> sharedInt = new SharedData<int>(42);
-                 SharedData<string> sharedObj = new SharedData<string>("Hello");
-                 sharedObj.UpdateNotifications.ConnectTo(updateReceiver);
-
-                 using (var myInt = sharedInt.GetReadAccess())
-                 using (var myObj = sharedObj.GetWriteAccess(99))
-                 {
-                     myObj.SetValue(myObj.Value + myInt.Value);                
-                 }            
-
-                 if (updateReceiver.TryReceive(out SharedDataUpdateNotification update))
-                 {
-                     if (update.originatorId == 99 && update.sharedData is SharedData<string> objUpdate)
-                     {
-                         objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
-                     }
-                 }            
-
-                 var timer = AppTime.TimeKeeper;
-                 TimeSpan x;
-                 long c1 = 0;
-                 while(timer.Elapsed < 1.Seconds())
-                 {
-                     x = AppTime.Elapsed;
-                     c1++;
+                     objUpdate.WithReadAccess(reader => Console.WriteLine(reader.Value));
                  }
+             }            
 
-                 timer.Restart();
-                 long c2 = 0;
-                 DateTime s = AppTime.Now;
-                 TimeSpan y;
-                 while(timer.Elapsed < 1.Seconds())
-                 {
-                     y = AppTime.Now.Subtract(s);
-                     c2++;
-                 }
+             var timer = AppTime.TimeKeeper;
+             TimeSpan x;
+             long c1 = 0;
+             while(timer.Elapsed < 1.Seconds())
+             {
+                 x = AppTime.Elapsed;
+                 c1++;
+             }
 
-                 Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
-     */
+             timer.Restart();
+             long c2 = 0;
+             DateTime s = AppTime.Now;
+             TimeSpan y;
+             while(timer.Elapsed < 1.Seconds())
+             {
+                 y = AppTime.Now.Subtract(s);
+                 c2++;
+             }
+
+             Console.WriteLine($"c1={1.Seconds().TotalMilliseconds/c1}ms, c2={1.Seconds().TotalMilliseconds / c2}ms");
+ */
 
 
-                //  Console.ReadKey();
+            //  Console.ReadKey();
 
 
 
-                int numReader = 100;
+            int numReader = 100;
             TimeSpan readerSlack = 0.0.Milliseconds();
             int numWriter = 100;
             TimeSpan writerSlack = 0.0.Milliseconds();

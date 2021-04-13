@@ -117,7 +117,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
                 timestampBuffer?.Add(AppTime.Now);
                 if(timeSliceCounterBuffer != null)
                 {
-                    if(currentTimeSlice.timeFrame.Elapsed)
+                    if(currentTimeSlice.timeFrame.Elapsed())
                     {
                         timeSliceCounterBuffer.Add(currentTimeSlice);
                         currentTimeSlice = new TimeSliceCounter(timeSliceSize);

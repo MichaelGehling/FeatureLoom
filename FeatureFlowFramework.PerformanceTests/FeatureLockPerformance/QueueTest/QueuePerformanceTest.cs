@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         void WorkSomething()
         {
             var timer = new TimeFrame(0.001.Milliseconds());
-            while (!timer.Elapsed) /* work */;
+            while (!timer.Elapsed()) /* work */;
         }
 
         public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)

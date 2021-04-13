@@ -435,7 +435,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 tasks.Add(Task.Run(() =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed)
+                    while(!executionTime.Elapsed())
                     {
                         using(myLock.Lock())
                         {
@@ -449,7 +449,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 tasks.Add(Task.Run(async () =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed)
+                    while(!executionTime.Elapsed())
                     {
                         using(await myLock.LockAsync())
                         {
@@ -464,7 +464,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 tasks.Add(Task.Run(() =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed)
+                    while(!executionTime.Elapsed())
                     {
                         using(myLock.LockReadOnly())
                         {
@@ -479,7 +479,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 tasks.Add(Task.Run(async () =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed)
+                    while(!executionTime.Elapsed())
                     {
                         using(await myLock.LockReadOnlyAsync())
                         {
@@ -489,7 +489,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             }
             
             starter.Set();
-            bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining + 100.Milliseconds());
+            bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining() + 100.Milliseconds());
             Assert.True(allFinished);
         }
 
@@ -582,19 +582,19 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
             {
                 using(myLock.LockReentrantReadOnly())
                 {
-                    while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed) ;
-                    Assert.False(timer.Elapsed);
+                    while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed()) ;
+                    Assert.False(timer.Elapsed());
 
-                    signal.Wait(timer.Remaining);
-                    Assert.False(timer.Elapsed);
+                    signal.Wait(timer.Remaining());
+                    Assert.False(timer.Elapsed());
                     Thread.Sleep(10);
                 }
             });
 
             using(myLock.LockReentrantReadOnly())
             {
-                while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed) ;
-                Assert.False(timer.Elapsed);
+                while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed()) ;
+                Assert.False(timer.Elapsed());
                 Assert.Equal(2, myLock.CountParallelReadLocks);
 
                 Assert.False(myLock.TryLockReentrant(out _));
@@ -602,8 +602,8 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
 
                 signal.Set();
                 // The other readlock will be exited in 10 ms. So long TryLock will wait and then perform the upgrade.
-                Assert.True(myLock.TryLockReentrant(timer.Remaining, out var writeLock));
-                Assert.False(timer.Elapsed);
+                Assert.True(myLock.TryLockReentrant(timer.Remaining(), out var writeLock));
+                Assert.False(timer.Elapsed());
                 Assert.Equal(0, myLock.CountParallelReadLocks);
                 Assert.True(myLock.IsWriteLocked);
                 Assert.True(writeLock.IsActive);
@@ -634,7 +634,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.False(exited);
 
                     signal1.Set();
-                    Assert.True(myLock.TryLockReentrant(timer.Remaining, out var deferredLock));
+                    Assert.True(myLock.TryLockReentrant(timer.Remaining(), out var deferredLock));
                     Assert.True(exited);
                     deferredLock.Exit();
                 });
@@ -642,12 +642,12 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 Assert.True(myLock.TryLockReentrant(out var innerLock));
                 innerLock.Exit();
 
-                signal1.Wait(timer.Remaining);
-                Assert.False(timer.Elapsed);
+                signal1.Wait(timer.Remaining());
+                Assert.False(timer.Elapsed());
                 exited = true;
             }
-            await task.WaitAsync(timer.Remaining);
-            Assert.False(timer.Elapsed);
+            await task.WaitAsync(timer.Remaining());
+            Assert.False(timer.Elapsed());
 
             // Check again for async call
             signal1.Reset();
@@ -663,7 +663,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.False(exited);
                     
                     signal1.Set();
-                    Assert.True(myLock.TryLockReentrant(timer.Remaining, out var deferredLock));  // TODO TryLockAsync needed
+                    Assert.True(myLock.TryLockReentrant(timer.Remaining(), out var deferredLock));  // TODO TryLockAsync needed
                     Assert.True(exited);
                     deferredLock.Exit();
                 });
@@ -671,12 +671,12 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 Assert.True(myLock.TryLockReentrant(out var innerLock));
                 innerLock.Exit();
 
-                signal1.Wait(timer.Remaining);
-                Assert.False(timer.Elapsed);
+                signal1.Wait(timer.Remaining());
+                Assert.False(timer.Elapsed());
                 exited = true;
             }
-            await task.WaitAsync(timer.Remaining);
-            Assert.False(timer.Elapsed);
+            await task.WaitAsync(timer.Remaining());
+            Assert.False(timer.Elapsed());
 
             // Check again for removing context from within the task
             signal1.Reset();
@@ -692,7 +692,7 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                     Assert.False(exited);
 
                     signal1.Set();
-                    Assert.True(myLock.TryLockReentrant(timer.Remaining, out var deferredLock));
+                    Assert.True(myLock.TryLockReentrant(timer.Remaining(), out var deferredLock));
                     Assert.True(exited);
                     deferredLock.Exit();
                 });
@@ -700,12 +700,12 @@ namespace FeatureFlowFramework.Tests.Helper.Synchronization
                 Assert.True(myLock.TryLockReentrant(out var innerLock));
                 innerLock.Exit();
 
-                signal1.Wait(timer.Remaining);
-                Assert.False(timer.Elapsed);
+                signal1.Wait(timer.Remaining());
+                Assert.False(timer.Elapsed());
                 exited = true;
             }
-            await task.WaitAsync(timer.Remaining);
-            Assert.False(timer.Elapsed);
+            await task.WaitAsync(timer.Remaining());
+            Assert.False(timer.Elapsed());
         }
 
         [Fact]

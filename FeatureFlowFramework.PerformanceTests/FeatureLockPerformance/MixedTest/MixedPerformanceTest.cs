@@ -13,6 +13,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         public MixedPerformanceTest(int numThreads)
         {
             var x = numThreads - 1;
+            x = 1;
             for (int i = 0; i < numThreads; i++)
             {
                 collection.AddSequence(new LockingSequence()

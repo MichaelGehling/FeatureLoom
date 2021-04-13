@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class SpinLockSubjects
     {
-        SpinLock myLock = new SpinLock();
+        SpinLock myLock = new SpinLock(false);
 
         public void Init() => myLock = new SpinLock();
 
@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
                 }
                 finally
                 {
-                    myLock.Exit();
+                    myLock.Exit(false);
                 }
             }
         }
@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
                 }
                 finally
                 {
-                    myLock.Exit();
+                    myLock.Exit(false);
                 }
             }
         }
@@ -57,7 +57,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
                 }
                 finally
                 {
-                    myLock.Exit();
+                    myLock.Exit(false);
                 }
             }
         }

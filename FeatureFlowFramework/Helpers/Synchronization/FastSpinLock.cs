@@ -68,7 +68,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             int cycleCounter = 0;
             do
             {
-                if(timer.Elapsed)
+                if(timer.Elapsed())
                 {
                     acquiredLock = new AcquiredLock();
                     return false;

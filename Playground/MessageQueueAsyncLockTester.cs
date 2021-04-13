@@ -57,12 +57,12 @@ namespace Playground
                     await Task.Yield();
                     await starter.WaitAsync();
                     TimeFrame timeFrame = timeBox;                    
-                    while(!timeFrame.Elapsed)
+                    while(!timeFrame.Elapsed())
                     {
                         if(queue.Count > 10000) await Task.Yield();
                         await writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(writerSlack);
-                        while(!slackTime.Elapsed) Thread.Yield();
+                        while(!slackTime.Elapsed()) Thread.Yield();
                     }
                 }).Invoke());
             }
@@ -74,12 +74,12 @@ namespace Playground
                     await Task.Yield();
                     await starter.WaitAsync();
                     TimeFrame timeFrame = timeBox;                    
-                    while(!timeFrame.Elapsed)
+                    while(!timeFrame.Elapsed())
                     {
                         if (queue.Count == 0) await Task.Yield();
                         await readLockFrame(lockObject, ReadFromQueue, queue.Count);                        
                         TimeFrame slackTime = new TimeFrame(readerSlack);
-                        while(!slackTime.Elapsed) Thread.Yield();
+                        while(!slackTime.Elapsed()) Thread.Yield();
                     }
                 }).Invoke());
             }
@@ -95,14 +95,14 @@ namespace Playground
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
             queue.Enqueue(writeCounter++);
-            while(!executionTimeFrame.Elapsed) ;
+            while(!executionTimeFrame.Elapsed()) ;
         }
 
         void ReadFromQueue()
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
             if(queue.TryDequeue(out _)) readCounter++;
-            while(!executionTimeFrame.Elapsed) ;
+            while(!executionTimeFrame.Elapsed()) ;
         }
 
         public readonly struct Result

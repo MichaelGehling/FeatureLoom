@@ -26,6 +26,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
         BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
+        MicroSpinLockSubjects microSpinLockSubjects = new MicroSpinLockSubjects();
 
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
@@ -57,16 +58,19 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public void FastSpinLock_Lock() => queueTest.Run(fastSpinLockSubjects.Init, fastSpinLockSubjects.Lock);
 
         [Benchmark]
+        public void MicroSpinLock_Lock() => queueTest.Run(microSpinLockSubjects.Init, microSpinLockSubjects.Lock);
+
+        [Benchmark]
+        public void SpinLock_Lock() => queueTest.Run(spinLockSubjects.Init, spinLockSubjects.Lock);
+
+        [Benchmark]
         public void Monitor_Lock() => queueTest.Run(monitorSubjects.Init, monitorSubjects.Lock);
 
         [Benchmark]
         public void SemaphoreSlim_Lock() => queueTest.Run(semaphoreSlimSubjects.Init, semaphoreSlimSubjects.Lock);
 
         [Benchmark]
-        public void ReaderWriterLockSlim_Lock() => queueTest.Run(readerWriterLockSlimSubjects.Init, readerWriterLockSlimSubjects.Lock);
-
-        [Benchmark]
-        public void SpinLock_Lock() => queueTest.Run(spinLockSubjects.Init, spinLockSubjects.Lock);
+        public void ReaderWriterLockSlim_Lock() => queueTest.Run(readerWriterLockSlimSubjects.Init, readerWriterLockSlimSubjects.Lock);        
 
         [Benchmark]
         public void AsyncEx_Lock() => queueTest.Run(asyncExSubjects.Init, asyncExSubjects.Lock);

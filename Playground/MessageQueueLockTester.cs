@@ -60,12 +60,12 @@ namespace Playground
                     {
                         starter.Wait();
                         TimeFrame timeFrame = timeBox;
-                        while (!timeFrame.Elapsed)
+                        while (!timeFrame.Elapsed())
                         {
                             if (queue.Count > 10000) Thread.Yield();
                             writeLockFrame(lockObject, WriteToQueue, queue.Count);
                             TimeFrame slackTime = new TimeFrame(writerSlack);
-                            while (!slackTime.Elapsed) Thread.Yield();
+                            while (!slackTime.Elapsed()) Thread.Yield();
                         }
                     }));
                 }
@@ -76,12 +76,12 @@ namespace Playground
                     {
                         starter.Wait();
                         TimeFrame timeFrame = timeBox;
-                        while (!timeFrame.Elapsed)
+                        while (!timeFrame.Elapsed())
                         {
                             if (queue.Count == 0) Thread.Yield();
                             readLockFrame(lockObject, ReadFromQueue, queue.Count);
                             TimeFrame slackTime = new TimeFrame(readerSlack);
-                            while (!slackTime.Elapsed) Thread.Yield();
+                            while (!slackTime.Elapsed()) Thread.Yield();
                         }
                     }));
                 }
@@ -91,21 +91,21 @@ namespace Playground
             starter.Set();
             Task.WaitAll(tasks.ToArray());
             queue = null;
-            return new Result(name, writeCounter, readCounter, timeBox.value.TimeSinceStart);
+            return new Result(name, writeCounter, readCounter, timeBox.value.TimeSinceStart());
         }
 
         void WriteToQueue()
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
             queue.Enqueue(writeCounter++);
-            while (!executionTimeFrame.Elapsed) ;
+            while (!executionTimeFrame.Elapsed()) ;
         }
 
         void ReadFromQueue()
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
             if (queue.TryDequeue(out _)) readCounter++;
-            while (!executionTimeFrame.Elapsed) ;
+            while (!executionTimeFrame.Elapsed()) ;
         }
 
         public readonly struct Result

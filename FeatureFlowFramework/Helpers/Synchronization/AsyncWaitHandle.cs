@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -107,7 +108,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if(timeout <= TimeSpan.Zero) return false;
 
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
+            DateTime now = AppTime.Now;
+            TimeFrame timeoutFrame = new TimeFrame(now, timeout);
 
             bool allProvideWaitHandle = true;
             bool anyWouldWait = false;
@@ -118,7 +120,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
 
             if (!anyWouldWait) return true;
-            if (timeoutFrame.Elapsed) return false;
+            if (timeoutFrame.Elapsed(now)) return false;
 
             if (allProvideWaitHandle)
             {
@@ -127,7 +129,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
                 }
-                return WaitHandle.WaitAll(handles, timeoutFrame.Remaining);
+                return WaitHandle.WaitAll(handles, timeoutFrame.Remaining(now));
             }
             else
             {
@@ -135,12 +137,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 do
                 {
                     allReady = true;
-                    for (int i = 0; i < asyncWaitHandles.Length && !timeoutFrame.Elapsed; i++)
+                    for (int i = 0; i < asyncWaitHandles.Length && !timeoutFrame.Elapsed(now); i++)
                     {
                         if (asyncWaitHandles[i].WouldWait())
                         {
                             allReady = false;
-                            asyncWaitHandles[i].Wait(timeoutFrame.Remaining);
+                            asyncWaitHandles[i].Wait(timeoutFrame.Remaining(now));
+                            now = AppTime.Now;
                             break;
                         }
                     }
@@ -148,14 +151,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 while (!allReady);
             }
 
-            return !timeoutFrame.Elapsed;
+            return !timeoutFrame.Elapsed(now);
         }
 
         public async static Task<bool> WaitAllAsync(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
         {
             if(timeout <= TimeSpan.Zero) return false;
-
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
 
             bool anyWouldWait = false;
             for(int i = 0; i < asyncWaitHandles.Length; i++)
@@ -165,7 +166,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.Remaining);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeout);
             return true;
         }
 
@@ -174,18 +175,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(token.IsCancellationRequested) return false;
             if(timeout <= TimeSpan.Zero) return false;
 
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
+            DateTime now = AppTime.Now;
+            TimeFrame timeoutFrame = new TimeFrame(now, timeout);
 
             bool allReady;
             do
             {
                 allReady = true;
-                for(int i = 0; i < asyncWaitHandles.Length && !timeoutFrame.Elapsed; i++)
+                for(int i = 0; i < asyncWaitHandles.Length && !timeoutFrame.Elapsed(now); i++)
                 {
                     if(asyncWaitHandles[i].WouldWait())
                     {
                         allReady = false;
-                        asyncWaitHandles[i].Wait(timeoutFrame.Remaining, token);
+                        asyncWaitHandles[i].Wait(timeoutFrame.Remaining(now), token);
+                        now = AppTime.Now;
                         break;
                     }
                 }
@@ -199,7 +202,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if(token.IsCancellationRequested) return false;
             if(timeout <= TimeSpan.Zero) return false;
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
 
             bool anyWouldWait = false;
             for(int i = 0; i < asyncWaitHandles.Length; i++)
@@ -209,7 +211,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeoutFrame.Remaining, token);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeout, token);
             return true;
         }
 
@@ -317,8 +319,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
 
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
-
             bool allProvideWaitHandle = true;
             for (int i = 0; i < asyncWaitHandles.Length; i++)
             {
@@ -327,8 +327,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 allProvideWaitHandle &= asyncWaitHandles[i].TryConvertToWaitHandle(out _);
             }
 
-            if (timeoutFrame.Elapsed) return WaitHandle.WaitTimeout;
-
             if (allProvideWaitHandle)
             {
                 WaitHandle[] handles = new WaitHandle[asyncWaitHandles.Length];
@@ -336,11 +334,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
                 }
-                return WaitHandle.WaitAny(handles, timeoutFrame.Remaining);
+                return WaitHandle.WaitAny(handles, timeout);
             }
             else
             {
-                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
                 Task.WhenAny(tasks).Wait();
                 for (int i = 0; i < tasks.Length-1; i++)
                 {
@@ -354,14 +352,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
 
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
-
             for(int i = 0; i < asyncWaitHandles.Length; i++)
             {
                 if(!asyncWaitHandles[i].WouldWait()) return i;
             }
 
-            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
             await Task.WhenAny(tasks);
             for(int i = 0; i < tasks.Length-1; i++)
             {
@@ -375,8 +371,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
             if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
 
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
-
             bool allProvideWaitHandle = true;
             for(int i = 0; i < asyncWaitHandles.Length; i++)
             {
@@ -384,8 +378,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
                 allProvideWaitHandle &= asyncWaitHandles[i].TryConvertToWaitHandle(out _);
             }
-
-            if(timeoutFrame.Elapsed) return WaitHandle.WaitTimeout;
 
             if(allProvideWaitHandle)
             {
@@ -395,13 +387,13 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     asyncWaitHandles[i].TryConvertToWaitHandle(out handles[i]);
                 }
                 handles[handles.Length - 1] = token.WaitHandle;
-                var index = WaitHandle.WaitAny(handles, timeoutFrame.Remaining);
+                var index = WaitHandle.WaitAny(handles, timeout);
                 if(index == handles.Length - 1) index = WaitHandle.WaitTimeout;
                 return index;
             }
             else
             {
-                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
+                Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
                 Task.WhenAny(tasks).Wait(token);
                 for(int i = 0; i < tasks.Length-1; i++)
                 {
@@ -416,14 +408,12 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
             if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
 
-            TimeFrame timeoutFrame = new TimeFrame(timeout);
-
             for(int i = 0; i < asyncWaitHandles.Length; i++)
             {
                 if(!asyncWaitHandles[i].WouldWait()) return i;
             }
 
-            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeoutFrame.Remaining));
+            Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
             await Task.WhenAny(tasks).WaitAsync(token);
             for(int i = 0; i < tasks.Length-1; i++)
             {

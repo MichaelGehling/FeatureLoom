@@ -1,6 +1,7 @@
 ﻿using FeatureFlowFramework.Helpers.Extensions;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.DataStorage;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
@@ -43,7 +44,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                     .Step("Reset connection wait event")
                         .Do(c => c.connectionWaitEvent.Reset())
                     .Step("Wait for reconnection timer or a config change")
-                        .WaitFor(c => c.config.SubscriptionWaitHandle, c => c.reconnectionCheckTimer.Remaining.ClampLow(TimeSpan.Zero))
+                        .WaitFor(c => c.config.SubscriptionWaitHandle, c => c.reconnectionCheckTimer.Remaining().ClampLow(TimeSpan.Zero))
                     .Step("If config change available, apply it, eventually try to reconnect")
                         .If(c => c.config.HasSubscriptionUpdate)
                             .Do(async c => await c.UpdateConfig(false))
@@ -51,7 +52,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                         .If(c => !c.config.active)
                             .Goto(waitingForActivation)
                     .Step("If disconnected and reconnection timer elapsed try to reconnect and reset timer")
-                        .If(c => c.connection?.Disconnected ?? true && c.reconnectionCheckTimer.Elapsed)
+                        .If(c => c.connection?.Disconnected ?? true && c.reconnectionCheckTimer.Elapsed())
                             .Do(async c => await c.TryConnect(false))
                     .Step("If connected go to observing connection, otherwise continue reconnecting")
                         .If(c => c.connection?.Connected ?? false)
@@ -160,7 +161,11 @@ namespace FeatureFlowFramework.DataFlows.TCP
             {
                 if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
 
-                if (initial || oldConfig.reconnectionCheckTime != config.reconnectionCheckTime) reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime - reconnectionCheckTimer.TimeSinceStart);
+                if (initial || oldConfig.reconnectionCheckTime != config.reconnectionCheckTime)
+                {
+                    DateTime now = AppTime.Now;
+                    reconnectionCheckTimer = new TimeFrame(now, config.reconnectionCheckTime - reconnectionCheckTimer.TimeSinceStart(now));
+                }
 
                 if (initial || ConfigChanged(oldConfig))
                 {

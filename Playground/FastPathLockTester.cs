@@ -29,7 +29,7 @@ namespace Playground
 
             long counter = 0;
             var timeFrame = new TimeFrame(duration);
-            while(!timeFrame.Elapsed)
+            while(!timeFrame.Elapsed())
             {
                 for(int i = 0; i < 100; i++)
                 {
@@ -76,7 +76,7 @@ namespace Playground
         {
             long counter = 0;
             var timeFrame = new TimeFrame(duration);
-            while(!timeFrame.Elapsed)
+            while(!timeFrame.Elapsed())
             {
                 for(int i = 0; i < 100; i++)
                 {

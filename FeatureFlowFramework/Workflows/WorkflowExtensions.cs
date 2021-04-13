@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.DataFlows;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Workflows;
 using System;
 using System.Collections.Generic;
@@ -49,15 +50,21 @@ namespace FeatureFlowFramework.Workflows
 
         public static async Task<bool> WaitUntilAsync(this Workflow workflow, Predicate<Workflow.ExecutionInfo> startCondition, Predicate<Workflow.ExecutionInfo> endCondition, TimeSpan timeout = default)
         {
-            TimeFrame timeFrame = new TimeFrame(timeout);
+            TimeFrame timeFrame = new TimeFrame();
+
 
             ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> startTrigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(startCondition);
             workflow.ExecutionInfoSource.ConnectTo(startTrigger);
             startTrigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
-            if(timeout == default) await startTrigger.WaitAsync();
-            else success = await startTrigger.WaitAsync(timeFrame.Remaining);
+            if (timeout == default) await startTrigger.WaitAsync();
+            else
+            {
+                DateTime now = AppTime.Now;
+                timeFrame = new TimeFrame(now, timeout);
+                success = await startTrigger.WaitAsync(timeFrame.Remaining(now));
+            }
 
             workflow.ExecutionInfoSource.DisconnectFrom(startTrigger);
 
@@ -69,7 +76,7 @@ namespace FeatureFlowFramework.Workflows
                 endTrigger.Post(workflow.CreateExecutionInfo());
 
                 if(timeout == default) await endTrigger.WaitAsync();
-                else success = await endTrigger.WaitAsync(timeFrame.Remaining);
+                else success = await endTrigger.WaitAsync(timeFrame.Remaining());
 
                 workflow.ExecutionInfoSource.DisconnectFrom(endTrigger);
             }
@@ -78,15 +85,20 @@ namespace FeatureFlowFramework.Workflows
 
         public static bool WaitUntil(this Workflow workflow, Predicate<Workflow.ExecutionInfo> startCondition, Predicate<Workflow.ExecutionInfo> endCondition, TimeSpan timeout = default)
         {
-            TimeFrame timeFrame = new TimeFrame(timeout);
+            TimeFrame timeFrame = new TimeFrame();
 
             ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo> startTrigger = new ConditionalTrigger<Workflow.ExecutionInfo, Workflow.ExecutionInfo>(startCondition);
             workflow.ExecutionInfoSource.ConnectTo(startTrigger);
             startTrigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
-            if(timeout == default) startTrigger.Wait();
-            else success = startTrigger.Wait(timeFrame.Remaining);
+            if (timeout == default) startTrigger.Wait();
+            else
+            {
+                DateTime now = AppTime.Now;
+                timeFrame = new TimeFrame(now, timeout);
+                success = startTrigger.Wait(timeFrame.Remaining(now));
+            }
 
             workflow.ExecutionInfoSource.DisconnectFrom(startTrigger);
 
@@ -98,7 +110,7 @@ namespace FeatureFlowFramework.Workflows
                 endTrigger.Post(workflow.CreateExecutionInfo());
 
                 if(timeout == default) endTrigger.Wait();
-                else success = endTrigger.Wait(timeFrame.Remaining);
+                else success = endTrigger.Wait(timeFrame.Remaining());
 
                 workflow.ExecutionInfoSource.DisconnectFrom(endTrigger);
             }

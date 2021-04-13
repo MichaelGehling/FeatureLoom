@@ -27,11 +27,12 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void CheckForTimeouts(object state)
         {
+            DateTime now = AppTime.Now;
             using (responseHandlersLock.Lock())
             {
                 for (int i = 0; i < responseHandlers.Count; i++)
                 {
-                    if (responseHandlers[i].LifeTime.Elapsed)
+                    if (responseHandlers[i].LifeTime.Elapsed(now))
                     {
                         responseHandlers[i].Cancel();
                         responseHandlers.RemoveAt(i--);
@@ -150,6 +151,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             }
             else if(message is IRpcResponse)
             {
+                DateTime now = AppTime.Now;
                 using (responseHandlersLock.Lock())
                 {
                     for(int i = 0; i < responseHandlers.Count; i++)
@@ -159,7 +161,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                             responseHandlers.RemoveAt(i--);
                             break;
                         }
-                        else if(responseHandlers[i].LifeTime.Elapsed)
+                        else if(responseHandlers[i].LifeTime.Elapsed(now))
                         {
                             responseHandlers[i].Cancel();
                             responseHandlers.RemoveAt(i--);

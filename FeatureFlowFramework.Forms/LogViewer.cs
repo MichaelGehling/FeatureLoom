@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.Forms
                                 TimeFrame timeSlice = new TimeFrame(20.Milliseconds());
                                 var textBox = c.logViewer.richTextBox1;
                                 while(!textBox.IsDisposed &&
-                                      !timeSlice.Elapsed &&
+                                      !timeSlice.Elapsed() &&
                                       c.logViewer.keepReading &&
                                       c.queue.TryReceive(out LogMessage msg))
                                 {
