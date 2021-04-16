@@ -99,7 +99,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if(task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested) return false;
             else if(task.IsCompleted) return true;
-            try
+            
+            /*try
             {
                 using(var cancelRegistration = cancellationToken.Register(() => throw new TaskCanceledException(task), true))
                 {
@@ -113,8 +114,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
-
-            /*
+            */
+            
             var tcs = new TaskCompletionSource<bool>();
             var registration = cancellationToken.Register(s =>
             {
@@ -152,7 +153,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
-            */
+            
         }
 
         public async static Task<bool> WaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken)

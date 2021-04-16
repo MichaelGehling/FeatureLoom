@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public StorageWebAccess(Config config = null, IWebServer webServer = null)
         {
             this.config = config ?? new Config();
-            this.config.TryUpdateFromStorageAsync(false).Wait();
+            this.config.TryUpdateFromStorage(false);
             webServer = webServer ?? SharedWebServer.WebServer;
             if (!this.config.route.StartsWith("/")) this.config.route = "/" + this.config.route;
             this.config.route = this.config.route.TrimEnd("/");

@@ -3,6 +3,7 @@ using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Forms;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Services;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Workflows;
 using System.Drawing;
@@ -16,8 +17,12 @@ namespace FeatureFlowFramework.Forms
         public bool keepReading = true;
         public bool hideOnClosing = false;
 
-        public LogViewer(IDataFlowSource logMessageSource = null)
+        public Sender<LogMessage> logNotificationSender = new Sender<LogMessage>();
+
+        public LogViewer(IDataFlowSource logMessageSource = null, bool hideOnClosing = false, bool startReading = true)
         {
+            this.hideOnClosing = hideOnClosing;
+            this.keepReading = startReading;
             InitializeComponent();
             FormClosing += (o, e) =>
             {
@@ -63,10 +68,10 @@ namespace FeatureFlowFramework.Forms
                         .Step("Read logmessages from queue and write them to the textbox for a short time")
                             .Do(c =>
                             {
-                                TimeFrame timeSlice = new TimeFrame(20.Milliseconds());
+                                TimeFrame timeSlice = new TimeFrame(50.Milliseconds());
                                 var textBox = c.logViewer.richTextBox1;
                                 while(!textBox.IsDisposed &&
-                                      !timeSlice.Elapsed() &&
+                                      !timeSlice.Elapsed(AppTime.CoarseNow) &&
                                       c.logViewer.keepReading &&
                                       c.queue.TryReceive(out LogMessage msg))
                                 {
@@ -82,10 +87,13 @@ namespace FeatureFlowFramework.Forms
                                     }
                                     if(color != textBox.ForeColor) textBox.AppendText(msg.Print() + "\n", color);
                                     else textBox.AppendText(msg.Print() + "\n");
+
+                                    c.logViewer.logNotificationSender.Send(msg);
                                 }
                             })
                             .Catch()
                         .Step("Loop")
+                            .Wait(20.Milliseconds())
                             .Loop();
                 }
             }

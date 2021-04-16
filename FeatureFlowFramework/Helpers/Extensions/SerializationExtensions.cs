@@ -2,6 +2,7 @@
 using FeatureFlowFramework.Services.Serialization;
 using Newtonsoft.Json;
 using System.IO;
+using System.Xml;
 
 namespace FeatureFlowFramework.Helpers.Extensions
 {
@@ -42,6 +43,13 @@ namespace FeatureFlowFramework.Helpers.Extensions
         public static void UpdateFromJson<T>(this T obj, string json, JsonSerializerSettings settings = null) where T : class
         {
             Json.UpdateFromJson(obj, json, settings);
+        }
+
+        public static XmlElement ToXmlElement(this string xml, XmlDocument xmlDoc)
+        {
+            if (xmlDoc == null) xmlDoc = new XmlDocument();
+            xmlDoc.LoadXml(xml);
+            return xmlDoc.DocumentElement;
         }
     }
 }

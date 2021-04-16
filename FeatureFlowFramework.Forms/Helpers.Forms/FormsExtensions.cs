@@ -29,5 +29,12 @@ namespace FeatureFlowFramework.Helpers.Forms
             }
             return false;
         }
+
+        public static T FindParent<T>(this Control control, string name = null) where T : Control
+        {
+            Control parent = control.Parent;
+            while(parent != null && !(parent is T) && (name == null || parent.Name != name)) parent = parent.Parent;
+            return parent as T;
+        }
     }
 }

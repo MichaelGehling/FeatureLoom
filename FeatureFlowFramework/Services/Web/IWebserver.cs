@@ -5,8 +5,10 @@ namespace FeatureFlowFramework.Services.Web
     public interface IWebServer
     {
         void Start();
+        
+        Task StopAsync();
 
-        Task Stop();
+        void Stop();
 
         bool Started { get; }
 

@@ -125,5 +125,44 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             return success;
         }
+
+        public bool TryUpdateFromStorage(bool useSubscription)
+        {
+            bool success = false;
+            string json = null;
+            if (useSubscription)
+            {
+                if (!subscriptionReceiver.IsInstantiated)
+                {
+                    success = Reader.TryReadAsync<string>(this.Uri).Result.Out(out json);
+                    StartSubscription();
+                }
+                else
+                {
+                    if (this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
+                    {
+                        success = changeUpdate.isValid;
+                        json = changeUpdate.item;
+                    }
+                }
+            }
+            else
+            {
+                success = Reader.TryReadAsync<string>(this.Uri).Result.Out(out json);
+            }
+            if (success)
+            {
+                try
+                {
+                    this.UpdateFromJson(json);
+                    Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");
+                }
+                catch
+                {
+                    success = false;
+                }
+            }
+            return success;
+        }
     }
 }

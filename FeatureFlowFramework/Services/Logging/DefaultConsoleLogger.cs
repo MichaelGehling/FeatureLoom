@@ -27,7 +27,7 @@ namespace FeatureFlowFramework.Services.Logging
         {
             if(!hasConsole) return;
 
-            config.TryUpdateFromStorageAsync(true).Wait();
+            config.TryUpdateFromStorage(true);
 
             if(message is LogMessage logMessage)
             {

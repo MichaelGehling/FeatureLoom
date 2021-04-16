@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace FeatureFlowFramework.Helpers.Extensions
 {
@@ -44,6 +45,20 @@ namespace FeatureFlowFramework.Helpers.Extensions
                 array[i++] = item;
             }            
             return array;
+        }
+
+        public static string AllItemsToString<T>(this IEnumerable<T> collection, string delimiter = null)
+        {
+            if (collection.EmptyOrNull()) return "";
+            StringBuilder sb = new StringBuilder();
+            bool isFirst = true;
+            foreach (var item in collection)
+            {
+                if (!isFirst && delimiter != null) sb.Append(delimiter);
+                else isFirst = false;
+                sb.Append(item.ToString());
+            }
+            return sb.ToString();
         }
 
     }

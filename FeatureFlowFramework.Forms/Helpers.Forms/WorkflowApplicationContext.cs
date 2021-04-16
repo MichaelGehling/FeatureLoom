@@ -4,6 +4,7 @@ using System;
 using System.Windows.Forms;
 using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Helpers.Extensions;
 
 namespace FeatureFlowFramework.Helpers.Forms
 {
@@ -31,8 +32,8 @@ namespace FeatureFlowFramework.Helpers.Forms
                        msg.executionPhase == Workflow.ExecutionPhase.Invalid)
                     {
                         if (!await runner.PauseAllWorkflows(true).WaitAsync(5.Seconds()))
-                        {
-                            throw new Exception("Failed to stop workflows!");
+                        {                            
+                            throw new Exception($"Failed to stop all workflows!\n{runner.RunningWorkflows.AllItemsToString()}");
                         }
                         Application.ExitThread();
                     }

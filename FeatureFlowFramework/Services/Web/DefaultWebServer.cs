@@ -61,7 +61,7 @@ namespace FeatureFlowFramework.Services.Web
                 endpoints.Add(endpoint);
                 if (started)
                 {
-                    Stop().Wait();
+                    Stop();
                     Start();
                 }
             }
@@ -77,7 +77,7 @@ namespace FeatureFlowFramework.Services.Web
                 this.requestHandlers = requestHandlers;
                 if (started)
                 {
-                    Stop().Wait();
+                    Stop();
                     Start();
                 }
             }
@@ -93,7 +93,7 @@ namespace FeatureFlowFramework.Services.Web
                 this.requestHandlers = requestHandlers;
                 if (started)
                 {
-                    Stop().Wait();
+                    Stop();
                     Start();
                 }
             }
@@ -109,7 +109,7 @@ namespace FeatureFlowFramework.Services.Web
                 this.requestHandlers = requestHandlers;
                 if (started)
                 {
-                    Stop().Wait();
+                    Stop();
                     Start();
                 }
             }
@@ -123,7 +123,7 @@ namespace FeatureFlowFramework.Services.Web
                 endpoints.Clear();
                 if (started)
                 {
-                    Stop().Wait();
+                    Stop();
                     Start();
                 }
             }
@@ -281,7 +281,15 @@ namespace FeatureFlowFramework.Services.Web
             });
         }
 
-        public async Task Stop()
+        public void Stop()
+        {
+            if (webserver != null)
+            {
+                webserver.StopAsync().Wait();
+            }
+        }
+
+        public async Task StopAsync()
         {
             if (webserver != null)
             {

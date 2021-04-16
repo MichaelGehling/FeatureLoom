@@ -57,7 +57,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 
             if (config.IsUriDefault) config.Uri = "TextFileStorageConfig" + "_" + this.category;
 
-            if (config.ConfigCategory != this.category) config.TryUpdateFromStorageAsync(false).Wait();            
+            if (config.ConfigCategory != this.category) config.TryUpdateFromStorage(false);            
 
             string basePath = config.basePath;
             if (config.useCategoryFolder) basePath = Path.Combine(config.basePath, this.category);

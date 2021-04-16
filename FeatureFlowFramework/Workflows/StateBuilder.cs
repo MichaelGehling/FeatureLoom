@@ -164,7 +164,7 @@ namespace FeatureFlowFramework.Workflows
         public IAfterActionStateBuilder<CT> Wait(Func<CT, TimeSpan> waitingTime)
         {
             CurrentPartialStep.hasWaiting = true;
-            CurrentPartialStep.waitingDelegate = c => Task.Delay(waitingTime(c), c.CancellationToken).Wait();
+            CurrentPartialStep.waitingDelegate = c => c.CancellationToken.WaitHandle.WaitOne(waitingTime(c));
             CurrentPartialStep.waitingAsyncDelegate = c => Task.Delay(waitingTime(c), c.CancellationToken);
             return this;
         }
@@ -172,7 +172,7 @@ namespace FeatureFlowFramework.Workflows
         public IAfterActionStateBuilder<CT> Wait(TimeSpan waitingTime)
         {
             CurrentPartialStep.hasWaiting = true;
-            CurrentPartialStep.waitingDelegate = c => Task.Delay(waitingTime, c.CancellationToken).Wait();
+            CurrentPartialStep.waitingDelegate = c => c.CancellationToken.WaitHandle.WaitOne(waitingTime);
             CurrentPartialStep.waitingAsyncDelegate = c => Task.Delay(waitingTime, c.CancellationToken);
             return this;
         }
