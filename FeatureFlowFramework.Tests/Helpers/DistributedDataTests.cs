@@ -8,7 +8,7 @@ using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.Helpers
 {
-    public class DistributedDataTests
+    public class AppTimeTestsTests
     {
         [Fact]
         public void ChangedDataWillBePublishedToConnectedDistributedData()

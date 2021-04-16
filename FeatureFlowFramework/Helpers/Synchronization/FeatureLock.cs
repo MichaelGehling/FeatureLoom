@@ -315,7 +315,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool MustYieldAsyncThread(int rank, bool prioritized, int counter)
         {
             // If a special synchronization context is set (e.g. UI-Thread) the task must always be yielded to avoid blocking
-            if (SynchronizationContext.Current != null) return true;
+            if (SynchronizationContext.Current != null) return true;            
 
             // We must ensure that the rank is at least 1, otherwise we can get division by zero!
             rank = rank + 1;
@@ -604,7 +604,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         if (rank == 0) waitCounter++;
 
-                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
+                        if (MustYieldAsyncThread(rank, prioritized, counter++))
+                        {
+                            if (rank == 0) waitCounter += 100;
+                            await Task.Yield();                            
+                        }
                         else Thread.Sleep(0);
 
                         skip = MustStillWait(prioritized, readOnly);
@@ -1052,7 +1056,11 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         if (rank == 0) waitCounter++;
 
-                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
+                        if (MustYieldAsyncThread(rank, prioritized, counter++))
+                        {
+                            if (rank == 0) waitCounter += 100;
+                            await Task.Yield();                            
+                        }
                         else Thread.Sleep(0);
 
                         skip = MustStillWait(prioritized, readOnly);

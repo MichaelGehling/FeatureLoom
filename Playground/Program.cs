@@ -33,24 +33,76 @@ namespace Playground
 
         volatile static bool done = false;
 
+        public static async Task YieldAsync() => await Task.Yield();
+        public static async Task WaitAsync() => await Task.Delay(0);
+
         static void Main(string[] args)
         {
-            DateTime baseTime = DateTime.UtcNow;
-            int baseTicks = Environment.TickCount;
-            
+
+            int num = 10_000;
+            TimeKeeper y;
+
+            DateTime x;
+            var tk = AppTime.TimeKeeper;
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) YieldAsync().Wait();
+            Console.WriteLine($"Y {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) YieldAsync().Wait();
+            Console.WriteLine($"Y {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) WaitAsync().Wait();
+            Console.WriteLine($"ASYNC {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) AppTime.WaitAsync(1.Milliseconds()).Wait();
+            Console.WriteLine($"AWAIT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) ;
+            Console.WriteLine($"NIX {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) AppTime.Wait(1.Milliseconds());
+            Console.WriteLine($"WAIT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) x = AppTime.Now;
+            Console.WriteLine($"AT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) x = AppTime.CoarseNow;
+            Console.WriteLine($"CT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) x = DateTime.UtcNow;
+            Console.WriteLine($"UTC {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+            tk.Restart();
+            for (int i = 0; i < num; i++) y = AppTime.TimeKeeper;
+            Console.WriteLine($"SW {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
+
+
+            Task.Run(() =>
+            {
+                while(true)
+                {
+                    var xy = AppTime.Now;
+                    Console.WriteLine($"----");
+                    Thread.Sleep(3333);
+                }
+            });
+
             while (true)
             {
-
-                DateTime now = DateTime.UtcNow;
-                DateTime tickNow = baseTime + (Environment.TickCount - baseTicks).Milliseconds();
-                TimeSpan diff = now - tickNow;
-
-                Console.WriteLine($"{diff.Milliseconds}");
+                Thread.Sleep(1000);
+                var dt = DateTime.UtcNow;
+                var coarse = AppTime.CoarseNow;
+                Console.WriteLine($"Diff: {(coarse - dt).TotalMilliseconds}");
             }
-
-            new TimeSpan((long)Environment.TickCount * 1000);
-
-
 
             Console.ReadKey();
 

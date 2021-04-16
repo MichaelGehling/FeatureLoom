@@ -67,5 +67,25 @@ namespace FeatureFlowFramework.Helpers.Time
         {
             return (time - compTime).Duration() < tolerance;
         }
+
+        public static TimeSpan divide(this TimeSpan time, int divisor)
+        {
+            return new TimeSpan(time.Ticks / divisor);
+        }
+
+        public static TimeSpan divide(this TimeSpan time, double divisor)
+        {
+            return new TimeSpan((long)(time.Ticks / divisor));
+        }
+
+        public static TimeSpan multiply(this TimeSpan time, int factor)
+        {
+            return new TimeSpan(time.Ticks * factor);
+        }
+
+        public static TimeSpan multiply(this TimeSpan time, double factor)
+        {
+            return new TimeSpan((long)(time.Ticks * factor));
+        }
     }
 }

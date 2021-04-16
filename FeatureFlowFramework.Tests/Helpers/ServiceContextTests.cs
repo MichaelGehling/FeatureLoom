@@ -6,7 +6,7 @@ using FeatureFlowFramework.Helpers;
 using System.Threading.Tasks;
 using FeatureFlowFramework.Helpers.Misc;
 
-namespace FeatureFlowFramework.Tests.Helper
+namespace FeatureFlowFramework.Helpers
 {
     public class ServiceContextTests
     {

@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureFlowFramework.Tests.Helper.Synchronization
+namespace FeatureFlowFramework.Helpers.Synchronization
 {
     public class FeatureLockTests
     {

@@ -34,8 +34,8 @@ namespace FeatureFlowFramework.DataFlows
         }
 
         public void Post<M>(in M message)
-        {
-            sendingHelper.ForwardAsync(message).Wait();
+        {            
+            _ = sendingHelper.ForwardAsync(message);
         }
 
         public Task PostAsync<M>(M message)
