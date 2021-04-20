@@ -73,17 +73,39 @@ namespace FeatureFlowFramework.Services
             while (timer.Elapsed < timeout) Thread.Sleep(0);
         }
 
+        public static void Wait(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            if (timeout == TimeSpan.Zero || cancellationToken.IsCancellationRequested) return;
+            else timeout = new TimeSpan(timeout.Ticks - 1);
+
+            TimeKeeper timer = TimeKeeper;
+            if (timeout > 16.Milliseconds()) cancellationToken.WaitHandle.WaitOne(timeout - 16.Milliseconds());
+            while (timer.Elapsed < timeout && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
+        }
+
         public static async Task WaitAsync(TimeSpan timeout)
         {
             if (timeout.Ticks <= 5) Wait(timeout);
             else
             {
-
                 TimeKeeper timer = TimeKeeper;
                 if (timeout > 16.Milliseconds()) await Task.Delay(timeout - 16.Milliseconds());
                 while (timer.Elapsed < timeout - 0.01.Milliseconds()) await Task.Yield();
                 while (timer.Elapsed.Ticks < timeout.Ticks - 1000) await Task.Delay(0);
                 while (timer.Elapsed.Ticks < timeout.Ticks - 50) Thread.Sleep(0);
+            }
+        }
+
+        public static async Task WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            if (timeout.Ticks <= 5) Wait(timeout, cancellationToken);
+            else
+            {
+                TimeKeeper timer = TimeKeeper;
+                if (timeout > 16.Milliseconds()) await Task.Delay(timeout - 16.Milliseconds(), cancellationToken);
+                while (timer.Elapsed < timeout - 0.01.Milliseconds() && !cancellationToken.IsCancellationRequested) await Task.Yield();
+                while (timer.Elapsed.Ticks < timeout.Ticks - 1000 && !cancellationToken.IsCancellationRequested) await Task.Delay(0);
+                while (timer.Elapsed.Ticks < timeout.Ticks - 50 && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
             }
         }
 

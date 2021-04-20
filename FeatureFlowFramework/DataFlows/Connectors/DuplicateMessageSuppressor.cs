@@ -14,7 +14,7 @@ namespace FeatureFlowFramework.DataFlows
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private Queue<(object message, DateTime suppressionEnd)> suppressors = new Queue<(object, DateTime)>();
-        FastSpinLock suppressorsLock = new FastSpinLock();
+        MicroLock suppressorsLock = new MicroLock();
         private readonly TimeSpan suppressionTime;
         private readonly TimeSpan cleanupPeriode = 10.Seconds();
         private readonly Func<object, object, bool> isDuplicate;

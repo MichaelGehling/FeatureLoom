@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Helpers.Diagnostics;
+using FeatureFlowFramework.Helpers.Synchronization;
 using Xunit;
 
 namespace FeatureFlowFramework.DataFlows.RPC
@@ -17,7 +18,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
             callee.RegisterMethod("Get42", () => 42);
 
-            int result = caller.CallAsync<int>("Get42").Result;
+            int result = caller.CallAsync<int>("Get42").WaitFor();
             Assert.Equal(42, result);
         }
 
@@ -37,7 +38,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 return response;
             });
 
-            string result = caller.CallAsync<(string, int), string>("RepeatString", ("Test ", 3)).Result;
+            string result = caller.CallAsync<(string, int), string>("RepeatString", ("Test ", 3)).WaitFor();
             Assert.Equal("Test Test Test ", result);
         }
 
@@ -85,7 +86,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 return response;
             });
 
-            string result = caller.CallAsync("RepeatString \"Test \" 3").Result;
+            string result = caller.CallAsync("RepeatString \"Test \" 3").WaitFor();
             Assert.Equal("Test Test Test ", result);
 
             callee.RegisterMethod<TestParameters, string>("RepeatString2", (testParams) =>
@@ -95,7 +96,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 return response;
             });
 
-            string result2 = caller.CallAsync("RepeatString2 {str:\"Abc \", num:2}").Result;
+            string result2 = caller.CallAsync("RepeatString2 {str:\"Abc \", num:2}").WaitFor();
             Assert.Equal("Abc Abc ", result2);
         }
 
@@ -159,7 +160,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             callee.WaitHandle.Wait();
             callee.HandleQueuedRpcRequests();
             Assert.True(callTask.IsCompleted);
-            Assert.Equal(42, callTask.Result);
+            Assert.Equal(42, callTask.WaitFor());
             Assert.Equal(0, callee.Count);
         }
     }

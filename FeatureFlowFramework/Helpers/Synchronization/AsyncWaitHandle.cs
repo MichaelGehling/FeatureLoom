@@ -8,6 +8,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 {
     public class AsyncWaitHandle : IAsyncWaitHandle
     {
+        #region static
         public static bool WaitAll(params IAsyncWaitHandle[] asyncWaitHandles)
         {
             bool allProvideWaitHandle = true;
@@ -51,7 +52,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return true;
         }
 
-        public async static Task<bool> WaitAllAsync(params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async Task<bool> WaitAllAsync(params IAsyncWaitHandle[] asyncWaitHandles)
         {
             bool anyWouldWait = false;
             for(int i = 0; i < asyncWaitHandles.Length; i++)
@@ -88,7 +89,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return true;
         }
 
-        public async static Task<bool> WaitAllAsync(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async  Task<bool> WaitAllAsync(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
         {
             if(token.IsCancellationRequested) return false;
 
@@ -154,7 +155,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return !timeoutFrame.Elapsed(now);
         }
 
-        public async static Task<bool> WaitAllAsync(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async Task<bool> WaitAllAsync(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
         {
             if(timeout <= TimeSpan.Zero) return false;
 
@@ -198,7 +199,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             return true;
         }
 
-        public async static Task<bool> WaitAllAsync(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async Task<bool> WaitAllAsync(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
         {
             if(token.IsCancellationRequested) return false;
             if(timeout <= TimeSpan.Zero) return false;
@@ -214,7 +215,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeout, token);
             return true;
         }
-
 
         public static int WaitAny(params IAsyncWaitHandle[] asyncWaitHandles)
         {
@@ -238,7 +238,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else
             {
                 Task[] tasks = asyncWaitHandles.GetWaitingTasks();
-                Task.WhenAny(tasks).Wait();                
+                Task.WhenAny(tasks).WaitFor();                
                 for (int i = 0; i < tasks.Length; i++)
                 {
                     if (tasks[i].IsCompleted) return i;
@@ -247,7 +247,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        public async static Task<int> WaitAnyAsync(params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async Task<int> WaitAnyAsync(params IAsyncWaitHandle[] asyncWaitHandles)
         {
             for(int i = 0; i < asyncWaitHandles.Length; i++)
             {
@@ -297,7 +297,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        public async static Task<int> WaitAnyAsync(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async Task<int> WaitAnyAsync(CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
         {
             if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
 
@@ -339,7 +339,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             else
             {
                 Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
-                Task.WhenAny(tasks).Wait();
+                Task.WhenAny(tasks).WaitFor();
                 for (int i = 0; i < tasks.Length-1; i++)
                 {
                     if (tasks[i].IsCompleted) return i;
@@ -348,7 +348,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        public async static Task<int> WaitAnyAsync(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async Task<int> WaitAnyAsync(TimeSpan timeout, params IAsyncWaitHandle[] asyncWaitHandles)
         {
             if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
 
@@ -403,7 +403,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
-        public async static Task<int> WaitAnyAsync(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
+        public static async Task<int> WaitAnyAsync(TimeSpan timeout, CancellationToken token, params IAsyncWaitHandle[] asyncWaitHandles)
         {
             if(token.IsCancellationRequested) return WaitHandle.WaitTimeout;
             if(timeout <= TimeSpan.Zero) return WaitHandle.WaitTimeout;
@@ -425,6 +425,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         public static IAsyncWaitHandle NoWaitingHandle { get; } = new AsyncManualResetEvent(true);
         public static IAsyncWaitHandle FromTask(Task task) => task.IsCompleted ? NoWaitingHandle : new AsyncWaitHandle(task);
+        #endregion static
+
         private Task task;
         
         private AsyncWaitHandle(Task task)
@@ -456,7 +458,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         public bool Wait()
         {
-            task.Wait();
+            task.WaitFor();
             return !task.IsCanceled && !task.IsFaulted && task.IsCompleted;
         }
 

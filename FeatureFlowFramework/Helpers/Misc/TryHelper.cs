@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.Helpers.Misc
         {
             try
             {
-                result = function().Result;
+                result = function().WaitFor();
                 return true;
             }
             catch
@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.Helpers.Misc
         {
             try
             {
-                action().Wait();
+                action().WaitFor();
                 return true;
             }
             catch

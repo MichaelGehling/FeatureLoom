@@ -48,7 +48,7 @@ namespace FeatureFlowFramework.Services
             {
                 public Func<T> create = null;
                 public Dictionary<string, Func<T>> namedFactories = null;
-                public FastSpinLock myLock = new FastSpinLock();
+                public MicroLock myLock = new MicroLock();
 
                 public IServiceContextData Copy()
                 {

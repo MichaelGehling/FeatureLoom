@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helpers.Synchronization;
+using System;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
@@ -78,7 +79,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
                 else
                 {
-                    if(!processingAsync(msgT).Result)
+                    if(!processingAsync(msgT).WaitFor())
                     {
                         alternativeSendingHelper?.Forward(message);
                     }

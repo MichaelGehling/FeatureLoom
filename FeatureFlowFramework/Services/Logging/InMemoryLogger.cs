@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.Services.Logging
     public class InMemoryLogger : IDataFlowSink
     {       
         CountingRingBuffer<LogMessage> buffer;
-        FastSpinLock bufferLock = new FastSpinLock();
+        MicroLock bufferLock = new MicroLock();
 
         public InMemoryLogger(int bufferSize)
         {

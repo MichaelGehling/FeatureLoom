@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace FeatureFlowFramework.Helpers.Synchronization
 {
-    public struct MicroSpinLock
+    public struct MicroValueLock
     {
         const int NO_LOCK = 0;
         const int LOCKED = 1;

@@ -78,9 +78,9 @@ namespace FeatureRpcClient
                             .Goto(callFailed)
                     .Step("Print result to console.")
                         .If(c => c.multiCall)
-                            .Do(c => Console.WriteLine(c.rpcCallFuture.Result))
+                            .Do(async c => Console.WriteLine(await c.rpcCallFuture))
                         .Else()
-                            .Do(c => Console.Write(c.rpcCallFuture.Result))
+                            .Do(async c => Console.Write(await c.rpcCallFuture))
                     .Step("If multi call loop calling state, else go to closing connection state.")
                         .If(c => c.multiCall)
                             .Loop()
@@ -115,7 +115,7 @@ namespace FeatureRpcClient
             Log.LogForwarder.DisconnectFrom(Log.defaultConsoleLogger);
             var workflow = new FeatureRpcClient(args.Length >= 1 ? args[0] : null);
             new BlockingRunner().Run(workflow);
-            WorkflowRunnerService.PauseAllWorkflows(true).Wait(1.Seconds());
+            WorkflowRunnerService.PauseAllWorkflowsAsync(true).Wait(1.Seconds());
             return workflow.errorCode;
         }
     }

@@ -33,7 +33,7 @@ namespace FeatureFlowFramework.Helpers
                 Thread.Sleep(10.Milliseconds());
                 Assert.Equal(1, data.Value);
             }
-            task.Wait();
+            task.WaitFor();
             using(var data = sharedData.GetReadAccess())
             {
                 Assert.Equal(2, data.Value);

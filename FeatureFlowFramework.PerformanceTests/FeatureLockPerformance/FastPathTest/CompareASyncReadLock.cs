@@ -1,5 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
@@ -18,13 +19,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         AsyncExRWSubjects asyncExRWSubjects = new AsyncExRWSubjects();
 
         [Benchmark(Baseline = true)]
-        public void FeatureLock_LockReadOnlyAsync_() => featureLockSubjects.LockReadOnlyAsync().Wait();
+        public void FeatureLock_LockReadOnlyAsync_() => featureLockSubjects.LockReadOnlyAsync().WaitFor();
 
         [Benchmark]
-        public void VSAsyncReaderWriterLock_LockReadOnlyAsync_() => vSAsyncReaderWriterLockSubjects.LockReadOnlyAsync().Wait();
+        public void VSAsyncReaderWriterLock_LockReadOnlyAsync_() => vSAsyncReaderWriterLockSubjects.LockReadOnlyAsync().WaitFor();
 
         [Benchmark]
-        public void AsyncExRW_LockReadOnlyAsync_() => asyncExRWSubjects.LockReadOnlyAsync().Wait();
+        public void AsyncExRW_LockReadOnlyAsync_() => asyncExRWSubjects.LockReadOnlyAsync().WaitFor();
 
     }
 }

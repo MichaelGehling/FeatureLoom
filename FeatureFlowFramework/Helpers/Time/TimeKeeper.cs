@@ -24,6 +24,9 @@ namespace FeatureFlowFramework.Helpers.Time
 
         public TimeSpan LastElapsed => lastElapsed;
 
-        public void Restart() => startTime = AppTime.Elapsed;
+        public void Restart() => this.startTime = AppTime.Elapsed;
+        public void Restart(TimeSpan startTime) => this.startTime = startTime;
+
+        public TimeSpan StartTime => startTime;
     }
 }

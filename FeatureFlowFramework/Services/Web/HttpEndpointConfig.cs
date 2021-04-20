@@ -4,6 +4,7 @@ using FeatureFlowFramework.Services.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Net;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.Services.Web
 {
@@ -29,7 +30,7 @@ namespace FeatureFlowFramework.Services.Web
                 hostAddress = value;
                 try
                 {
-                    address = hostAddress.ResolveToIpAddressAsync(true).Result;
+                    address = hostAddress.ResolveToIpAddressAsync(true).WaitFor();
                 }
                 catch(Exception e)
                 {

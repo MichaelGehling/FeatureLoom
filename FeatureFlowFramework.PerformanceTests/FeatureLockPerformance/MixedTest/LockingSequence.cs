@@ -25,6 +25,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         public IAsyncWaitHandle WaitHandle => waitHandle;
         public int CountInLockSteps => inLockTimes.Count;
         public int CountWaitingSteps => waitingTimes.Count;
+        int seed = -1;
 
         public LockingSequence SetReadOnly(bool readOnly)
         {
@@ -58,6 +59,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
 
         public LockingSequence RandomizeSequences(int seed)
         {
+            this.seed = seed;
             Random rnd = new Random(seed);
 
             List<TimeSpan> mixedInLockTimes = new List<TimeSpan>();
@@ -120,6 +122,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
                 this.waitHandle.Reset();
 
                 var thread = new Thread(() => Execute(lockAction, numSteps, abortWaitHandle));
+                thread.Name = "Seq" + seed.ToString();
                 thread.Start();
                 return waitHandle.WaitAsync();
             }
@@ -169,6 +172,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         protected async Task ExecuteAsync(Func<Func<Task>, Task> lockActionAsync, int numSteps, IAsyncWaitHandle abortWaitHandle)
         {
             if (lockActionAsync == null) lockActionAsync = this.lockActionAsync;
+            await Task.Yield();
 
             for (int i = 0; i < numSteps; i++)
             {
@@ -199,9 +203,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         protected void Wait(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {
             if (time == TimeSpan.Zero) return;
+            Work(time); return;
 
-            Work(time);
-            return;
             DateTime now = AppTime.Now;
             var timer = new TimeFrame(now, time);
             while (!timer.Elapsed(now))
@@ -219,22 +222,27 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         {
             for (long i = 0; i < time.Ticks; i++)
             {
-                for (int j = 0; j < 500; j++)
+                // Simulating non CPU bound work (e.g. IO)
+                if (i % 100 == 0) Thread.Sleep(0);
+                else
                 {
-                    double x = Math.Sin((double)i*j);
+                    // simulating CPU bound work
+                    for (int j = 0; j < 250; j++)
+                    {
+                        double x = Math.Sin((double)i * j);
+                    }
                 }
             }
         }
 
         protected async Task WaitAsync(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {
-            if (time == TimeSpan.Zero) return;
+            if (time == TimeSpan.Zero) return;            
+            Work(time); return;
+
+
             DateTime now = AppTime.Now;
             var timer = new TimeFrame(now, time);
-            //await Task.Yield();
-            Work(time);
-            return;
-            
             while (!timer.Elapsed(now))
             {                
                 //if (!abortWaitHandle.WouldWait()) return;

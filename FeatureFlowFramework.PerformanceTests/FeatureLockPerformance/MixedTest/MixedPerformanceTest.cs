@@ -17,6 +17,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
             for (int i = 0; i < numThreads; i++)
             {
                 collection.AddSequence(new LockingSequence()
+                    .AddInLockTime(10.0.Milliseconds(), 1)
+                    .AddWaitingTime(x * 10.0.Milliseconds(), 1)
                     .AddInLockTime(1.0.Milliseconds(), 5)
                     .AddWaitingTime(x * 1.0.Milliseconds(), 5)
                     .AddInLockTime(0.1.Milliseconds(), 10)

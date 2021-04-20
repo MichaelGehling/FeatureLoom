@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.DataStorage;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
@@ -35,7 +36,7 @@ namespace FeatureFlowFramework.Services.Web
 
         public DefaultWebServer()
         {
-            TryUpdateConfigAsync().Wait();
+            TryUpdateConfigAsync().WaitFor();
         }
 
         public async Task<bool> TryUpdateConfigAsync()
@@ -245,7 +246,7 @@ namespace FeatureFlowFramework.Services.Web
 
                         if (endpoint.certificateName != null)
                         {
-                            if (Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName).Result.Out(out X509Certificate2 certificate))
+                            if (Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName).WaitFor(out X509Certificate2 certificate))
                             {
                                 options.Listen(endpoint.address, endpoint.port, listenOptions =>
                                 {
@@ -285,7 +286,7 @@ namespace FeatureFlowFramework.Services.Web
         {
             if (webserver != null)
             {
-                webserver.StopAsync().Wait();
+                webserver.StopAsync().WaitFor();
             }
         }
 

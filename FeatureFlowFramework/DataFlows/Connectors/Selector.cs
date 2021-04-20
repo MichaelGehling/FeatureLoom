@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.DataFlows
         private List<(Func<T, bool> predicate, DataFlowSourceHelper sender)> options = null;
         private DataFlowSourceHelper alternativeSendingHelper = null;
 
-        FastSpinLock myLock = new FastSpinLock();
+        MicroLock myLock = new MicroLock();
 
         public Selector(bool multiMatch = false)
         {

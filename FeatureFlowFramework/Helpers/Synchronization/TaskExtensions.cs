@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helpers.Misc;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -6,11 +7,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 {
     public static class TaskExtensions
     {
-        public static SynchronizationContextRestorer Suspend(this SynchronizationContext syncContext)
+        public static SynchronizationContextRestorer Suspend(this SynchronizationContext context)
         {
-            SynchronizationContext context = SynchronizationContext.Current;
-            SynchronizationContext.SetSynchronizationContext(null);
-            return new SynchronizationContextRestorer(context);
+            if (SynchronizationContext.Current == null) return new SynchronizationContextRestorer(null);
+            else
+            {
+                SynchronizationContext.SetSynchronizationContext(null);
+                return new SynchronizationContextRestorer(context);
+            }
         }
 
         public struct SynchronizationContextRestorer : IDisposable
@@ -24,8 +28,26 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             public void Dispose()
             {
-                SynchronizationContext.SetSynchronizationContext(context);
+                if (SynchronizationContext.Current != context) SynchronizationContext.SetSynchronizationContext(context);
             }
+        }
+
+        public static void WaitFor(this Task task, bool unwrapExeption = true)
+        {
+            if (unwrapExeption) task.GetAwaiter().GetResult();
+            else task.Wait();
+        }
+
+        public static T WaitFor<T>(this Task<T> task, bool unwrapExeption = true)
+        {
+            if (unwrapExeption) return task.GetAwaiter().GetResult();
+            else return task.Result;
+        }
+
+        public static T WaitFor<T,OUT>(this Task<AsyncOut<T, OUT>> task, out OUT result, bool unwrapExeption = true)
+        {
+            if (unwrapExeption) return task.GetAwaiter().GetResult().Out(out result);
+            else return task.Result.Out(out result);
         }
 
 
@@ -34,7 +56,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(task.IsCanceled || task.IsFaulted) return false;
             else if(task.IsCompleted) return true;
 
-            await task;
+            await task.ConfigureAwait(false);
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -45,7 +67,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if(task.IsCanceled || task.IsFaulted) return false;
             else if(task.IsCompleted) return true;
 
-            await Task.WhenAny(task, Task.Delay(timeout));
+            await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -149,7 +171,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-            await tcs.Task;
+            await tcs.Task.ConfigureAwait(false);
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -163,7 +185,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             try
             {
-                await Task.WhenAny(task, Task.Delay(timeout, cancellationToken));
+                await Task.WhenAny(task, Task.Delay(timeout, cancellationToken)).ConfigureAwait(false);
             }
             catch (TaskCanceledException)
             {                

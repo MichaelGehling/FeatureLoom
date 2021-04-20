@@ -12,7 +12,7 @@ namespace FeatureFlowFramework.Services.Logging
     {
         private readonly bool hasConsole = CheckHasConsole();
         private StringBuilder stringBuilder = new StringBuilder();
-        FastSpinLock stringBuilderLock = new FastSpinLock();
+        MicroLock stringBuilderLock = new MicroLock();
 
 
         public class Config : Configuration

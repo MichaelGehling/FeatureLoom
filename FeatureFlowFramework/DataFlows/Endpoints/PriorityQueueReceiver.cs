@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.DataFlows
     public class PriorityQueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private PriorityQueue<T> queue;
-        FastSpinLock queueLock = new FastSpinLock();
+        MicroLock queueLock = new MicroLock();
 
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;

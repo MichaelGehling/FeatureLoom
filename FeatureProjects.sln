@@ -25,7 +25,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlowFramework.Forms"
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlowFramework.PerformanceTests", "FeatureFlowFramework.PerformanceTests\FeatureFlowFramework.PerformanceTests.csproj", "{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework.PerformanceTests", "FeatureFlowFramework.PerformanceTests\FeatureFlowFramework.PerformanceTests.csproj", "{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}"
+	ProjectSection(ProjectDependencies) = postProject
+		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsFormsApp1", "WindowsFormsApp1\WindowsFormsApp1.csproj", "{86AA2077-1610-41A4-BCF0-2C31219BA5FA}"
 	ProjectSection(ProjectDependencies) = postProject
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 	EndProjectSection
@@ -60,6 +65,10 @@ Global
 		{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86AA2077-1610-41A4-BCF0-2C31219BA5FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86AA2077-1610-41A4-BCF0-2C31219BA5FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86AA2077-1610-41A4-BCF0-2C31219BA5FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86AA2077-1610-41A4-BCF0-2C31219BA5FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -6,9 +6,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class MicroSpinLockSubjects
     {
-        MicroSpinLock myLock = new MicroSpinLock();
+        MicroValueLock myLock = new MicroValueLock();
 
-        public void Init() => myLock = new MicroSpinLock();
+        public void Init() => myLock = new MicroValueLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)

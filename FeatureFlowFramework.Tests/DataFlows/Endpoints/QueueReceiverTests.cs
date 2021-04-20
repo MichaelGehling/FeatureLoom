@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -86,7 +87,7 @@ namespace FeatureFlowFramework.DataFlows
                 var timeKeeper = AppTime.TimeKeeper;
                 var task = sender.SendAsync(42);
                 Assert.False(task.IsCompleted);
-                task.Wait();
+                task.WaitFor();
                 Assert.InRange(timeKeeper.Elapsed, blockTime - tolerance, blockTime + tolerance);
             }
             else
@@ -147,7 +148,7 @@ namespace FeatureFlowFramework.DataFlows
                 });
             }
 
-            Task.WhenAll(tasks).Wait();
+            Task.WhenAll(tasks).WaitFor(false);
 
             for (int i = 0; i < numThreads; i++)
             {

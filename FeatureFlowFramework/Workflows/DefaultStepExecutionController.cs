@@ -1,5 +1,6 @@
 ﻿using FeatureFlowFramework.Helpers;
 using FeatureFlowFramework.Helpers.Extensions;
+using FeatureFlowFramework.Helpers.Synchronization;
 using FeatureFlowFramework.Services.Logging;
 using FeatureFlowFramework.Services.MetaData;
 using System;
@@ -184,7 +185,7 @@ namespace FeatureFlowFramework.Workflows
 
         private static Workflow.ExecutionState HandleAsyncExceptionRepeat<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : class, IStateMachineContext
         {
-            if (step.onExceptionRepeatConditionAsync(context, e).Result)
+            if (step.onExceptionRepeatConditionAsync(context, e).WaitFor())
             {
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithRetry, e);                
                 nextExecutionState = currentExecutionState;
@@ -207,7 +208,7 @@ namespace FeatureFlowFramework.Workflows
         private static void HandleAsyncExceptionAction<C>(C context, Step<C> step, Exception e) where C : class, IStateMachineContext
         {
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
-            step.onExceptionAsync(context, e).Wait();
+            step.onExceptionAsync(context, e).WaitFor();
         }
 
         private static Workflow.ExecutionState HandleExceptionTransition<C>(C context, Step<C> step, Exception e) where C : class, IStateMachineContext
@@ -231,7 +232,7 @@ namespace FeatureFlowFramework.Workflows
             {
                 try
                 {
-                    partialStep.actionAsync(context).Wait();
+                    partialStep.actionAsync(context).WaitFor();
                 }
                 catch (Exception e)
                 {
@@ -252,7 +253,7 @@ namespace FeatureFlowFramework.Workflows
                 }
                 else if (partialStep.conditionAsync != null)
                 {
-                    if (!partialStep.conditionAsync(context).Result) result = false;
+                    if (!partialStep.conditionAsync(context).WaitFor()) result = false;
                 }
             }
 
@@ -336,7 +337,7 @@ namespace FeatureFlowFramework.Workflows
 
         private static Workflow.ExecutionState HandleAsyncExceptionRepeatAsync<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, Workflow.ExecutionState nextExecutionState, Exception e) where C : class, IStateMachineContext
         {
-            if (step.onExceptionRepeatConditionAsync(context, e).Result)
+            if (step.onExceptionRepeatConditionAsync(context, e).WaitFor())
             {
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithRetry, e);
                 nextExecutionState = currentExecutionState;

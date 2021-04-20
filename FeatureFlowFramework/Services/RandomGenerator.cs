@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.Services
     public static class RandomGenerator
     {
         private static Random rnd = new Random();
-        private static FastSpinLock myLock = new FastSpinLock();
+        private static MicroLock myLock = new MicroLock();
 
         public static int Int32()
         {

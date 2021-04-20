@@ -1,5 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
@@ -60,25 +61,25 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
 
 
         [Benchmark]
-        public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().Wait();
+        public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void SemaphoreSlim_LockAsync_() => semaphoreSlimSubjects.LockAsync().Wait();
+        public void SemaphoreSlim_LockAsync_() => semaphoreSlimSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void VSAsyncReaderWriterLock_LockAsync_() => vSAsyncReaderWriterLockSubjects.LockAsync().Wait();
+        public void VSAsyncReaderWriterLock_LockAsync_() => vSAsyncReaderWriterLockSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void AsyncEx_LockAsync_() => asyncExSubjects.LockAsync().Wait();
+        public void AsyncEx_LockAsync_() => asyncExSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockAsync().Wait();
+        public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void Bmbsqd_LockAsync_() => bmbsqdSubjects.LockAsync().Wait();
+        public void Bmbsqd_LockAsync_() => bmbsqdSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void NeoSmart_LockAsync_() => neoSmartSubjects.LockAsync().Wait();
+        public void NeoSmart_LockAsync_() => neoSmartSubjects.LockAsync().WaitFor();
 
 
 
@@ -90,6 +91,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
 
 
         [Benchmark]
-        public void ReentrantFeatureLock_LockAsync_() => featureLockSubjects.ReentrantLockAsync().Wait();
+        public void ReentrantFeatureLock_LockAsync_() => featureLockSubjects.ReentrantLockAsync().WaitFor();
     }
 }

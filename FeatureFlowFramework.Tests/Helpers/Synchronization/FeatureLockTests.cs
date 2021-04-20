@@ -35,7 +35,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
-            task.Wait();
+            task.WaitFor();
             Assert.True(secondLockEntered);
             Assert.True(myLock.TryLock(out _));
         }
@@ -61,7 +61,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
-            task.Wait();
+            task.WaitFor();
             Assert.True(secondLockEntered);
         }
 
@@ -88,7 +88,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
-            task.Wait();
+            task.WaitFor();
             Assert.True(secondLockEntered);
             Assert.True(myLock.TryLockReadOnly(out _));
         }
@@ -114,7 +114,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 Thread.Sleep(10);
                 Assert.False(secondLockEntered);
             }
-            task.Wait();
+            task.WaitFor();
             Assert.True(secondLockEntered);
         }
 
@@ -253,13 +253,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Thread thread1;
             Thread thread2;
-            bool task1Started = false;
-            bool task2Started = false;
             using(myLock.Lock())
             {
                 thread1 = new Thread(() =>
                 {
-                    task1Started = true;
                     waiter.Set();
                     using(myLock.Lock())
                     {
@@ -270,7 +267,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 waiter.Wait();
                 thread2 = new Thread(() =>
                 {
-                    task2Started = true;
                     waiter.Set();
                     using(myLock.Lock(true))
                     {

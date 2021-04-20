@@ -9,7 +9,7 @@ namespace FeatureFlowFramework.Workflows
 {
     public abstract class AbstractRunner : IWorkflowRunner
     {
-        private FastSpinLock runningWorkflowsLock = new FastSpinLock();
+        private MicroLock runningWorkflowsLock = new MicroLock();
         protected List<Workflow> runningWorkflows = new List<Workflow>();
         protected readonly IStepExecutionController executionController = new DefaultStepExecutionController();
         protected Forwarder executionInfoForwarder = null;

@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.DataFlows
     public class QueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private Queue<T> queue = new Queue<T>();
-        FastSpinLock queueLock = new FastSpinLock();
+        MicroLock queueLock = new MicroLock();
 
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;

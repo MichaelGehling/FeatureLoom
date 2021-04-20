@@ -85,13 +85,13 @@ namespace FeatureFlowFramework.DataFlows
             if(numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
             {
                 Interlocked.Increment(ref numThreads);
-                new Task(Run).Start();
+                _ = Run();
             }
         }
 
-        private void Run()
+        private async Task Run()
         {
-            while(receiver.TryReceiveAsync(maxIdleMilliseconds.Milliseconds()).Result.Out(out T message))
+            while ((await receiver.TryReceiveAsync(maxIdleMilliseconds.Milliseconds())).Out(out T message))
             {
                 try
                 {

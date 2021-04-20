@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
     {
         private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
         private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();
-        FastSpinLock requestHandlersLock = new FastSpinLock();
+        MicroLock requestHandlersLock = new MicroLock();
 
         private void AddRpcRequestHandler(IRpcRequestHandler handler)
         {

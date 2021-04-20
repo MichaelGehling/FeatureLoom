@@ -1,5 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
@@ -22,10 +23,10 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         public void FeatureLock_LockReadOnly() => featureLockSubjects.LockReadOnly();
 
         [Benchmark]
-        public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().GetAwaiter().GetResult();
+        public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void FeatureLock_LockReadOnlyAsync_() => featureLockSubjects.LockReadOnlyAsync().Wait();
+        public void FeatureLock_LockReadOnlyAsync_() => featureLockSubjects.LockReadOnlyAsync().WaitFor();
 
         [Benchmark]
         public void FeatureLock_TryLock() => featureLockSubjects.TryLock();
@@ -34,10 +35,10 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         public void FeatureLock_TryLockReadOnly() => featureLockSubjects.TryLockReadOnly();
 
         [Benchmark]
-        public void FeatureLock_TryLockAsync_() => featureLockSubjects.TryLockAsync().Wait();
+        public void FeatureLock_TryLockAsync_() => featureLockSubjects.TryLockAsync().WaitFor();
 
         [Benchmark]
-        public void FeatureLock_TryLockReadOnlyAsync_() => featureLockSubjects.TryLockReadOnlyAsync().Wait();
+        public void FeatureLock_TryLockReadOnlyAsync_() => featureLockSubjects.TryLockReadOnlyAsync().WaitFor();
 
         [Benchmark]
         public void FeatureLock_ReentrantLock() => featureLockSubjects.ReentrantLock();
@@ -46,10 +47,10 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         public void FeatureLock_ReentrantLockReadOnly() => featureLockSubjects.ReentrantLockReadOnly();
 
         [Benchmark]
-        public void FeatureLock_ReentrantLockAsync_() => featureLockSubjects.ReentrantLockAsync().Wait();
+        public void FeatureLock_ReentrantLockAsync_() => featureLockSubjects.ReentrantLockAsync().WaitFor();
 
         [Benchmark]
-        public void FeatureLock_ReentrantLockReadOnlyAsync_() => featureLockSubjects.ReentrantLockReadOnlyAsync().Wait();
+        public void FeatureLock_ReentrantLockReadOnlyAsync_() => featureLockSubjects.ReentrantLockReadOnlyAsync().WaitFor();
 
         [Benchmark]
         public void FeatureLock_ReentrantTryLock() => featureLockSubjects.ReentrantTryLock();
@@ -58,9 +59,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         public void FeatureLock_ReentrantTryLockReadOnly() => featureLockSubjects.ReentrantTryLockReadOnly();
 
         [Benchmark]
-        public void FeatureLock_ReentrantTryLockAsync_() => featureLockSubjects.ReentrantTryLockAsync().Wait();
+        public void FeatureLock_ReentrantTryLockAsync_() => featureLockSubjects.ReentrantTryLockAsync().WaitFor();
 
         [Benchmark]
-        public void FeatureLock_ReentrantTryLockReadOnlyAsync_() => featureLockSubjects.ReentrantTryLockReadOnlyAsync().Wait();
+        public void FeatureLock_ReentrantTryLockReadOnlyAsync_() => featureLockSubjects.ReentrantTryLockReadOnlyAsync().WaitFor();
     }
 }

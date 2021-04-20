@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace FeatureFlowFramework.Helpers.Synchronization
 {
-    public sealed class FastSpinLock
+    public sealed class MicroLock
     {        
         const int NO_LOCK = 0;
         const int LOCKED = 1;
@@ -15,7 +15,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         int cyclesBeforeYielding = 200;
         int lockIndicator = NO_LOCK;
 
-        public FastSpinLock(int cyclesBeforeYielding = 200)
+        public MicroLock(int cyclesBeforeYielding = 200)
         {
             this.cyclesBeforeYielding = cyclesBeforeYielding;
         }
@@ -92,10 +92,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         public struct AcquiredLock : IDisposable
         {
-            FastSpinLock parentLock;
+            MicroLock parentLock;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal AcquiredLock(FastSpinLock parentLock)
+            internal AcquiredLock(MicroLock parentLock)
             {
                 this.parentLock = parentLock;
             }

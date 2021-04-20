@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using FeatureFlowFramework.Helpers.Time;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace Playground
 {
@@ -66,7 +67,7 @@ namespace Playground
             GC.WaitForPendingFinalizers();
             int gcc = GC.CollectionCount(0);
 
-            long counter = RunAsync().Result;
+            long counter = RunAsync().WaitFor();
 
             gcc = GC.CollectionCount(0) - gcc;
             return new FastPathLockTesterResult(name, counter, compareResult, duration, gcc);

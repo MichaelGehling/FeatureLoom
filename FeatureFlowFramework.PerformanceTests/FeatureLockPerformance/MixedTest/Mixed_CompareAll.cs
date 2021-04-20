@@ -25,9 +25,21 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
         MixedPerformanceTest test = new MixedPerformanceTest(50);
-        
+
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);
+
+        [Benchmark]
+        public void Monitor_Lock() => test.Run(monitorSubjects.Lock);
+
+        [Benchmark]
+        public void FeatureLock_LockAsync_() => test.Run(featureLockSubjects.LockAsync);
+
+        [Benchmark]
+        public void SemaphoreSlim_LockAsync_() => test.Run(semaphoreSlimSubjects.LockAsync);
+
+        
+        
 
         [Benchmark]
         public void FeatureLock_LockPrio() => test.Run(featureLockSubjects.LockPrio);
@@ -35,8 +47,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         [Benchmark]
         public void FastSpinLock_Lock() => test.Run(fastSpinLockSubjects.Lock);          
 
-        [Benchmark]
-        public void Monitor_Lock() => test.Run(monitorSubjects.Lock);
+        
 
         [Benchmark]
         public void SpinLock_Lock() => test.Run(spinLockSubjects.Lock);
@@ -56,11 +67,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         [Benchmark]
         public void NeoSmart_Lock() => test.Run(neoSmartSubjects.Lock);   
 
-        [Benchmark]
-        public void FeatureLock_LockAsync_() => test.Run(featureLockSubjects.LockAsync);        
 
-        [Benchmark]
-        public void SemaphoreSlim_LockAsync_() => test.Run(semaphoreSlimSubjects.LockAsync);
+
+        
 
         [Benchmark]
         public void AsyncEx_LockAsync_() => test.Run(asyncExSubjects.LockAsync);

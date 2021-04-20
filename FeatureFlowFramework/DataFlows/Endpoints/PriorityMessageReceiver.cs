@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows
     public class PriorityMessageReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
-        FastSpinLock myLock = new FastSpinLock();
+        MicroLock myLock = new MicroLock();
         private T receivedMessage;
         private LazySlim<DataFlowSourceHelper> alternativeSendingHelper;
         public IDataFlowSource Else => alternativeSendingHelper.Obj;

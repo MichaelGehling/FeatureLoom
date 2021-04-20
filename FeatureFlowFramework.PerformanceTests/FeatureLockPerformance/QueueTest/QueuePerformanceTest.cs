@@ -52,7 +52,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         else
                         {
                             empty = true;
-                            Thread.Sleep(0);
+                            //Thread.Sleep(0);
                         }
                     }
                 });
@@ -119,7 +119,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         else
                         {
                             empty = true;
-                            await Task.Yield();
+                            //await Task.Yield();
                         }
                     }
                 }).Invoke());

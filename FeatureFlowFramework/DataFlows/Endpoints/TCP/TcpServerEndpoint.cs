@@ -70,7 +70,7 @@ namespace FeatureFlowFramework.DataFlows.TCP
                             {
                                 IStreamUpgrader sslUpgrader = null;
                                 if (c.serverCertificate != null) sslUpgrader = new ServerSslStreamUpgrader(c.serverCertificate);
-                                var connection = new TcpConnection(c.awaitedConnectionRequest.Result, c.decoder, c.config.receivingBufferSize, c.config.addRoutingWrapper, sslUpgrader);
+                                var connection = new TcpConnection(c.awaitedConnectionRequest.WaitFor(), c.decoder, c.config.receivingBufferSize, c.config.addRoutingWrapper, sslUpgrader);
                                 c.connectionForwarder.ConnectTo(connection.SendingSink, true);
                                 connection.ReceivingSource.ConnectTo(c.receivedMessageSource);
                                 c.connections.Add(connection);

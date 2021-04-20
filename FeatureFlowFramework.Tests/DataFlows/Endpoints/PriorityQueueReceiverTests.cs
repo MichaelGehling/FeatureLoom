@@ -7,6 +7,7 @@ using System.Threading;
 using Xunit;
 using FeatureFlowFramework.Helpers.Extensions;
 using System.Threading.Tasks;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.DataFlows
 {
@@ -84,7 +85,7 @@ namespace FeatureFlowFramework.DataFlows
                 var timeKeeper = AppTime.TimeKeeper;
                 var task = sender.SendAsync(42);
                 Assert.False(task.IsCompleted);
-                task.Wait();
+                task.WaitFor();
                 Assert.InRange(timeKeeper.Elapsed, blockTime - tolerance, blockTime + tolerance);
             }
             else

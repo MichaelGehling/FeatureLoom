@@ -11,7 +11,7 @@ namespace FeatureFlowFramework.DataFlows
     public class LatestMessageReceiver<T> : IDataFlowQueue, IDataFlowSink<T>, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
-        FastSpinLock myLock = new FastSpinLock();
+        MicroLock myLock = new MicroLock();
         private T receivedMessage;
         private LazySlim<DataFlowSourceHelper> alternativeSendingHelper;
         public IDataFlowSource Else => alternativeSendingHelper.Obj;

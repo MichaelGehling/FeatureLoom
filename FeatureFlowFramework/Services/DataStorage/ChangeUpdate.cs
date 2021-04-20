@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helpers.Synchronization;
+using System;
 
 namespace FeatureFlowFramework.Services.DataStorage
 {
@@ -18,7 +19,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             this.updateEvent = notification.updateEvent;
             this.timestamp = notification.timestamp;
             reader = reader ?? Storage.GetReader(category);
-            isValid = reader.TryReadAsync<T>(uri).Result.Out(out item);
+            isValid = reader.TryReadAsync<T>(uri).WaitFor(out item);
         }
     }
 }

@@ -134,7 +134,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             {
                 if (!subscriptionReceiver.IsInstantiated)
                 {
-                    success = Reader.TryReadAsync<string>(this.Uri).Result.Out(out json);
+                    success = Reader.TryReadAsync<string>(this.Uri).WaitFor(out json);
                     StartSubscription();
                 }
                 else
@@ -148,7 +148,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             }
             else
             {
-                success = Reader.TryReadAsync<string>(this.Uri).Result.Out(out json);
+                success = Reader.TryReadAsync<string>(this.Uri).WaitFor(out json);
             }
             if (success)
             {

@@ -5,6 +5,7 @@ using Xunit;
 using FeatureFlowFramework.Helpers;
 using System.Threading.Tasks;
 using FeatureFlowFramework.Helpers.Misc;
+using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.Helpers
 {
@@ -36,7 +37,7 @@ namespace FeatureFlowFramework.Helpers
                 context.UseCopy();
                 context.Data.i = 3;
                 Assert.Equal(3, context.Data.i);
-            }).Wait();
+            }).WaitFor();
             Assert.Equal(42, context.Data.i);
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -47,7 +48,7 @@ namespace FeatureFlowFramework.Helpers
                 context.Data.i = 3;
                 Assert.Equal(3, context.Data.i);                
             }
-            CopyContextInAsync().Wait();
+            CopyContextInAsync().WaitFor();
             Assert.Equal(42, context.Data.i);
             
             void CopyContextInSync()
@@ -81,7 +82,7 @@ namespace FeatureFlowFramework.Helpers
                 Assert.Equal(0, context.Data.i);
                 context.Data.i = 3;
                 Assert.Equal(3, context.Data.i);
-            }).Wait();
+            }).WaitFor();
             Assert.Equal(42, context.Data.i);
         }
 
@@ -102,7 +103,7 @@ namespace FeatureFlowFramework.Helpers
                 Assert.Equal(11, context1.Data.i);
                 context2.Data.i = 22;
                 Assert.Equal(22, context2.Data.i);
-            }).Wait();
+            }).WaitFor();
 
             Assert.Equal(1, context1.Data.i);
             Assert.Equal(2, context2.Data.i);
@@ -116,7 +117,7 @@ namespace FeatureFlowFramework.Helpers
                 Assert.Equal(11, context1.Data.i);
                 context2.Data.i = 22;
                 Assert.Equal(22, context2.Data.i);
-            }).Wait();
+            }).WaitFor();
 
             Assert.Equal(1, context1.Data.i);
             Assert.Equal(2, context2.Data.i);
@@ -139,7 +140,7 @@ namespace FeatureFlowFramework.Helpers
                 Assert.Equal(11, context1.Data.i);
                 context2.Data.i = 22;
                 Assert.Equal(22, context2.Data.i);
-            }).Wait();
+            }).WaitFor();
 
             Assert.Equal(11, context1.Data.i);
             Assert.Equal(22, context2.Data.i);
@@ -151,7 +152,7 @@ namespace FeatureFlowFramework.Helpers
                 Assert.Equal(111, context1.Data.i);
                 context2.Data.i = 222;
                 Assert.Equal(122, context2.Data.i);
-            }).Wait();
+            }).WaitFor();
 
             Assert.Equal(111, context1.Data.i);
             Assert.Equal(222, context2.Data.i);
