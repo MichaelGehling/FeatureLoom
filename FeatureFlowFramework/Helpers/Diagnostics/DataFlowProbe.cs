@@ -19,7 +19,7 @@ namespace FeatureFlowFramework.Helpers.Diagnostics
         private readonly Func<T1, T2> convert;
         private readonly TimeSpan timeSliceSize;
         private TimeSliceCounter currentTimeSlice;
-        private LazySlim<AsyncManualResetEvent> manualResetEvent;
+        private LazyValue<AsyncManualResetEvent> manualResetEvent;
 
         private long counter;
         private CountingRingBuffer<(DateTime timestamp, T2 message)> messageBuffer;

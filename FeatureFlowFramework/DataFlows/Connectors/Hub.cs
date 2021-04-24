@@ -39,9 +39,9 @@ namespace FeatureFlowFramework.DataFlows
         {
             private Hub hub;
             private WeakReference ownerRef;
-            private DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
+            private SourceValueHelper sourceHelper;
 
-            public int CountConnectedSinks => ((IDataFlowSource)sendingHelper).CountConnectedSinks;
+            public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
             public Socket(Hub hub, object owner)
             {
@@ -63,7 +63,7 @@ namespace FeatureFlowFramework.DataFlows
                 hub.sockets = newSocketList;
                 hub = null;
                 ownerRef = null;
-                sendingHelper = null;
+                sourceHelper = new SourceValueHelper();
                 return removed;
             }
 
@@ -90,7 +90,7 @@ namespace FeatureFlowFramework.DataFlows
             {
                 if(CheckRemovalByOwner()) return;
 
-                sendingHelper.Forward(message);
+                sourceHelper.Forward(message);
             }
 
             public Task PostAsync<M>(M message)
@@ -113,22 +113,22 @@ namespace FeatureFlowFramework.DataFlows
             {
                 if(CheckRemovalByOwner()) return Task.CompletedTask;
 
-                return sendingHelper.ForwardAsync(message);
+                return sourceHelper.ForwardAsync(message);
             }
 
             public void DisconnectFrom(IDataFlowSink sink)
             {
-                ((IDataFlowSource)sendingHelper).DisconnectFrom(sink);
+                sourceHelper.DisconnectFrom(sink);
             }
 
             public void DisconnectAll()
             {
-                ((IDataFlowSource)sendingHelper).DisconnectAll();
+                sourceHelper.DisconnectAll();
             }
 
             public IDataFlowSink[] GetConnectedSinks()
             {
-                return ((IDataFlowSource)sendingHelper).GetConnectedSinks();
+                return sourceHelper.GetConnectedSinks();
             }
 
             public void Dispose()
@@ -141,12 +141,12 @@ namespace FeatureFlowFramework.DataFlows
 
             public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
             {
-                ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+                sourceHelper.ConnectTo(sink, weakReference);
             }
 
             public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
             {
-                return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+                return sourceHelper.ConnectTo(sink, weakReference);
             }
         }
     }

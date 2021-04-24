@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             private Func<P1, R> method;
             private readonly string name;
-            private DataFlowSourceHelper target;
+            private SourceHelper target;
 
             public RpcRequestHandler(string name, Func<P1, R> method)
             {
@@ -21,7 +21,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 this.name = name;
             }
 
-            public void SetTarget(DataFlowSourceHelper target)
+            public void SetTarget(SourceHelper target)
             {
                 this.target = target;
             }

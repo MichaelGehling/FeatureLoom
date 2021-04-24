@@ -18,9 +18,9 @@ namespace FeatureFlowFramework.DataFlows
         public bool TryGetTarget(out IDataFlowSink sink)
         {
             if (weakRefSink == null)
-            {
+            {                
                 sink = strongRefSink;
-                return true;
+                return sink != null;
             }
             else
             {

@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         MicroLock myLock = new MicroLock();
         private T receivedMessage;
-        private LazySlim<DataFlowSourceHelper> alternativeSendingHelper;
+        private LazyValue<SourceHelper> alternativeSendingHelper;
         public IDataFlowSource Else => alternativeSendingHelper.Obj;
         public bool IsEmpty => !readerWakeEvent.IsSet;
         public bool IsFull => false;

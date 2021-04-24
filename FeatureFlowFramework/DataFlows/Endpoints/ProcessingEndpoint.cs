@@ -1,4 +1,5 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureFlowFramework.Helpers.Misc;
+using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 using System.Threading.Tasks;
 
@@ -19,7 +20,7 @@ namespace FeatureFlowFramework.DataFlows
     {
         private readonly Func<T, bool> processing;
         private readonly Func<T, Task<bool>> processingAsync;
-        private DataFlowSourceHelper alternativeSendingHelper = null;
+        private LazyValue<SourceHelper> alternativeSendingHelper;
 
         //TODO: Better switch to FeatureLock?
         private readonly object syncLock;
@@ -45,14 +46,7 @@ namespace FeatureFlowFramework.DataFlows
             this.processingAsync = processingAsync;
         }
 
-        public IDataFlowSource Else
-        {
-            get
-            {
-                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
-                return alternativeSendingHelper;
-            }
-        }
+        public IDataFlowSource Else => alternativeSendingHelper.Obj;
 
         public void Post<M>(in M message)
         {
@@ -64,7 +58,7 @@ namespace FeatureFlowFramework.DataFlows
                     {
                         if(!processing(msgT))
                         {
-                            alternativeSendingHelper?.Forward(message);
+                            alternativeSendingHelper.ObjIfExists?.Forward(message);
                         }
                     }
                     else
@@ -74,18 +68,18 @@ namespace FeatureFlowFramework.DataFlows
                         {
                             result = processing(msgT);
                         }
-                        if(!result) alternativeSendingHelper?.Forward(message);
+                        if(!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
                 }
                 else
                 {
                     if(!processingAsync(msgT).WaitFor())
                     {
-                        alternativeSendingHelper?.Forward(message);
+                        alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
                 }
             }
-            else alternativeSendingHelper?.Forward(message);
+            else alternativeSendingHelper.ObjIfExists?.Forward(message);
         }
 
         public async Task PostAsync<M>(M message)
@@ -98,7 +92,7 @@ namespace FeatureFlowFramework.DataFlows
                     {
                         if(!processing(msgT))
                         {
-                            alternativeSendingHelper?.Forward(message);
+                            alternativeSendingHelper.ObjIfExists?.Forward(message);
                         }
                     }
                     else
@@ -108,18 +102,18 @@ namespace FeatureFlowFramework.DataFlows
                         {
                             result = processing(msgT);
                         }
-                        if(!result) alternativeSendingHelper?.Forward(message);
+                        if(!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
                 }
                 else
                 {
                     if(!await processingAsync(msgT))
                     {
-                        await alternativeSendingHelper?.ForwardAsync(message);
+                        await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
                     }
                 }
             }
-            else await alternativeSendingHelper?.ForwardAsync(message);
+            else await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
         }
     }
 }

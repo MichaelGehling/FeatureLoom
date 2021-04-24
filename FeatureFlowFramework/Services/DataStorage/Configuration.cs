@@ -40,7 +40,7 @@ namespace FeatureFlowFramework.Services.DataStorage
         public virtual string ConfigCategory => defaultCategory;
 
         [JsonIgnore]
-        protected LazySlim<LatestMessageReceiver<ChangeUpdate<string>>> subscriptionReceiver = new LazySlim<LatestMessageReceiver<ChangeUpdate<string>>>();
+        protected LazyValue<LatestMessageReceiver<ChangeUpdate<string>>> subscriptionReceiver = new LazyValue<LatestMessageReceiver<ChangeUpdate<string>>>();
 
         [JsonIgnore]
         protected IStorageReader reader;
@@ -93,7 +93,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             string json = null;
             if(useSubscription)
             {
-                if(!subscriptionReceiver.IsInstantiated)
+                if(!subscriptionReceiver.Exists)
                 {
                     success = (await Reader.TryReadAsync<string>(this.Uri)).Out(out json);
                     StartSubscription();
@@ -132,7 +132,7 @@ namespace FeatureFlowFramework.Services.DataStorage
             string json = null;
             if (useSubscription)
             {
-                if (!subscriptionReceiver.IsInstantiated)
+                if (!subscriptionReceiver.Exists)
                 {
                     success = Reader.TryReadAsync<string>(this.Uri).WaitFor(out json);
                     StartSubscription();

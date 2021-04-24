@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
@@ -9,8 +10,8 @@ namespace FeatureFlowFramework.DataFlows
     public class Selector<T> : IDataFlowSink<T>, IAlternativeDataFlow
     {
         private volatile bool multiMatch = false;
-        private List<(Func<T, bool> predicate, DataFlowSourceHelper sender)> options = null;
-        private DataFlowSourceHelper alternativeSendingHelper = null;
+        private List<(Func<T, bool> predicate, SourceHelper sender)> options = null;
+        private LazyValue<SourceHelper> alternativeSendingHelper;
 
         MicroLock myLock = new MicroLock();
 
@@ -19,14 +20,7 @@ namespace FeatureFlowFramework.DataFlows
             this.multiMatch = multiMatch;
         }
 
-        public IDataFlowSource Else
-        {
-            get
-            {
-                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
-                return alternativeSendingHelper;
-            }
-        }
+        public IDataFlowSource Else => alternativeSendingHelper.Obj;
 
         public void Post<M>(in M message)
         {
@@ -44,7 +38,7 @@ namespace FeatureFlowFramework.DataFlows
                     if(!multiMatch && success) return;
                 }
             }
-            if(!success) alternativeSendingHelper?.Forward(message);
+            if(!success) alternativeSendingHelper.ObjIfExists?.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
@@ -69,7 +63,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
                 if(multiMatch) return Task.WhenAll(tasks);
             }
-            if(!success) return alternativeSendingHelper?.ForwardAsync(message);
+            if(!success) return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
             else return Task.CompletedTask;
         }
 
@@ -80,10 +74,10 @@ namespace FeatureFlowFramework.DataFlows
 
         public IDataFlowSource InsertOptionAt(Func<T, bool> predicate, int index)
         {
-            (Func<T, bool> predicate, DataFlowSourceHelper sender) newOption = (predicate, new DataFlowSourceHelper());
+            (Func<T, bool> predicate, SourceHelper sender) newOption = (predicate, new SourceHelper());
             using(myLock.Lock())
             {
-                var newOptions = new List<(Func<T, bool> predicate, DataFlowSourceHelper sender)>();
+                var newOptions = new List<(Func<T, bool> predicate, SourceHelper sender)>();
                 if(options != null) newOptions.AddRange(options);
                 if(index <= newOptions.Count) newOptions.Insert(index, newOption);
                 else newOptions.Add(newOption);
@@ -123,7 +117,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
                 else if(options.Count > index)
                 {
-                    var newOptions = new List<(Func<T, bool> predicate, DataFlowSourceHelper sender)>();
+                    var newOptions = new List<(Func<T, bool> predicate, SourceHelper sender)>();
                     if(options != null) newOptions.AddRange(options);
                     newOptions.RemoveAt(index);
                     options = newOptions;

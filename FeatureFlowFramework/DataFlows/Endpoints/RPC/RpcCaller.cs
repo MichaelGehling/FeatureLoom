@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 {
     public partial class RpcCaller : IDataFlowSource, IDataFlowSink, IRequester
     {
-        private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper;
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
         FeatureLock responseHandlersLock = new FeatureLock();
         private readonly TimeSpan timeout;
@@ -177,21 +177,21 @@ namespace FeatureFlowFramework.DataFlows.RPC
             return Task.CompletedTask;
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sourceHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void ConnectToAndBack(IReplier replier, bool weakReference = false)
@@ -202,12 +202,12 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

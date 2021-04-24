@@ -14,13 +14,13 @@ namespace FeatureFlowFramework.DataFlows.RPC
 {
     public partial class StringRpcCaller : IDataFlowSource, IDataFlowSink, IRequester
     {
-        private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper;
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
         MicroLock responseHandlersLock = new MicroLock();
         private readonly TimeSpan timeout;
         private readonly Timer timeoutTimer;
 
-        public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public StringRpcCaller(TimeSpan timeout)
         {
@@ -185,17 +185,17 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sourceHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void ConnectToAndBack(IReplier replier, bool weakReference= false)
@@ -206,12 +206,12 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

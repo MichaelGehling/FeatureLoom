@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows
     /// <typeparam name="O"> The output type for the converter function </typeparam>
     public class MessageConverter<I, O> : IDataFlowConnection<I, O>
     {
-        private DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly Func<I, O> convertFunc;
 
         public MessageConverter(Func<I, O> convertFunc)
@@ -22,49 +22,49 @@ namespace FeatureFlowFramework.DataFlows
         }
 
 
-        public int CountConnectedSinks => sendingHelper.CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return sendingHelper.GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sendingHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sendingHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public void Post<M>(in M message)
         {
             if(message is I msgT)
             {
-                sendingHelper.Forward(convertFunc(msgT));
+                sourceHelper.Forward(convertFunc(msgT));
             }
-            else sendingHelper.Forward(message);
+            else sourceHelper.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
         {
             if(message is I msgT)
             {
-                return sendingHelper.ForwardAsync(convertFunc(msgT));
+                return sourceHelper.ForwardAsync(convertFunc(msgT));
             }
-            else return sendingHelper.ForwardAsync(message);
+            else return sourceHelper.ForwardAsync(message);
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

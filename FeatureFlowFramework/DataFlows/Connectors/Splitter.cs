@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.DataFlows
 {
     public class Splitter<T> : IDataFlowConnection, IDataFlowSink<T>
     {
-        private DataFlowSourceHelper sender = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper;
         private readonly Func<T, ICollection> split;
 
         public Splitter(Func<T, ICollection> split)
@@ -22,12 +22,12 @@ namespace FeatureFlowFramework.DataFlows
                 var output = split(tMsg);
                 foreach(var msg in output)
                 {
-                    sender.Forward(msg);
+                    sourceHelper.Forward(msg);
                     alternative = false;
                 }
             }
 
-            if(alternative) sender.Forward(message);
+            if(alternative) sourceHelper.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
@@ -41,39 +41,39 @@ namespace FeatureFlowFramework.DataFlows
                     int i = 0;
                     foreach(var msg in output)
                     {
-                        tasks[i++] = sender.ForwardAsync(msg);
+                        tasks[i++] = sourceHelper.ForwardAsync(msg);
                     }
                     return Task.WhenAll(tasks);
                 }
             }
-            return sender.ForwardAsync(message);
+            return sourceHelper.ForwardAsync(message);
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)sender).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sender).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sender).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sender).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

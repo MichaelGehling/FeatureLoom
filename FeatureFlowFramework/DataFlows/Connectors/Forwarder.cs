@@ -8,43 +8,43 @@ namespace FeatureFlowFramework.DataFlows
     /// </summary>
     public class Forwarder : IDataFlowSource, IDataFlowConnection
     {
-        protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
+        protected SourceValueHelper sourceHelper;
 
-        public int CountConnectedSinks => sendingHelper.CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return sendingHelper.GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sendingHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sendingHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public virtual void Post<M>(in M message)
         {
-            sendingHelper.Forward(message);
+            sourceHelper.Forward(message);
         }
 
         public virtual Task PostAsync<M>(M message)
         {
-            return sendingHelper.ForwardAsync(message);            
+            return sourceHelper.ForwardAsync(message);            
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 
@@ -52,12 +52,12 @@ namespace FeatureFlowFramework.DataFlows
     {
         public override void Post<M>(in M message)
         {
-            if (message is T) sendingHelper.Forward(message);
+            if (message is T) sourceHelper.Forward(message);
         }
 
         public override Task PostAsync<M>(M message)
         {
-            if(message is T) return sendingHelper.ForwardAsync(message);
+            if(message is T) return sourceHelper.ForwardAsync(message);
             else return Task.CompletedTask;
         }
     }

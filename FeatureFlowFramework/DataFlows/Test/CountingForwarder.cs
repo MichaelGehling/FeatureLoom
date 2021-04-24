@@ -7,7 +7,7 @@ namespace FeatureFlowFramework.DataFlows.Test
 {
     public class CountingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
-        private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper;
 
         private volatile int counter;
         FeatureLock myLock = new FeatureLock();
@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.DataFlows.Test
             get { using (myLock.LockReadOnly()) return counter; }
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public Task<int> WaitForAsync(int numMessages)
         {
@@ -65,27 +65,27 @@ namespace FeatureFlowFramework.DataFlows.Test
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sourceHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

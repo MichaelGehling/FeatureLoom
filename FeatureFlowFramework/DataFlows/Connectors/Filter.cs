@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helpers.Misc;
+using System;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.DataFlows
@@ -13,15 +14,15 @@ namespace FeatureFlowFramework.DataFlows
     /// <typeparam name="T"> The input type for the filter function </typeparam>
     public class Filter<T> : IDataFlowConnection<T>, IAlternativeDataFlow
     {
-        protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
+        protected SourceValueHelper sourceHelper;
         protected Func<T, bool> predicate;
-        protected DataFlowSourceHelper alternativeSendingHelper = null;
+        private LazyValue<SourceHelper> alternativeSendingHelper;
 
-        public int CountConnectedSinks => sendingHelper.CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return sendingHelper.GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public Filter(Func<T, bool> predicate = null)
@@ -29,53 +30,46 @@ namespace FeatureFlowFramework.DataFlows
             this.predicate = predicate;
         }
 
-        public IDataFlowSource Else
-        {
-            get
-            {
-                if(alternativeSendingHelper == null) alternativeSendingHelper = new DataFlowSourceHelper();
-                return alternativeSendingHelper;
-            }
-        }
+        public IDataFlowSource Else => alternativeSendingHelper.Obj;        
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sendingHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sendingHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public void Post<M>(in M message)
         {
             if(message is T msgT)
             {
-                if(predicate == null || predicate(msgT)) sendingHelper.Forward(msgT);
-                else alternativeSendingHelper?.Forward(msgT);
+                if(predicate == null || predicate(msgT)) sourceHelper.Forward(msgT);
+                else alternativeSendingHelper.ObjIfExists?.Forward(msgT);
             }
-            else alternativeSendingHelper?.Forward(message);
+            else alternativeSendingHelper.ObjIfExists?.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
         {
             if(message is T msgT)
             {
-                if(predicate == null || predicate(msgT)) return sendingHelper.ForwardAsync(msgT);
-                else return alternativeSendingHelper?.ForwardAsync(msgT);
+                if(predicate == null || predicate(msgT)) return sourceHelper.ForwardAsync(msgT);
+                else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(msgT);
             }
-            else return alternativeSendingHelper?.ForwardAsync(message);
+            else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

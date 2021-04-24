@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.DataFlows.Test
 {
     public class DelayingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
-        private DataFlowSourceHelper helper = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly TimeSpan delay;
 
         public DelayingForwarder(TimeSpan delay)
@@ -14,43 +14,43 @@ namespace FeatureFlowFramework.DataFlows.Test
             this.delay = delay;
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)helper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)helper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)helper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)helper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void Post<M>(in M message)
         {
             Thread.Sleep(delay);
-            helper.Forward(message);
+            sourceHelper.Forward(message);
         }
 
         public async Task PostAsync<M>(M message)
         {
             await Task.Delay(delay);
-            await helper.ForwardAsync(message);
+            await sourceHelper.ForwardAsync(message);
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)helper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)helper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

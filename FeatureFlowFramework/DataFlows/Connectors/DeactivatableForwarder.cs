@@ -7,7 +7,7 @@ namespace FeatureFlowFramework.DataFlows
 {
     public class DeactivatableForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {
-        DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+        SourceValueHelper sourceHelper;
         bool active = true;
         readonly Func<bool> autoActivationCondition = null;
 
@@ -29,33 +29,33 @@ namespace FeatureFlowFramework.DataFlows
             else return Task.CompletedTask;
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public bool Active { get => active; set => active = value; }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sourceHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
     }

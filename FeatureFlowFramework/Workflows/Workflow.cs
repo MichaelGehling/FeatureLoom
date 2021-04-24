@@ -26,7 +26,7 @@ namespace FeatureFlowFramework.Workflows
         [JsonIgnore]
         protected ControlData controlData = ControlData.Init();
 
-        protected LazySlim<Sender> executionInfoSender;        
+        protected LazyValue<Sender> executionInfoSender;        
 
         [JsonIgnore]
         public IDataFlowSource ExecutionInfoSource => executionInfoSender.Obj;

@@ -18,7 +18,7 @@ namespace FeatureFlowFramework.Services.MetaData
 
 
         readonly ObjectHandle handle;
-        LazySlim<Dictionary<string, object>> data;
+        LazyValue<Dictionary<string, object>> data;
         readonly WeakReference<object> objRef;
         FeatureLock objLock = new FeatureLock();
         Sender<MetaDataUpdateInfo> metaDataUpdateSender;
@@ -169,7 +169,7 @@ namespace FeatureFlowFramework.Services.MetaData
             if(!objects.TryGetValue(obj, out MetaData metaData)) return false;
             using(metaData.objLock.LockReadOnly())
             {
-                if(metaData.data.IsInstantiated &&
+                if(metaData.data.Exists &&
                     metaData.data.Obj.TryGetValue(key, out object untypedData) &&
                     untypedData is D typedData)
                 {

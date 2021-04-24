@@ -4,43 +4,43 @@ namespace FeatureFlowFramework.DataFlows
 {
     public class AsyncForwarder : IDataFlowConnection
     {
-        protected DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
+        protected SourceValueHelper sourceHelper;
 
-        public int CountConnectedSinks => ((IDataFlowSource)sendingHelper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sendingHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sendingHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sendingHelper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void Post<M>(in M message)
         {            
-            _ = sendingHelper.ForwardAsync(message);
+            _ = sourceHelper.ForwardAsync(message);
         }
 
         public Task PostAsync<M>(M message)
         {
-            return sendingHelper.ForwardAsync(message);
+            return sourceHelper.ForwardAsync(message);
         }
     }
 }

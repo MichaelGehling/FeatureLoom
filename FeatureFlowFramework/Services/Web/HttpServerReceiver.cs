@@ -16,7 +16,7 @@ namespace FeatureFlowFramework.Services.Web
         private IWebMessageTranslator translator;
         private readonly IWebServer webServer;
 
-        private DataFlowSourceHelper sendingHelper = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper;
 
         public HttpServerReceiver(string route, IWebMessageTranslator translator, int bufferSize = 1024 * 128, IWebServer webServer = null)
         {
@@ -30,23 +30,23 @@ namespace FeatureFlowFramework.Services.Web
             this.webServer.AddRequestHandler(this);
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)sendingHelper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public string Route => route;
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sendingHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sendingHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sendingHelper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
@@ -63,7 +63,7 @@ namespace FeatureFlowFramework.Services.Web
                 string bodyString = await request.ReadAsync();
                 if(translator.TryTranslate(bodyString, out object message))
                 {
-                    await sendingHelper.ForwardAsync(message);
+                    await sourceHelper.ForwardAsync(message);
                 }
                 else
                 {
@@ -81,12 +81,12 @@ namespace FeatureFlowFramework.Services.Web
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sendingHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

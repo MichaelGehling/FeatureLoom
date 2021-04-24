@@ -24,7 +24,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();        
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
-        MixedPerformanceTest test = new MixedPerformanceTest(50);
+        MixedPerformanceTest test = new MixedPerformanceTest(5);
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);

@@ -1,4 +1,5 @@
 ﻿using FeatureFlowFramework.Helpers;
+using FeatureFlowFramework.Helpers.Misc;
 using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 using System.Collections;
@@ -8,8 +9,8 @@ namespace FeatureFlowFramework.DataFlows
 {
     public class Aggregator<T, A> : IDataFlowSink<T>, IDataFlowConnection, IAlternativeDataFlow where A : IAggregationData, new()
     {
-        private DataFlowSourceHelper sender = new DataFlowSourceHelper();
-        private DataFlowSourceHelper alternativeSender = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper = new SourceValueHelper();
+        private LazyValue<SourceHelper> alternativeSender;
 
         private A aggregationData = new A();
         FeatureLock dataLock = new FeatureLock();
@@ -41,10 +42,10 @@ namespace FeatureFlowFramework.DataFlows
 
             if(output.ready && output.msg != null)
             {
-                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(msg);
-                else sender.Forward(output.msg);
+                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sourceHelper.Forward(msg);
+                else sourceHelper.Forward(output.msg);
             }
-            if(alternative) alternativeSender.Forward(message);
+            if(alternative) alternativeSender.ObjIfExists?.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
@@ -62,40 +63,40 @@ namespace FeatureFlowFramework.DataFlows
 
             if(output.ready && output.msg != null)
             {
-                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sender.Forward(msg);
-                else return sender.ForwardAsync(output.msg);
+                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sourceHelper.Forward(msg);
+                else return sourceHelper.ForwardAsync(output.msg);
             }
-            if(alternative) return alternativeSender.ForwardAsync(message);
+            if(alternative) return alternativeSender.ObjIfExists?.ForwardAsync(message);
             return Task.CompletedTask;
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)sender).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public IDataFlowSource Else => alternativeSender;
+        public IDataFlowSource Else => alternativeSender.Obj;
 
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sender).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sender).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sender).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sender).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 

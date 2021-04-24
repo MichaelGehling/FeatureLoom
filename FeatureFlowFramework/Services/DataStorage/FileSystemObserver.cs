@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.Services.DataStorage
 {
     public class FileSystemObserver : IDataFlowSource, IDisposable
     {
-        private DataFlowSourceHelper sourceHelper = new DataFlowSourceHelper();
+        private SourceValueHelper sourceHelper;
         private FileSystemWatcher fileWatcher;
         private FileSystemWatcher dirWatcher;
         private readonly string path;
@@ -85,15 +85,15 @@ namespace FeatureFlowFramework.Services.DataStorage
             sourceHelper.Forward(message);
         }
 
-        public int CountConnectedSinks => ((IDataFlowSource)sourceHelper).CountConnectedSinks;
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
         public void DisconnectAll()
         {
-            ((IDataFlowSource)sourceHelper).DisconnectAll();
+            sourceHelper.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            ((IDataFlowSource)sourceHelper).DisconnectFrom(sink);
+            sourceHelper.DisconnectFrom(sink);
         }
 
         public void Dispose()
@@ -103,17 +103,17 @@ namespace FeatureFlowFramework.Services.DataStorage
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return ((IDataFlowSource)sourceHelper).GetConnectedSinks();
+            return sourceHelper.GetConnectedSinks();
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)sourceHelper).ConnectTo(sink, weakReference);
+            return sourceHelper.ConnectTo(sink, weakReference);
         }
 
         public readonly struct ChangeNotification

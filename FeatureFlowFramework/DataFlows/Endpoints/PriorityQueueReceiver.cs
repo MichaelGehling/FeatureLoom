@@ -31,7 +31,7 @@ namespace FeatureFlowFramework.DataFlows
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         private AsyncManualResetEvent writerWakeEvent = new AsyncManualResetEvent(true);
 
-        private LazySlim<DataFlowSourceHelper> alternativeSendingHelper;
+        private LazyValue<SourceHelper> alternativeSendingHelper;
 
         public PriorityQueueReceiver(Comparer<T> priorityComparer, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
         {
