@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
         {
             private Func<P1, R> method;
             private readonly string name;
-            private SourceHelper target;
+            private ISender target;
 
             public RpcRequestHandler(string name, Func<P1, R> method)
             {
@@ -21,7 +21,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                 this.name = name;
             }
 
-            public void SetTarget(SourceHelper target)
+            public void SetTarget(ISender target)
             {
                 this.target = target;
             }
@@ -53,7 +53,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                     if(!myRequest.noResponse)
                     {
                         var response = new RpcResponse<R>(myRequest.requestId, result);
-                        target.Forward(response);
+                        target.Send(response);
                     }
                 }
                 catch(Exception e)
@@ -66,7 +66,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                     {
                         string errorMessage = e.ToString();
                         var response = new RpcErrorResponse(myRequest.requestId, errorMessage);
-                        target.Forward(response);
+                        target.Send(response);
                     }
                 }
             }

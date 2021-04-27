@@ -13,7 +13,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
     //[SimpleJob(RuntimeMoniker.Mono)]
     //[HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)]
-    public class Queue_CompareAll
+    public class Queue1_1_CompareAll
     {
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
         MonitorSubjects monitorSubjects = new MonitorSubjects();
@@ -26,17 +26,17 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
         BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
-        MicroSpinLockSubjects microSpinLockSubjects = new MicroSpinLockSubjects();
+        MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
         QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
-        [Params(5)]
+        [Params(1)]
         public int numProducers
         {
             set => queueTest.numProducers = value;
         }
 
-        [Params(5)]
+        [Params(1)]
         public int numConsumers
         {
             set => queueTest.numConsumers = value;
@@ -78,8 +78,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void AsyncExRw_Lock() => queueTest.Run(null, asyncExRwSubjects.Lock);
 
-        [Benchmark]
-        public void NeoSmart_Lock() => queueTest.Run(neoSmartSubjects.Init, neoSmartSubjects.Lock);
+        //[Benchmark]
+        //public void NeoSmart_Lock() => queueTest.Run(neoSmartSubjects.Init, neoSmartSubjects.Lock);
         
 
 

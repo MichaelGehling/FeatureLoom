@@ -25,7 +25,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
         BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();        
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
-        MicroSpinLockSubjects microSpinLockSubjects = new MicroSpinLockSubjects();
+        MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();
@@ -55,8 +55,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         [Benchmark]
         public void AsyncExRW_Lock() => asyncExRWSubjects.Lock();
 
-        [Benchmark]
-        public void NeoSmart_Lock() => neoSmartSubjects.Lock();
+        //[Benchmark]
+        //public void NeoSmart_Lock() => neoSmartSubjects.Lock();
 
 
 

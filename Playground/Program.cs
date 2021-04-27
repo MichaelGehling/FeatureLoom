@@ -35,12 +35,13 @@ namespace Playground
         volatile static bool done = false;
 
         public static async Task YieldAsync() => await Task.Yield();
-        public static async Task WaitAsync() {}//await Task.Delay(0);                
+        public static async Task WaitAsync() {}//await Task.Delay(0);      
+        public static void EmptyAction() { }
 
         static void Main(string[] args)
         {
 
-            int ex = 10_000;
+            int ex = 200_000;
 
             long start_mem = GC.GetTotalMemory(true);
             object[] array = new object[ex];
@@ -81,6 +82,28 @@ namespace Playground
             array = new object[ex];
             for (int n = 0; n < ex; n++)
             {
+                var obj = new object();
+                array[n] = obj;
+                Monitor.Enter(obj);
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" Monitor: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            var array3 = new SpinLock[ex];
+            for (int n = 0; n < ex; n++)
+            {
+                array3[n] = new SpinLock(false);
+                bool sl = false;
+                array3[n].Enter(ref sl);
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" SpinLock: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            array = new object[ex];
+            for (int n = 0; n < ex; n++)
+            {
                 var obj = new SemaphoreSlim(1, 1);
                 array[n] = obj;
                 obj.Wait();
@@ -103,8 +126,64 @@ namespace Playground
             array = new object[ex];
             for (int n = 0; n < ex; n++)
             {
-                array[n] = new MicroLock();
-                //using (array[n].LockAsync().WaitFor()) { }
+                var obj = new AsyncLock();
+                array[n] = obj;
+                obj.Lock();                
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" AsyncEx.AsyncLock: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            array = new object[ex];
+            for (int n = 0; n < ex; n++)
+            {
+                var obj = new AsyncReaderWriterLock();
+                array[n] = obj;
+                obj.WriterLock();
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" AsyncEx.AsyncReaderWriterLock: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            array = new object[ex];
+            for (int n = 0; n < ex; n++)
+            {
+                var obj = new NeoSmart.AsyncLock.AsyncLock();
+                array[n] = obj;
+                obj.Lock();
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" NeoSmart.AsyncLock: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            array = new object[ex];
+            for (int n = 0; n < ex; n++)
+            {
+                var obj = new Bmbsqd.Async.AsyncLock();
+                array[n] = obj;
+                obj.GetAwaiter();
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" Bmbsqd.AsyncLock: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            array = new object[ex];
+            for (int n = 0; n < ex; n++)
+            {
+                var obj = new Microsoft.VisualStudio.Threading.AsyncReaderWriterLock();
+                array[n] = obj;
+                obj.WriteLockAsync();
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" VS.AsyncReaderWriterLock: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            array = new object[ex];
+            for (int n = 0; n < ex; n++)
+            {
+                var obj = new MicroLock();
+                array[n] = obj;
+                obj.Lock();
             }
             used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
             Console.WriteLine($" MicroLock: {used_mem_median} Bytes");
@@ -114,7 +193,7 @@ namespace Playground
             for (int n = 0; n < ex; n++)
             {
                 array2[n] = new MicroValueLock();
-                //using (array[n].LockAsync().WaitFor()) { }
+                array2[n].Enter();
             }
             used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
             Console.WriteLine($" MicroValueLock: {used_mem_median} Bytes");
@@ -138,6 +217,16 @@ namespace Playground
             }
             used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
             Console.WriteLine($" Array1: {used_mem_median} Bytes");
+
+            start_mem = GC.GetTotalMemory(true);
+            array = new Task[ex];
+            for (int n = 0; n < ex; n++)
+            {
+                array[n] = new Task(EmptyAction);
+                //using (array[n].LockAsync().WaitFor()) { }
+            }
+            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
+            Console.WriteLine($" Task: {used_mem_median} Bytes");
 
             Console.ReadKey();
 

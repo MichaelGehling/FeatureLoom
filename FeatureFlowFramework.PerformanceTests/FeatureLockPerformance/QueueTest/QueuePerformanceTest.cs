@@ -15,12 +15,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numConsumers = 1;
         public int numOverallMessages = 1_000_000;
 
-        void WorkSomething()
-        {
-            var timer = new TimeFrame(0.001.Milliseconds());
-            while (!timer.Elapsed()) /* work */;
-        }
-
         public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)
         {
             if(consumerLock == null) consumerLock = producerLock;
@@ -37,23 +31,15 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                 {
                     starter.Wait();
                     bool empty = false;
-                    while (!empty || !producersDone)
+                    while (!producersDone || !empty)
                     {
-                        if (queue.Count > 0)
+                        consumerLock(() =>
                         {
-                            consumerLock(() =>
+                            if (!queue.TryDequeue(out _))
                             {
-                                if (!queue.TryDequeue(out _))
-                                {
-                                    empty = true;
-                                }
-                            });
-                        }
-                        else
-                        {
-                            empty = true;
-                            //Thread.Sleep(0);
-                        }
+                                empty = true;
+                            }
+                        });
                     }
                 });
                 thread.Start();
@@ -72,7 +58,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                         });
-                        //WorkSomething();
                     }
                 });
                 thread.Start();
@@ -105,22 +90,14 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                     bool empty = false;
                     while (!empty || !producersDone)
                     {
-                        if (queue.Count > 0)
+                        await consumerLock(() =>
                         {
-                            await consumerLock(() =>
+                            if (!queue.TryDequeue(out _))
                             {
-                                if (!queue.TryDequeue(out _))
-                                {
-                                    empty = true;
-                                }
-                                return Task.CompletedTask;
-                            });
-                        }
-                        else
-                        {
-                            empty = true;
-                            //await Task.Yield();
-                        }
+                                empty = true;
+                            }
+                            return Task.CompletedTask;
+                        });
                     }
                 }).Invoke());
             }
@@ -137,8 +114,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                             return Task.CompletedTask;
-                        });
-                        //WorkSomething();                        
+                        });                     
                     }
 
                 }).Invoke());

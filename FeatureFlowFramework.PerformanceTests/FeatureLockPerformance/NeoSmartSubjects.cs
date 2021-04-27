@@ -10,6 +10,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         public void Init() => myLock = new NeoSmart.AsyncLock.AsyncLock();
 
+        /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)
         {
@@ -18,6 +19,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
                 action();
             }
         }
+        */
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockAsync(Func<Task> action)
@@ -31,7 +33,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
 
 
-
+        /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
         {
@@ -40,6 +42,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
             }
         }
+        */
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockAsync()

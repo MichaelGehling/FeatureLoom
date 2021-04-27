@@ -8,36 +8,50 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.Helpers.Synchronization
-{      
+{
 
     /// <summary>
     /// A multi-purpose high-performance lock object that can be used in synchronous and asynchronous contexts.
-    /// It supports reentrancy, prioritized lock acquiring, trying for lock acquiring with timeout and
+    /// It supports reentrancy, prioritized lock acquiring, trying for lock acquiring with or without timeout and
     /// read-only locking for parallel access (incl. automatic upgrading/downgrading in conjunction with reentrancy).
     /// When the lock is acquired, it returns a handle that can be used with a using statement for simple and clean usage.
     /// Example: using(myLock.Lock()) { ... }
-    /// In most scenarios the FeatureLock is faster than the build-in locks (e.g. Monitor/ReaderWriterLock for synchronous contexts
+    /// In many scenarios the FeatureLock is faster than the build-in locks (e.g. Monitor/ReaderWriterLock for synchronous contexts
     /// and SemaphoreSlim for asynchronous contexts). Though reentrant locking in synchronous contexts using FeatureLock
-    /// is slower than with Monitor/ReaderWriterLock, it also allows reentrancy for asynchronous contexts and even mixed contexts.
+    /// is slower than with Monitor/ReaderWriterLock, but it also allows reentrancy for asynchronous contexts and even mixed contexts.
     /// </summary>
     public sealed class FeatureLock : ISupervisor
     {
+        #region ConstructorAndSettings
         /// <summary>
         /// A multi-purpose high-performance lock object that can be used in synchronous and asynchronous contexts.
-        /// It supports reentrancy, prioritized lock acquiring, trying for lock acquiring with timeout and
+        /// It supports reentrancy, prioritized lock acquiring, trying for lock acquiring with or without timeout and
         /// read-only locking for parallel access (incl. automatic upgrading/downgrading in conjunction with reentrancy).
         /// When the lock is acquired it returns a handle that can be used with a using statement for simple and clean usage.
-        /// Example: using(myLock.Lock()) { ... }
-        /// </summary>
+        /// Example: using(myLock.Lock()) { ... }        
+        /// </summary>        
         public FeatureLock(FeatureLockSettings settings = null)
         {
             if (settings != null) lazy.Obj.settings.Obj = settings;
         }
 
-        #region ObjectLock
+        public class FeatureLockSettings
+        {
+            public ushort passiveWaitThreshold = 30;
+            public ushort sleepWaitThreshold = 30;
+            public ushort awakeThreshold = 3;
+            public ushort asyncYieldBaseFrequency = 300;
+            public ushort averageWeighting = 1;
+            public ushort supervisionDelayFactor = 100;
+        }
 
+        private static FeatureLockSettings defaultSettings = new FeatureLockSettings();
+        public static FeatureLockSettings DefaultSettings { get => defaultSettings; set => defaultSettings = value; }        
+        #endregion ConstructorAndSettings
+
+        #region ObjectLock
         // Stores FeatureLocks associated with objects, for the lifetime of the object
-        private static ConditionalWeakTable<object, FeatureLock> lockObjects = new ConditionalWeakTable<object, FeatureLock>();
+        private static LazyValue<ConditionalWeakTable<object, FeatureLock>> lockObjects;
 
         /// <summary>
         /// Provides a FeatureLock object that is associated with the given object.
@@ -51,51 +65,45 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// <returns></returns>
         public static FeatureLock GetLockFor(object obj)
         {
-            if (!lockObjects.TryGetValue(obj, out FeatureLock featureLock))
+            if (!lockObjects.Obj.TryGetValue(obj, out FeatureLock featureLock))
             {
                 featureLock = new FeatureLock();
-                lockObjects.Add(obj, featureLock);
+                lockObjects.Obj.Add(obj, featureLock);
             }
 
             return featureLock;
         }
-
         #endregion ObjectLock
 
         #region Constants
 
-        // Are set to lockIndicator if the lock is not acquired, acquired for writing, cquired for reading (further readers increase this value, each by one)
+        // Are set to lockIndicator if the lock is not acquired, acquired for writing, aquired for reading (further readers increase this value, each by one)
         private const int NO_LOCK = 0;
-
         private const int WRITE_LOCK = NO_LOCK - 1;
         private const int FIRST_READ_LOCK = NO_LOCK + 1;
 
         // Booleans cannot be used in CompareExchange, so ints are used.
         private const int FALSE = 0;
-
         private const int TRUE = 1;
 
         #endregion Constants
 
-        public class FeatureLockSettings
-        {
-            public ushort passiveWaitThreshold = 30;
-            public ushort sleepWaitThreshold = 30;
-            public ushort awakeThreshold = 3;
-            public ushort asyncYieldBaseFrequency = 300;
-        }
-
         #region Variables
 
-        private static FeatureLockSettings defaultSettings = new FeatureLockSettings();
-        public static FeatureLockSettings DefaultSettings { get => defaultSettings; set => defaultSettings = value; }
-        private static Task<LockAttempt> failedAttemptTask;
-
-        private SleepHandle queueHead = null;
-        private Task<LockHandle> writeLockTask;
-        private Task<LockAttempt> writeLockAttemptTask;
+        // Additional variables that are used less often, so they are kept in an extra object which is only loaded as required 
+        // in ordr to reduce the memory footprint
         private LazyValue<LazyVariables> lazy;
 
+        // Stored prepared tasks to speed up async calls that can be handeled synchronously.
+        // More prepared tasks are in LazyVariables object
+        // Note: failedAttemptTask can be static, because it is the same form all lock instances.
+        private static Task<LockAttempt> failedAttemptTask;
+        private Task<LockHandle> writeLockTask;
+        private Task<LockAttempt> writeLockAttemptTask;        
+
+        // The first element of a linked list of SleepHandles
+        private SleepHandle queueHead = null;        
+        // Used to safely manage Sleephandles
         private MicroValueLock sleepLock = new MicroValueLock();
 
         // the main lock variable, indicating current locking state:
@@ -107,10 +115,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // Is used to measure how long it takes until the lock is released again.
         // It is incremented in every waiting cycle by the candidate with the firstRankTicket (rank 0).
         // When the lock is acquired again, it is reset to 0.
-        private uint waitCounter = 0;
+        private ushort waitCounter = 1;
 
         // After the lock was acquired, the average is updated by including the last waitCounter.
-        private uint averageWaitCount = 10;
+        private ushort averageWaitCount = 10;
 
         // The next ticket number that will be provided. A ticket number must never be 0, so if nextTicket turns to be 0, it must be incremented, again.
         private ushort nextTicket = 1;
@@ -119,56 +127,19 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         // Will be reset to 0 when the currently oldest candidate acquired the lock. For a short time, it is possible that some newer ticket number
         // is set until the oldest one reaches the pooint to update.
         private ushort firstRankTicket = 0;
-
+        
 
         // Will be true if a candidate tries to acquire the lock with priority, so the other candidates know that they have to stay back.
         // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate already waits,
         // it must set it back to true in its next cycle. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
         private bool prioritizedWaiting = false;
 
+        // Indicates if supervision is currently observing SleepHandles to wake up the candidates on time
         private bool isSupervisionActive = false;
 
         #endregion Variables
 
-
-        public FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? defaultSettings;
-        // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
-        private ushort PassiveWaitThreshold => Settings.passiveWaitThreshold;
-
-        private ushort SleepWaitThreshold => Settings.sleepWaitThreshold;
-
-        private ushort AwakeThreshold => Settings.awakeThreshold;
-
-        // The lower this value, the more often async threads yield
-        private ushort AsyncYieldBaseFrequency => Settings.asyncYieldBaseFrequency;
-
-        // Keeps the last reentrancyId of the "logical thread".
-        // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
-        // so it must be acquired and cannot simply be reentered.
-        private ushort ReentrancyIndicator
-        {
-            get
-            {
-                return lazy.Obj.reentrancyIndicator.Obj.Value;
-            }
-
-            set
-            {
-                lazy.Obj.reentrancyIndicator.Obj.Value = value;
-            }
-        }
-
-        bool ReentrancyIndicatorExists => lazy.Exists && lazy.Obj.reentrancyIndicator.Exists;
-
-        // If true, indicates that a reentrant write lock tries to upgrade an existing reentrant read lock,
-        // but more than one reader is active, the upgrade must wait until only one reader is left
-        private int WaitingForUpgrade => lazy.Obj.waitingForUpgrade;
-
-        // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
-        private ushort ReentrancyId => lazy.Obj.reentrancyId;
-
-
-        #region PreparedTasks
+        #region LazyVariables
 
         internal class LazyVariables
         {
@@ -258,6 +229,44 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
         }
 
+        #endregion LazyVariables
+
+        #region LocalVariableAccess
+        // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
+        private ushort PassiveWaitThreshold => Settings.passiveWaitThreshold;
+
+        private ushort SleepWaitThreshold => Settings.sleepWaitThreshold;
+
+        private ushort AwakeThreshold => Settings.awakeThreshold;
+
+        // The lower this value, the more often async threads yield
+        private ushort AsyncYieldBaseFrequency => Settings.asyncYieldBaseFrequency;
+
+        // Keeps the last reentrancyId of the "logical thread".
+        // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
+        // so it must be acquired and cannot simply be reentered.
+        private ushort ReentrancyIndicator
+        {
+            get
+            {
+                return lazy.Obj.reentrancyIndicator.Obj.Value;
+            }
+
+            set
+            {
+                lazy.Obj.reentrancyIndicator.Obj.Value = value;
+            }
+        }
+
+        bool ReentrancyIndicatorExists => lazy.Exists && lazy.Obj.reentrancyIndicator.Exists;
+
+        // If true, indicates that a reentrant write lock tries to upgrade an existing reentrant read lock,
+        // but more than one reader is active, the upgrade must wait until only one reader is left
+        private int WaitingForUpgrade => lazy.Obj.waitingForUpgrade;
+
+        // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
+        private ushort ReentrancyId => lazy.Obj.reentrancyId;
+
         internal Task<LockHandle> GetWriteLockTask(FeatureLock parent)
         {
             if (writeLockTask == null) Interlocked.CompareExchange(ref writeLockTask, Task.FromResult(new LockHandle(parent, LockMode.WriteLock)), null);
@@ -289,8 +298,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private Task<LockAttempt> ReenterableWriteLockAttemptTask => lazy.Obj.GetReenterableWriteLockAttemptTask(this);
         private Task<LockAttempt> UpgradedLockAttemptTask => lazy.Obj.GetUpgradedLockAttemptTask(this);
         private Task<LockAttempt> ReenteredLockAttemptTask => lazy.Obj.GetReenteredLockAttemptTask(this);
-
-        #endregion PreparedTasks
+        #endregion LocalVariableAccess
 
         #region PublicProperties
 
@@ -323,6 +331,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// Lock was already taken reentrantly in the same context
         /// </summary>
         public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;
+
+        public FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? defaultSettings;
 
         #endregion PublicProperties
 
@@ -403,7 +413,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
-            return !prioritized && (prioritizedWaiting || waitCounter != 0);
+            return !prioritized && (prioritizedWaiting || firstRankTicket != 0);
         }
 
         // Invalidates the current reentrancyIndicator by changing the reentrancy ID to compare
@@ -486,17 +496,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         // Checks if the one ticket is older than the other one
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsTicketOlder(int ticket, int otherTicket)
+        private static bool IsTicketOlder(ushort ticket, ushort otherTicket)
         {
             if (ticket < otherTicket)
             {
                 // handle the wrap-around case
-                if ((otherTicket - ticket) < (int.MaxValue / 2)) return true;
+                if ((otherTicket - ticket) < (ushort.MaxValue / 2)) return true;
             }
             else if (ticket > otherTicket)
             {
                 // handle the wrap-around case
-                if ((ticket - otherTicket) > (int.MaxValue / 2)) return true;
+                if ((ticket - otherTicket) > (ushort.MaxValue / 2)) return true;
             }
 
             return false;
@@ -542,8 +552,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (prioritized) prioritizedWaiting = false;
             if (acquired)
             {
-                averageWaitCount = (averageWaitCount * 9 + waitCounter + 1) / 10;
-                waitCounter = 0;
+                var averageWeighting = Settings.averageWeighting;
+                averageWaitCount = (ushort)((averageWaitCount * averageWeighting + waitCounter + 1) / (averageWeighting+1));
+                waitCounter = 1;
             }
         }
 
@@ -577,9 +588,10 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void IncWaitCounter(uint increment = 1)
+        private void IncWaitCounter(ushort increment = 1)
         {
-            waitCounter += increment;
+            if (ushort.MaxValue - increment <= waitCounter) waitCounter = ushort.MaxValue;
+            else waitCounter += increment;
         }
 
         #endregion HelperMethods
@@ -1511,8 +1523,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         public struct LockHandle : IDisposable
         {
-            private FeatureLock parentLock;
             internal LockMode mode;
+            private FeatureLock parentLock;            
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal LockHandle(FeatureLock parentLock, LockMode mode)
@@ -1579,7 +1591,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         bool ISupervisor.IsActive => isSupervisionActive;
 
-        TimeSpan ISupervisor.MaxDelay => 0.02.Milliseconds();
+        TimeSpan ISupervisor.MaxDelay => (0.0002 * Settings.supervisionDelayFactor).Milliseconds();
 
         void ISupervisor.Handle()
         {

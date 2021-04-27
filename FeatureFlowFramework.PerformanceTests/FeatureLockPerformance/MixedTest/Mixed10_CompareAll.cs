@@ -10,7 +10,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
     [CsvMeasurementsExporter]
     [RPlotExporter]
     [HtmlExporter]
-    public class Mixed_CompareAll
+    public class Mixed10_CompareAll
     {
         FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
         MonitorSubjects monitorSubjects = new MonitorSubjects();
@@ -24,7 +24,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();        
         VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
-        MixedPerformanceTest test = new MixedPerformanceTest(5);
+        MixedPerformanceTest test = new MixedPerformanceTest(10);
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);
@@ -64,8 +64,8 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         [Benchmark]
         public void AsyncExRW_Lock() => test.Run(asyncExRwSubjects.Lock);
 
-        [Benchmark]
-        public void NeoSmart_Lock() => test.Run(neoSmartSubjects.Lock);   
+        //[Benchmark]
+        //public void NeoSmart_Lock() => test.Run(neoSmartSubjects.Lock);   
 
 
 

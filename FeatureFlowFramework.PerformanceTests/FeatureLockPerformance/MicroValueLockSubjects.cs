@@ -4,7 +4,7 @@ using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
-    public class MicroSpinLockSubjects
+    public class MicroValueLockSubjects
     {
         MicroValueLock myLock = new MicroValueLock();
 

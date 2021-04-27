@@ -8,7 +8,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
 {
     public partial class RpcCallee : IDataFlowSink, IDataFlowSource, IReplier
     {
-        private SourceHelper sourceHelper;
+        private Sender sender = new Sender();
         private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();
         MicroLock requestHandlersLock = new MicroLock();
 
@@ -17,7 +17,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
             using(requestHandlersLock.Lock())
             {
                 var newRequestHandlers = new List<IRpcRequestHandler>(requestHandlers);
-                handler.SetTarget(this.sourceHelper);
+                handler.SetTarget(this.sender);
                 newRequestHandlers.Add(handler);
                 requestHandlers = newRequestHandlers;
             }
@@ -37,7 +37,7 @@ namespace FeatureFlowFramework.DataFlows.RPC
                     }
                 }
 
-                if(!handled && message is IRpcRequest request) sourceHelper.Forward(new RpcErrorResponse(request.RequestId, $"No matching method registered for {request.Method}"));
+                if(!handled && message is IRpcRequest request) sender.Send(new RpcErrorResponse(request.RequestId, $"No matching method registered for {request.Method}"));
             }
         }
 
@@ -47,29 +47,29 @@ namespace FeatureFlowFramework.DataFlows.RPC
             return Task.CompletedTask;
         }
 
-        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+        public int CountConnectedSinks => sender.CountConnectedSinks;
 
 
         public void DisconnectAll()
         {
-            sourceHelper.DisconnectAll();
+            sender.DisconnectAll();
         }
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            sourceHelper.DisconnectFrom(sink);
+            sender.DisconnectFrom(sink);
         }
 
         public IDataFlowSink[] GetConnectedSinks()
         {
-            return sourceHelper.GetConnectedSinks();
+            return sender.GetConnectedSinks();
         }
 
         private interface IRpcRequestHandler
         {
             bool Handle<M>(in M message);
 
-            void SetTarget(SourceHelper target);
+            void SetTarget(ISender target);
         }
 
         public void RegisterMethod<R>(string methodName, Func<R> method)
@@ -134,12 +134,12 @@ namespace FeatureFlowFramework.DataFlows.RPC
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            sourceHelper.ConnectTo(sink, weakReference);
+            sender.ConnectTo(sink, weakReference);
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return sourceHelper.ConnectTo(sink, weakReference);
+            return sender.ConnectTo(sink, weakReference);
         }
     }
 }
