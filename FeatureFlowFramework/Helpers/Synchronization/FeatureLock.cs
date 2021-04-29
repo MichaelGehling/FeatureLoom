@@ -27,16 +27,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// A multi-purpose high-performance lock object that can be used in synchronous and asynchronous contexts.
         /// It supports reentrancy, prioritized lock acquiring, trying for lock acquiring with or without timeout and
         /// read-only locking for parallel access (incl. automatic upgrading/downgrading in conjunction with reentrancy).
-        /// When the lock is acquired it returns a handle that can be used with a using statement for simple and clean usage.
+        /// When the lock is acquired it returns a handle that can be used within a using statement for simple and clean usage.
         /// Example: using(myLock.Lock()) { ... }        
-        /// </summary>        
+        /// </summary>
         public FeatureLock(FeatureLockSettings settings = null)
         {
             if (settings != null) lazy.Obj.settings.Obj = settings;
         }
 
+        // Several configuration settings for the FeatureLock
         public class FeatureLockSettings
-        {
+        {            
             public ushort passiveWaitThreshold = 30;
             public ushort sleepWaitThreshold = 30;
             public ushort awakeThreshold = 3;
@@ -46,6 +47,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             public bool restrictQueueJumping = false;
         }
 
+        // Predefined settings, default is PerformanceSettings
         private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
         private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 10, supervisionDelayFactor = 10 };
         public static FeatureLockSettings PerformanceSettings { get => performanceSettings; set => performanceSettings = value; }
@@ -235,11 +237,14 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #endregion LazyVariables
 
         #region LocalVariableAccess
+        // Provides the active settings of the FeatureLock
+        private FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? PerformanceSettings;
+
         // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
         private ushort PassiveWaitThreshold => Settings.passiveWaitThreshold;
-
+        // The lower this value, the more candidates will go to sleep (must not be smaller than PassiveWaitThreshold)
         private ushort SleepWaitThreshold => Settings.sleepWaitThreshold;
-
+        // The lower this value, the later a sleeping candidate is waked up
         private ushort AwakeThreshold => Settings.awakeThreshold;
 
         // The lower this value, the more often async threads yield
@@ -260,34 +265,38 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 lazy.Obj.reentrancyIndicator.Obj.Value = value;
             }
         }
+        // True when the ReentrancyIndicator was already created
+        private bool ReentrancyIndicatorExists => lazy.Exists && lazy.Obj.reentrancyIndicator.Exists;
 
-        bool ReentrancyIndicatorExists => lazy.Exists && lazy.Obj.reentrancyIndicator.Exists;
+        // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
+        private ushort ReentrancyId => lazy.Obj.reentrancyId;
 
         // If true, indicates that a reentrant write lock tries to upgrade an existing reentrant read lock,
         // but more than one reader is active, the upgrade must wait until only one reader is left
         private int WaitingForUpgrade => lazy.Obj.waitingForUpgrade;
 
-        // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
-        private ushort ReentrancyId => lazy.Obj.reentrancyId;
-
-        internal Task<LockHandle> GetWriteLockTask(FeatureLock parent)
+        // Creates a prepared task if not already available and returns it
+        private Task<LockHandle> GetWriteLockTask(FeatureLock parent)
         {
             if (writeLockTask == null) Interlocked.CompareExchange(ref writeLockTask, Task.FromResult(new LockHandle(parent, LockMode.WriteLock)), null);
             return writeLockTask;
         }
 
-        internal Task<LockAttempt> GetFailedAttemptTask()
+        // Creates a prepared task if not already available and returns it
+        private Task<LockAttempt> GetFailedAttemptTask()
         {
             if (failedAttemptTask == null) Interlocked.CompareExchange(ref failedAttemptTask, Task.FromResult(new LockAttempt(new LockHandle())), null);
             return failedAttemptTask;
         }
 
-        internal Task<LockAttempt> GetWriteLockAttemptTask(FeatureLock parent)
+        // Creates a prepared task if not already available and returns it
+        private Task<LockAttempt> GetWriteLockAttemptTask(FeatureLock parent)
         {
             if (writeLockAttemptTask == null) Interlocked.CompareExchange(ref writeLockAttemptTask, Task.FromResult(new LockAttempt(new LockHandle(parent, LockMode.WriteLock))), null);
             return writeLockAttemptTask;
         }
 
+        // Access to the prepared tasks (most are in the lazyVariable class)
         private Task<LockHandle> ReadLockTask => lazy.Obj.GetReadLockTask(this);
         private Task<LockHandle> ReenterableReadLockTask => lazy.Obj.GetReenterableReadLockTask(this);
         private Task<LockHandle> WriteLockTask => GetWriteLockTask(this);
@@ -333,9 +342,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// <summary>
         /// Lock was already taken reentrantly in the same context
         /// </summary>
-        public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;
-
-        public FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? PerformanceSettings;
+        public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;        
 
         #endregion PublicProperties
 
@@ -556,15 +563,17 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (acquired)
             {
                 var averageWeighting = Settings.averageWeighting;
-                averageWaitCount = (ushort)(((uint)averageWaitCount * averageWeighting + waitCounter + 1) / (averageWeighting + 1));
+                averageWaitCount = (ushort)(((uint)averageWaitCount * averageWeighting + waitCounter) / (averageWeighting + 1));
+                // Reset the waitCounter to 1 (not 0), so that averageWaitCount will never be 0, which would never allow PassiveWaiting and Sleeping, even with a very high rank
                 waitCounter = 1;
             }
         }
 
+        // Increases the waitCounter while avoiding a possible overflow
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void IncWaitCounter(ushort increment = 1)
-        {
-            if (ushort.MaxValue - increment <= waitCounter - 1) waitCounter = ushort.MaxValue - 1;
+        {            
+            if (ushort.MaxValue - increment <= waitCounter) waitCounter = ushort.MaxValue;
             else waitCounter += increment;
         }
 
@@ -573,19 +582,20 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool MustWaitPassive(bool prioritized, int rank, bool readOnly)
         {
             if (readOnly && IsReadOnlyLocked) return false;
-
             return !prioritized && rank * averageWaitCount > PassiveWaitThreshold;
         }
 
+        // Checks if the candidate must go to sleep based on its rank
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWaitSleeping(int rank, bool readOnly)
-        {
-            if (readOnly && IsReadOnlyLocked) return false;
+        {            
+            if (readOnly && IsReadOnlyLocked) return false;            
             if (sleepLock.IsLocked) return false;
 
             return rank * averageWaitCount > SleepWaitThreshold;
         }
 
+        // Checks if a sleeping candidate may be waked up
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustAwake(int rank, bool readOnly)
         {
