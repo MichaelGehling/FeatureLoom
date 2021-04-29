@@ -40,13 +40,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             public ushort passiveWaitThreshold = 30;
             public ushort sleepWaitThreshold = 30;
             public ushort awakeThreshold = 3;
-            public ushort asyncYieldBaseFrequency = 300;
+            public ushort asyncYieldBaseFrequency = 100;
             public ushort averageWeighting = 1;
             public ushort supervisionDelayFactor = 100;
+            public bool restrictQueueJumping = false;
         }
 
-        private static FeatureLockSettings defaultSettings = new FeatureLockSettings();
-        public static FeatureLockSettings DefaultSettings { get => defaultSettings; set => defaultSettings = value; }        
+        private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
+        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 10, supervisionDelayFactor = 10 };
+        public static FeatureLockSettings PerformanceSettings { get => performanceSettings; set => performanceSettings = value; }
+        public static FeatureLockSettings FairnessSettings { get => fairnessSettings; set => fairnessSettings = value; }
         #endregion ConstructorAndSettings
 
         #region ObjectLock
@@ -135,7 +138,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool prioritizedWaiting = false;
 
         // Indicates if supervision is currently observing SleepHandles to wake up the candidates on time
-        private bool isSupervisionActive = false;
+        private bool isSupervisionActive = false;        
 
         #endregion Variables
 
@@ -332,7 +335,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         /// </summary>
         public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;
 
-        public FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? defaultSettings;
+        public FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? PerformanceSettings;
 
         #endregion PublicProperties
 
@@ -413,7 +416,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
-            return !prioritized && (prioritizedWaiting || firstRankTicket != 0);
+            return !prioritized && (prioritizedWaiting || (Settings.restrictQueueJumping && (firstRankTicket != 0 || isSupervisionActive)));
         }
 
         // Invalidates the current reentrancyIndicator by changing the reentrancy ID to compare
@@ -553,7 +556,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (acquired)
             {
                 var averageWeighting = Settings.averageWeighting;
-                averageWaitCount = (ushort)((averageWaitCount * averageWeighting + waitCounter + 1) / (averageWeighting+1));
+                averageWaitCount = (ushort)(((uint)averageWaitCount * averageWeighting + waitCounter + 1) / (averageWeighting+1));
                 waitCounter = 1;
             }
         }
@@ -1591,7 +1594,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         bool ISupervisor.IsActive => isSupervisionActive;
 
-        TimeSpan ISupervisor.MaxDelay => (0.0002 * Settings.supervisionDelayFactor).Milliseconds();
+        TimeSpan ISupervisor.MaxDelay => (0.0005 * Settings.supervisionDelayFactor).Milliseconds();
 
         void ISupervisor.Handle()
         {

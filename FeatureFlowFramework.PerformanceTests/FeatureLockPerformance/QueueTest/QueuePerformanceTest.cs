@@ -15,7 +15,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numConsumers = 1;
         public int numOverallMessages = 1_000_000;
 
-        public void Run(Action init, Action<Action> producerLock, Action<Action> consumerLock = null)
+        public void Run(Action<Action> producerLock, Action<Action> consumerLock = null)
         {
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
@@ -72,7 +72,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             //if(!Task.WhenAll(consumerThreads.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
         }
 
-        public void AsyncRun(Action init, Func<Func<Task>, Task> producerLock, Func<Func<Task>, Task> consumerLock = null)
+        public void AsyncRun(Func<Func<Task>, Task> producerLock, Func<Func<Task>, Task> consumerLock = null)
         {
             if(consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
