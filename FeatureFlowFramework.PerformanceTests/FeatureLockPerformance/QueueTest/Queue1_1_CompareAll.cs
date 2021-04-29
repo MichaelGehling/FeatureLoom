@@ -1,6 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 {
@@ -15,21 +14,21 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
     //[HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)]
     public class Queue1_1_CompareAll
     {
-        FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
-        FairFeatureLockSubjects fairFeatureLockSubjects = new FairFeatureLockSubjects();
-        MonitorSubjects monitorSubjects = new MonitorSubjects();
-        SemaphoreSlimSubjects semaphoreSlimSubjects = new SemaphoreSlimSubjects();
-        ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
-        AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
-        AsyncExRWSubjects asyncExRwSubjects = new AsyncExRWSubjects();
-        NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
-        FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
-        SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
-        VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
-        MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
+        private FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
+        private FairFeatureLockSubjects fairFeatureLockSubjects = new FairFeatureLockSubjects();
+        private MonitorSubjects monitorSubjects = new MonitorSubjects();
+        private SemaphoreSlimSubjects semaphoreSlimSubjects = new SemaphoreSlimSubjects();
+        private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
+        private AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
+        private AsyncExRWSubjects asyncExRwSubjects = new AsyncExRWSubjects();
+        private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
+        private FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
+        private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
+        private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
+        private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
+        private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
-        QueuePerformanceTest queueTest = new QueuePerformanceTest();
+        private QueuePerformanceTest queueTest = new QueuePerformanceTest();
 
         [Params(1)]
         public int numProducers
@@ -50,7 +49,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         }
 
         [Benchmark(Baseline = true)]
-        public void FeatureLock_Lock() => queueTest.Run( featureLockSubjects.Lock);
+        public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Lock);
 
         [Benchmark]
         public void FairFeatureLock_Lock() => queueTest.Run(fairFeatureLockSubjects.Lock);
@@ -74,7 +73,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         public void SemaphoreSlim_Lock() => queueTest.Run(semaphoreSlimSubjects.Lock);
 
         [Benchmark]
-        public void ReaderWriterLockSlim_Lock() => queueTest.Run( readerWriterLockSlimSubjects.Lock);        
+        public void ReaderWriterLockSlim_Lock() => queueTest.Run(readerWriterLockSlimSubjects.Lock);
 
         [Benchmark]
         public void AsyncEx_Lock() => queueTest.Run(asyncExSubjects.Lock);
@@ -84,8 +83,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         //[Benchmark]
         //public void NeoSmart_Lock() => queueTest.Run(neoSmartSubjects.Init, neoSmartSubjects.Lock);
-        
-
 
         [Benchmark]
         public void FeatureLock_LockAsync_() => queueTest.AsyncRun(featureLockSubjects.LockAsync);
@@ -114,8 +111,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void vSAsyncReaderWriter_LockAsync_() => queueTest.AsyncRun(vSAsyncReaderWriterLockSubjects.LockAsync);
 
-
-
         [Benchmark]
         public void FeatureLock_ReentrantLock() => queueTest.Run(featureLockSubjects.ReentrantLock);
 
@@ -124,8 +119,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
 
         [Benchmark]
         public void ReaderWriterLockSlim_ReentrantLock() => queueTest.Run(readerWriterLockSlimSubjects.ReentrantLock);
-
-
 
         [Benchmark]
         public void FeatureLock_ReentrantLockAsync_() => queueTest.AsyncRun(featureLockSubjects.ReentrantLockAsync);

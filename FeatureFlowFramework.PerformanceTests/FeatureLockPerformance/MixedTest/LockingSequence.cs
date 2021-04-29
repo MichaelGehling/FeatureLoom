@@ -3,29 +3,27 @@ using FeatureFlowFramework.Helpers.Time;
 using FeatureFlowFramework.Services;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
 {
-
     public class LockingSequence
     {
-        List<TimeSpan> inLockTimes = new List<TimeSpan>();
-        List<TimeSpan> waitingTimes = new List<TimeSpan>();
-        bool readOnly = false;
-        bool prioritized = false;
-        Action<Action> lockAction = null;
-        Func<Func<Task>, Task> lockActionAsync = null;
-        AsyncManualResetEvent waitHandle = new AsyncManualResetEvent(false);
+        private List<TimeSpan> inLockTimes = new List<TimeSpan>();
+        private List<TimeSpan> waitingTimes = new List<TimeSpan>();
+        private bool readOnly = false;
+        private bool prioritized = false;
+        private Action<Action> lockAction = null;
+        private Func<Func<Task>, Task> lockActionAsync = null;
+        private AsyncManualResetEvent waitHandle = new AsyncManualResetEvent(false);
 
         public bool IsReadOnly => readOnly;
         public bool IsPrioritized => prioritized;
         public IAsyncWaitHandle WaitHandle => waitHandle;
         public int CountInLockSteps => inLockTimes.Count;
         public int CountWaitingSteps => waitingTimes.Count;
-        int seed = -1;
+        private int seed = -1;
 
         public LockingSequence SetReadOnly(bool readOnly)
         {
@@ -43,15 +41,15 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         {
             for (int i = 0; i < repetitions; i++)
             {
-                inLockTimes.Add(time);                
+                inLockTimes.Add(time);
             }
             return this;
         }
 
         public LockingSequence AddWaitingTime(TimeSpan time, int repetitions = 1)
         {
-            for(int i=0; i< repetitions; i++)
-            {                
+            for (int i = 0; i < repetitions; i++)
+            {
                 waitingTimes.Add(time);
             }
             return this;
@@ -92,7 +90,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         }
 
         public LockingSequence SetLockAction(Func<Func<Task>, Task> lockActionAsync)
-        {            
+        {
             this.lockActionAsync = lockActionAsync;
             this.lockAction = null;
             return this;
@@ -237,14 +235,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
 
         protected async Task WaitAsync(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {
-            if (time == TimeSpan.Zero) return;            
+            if (time == TimeSpan.Zero) return;
             Work(time); return;
-
 
             DateTime now = AppTime.Now;
             var timer = new TimeFrame(now, time);
             while (!timer.Elapsed(now))
-            {                
+            {
                 //if (!abortWaitHandle.WouldWait()) return;
                 if (timer.Remaining(now) < 0.002.Milliseconds()) /* do nothing */;
                 else if (timer.Remaining(now) < 0.02.Milliseconds()) Thread.Sleep(0);

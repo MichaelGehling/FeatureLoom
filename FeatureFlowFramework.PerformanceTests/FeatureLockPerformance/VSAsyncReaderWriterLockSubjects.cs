@@ -1,21 +1,20 @@
-﻿using System;
+﻿using Microsoft.VisualStudio.Threading;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.Threading;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class VSAsyncReaderWriterLockSubjects
     {
-        AsyncReaderWriterLock myLock = new AsyncReaderWriterLock();
+        private AsyncReaderWriterLock myLock = new AsyncReaderWriterLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockAsync()
         {
             using (await myLock.WriteLockAsync())
             {
-
-            }                
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -32,7 +31,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (await myLock.ReadLockAsync())
             {
-
             }
         }
     }

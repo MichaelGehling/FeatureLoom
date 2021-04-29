@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
 using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
@@ -14,7 +13,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
     //[SimpleJob(RuntimeMoniker.Mono)]
     public class FastPath_CompareFeatuerLockIntern
     {
-        FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
+        private FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();

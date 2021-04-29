@@ -7,7 +7,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class SemaphoreSlimSubjects
     {
-        SemaphoreSlim semaphore = new SemaphoreSlim(1);
+        private SemaphoreSlim semaphore = new SemaphoreSlim(1);
 
         public void Init() => semaphore = new SemaphoreSlim(1);
 
@@ -42,7 +42,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock(Action action)
         {
-            if(semaphore.Wait(0))
+            if (semaphore.Wait(0))
             {
                 try
                 {
@@ -55,17 +55,12 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             }
         }
 
-
-
-
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
         {
             semaphore.Wait();
             try
             {
-
             }
             finally
             {
@@ -79,7 +74,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             await semaphore.WaitAsync();
             try
             {
-
             }
             finally
             {
@@ -94,7 +88,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             {
                 try
                 {
-
                 }
                 finally
                 {

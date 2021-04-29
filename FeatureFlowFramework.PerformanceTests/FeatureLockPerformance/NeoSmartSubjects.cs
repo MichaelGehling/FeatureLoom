@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class NeoSmartSubjects
     {
-        NeoSmart.AsyncLock.AsyncLock myLock = new NeoSmart.AsyncLock.AsyncLock();
+        private NeoSmart.AsyncLock.AsyncLock myLock = new NeoSmart.AsyncLock.AsyncLock();
 
         public void Init() => myLock = new NeoSmart.AsyncLock.AsyncLock();
 
@@ -24,14 +24,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockAsync(Func<Task> action)
         {
-            using(await myLock.LockAsync())
+            using (await myLock.LockAsync())
             {
                 await action();
             }
         }
-
-
-
 
         /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -39,7 +36,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (myLock.Lock())
             {
-
             }
         }
         */
@@ -49,7 +45,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (await myLock.LockAsync())
             {
-
             }
         }
     }

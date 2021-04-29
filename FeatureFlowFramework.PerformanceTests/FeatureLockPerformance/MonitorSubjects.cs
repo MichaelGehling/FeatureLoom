@@ -6,14 +6,14 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class MonitorSubjects
     {
-        object lockObj = new object();
+        private object lockObj = new object();
 
         public void Init() => lockObj = new object();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)
         {
-            lock(lockObj)
+            lock (lockObj)
             {
                 action();
             }
@@ -22,7 +22,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock(Action action)
         {
-            if(Monitor.TryEnter(lockObj))
+            if (Monitor.TryEnter(lockObj))
             {
                 try
                 {
@@ -35,14 +35,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             }
         }
 
-
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
         {
-            lock(lockObj)
+            lock (lockObj)
             {
-
             }
         }
 

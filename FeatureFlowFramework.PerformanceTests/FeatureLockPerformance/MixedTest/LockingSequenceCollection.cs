@@ -1,16 +1,15 @@
 ﻿using FeatureFlowFramework.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
 {
     public class LockingSequenceCollection
     {
-        List<LockingSequence> sequences = new List<LockingSequence>();
-        LockingSequence hotPathSequence = null;
-        int maxSteps;
+        private List<LockingSequence> sequences = new List<LockingSequence>();
+        private LockingSequence hotPathSequence = null;
+        private int maxSteps;
         public int MaxSteps => maxSteps;
 
         public void SetHotPathSequence(LockingSequence hotPathSequence)
@@ -37,7 +36,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
                 tasks.Add(hotPathSequence.RunAsync(numSteps, AsyncWaitHandle.NoWaitingHandle, lockAction));
             }
 
-            foreach(var sequence in sequences)
+            foreach (var sequence in sequences)
             {
                 tasks.Add(sequence.RunAsync(numSteps, AsyncWaitHandle.NoWaitingHandle, lockAction));
             }

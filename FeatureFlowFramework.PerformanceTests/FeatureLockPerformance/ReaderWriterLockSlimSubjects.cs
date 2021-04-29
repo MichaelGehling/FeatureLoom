@@ -4,11 +4,10 @@ using System.Threading;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
-
     public class ReaderWriterLockSlimSubjects
     {
-        ReaderWriterLockSlim myLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
-        ReaderWriterLockSlim reentrantLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+        private ReaderWriterLockSlim myLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
+        private ReaderWriterLockSlim reentrantLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 
         public void Init()
         {
@@ -18,7 +17,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)
-        {            
+        {
             try
             {
                 myLock.EnterWriteLock();
@@ -32,7 +31,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockReadOnly(Action action)
-        {            
+        {
             try
             {
                 myLock.EnterReadLock();
@@ -47,7 +46,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock(Action action)
         {
-            if(myLock.TryEnterWriteLock(0))
+            if (myLock.TryEnterWriteLock(0))
             {
                 try
                 {
@@ -63,7 +62,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLockReadOnly(Action action)
         {
-            if(myLock.TryEnterReadLock(0))
+            if (myLock.TryEnterReadLock(0))
             {
                 try
                 {
@@ -78,7 +77,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLock(Action action)
-        {            
+        {
             try
             {
                 reentrantLock.EnterWriteLock();
@@ -92,7 +91,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLockReadOnly(Action action)
-        {            
+        {
             try
             {
                 reentrantLock.EnterReadLock();
@@ -107,7 +106,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantTryLock(Action action)
         {
-            if(reentrantLock.TryEnterWriteLock(0))
+            if (reentrantLock.TryEnterWriteLock(0))
             {
                 try
                 {
@@ -123,7 +122,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantTryLockReadOnly(Action action)
         {
-            if(reentrantLock.TryEnterReadLock(0))
+            if (reentrantLock.TryEnterReadLock(0))
             {
                 try
                 {
@@ -136,15 +135,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             }
         }
 
-
-
-
-
-
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
-        {            
+        {
             try
             {
                 myLock.EnterWriteLock();
@@ -157,7 +150,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockReadOnly()
-        {            
+        {
             try
             {
                 myLock.EnterReadLock();
@@ -200,7 +193,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLock()
-        {            
+        {
             try
             {
                 reentrantLock.EnterWriteLock();
@@ -213,7 +206,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReentrantLockReadOnly()
-        {            
+        {
             try
             {
                 reentrantLock.EnterReadLock();

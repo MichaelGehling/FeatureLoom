@@ -1,14 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using FeatureFlowFramework.Helpers.Time;
+using System;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Helpers.Time;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
 {
     public class MixedPerformanceTest
     {
-        LockingSequenceCollection collection = new LockingSequenceCollection();    
+        private LockingSequenceCollection collection = new LockingSequenceCollection();
 
         public MixedPerformanceTest(int numThreads)
         {

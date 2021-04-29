@@ -1,18 +1,18 @@
-﻿using System;
+﻿using FeatureFlowFramework.Helpers.Synchronization;
+using System;
 using System.Runtime.CompilerServices;
-using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class MicroValueLockSubjects
     {
-        MicroValueLock myLock = new MicroValueLock();
+        private MicroValueLock myLock = new MicroValueLock();
 
         public void Init() => myLock = new MicroValueLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)
-        {            
+        {
             myLock.Enter();
             try
             {
@@ -30,7 +30,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             myLock.Enter();
             try
             {
-                
             }
             finally
             {
@@ -45,7 +44,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
             {
                 try
                 {
-
                 }
                 finally
                 {
@@ -53,6 +51,5 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
                 }
             }
         }
-
     }
 }

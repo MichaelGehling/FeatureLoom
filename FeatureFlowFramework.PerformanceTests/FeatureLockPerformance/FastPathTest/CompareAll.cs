@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
 using FeatureFlowFramework.Helpers.Synchronization;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
@@ -14,18 +13,18 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
     //[SimpleJob(RuntimeMoniker.Mono)]
     public class FastPath_CompareAll
     {
-        FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
-        MonitorSubjects monitorSubjects = new MonitorSubjects();
-        SemaphoreSlimSubjects semaphoreSlimSubjects = new SemaphoreSlimSubjects();
-        AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
-        AsyncExRWSubjects asyncExRWSubjects = new AsyncExRWSubjects();
-        ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
-        SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
-        FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
-        BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();        
-        VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
-        MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
+        private FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
+        private MonitorSubjects monitorSubjects = new MonitorSubjects();
+        private SemaphoreSlimSubjects semaphoreSlimSubjects = new SemaphoreSlimSubjects();
+        private AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
+        private AsyncExRWSubjects asyncExRWSubjects = new AsyncExRWSubjects();
+        private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
+        private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
+        private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
+        private FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
+        private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
+        private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
+        private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();
@@ -47,7 +46,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
 
         [Benchmark]
         public void ReaderWriterLockSlim_Lock() => readerWriterLockSlimSubjects.Lock();
-        
 
         [Benchmark]
         public void AsyncEx_Lock() => asyncExSubjects.Lock();
@@ -57,8 +55,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
 
         //[Benchmark]
         //public void NeoSmart_Lock() => neoSmartSubjects.Lock();
-
-
 
         [Benchmark]
         public void FeatureLock_LockAsync_() => featureLockSubjects.LockAsync().WaitFor();
@@ -81,14 +77,11 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         [Benchmark]
         public void NeoSmart_LockAsync_() => neoSmartSubjects.LockAsync().WaitFor();
 
-
-
         [Benchmark]
         public void ReentrantFeatureLock_Lock() => featureLockSubjects.ReentrantLock();
 
         [Benchmark]
         public void ReentrantReaderWriterLockSlim_Lock() => readerWriterLockSlimSubjects.ReentrantLock();
-
 
         [Benchmark]
         public void ReentrantFeatureLock_LockAsync_() => featureLockSubjects.ReentrantLockAsync().WaitFor();

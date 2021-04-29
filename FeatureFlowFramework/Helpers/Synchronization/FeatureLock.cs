@@ -41,7 +41,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             public ushort sleepWaitThreshold = 30;
             public ushort awakeThreshold = 3;
             public ushort asyncYieldBaseFrequency = 100;
-            public ushort averageWeighting = 1;
+            public ushort averageWeighting = 3;
             public ushort supervisionDelayFactor = 100;
             public bool restrictQueueJumping = false;
         }
@@ -138,7 +138,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool prioritizedWaiting = false;
 
         // Indicates if supervision is currently observing SleepHandles to wake up the candidates on time
-        private bool isSupervisionActive = false;        
+        private bool isSupervisionActive = false;
 
         #endregion Variables
 
@@ -556,9 +556,16 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (acquired)
             {
                 var averageWeighting = Settings.averageWeighting;
-                averageWaitCount = (ushort)(((uint)averageWaitCount * averageWeighting + waitCounter + 1) / (averageWeighting+1));
+                averageWaitCount = (ushort)(((uint)averageWaitCount * averageWeighting + waitCounter + 1) / (averageWeighting + 1));
                 waitCounter = 1;
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void IncWaitCounter(ushort increment = 1)
+        {
+            if (ushort.MaxValue - increment <= waitCounter - 1) waitCounter = ushort.MaxValue - 1;
+            else waitCounter += increment;
         }
 
         // Checks if the candidate may acquire the lock or must stay back and wait based on its rank
@@ -567,8 +574,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (readOnly && IsReadOnlyLocked) return false;
 
-            uint waitFactor = Math.Max(averageWaitCount, waitCounter);
-            return !prioritized && rank * waitFactor > PassiveWaitThreshold;
+            return !prioritized && rank * averageWaitCount > PassiveWaitThreshold;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -577,8 +583,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (readOnly && IsReadOnlyLocked) return false;
             if (sleepLock.IsLocked) return false;
 
-            uint waitFactor = Math.Max(averageWaitCount, waitCounter);
-            return rank * waitFactor > SleepWaitThreshold;
+            return rank * averageWaitCount > SleepWaitThreshold;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -588,14 +593,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             uint waitFactor = Math.Max(averageWaitCount, waitCounter);
             return rank * waitFactor <= AwakeThreshold;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void IncWaitCounter(ushort increment = 1)
-        {
-            if (ushort.MaxValue - increment <= waitCounter) waitCounter = ushort.MaxValue;
-            else waitCounter += increment;
-        }
+        }        
 
         #endregion HelperMethods
 

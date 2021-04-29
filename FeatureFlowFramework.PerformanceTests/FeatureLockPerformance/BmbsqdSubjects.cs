@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class BmbsqdSubjects
     {
-        Bmbsqd.Async.AsyncLock myLock = new Bmbsqd.Async.AsyncLock();
+        private Bmbsqd.Async.AsyncLock myLock = new Bmbsqd.Async.AsyncLock();
 
         public void Init() => myLock = new Bmbsqd.Async.AsyncLock();
 
@@ -15,7 +15,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (await myLock)
             {
-
             }
         }
 

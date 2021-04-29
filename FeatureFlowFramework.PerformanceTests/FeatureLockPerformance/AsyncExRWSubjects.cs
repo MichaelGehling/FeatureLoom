@@ -7,14 +7,13 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class AsyncExRWSubjects
     {
-        AsyncReaderWriterLock myLock = new AsyncReaderWriterLock();
+        private AsyncReaderWriterLock myLock = new AsyncReaderWriterLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
         {
             using (myLock.WriterLock())
             {
-
             }
         }
 
@@ -32,7 +31,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (myLock.ReaderLock())
             {
-
             }
         }
 
@@ -41,7 +39,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (await myLock.WriterLockAsync())
             {
-                
             }
         }
 
@@ -59,7 +56,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (await myLock.ReaderLockAsync())
             {
-
             }
         }
     }

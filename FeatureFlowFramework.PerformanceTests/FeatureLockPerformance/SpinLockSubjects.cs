@@ -6,7 +6,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
     public class SpinLockSubjects
     {
-        SpinLock myLock = new SpinLock(false);
+        private SpinLock myLock = new SpinLock(false);
 
         public void Init() => myLock = new SpinLock();
 

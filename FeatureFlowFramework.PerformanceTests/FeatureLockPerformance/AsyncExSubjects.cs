@@ -4,17 +4,16 @@ using System.Threading.Tasks;
 
 namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
 {
-
     public class AsyncExSubjects
     {
-        Nito.AsyncEx.AsyncLock myLock = new Nito.AsyncEx.AsyncLock();
+        private Nito.AsyncEx.AsyncLock myLock = new Nito.AsyncEx.AsyncLock();
 
         public void Init() => myLock = new Nito.AsyncEx.AsyncLock();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)
         {
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 action();
             }
@@ -23,7 +22,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockAsync(Func<Task> action)
         {
-            using(await myLock.LockAsync())
+            using (await myLock.LockAsync())
             {
                 await action();
             }
@@ -34,7 +33,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (myLock.Lock())
             {
-
             }
         }
 
@@ -43,7 +41,6 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         {
             using (await myLock.LockAsync())
             {
-
             }
         }
     }
