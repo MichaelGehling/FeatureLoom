@@ -287,7 +287,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [Fact]
         public void FirstAttemptSucceedsFirst()
         {
-            var myLock = new FeatureLock( new FeatureLock.FeatureLockSettings() { passiveWaitThreshold = 1});            
+            var myLock = new FeatureLock(FeatureLock.FairnessSettings);            
             int counter = 0;
             bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
@@ -330,7 +330,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [Fact]
         public void FirstAttemptSucceedsFirstAsync()
         {
-            var myLock = new FeatureLock(new FeatureLock.FeatureLockSettings() { passiveWaitThreshold = 1 });
+            var myLock = new FeatureLock(FeatureLock.FairnessSettings);
             int counter = 0;
             bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
@@ -373,7 +373,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         [Fact]
         public void FirstAttemptSucceedsFirstMixed()
         {
-            var myLock = new FeatureLock(new FeatureLock.FeatureLockSettings() { passiveWaitThreshold = 1 });
+            var myLock = new FeatureLock(FeatureLock.FairnessSettings);
             int counter = 0;
             bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);

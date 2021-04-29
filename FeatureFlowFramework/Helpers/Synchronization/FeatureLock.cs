@@ -37,21 +37,30 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
         // Several configuration settings for the FeatureLock
         public class FeatureLockSettings
-        {            
-            public ushort passiveWaitThreshold = 30;
+        {
+            // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
+            // 0 means that the wait order will be exactly respected (in nearly all cases), but it comes with a quite noticeable performance cost, especially for high frequency locking.
+            public ushort passiveWaitThreshold = 50;
+            // The lower this value, the more candidates will go to sleep (must not be smaller than PassiveWaitThreshold)
             public ushort sleepWaitThreshold = 30;
+            // The lower this value, the later a sleeping candidate is waked up
             public ushort awakeThreshold = 3;
+            // The lower this value, the more often async threads yield
             public ushort asyncYieldBaseFrequency = 100;
+            // The weight of the former averageWaitCount vs. the current waitCount (e.g. 3 means 3:1)
             public ushort averageWeighting = 3;
+            // How often the supervision roughly checks to wake up sleeping candidates (100 means 0.05ms)
             public ushort supervisionDelayFactor = 100;
+            // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
+            // Comes with a quite noticeable performance cost, especially for high frequency locking.
             public bool restrictQueueJumping = false;
         }
 
         // Predefined settings, default is PerformanceSettings
         private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
-        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 10, supervisionDelayFactor = 10 };
-        public static FeatureLockSettings PerformanceSettings { get => performanceSettings; set => performanceSettings = value; }
-        public static FeatureLockSettings FairnessSettings { get => fairnessSettings; set => fairnessSettings = value; }
+        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20, supervisionDelayFactor = 10 };
+        public static FeatureLockSettings PerformanceSettings => performanceSettings;
+        public static FeatureLockSettings FairnessSettings  => fairnessSettings;
         #endregion ConstructorAndSettings
 
         #region ObjectLock
@@ -239,16 +248,6 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         #region LocalVariableAccess
         // Provides the active settings of the FeatureLock
         private FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? PerformanceSettings;
-
-        // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
-        private ushort PassiveWaitThreshold => Settings.passiveWaitThreshold;
-        // The lower this value, the more candidates will go to sleep (must not be smaller than PassiveWaitThreshold)
-        private ushort SleepWaitThreshold => Settings.sleepWaitThreshold;
-        // The lower this value, the later a sleeping candidate is waked up
-        private ushort AwakeThreshold => Settings.awakeThreshold;
-
-        // The lower this value, the more often async threads yield
-        private ushort AsyncYieldBaseFrequency => Settings.asyncYieldBaseFrequency;
 
         // Keeps the last reentrancyId of the "logical thread".
         // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
@@ -445,8 +444,8 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             // Otherwise we only yield every now and then, less often for prioritized and lower ranks that should be preferred
             int asyncYieldFrequency;
-            if (prioritized || rank == 0) asyncYieldFrequency = AsyncYieldBaseFrequency;
-            else asyncYieldFrequency = AsyncYieldBaseFrequency / rank;
+            if (prioritized || rank == 0) asyncYieldFrequency = Settings.asyncYieldBaseFrequency;
+            else asyncYieldFrequency = Settings.asyncYieldBaseFrequency / rank;
             if (counter % asyncYieldFrequency.ClampLow(1) != 0) return false;
 
             ThreadPool.GetAvailableThreads(out int availableThreads, out _);
@@ -582,7 +581,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool MustWaitPassive(bool prioritized, int rank, bool readOnly)
         {
             if (readOnly && IsReadOnlyLocked) return false;
-            return !prioritized && rank * averageWaitCount > PassiveWaitThreshold;
+            return !prioritized && rank * averageWaitCount > Settings.passiveWaitThreshold;
         }
 
         // Checks if the candidate must go to sleep based on its rank
@@ -592,7 +591,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (readOnly && IsReadOnlyLocked) return false;            
             if (sleepLock.IsLocked) return false;
 
-            return rank * averageWaitCount > SleepWaitThreshold;
+            return rank * averageWaitCount > Settings.sleepWaitThreshold;
         }
 
         // Checks if a sleeping candidate may be waked up
@@ -602,8 +601,25 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             if (readOnly && IsReadOnlyLocked) return true;
 
             uint waitFactor = Math.Max(averageWaitCount, waitCounter);
-            return rank * waitFactor <= AwakeThreshold;
-        }        
+            return rank * waitFactor <= Settings.awakeThreshold;
+        }
+
+        // Yields CPU time to wait
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void YieldCpuTime(bool lowerPriority = false)
+        {
+            if (!lowerPriority) Thread.Sleep(0);
+            else
+            {
+                var currentThread = Thread.CurrentThread;
+                var oldPriority = currentThread.Priority;
+                currentThread.Priority = ThreadPriority.BelowNormal;
+                Thread.Sleep(0);
+                currentThread.Priority = oldPriority;
+            }
+        }
+
+
 
         #endregion HelperMethods
 
@@ -642,7 +658,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) Sleep(ticket, readOnly);
-                    else Thread.Sleep(0);
+                    else YieldCpuTime(true);
                 }
                 else
                 {
@@ -651,7 +667,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        Thread.Sleep(0);
+                        YieldCpuTime();
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -687,7 +703,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, false);
                     else if (MustYieldAsyncThread(rank, prioritized, ++counter)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, true);
-                    else Thread.Sleep(0);
+                    else YieldCpuTime();
                 }
                 else
                 {
@@ -697,7 +713,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         if (rank == 0) IncWaitCounter();
                         if (MustYieldAsyncThread(rank, prioritized, ++counter)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, true);
-                        Thread.Sleep(0);
+                        YieldCpuTime();
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -739,7 +755,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) await SleepAsync(ticket, readOnly);
                     else if (MustYieldAsyncThread(rank, prioritized, ++counter)) await Task.Yield();
-                    else Thread.Sleep(0);
+                    else YieldCpuTime();
                 }
                 else
                 {
@@ -749,7 +765,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         if (rank == 0) IncWaitCounter();
                         if (MustYieldAsyncThread(rank, prioritized, ++counter)) await Task.Yield();
-                        else Thread.Sleep(0);
+                        else YieldCpuTime();
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -828,7 +844,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                         if (waitForUpgrade)
                         {
                             prioritizedWaiting = true;
-                            Thread.Sleep(0);
+                            YieldCpuTime();
                         }
                         else
                         {
@@ -884,7 +900,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             {
                 prioritizedWaiting = true;
                 if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await Task.Yield();
-                else Thread.Sleep(0);
+                else YieldCpuTime();
             }
             lazyObj.waitingForUpgrade = FALSE;
             prioritizedWaiting = false;
@@ -1073,7 +1089,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 {
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) TrySleep(timer, ticket, readOnly);
-                    else Thread.Sleep(0);
+                    else YieldCpuTime();
                 }
                 else
                 {
@@ -1082,7 +1098,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        Thread.Sleep(0);
+                        YieldCpuTime();
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -1128,7 +1144,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, false);
                     if (MustYieldAsyncThread(rank, prioritized, counter++)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, true);
-                    else Thread.Sleep(0);
+                    else YieldCpuTime();
                 }
                 else
                 {
@@ -1138,7 +1154,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         if (rank == 0) IncWaitCounter();
                         if (MustYieldAsyncThread(rank, prioritized, counter++)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, true);
-                        Thread.Sleep(0);
+                        YieldCpuTime();
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -1186,7 +1202,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) await TrySleepAsync(timer, ticket, readOnly);
                     else if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
-                    else Thread.Sleep(0);
+                    else YieldCpuTime();
                 }
                 else
                 {
@@ -1196,7 +1212,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     {
                         if (rank == 0) IncWaitCounter();
                         if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
-                        else Thread.Sleep(0);
+                        else YieldCpuTime();
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -1308,7 +1324,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                     lazyObj.waitingForUpgrade = FALSE;
                     return false;
                 }
-                Thread.Sleep(0);
+                YieldCpuTime();
             }
             lazyObj.waitingForUpgrade = FALSE;
             return true;
@@ -1359,7 +1375,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
                 }
 
                 if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await Task.Yield();
-                else Thread.Sleep(0);
+                else YieldCpuTime();
             }
             lazyObj.waitingForUpgrade = FALSE;
             return new LockAttempt(new LockHandle(this, LockMode.Upgraded));
