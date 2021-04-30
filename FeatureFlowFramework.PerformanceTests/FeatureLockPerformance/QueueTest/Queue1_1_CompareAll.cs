@@ -48,6 +48,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numOverallMessages = value;
         }
 
+        [Benchmark]
+        public void MicroSpinLock_Lock_() => queueTest.Run(microSpinLockSubjects.Lock);
+
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Lock);
 

@@ -158,7 +158,7 @@ namespace FeatureFlowFramework.DataFlows
         private void RemoveInvalidReferences(int invalidReferences)
         {
             if(sinks == null) return;
-            myLock.Enter();
+            myLock.Enter(out var lockHandle);
             try
             {
                 if (sinks.Length == invalidReferences) sinks = null;
@@ -178,7 +178,7 @@ namespace FeatureFlowFramework.DataFlows
             }
             finally
             {
-                myLock.Exit();
+                myLock.Exit(lockHandle);
             }
         }
 
@@ -188,19 +188,19 @@ namespace FeatureFlowFramework.DataFlows
 
             if(sinks == null)
             {
-                myLock.Enter();
+                myLock.Enter(out var lockHandle);
                 try
                 {
                     sinks = new DataFlowReference[] { new DataFlowReference(sink, weakReference) };
                 }
                 finally
                 {
-                    myLock.Exit();
+                    myLock.Exit(lockHandle);
                 }
             }
             else
             {
-                myLock.Enter();
+                myLock.Enter(out var lockHandle);
                 try
                 {
                     DataFlowReference[] newSinks = new DataFlowReference[sinks.Length + 1];
@@ -210,7 +210,7 @@ namespace FeatureFlowFramework.DataFlows
                 }
                 finally
                 {
-                    myLock.Exit();
+                    myLock.Exit(lockHandle);
                 }
             }
         }
@@ -225,9 +225,9 @@ namespace FeatureFlowFramework.DataFlows
         {
             if (sinks == null) return;
 
-            myLock.Enter();
+            myLock.Enter(out var lockHandle);
             sinks = null;
-            myLock.Exit();
+            myLock.Exit(lockHandle);
         }
             
 

@@ -26,6 +26,9 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathT
         private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
         private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
+        [Benchmark]
+        public void MicroSpinLock_Lock_() => microSpinLockSubjects.Lock();
+
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();
 

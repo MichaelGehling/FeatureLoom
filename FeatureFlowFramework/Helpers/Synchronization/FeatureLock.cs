@@ -535,7 +535,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         private bool TryAcquireForWriting()
         {
             // Only allow setting the write lock if the lockIndicator was set to NO_LOCK before
-            return NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK);
+            return lockIndicator == NO_LOCK && NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK);
         }
 
         // Actually tries to acquire the lock for reading.
@@ -1624,9 +1624,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (queueHead == null)
             {
-                sleepLock.Enter();
+                sleepLock.Enter(out var lockHandle1);
                 isSupervisionActive = queueHead != null;
-                sleepLock.Exit();
+                sleepLock.Exit(lockHandle1);
             }
 
             SleepHandle firstAwaking = null;
@@ -1634,7 +1634,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var candidate = queueHead;
             if (candidate == null || (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly))) return;
 
-            sleepLock.Enter();
+            sleepLock.Enter(out var lockHandle2, true);
             try
             {
                 while (candidate != null)
@@ -1662,7 +1662,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             finally
             {
-                sleepLock.Exit();
+                sleepLock.Exit(lockHandle2);
             }
 
             candidate = firstAwaking;
@@ -1749,7 +1749,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         void AddSleepHandle(SleepHandle sleepHandle)
         {
             bool addSupervisor = false;
-            sleepLock.Enter();
+            sleepLock.Enter(out var lockHandle);
             try
             {
                 if (queueHead == null)
@@ -1778,7 +1778,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             finally
             {
-                sleepLock.Exit();
+                sleepLock.Exit(lockHandle);
                 if (addSupervisor) SupervisionService.AddSupervisor(this);
             }
         }

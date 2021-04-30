@@ -193,7 +193,7 @@ namespace Playground
             for (int n = 0; n < ex; n++)
             {
                 array2[n] = new MicroValueLock();
-                array2[n].Enter();
+                array2[n].Enter(out var lockHandle);
             }
             used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
             Console.WriteLine($" MicroValueLock: {used_mem_median} Bytes");
