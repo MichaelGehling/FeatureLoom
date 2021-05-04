@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Misc
+namespace FeatureLoom.Helpers.Misc
 {
     public class Box<T> where T : struct
     {

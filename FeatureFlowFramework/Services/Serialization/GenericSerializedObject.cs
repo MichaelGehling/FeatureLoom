@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Services.Logging;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Services.Logging;
 using System;
 using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Serialization
+namespace FeatureLoom.Services.Serialization
 {
     public class GenericSerializedObject : ISerializedObject
     {

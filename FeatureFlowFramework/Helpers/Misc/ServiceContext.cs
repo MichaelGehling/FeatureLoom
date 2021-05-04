@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 
-namespace FeatureFlowFramework.Helpers.Misc
+namespace FeatureLoom.Helpers.Misc
 {
 
     public abstract class ServiceContext

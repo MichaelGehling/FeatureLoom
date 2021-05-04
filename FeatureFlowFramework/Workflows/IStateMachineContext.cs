@@ -1,6 +1,6 @@
 ﻿using System.Threading;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public interface IStateMachineContext
     {

@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Synchronization;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows.Test
+namespace FeatureLoom.DataFlows.Test
 {
     public class SingleMessageTestSink<T> : IDataFlowSink
     {

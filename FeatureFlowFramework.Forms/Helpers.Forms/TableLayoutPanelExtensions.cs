@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace FeatureFlowFramework.Helpers.Forms
+namespace FeatureLoom.Helpers.Forms
 {
     public static class TableLayoutPanelExtensions
     {

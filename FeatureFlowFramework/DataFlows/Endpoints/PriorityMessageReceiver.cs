@@ -1,14 +1,14 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class PriorityMessageReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {

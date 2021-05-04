@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Time
+namespace FeatureLoom.Helpers.Time
 {
     public readonly struct TimeFrame
     {

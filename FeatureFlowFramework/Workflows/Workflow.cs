@@ -1,15 +1,15 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Services;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Services;
+using FeatureLoom.Services.MetaData;
 using Newtonsoft.Json;
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext
     {                

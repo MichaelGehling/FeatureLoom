@@ -1,13 +1,13 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public abstract class StateMachine<CT> : StateMachine where CT : class, IStateMachineContext
     {

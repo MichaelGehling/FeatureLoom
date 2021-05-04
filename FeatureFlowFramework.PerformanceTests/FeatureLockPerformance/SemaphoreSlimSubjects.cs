@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
 {
     public class SemaphoreSlimSubjects
     {

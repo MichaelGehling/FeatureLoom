@@ -1,16 +1,16 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services.DataStorage;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services.DataStorage;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Workflows;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Logging
+namespace FeatureLoom.Services.Logging
 {
     public class DefaultFileLogger : Workflow<DefaultFileLogger.StateMachine>, IDataFlowSink
     {

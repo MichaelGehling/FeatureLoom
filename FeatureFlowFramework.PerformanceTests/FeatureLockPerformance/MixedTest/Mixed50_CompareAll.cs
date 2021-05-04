@@ -1,6 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 {
     [MaxIterationCount(20)]
     [MemoryDiagnoser]

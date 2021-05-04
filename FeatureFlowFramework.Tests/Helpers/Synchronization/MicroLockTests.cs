@@ -1,5 +1,5 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
+﻿using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureFlowFramework.Helpers.Synchronization
+namespace FeatureLoom.Helpers.Synchronization
 {
     public class MicroLockTests
     {

@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows.RPC
+namespace FeatureLoom.DataFlows.RPC
 {
     public partial class RpcCallee : IDataFlowSink, IDataFlowSource, IReplier
     {

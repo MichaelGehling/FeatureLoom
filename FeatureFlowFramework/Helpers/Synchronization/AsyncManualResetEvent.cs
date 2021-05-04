@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Synchronization
+namespace FeatureLoom.Helpers.Synchronization
 {
     public class AsyncManualResetEvent : IAsyncManualResetEvent
     {

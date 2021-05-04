@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public class AsyncRunner : AbstractRunner
     {

@@ -1,13 +1,13 @@
-﻿using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Diagnostics;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Diagnostics;
+using FeatureLoom.Services;
 using System;
 using System.Threading;
 using Xunit;
-using FeatureFlowFramework.Helpers.Extensions;
+using FeatureLoom.Helpers.Extensions;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class LatestMessageReceiverTests
     {

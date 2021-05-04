@@ -1,5 +1,5 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Services.Logging;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Services.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
@@ -9,7 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-namespace FeatureFlowFramework.Services.Serialization
+namespace FeatureLoom.Services.Serialization
 {
     public interface IJsonSerializationSupport
     {

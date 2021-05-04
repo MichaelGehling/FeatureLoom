@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Collections;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Collections;
+using FeatureLoom.Helpers.Synchronization;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class BufferingForwarder : BufferingForwarder<object>
     {

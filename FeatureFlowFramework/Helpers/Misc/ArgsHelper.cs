@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
+﻿using FeatureLoom.Helpers.Extensions;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Misc
+namespace FeatureLoom.Helpers.Misc
 {
     public class ArgsHelper : IEnumerable<KeyValuePair<string, string>> 
     {

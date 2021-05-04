@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Forms
+﻿namespace FeatureLoom.Forms
 {
     partial class MultiPropertyControl
     {

@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class NetworkExtensions
     {

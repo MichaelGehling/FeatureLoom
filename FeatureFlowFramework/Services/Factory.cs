@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Services
+namespace FeatureLoom.Services
 {
     public static class Factory
     {

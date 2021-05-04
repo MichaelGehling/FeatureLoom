@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Synchronization;
 using System;
 
-namespace FeatureFlowFramework.Services
+namespace FeatureLoom.Services
 {
     public static class RandomGenerator
     {

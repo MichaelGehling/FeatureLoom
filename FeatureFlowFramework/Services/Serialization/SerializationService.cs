@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace FeatureFlowFramework.Services.Serialization
+namespace FeatureLoom.Services.Serialization
 {
     public static class SerializationService
     {

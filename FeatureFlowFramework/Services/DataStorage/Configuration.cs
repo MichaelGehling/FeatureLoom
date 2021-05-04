@@ -1,14 +1,14 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.DataStorage
+namespace FeatureLoom.Services.DataStorage
 {
     public abstract class Configuration
     {

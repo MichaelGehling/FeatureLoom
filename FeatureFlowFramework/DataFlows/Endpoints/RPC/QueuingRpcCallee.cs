@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.DataFlows.RPC
+namespace FeatureLoom.DataFlows.RPC
 {
     public class QueuingRpcCallee : RpcCallee
     {

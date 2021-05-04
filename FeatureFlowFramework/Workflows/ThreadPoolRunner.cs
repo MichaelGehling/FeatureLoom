@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public class ThreadPoolRunner : AbstractRunner
     {

@@ -3,7 +3,7 @@ using BenchmarkDotNet.Running;
 using System;
 using System.Diagnostics;
 
-namespace FeatureFlowFramework.PerformanceTests
+namespace FeatureLoom.PerformanceTests
 {
     class Program
     {

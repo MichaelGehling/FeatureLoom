@@ -1,6 +1,6 @@
 ﻿using System.Threading;
 
-namespace FeatureFlowFramework.Helpers.Misc
+namespace FeatureLoom.Helpers.Misc
 {
     public struct LazyValue<T> where T : class, new()
     {

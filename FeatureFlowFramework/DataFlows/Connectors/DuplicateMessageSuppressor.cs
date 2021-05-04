@@ -1,14 +1,14 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class DuplicateMessageSuppressor : IDataFlowSource, IDataFlowConnection
     {

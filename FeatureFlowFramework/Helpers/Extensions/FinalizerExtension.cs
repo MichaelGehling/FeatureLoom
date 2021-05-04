@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Services;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.Services;
+using FeatureLoom.Services.MetaData;
 using System;
 using System.Collections.Generic;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class FinalizerExtension
     {

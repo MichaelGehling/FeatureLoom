@@ -6,17 +6,17 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.DataFlows.RPC;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Services.Supervision;
-using FeatureFlowFramework.Services.Web;
-using FeatureFlowFramework.Workflows;
+using FeatureLoom.DataFlows;
+using FeatureLoom.DataFlows.RPC;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Services.Supervision;
+using FeatureLoom.Services.Web;
+using FeatureLoom.Workflows;
 using Nito.AsyncEx;
 
 namespace Playground
@@ -34,22 +34,9 @@ namespace Playground
 
         volatile static bool done = false;
 
-        public static async Task YieldAsync() => await Task.Yield();
-        public static async Task WaitAsync() {}//await Task.Delay(0);      
-        public static void EmptyAction() { }
-
         static void Main(string[] args)
         {            
-            while(true)
-            {
-                DateTime utc = DateTime.UtcNow;
-                DateTime coarse = AppTime.CoarseNow;
-                var diff = (utc - coarse).TotalMilliseconds;
-                if (diff > 20 || diff < 0) Console.WriteLine($"Diff: {diff}, \tUTC: {utc.ToLongTimeString()}, \tCoarse{coarse.ToLongTimeString()}");
-            }
 
-
-            Console.ReadKey();
 
             int ex = 200_000;
 
@@ -228,105 +215,7 @@ namespace Playground
             used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
             Console.WriteLine($" Array1: {used_mem_median} Bytes");
 
-            start_mem = GC.GetTotalMemory(true);
-            array = new Task[ex];
-            for (int n = 0; n < ex; n++)
-            {
-                array[n] = new Task(EmptyAction);
-                //using (array[n].LockAsync().WaitFor()) { }
-            }
-            used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
-            Console.WriteLine($" Task: {used_mem_median} Bytes");
-
             Console.ReadKey();
-
-
-            int num = 100_000;
-            TimeKeeper y;
-
-            DateTime x;
-            var tk = AppTime.TimeKeeper;
-
-            tk.Restart();
-            for (int i = 0; i < num; i++)
-            {
-                using (SynchronizationContext.Current.Suspend()) WaitAsync().WaitFor();
-            };
-            Console.WriteLine($"CON {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++)
-            {
-                using(SynchronizationContext.Current.Suspend()) WaitAsync().WaitFor();
-            };
-            Console.WriteLine($"CON {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
-
-            tk.Restart();
-            for (int i = 0; i < num; i++)
-            {
-                using (SynchronizationContext.Current.Suspend()) WaitAsync().WaitFor();
-            };
-            Console.WriteLine($"CON {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++)
-            {
-                try
-                {
-                    WaitAsync().WaitFor();
-                }
-                finally
-                {
-
-                }
-            }
-            Console.WriteLine($"ASYNC {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) YieldAsync().WaitFor();
-            Console.WriteLine($"Y {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) YieldAsync().WaitFor();
-            Console.WriteLine($"Y {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) WaitAsync().WaitFor();
-            Console.WriteLine($"ASYNC {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) AppTime.WaitAsync(1.Milliseconds()).WaitFor();
-            Console.WriteLine($"AWAIT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) ;
-            Console.WriteLine($"NIX {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) AppTime.Wait(1.Milliseconds());
-            Console.WriteLine($"WAIT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) x = AppTime.Now;
-            Console.WriteLine($"AT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) x = AppTime.CoarseNow;
-            Console.WriteLine($"CT {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) x = DateTime.UtcNow;
-            Console.WriteLine($"UTC {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-            tk.Restart();
-            for (int i = 0; i < num; i++) y = AppTime.TimeKeeper;
-            Console.WriteLine($"SW {tk.Elapsed.TotalMilliseconds / num * 1_000_000}");
-
-
-            Console.ReadKey();
-
 
  
         }

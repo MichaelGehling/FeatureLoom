@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Services.DataStorage;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Services.DataStorage;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -15,7 +15,7 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Web
+namespace FeatureLoom.Services.Web
 {
     public class DefaultWebServer : IWebServer
     {

@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Workflows;
 using System;
 using System.IO;
 using System.Net.Security;
@@ -10,7 +10,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows.TCP
+namespace FeatureLoom.DataFlows.TCP
 {
     public class TcpConnection : Workflow<TcpConnection.StateMachine>
     {

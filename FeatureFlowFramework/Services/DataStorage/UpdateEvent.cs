@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Services.DataStorage
+﻿namespace FeatureLoom.Services.DataStorage
 {
     public enum UpdateEvent
     {

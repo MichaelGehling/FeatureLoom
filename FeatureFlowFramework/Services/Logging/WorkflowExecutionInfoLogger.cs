@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Workflows;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Logging
+namespace FeatureLoom.Services.Logging
 {
     public class WorkflowExecutionInfoLogger : IDataFlowSink
     {

@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Workflows;
 using System;
 
-namespace FeatureFlowFramework.Services.Logging
+namespace FeatureLoom.Services.Logging
 {
     public static class Log
     {

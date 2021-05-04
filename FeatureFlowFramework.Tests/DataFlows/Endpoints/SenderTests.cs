@@ -1,9 +1,9 @@
-using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Diagnostics;
+using FeatureLoom.DataFlows.Test;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Diagnostics;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class SenderTests
     {

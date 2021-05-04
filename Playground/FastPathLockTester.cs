@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Synchronization;
 
 namespace Playground
 {

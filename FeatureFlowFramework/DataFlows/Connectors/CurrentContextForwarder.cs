@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class CurrentContextForwarder : CurrentContextForwarder<object>
     {

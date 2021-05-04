@@ -1,13 +1,13 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Collections;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Collections;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     /// <summary>
     ///     An endpoint with a queue to receive messages asynchronously ordered by priority and

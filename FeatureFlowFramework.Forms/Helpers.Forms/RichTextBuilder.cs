@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
-using FeatureFlowFramework.Helpers.Extensions;
+using FeatureLoom.Helpers.Extensions;
 
-namespace FeatureFlowFramework.Helpers.Forms
+namespace FeatureLoom.Helpers.Forms
 {
     public class RichTextBuilder
     {

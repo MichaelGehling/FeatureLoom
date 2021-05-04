@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class ByteArrayExtensions
     {

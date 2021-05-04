@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
 
 namespace Playground
 {

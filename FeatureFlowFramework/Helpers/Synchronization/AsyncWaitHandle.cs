@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Synchronization
+namespace FeatureLoom.Helpers.Synchronization
 {
     public class AsyncWaitHandle : IAsyncWaitHandle
     {

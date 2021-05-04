@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class AsyncForwarder : IDataFlowConnection
     {

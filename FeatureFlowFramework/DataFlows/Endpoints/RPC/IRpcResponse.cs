@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.DataFlows.RPC
+﻿namespace FeatureLoom.DataFlows.RPC
 {
     public interface IRpcResponse
     {

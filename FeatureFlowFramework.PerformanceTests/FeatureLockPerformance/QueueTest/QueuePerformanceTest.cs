@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
 {
     public class QueuePerformanceTest
     {

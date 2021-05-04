@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Services.Serialization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Services.Serialization;
 using System;
 
-namespace FeatureFlowFramework.DataFlows.RPC
+namespace FeatureLoom.DataFlows.RPC
 {
     public partial class RpcCallee
     {

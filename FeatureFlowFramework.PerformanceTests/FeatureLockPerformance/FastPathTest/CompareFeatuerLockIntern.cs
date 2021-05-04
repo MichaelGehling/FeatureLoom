@@ -1,7 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.FastPathTest
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
     [MaxIterationCount(40)]
     [MemoryDiagnoser]

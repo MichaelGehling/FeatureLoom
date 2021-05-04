@@ -7,11 +7,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using FeatureFlowFramework.Helpers.Forms;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.DataFlows;
+using FeatureLoom.Helpers.Forms;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.DataFlows;
 
-namespace FeatureFlowFramework.Forms
+namespace FeatureLoom.Forms
 {
     public partial class MultiPropertyControl : UserControl
     {

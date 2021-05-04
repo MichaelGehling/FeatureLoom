@@ -1,15 +1,15 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Diagnostics;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Diagnostics;
+using FeatureLoom.Services;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using Xunit;
-using FeatureFlowFramework.Helpers.Extensions;
+using FeatureLoom.Helpers.Extensions;
 
-namespace FeatureFlowFramework.Tests.DataFlows.Endpoints
+namespace FeatureLoom.Tests.DataFlows.Endpoints
 {
     public class PriorityMessageReceiverTests
     {

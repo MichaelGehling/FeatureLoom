@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     /// <summary>
     ///     Messages put to the processing endpoint are processed in the passed action. The

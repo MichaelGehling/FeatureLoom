@@ -1,17 +1,17 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.DataStorage
+namespace FeatureLoom.Services.DataStorage
 {
     /*
      * TODO:

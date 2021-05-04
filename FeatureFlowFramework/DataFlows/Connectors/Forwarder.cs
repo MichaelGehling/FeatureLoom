@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     /// <summary>
     ///     Just forwards messages without processing it. It is thread-safe. Can be used as a

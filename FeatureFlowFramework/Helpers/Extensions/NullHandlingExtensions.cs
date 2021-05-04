@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class NullHandlingExtensions
     {

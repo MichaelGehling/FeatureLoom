@@ -1,14 +1,14 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Services.Web;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Services.Web;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.DataStorage
+namespace FeatureLoom.Services.DataStorage
 {
     public class StorageWebAccess<T> : IWebRequestHandler
     {

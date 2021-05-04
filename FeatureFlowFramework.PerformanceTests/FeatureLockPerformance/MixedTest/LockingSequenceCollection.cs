@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 {
     public class LockingSequenceCollection
     {

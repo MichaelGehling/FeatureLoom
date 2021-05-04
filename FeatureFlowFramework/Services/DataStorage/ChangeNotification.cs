@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace FeatureFlowFramework.Services.DataStorage
+namespace FeatureLoom.Services.DataStorage
 {
     public readonly struct ChangeNotification
     {

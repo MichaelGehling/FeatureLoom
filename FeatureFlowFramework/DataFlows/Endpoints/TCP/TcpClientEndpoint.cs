@@ -1,17 +1,17 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
-using FeatureFlowFramework.Services.DataStorage;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
+using FeatureLoom.Services.DataStorage;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Workflows;
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows.TCP
+namespace FeatureLoom.DataFlows.TCP
 {
     public class TcpClientEndpoint : Workflow<TcpClientEndpoint.StateMachine>, IDataFlowSink, IDataFlowSource, IRequester, IReplier
     {

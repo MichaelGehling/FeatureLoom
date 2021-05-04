@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers.Misc;
+﻿using FeatureLoom.Helpers.Misc;
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     /// <summary>
     ///     Messages from a dataFlow source put to the filter are checked in a filter function and

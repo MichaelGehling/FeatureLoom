@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Services
+﻿namespace FeatureLoom.Services
 {
     public static class StringGenerator
     {

@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
-using FeatureFlowFramework.Helpers;
+using FeatureLoom.Helpers;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureLoom.Helpers
 {
     public class ServiceContextTests
     {

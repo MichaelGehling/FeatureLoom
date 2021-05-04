@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Services.DataStorage
+namespace FeatureLoom.Services.DataStorage
 {
     public class StorageSubscriptions
     {

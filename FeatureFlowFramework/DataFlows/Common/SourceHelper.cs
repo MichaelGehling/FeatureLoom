@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     /// <summary> Helps implementing IDataFlowSource and should be used wherever IDataFlowSource is
     /// implemented. It is thread safe, but doesn't need any lock while sending, so it will never

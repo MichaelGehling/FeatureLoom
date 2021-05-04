@@ -1,13 +1,13 @@
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services.Supervision;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services.Supervision;
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Synchronization
+namespace FeatureLoom.Helpers.Synchronization
 {
 
     /// <summary>

@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services.DataStorage;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services.DataStorage;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
+using FeatureLoom.Workflows;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +15,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows.TCP
+namespace FeatureLoom.DataFlows.TCP
 {
     public class TcpServerEndpoint : Workflow<TcpServerEndpoint.StateMachine>, IDataFlowSink, IDataFlowSource, IRequester, IReplier
     {

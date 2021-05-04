@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 {
     public class LockingSequence
     {

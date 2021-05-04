@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Extensions;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Extensions;
 using Newtonsoft.Json;
 
-namespace FeatureFlowFramework.DataFlows.RPC
+namespace FeatureLoom.DataFlows.RPC
 {
     public struct RpcResponse<R> : IRpcResponse
     {

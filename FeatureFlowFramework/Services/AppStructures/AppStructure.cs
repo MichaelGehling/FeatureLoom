@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Services.AppStructures
+namespace FeatureLoom.Services.AppStructures
 {
     public static class AppStructure
     {

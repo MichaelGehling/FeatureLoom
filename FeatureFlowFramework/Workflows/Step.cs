@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public class Step<CT> : PartialStep<CT>, IStepInfo where CT : class, IStateMachineContext
     {

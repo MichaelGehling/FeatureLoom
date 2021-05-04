@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Services.Serialization;
+﻿using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Services.Serialization;
 using Newtonsoft.Json;
 using System.IO;
 using System.Xml;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class SerializationExtensions
     {

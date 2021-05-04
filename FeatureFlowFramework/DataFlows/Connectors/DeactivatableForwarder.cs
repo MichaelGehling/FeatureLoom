@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class DeactivatableForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {

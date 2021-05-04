@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace FeatureFlowFramework.Helpers.Misc
+namespace FeatureLoom.Helpers.Misc
 {
     public class GenericComparer<T> : IComparer<T>, IComparer
     {

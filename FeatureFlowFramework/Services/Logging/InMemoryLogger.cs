@@ -1,13 +1,13 @@
-﻿using FeatureFlowFramework.DataFlows;
+﻿using FeatureLoom.DataFlows;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Collections;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Collections;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.Services.Logging
+namespace FeatureLoom.Services.Logging
 {
     public class InMemoryLogger : IDataFlowSink
     {       

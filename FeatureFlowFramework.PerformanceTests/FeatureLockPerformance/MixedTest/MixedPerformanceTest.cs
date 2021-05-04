@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers.Time;
+﻿using FeatureLoom.Helpers.Time;
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 {
     public class MixedPerformanceTest
     {

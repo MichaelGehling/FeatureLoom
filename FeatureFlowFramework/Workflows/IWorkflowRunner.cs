@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.DataFlows;
+﻿using FeatureLoom.DataFlows;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public interface IWorkflowRunner
     {

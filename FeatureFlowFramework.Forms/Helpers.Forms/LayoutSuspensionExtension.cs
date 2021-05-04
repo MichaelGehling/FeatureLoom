@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
+﻿using FeatureLoom.Helpers.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using FeatureFlowFramework.Services.MetaData;
+using FeatureLoom.Services.MetaData;
 
-namespace FeatureFlowFramework.Helpers.Forms
+namespace FeatureLoom.Helpers.Forms
 {
     public static class LayoutSuspensionExtension
     {

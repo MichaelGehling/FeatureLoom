@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class ConditionalTrigger<T, R> : MessageTrigger
     {

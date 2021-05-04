@@ -1,13 +1,13 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Diagnostics;
-using FeatureFlowFramework.Helpers.Time;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Diagnostics;
+using FeatureLoom.Helpers.Time;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureLoom.Helpers
 {
     public class SharedDataTests
     {

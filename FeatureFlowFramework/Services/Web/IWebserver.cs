@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Web
+namespace FeatureLoom.Services.Web
 {
     public interface IWebServer
     {

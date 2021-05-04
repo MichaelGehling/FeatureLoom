@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace FeatureFlowFramework.Services.Supervision
+namespace FeatureLoom.Services.Supervision
 {
     public static class SupervisionService
     {

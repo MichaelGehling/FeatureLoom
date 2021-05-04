@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class NetStandardCompatibilityExtensions
     {

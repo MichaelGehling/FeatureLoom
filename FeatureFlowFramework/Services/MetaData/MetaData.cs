@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace FeatureFlowFramework.Services.MetaData
+namespace FeatureLoom.Services.MetaData
 {
     public class MetaData
     {

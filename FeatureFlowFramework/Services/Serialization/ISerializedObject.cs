@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Serialization
+namespace FeatureLoom.Services.Serialization
 {
     public interface ISerializedObject
     {

@@ -4,12 +4,12 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 
-namespace FeatureFlowFramework.Services.Serialization
+namespace FeatureLoom.Services.Serialization
 {
     public class TypeBasedMetaSerializer : ISerializer
     {

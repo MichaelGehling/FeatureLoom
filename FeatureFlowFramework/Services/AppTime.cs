@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Time;
+﻿using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Time;
 using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services
+namespace FeatureLoom.Services
 {
     public static class AppTime
     {

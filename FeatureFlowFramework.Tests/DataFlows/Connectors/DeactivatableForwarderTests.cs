@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Diagnostics;
+﻿using FeatureLoom.DataFlows.Test;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class DeactivatableForwarderTests
     {

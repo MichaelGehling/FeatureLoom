@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Diagnostics;
+﻿using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.Helpers
+namespace FeatureLoom.Helpers
 {
     public class AppTimeTestsTests
     {

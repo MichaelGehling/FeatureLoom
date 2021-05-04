@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Misc;
+﻿using FeatureLoom.Helpers.Misc;
 using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Serialization
+namespace FeatureLoom.Services.Serialization
 {
     public interface ISerializer
     {        

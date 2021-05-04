@@ -1,15 +1,15 @@
-﻿using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Diagnostics;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Diagnostics;
+using FeatureLoom.Services;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class QueueReceiverTests
     {

@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Services.Logging;
+﻿using FeatureLoom.Services.Logging;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class DelegateExtensions
     {

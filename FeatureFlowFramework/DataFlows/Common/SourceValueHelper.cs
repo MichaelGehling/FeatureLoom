@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Synchronization;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     /// <summary> Can replace SourceHelper in situations where memory consumption and garbage must be minimized.
     /// WARNING: SourceValueHelper is a mutable struct and so there is a danger to cause severe bugs when not used

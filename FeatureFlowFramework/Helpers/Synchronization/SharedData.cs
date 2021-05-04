@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 
-namespace FeatureFlowFramework.Helpers.Synchronization
+namespace FeatureLoom.Helpers.Synchronization
 {
     /// <summary>
     /// Shared data can be used in multiple parallel contexts to store and share data.

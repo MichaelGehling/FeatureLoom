@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Synchronization;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public class StateBuilder<CT> : IAfterStartStateBuilder<CT>, INextStateBuilder<CT>, IInitialStateBuilder<CT>,
                                     IAfterPreconditionStateBuilder<CT>, IAfterActionStateBuilder<CT>,

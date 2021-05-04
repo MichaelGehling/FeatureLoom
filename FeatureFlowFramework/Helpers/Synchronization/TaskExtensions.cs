@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Helpers.Misc;
+﻿using FeatureLoom.Helpers.Misc;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Synchronization
+namespace FeatureLoom.Helpers.Synchronization
 {
     public static class TaskExtensions
     {

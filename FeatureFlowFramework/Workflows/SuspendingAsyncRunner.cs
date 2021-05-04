@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public class SuspendingAsyncRunner : AbstractRunner
     {

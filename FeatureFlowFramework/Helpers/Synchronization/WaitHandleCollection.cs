@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Helpers.Synchronization
+﻿namespace FeatureLoom.Helpers.Synchronization
 {
     public struct WaitHandleCollection
     {

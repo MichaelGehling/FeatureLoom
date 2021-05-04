@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
+﻿using FeatureLoom.Helpers.Extensions;
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     internal interface ISender
     {

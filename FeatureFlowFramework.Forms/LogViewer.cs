@@ -1,15 +1,15 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Forms;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Forms;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Workflows;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace FeatureFlowFramework.Forms
+namespace FeatureLoom.Forms
 {
     public partial class LogViewer : Form
     {

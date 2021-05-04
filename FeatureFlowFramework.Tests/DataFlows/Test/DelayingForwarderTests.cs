@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Diagnostics;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.DataFlows.Test;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Diagnostics;
 using Xunit;
-using FeatureFlowFramework.Services;
+using FeatureLoom.Services;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class DelayingForwarderTests
     {

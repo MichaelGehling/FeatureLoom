@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.Workflows;
 using System.Windows.Forms;
 
-namespace FeatureFlowFramework.Helpers.Forms
+namespace FeatureLoom.Helpers.Forms
 {
     public static partial class FormsExtensions
     {

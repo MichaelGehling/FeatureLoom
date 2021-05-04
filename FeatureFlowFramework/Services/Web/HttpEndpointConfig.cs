@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.Services.MetaData;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Services.Logging;
+﻿using FeatureLoom.Services.MetaData;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Services.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Net;
-using FeatureFlowFramework.Helpers.Synchronization;
+using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.Services.Web
+namespace FeatureLoom.Services.Web
 {
     public struct HttpEndpointConfig
     {

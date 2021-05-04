@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Services.MetaData;
 using System;
 using System.Text;
 using System.Threading;
 
-namespace FeatureFlowFramework.Services.Logging
+namespace FeatureLoom.Services.Logging
 {
     public struct LogMessage
     {

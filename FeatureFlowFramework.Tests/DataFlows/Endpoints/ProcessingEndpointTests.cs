@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Diagnostics;
+﻿using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class ProcessingEndpointTests
     {

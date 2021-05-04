@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Diagnostics;
+﻿using FeatureLoom.DataFlows.Test;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Diagnostics;
 using System.Collections.Generic;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class AggregatorTests
     {

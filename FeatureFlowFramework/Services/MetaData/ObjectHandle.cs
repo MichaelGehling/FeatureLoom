@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Services.MetaData
+﻿namespace FeatureLoom.Services.MetaData
 {
     public readonly struct ObjectHandle
     {

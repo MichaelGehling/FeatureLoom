@@ -1,15 +1,15 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Collections;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Collections;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Services;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Diagnostics
+namespace FeatureLoom.Helpers.Diagnostics
 {
     public class DataFlowProbe<T1, T2> : IDataFlowSink
     {

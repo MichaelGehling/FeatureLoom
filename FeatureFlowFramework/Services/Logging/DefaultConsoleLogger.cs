@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Services.DataStorage;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Services.DataStorage;
 using System;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Services.Logging
+namespace FeatureLoom.Services.Logging
 {
     public class DefaultConsoleLogger : IDataFlowSink
     {

@@ -1,12 +1,12 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Workflows;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Workflows;
 using System;
 using System.Windows.Forms;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Extensions;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Extensions;
 
-namespace FeatureFlowFramework.Helpers.Forms
+namespace FeatureLoom.Helpers.Forms
 {
     public static partial class FormsExtensions
     {

@@ -1,10 +1,10 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Diagnostics;
-using FeatureFlowFramework.Services;
+﻿using FeatureLoom.DataFlows.Test;
+using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Diagnostics;
+using FeatureLoom.Services;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class SelectorTests
     {

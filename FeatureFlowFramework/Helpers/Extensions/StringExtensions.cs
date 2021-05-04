@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.Services.Serialization;
+﻿using FeatureLoom.Services.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class StringExtensions
     {

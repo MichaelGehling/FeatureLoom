@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.Helpers;
+﻿using FeatureLoom.Helpers;
 using System.Threading;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public partial class Workflow
     {

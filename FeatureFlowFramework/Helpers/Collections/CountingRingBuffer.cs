@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Synchronization;
 using System;
 
-namespace FeatureFlowFramework.Helpers.Collections
+namespace FeatureLoom.Helpers.Collections
 {
     public class CountingRingBuffer<T>
     {

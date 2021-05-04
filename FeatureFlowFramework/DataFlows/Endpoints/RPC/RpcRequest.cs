@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace FeatureFlowFramework.DataFlows.RPC
+namespace FeatureLoom.DataFlows.RPC
 {
     public struct RpcRequest<P, R> : IRpcRequest
     {

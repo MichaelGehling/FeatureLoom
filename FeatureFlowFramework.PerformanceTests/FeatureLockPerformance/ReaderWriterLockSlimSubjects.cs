@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
 {
     public class ReaderWriterLockSlimSubjects
     {

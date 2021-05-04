@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers;
 
-namespace FeatureFlowFramework.Services.DataStorage
+namespace FeatureLoom.Services.DataStorage
 {
     public static class StorageReaderExtensions
     {

@@ -1,6 +1,6 @@
-﻿using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Synchronization;
 
-namespace FeatureFlowFramework.Services.MetaData
+namespace FeatureLoom.Services.MetaData
 {
     public static class MetaDataExtensions
     {

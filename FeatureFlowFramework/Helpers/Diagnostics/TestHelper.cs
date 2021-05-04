@@ -1,13 +1,13 @@
-﻿using FeatureFlowFramework.DataFlows;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Synchronization;
-using FeatureFlowFramework.Services.DataStorage;
-using FeatureFlowFramework.Services.Logging;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Services.DataStorage;
+using FeatureLoom.Services.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Helpers.Diagnostics
+namespace FeatureLoom.Helpers.Diagnostics
 {
     public static class TestHelper
     {

@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.Services;
+﻿using FeatureLoom.Services;
 using System;
 
-namespace FeatureFlowFramework.Helpers.Time
+namespace FeatureLoom.Helpers.Time
 {
     public struct TimeKeeper
     {

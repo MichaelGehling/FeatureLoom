@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Services.Logging
+﻿namespace FeatureLoom.Services.Logging
 {
     public enum Loglevel
     {

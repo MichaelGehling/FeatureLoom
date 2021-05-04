@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace FeatureFlowFramework.Helpers.Collections
+namespace FeatureLoom.Helpers.Collections
 {
     public class PriorityQueue<T> : IEnumerable<T>, IEnumerable, IReadOnlyCollection<T>, ICollection
     {

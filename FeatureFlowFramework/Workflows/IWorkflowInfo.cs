@@ -1,6 +1,6 @@
-﻿using FeatureFlowFramework.DataFlows;
+﻿using FeatureLoom.DataFlows;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public interface IWorkflowInfo
     {

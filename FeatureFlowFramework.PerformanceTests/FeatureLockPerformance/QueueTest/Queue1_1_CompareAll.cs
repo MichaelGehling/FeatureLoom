@@ -1,7 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
 
-namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.QueueTest
+namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
 {
     [MaxIterationCount(20)]
     [MemoryDiagnoser]

@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Workflows
+﻿namespace FeatureLoom.Workflows
 {
     public abstract partial class Workflow
     {

@@ -1,8 +1,8 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Diagnostics;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Diagnostics;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class SplitterTests
     {

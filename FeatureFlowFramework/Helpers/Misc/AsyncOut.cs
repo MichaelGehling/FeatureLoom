@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Misc
+namespace FeatureLoom.Helpers.Misc
 {
     public readonly struct AsyncOut<T, OUT>
     {

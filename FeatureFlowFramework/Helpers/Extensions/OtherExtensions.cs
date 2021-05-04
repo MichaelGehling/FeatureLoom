@@ -1,7 +1,7 @@
-﻿using FeatureFlowFramework.Services.Serialization;
+﻿using FeatureLoom.Services.Serialization;
 using System;
 
-namespace FeatureFlowFramework.Helpers.Extensions
+namespace FeatureLoom.Helpers.Extensions
 {
     public static class OtherExtensions
     {

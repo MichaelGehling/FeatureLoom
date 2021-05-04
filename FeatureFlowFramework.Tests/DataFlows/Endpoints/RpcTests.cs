@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Diagnostics;
-using FeatureFlowFramework.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Diagnostics;
+using FeatureLoom.Helpers.Synchronization;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows.RPC
+namespace FeatureLoom.DataFlows.RPC
 {
     public class RpcTests
     {

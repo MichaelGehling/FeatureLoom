@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace FeatureFlowFramework.Helpers.Time
+namespace FeatureLoom.Helpers.Time
 {
     public static class TimeSpanExtensions
     {

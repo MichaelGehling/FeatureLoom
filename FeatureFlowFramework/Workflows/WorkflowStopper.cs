@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.DataFlows;
+﻿using FeatureLoom.DataFlows;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureFlowFramework.Workflows
+namespace FeatureLoom.Workflows
 {
     public class WorkflowStopper
     {

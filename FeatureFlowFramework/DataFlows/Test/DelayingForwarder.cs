@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.DataFlows.Test
+namespace FeatureLoom.DataFlows.Test
 {
     public class DelayingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
     {

@@ -1,14 +1,14 @@
-﻿using FeatureFlowFramework.Helpers;
-using FeatureFlowFramework.Helpers.Misc;
-using FeatureFlowFramework.Helpers.Extensions;
-using FeatureFlowFramework.Services.DataStorage;
-using FeatureFlowFramework.Services.Logging;
-using FeatureFlowFramework.Services.MetaData;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Helpers.Misc;
+using FeatureLoom.Helpers.Extensions;
+using FeatureLoom.Services.DataStorage;
+using FeatureLoom.Services.Logging;
+using FeatureLoom.Services.MetaData;
 using System;
 using System.Text;
-using FeatureFlowFramework.Services.Serialization;
+using FeatureLoom.Services.Serialization;
 
-namespace FeatureFlowFramework.DataFlows.TCP
+namespace FeatureLoom.DataFlows.TCP
 {
     public class DefaultTcpMessageEncoderDecoder : ITcpMessageEncoder, ITcpMessageDecoder
     {

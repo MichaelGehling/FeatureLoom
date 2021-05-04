@@ -1,11 +1,11 @@
-﻿using FeatureFlowFramework.DataFlows.Test;
-using FeatureFlowFramework.Helpers.Time;
-using FeatureFlowFramework.Helpers.Diagnostics;
+﻿using FeatureLoom.DataFlows.Test;
+using FeatureLoom.Helpers.Time;
+using FeatureLoom.Helpers.Diagnostics;
 using System;
 using System.Collections.Generic;
 using Xunit;
 
-namespace FeatureFlowFramework.DataFlows
+namespace FeatureLoom.DataFlows
 {
     public class ActivePriorityForwarderTest
     {

@@ -1,9 +1,9 @@
-﻿using FeatureFlowFramework.Helpers.Extensions;
+﻿using FeatureLoom.Helpers.Extensions;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureFlowFramework.Helpers.Synchronization
+namespace FeatureLoom.Helpers.Synchronization
 {
     public static class WaitHandleExtensions
     {

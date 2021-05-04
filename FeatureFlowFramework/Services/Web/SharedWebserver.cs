@@ -1,4 +1,4 @@
-﻿namespace FeatureFlowFramework.Services.Web
+﻿namespace FeatureLoom.Services.Web
 {
     public static class SharedWebServer
     {
