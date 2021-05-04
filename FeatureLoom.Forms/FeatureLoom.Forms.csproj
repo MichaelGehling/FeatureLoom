@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{6ABB1FCC-6E5A-4934-9782-7381B2F492B6}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>FeatureFlowFramework.Forms</RootNamespace>
-    <AssemblyName>FeatureFlowFramework.Forms</AssemblyName>
+    <RootNamespace>FeatureLoom.Forms</RootNamespace>
+    <AssemblyName>FeatureLoom.Forms</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -74,7 +74,7 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FeatureFlowFramework\FeatureLoom.csproj">
+    <ProjectReference Include="..\FeatureLoom\FeatureLoom.csproj">
       <Project>{52d3f346-b06a-419c-87e9-11bd1c3155d9}</Project>
       <Name>FeatureLoom</Name>
     </ProjectReference>

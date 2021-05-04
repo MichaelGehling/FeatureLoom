@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FeatureFlowFramework\FeatureLoom.csproj" />
+    <ProjectReference Include="..\FeatureLoom\FeatureLoom.csproj" />
   </ItemGroup>
 
 </Project>
