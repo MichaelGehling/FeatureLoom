@@ -39,7 +39,17 @@ namespace Playground
         public static void EmptyAction() { }
 
         static void Main(string[] args)
-        {
+        {            
+            while(true)
+            {
+                DateTime utc = DateTime.UtcNow;
+                DateTime coarse = AppTime.CoarseNow;
+                var diff = (utc - coarse).TotalMilliseconds;
+                if (diff > 20 || diff < 0) Console.WriteLine($"Diff: {diff}, \tUTC: {utc.ToLongTimeString()}, \tCoarse{coarse.ToLongTimeString()}");
+            }
+
+
+            Console.ReadKey();
 
             int ex = 200_000;
 
@@ -193,7 +203,7 @@ namespace Playground
             for (int n = 0; n < ex; n++)
             {
                 array2[n] = new MicroValueLock();
-                array2[n].Enter(out var lockHandle);
+                array2[n].Enter();
             }
             used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
             Console.WriteLine($" MicroValueLock: {used_mem_median} Bytes");
@@ -318,32 +328,7 @@ namespace Playground
             Console.ReadKey();
 
 
-            ManualResetEventSlim mre = new ManualResetEventSlim(false);
-            
-            int count = 0;
-            new Thread(() =>
-            {
-                Thread.Sleep(100);
-                mre.Set();
-                var ticks = new TimeSpan((long)Environment.TickCount * 1000);                
-                done = true;
-            }).Start();
-            mre.Wait();
-            while (!done) count++;
-            Console.WriteLine($"{count}");
-            Console.ReadKey();
-
-            int a = 0;
-            SupervisionService.Supervise(() => Console.WriteLine($"a{a++}"), ()=> a < 10);
-
-            int b = 0;
-            SupervisionService.Supervise(() => Console.WriteLine($"b{b++}"), () => b < 10);
-
-            int c = 0;
-            SupervisionService.Supervise(() => Console.WriteLine($"c{c++}"), () => c < 10);
-
-            Console.ReadKey();
-
+ 
         }
 
 

@@ -13,41 +13,41 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock(Action action)
         {
-            myLock.Enter(out var lockHandle);
+            myLock.Enter();
             try
             {
                 action();
             }
             finally
             {
-                myLock.Exit(lockHandle);
+                myLock.Exit();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock()
         {
-            myLock.Enter(out var lockHandle);
+            myLock.Enter();
             try
             {
             }
             finally
             {
-                myLock.Exit(lockHandle);
+                myLock.Exit();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock()
         {
-            if (myLock.TryEnter(out var lockHandle))
+            if (myLock.TryEnter())
             {
                 try
                 {
                 }
                 finally
                 {
-                    myLock.Exit(lockHandle);
+                    myLock.Exit();
                 }
             }
         }

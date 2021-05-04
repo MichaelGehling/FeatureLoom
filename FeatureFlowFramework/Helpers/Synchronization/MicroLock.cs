@@ -8,44 +8,24 @@ using System.Threading;
 namespace FeatureFlowFramework.Helpers.Synchronization
 {
     public sealed class MicroLock
-    {        
-        const int NO_LOCK = 0;
-        const int LOCKED = 1;
+    {
+        MicroValueLock valueLock;
 
-        int cyclesBeforeYielding = 200;
-        int lockIndicator = NO_LOCK;
-
-        public MicroLock(int cyclesBeforeYielding = 200)
-        {
-            this.cyclesBeforeYielding = cyclesBeforeYielding;
-        }
-
-        public bool IsLocked => Volatile.Read(ref lockIndicator) == LOCKED;
+        public bool IsLocked => valueLock.IsLocked;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock Lock()
+        public AcquiredLock Lock(bool prioritized = false, int cyclesBeforeYielding = 0)
         {
-            
-            if(Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK) Lock_Wait();
-            return new AcquiredLock(this);
-        }
-
-        private void Lock_Wait()
-        {
-            int cycleCounter = 0;
-            do
-            {
-                if (cycleCounter >= cyclesBeforeYielding) Thread.Sleep(0);
-                else cycleCounter++;
-            } while (Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
+            valueLock.Enter(prioritized, cyclesBeforeYielding);
+            return new AcquiredLock(this, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out AcquiredLock acquiredLock)
+        public bool TryLock(out AcquiredLock acquiredLock, bool prioritized = false)
         {
-            if(Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) == NO_LOCK) 
+            if(valueLock.TryEnter(prioritized)) 
             {
-                acquiredLock = new AcquiredLock(this);
+                acquiredLock = new AcquiredLock(this, false);
                 return true;
             }
             else
@@ -56,48 +36,67 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out AcquiredLock acquiredLock, TimeSpan timeout)
+        public bool TryLock(out AcquiredLock acquiredLock, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
         {
-            if(Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) == NO_LOCK)
+            if (valueLock.TryEnter(timeout, prioritized, numHotCycles))
             {
-                acquiredLock = new AcquiredLock(this);
+                acquiredLock = new AcquiredLock(this, false);
                 return true;
             }
-
-            TimeFrame timer = new TimeFrame(timeout);
-            int cycleCounter = 0;
-            do
+            else
             {
-                if(timer.Elapsed())
-                {
-                    acquiredLock = new AcquiredLock();
-                    return false;
-                }
-
-                if(cycleCounter >= cyclesBeforeYielding) Thread.Yield();
-                else cycleCounter++;
-
-            } while(Volatile.Read(ref lockIndicator) == LOCKED || Interlocked.CompareExchange(ref lockIndicator, LOCKED, NO_LOCK) != NO_LOCK);
-
-            acquiredLock = new AcquiredLock(this);
-            return true;
-
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Exit()
+        public AcquiredLock LockReadOnly(bool prioritized = false, int cyclesBeforeYielding = 0)
         {
-            Volatile.Write(ref lockIndicator, NO_LOCK);            
+            valueLock.EnterReadOnly(prioritized, cyclesBeforeYielding);
+            return new AcquiredLock(this, true);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryLockReadOnly(out AcquiredLock acquiredLock, bool prioritized = false)
+        {
+            if (valueLock.TryEnterReadOnly(prioritized))
+            {
+                acquiredLock = new AcquiredLock(this, true);
+                return true;
+            }
+            else
+            {
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryLockReadOnly(out AcquiredLock acquiredLock, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
+        {
+            if (valueLock.TryEnterReadOnly(timeout, prioritized, numHotCycles))
+            {
+                acquiredLock = new AcquiredLock(this, true);
+                return true;
+            }
+            else
+            {
+                acquiredLock = new AcquiredLock();
+                return false;
+            }
         }
 
         public struct AcquiredLock : IDisposable
         {
             MicroLock parentLock;
+            readonly bool readOnly;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal AcquiredLock(MicroLock parentLock)
+            internal AcquiredLock(MicroLock parentLock, bool readOnly)
             {
                 this.parentLock = parentLock;
+                this.readOnly = readOnly;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -108,8 +107,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit()
-            {
-                parentLock.Exit();
+            {                
+                if (readOnly) parentLock.valueLock.ExitReadOnly();
+                else parentLock.valueLock.Exit();
                 parentLock = null;
             }
 

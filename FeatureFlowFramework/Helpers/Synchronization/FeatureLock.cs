@@ -1624,9 +1624,9 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         {
             if (queueHead == null)
             {
-                sleepLock.Enter(out var lockHandle1);
+                sleepLock.Enter();
                 isSupervisionActive = queueHead != null;
-                sleepLock.Exit(lockHandle1);
+                sleepLock.Exit();
             }
 
             SleepHandle firstAwaking = null;
@@ -1634,7 +1634,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             var candidate = queueHead;
             if (candidate == null || (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly))) return;
 
-            sleepLock.Enter(out var lockHandle2, true);
+            sleepLock.Enter(true);
             try
             {
                 while (candidate != null)
@@ -1662,7 +1662,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             finally
             {
-                sleepLock.Exit(lockHandle2);
+                sleepLock.Exit();
             }
 
             candidate = firstAwaking;
@@ -1749,7 +1749,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
         void AddSleepHandle(SleepHandle sleepHandle)
         {
             bool addSupervisor = false;
-            sleepLock.Enter(out var lockHandle);
+            sleepLock.Enter();
             try
             {
                 if (queueHead == null)
@@ -1778,7 +1778,7 @@ namespace FeatureFlowFramework.Helpers.Synchronization
             }
             finally
             {
-                sleepLock.Exit(lockHandle);
+                sleepLock.Exit();
                 if (addSupervisor) SupervisionService.AddSupervisor(this);
             }
         }

@@ -25,7 +25,7 @@ namespace FeatureFlowFramework.Services.Web
         }
 
         private Config config = new Config();
-        private readonly object configLock = new object();
+        FeatureLock myLock = new FeatureLock();
         public bool started = false;
         private IWebHost webserver;
 
@@ -56,7 +56,7 @@ namespace FeatureFlowFramework.Services.Web
 
         public void AddEndpoint(HttpEndpointConfig endpoint)
         {
-            lock (configLock)
+            using(myLock.Lock())
             {
                 //if(started) throw new Exception("Endpoints can only be configured before the server is started.");
                 endpoints.Add(endpoint);
@@ -70,7 +70,7 @@ namespace FeatureFlowFramework.Services.Web
 
         public void AddRequestHandler(IWebRequestHandler handler)
         {
-            lock (configLock)
+            using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
                 if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
@@ -86,7 +86,7 @@ namespace FeatureFlowFramework.Services.Web
 
         public void RemoveRequestHandler(IWebRequestHandler handler)
         {
-            lock (configLock)
+            using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
                 if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
@@ -102,7 +102,7 @@ namespace FeatureFlowFramework.Services.Web
 
         public void ClearRequestHandlers()
         {
-            lock (configLock)
+            using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
                 if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
@@ -118,7 +118,7 @@ namespace FeatureFlowFramework.Services.Web
 
         public void ClearEndpoints()
         {
-            lock (configLock)
+            using (myLock.Lock())
             {
                 if (started) throw new Exception("Endpoints can only be configured before the server is started.");
                 endpoints.Clear();
@@ -236,17 +236,17 @@ namespace FeatureFlowFramework.Services.Web
                 started = true;
 
                 this.webserver = new WebHostBuilder()
-                .UseKestrel(options =>
+                .UseKestrel(async options =>
                 {
                     options.Limits.MaxRequestBodySize = null;
-                    options.AllowSynchronousIO = false;
+                    options.AllowSynchronousIO = false;                    
                     foreach (var endpoint in endpoints)
                     {
                         if (endpoint.address == null) continue;
 
                         if (endpoint.certificateName != null)
                         {
-                            if (Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName).WaitFor(out X509Certificate2 certificate))
+                            if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
                             {
                                 options.Listen(endpoint.address, endpoint.port, listenOptions =>
                                 {

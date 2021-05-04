@@ -16,12 +16,15 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
         private AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
         private AsyncExRWSubjects asyncExRwSubjects = new AsyncExRWSubjects();
         private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
-        private FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
+        private MicroValueLockSubjects microValueLockSubjects = new MicroValueLockSubjects();
         private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
         private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
         private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
         private MixedPerformanceTest test = new MixedPerformanceTest(2);
+
+        [Benchmark]
+        public void MicroValueLock_Lock() => test.Run(microValueLockSubjects.Lock);
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);
@@ -37,9 +40,7 @@ namespace FeatureFlowFramework.PerformanceTests.FeatureLockPerformance.MixedTest
 
         [Benchmark]
         public void FeatureLock_LockPrio() => test.Run(featureLockSubjects.LockPrio);
-
-        [Benchmark]
-        public void FastSpinLock_Lock() => test.Run(fastSpinLockSubjects.Lock);
+        
 
         [Benchmark]
         public void SpinLock_Lock() => test.Run(spinLockSubjects.Lock);

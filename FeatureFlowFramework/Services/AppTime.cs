@@ -17,9 +17,18 @@ namespace FeatureFlowFramework.Services
         static AppTime()
         {
             stopWatch.Start();
-            ResetCoarseNow();
+            ResetCoarseNow(DateTime.UtcNow);
         }
 
+        public static TimeSpan Elapsed => stopWatch.Elapsed;
+
+        public static TimeKeeper TimeKeeper => new TimeKeeper(Elapsed);
+
+        public static TimeSpan CoarsePrecision => 20.Milliseconds();
+
+        /// <summary>
+        /// Returns the current UTC time
+        /// </summary>
         public static DateTime Now
         {
             get
@@ -30,19 +39,19 @@ namespace FeatureFlowFramework.Services
             }
         }
 
-        public static TimeSpan Elapsed => stopWatch.Elapsed;
-
-        public static TimeKeeper TimeKeeper => new TimeKeeper(Elapsed);
-
+        /// <summary>
+        /// A very quick and cheap way to get the current UTC time, but it is between 0 - 20 milliseconds (usually 2-18 ms) behind the actual time.
+        /// </summary>
         public static DateTime CoarseNow        
         {
             get
             {
                 var newCoarseMillisecondCount = Environment.TickCount;
-                if (lastCoarseMillisecondCount - coarseMillisecondCountBase > 1000 ||
+                if (coarseMillisecondCountBase > lastCoarseMillisecondCount ||
+                    lastCoarseMillisecondCount - coarseMillisecondCountBase > 1000 ||                    
                     newCoarseMillisecondCount < lastCoarseMillisecondCount)
                 {
-                    ResetCoarseNow();
+                    return ResetCoarseNow(DateTime.UtcNow);
                 }
                 else lastCoarseMillisecondCount = newCoarseMillisecondCount;
 
@@ -50,17 +59,12 @@ namespace FeatureFlowFramework.Services
             }
         }
 
-        private static void ResetCoarseNow(DateTime now)
+        private static DateTime ResetCoarseNow(DateTime now)
         {
-            coarseTimeBase = now;
+            coarseTimeBase = now - 2.Milliseconds(); // Shift by 2 milliseconds so that the coarse time will (nearly) always be behind the normal UTC time.
             coarseMillisecondCountBase = Environment.TickCount;
-            lastCoarseMillisecondCount = coarseMillisecondCountBase;            
-        }
-
-        private static void ResetCoarseNow()
-        {
-            var now = DateTime.UtcNow;
-            ResetCoarseNow(now);
+            lastCoarseMillisecondCount = coarseMillisecondCountBase;
+            return coarseTimeBase;
         }
 
         public static void Wait(TimeSpan timeout)
@@ -69,17 +73,17 @@ namespace FeatureFlowFramework.Services
             else timeout = new TimeSpan(timeout.Ticks - 1);
 
             TimeKeeper timer = TimeKeeper;
-            if (timeout > 16.Milliseconds()) Thread.Sleep(timeout - 16.Milliseconds());
+            if (timeout > 18.Milliseconds()) Thread.Sleep(timeout - 18.Milliseconds());
             while (timer.Elapsed < timeout) Thread.Sleep(0);
         }
 
         public static void Wait(TimeSpan timeout, CancellationToken cancellationToken)
         {
-            if (timeout == TimeSpan.Zero || cancellationToken.IsCancellationRequested) return;
+            if (timeout.Ticks <= 1 || cancellationToken.IsCancellationRequested) return;
             else timeout = new TimeSpan(timeout.Ticks - 1);
 
             TimeKeeper timer = TimeKeeper;
-            if (timeout > 16.Milliseconds()) cancellationToken.WaitHandle.WaitOne(timeout - 16.Milliseconds());
+            if (timeout > 18.Milliseconds()) cancellationToken.WaitHandle.WaitOne(timeout - 18.Milliseconds());
             while (timer.Elapsed < timeout && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
         }
 
@@ -89,7 +93,7 @@ namespace FeatureFlowFramework.Services
             else
             {
                 TimeKeeper timer = TimeKeeper;
-                if (timeout > 16.Milliseconds()) await Task.Delay(timeout - 16.Milliseconds());
+                if (timeout > 18.Milliseconds()) await Task.Delay(timeout - 18.Milliseconds());
                 while (timer.Elapsed < timeout - 0.01.Milliseconds()) await Task.Yield();
                 while (timer.Elapsed.Ticks < timeout.Ticks - 1000) await Task.Delay(0);
                 while (timer.Elapsed.Ticks < timeout.Ticks - 50) Thread.Sleep(0);
@@ -102,7 +106,7 @@ namespace FeatureFlowFramework.Services
             else
             {
                 TimeKeeper timer = TimeKeeper;
-                if (timeout > 16.Milliseconds()) await Task.Delay(timeout - 16.Milliseconds(), cancellationToken);
+                if (timeout > 18.Milliseconds()) await Task.Delay(timeout - 18.Milliseconds(), cancellationToken);
                 while (timer.Elapsed < timeout - 0.01.Milliseconds() && !cancellationToken.IsCancellationRequested) await Task.Yield();
                 while (timer.Elapsed.Ticks < timeout.Ticks - 1000 && !cancellationToken.IsCancellationRequested) await Task.Delay(0);
                 while (timer.Elapsed.Ticks < timeout.Ticks - 50 && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
