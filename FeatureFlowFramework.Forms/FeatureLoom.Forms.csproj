@@ -74,9 +74,9 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FeatureFlowFramework\FeatureFlowFramework.csproj">
+    <ProjectReference Include="..\FeatureFlowFramework\FeatureLoom.csproj">
       <Project>{52d3f346-b06a-419c-87e9-11bd1c3155d9}</Project>
-      <Name>FeatureFlowFramework</Name>
+      <Name>FeatureLoom</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2003
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework", "FeatureFlowFramework\FeatureFlowFramework.csproj", "{52D3F346-B06A-419C-87E9-11BD1C3155D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureLoom", "FeatureFlowFramework\FeatureLoom.csproj", "{52D3F346-B06A-419C-87E9-11BD1C3155D9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework.Tests", "FeatureFlowFramework.Tests\FeatureFlowFramework.Tests.csproj", "{8AEACB46-3C74-4BC7-AF3E-B79DD8D2812B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureLoom.Tests", "FeatureFlowFramework.Tests\FeatureLoom.Tests.csproj", "{8AEACB46-3C74-4BC7-AF3E-B79DD8D2812B}"
 	ProjectSection(ProjectDependencies) = postProject
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 	EndProjectSection
@@ -20,12 +20,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Playground\Pl
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlowFramework.Forms", "FeatureFlowFramework.Forms\FeatureFlowFramework.Forms.csproj", "{6ABB1FCC-6E5A-4934-9782-7381B2F492B6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureLoom.Forms", "FeatureFlowFramework.Forms\FeatureLoom.Forms.csproj", "{6ABB1FCC-6E5A-4934-9782-7381B2F492B6}"
 	ProjectSection(ProjectDependencies) = postProject
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureFlowFramework.PerformanceTests", "FeatureFlowFramework.PerformanceTests\FeatureFlowFramework.PerformanceTests.csproj", "{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureLoom.PerformanceTests", "FeatureFlowFramework.PerformanceTests\FeatureLoom.PerformanceTests.csproj", "{8FB64CBB-2D41-4EB1-9664-5EAEB0678893}"
 	ProjectSection(ProjectDependencies) = postProject
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 	EndProjectSection
