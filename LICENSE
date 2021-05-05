@@ -1,4 +1,4 @@
-MIT License
+tMIT License
 
 Copyright (c) 2020 Michael Gehling
 
@@ -27,4 +27,4 @@ open source projects. Each of those files includes the respective license notice
 and the name of the original creator.
 
 Here is the list of third party sources with their author and license:
-- "Fast Wildcard Matching" (https://bitbucket.org/hasullivan/fast-wildcard-matching/src/master/) from "H.A. Sullivan" under MIT license  (see /FeatureFlowFramework/Helpers/Extensions/WildcardMatchExtension.cs)
+- "Fast Wildcard Matching" (https://bitbucket.org/hasullivan/fast-wildcard-matching/src/master/) from "H.A. Sullivan" under MIT license  (see /FeatureLoom/Helpers/Extensions/WildcardMatchExtension.cs)
