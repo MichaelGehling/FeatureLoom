@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;

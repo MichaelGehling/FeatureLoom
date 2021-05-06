@@ -1,13 +1,9 @@
-﻿using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureLoom.Helpers.Synchronization
+namespace FeatureLoom.Synchronization
 {
     public class AsyncManualResetEventTests
     {
@@ -41,9 +37,9 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
             List<Thread> threads = new List<Thread>();
-            int countEnd = 0;            
+            int countEnd = 0;
 
-            for(int i = 0; i < 20; i = i+2)
+            for (int i = 0; i < 20; i = i + 2)
             {
                 Thread thread = new Thread(() =>
                 {
@@ -62,13 +58,12 @@ namespace FeatureLoom.Helpers.Synchronization
                 threads.Add(thread);
             }
 
-            Thread.Sleep(100);            
+            Thread.Sleep(100);
             Assert.Equal(0, countEnd);
 
             mre.PulseAll();
             Thread.Sleep(100);
             Assert.Equal(threads.Count, countEnd);
-
         }
     }
 }

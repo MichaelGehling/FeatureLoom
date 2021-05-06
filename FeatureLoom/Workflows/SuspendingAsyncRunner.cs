@@ -1,6 +1,5 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Services;
+﻿using FeatureLoom.Time;
+
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,34 +35,34 @@ namespace FeatureLoom.Workflows
                 {
                     Task<bool> stepTask = workflow.ExecuteNextStepAsync(executionController);
 
-                    // If step is already completed, it was executed synchronously.                  
+                    // If step is already completed, it was executed synchronously.
                     if (stepTask.IsCompleted)
                     {
                         // If also the suspension intervall is elapsed a suspension has to be performed.
-                        if(timer.Elapsed > suspensionIntervall)
+                        if (timer.Elapsed > suspensionIntervall)
                         {
                             var syncContext = SynchronizationContext.Current;
-                            if(syncContext != null && syncContext.GetType() != typeof(SynchronizationContext))
+                            if (syncContext != null && syncContext.GetType() != typeof(SynchronizationContext))
                             {
-                                if(suspensionTime == TimeSpan.Zero) await Task.Yield();
-                                else await Task.Delay(suspensionTime);                                
+                                if (suspensionTime == TimeSpan.Zero) await Task.Yield();
+                                else await Task.Delay(suspensionTime);
                             }
                             else
                             {
                                 ThreadPool.GetAvailableThreads(out int availableThreads, out _);
-                                if(availableThreads == 0)
+                                if (availableThreads == 0)
                                 {
-                                    if(suspensionTime == TimeSpan.Zero) await Task.Yield();
+                                    if (suspensionTime == TimeSpan.Zero) await Task.Yield();
                                     else await Task.Delay(suspensionTime);
                                 }
                             }
                             timer.Restart(); // When suspension was forced, the suspensionTimer can be reset.
                         }
-                    }    
+                    }
                     else timer.Restart(); // When step ran async the suspensionTimer can be reset.
-                    
+
                     running = await stepTask;
-                } while (running);                
+                } while (running);
             }
             finally
             {

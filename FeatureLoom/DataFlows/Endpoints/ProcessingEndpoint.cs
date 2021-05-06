@@ -1,5 +1,5 @@
-﻿using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using System;
 using System.Threading.Tasks;
 
@@ -50,13 +50,13 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(processing != null)
+                if (processing != null)
                 {
-                    if(syncLock == null)
+                    if (syncLock == null)
                     {
-                        if(!processing(msgT))
+                        if (!processing(msgT))
                         {
                             alternativeSendingHelper.ObjIfExists?.Forward(message);
                         }
@@ -64,16 +64,16 @@ namespace FeatureLoom.DataFlows
                     else
                     {
                         bool result;
-                        lock(syncLock)
+                        lock (syncLock)
                         {
                             result = processing(msgT);
                         }
-                        if(!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                        if (!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
                 }
                 else
                 {
-                    if(!processingAsync(msgT).WaitFor())
+                    if (!processingAsync(msgT).WaitFor())
                     {
                         alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
@@ -84,13 +84,13 @@ namespace FeatureLoom.DataFlows
 
         public async Task PostAsync<M>(M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(processing != null)
+                if (processing != null)
                 {
-                    if(syncLock == null)
+                    if (syncLock == null)
                     {
-                        if(!processing(msgT))
+                        if (!processing(msgT))
                         {
                             alternativeSendingHelper.ObjIfExists?.Forward(message);
                         }
@@ -98,16 +98,16 @@ namespace FeatureLoom.DataFlows
                     else
                     {
                         bool result;
-                        lock(syncLock)
+                        lock (syncLock)
                         {
                             result = processing(msgT);
                         }
-                        if(!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                        if (!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
                 }
                 else
                 {
-                    if(!await processingAsync(msgT))
+                    if (!await processingAsync(msgT))
                     {
                         await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
                     }

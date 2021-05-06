@@ -19,10 +19,11 @@
             }
 
             public static implicit operator ExecutionState((int stateIndex, int stepIndex) tupel) => new ExecutionState(tupel.stateIndex, tupel.stepIndex);
+
             public override bool Equals(object obj)
             {
-                return obj is ExecutionState state && 
-                       state.stateIndex == this.stateIndex && 
+                return obj is ExecutionState state &&
+                       state.stateIndex == this.stateIndex &&
                        state.stepIndex == this.stepIndex;
             }
 
@@ -36,6 +37,6 @@
             {
                 return base.GetHashCode();
             }
-        }        
+        }
     }
 }

@@ -1,14 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using FeatureLoom.Services.Logging;
+﻿using FeatureLoom.Logging;
 using FeatureLoom.Workflows;
+using System;
+using System.Collections.Generic;
 
 namespace Playground
 {
     public class GuessTheWord : Workflow<GuessTheWord.StateMachine>
     {
-
-        static void Main()
+        private static void Main()
         {
             var guessTheWord = new GuessTheWord();
             guessTheWord.ExecutionInfoSource.ConnectTo(new WorkflowExecutionInfoLogger());
@@ -16,15 +15,15 @@ namespace Playground
             guessTheWord.WaitUntilFinished();
         }
 
-        string theWord;
-        List<char> guessedChars = new List<char>();
-        int counter = 0;
-        bool done = false;
+        private string theWord;
+        private List<char> guessedChars = new List<char>();
+        private int counter = 0;
+        private bool done = false;
 
         public class StateMachine : StateMachine<GuessTheWord>
         {
             protected override void Init()
-            {                
+            {
                 var entering = State("entering");
                 var guessing = State("guessing");
                 var finished = State("finished");

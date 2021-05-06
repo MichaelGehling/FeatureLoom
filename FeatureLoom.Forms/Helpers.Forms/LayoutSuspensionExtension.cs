@@ -1,8 +1,8 @@
-﻿using FeatureLoom.Helpers.Extensions;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.MetaDatas;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using FeatureLoom.Services.MetaData;
 
 namespace FeatureLoom.Helpers.Forms
 {
@@ -10,45 +10,42 @@ namespace FeatureLoom.Helpers.Forms
     {
         public static LayoutResumer LayoutSuspension(this Control control, bool recursive = true)
         {
-            if(control.TryGetMetaData("LayoutSuspensionActive", out bool active) && active) return new LayoutResumer(null, null);
+            if (control.TryGetMetaData("LayoutSuspensionActive", out bool active) && active) return new LayoutResumer(null, null);
             else control.SetMetaData("LayoutSuspensionActive", true);
 
             control.SuspendLayout();
             List<Control> suspendedChildren = null;
-            if(control is TreeView tree) tree.BeginUpdate();
-            if(recursive)
+            if (control is TreeView tree) tree.BeginUpdate();
+            if (recursive)
             {
                 suspendedChildren = new List<Control>();
                 SuspendChildren(control, suspendedChildren);
             }
 
             return new LayoutResumer(control, suspendedChildren);
-
         }
 
-        static void SuspendChildren(Control parent, IList<Control> suspendedChildren)
+        private static void SuspendChildren(Control parent, IList<Control> suspendedChildren)
         {
-            foreach(var child in parent.Controls)
+            foreach (var child in parent.Controls)
             {
-                if(child is Control childControl)
+                if (child is Control childControl)
                 {
-
-                    if(childControl.TryGetMetaData("LayoutSuspensionActive", out bool active) && active) continue;
+                    if (childControl.TryGetMetaData("LayoutSuspensionActive", out bool active) && active) continue;
                     else childControl.SetMetaData("LayoutSuspensionActive", true);
 
                     childControl.SuspendLayout();
-                    if(childControl is TreeView tree) tree.BeginUpdate();
+                    if (childControl is TreeView tree) tree.BeginUpdate();
                     suspendedChildren.Add(childControl);
                     SuspendChildren(childControl, suspendedChildren);
                 }
             }
         }
 
-
         public struct LayoutResumer : IDisposable
         {
-            Control control;
-            IEnumerable<Control> children;
+            private Control control;
+            private IEnumerable<Control> children;
 
             public LayoutResumer(Control control, IEnumerable<Control> children)
             {
@@ -58,13 +55,13 @@ namespace FeatureLoom.Helpers.Forms
 
             public void Dispose()
             {
-                if(control is TreeView tree) tree.EndUpdate();
+                if (control is TreeView tree) tree.EndUpdate();
                 control?.ResumeLayout();
                 control?.SetMetaData("LayoutSuspensionActive", false);
 
-                foreach(var child in children.EmptyIfNull())
+                foreach (var child in children.EmptyIfNull())
                 {
-                    if(child is TreeView treeChild) treeChild.EndUpdate();
+                    if (child is TreeView treeChild) treeChild.EndUpdate();
                     child?.ResumeLayout();
                     child?.SetMetaData("LayoutSuspensionActive", false);
                 }

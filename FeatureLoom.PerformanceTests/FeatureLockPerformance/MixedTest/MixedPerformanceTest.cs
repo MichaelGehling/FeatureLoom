@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Helpers.Time;
+﻿using FeatureLoom.Time;
 using System;
 using System.Threading.Tasks;
 

@@ -1,5 +1,4 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.Synchronization;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,9 +34,9 @@ namespace FeatureLoom.DataFlows
 
         public bool IsTriggered(bool reset = false)
         {
-            if(mre.IsSet)
+            if (mre.IsSet)
             {
-                if(reset) Reset();
+                if (reset) Reset();
                 return true;
             }
             return false;
@@ -58,15 +57,15 @@ namespace FeatureLoom.DataFlows
 
         protected virtual void HandleMessage<M>(in M message)
         {
-            if(mode == Mode.Toggle)
+            if (mode == Mode.Toggle)
             {
-                if(IsTriggered(false)) Reset();
+                if (IsTriggered(false)) Reset();
                 else Trigger();
             }
             else
             {
                 mre.Set();
-                if(mode == Mode.InstantReset) Reset();
+                if (mode == Mode.InstantReset) Reset();
             }
         }
 

@@ -1,10 +1,8 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Services.Logging;
-using FeatureLoom.Services.MetaData;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
+using FeatureLoom.MetaDatas;
+using FeatureLoom.Synchronization;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Workflows
@@ -47,7 +45,7 @@ namespace FeatureLoom.Workflows
                         proceedStep = DoWaiting(context, step, partialStep);
                     }
 
-                    if(partialStep.targetState != null || partialStep.finishStateMachine)
+                    if (partialStep.targetState != null || partialStep.finishStateMachine)
                     {
                         DoTransition(context, step, currentExecutionState, ref nextExecutionState, ref nextExecutionPhase, ref proceedStep, partialStep);
                     }
@@ -90,7 +88,7 @@ namespace FeatureLoom.Workflows
                     {
                         proceedStep = await DoWaitingAsync(context, step, proceedStep, partialStep);
                     }
-                    
+
                     if (partialStep.targetState != null || partialStep.finishStateMachine)
                     {
                         DoTransition(context, step, currentExecutionState, ref nextExecutionState, ref nextExecutionPhase, ref proceedStep, partialStep);
@@ -111,7 +109,7 @@ namespace FeatureLoom.Workflows
             if (partialStep.targetState != null)
             {
                 var targetState = partialStep.targetState(context);
-                nextExecutionState = (targetState.stateIndex, 0);                
+                nextExecutionState = (targetState.stateIndex, 0);
                 if (step.parentState != targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StateTransition, targetState);
                 proceed = false;
             }
@@ -138,7 +136,7 @@ namespace FeatureLoom.Workflows
             }
             catch (Exception e)
             {
-                if(e.InnerOrSelf() is TaskCanceledException)
+                if (e.InnerOrSelf() is TaskCanceledException)
                 {
                     proceed = false;
                     Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
@@ -187,7 +185,7 @@ namespace FeatureLoom.Workflows
         {
             if (step.onExceptionRepeatConditionAsync(context, e).WaitFor())
             {
-                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithRetry, e);                
+                context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithRetry, e);
                 nextExecutionState = currentExecutionState;
             }
             else context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithoutRetry, e);
@@ -286,7 +284,7 @@ namespace FeatureLoom.Workflows
             }
             catch (Exception e)
             {
-                if(e.InnerOrSelf() is TaskCanceledException)
+                if (e.InnerOrSelf() is TaskCanceledException)
                 {
                     proceed = false;
                     Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
@@ -294,7 +292,7 @@ namespace FeatureLoom.Workflows
                 else throw e.InnerOrSelf();
             }
             context.ExecutionPhase = Workflow.ExecutionPhase.Running;
-            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);            
+            context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
             return proceed;
         }
 

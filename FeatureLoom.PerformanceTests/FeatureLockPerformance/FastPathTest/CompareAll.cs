@@ -1,5 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
-using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Synchronization;
 
 namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
 {

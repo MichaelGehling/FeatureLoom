@@ -1,7 +1,6 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Services.Logging;
-using FeatureLoom.Services.MetaData;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
+using FeatureLoom.MetaDatas;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -107,7 +106,7 @@ namespace FeatureLoom.Workflows
 
             var step = states.ItemOrNull(executionState.stateIndex)?.steps.ItemOrNull(executionState.stepIndex);
             if (step != null)
-            {                
+            {
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
                 controller.ExecuteStep(context, step);
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished, executionState, executionPhase);
@@ -131,7 +130,7 @@ namespace FeatureLoom.Workflows
 
             var step = states.ItemOrNull(executionState.stateIndex)?.steps.ItemOrNull(executionState.stepIndex);
             if (step != null)
-            {                
+            {
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
                 await controller.ExecuteStepAsync(context, step);
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished, executionState, executionPhase);
@@ -179,7 +178,7 @@ namespace FeatureLoom.Workflows
                 Log.WARNING(context.GetHandle(), $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToString()}!");
                 proceed = false;
             }
-            else if(executionPhase != Workflow.ExecutionPhase.Running)
+            else if (executionPhase != Workflow.ExecutionPhase.Running)
             {
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.WorkflowStarted);
                 context.ExecutionPhase = Workflow.ExecutionPhase.Running;
@@ -201,7 +200,7 @@ namespace FeatureLoom.Workflows
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override Task<bool> ExecuteNextStepAsync<C>(C context, IStepExecutionController controller)
         {
-            if(context is CT ct) return ExecuteNextStepAsync(ct, controller);
+            if (context is CT ct) return ExecuteNextStepAsync(ct, controller);
             else
             {
                 Log.ERROR(context.GetHandle(), $"Wrong context object used for this Statemachine! ({typeof(C)} instead of {typeof(CT)})");
@@ -212,7 +211,7 @@ namespace FeatureLoom.Workflows
         public virtual Workflow.ExecutionState HandleException(CT context, Exception e, Workflow.ExecutionState nextExecutionState)
         {
             var step = this.states.ItemOrNull(context.CurrentExecutionState.stateIndex)?.steps.ItemOrNull(context.CurrentExecutionState.stepIndex);
-            if(this.robustExecutionActive)
+            if (this.robustExecutionActive)
             {
                 Log.ERROR(context.GetHandle(), $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
                 return nextExecutionState;

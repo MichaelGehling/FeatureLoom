@@ -1,6 +1,4 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Extensions;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
@@ -12,7 +10,7 @@ namespace FeatureLoom.DataFlows
     /// sinks that are not needed any more. <summary>
     public class SourceHelper : IDataFlowSource
     {
-        SourceValueHelper sourceHelper;
+        private SourceValueHelper sourceHelper;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
@@ -45,6 +43,7 @@ namespace FeatureLoom.DataFlows
         {
             sourceHelper.Forward<M>(in message);
         }
+
         public Task ForwardAsync<M>(M message)
         {
             return sourceHelper.ForwardAsync<M>(message);

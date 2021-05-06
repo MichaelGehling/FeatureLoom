@@ -51,13 +51,13 @@ namespace FeatureLoom.DataFlows
 
             private bool RemoveFromHub()
             {
-                if(hub == null) return true;
+                if (hub == null) return true;
                 var sockets = hub.sockets;
                 List<Socket> newSocketList = new List<Socket>(sockets.Count - 1);
                 bool removed = false;
-                foreach(var socket in sockets)
+                foreach (var socket in sockets)
                 {
-                    if(socket != this) newSocketList.Add(socket);
+                    if (socket != this) newSocketList.Add(socket);
                     else removed = true;
                 }
                 hub.sockets = newSocketList;
@@ -69,41 +69,41 @@ namespace FeatureLoom.DataFlows
 
             private bool CheckRemovalByOwner()
             {
-                if(!ownerRef.IsAlive) return RemoveFromHub();
+                if (!ownerRef.IsAlive) return RemoveFromHub();
                 else return false;
             }
 
             public void Post<M>(in M message)
             {
-                if(CheckRemovalByOwner()) return;
+                if (CheckRemovalByOwner()) return;
 
                 var sockets = hub.sockets;
-                if(sockets.Count == 1) return;
+                if (sockets.Count == 1) return;
 
-                foreach(var socket in sockets)
+                foreach (var socket in sockets)
                 {
-                    if(socket != this) socket.Forward(message);
+                    if (socket != this) socket.Forward(message);
                 }
             }
 
             private void Forward<M>(in M message)
             {
-                if(CheckRemovalByOwner()) return;
+                if (CheckRemovalByOwner()) return;
 
                 sourceHelper.Forward(message);
             }
 
             public Task PostAsync<M>(M message)
             {
-                if(CheckRemovalByOwner()) return Task.CompletedTask;
+                if (CheckRemovalByOwner()) return Task.CompletedTask;
 
                 var sockets = hub.sockets;
-                if(sockets.Count == 1) return Task.CompletedTask;
+                if (sockets.Count == 1) return Task.CompletedTask;
 
                 Task[] tasks = new Task[sockets.Count];
-                for(int i = 0; i < sockets.Count; i++)
+                for (int i = 0; i < sockets.Count; i++)
                 {
-                    if(sockets[i] != this) tasks[i] = sockets[i].ForwardAsync(message);
+                    if (sockets[i] != this) tasks[i] = sockets[i].ForwardAsync(message);
                     else tasks[i] = Task.CompletedTask;
                 }
                 return Task.WhenAll(tasks);
@@ -111,7 +111,7 @@ namespace FeatureLoom.DataFlows
 
             private Task ForwardAsync<M>(M message)
             {
-                if(CheckRemovalByOwner()) return Task.CompletedTask;
+                if (CheckRemovalByOwner()) return Task.CompletedTask;
 
                 return sourceHelper.ForwardAsync(message);
             }
@@ -133,7 +133,7 @@ namespace FeatureLoom.DataFlows
 
             public void Dispose()
             {
-                if(hub != null)
+                if (hub != null)
                 {
                     RemoveFromHub();
                 }

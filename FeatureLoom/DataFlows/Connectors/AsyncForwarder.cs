@@ -34,7 +34,7 @@ namespace FeatureLoom.DataFlows
         }
 
         public void Post<M>(in M message)
-        {            
+        {
             _ = sourceHelper.ForwardAsync(message);
         }
 

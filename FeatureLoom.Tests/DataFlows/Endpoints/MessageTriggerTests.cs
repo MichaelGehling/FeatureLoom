@@ -1,8 +1,4 @@
-﻿using FeatureLoom.DataFlows;
-using FeatureLoom.DataFlows.Test;
-using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Diagnostics;
-using System.Threading.Tasks;
+﻿using FeatureLoom.Diagnostics;
 using Xunit;
 
 namespace FeatureLoom.DataFlows
@@ -33,7 +29,7 @@ namespace FeatureLoom.DataFlows
             Assert.False(trigger.IsTriggered());
             trigger.Post(42);
             Assert.True(trigger.IsTriggered());
-            trigger.Post(43);            
+            trigger.Post(43);
             Assert.False(trigger.IsTriggered());
             trigger.Post(44);
             Assert.True(trigger.IsTriggered());

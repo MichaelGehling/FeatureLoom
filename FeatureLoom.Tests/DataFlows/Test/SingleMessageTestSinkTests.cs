@@ -1,6 +1,4 @@
-﻿using FeatureLoom.DataFlows.Test;
-using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Diagnostics;
+﻿using FeatureLoom.Diagnostics;
 using Xunit;
 
 namespace FeatureLoom.DataFlows
@@ -14,7 +12,7 @@ namespace FeatureLoom.DataFlows
         {
             TestHelper.PrepareTestContext();
 
-            var sender = new Sender<T>();            
+            var sender = new Sender<T>();
             var sink = new SingleMessageTestSink<T>();
             sender.ConnectTo(sink);
             sender.Send(message);

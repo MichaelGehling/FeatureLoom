@@ -1,6 +1,5 @@
 ﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections;
 using System.Threading.Tasks;
@@ -13,7 +12,7 @@ namespace FeatureLoom.DataFlows
         private LazyValue<SourceHelper> alternativeSender;
 
         private A aggregationData = new A();
-        FeatureLock dataLock = new FeatureLock();
+        private FeatureLock dataLock = new FeatureLock();
         private readonly Func<T, A, bool> aggregate;
 
         /// <summary> The constructor taking the aggregation function. </summary>
@@ -31,28 +30,7 @@ namespace FeatureLoom.DataFlows
         {
             bool alternative = true;
             (bool ready, object msg, bool enumerate) output = default;
-            if(message is T validMessage)
-            {
-                using(dataLock.Lock())
-                {
-                    alternative = !aggregate(validMessage, aggregationData);
-                    output = aggregationData.TryCreateOutputMessage();
-                }
-            }
-
-            if(output.ready && output.msg != null)
-            {
-                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sourceHelper.Forward(msg);
-                else sourceHelper.Forward(output.msg);
-            }
-            if(alternative) alternativeSender.ObjIfExists?.Forward(message);
-        }
-
-        public Task PostAsync<M>(M message)
-        {
-            bool alternative = true;
-            (bool ready, object msg, bool enumerate) output = default;
-            if(message is T validMessage)
+            if (message is T validMessage)
             {
                 using (dataLock.Lock())
                 {
@@ -61,12 +39,33 @@ namespace FeatureLoom.DataFlows
                 }
             }
 
-            if(output.ready && output.msg != null)
+            if (output.ready && output.msg != null)
             {
-                if(output.enumerate && output.msg is IEnumerable outputMessages) foreach(var msg in outputMessages) sourceHelper.Forward(msg);
+                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sourceHelper.Forward(msg);
+                else sourceHelper.Forward(output.msg);
+            }
+            if (alternative) alternativeSender.ObjIfExists?.Forward(message);
+        }
+
+        public Task PostAsync<M>(M message)
+        {
+            bool alternative = true;
+            (bool ready, object msg, bool enumerate) output = default;
+            if (message is T validMessage)
+            {
+                using (dataLock.Lock())
+                {
+                    alternative = !aggregate(validMessage, aggregationData);
+                    output = aggregationData.TryCreateOutputMessage();
+                }
+            }
+
+            if (output.ready && output.msg != null)
+            {
+                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sourceHelper.Forward(msg);
                 else return sourceHelper.ForwardAsync(output.msg);
             }
-            if(alternative) return alternativeSender.ObjIfExists?.ForwardAsync(message);
+            if (alternative) return alternativeSender.ObjIfExists?.ForwardAsync(message);
             return Task.CompletedTask;
         }
 

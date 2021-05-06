@@ -1,7 +1,6 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +10,7 @@ namespace FeatureLoom.DataFlows
     public class LatestMessageReceiver<T> : IDataFlowQueue, IDataFlowSink<T>, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
-        MicroLock myLock = new MicroLock();
+        private MicroLock myLock = new MicroLock();
         private T receivedMessage;
         private LazyValue<SourceHelper> alternativeSendingHelper;
         public IDataFlowSource Else => alternativeSendingHelper.Obj;
@@ -22,9 +21,9 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is T typedMessage)
+            if (message is T typedMessage)
             {
-                using(myLock.Lock())
+                using (myLock.Lock())
                 {
                     receivedMessage = typedMessage;
                 }
@@ -35,9 +34,9 @@ namespace FeatureLoom.DataFlows
 
         public Task PostAsync<M>(M message)
         {
-            if(message is T typedMessage)
+            if (message is T typedMessage)
             {
-                using(myLock.Lock())
+                using (myLock.Lock())
                 {
                     receivedMessage = typedMessage;
                 }
@@ -50,9 +49,9 @@ namespace FeatureLoom.DataFlows
         public bool TryReceive(out T message)
         {
             message = default;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
-                if(IsEmpty) return false;
+                if (IsEmpty) return false;
                 message = receivedMessage;
                 receivedMessage = default;
                 readerWakeEvent.Reset();
@@ -63,10 +62,10 @@ namespace FeatureLoom.DataFlows
         public async Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
         {
             T message = default;
-            if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
+            if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
             using (myLock.Lock())
             {
-                if(IsEmpty) return (false, message);
+                if (IsEmpty) return (false, message);
                 message = receivedMessage;
                 receivedMessage = default;
                 readerWakeEvent.Reset();
@@ -78,7 +77,7 @@ namespace FeatureLoom.DataFlows
         {
             using (myLock.Lock())
             {
-                if(IsEmpty) return Array.Empty<T>();
+                if (IsEmpty) return Array.Empty<T>();
                 T message = receivedMessage;
                 receivedMessage = default;
                 readerWakeEvent.Reset();
@@ -91,7 +90,7 @@ namespace FeatureLoom.DataFlows
             nextItem = default;
             using (myLock.Lock())
             {
-                if(IsEmpty) return false;
+                if (IsEmpty) return false;
                 nextItem = receivedMessage;
                 return true;
             }
@@ -101,7 +100,7 @@ namespace FeatureLoom.DataFlows
         {
             using (myLock.Lock())
             {
-                if(IsEmpty) return Array.Empty<T>();
+                if (IsEmpty) return Array.Empty<T>();
                 T message = receivedMessage;
                 return message.ToSingleEntryArray();
             }
@@ -120,7 +119,7 @@ namespace FeatureLoom.DataFlows
         {
             using (myLock.Lock())
             {
-                if(IsEmpty) return Array.Empty<object>();
+                if (IsEmpty) return Array.Empty<object>();
                 T message = receivedMessage;
                 return message.ToSingleEntryArray<object>();
             }

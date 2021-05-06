@@ -66,11 +66,11 @@ namespace FeatureLoom.Workflows
         {
             get
             {
-                if(finishStateMachine) return true;
+                if (finishStateMachine) return true;
                 var nextElse = doElse;
-                while(nextElse != null)
+                while (nextElse != null)
                 {
-                    if(nextElse.finishStateMachine) return true;
+                    if (nextElse.finishStateMachine) return true;
                     nextElse = nextElse.doElse;
                 }
                 return false;
@@ -81,7 +81,7 @@ namespace FeatureLoom.Workflows
 
         public void AddUsingResource(Func<CT, object> resourceDelegate)
         {
-            if(usingResourcesDelegates == null) usingResourcesDelegates = new List<Func<CT, object>>();
+            if (usingResourcesDelegates == null) usingResourcesDelegates = new List<Func<CT, object>>();
             usingResourcesDelegates.Add(resourceDelegate);
         }
     }

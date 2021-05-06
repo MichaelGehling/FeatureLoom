@@ -1,12 +1,6 @@
-﻿using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Diagnostics;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Time;
 using Xunit;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Services;
-using FeatureLoom.Helpers.Time;
 
 namespace FeatureLoom.Helpers
 {
@@ -18,7 +12,6 @@ namespace FeatureLoom.Helpers
             TestHelper.PrepareTestContext();
 
             Assert.True((AppTime.Now - AppTime.CoarseNow).Duration() < 20.Milliseconds());
-
         }
     }
 }

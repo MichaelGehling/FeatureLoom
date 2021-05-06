@@ -1,8 +1,8 @@
-﻿using System;
+﻿using FeatureLoom.Extensions;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
-using FeatureLoom.Helpers.Extensions;
 
 namespace FeatureLoom.Helpers.Forms
 {
@@ -14,9 +14,9 @@ namespace FeatureLoom.Helpers.Forms
 
         public override string ToString()
         {
-            if(sb.Value.Length == 0)
+            if (sb.Value.Length == 0)
             {
-                foreach(var section in sections)
+                foreach (var section in sections)
                 {
                     sb.Value.Append(section.text);
                 }
@@ -26,7 +26,7 @@ namespace FeatureLoom.Helpers.Forms
 
         public RichTextBuilder Append(RichTextBuilder container)
         {
-            foreach(var section in container.Sections)
+            foreach (var section in container.Sections)
             {
                 sections.Add(section);
             }

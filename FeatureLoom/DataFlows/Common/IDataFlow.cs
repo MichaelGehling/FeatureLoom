@@ -35,12 +35,10 @@ namespace FeatureLoom.DataFlows
 
     public interface IDataFlowSink<T> : IDataFlowSink
     {
-
     }
 
     public interface IDataFlowSource<T> : IDataFlowSource
     {
-
     }
 
     public interface IDataFlowConnection : IDataFlowSink, IDataFlowSource
@@ -51,7 +49,7 @@ namespace FeatureLoom.DataFlows
     {
     }
 
-    public interface IDataFlowConnection<I,O> : IDataFlowConnection, IDataFlowSink<I>, IDataFlowSource<O>
+    public interface IDataFlowConnection<I, O> : IDataFlowConnection, IDataFlowSink<I>, IDataFlowSource<O>
     {
     }
 

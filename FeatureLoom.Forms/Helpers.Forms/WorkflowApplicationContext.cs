@@ -1,10 +1,10 @@
 ﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Extensions;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using FeatureLoom.Workflows;
 using System;
 using System.Windows.Forms;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Extensions;
 
 namespace FeatureLoom.Helpers.Forms
 {
@@ -28,11 +28,11 @@ namespace FeatureLoom.Helpers.Forms
                 workflow.Run(runner);
                 workflow.ExecutionInfoSource.ConnectTo(new ProcessingEndpoint<Workflow.ExecutionInfo>(async msg =>
                 {
-                    if(msg.executionPhase == Workflow.ExecutionPhase.Finished ||
+                    if (msg.executionPhase == Workflow.ExecutionPhase.Finished ||
                        msg.executionPhase == Workflow.ExecutionPhase.Invalid)
                     {
                         if (!await runner.PauseAllWorkflows(true).WaitAsync(5.Seconds()))
-                        {                            
+                        {
                             throw new Exception($"Failed to stop all workflows!\n{runner.RunningWorkflows.AllItemsToString()}");
                         }
                         Application.ExitThread();

@@ -1,10 +1,8 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,7 +11,7 @@ namespace FeatureLoom.DataFlows
     public class PriorityMessageReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
-        MicroLock myLock = new MicroLock();
+        private MicroLock myLock = new MicroLock();
         private T receivedMessage;
         private LazyValue<SourceHelper> alternativeSendingHelper;
         public IDataFlowSource Else => alternativeSendingHelper.Obj;
@@ -21,7 +19,7 @@ namespace FeatureLoom.DataFlows
         public bool IsFull => false;
         public int Count => IsEmpty ? 0 : 1;
         public IAsyncWaitHandle WaitHandle => readerWakeEvent.AsyncWaitHandle;
-        Comparer<T> priorityComparer;
+        private Comparer<T> priorityComparer;
 
         public PriorityMessageReceiver(Comparer<T> priorityComparer)
         {

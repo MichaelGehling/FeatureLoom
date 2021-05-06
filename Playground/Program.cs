@@ -1,27 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.Sockets;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
-using FeatureLoom.DataFlows;
-using FeatureLoom.DataFlows.RPC;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Services;
-using FeatureLoom.Services.MetaData;
-using FeatureLoom.Services.Supervision;
-using FeatureLoom.Services.Web;
-using FeatureLoom.Workflows;
+﻿using FeatureLoom.Synchronization;
 using Nito.AsyncEx;
+using System;
+using System.Collections.Generic;
+using System.Net.Sockets;
+using System.Threading;
 
 namespace Playground
 {
-
     public static class SocketExtensions
     {
         public static void SetBlocking(this Socket socket, bool blocking)
@@ -29,15 +14,13 @@ namespace Playground
             if (socket != null) socket.Blocking = blocking;
         }
     }
+
     partial class Program
     {
+        private static volatile bool done = false;
 
-        volatile static bool done = false;
-
-        static void Main(string[] args)
-        {            
-
-
+        private static void Main(string[] args)
+        {
             int ex = 200_000;
 
             long start_mem = GC.GetTotalMemory(true);
@@ -46,7 +29,7 @@ namespace Playground
             {
                 var obj = new FeatureLock();
                 array[n] = obj;
-                using (obj.LockAsync().WaitFor()) {}
+                using (obj.LockAsync().WaitFor()) { }
                 obj.TryLockAsync(TimeSpan.Zero).WaitFor();
             }
             double used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
@@ -125,7 +108,7 @@ namespace Playground
             {
                 var obj = new AsyncLock();
                 array[n] = obj;
-                obj.Lock();                
+                obj.Lock();
             }
             used_mem_median = (GC.GetTotalMemory(false) - start_mem) / ex;
             Console.WriteLine($" AsyncEx.AsyncLock: {used_mem_median} Bytes");
@@ -216,11 +199,6 @@ namespace Playground
             Console.WriteLine($" Array1: {used_mem_median} Bytes");
 
             Console.ReadKey();
-
- 
         }
-
-
-
     }
 }

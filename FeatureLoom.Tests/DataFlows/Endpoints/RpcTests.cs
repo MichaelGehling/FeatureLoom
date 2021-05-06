@@ -1,9 +1,10 @@
-﻿using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Diagnostics;
-using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Diagnostics;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using Xunit;
 
-namespace FeatureLoom.DataFlows.RPC
+namespace FeatureLoom.RPC
 {
     public class RpcTests
     {
@@ -34,7 +35,7 @@ namespace FeatureLoom.DataFlows.RPC
             callee.RegisterMethod<string, int, string>("RepeatString", (str, num) =>
             {
                 string response = "";
-                for(int i = 0; i < num; i++) response += str;
+                for (int i = 0; i < num; i++) response += str;
                 return response;
             });
 
@@ -82,7 +83,7 @@ namespace FeatureLoom.DataFlows.RPC
             callee.RegisterMethod<string, int, string>("RepeatString", (str, num) =>
             {
                 string response = "";
-                for(int i = 0; i < num; i++) response += str;
+                for (int i = 0; i < num; i++) response += str;
                 return response;
             });
 
@@ -92,7 +93,7 @@ namespace FeatureLoom.DataFlows.RPC
             callee.RegisterMethod<TestParameters, string>("RepeatString2", (testParams) =>
             {
                 string response = "";
-                for(int i = 0; i < testParams.num; i++) response += testParams.str;
+                for (int i = 0; i < testParams.num; i++) response += testParams.str;
                 return response;
             });
 

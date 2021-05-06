@@ -5,8 +5,8 @@ namespace FeatureLoom.DataFlows
 {
     public struct DataFlowReference
     {
-        readonly IDataFlowSink strongRefSink;
-        readonly WeakReference<IDataFlowSink> weakRefSink;
+        private readonly IDataFlowSink strongRefSink;
+        private readonly WeakReference<IDataFlowSink> weakRefSink;
 
         public DataFlowReference(IDataFlowSink sink, bool weakReference)
         {
@@ -18,7 +18,7 @@ namespace FeatureLoom.DataFlows
         public bool TryGetTarget(out IDataFlowSink sink)
         {
             if (weakRefSink == null)
-            {                
+            {
                 sink = strongRefSink;
                 return sink != null;
             }
@@ -27,6 +27,5 @@ namespace FeatureLoom.DataFlows
                 return weakRefSink.TryGetTarget(out sink);
             }
         }
-
     }
 }

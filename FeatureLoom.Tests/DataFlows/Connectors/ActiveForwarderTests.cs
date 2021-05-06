@@ -1,6 +1,5 @@
-﻿using FeatureLoom.DataFlows.Test;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Diagnostics;
+﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Time;
 using Xunit;
 
 namespace FeatureLoom.DataFlows

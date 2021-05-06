@@ -1,0 +1,91 @@
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
+using FeatureLoom.MetaDatas;
+using System;
+using System.Net;
+using System.Threading.Tasks;
+
+namespace FeatureLoom.Web
+{
+    public class HttpServerReceiver : IDataFlowSource, IWebRequestHandler
+    {
+        private readonly int bufferSize;
+        private readonly string route;
+        private IWebMessageTranslator translator;
+        private readonly IWebServer webServer;
+
+        private SourceValueHelper sourceHelper;
+
+        public HttpServerReceiver(string route, IWebMessageTranslator translator, int bufferSize = 1024 * 128, IWebServer webServer = null)
+        {
+            if (!route.StartsWith("/")) route = "/" + route;
+            route = route.TrimEnd("/");
+            this.route = route;
+            this.translator = translator;
+            this.webServer = webServer ?? SharedWebServer.WebServer;
+            this.bufferSize = bufferSize;
+
+            this.webServer.AddRequestHandler(this);
+        }
+
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        public string Route => route;
+
+        public void DisconnectAll()
+        {
+            sourceHelper.DisconnectAll();
+        }
+
+        public void DisconnectFrom(IDataFlowSink sink)
+        {
+            sourceHelper.DisconnectFrom(sink);
+        }
+
+        public IDataFlowSink[] GetConnectedSinks()
+        {
+            return sourceHelper.GetConnectedSinks();
+        }
+
+        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        {
+            if (!request.IsPost)
+            {
+                response.StatusCode = HttpStatusCode.MethodNotAllowed;
+                await response.WriteAsync("Use 'POST' to send messages!");
+                return false;
+            }
+
+            try
+            {
+                string bodyString = await request.ReadAsync();
+                if (translator.TryTranslate(bodyString, out object message))
+                {
+                    await sourceHelper.ForwardAsync(message);
+                }
+                else
+                {
+                    Log.WARNING(this.GetHandle(), $"Received message could not be translated. Route:{route}");
+                    response.StatusCode = HttpStatusCode.InternalServerError;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.ERROR(this.GetHandle(), $"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
+                response.StatusCode = HttpStatusCode.InternalServerError;
+            }
+            return true;
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            sourceHelper.ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return sourceHelper.ConnectTo(sink, weakReference);
+        }
+    }
+}

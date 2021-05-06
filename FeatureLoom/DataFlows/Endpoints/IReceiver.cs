@@ -1,6 +1,5 @@
 ﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Synchronization;
 using System;
 using System.Threading.Tasks;
 

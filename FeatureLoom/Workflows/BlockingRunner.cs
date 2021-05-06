@@ -7,7 +7,7 @@
             AddToRunningWorkflows(workflow);
             try
             {
-                while(workflow.ExecuteNextStep(executionController)) ;
+                while (workflow.ExecuteNextStep(executionController)) ;
             }
             finally
             {

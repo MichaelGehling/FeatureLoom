@@ -1,6 +1,5 @@
 ﻿using FeatureLoom.DataFlows;
-using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Synchronization;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -23,7 +22,7 @@ namespace FeatureLoom.Workflows
         {
             get
             {
-                using(runningWorkflowsLock.Lock())
+                using (runningWorkflowsLock.Lock())
                 {
                     return runningWorkflows.ToArray();
                 }
@@ -34,10 +33,10 @@ namespace FeatureLoom.Workflows
         {
             get
             {
-                if(executionInfoForwarder == null)
+                if (executionInfoForwarder == null)
                 {
                     executionInfoForwarder = new Forwarder();
-                    foreach(var workflow in RunningWorkflows)
+                    foreach (var workflow in RunningWorkflows)
                     {
                         workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
                     }
@@ -49,7 +48,7 @@ namespace FeatureLoom.Workflows
         public async Task PauseAllWorkflows(bool tryCancelWaitingStep)
         {
             List<Task> tasks = new List<Task>();
-            foreach(var wf in RunningWorkflows)
+            foreach (var wf in RunningWorkflows)
             {
                 wf.RequestPause(tryCancelWaitingStep);
 
@@ -60,22 +59,22 @@ namespace FeatureLoom.Workflows
 
         protected void RemoveFromRunningWorkflows(Workflow workflow)
         {
-            using(runningWorkflowsLock.Lock())
+            using (runningWorkflowsLock.Lock())
             {
                 runningWorkflows.Remove(workflow);
-                if(executionInfoForwarder != null) workflow.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
+                if (executionInfoForwarder != null) workflow.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
             }
         }
 
         protected void AddToRunningWorkflows(Workflow workflow)
         {
-            if(workflow.IsRunning) throw new Exception("Workflow is already running!");
+            if (workflow.IsRunning) throw new Exception("Workflow is already running!");
 
             workflow.Runner = this;
-            using(runningWorkflowsLock.Lock())
+            using (runningWorkflowsLock.Lock())
             {
                 runningWorkflows.Add(workflow);
-                if(executionInfoForwarder != null) workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
+                if (executionInfoForwarder != null) workflow.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
             }
         }
 

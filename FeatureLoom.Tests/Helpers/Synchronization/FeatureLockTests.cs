@@ -1,13 +1,11 @@
-﻿using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
+﻿using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureLoom.Helpers.Synchronization
+namespace FeatureLoom.Synchronization
 {
     public class FeatureLockTests
     {
@@ -18,7 +16,7 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 Assert.False(myLock.TryLock(out var writeLock));
                 Assert.False(writeLock.IsActive);
@@ -26,7 +24,7 @@ namespace FeatureLoom.Helpers.Synchronization
                 task = Task.Run(() =>
                 {
                     waiter.Set();
-                    using(myLock.Lock())
+                    using (myLock.Lock())
                     {
                         secondLockEntered = true;
                     }
@@ -47,12 +45,12 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(await myLock.LockAsync())
+            using (await myLock.LockAsync())
             {
                 task = Task.Run(async () =>
                  {
                      waiter.Set();
-                     using(await myLock.LockAsync())
+                     using (await myLock.LockAsync())
                      {
                          secondLockEntered = true;
                      }
@@ -72,14 +70,14 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 Assert.False(myLock.TryLockReadOnly(out _));
 
                 task = Task.Run(() =>
                 {
                     waiter.Set();
-                    using(myLock.LockReadOnly())
+                    using (myLock.LockReadOnly())
                     {
                         secondLockEntered = true;
                     }
@@ -100,12 +98,12 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(await myLock.LockAsync())
+            using (await myLock.LockAsync())
             {
                 task = Task.Run(async () =>
                 {
                     waiter.Set();
-                    using(await myLock.LockReadOnlyAsync())
+                    using (await myLock.LockReadOnlyAsync())
                     {
                         secondLockEntered = true;
                     }
@@ -125,15 +123,14 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(myLock.LockReadOnly())
+            using (myLock.LockReadOnly())
             {
                 Assert.True(myLock.TryLockReadOnly(out var readLock));
                 readLock.Exit();
 
                 task = Task.Run(() =>
                 {
-
-                    using(myLock.LockReadOnly())
+                    using (myLock.LockReadOnly())
                     {
                         secondLockEntered = true;
                         waiter.Set();
@@ -151,12 +148,12 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(await myLock.LockReadOnlyAsync())
+            using (await myLock.LockReadOnlyAsync())
             {
                 task = Task.Run(async () =>
                 {
                     waiter.Set();
-                    using(await myLock.LockReadOnlyAsync())
+                    using (await myLock.LockReadOnlyAsync())
                     {
                         secondLockEntered = true;
                     }
@@ -172,7 +169,7 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 Assert.False((await myLock.TryLockAsync(10.Milliseconds())).Succeeded(out var notAcquiredLock));
                 Assert.False(notAcquiredLock.IsActive);
@@ -188,8 +185,8 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            if((await myLock.TryLockReentrantAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
-                using(outerLock)
+            if ((await myLock.TryLockReentrantAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
+                using (outerLock)
                 {
                     Assert.True(outerLock.IsActive);
                     Assert.True((await myLock.TryLockReentrantAsync(TimeSpan.Zero)).Succeeded(out var innerLock));
@@ -207,8 +204,8 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            if((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
-                using(outerLock)
+            if ((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var outerLock))
+                using (outerLock)
                 {
                     Assert.True(outerLock.IsActive);
                     Assert.True((await myLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var innerLock));
@@ -232,7 +229,7 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 Assert.False((await myLock.TryLockReadOnlyAsync(10.Milliseconds())).Succeeded(out var notAcquiredLock));
                 Assert.False(notAcquiredLock.IsActive);
@@ -243,7 +240,6 @@ namespace FeatureLoom.Helpers.Synchronization
             acquiredLock.Exit();
         }
 
-        
         [Fact]
         public void PrioritizedAttemptSucceedsFirst()
         {
@@ -253,12 +249,12 @@ namespace FeatureLoom.Helpers.Synchronization
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Thread thread1;
             Thread thread2;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 thread1 = new Thread(() =>
                 {
                     waiter.Set();
-                    using(myLock.Lock())
+                    using (myLock.Lock())
                     {
                         rightOrder = 1 == counter++;
                     }
@@ -268,7 +264,7 @@ namespace FeatureLoom.Helpers.Synchronization
                 thread2 = new Thread(() =>
                 {
                     waiter.Set();
-                    using(myLock.Lock(true))
+                    using (myLock.Lock(true))
                     {
                         rightOrder = 0 == counter++;
                     }
@@ -282,12 +278,11 @@ namespace FeatureLoom.Helpers.Synchronization
             Assert.True(thread2.Join(1.Seconds()));
             Assert.True(rightOrder);
         }
-        
-        
+
         [Fact]
         public void FirstAttemptSucceedsFirst()
         {
-            var myLock = new FeatureLock(FeatureLock.FairnessSettings);            
+            var myLock = new FeatureLock(FeatureLock.FairnessSettings);
             int counter = 0;
             bool rightOrder = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
@@ -295,13 +290,13 @@ namespace FeatureLoom.Helpers.Synchronization
             Thread thread2;
             bool task1Started = false;
             bool task2Started = false;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 thread1 = new Thread(() =>
                 {
                     task1Started = true;
                     waiter.Set();
-                    using(myLock.Lock())
+                    using (myLock.Lock())
                     {
                         rightOrder = 0 == counter++;
                     }
@@ -313,13 +308,13 @@ namespace FeatureLoom.Helpers.Synchronization
                 {
                     task2Started = true;
                     waiter.Set();
-                    using(myLock.Lock())
-                    {                        
+                    using (myLock.Lock())
+                    {
                         rightOrder = 1 == counter++;
                     }
                 });
                 thread2.Start();
-                while(!task1Started || !task2Started) waiter.Wait();
+                while (!task1Started || !task2Started) waiter.Wait();
                 Thread.Sleep(10);
             }
             Assert.True(thread1.Join(1.Seconds()));
@@ -338,13 +333,13 @@ namespace FeatureLoom.Helpers.Synchronization
             Thread thread2;
             bool task1Started = false;
             bool task2Started = false;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 thread1 = new Thread(async () =>
                 {
                     task1Started = true;
                     waiter.Set();
-                    using(await myLock.LockAsync())
+                    using (await myLock.LockAsync())
                     {
                         rightOrder = 0 == counter++;
                     }
@@ -356,20 +351,20 @@ namespace FeatureLoom.Helpers.Synchronization
                 {
                     task2Started = true;
                     waiter.Set();
-                    using(await myLock.LockAsync())
+                    using (await myLock.LockAsync())
                     {
                         rightOrder = 1 == counter++;
                     }
                 });
                 thread2.Start();
-                while(!task1Started || !task2Started) waiter.Wait();
+                while (!task1Started || !task2Started) waiter.Wait();
                 Thread.Sleep(10);
             }
             Assert.True(thread1.Join(1.Seconds()));
             Assert.True(thread2.Join(1.Seconds()));
             Assert.True(rightOrder);
         }
-        
+
         [Fact]
         public void FirstAttemptSucceedsFirstMixed()
         {
@@ -381,13 +376,13 @@ namespace FeatureLoom.Helpers.Synchronization
             Thread thread2;
             bool task1Started = false;
             bool task2Started = false;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 thread1 = new Thread(async () =>
                 {
                     task1Started = true;
                     waiter.Set();
-                    using(await myLock.LockAsync())
+                    using (await myLock.LockAsync())
                     {
                         rightOrder = 0 == counter++;
                     }
@@ -399,20 +394,19 @@ namespace FeatureLoom.Helpers.Synchronization
                 {
                     task2Started = true;
                     waiter.Set();
-                    using(myLock.Lock())
+                    using (myLock.Lock())
                     {
                         rightOrder = 1 == counter++;
                     }
                 });
                 thread2.Start();
-                while(!task1Started || !task2Started) waiter.Wait();
+                while (!task1Started || !task2Started) waiter.Wait();
                 Thread.Sleep(10);
             }
             Assert.True(thread1.Join(1.Seconds()));
             Assert.True(thread2.Join(1.Seconds()));
             Assert.True(rightOrder);
         }
-
 
         [Fact]
         public void ManyParallelLockAttemptsWillAllFinish()
@@ -422,65 +416,63 @@ namespace FeatureLoom.Helpers.Synchronization
             TimeFrame executionTime = new TimeFrame(1.Seconds());
 
             AsyncManualResetEvent starter = new AsyncManualResetEvent();
-            
-            for(int i = 0; i < 5; i++)
+
+            for (int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(() =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed())
+                    while (!executionTime.Elapsed())
                     {
-                        using(myLock.Lock())
+                        using (myLock.Lock())
                         {
                         }
                     }
                 }));
             }
-            
-            for(int i = 0; i < 5; i++)
+
+            for (int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(async () =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed())
+                    while (!executionTime.Elapsed())
                     {
-                        using(await myLock.LockAsync())
+                        using (await myLock.LockAsync())
                         {
                         }
                     }
                 }));
             }
-            
-            
-            for(int i = 0; i < 5; i++)
+
+            for (int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(() =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed())
+                    while (!executionTime.Elapsed())
                     {
-                        using(myLock.LockReadOnly())
+                        using (myLock.LockReadOnly())
                         {
                         }
                     }
                 }));
             }
-            
-            
-            for(int i = 0; i < 5; i++)
+
+            for (int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(async () =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed())
+                    while (!executionTime.Elapsed())
                     {
-                        using(await myLock.LockReadOnlyAsync())
+                        using (await myLock.LockReadOnlyAsync())
                         {
                         }
                     }
                 }));
             }
-            
+
             starter.Set();
             bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining() + 100.Milliseconds());
             Assert.True(allFinished);
@@ -491,7 +483,7 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.LockReadOnly())
+            using (myLock.LockReadOnly())
             {
                 Assert.True(myLock.TryLockReadOnly(out var readLock));
                 Assert.True(readLock.IsActive);
@@ -508,14 +500,14 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
                 Assert.True(myLock.TryLockReentrant(out var writeLock));
                 Assert.True(writeLock.IsActive);
                 writeLock.Exit();
 
                 Assert.True(myLock.HasValidReentrancyContext);
-                Assert.True(myLock.IsLocked);                
+                Assert.True(myLock.IsLocked);
             }
             Assert.False(myLock.IsLocked);
             Assert.False(myLock.HasValidReentrancyContext);
@@ -526,7 +518,7 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.LockReentrantReadOnly())
+            using (myLock.LockReentrantReadOnly())
             {
                 Assert.True(myLock.TryLockReentrantReadOnly(out var readLock));
                 Assert.Equal(1, myLock.CountParallelReadLocks);
@@ -535,7 +527,7 @@ namespace FeatureLoom.Helpers.Synchronization
                 Assert.Equal(1, myLock.CountParallelReadLocks);
 
                 Assert.True(myLock.HasValidReentrancyContext);
-                Assert.True(myLock.IsLocked);                
+                Assert.True(myLock.IsLocked);
             }
             Assert.False(myLock.IsLocked);
             Assert.False(myLock.HasValidReentrancyContext);
@@ -546,7 +538,7 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             FeatureLock myLock = new FeatureLock();
 
-            using(myLock.LockReentrantReadOnly())
+            using (myLock.LockReentrantReadOnly())
             {
                 Assert.Equal(1, myLock.CountParallelReadLocks);
                 Assert.False(myLock.IsWriteLocked);
@@ -573,9 +565,9 @@ namespace FeatureLoom.Helpers.Synchronization
             AsyncManualResetEvent signal = new AsyncManualResetEvent(false);
             Task task = Task.Run(() =>
             {
-                using(myLock.LockReentrantReadOnly())
+                using (myLock.LockReentrantReadOnly())
                 {
-                    while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed()) ;
+                    while (myLock.CountParallelReadLocks < 2 && !timer.Elapsed()) ;
                     Assert.False(timer.Elapsed());
 
                     signal.Wait(timer.Remaining());
@@ -584,9 +576,9 @@ namespace FeatureLoom.Helpers.Synchronization
                 }
             });
 
-            using(myLock.LockReentrantReadOnly())
+            using (myLock.LockReentrantReadOnly())
             {
-                while(myLock.CountParallelReadLocks < 2 && !timer.Elapsed()) ;
+                while (myLock.CountParallelReadLocks < 2 && !timer.Elapsed()) ;
                 Assert.False(timer.Elapsed());
                 Assert.Equal(2, myLock.CountParallelReadLocks);
 
@@ -619,7 +611,7 @@ namespace FeatureLoom.Helpers.Synchronization
             AsyncManualResetEvent signal1 = new AsyncManualResetEvent(false);
             bool exited = false;
             Task task;
-            using(myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
                 task = myLock.RunDeferredTask(() =>
                 {
@@ -646,7 +638,7 @@ namespace FeatureLoom.Helpers.Synchronization
             signal1.Reset();
             exited = false;
             task = null;
-            using(myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
                 task = myLock.RunDeferredAsync(async () =>
                 {
@@ -654,7 +646,7 @@ namespace FeatureLoom.Helpers.Synchronization
 
                     Assert.False(myLock.TryLockReentrant(out _)); // TODO TryLockAsync needed
                     Assert.False(exited);
-                    
+
                     signal1.Set();
                     Assert.True(myLock.TryLockReentrant(timer.Remaining(), out var deferredLock));  // TODO TryLockAsync needed
                     Assert.True(exited);
@@ -743,7 +735,5 @@ namespace FeatureLoom.Helpers.Synchronization
             }
             Assert.False(myLock.IsLocked);
         }
-
-
     }
 }

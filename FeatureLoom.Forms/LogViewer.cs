@@ -1,10 +1,8 @@
 ﻿using FeatureLoom.DataFlows;
-using FeatureLoom.Helpers;
 using FeatureLoom.Helpers.Forms;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Services;
-using FeatureLoom.Services.Logging;
+using FeatureLoom.Logging;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using FeatureLoom.Workflows;
 using System.Drawing;
 using System.Windows.Forms;
@@ -26,7 +24,7 @@ namespace FeatureLoom.Forms
             InitializeComponent();
             FormClosing += (o, e) =>
             {
-                if(hideOnClosing)
+                if (hideOnClosing)
                 {
                     Hide();
                     keepReading = true;
@@ -34,7 +32,7 @@ namespace FeatureLoom.Forms
                 }
             };
 
-            this.richTextBox1.DoubleClick += (a, b) => keepReading = !keepReading;            
+            this.richTextBox1.DoubleClick += (a, b) => keepReading = !keepReading;
             this.workflow = new WritingLogWorkflow(this, logMessageSource ?? Log.LogForwarder);
             Log.logRunner.Run(workflow);
         }
@@ -70,14 +68,14 @@ namespace FeatureLoom.Forms
                             {
                                 TimeFrame timeSlice = new TimeFrame(50.Milliseconds());
                                 var textBox = c.logViewer.richTextBox1;
-                                while(!textBox.IsDisposed &&
+                                while (!textBox.IsDisposed &&
                                       !timeSlice.Elapsed(AppTime.CoarseNow) &&
                                       c.logViewer.keepReading &&
                                       c.queue.TryReceive(out LogMessage msg))
                                 {
-                                    if(textBox.TextLength > 1_000_000) textBox.Text = textBox.Text.Substring(100_000);
+                                    if (textBox.TextLength > 1_000_000) textBox.Text = textBox.Text.Substring(100_000);
                                     Color color = textBox.ForeColor;
-                                    switch(msg.level)
+                                    switch (msg.level)
                                     {
                                         case Loglevel.ALWAYS: color = Color.Purple; break;
                                         case Loglevel.ERROR: color = Color.Red; break;
@@ -85,7 +83,7 @@ namespace FeatureLoom.Forms
                                         case Loglevel.INFO: color = Color.DarkBlue; break;
                                         case Loglevel.TRACE: color = Color.Gray; break;
                                     }
-                                    if(color != textBox.ForeColor) textBox.AppendText(msg.Print() + "\n", color);
+                                    if (color != textBox.ForeColor) textBox.AppendText(msg.Print() + "\n", color);
                                     else textBox.AppendText(msg.Print() + "\n");
 
                                     c.logViewer.logNotificationSender.Send(msg);

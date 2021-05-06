@@ -1,7 +1,4 @@
-﻿using FeatureLoom.DataFlows;
-using FeatureLoom.DataFlows.Test;
-using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Diagnostics;
+﻿using FeatureLoom.Diagnostics;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -9,7 +6,6 @@ namespace FeatureLoom.DataFlows
 {
     public class CountingForwarderTests
     {
-
         [Theory]
         [InlineData(42)]
         [InlineData("test string")]

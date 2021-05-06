@@ -1,8 +1,4 @@
-﻿using FeatureLoom.DataFlows;
-using FeatureLoom.DataFlows.Test;
-using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Diagnostics;
-using System.Linq;
+﻿using FeatureLoom.Diagnostics;
 using Xunit;
 
 namespace FeatureLoom.DataFlows
@@ -20,7 +16,7 @@ namespace FeatureLoom.DataFlows
             var forwarder = new BufferingForwarder<object>(10);
             var sink = new SingleMessageTestSink<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
-            sender.Send(message);            
+            sender.Send(message);
             Assert.True(sink.received);
             Assert.Equal(message, sink.receivedMessage);
         }
@@ -37,7 +33,7 @@ namespace FeatureLoom.DataFlows
             sender.Send(1);
             sender.Send(2);
             sender.Send(3);
-            forwarder.ConnectTo(sink);                        
+            forwarder.ConnectTo(sink);
             Assert.Equal(3, sink.Count);
             sender.Send(4);
             Assert.Equal(4, sink.Count);

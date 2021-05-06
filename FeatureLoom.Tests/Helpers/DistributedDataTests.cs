@@ -1,10 +1,6 @@
-﻿using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Diagnostics;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Synchronization;
 using Xunit;
-using FeatureLoom.Helpers.Synchronization;
 
 namespace FeatureLoom.Helpers
 {
@@ -36,7 +32,6 @@ namespace FeatureLoom.Helpers
             {
                 Assert.Equal(42, access.Value);
             }
-
         }
     }
 }

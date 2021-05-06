@@ -17,29 +17,29 @@ namespace FeatureLoom.DataFlows
         public void Post<M>(in M message)
         {
             bool alternative = true;
-            if(message is T tMsg)
+            if (message is T tMsg)
             {
                 var output = split(tMsg);
-                foreach(var msg in output)
+                foreach (var msg in output)
                 {
                     sourceHelper.Forward(msg);
                     alternative = false;
                 }
             }
 
-            if(alternative) sourceHelper.Forward(message);
+            if (alternative) sourceHelper.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
         {
-            if(message is T tMsg)
+            if (message is T tMsg)
             {
                 var output = split(tMsg);
-                if(output.Count > 0)
+                if (output.Count > 0)
                 {
                     Task[] tasks = new Task[output.Count];
                     int i = 0;
-                    foreach(var msg in output)
+                    foreach (var msg in output)
                     {
                         tasks[i++] = sourceHelper.ForwardAsync(msg);
                     }

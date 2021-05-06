@@ -1,8 +1,6 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -22,7 +20,7 @@ namespace FeatureLoom.DataFlows
     public class QueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle, IDataFlowSink<T>
     {
         private Queue<T> queue = new Queue<T>();
-        MicroLock queueLock = new MicroLock();
+        private MicroLock queueLock = new MicroLock();
 
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;
@@ -51,10 +49,10 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message != null && message is T typedMessage)
+            if (message != null && message is T typedMessage)
             {
-                if(waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
-                if(IsFull && dropLatestMessageOnFullQueue) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
+                if (IsFull && dropLatestMessageOnFullQueue) alternativeSendingHelper.ObjIfExists?.Forward(message);
                 else Enqueue(typedMessage);
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
@@ -62,10 +60,10 @@ namespace FeatureLoom.DataFlows
 
         public async Task PostAsync<M>(M message)
         {
-            if(message != null && message is T typedMessage)
+            if (message != null && message is T typedMessage)
             {
-                if(waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
-                if(IsFull && dropLatestMessageOnFullQueue) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
+                if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
+                if (IsFull && dropLatestMessageOnFullQueue) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
                 else Enqueue(typedMessage);
             }
             else await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
@@ -73,19 +71,19 @@ namespace FeatureLoom.DataFlows
 
         private void Enqueue(T message)
         {
-            using(queueLock.Lock())
+            using (queueLock.Lock())
             {
                 queue.Enqueue(message);
-                EnsureMaxSize();                
+                EnsureMaxSize();
             }
-            if(IsFull) writerWakeEvent.Reset();
-            readerWakeEvent.Set();            
+            if (IsFull) writerWakeEvent.Reset();
+            readerWakeEvent.Set();
         }
 
         // ONLY USE IN LOCKED QUEUE!
         private void EnsureMaxSize()
         {
-            while(queue.Count > maxQueueSize)
+            while (queue.Count > maxQueueSize)
             {
                 var element = queue.Dequeue();
                 alternativeSendingHelper.ObjIfExists?.Forward(element);
@@ -98,10 +96,10 @@ namespace FeatureLoom.DataFlows
             bool success = false;
             using (queueLock.Lock())
             {
-                success = queue.TryDequeue(out message);                
+                success = queue.TryDequeue(out message);
             }
-            if(IsEmpty) readerWakeEvent.Reset();
-            if(!IsFull) writerWakeEvent.Set();
+            if (IsEmpty) readerWakeEvent.Reset();
+            if (!IsFull) writerWakeEvent.Set();
             return success;
         }
 
@@ -110,20 +108,20 @@ namespace FeatureLoom.DataFlows
             T message = default;
             bool success = false;
 
-            if(IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
-            if(IsEmpty) return (false, default);
+            if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
+            if (IsEmpty) return (false, default);
             using (queueLock.Lock())
             {
-                success = queue.TryDequeue(out message);                
+                success = queue.TryDequeue(out message);
             }
-            if(IsEmpty) readerWakeEvent.Reset();
-            if(!IsFull) writerWakeEvent.Set();
+            if (IsEmpty) readerWakeEvent.Reset();
+            if (!IsFull) writerWakeEvent.Set();
             return (success, message);
         }
 
         public T[] ReceiveAll()
         {
-            if(IsEmpty)
+            if (IsEmpty)
             {
                 return Array.Empty<T>();
             }
@@ -133,10 +131,10 @@ namespace FeatureLoom.DataFlows
             using (queueLock.Lock())
             {
                 messages = queue.ToArray();
-                queue.Clear();                
+                queue.Clear();
             }
-            if(IsEmpty) readerWakeEvent.Reset();
-            if(!IsFull) writerWakeEvent.Set();
+            if (IsEmpty) readerWakeEvent.Reset();
+            if (!IsFull) writerWakeEvent.Set();
             return messages;
         }
 
@@ -145,7 +143,7 @@ namespace FeatureLoom.DataFlows
             nextItem = default;
             using (queueLock.Lock())
             {
-                if(IsEmpty) return false;
+                if (IsEmpty) return false;
                 nextItem = queue.Peek();
                 return true;
             }
@@ -153,7 +151,7 @@ namespace FeatureLoom.DataFlows
 
         public T[] PeekAll()
         {
-            if(IsEmpty)
+            if (IsEmpty)
             {
                 return new T[0];
             }
@@ -173,8 +171,8 @@ namespace FeatureLoom.DataFlows
             {
                 queue.Clear();
             }
-            if(IsEmpty) readerWakeEvent.Reset();
-            if(!IsFull) writerWakeEvent.Set();
+            if (IsEmpty) readerWakeEvent.Reset();
+            if (!IsFull) writerWakeEvent.Set();
         }
 
         public int CountQueuedMessages => queue.Count;

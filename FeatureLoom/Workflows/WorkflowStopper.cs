@@ -1,15 +1,13 @@
 ﻿using FeatureLoom.DataFlows;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace FeatureLoom.Workflows
 {
     public class WorkflowStopper
     {
-        Workflow workflow;
-        readonly Predicate<Workflow.ExecutionInfo> predicate;
-        readonly ProcessingEndpoint<Workflow.ExecutionInfo> processor;
+        private Workflow workflow;
+        private readonly Predicate<Workflow.ExecutionInfo> predicate;
+        private readonly ProcessingEndpoint<Workflow.ExecutionInfo> processor;
 
         public WorkflowStopper(Workflow workflow, Predicate<Workflow.ExecutionInfo> predicate, bool tryCancelWaitingState, bool deactivateWhenFired)
         {
@@ -17,10 +15,10 @@ namespace FeatureLoom.Workflows
             this.predicate = predicate;
             this.processor = new ProcessingEndpoint<Workflow.ExecutionInfo>(info =>
             {
-                if(predicate(info))
+                if (predicate(info))
                 {
                     workflow.RequestPause(tryCancelWaitingState);
-                    if(deactivateWhenFired) Deactivate();
+                    if (deactivateWhenFired) Deactivate();
                 }
             });
             Activate();
@@ -36,5 +34,4 @@ namespace FeatureLoom.Workflows
             workflow.ExecutionInfoSource.DisconnectFrom(processor);
         }
     }
-
 }

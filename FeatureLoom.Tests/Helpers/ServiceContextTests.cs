@@ -1,19 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Xunit;
-using FeatureLoom.Helpers;
+﻿using FeatureLoom.Synchronization;
 using System.Threading.Tasks;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Synchronization;
+using Xunit;
 
 namespace FeatureLoom.Helpers
 {
     public class ServiceContextTests
     {
-        class TestContextData : IServiceContextData
+        private class TestContextData : IServiceContextData
         {
             public int i = 0;
+
             public IServiceContextData Copy()
             {
                 var newContext = new TestContextData()
@@ -46,11 +42,11 @@ namespace FeatureLoom.Helpers
             {
                 context.UseCopy();
                 context.Data.i = 3;
-                Assert.Equal(3, context.Data.i);                
+                Assert.Equal(3, context.Data.i);
             }
             CopyContextInAsync().WaitFor();
             Assert.Equal(42, context.Data.i);
-            
+
             void CopyContextInSync()
             {
                 context.UseCopy();
@@ -125,9 +121,9 @@ namespace FeatureLoom.Helpers
 
         [Fact(Skip = "NoContextSeperationPolicy will interfere other tests")]
         public void NoContextSeperationPolicyWillPreventCopyingContexts()
-        {            
+        {
             ServiceContext.NoContextSeperationPolicy = true;
-            
+
             ServiceContext<TestContextData> context1 = new ServiceContext<TestContextData>();
             ServiceContext<TestContextData> context2 = new ServiceContext<TestContextData>();
             context1.Data.i = 1;
@@ -157,6 +153,5 @@ namespace FeatureLoom.Helpers
             Assert.Equal(111, context1.Data.i);
             Assert.Equal(222, context2.Data.i);
         }
-
     }
 }

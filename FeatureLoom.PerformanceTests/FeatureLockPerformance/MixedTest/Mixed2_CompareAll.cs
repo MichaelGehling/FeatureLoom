@@ -40,7 +40,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 
         [Benchmark]
         public void FeatureLock_LockPrio() => test.Run(featureLockSubjects.LockPrio);
-        
 
         [Benchmark]
         public void SpinLock_Lock() => test.Run(spinLockSubjects.Lock);

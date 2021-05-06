@@ -1,30 +1,28 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Time;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
 
 namespace Playground
 {
-
-    class MessageQueueLockTester<T>
+    internal class MessageQueueLockTester<T>
     {
-        T lockObject;
-        Action<T, Action, int> readLockFrame;
-        Action<T, Action, int> writeLockFrame;
-        int numReader;
-        int numWriter;
-        TimeSpan duration;
-        TimeSpan executionTime;
-        TimeSpan readerSlack;
-        TimeSpan writerSlack;
-        string name;
+        private T lockObject;
+        private Action<T, Action, int> readLockFrame;
+        private Action<T, Action, int> writeLockFrame;
+        private int numReader;
+        private int numWriter;
+        private TimeSpan duration;
+        private TimeSpan executionTime;
+        private TimeSpan readerSlack;
+        private TimeSpan writerSlack;
+        private string name;
 
-        Queue<long> queue;
-        long writeCounter = 0;
-        long readCounter = 0;
+        private Queue<long> queue;
+        private long writeCounter = 0;
+        private long readCounter = 0;
 
         public MessageQueueLockTester(string name, T lockObject, int numReader, int numWriter, TimeSpan duration, TimeSpan readerSlackTime, TimeSpan writerSlackTime, TimeSpan executionTime, Action<T, Action, int> readLockFrame, Action<T, Action, int> writeLockFrame)
         {
@@ -47,12 +45,12 @@ namespace Playground
             queue = new Queue<long>(10_000_000);
             writeCounter = 0;
             readCounter = 0;
-                
+
             ManualResetEventSlim starter = new ManualResetEventSlim(false);
             List<Task> tasks = new List<Task>();
             Box<TimeFrame> timeBox = new Box<TimeFrame>();
             int max = Math.Max(numWriter, numReader);
-            for(int i= 0; i < max; i++)
+            for (int i = 0; i < max; i++)
             {
                 if (i < numWriter)
                 {
@@ -94,14 +92,14 @@ namespace Playground
             return new Result(name, writeCounter, readCounter, timeBox.value.TimeSinceStart());
         }
 
-        void WriteToQueue()
+        private void WriteToQueue()
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
             queue.Enqueue(writeCounter++);
             while (!executionTimeFrame.Elapsed()) ;
         }
 
-        void ReadFromQueue()
+        private void ReadFromQueue()
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
             if (queue.TryDequeue(out _)) readCounter++;
@@ -110,10 +108,10 @@ namespace Playground
 
         public readonly struct Result
         {
-            readonly string name;
-            readonly long writeCounter;
-            readonly long readCounter;
-            readonly TimeSpan duration;
+            private readonly string name;
+            private readonly long writeCounter;
+            private readonly long readCounter;
+            private readonly TimeSpan duration;
 
             public Result(string name, long writeCounter, long readCounter, TimeSpan duration)
             {
@@ -125,7 +123,7 @@ namespace Playground
 
             public override string ToString()
             {
-                return $"{name}:\tWrittenToQueue:{writeCounter},\tReadFromQueue:{readCounter}\t-> {readCounter/duration.TotalSeconds} per second / {duration.TotalMilliseconds * 1_000_000 / readCounter} ns per msg";
+                return $"{name}:\tWrittenToQueue:{writeCounter},\tReadFromQueue:{readCounter}\t-> {readCounter / duration.TotalSeconds} per second / {duration.TotalMilliseconds * 1_000_000 / readCounter} ns per msg";
             }
         }
     }

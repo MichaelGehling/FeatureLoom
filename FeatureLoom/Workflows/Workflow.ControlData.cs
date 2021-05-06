@@ -1,5 +1,4 @@
-﻿using FeatureLoom.Helpers;
-using System.Threading;
+﻿using System.Threading;
 
 namespace FeatureLoom.Workflows
 {

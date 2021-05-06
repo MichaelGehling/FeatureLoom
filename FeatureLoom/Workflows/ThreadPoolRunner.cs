@@ -1,5 +1,5 @@
-﻿using FeatureLoom.Services.Logging;
-using FeatureLoom.Services.MetaData;
+﻿using FeatureLoom.Logging;
+using FeatureLoom.MetaDatas;
 using System;
 using System.Threading.Tasks;
 
@@ -14,9 +14,9 @@ namespace FeatureLoom.Workflows
                 AddToRunningWorkflows(workflow);
                 try
                 {
-                    while(workflow.ExecuteNextStep(executionController)) ;
+                    while (workflow.ExecuteNextStep(executionController)) ;
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Log.ERROR(this.GetHandle(), $"Workflow failed! ({workflow.Name})", e.ToString());
                 }

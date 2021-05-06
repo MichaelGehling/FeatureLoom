@@ -1,9 +1,10 @@
-﻿using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Diagnostics;
-using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Diagnostics;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using Xunit;
 
-namespace FeatureLoom.DataFlows.TCP
+namespace FeatureLoom.TCP
 {
     public class TcpTests
     {

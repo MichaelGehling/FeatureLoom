@@ -34,7 +34,7 @@ namespace FeatureLoom.DataFlows
 
         public virtual Task PostAsync<M>(M message)
         {
-            return sourceHelper.ForwardAsync(message);            
+            return sourceHelper.ForwardAsync(message);
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
@@ -48,7 +48,7 @@ namespace FeatureLoom.DataFlows
         }
     }
 
-    public class Forwarder<T>: Forwarder, IDataFlowConnection<T>
+    public class Forwarder<T> : Forwarder, IDataFlowConnection<T>
     {
         public override void Post<M>(in M message)
         {
@@ -57,7 +57,7 @@ namespace FeatureLoom.DataFlows
 
         public override Task PostAsync<M>(M message)
         {
-            if(message is T) return sourceHelper.ForwardAsync(message);
+            if (message is T) return sourceHelper.ForwardAsync(message);
             else return Task.CompletedTask;
         }
     }

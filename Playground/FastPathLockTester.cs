@@ -1,17 +1,17 @@
-﻿using System;
+﻿using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
+using System;
 using System.Threading.Tasks;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Synchronization;
 
 namespace Playground
 {
-    class FastPathLockTester<T>
+    internal class FastPathLockTester<T>
     {
-        string name;
-        T lockObject;
-        TimeSpan duration;
-        Action<T> lockAction;
-        FastPathLockTesterResult compareResult;
+        private string name;
+        private T lockObject;
+        private TimeSpan duration;
+        private Action<T> lockAction;
+        private FastPathLockTesterResult compareResult;
 
         public FastPathLockTester(string name, T lockObject, TimeSpan duration, FastPathLockTesterResult compareResult, Action<T> lockAction)
         {
@@ -30,9 +30,9 @@ namespace Playground
 
             long counter = 0;
             var timeFrame = new TimeFrame(duration);
-            while(!timeFrame.Elapsed())
+            while (!timeFrame.Elapsed())
             {
-                for(int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; i++)
                 {
                     lockAction(lockObject);
                     counter++;
@@ -41,16 +41,15 @@ namespace Playground
             gcc = GC.CollectionCount(0) - gcc;
             return new FastPathLockTesterResult(name, counter, compareResult, duration, gcc);
         }
-
     }
 
-    class FastPathAsyncLockTester<T>
+    internal class FastPathAsyncLockTester<T>
     {
-        string name;
-        T lockObject;
-        TimeSpan duration;
-        Func<T, Task> lockAction;
-        FastPathLockTesterResult compareResult;
+        private string name;
+        private T lockObject;
+        private TimeSpan duration;
+        private Func<T, Task> lockAction;
+        private FastPathLockTesterResult compareResult;
 
         public FastPathAsyncLockTester(string name, T lockObject, TimeSpan duration, FastPathLockTesterResult compareResult, Func<T, Task> lockAction)
         {
@@ -77,9 +76,9 @@ namespace Playground
         {
             long counter = 0;
             var timeFrame = new TimeFrame(duration);
-            while(!timeFrame.Elapsed())
+            while (!timeFrame.Elapsed())
             {
-                for(int i = 0; i < 100; i++)
+                for (int i = 0; i < 100; i++)
                 {
                     await lockAction(lockObject);
                     counter++;
@@ -113,7 +112,7 @@ namespace Playground
             double nsc = duration.TotalMilliseconds * 1_000_000 / counter;
             double cmp_nsc = 0;
             double gccmc = (double)gcc / counter * 1_000_000;
-            if(compareResult != null) cmp_nsc = compareResult.duration.TotalMilliseconds * 1_000_000 / compareResult.counter;
+            if (compareResult != null) cmp_nsc = compareResult.duration.TotalMilliseconds * 1_000_000 / compareResult.counter;
             return $"{name}:\t Cycles:{counter},\t-> {cps} c/s / {nsc} ns per cycle / {nsc - cmp_nsc} ns per cycle (compared) / {gccmc} collection per 1mil cycles";
         }
     }

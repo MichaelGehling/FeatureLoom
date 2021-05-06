@@ -1,13 +1,11 @@
-﻿using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Diagnostics;
-using FeatureLoom.Services;
+﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Extensions;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Synchronization;
 
 namespace FeatureLoom.DataFlows
 {

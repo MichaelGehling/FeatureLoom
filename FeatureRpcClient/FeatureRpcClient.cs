@@ -1,10 +1,10 @@
-﻿using FeatureLoom.DataFlows.RPC;
-using FeatureLoom.DataFlows.TCP;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Services.DataStorage;
-using FeatureLoom.Services.Logging;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
+using FeatureLoom.RPC;
+using FeatureLoom.Storages;
+using FeatureLoom.Synchronization;
+using FeatureLoom.TCP;
+using FeatureLoom.Time;
 using FeatureLoom.Workflows;
 using System;
 using System.Threading.Tasks;
@@ -21,7 +21,7 @@ namespace FeatureRpcClient
         public FeatureRpcClient(string rpcCall)
         {
             this.rpcCall = rpcCall;
-            if(rpcCall.EmptyOrNull()) multiCall = true;
+            if (rpcCall.EmptyOrNull()) multiCall = true;
         }
 
         private TcpClientEndpoint tcpClient;

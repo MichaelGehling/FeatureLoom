@@ -1,5 +1,5 @@
-﻿using FeatureLoom.Services.Logging;
-using FeatureLoom.Services.MetaData;
+﻿using FeatureLoom.Logging;
+using FeatureLoom.MetaDatas;
 using System;
 using System.Collections.Generic;
 
@@ -24,7 +24,7 @@ namespace FeatureLoom.Workflows
         public IInitialStateBuilder<CT> Build(string description = "")
         {
             var builder = parentStateMachine.BuildState(this, description) as StateBuilder<CT>;
-            if(builder.state != this)
+            if (builder.state != this)
             {
                 Log.ERROR(parentStateMachine.GetHandle(), $"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
                 throw new Exception($"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");

@@ -8,7 +8,7 @@ namespace FeatureLoom.Helpers.Forms
         public static Control FindFocusedControl(this Control control)
         {
             var container = control as IContainerControl;
-            while(container != null)
+            while (container != null)
             {
                 control = container.ActiveControl;
                 container = control as IContainerControl;
@@ -23,9 +23,9 @@ namespace FeatureLoom.Helpers.Forms
 
         public static bool IsShown(this Form myForm)
         {
-            foreach(Form form in Application.OpenForms)
+            foreach (Form form in Application.OpenForms)
             {
-                if(myForm == form) return true;
+                if (myForm == form) return true;
             }
             return false;
         }
@@ -33,7 +33,7 @@ namespace FeatureLoom.Helpers.Forms
         public static T FindParent<T>(this Control control, string name = null) where T : Control
         {
             Control parent = control.Parent;
-            while(parent != null && !(parent is T) && (name == null || parent.Name != name)) parent = parent.Parent;
+            while (parent != null && !(parent is T) && (name == null || parent.Name != name)) parent = parent.Parent;
             return parent as T;
         }
     }

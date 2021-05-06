@@ -1,8 +1,6 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Extensions;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Services;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -14,7 +12,7 @@ namespace FeatureLoom.DataFlows
     {
         private SourceValueHelper sourceHelper;
         private Queue<(object message, DateTime suppressionEnd)> suppressors = new Queue<(object, DateTime)>();
-        MicroLock suppressorsLock = new MicroLock();
+        private MicroLock suppressorsLock = new MicroLock();
         private readonly TimeSpan suppressionTime;
         private readonly TimeSpan cleanupPeriode = 10.Seconds();
         private readonly Func<object, object, bool> isDuplicate;
@@ -22,9 +20,9 @@ namespace FeatureLoom.DataFlows
         public DuplicateMessageSuppressor(TimeSpan suppressionTime, Func<object, object, bool> isDuplicate = null, TimeSpan cleanupPeriode = default)
         {
             this.suppressionTime = suppressionTime;
-            if(isDuplicate == null) isDuplicate = (a, b) => a.Equals(b);
+            if (isDuplicate == null) isDuplicate = (a, b) => a.Equals(b);
             this.isDuplicate = isDuplicate;
-            if(cleanupPeriode != default) this.cleanupPeriode = cleanupPeriode;
+            if (cleanupPeriode != default) this.cleanupPeriode = cleanupPeriode;
             this.cleanupPeriode = this.cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
 
             // TODO make it testable
@@ -46,9 +44,9 @@ namespace FeatureLoom.DataFlows
             {
                 DateTime now = AppTime.Now;
                 CleanUpSuppressors(now);
-                foreach(var suppressor in suppressors)
+                foreach (var suppressor in suppressors)
                 {
-                    if(isDuplicate(message, suppressor.message))
+                    if (isDuplicate(message, suppressor.message))
                     {
                         return true;
                     }
@@ -60,9 +58,9 @@ namespace FeatureLoom.DataFlows
 
         private void CleanUpSuppressors(DateTime now)
         {
-            while(suppressors.Count > 0)
+            while (suppressors.Count > 0)
             {
-                if(now > suppressors.Peek().suppressionEnd) suppressors.Dequeue();
+                if (now > suppressors.Peek().suppressionEnd) suppressors.Dequeue();
                 else break;
             }
         }
@@ -86,12 +84,12 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(!IsSuppressed(message)) sourceHelper.Forward(message);
+            if (!IsSuppressed(message)) sourceHelper.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
         {
-            if(IsSuppressed(message)) return Task.CompletedTask;
+            if (IsSuppressed(message)) return Task.CompletedTask;
             else return sourceHelper.ForwardAsync(message);
         }
 

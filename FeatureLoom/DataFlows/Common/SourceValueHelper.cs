@@ -1,8 +1,7 @@
-﻿using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.Synchronization;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
@@ -15,17 +14,18 @@ namespace FeatureLoom.DataFlows
     {
         [JsonIgnore]
         public DataFlowReference[] sinks;
+
         [JsonIgnore]
-        MicroValueLock myLock;
+        private MicroValueLock myLock;
 
         public IDataFlowSink[] GetConnectedSinks()
         {
             var currentSinks = this.sinks;
 
-            if(currentSinks == null || currentSinks.Length == 0) return Array.Empty<IDataFlowSink>();
-            else if(currentSinks.Length == 1)
+            if (currentSinks == null || currentSinks.Length == 0) return Array.Empty<IDataFlowSink>();
+            else if (currentSinks.Length == 1)
             {
-                if(currentSinks[0].TryGetTarget(out IDataFlowSink target))
+                if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
                 {
                     return new IDataFlowSink[] { target };
                 }
@@ -39,9 +39,9 @@ namespace FeatureLoom.DataFlows
             {
                 List<IDataFlowSink> resultList = null;
                 int invalidReferences = 0;
-                for(int i = currentSinks.Length - 1; i >= 0; i--)
+                for (int i = currentSinks.Length - 1; i >= 0; i--)
                 {
-                    if(currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                    if (currentSinks[i].TryGetTarget(out IDataFlowSink target))
                     {
                         resultList = resultList ?? new List<IDataFlowSink>();
                         resultList.Add(target);
@@ -51,7 +51,7 @@ namespace FeatureLoom.DataFlows
                         invalidReferences++;
                     }
                 }
-                if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
                 return resultList?.ToArray() ?? Array.Empty<IDataFlowSink>();
             }
         }
@@ -62,18 +62,18 @@ namespace FeatureLoom.DataFlows
             {
                 var currentSinks = this.sinks;
 
-                if(currentSinks == null || currentSinks.Length == 0) return 0;
+                if (currentSinks == null || currentSinks.Length == 0) return 0;
                 else
                 {
                     int invalidReferences = 0;
-                    for(int i = currentSinks.Length - 1; i >= 0; i--)
+                    for (int i = currentSinks.Length - 1; i >= 0; i--)
                     {
-                        if(!currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                        if (!currentSinks[i].TryGetTarget(out IDataFlowSink target))
                         {
                             invalidReferences++;
                         }
                     }
-                    if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                    if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
                     return this.sinks.Length;
                 }
             }
@@ -81,14 +81,14 @@ namespace FeatureLoom.DataFlows
 
         public void Forward<M>(in M message)
         {
-            if(this.sinks == null) return;
+            if (this.sinks == null) return;
 
             var currentSinks = this.sinks;
 
-            if(currentSinks.Length == 0) return;
-            else if(currentSinks.Length == 1)
+            if (currentSinks.Length == 0) return;
+            else if (currentSinks.Length == 1)
             {
-                if(currentSinks[0].TryGetTarget(out IDataFlowSink target))
+                if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
                 {
                     target.Post(message);
                 }
@@ -100,9 +100,9 @@ namespace FeatureLoom.DataFlows
             else
             {
                 int invalidReferences = 0;
-                for(int i = currentSinks.Length - 1; i >= 0; i--)
+                for (int i = currentSinks.Length - 1; i >= 0; i--)
                 {
-                    if(currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                    if (currentSinks[i].TryGetTarget(out IDataFlowSink target))
                     {
                         target.Post(message);
                     }
@@ -111,20 +111,20 @@ namespace FeatureLoom.DataFlows
                         invalidReferences++;
                     }
                 }
-                if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
             }
         }
 
         public Task ForwardAsync<M>(M message)
         {
-            if(this.sinks == null) return Task.CompletedTask;
+            if (this.sinks == null) return Task.CompletedTask;
 
             var currentSinks = this.sinks;
 
-            if(currentSinks.Length == 0) return Task.CompletedTask;
-            else if(currentSinks.Length == 1)
+            if (currentSinks.Length == 0) return Task.CompletedTask;
+            else if (currentSinks.Length == 1)
             {
-                if(currentSinks[0].TryGetTarget(out IDataFlowSink target))
+                if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
                 {
                     return target.PostAsync(message);
                 }
@@ -138,9 +138,9 @@ namespace FeatureLoom.DataFlows
             {
                 int invalidReferences = 0;
                 Task[] tasks = new Task[currentSinks.Length];
-                for(int i = currentSinks.Length - 1; i >= 0; i--)
+                for (int i = currentSinks.Length - 1; i >= 0; i--)
                 {
-                    if(currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                    if (currentSinks[i].TryGetTarget(out IDataFlowSink target))
                     {
                         tasks[i] = target.PostAsync(message);
                     }
@@ -150,14 +150,14 @@ namespace FeatureLoom.DataFlows
                         invalidReferences++;
                     }
                 }
-                if(invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
                 return Task.WhenAll(tasks);
             }
         }
 
         private void RemoveInvalidReferences(int invalidReferences)
         {
-            if(sinks == null) return;
+            if (sinks == null) return;
             myLock.Enter();
             try
             {
@@ -184,9 +184,9 @@ namespace FeatureLoom.DataFlows
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            if(sink == null) return;
+            if (sink == null) return;
 
-            if(sinks == null)
+            if (sinks == null)
             {
                 myLock.Enter();
                 try
@@ -204,9 +204,9 @@ namespace FeatureLoom.DataFlows
                 try
                 {
                     DataFlowReference[] newSinks = new DataFlowReference[sinks.Length + 1];
-                    sinks.CopyTo(newSinks, 0);                    
-                    newSinks[newSinks.Length-1] = new DataFlowReference(sink, weakReference);
-                    sinks = newSinks;                    
+                    sinks.CopyTo(newSinks, 0);
+                    newSinks[newSinks.Length - 1] = new DataFlowReference(sink, weakReference);
+                    sinks = newSinks;
                 }
                 finally
                 {
@@ -229,15 +229,14 @@ namespace FeatureLoom.DataFlows
             sinks = null;
             myLock.Exit();
         }
-            
 
         public void DisconnectFrom(IDataFlowSink sink)
         {
-            if(sinks == null) return;
+            if (sinks == null) return;
 
             if (sinks.Length == 1)
             {
-                if(!sinks[0].TryGetTarget(out IDataFlowSink target) || target == sink)
+                if (!sinks[0].TryGetTarget(out IDataFlowSink target) || target == sink)
                 {
                     RemoveInvalidReferences(1);
                 }
@@ -259,7 +258,6 @@ namespace FeatureLoom.DataFlows
                 }
                 if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
             }
-
         }
     }
 }

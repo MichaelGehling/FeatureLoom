@@ -1,13 +1,7 @@
 ﻿using FeatureLoom.DataFlows;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Diagnostics;
-using FeatureLoom.Services;
-using System;
+using FeatureLoom.Diagnostics;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading;
 using Xunit;
-using FeatureLoom.Helpers.Extensions;
 
 namespace FeatureLoom.Tests.DataFlows.Endpoints
 {
@@ -45,6 +39,5 @@ namespace FeatureLoom.Tests.DataFlows.Endpoints
             sender.Send(42);
             Assert.True(waitHandle.WaitingTask.IsCompleted);
         }
-
     }
 }

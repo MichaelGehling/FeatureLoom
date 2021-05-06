@@ -1,5 +1,4 @@
-﻿using FeatureLoom.Helpers.Extensions;
-using System;
+﻿using System;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
@@ -88,13 +87,13 @@ namespace FeatureLoom.DataFlows
 
         public void Send<U>(in U message)
         {
-            if(typeof(T).IsAssignableFrom(typeof(U))) sourceHelper.Forward(message);
+            if (typeof(T).IsAssignableFrom(typeof(U))) sourceHelper.Forward(message);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow sending messages of type {typeof(U)}.");
         }
 
         public Task SendAsync<U>(U message)
         {
-            if(typeof(T).IsAssignableFrom(typeof(U))) return sourceHelper.ForwardAsync(message);
+            if (typeof(T).IsAssignableFrom(typeof(U))) return sourceHelper.ForwardAsync(message);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow sending messages of type {typeof(U)}.");
         }
 
@@ -103,13 +102,11 @@ namespace FeatureLoom.DataFlows
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        
         public void ConnectTo<U>(IDataFlowSink<U> sink, bool weakReference = false)
         {
             if (typeof(U).IsAssignableFrom(typeof(T))) sourceHelper.ConnectTo(sink, weakReference);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow connecting to sink of type {typeof(U)}.");
         }
-        
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
@@ -124,7 +121,7 @@ namespace FeatureLoom.DataFlows
             return sink;
         }
 
-        public IDataFlowSource ConnectTo<U,V>(IDataFlowConnection<U,V> sink, bool weakReference = false)
+        public IDataFlowSource ConnectTo<U, V>(IDataFlowConnection<U, V> sink, bool weakReference = false)
         {
             if (typeof(U).IsAssignableFrom(typeof(T))) sourceHelper.ConnectTo(sink, weakReference);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow connecting to sink of type {typeof(U)}.");

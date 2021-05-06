@@ -1,8 +1,6 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Services.Logging;
-using FeatureLoom.Services.MetaData;
+﻿using FeatureLoom.Logging;
+using FeatureLoom.MetaDatas;
+using FeatureLoom.Time;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,8 +68,8 @@ namespace FeatureLoom.DataFlows
             this.spawnThreshold = spawnThresholdFactor;
             this.maxIdleMilliseconds = maxIdleMilliseconds;
 
-            if(this.spawnThreshold < 1) this.spawnThreshold = 1;
-            if(this.threadLimit < 1) this.threadLimit = 1;
+            if (this.spawnThreshold < 1) this.spawnThreshold = 1;
+            if (this.threadLimit < 1) this.threadLimit = 1;
         }
 
         public int Count => receiver.Count;
@@ -84,7 +82,7 @@ namespace FeatureLoom.DataFlows
 
         private void ManageThreadCount()
         {
-            if(numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
+            if (numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
             {
                 Interlocked.Increment(ref numThreads);
                 _ = Run();
@@ -100,13 +98,13 @@ namespace FeatureLoom.DataFlows
 
         private async Task Run()
         {
-            while((await receiver.TryReceiveAsync(maxIdleMilliseconds.Milliseconds())).Out(out T message))
+            while ((await receiver.TryReceiveAsync(maxIdleMilliseconds.Milliseconds())).Out(out T message))
             {
                 try
                 {
                     base.Post(message);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Log.ERROR(this.GetHandle(), "Exception caught in ActiveForwarder while sending.", e.ToString());
                 }

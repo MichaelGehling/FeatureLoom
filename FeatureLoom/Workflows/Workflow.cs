@@ -1,10 +1,8 @@
 ﻿using FeatureLoom.DataFlows;
 using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Services;
-using FeatureLoom.Services.MetaData;
+
+using FeatureLoom.MetaDatas;
 using Newtonsoft.Json;
-using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,10 +10,10 @@ using System.Threading.Tasks;
 namespace FeatureLoom.Workflows
 {
     public abstract partial class Workflow : IWorkflowInfo, IStateMachineContext
-    {                
+    {
         protected ExecutionState executionState;
         protected ExecutionPhase executionPhase = ExecutionPhase.Prepared;
-        protected IWorkflowRunner currentRunner;        
+        protected IWorkflowRunner currentRunner;
 
         public IWorkflowRunner Runner
         {
@@ -26,7 +24,7 @@ namespace FeatureLoom.Workflows
         [JsonIgnore]
         protected ControlData controlData = ControlData.Init();
 
-        protected LazyValue<Sender> executionInfoSender;        
+        protected LazyValue<Sender> executionInfoSender;
 
         [JsonIgnore]
         public IDataFlowSource ExecutionInfoSource => executionInfoSender.Obj;
@@ -108,7 +106,7 @@ namespace FeatureLoom.Workflows
         public void RequestPause(bool tryCancelWaitingStep)
         {
             controlData.pauseRequested = true;
-            if(tryCancelWaitingStep) this.TryCancelWaiting();
+            if (tryCancelWaitingStep) this.TryCancelWaiting();
         }
 
         [JsonIgnore]
@@ -132,7 +130,6 @@ namespace FeatureLoom.Workflows
         }
 
         public IStateMachineInfo StateMachineInfo => WorkflowStateMachine;
-
     }
 
     public abstract class Workflow<SM> : Workflow where SM : StateMachine, new()

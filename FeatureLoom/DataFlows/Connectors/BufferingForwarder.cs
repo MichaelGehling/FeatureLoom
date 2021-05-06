@@ -1,6 +1,5 @@
-﻿using FeatureLoom.Helpers;
-using FeatureLoom.Helpers.Collections;
-using FeatureLoom.Helpers.Synchronization;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.Synchronization;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -26,10 +25,10 @@ namespace FeatureLoom.DataFlows
 
         private void OnConnection(IDataFlowSink sink)
         {
-            using(bufferLock.LockReadOnly())
+            using (bufferLock.LockReadOnly())
             {
                 var bufferedMessages = buffer.GetAvailableSince(0, out long missed);
-                foreach(var msg in bufferedMessages)
+                foreach (var msg in bufferedMessages)
                 {
                     sink.Post(msg);
                 }
@@ -55,20 +54,20 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is T msgT) using(bufferLock.Lock()) buffer.Add(msgT);
+            if (message is T msgT) using (bufferLock.Lock()) buffer.Add(msgT);
             sourceHelper.Forward(in message);
         }
 
         public async Task PostAsync<M>(M message)
         {
             var task = sourceHelper.ForwardAsync(message);
-            if (message is T msgT) using(await bufferLock.LockAsync()) buffer.Add(msgT);
+            if (message is T msgT) using (await bufferLock.LockAsync()) buffer.Add(msgT);
             await task;
         }
 
         public T[] GetAllBufferEntries()
         {
-            using(bufferLock.LockReadOnly())
+            using (bufferLock.LockReadOnly())
             {
                 return buffer.GetAvailableSince(0, out _);
             }
@@ -76,9 +75,9 @@ namespace FeatureLoom.DataFlows
 
         public void AddRangeToBuffer(IEnumerable<T> messages)
         {
-            using(bufferLock.Lock())
+            using (bufferLock.Lock())
             {
-                foreach(var msg in messages) buffer.Add(msg);
+                foreach (var msg in messages) buffer.Add(msg);
             }
         }
 

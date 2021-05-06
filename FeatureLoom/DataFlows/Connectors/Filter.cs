@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Helpers.Misc;
+﻿using FeatureLoom.Helpers;
 using System;
 using System.Threading.Tasks;
 
@@ -30,7 +30,7 @@ namespace FeatureLoom.DataFlows
             this.predicate = predicate;
         }
 
-        public IDataFlowSource Else => alternativeSendingHelper.Obj;        
+        public IDataFlowSource Else => alternativeSendingHelper.Obj;
 
         public void DisconnectAll()
         {
@@ -44,9 +44,9 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(predicate == null || predicate(msgT)) sourceHelper.Forward(msgT);
+                if (predicate == null || predicate(msgT)) sourceHelper.Forward(msgT);
                 else alternativeSendingHelper.ObjIfExists?.Forward(msgT);
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
@@ -54,9 +54,9 @@ namespace FeatureLoom.DataFlows
 
         public Task PostAsync<M>(M message)
         {
-            if(message is T msgT)
+            if (message is T msgT)
             {
-                if(predicate == null || predicate(msgT)) return sourceHelper.ForwardAsync(msgT);
+                if (predicate == null || predicate(msgT)) return sourceHelper.ForwardAsync(msgT);
                 else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(msgT);
             }
             else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);

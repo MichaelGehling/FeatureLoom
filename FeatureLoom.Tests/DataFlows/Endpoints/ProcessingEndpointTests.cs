@@ -1,5 +1,5 @@
-﻿using FeatureLoom.Helpers.Time;
-using FeatureLoom.Helpers.Diagnostics;
+﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Time;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;

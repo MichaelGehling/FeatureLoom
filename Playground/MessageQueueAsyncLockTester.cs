@@ -1,29 +1,29 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureLoom.Helpers.Misc;
-using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
 
 namespace Playground
 {
-    class MessageQueueAsyncLockTester<T>
+    internal class MessageQueueAsyncLockTester<T>
     {
-        T lockObject;
-        Func<T, Action, int, Task> readLockFrame;
-        Func<T, Action, int, Task> writeLockFrame;
-        int numReader;
-        int numWriter;
-        TimeSpan duration;
-        TimeSpan executionTime;
-        TimeSpan readerSlack;
-        TimeSpan writerSlack;
-        string name;
+        private T lockObject;
+        private Func<T, Action, int, Task> readLockFrame;
+        private Func<T, Action, int, Task> writeLockFrame;
+        private int numReader;
+        private int numWriter;
+        private TimeSpan duration;
+        private TimeSpan executionTime;
+        private TimeSpan readerSlack;
+        private TimeSpan writerSlack;
+        private string name;
 
-        Queue<long> queue;
-        long writeCounter = 0;
-        long readCounter = 0;
+        private Queue<long> queue;
+        private long writeCounter = 0;
+        private long readCounter = 0;
 
         public MessageQueueAsyncLockTester(string name, T lockObject, int numReader, int numWriter, TimeSpan duration, TimeSpan readerSlackTime, TimeSpan writerSlackTime, TimeSpan executionTime, Func<T, Action, int, Task> readLockFrame, Func<T, Action, int, Task> writeLockFrame)
         {
@@ -50,36 +50,36 @@ namespace Playground
             AsyncManualResetEvent starter = new AsyncManualResetEvent(false);
             List<Task> tasks = new List<Task>();
             Box<TimeFrame> timeBox = new Box<TimeFrame>();
-            for(int i = 0; i < numWriter; i++)
+            for (int i = 0; i < numWriter; i++)
             {
                 tasks.Add(new Func<Task>(async () =>
                 {
                     await Task.Yield();
                     await starter.WaitAsync();
-                    TimeFrame timeFrame = timeBox;                    
-                    while(!timeFrame.Elapsed())
+                    TimeFrame timeFrame = timeBox;
+                    while (!timeFrame.Elapsed())
                     {
-                        if(queue.Count > 10000) await Task.Yield();
+                        if (queue.Count > 10000) await Task.Yield();
                         await writeLockFrame(lockObject, WriteToQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(writerSlack);
-                        while(!slackTime.Elapsed()) Thread.Yield();
+                        while (!slackTime.Elapsed()) Thread.Yield();
                     }
                 }).Invoke());
             }
 
-            for(int i = 0; i < numReader; i++)
+            for (int i = 0; i < numReader; i++)
             {
                 tasks.Add(new Func<Task>(async () =>
                 {
                     await Task.Yield();
                     await starter.WaitAsync();
-                    TimeFrame timeFrame = timeBox;                    
-                    while(!timeFrame.Elapsed())
+                    TimeFrame timeFrame = timeBox;
+                    while (!timeFrame.Elapsed())
                     {
                         if (queue.Count == 0) await Task.Yield();
-                        await readLockFrame(lockObject, ReadFromQueue, queue.Count);                        
+                        await readLockFrame(lockObject, ReadFromQueue, queue.Count);
                         TimeFrame slackTime = new TimeFrame(readerSlack);
-                        while(!slackTime.Elapsed()) Thread.Yield();
+                        while (!slackTime.Elapsed()) Thread.Yield();
                     }
                 }).Invoke());
             }
@@ -91,26 +91,26 @@ namespace Playground
             return new Result(name, writeCounter, readCounter, duration);
         }
 
-        void WriteToQueue()
+        private void WriteToQueue()
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
             queue.Enqueue(writeCounter++);
-            while(!executionTimeFrame.Elapsed()) ;
+            while (!executionTimeFrame.Elapsed()) ;
         }
 
-        void ReadFromQueue()
+        private void ReadFromQueue()
         {
             TimeFrame executionTimeFrame = new TimeFrame(executionTime);
-            if(queue.TryDequeue(out _)) readCounter++;
-            while(!executionTimeFrame.Elapsed()) ;
+            if (queue.TryDequeue(out _)) readCounter++;
+            while (!executionTimeFrame.Elapsed()) ;
         }
 
         public readonly struct Result
         {
-            readonly string name;
-            readonly long writeCounter;
-            readonly long readCounter;
-            readonly TimeSpan duration;
+            private readonly string name;
+            private readonly long writeCounter;
+            private readonly long readCounter;
+            private readonly TimeSpan duration;
 
             public Result(string name, long writeCounter, long readCounter, TimeSpan duration)
             {

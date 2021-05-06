@@ -1,13 +1,10 @@
-﻿using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using System;
+﻿using FeatureLoom.Time;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureLoom.Helpers.Synchronization
+namespace FeatureLoom.Synchronization
 {
     public class MicroLockTests
     {
@@ -18,7 +15,7 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 Assert.False(myLock.TryLock(out var writeLock));
                 Assert.False(writeLock.IsActive);
@@ -26,7 +23,7 @@ namespace FeatureLoom.Helpers.Synchronization
                 task = Task.Run(() =>
                 {
                     waiter.Set();
-                    using(myLock.Lock())
+                    using (myLock.Lock())
                     {
                         secondLockEntered = true;
                     }
@@ -47,14 +44,14 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 Assert.False(myLock.TryLockReadOnly(out _));
 
                 task = Task.Run(() =>
                 {
                     waiter.Set();
-                    using(myLock.LockReadOnly())
+                    using (myLock.LockReadOnly())
                     {
                         secondLockEntered = true;
                     }
@@ -75,15 +72,14 @@ namespace FeatureLoom.Helpers.Synchronization
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Task task;
-            using(myLock.LockReadOnly())
+            using (myLock.LockReadOnly())
             {
                 Assert.True(myLock.TryLockReadOnly(out var readLock));
                 readLock.Exit();
 
                 task = Task.Run(() =>
                 {
-
-                    using(myLock.LockReadOnly())
+                    using (myLock.LockReadOnly())
                     {
                         secondLockEntered = true;
                         waiter.Set();
@@ -93,7 +89,7 @@ namespace FeatureLoom.Helpers.Synchronization
                 Assert.True(secondLockEntered);
             }
         }
-        
+
         [Fact]
         public void PrioritizedAttemptSucceedsFirst()
         {
@@ -103,12 +99,12 @@ namespace FeatureLoom.Helpers.Synchronization
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);
             Thread thread1;
             Thread thread2;
-            using(myLock.Lock())
+            using (myLock.Lock())
             {
                 thread1 = new Thread(() =>
                 {
                     waiter.Set();
-                    using(myLock.Lock())
+                    using (myLock.Lock())
                     {
                         rightOrder = 1 == counter++;
                     }
@@ -118,7 +114,7 @@ namespace FeatureLoom.Helpers.Synchronization
                 thread2 = new Thread(() =>
                 {
                     waiter.Set();
-                    using(myLock.Lock(true))
+                    using (myLock.Lock(true))
                     {
                         rightOrder = 0 == counter++;
                     }
@@ -132,7 +128,6 @@ namespace FeatureLoom.Helpers.Synchronization
             Assert.True(thread2.Join(1.Seconds()));
             Assert.True(rightOrder);
         }
-        
 
         [Fact]
         public void ManyParallelLockAttemptsWillAllFinish()
@@ -142,35 +137,35 @@ namespace FeatureLoom.Helpers.Synchronization
             TimeFrame executionTime = new TimeFrame(1.Seconds());
 
             AsyncManualResetEvent starter = new AsyncManualResetEvent();
-            
-            for(int i = 0; i < 10; i++)
+
+            for (int i = 0; i < 10; i++)
             {
                 tasks.Add(Task.Run(() =>
                 {
                     starter.Wait();
-                    while(!executionTime.Elapsed())
+                    while (!executionTime.Elapsed())
                     {
-                        using(myLock.Lock())
-                        {
-                        }
-                    }
-                }));
-            }            
-            
-            for(int i = 0; i < 10; i++)
-            {
-                tasks.Add(Task.Run(() =>
-                {
-                    starter.Wait();
-                    while(!executionTime.Elapsed())
-                    {
-                        using(myLock.LockReadOnly())
+                        using (myLock.Lock())
                         {
                         }
                     }
                 }));
             }
-            
+
+            for (int i = 0; i < 10; i++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    starter.Wait();
+                    while (!executionTime.Elapsed())
+                    {
+                        using (myLock.LockReadOnly())
+                        {
+                        }
+                    }
+                }));
+            }
+
             starter.Set();
             bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining() + 100.Milliseconds());
             Assert.True(allFinished);
@@ -181,7 +176,7 @@ namespace FeatureLoom.Helpers.Synchronization
         {
             var myLock = new MicroLock();
 
-            using(myLock.LockReadOnly())
+            using (myLock.LockReadOnly())
             {
                 Assert.True(myLock.TryLockReadOnly(out var readLock));
                 Assert.True(readLock.IsActive);
@@ -192,6 +187,5 @@ namespace FeatureLoom.Helpers.Synchronization
                 Assert.False(writeLock.IsActive);
             }
         }
-
     }
 }

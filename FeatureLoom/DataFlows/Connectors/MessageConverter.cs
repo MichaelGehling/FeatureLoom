@@ -21,7 +21,6 @@ namespace FeatureLoom.DataFlows
             this.convertFunc = convertFunc;
         }
 
-
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public IDataFlowSink[] GetConnectedSinks()
@@ -41,7 +40,7 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
-            if(message is I msgT)
+            if (message is I msgT)
             {
                 sourceHelper.Forward(convertFunc(msgT));
             }
@@ -50,7 +49,7 @@ namespace FeatureLoom.DataFlows
 
         public Task PostAsync<M>(M message)
         {
-            if(message is I msgT)
+            if (message is I msgT)
             {
                 return sourceHelper.ForwardAsync(convertFunc(msgT));
             }

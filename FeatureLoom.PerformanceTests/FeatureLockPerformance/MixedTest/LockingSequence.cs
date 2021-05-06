@@ -1,6 +1,6 @@
-﻿using FeatureLoom.Helpers.Synchronization;
-using FeatureLoom.Helpers.Time;
-using FeatureLoom.Services;
+﻿using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
+
 using System;
 using System.Collections.Generic;
 using System.Threading;
