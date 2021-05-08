@@ -42,10 +42,10 @@ namespace FeatureLoom.Helpers.Forms
             }
         }
 
-        public struct LayoutResumer : IDisposable
+        public readonly struct LayoutResumer : IDisposable
         {
-            private Control control;
-            private IEnumerable<Control> children;
+            private readonly Control control;
+            private readonly IEnumerable<Control> children;
 
             public LayoutResumer(Control control, IEnumerable<Control> children)
             {

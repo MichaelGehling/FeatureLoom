@@ -17,9 +17,9 @@ namespace FeatureLoom.Synchronization
             }
         }
 
-        public struct SynchronizationContextRestorer : IDisposable
+        public readonly struct SynchronizationContextRestorer : IDisposable
         {
-            private SynchronizationContext context;
+            private readonly SynchronizationContext context;
 
             public SynchronizationContextRestorer(SynchronizationContext context)
             {

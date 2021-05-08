@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.DataFlows
 {
-    public struct DataFlowReference
+    public readonly struct DataFlowReference
     {
         private readonly IDataFlowSink strongRefSink;
         private readonly WeakReference<IDataFlowSink> weakRefSink;

@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace FeatureLoom.Logging
 {
-    public struct LogMessage
+    public readonly struct LogMessage
     {
         public LogMessage(Loglevel level,
                           string shortText,
@@ -28,15 +28,15 @@ namespace FeatureLoom.Logging
             this.contextHandle = contextHandle;
         }
 
-        public DateTime timeStamp;
-        public string shortText;
-        public string detailText;
-        public Loglevel level;
-        public ObjectHandle contextHandle;
-        public string caller;
-        public string sourceFile;
-        public int sourceLine;
-        public int threadId;
+        public readonly DateTime timeStamp;
+        public readonly string shortText;
+        public readonly string detailText;
+        public readonly Loglevel level;
+        public readonly ObjectHandle contextHandle;
+        public readonly string caller;
+        public readonly string sourceFile;
+        public readonly int sourceLine;
+        public readonly int threadId;
 
         public static string defaultFormat = "| {0} | ctxt{4} | thrd{3} | {1} | {2} | File: {5} Line: {6} Method: {7} | {8} |";
         public static string defaultTimeStampFormat = "yyyy-MM-dd HH:mm:ss.fffffff";

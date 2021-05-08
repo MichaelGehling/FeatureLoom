@@ -7,7 +7,7 @@ using System.Net;
 
 namespace FeatureLoom.Web
 {
-    public struct HttpEndpointConfig
+    public class HttpEndpointConfig
     {
         [JsonIgnore]
         public IPAddress address;
@@ -16,7 +16,7 @@ namespace FeatureLoom.Web
         public string certificateName;
 
         [JsonIgnore]
-        public string hostAddress;
+        string hostAddress;
 
         public string HostAddress
         {
@@ -38,7 +38,7 @@ namespace FeatureLoom.Web
             }
         }
 
-        public HttpEndpointConfig(IPAddress address, int port) : this()
+        public HttpEndpointConfig(IPAddress address, int port)
         {
             this.address = address;
             this.port = port;

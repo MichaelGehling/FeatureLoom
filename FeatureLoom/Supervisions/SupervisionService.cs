@@ -49,21 +49,14 @@ namespace FeatureLoom.Supervisions
         private static void StartSupervision()
         {
             int stopCounter = 0;
-            int timingCounter = 0;
-            TimeKeeper timer = AppTime.TimeKeeper;
             while (true)
             {
-                if (!CheckForPause(ref stopCounter, ref timingCounter, ref timer)) return;
+                if (!CheckForPause(ref stopCounter)) return;
                 CheckForNewSupervisions(ref stopCounter);
                 HandleActiveSupervisions();
                 SwapHandledToActive();
 
                 TimeSpan delay = GetDelay();
-                if (timingCounter++ == 100_000)
-                {
-                    timingCounter = 0;                    
-                    timer.Restart(timer.StartTime + timer.LastElapsed);
-                }
 
                 AppTime.Wait(delay, cts.Token);
             }
@@ -109,7 +102,7 @@ namespace FeatureLoom.Supervisions
             handledSupervisions.Clear();
         }
 
-        private static bool CheckForPause(ref int stopCounter, ref int timingCounter, ref TimeKeeper timer)
+        private static bool CheckForPause(ref int stopCounter)
         {
             if (activeSupervisions.Count == 0 && newSupervisions.Count == 0)
             {
@@ -133,9 +126,6 @@ namespace FeatureLoom.Supervisions
                                 }
                             }
                         }
-
-                        timingCounter = 0;
-                        timer = AppTime.TimeKeeper;
                     }
                     else lockHandle.Exit();
                 }

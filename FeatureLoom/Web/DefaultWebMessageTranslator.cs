@@ -9,10 +9,10 @@ using System.Collections.Generic;
 
 namespace FeatureLoom.Web
 {
-    public struct WebMessageWrapper<T> : IMessageWrapper<T>
+    public readonly struct WebMessageWrapper<T> : IMessageWrapper<T>
     {
-        public T message;
-        public string messageType;
+        public readonly T message;
+        public readonly string messageType;
 
         public WebMessageWrapper(T message, string messageType)
         {
@@ -21,9 +21,9 @@ namespace FeatureLoom.Web
         }
 
         [JsonIgnore]
-        public T TypedMessage { get => message; set => message = value; }
+        public T TypedMessage { get => message; }
 
-        public object Message { get => message; set { if (value is T vT) message = vT; else throw new Exception($"This MessageWrapper can only take objects of type {typeof(T)}!"); } }
+        public object Message { get => message; }
     }
 
     public interface IWebMessageTranslator

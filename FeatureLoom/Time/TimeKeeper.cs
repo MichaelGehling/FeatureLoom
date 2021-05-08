@@ -2,30 +2,16 @@
 
 namespace FeatureLoom.Time
 {
-    public struct TimeKeeper
+    public readonly struct TimeKeeper
     {
-        private TimeSpan startTime;
-        private TimeSpan lastElapsed;
+        private readonly TimeSpan startTime;
 
         public TimeKeeper(TimeSpan startTime)
         {
             this.startTime = startTime;
         }
 
-        public TimeSpan Elapsed
-        {
-            get
-            {
-                lastElapsed = AppTime.Elapsed - startTime;
-                return lastElapsed;
-            }
-        }
-
-        public TimeSpan LastElapsed => lastElapsed;
-
-        public void Restart() => this.startTime = AppTime.Elapsed;
-
-        public void Restart(TimeSpan startTime) => this.startTime = startTime;
+        public TimeSpan Elapsed => AppTime.Elapsed - startTime;
 
         public TimeSpan StartTime => startTime;
     }

@@ -56,10 +56,10 @@ namespace FeatureLoom.Workflows
                                     else await Task.Delay(suspensionTime);
                                 }
                             }
-                            timer.Restart(); // When suspension was forced, the suspensionTimer can be reset.
+                            timer = new TimeKeeper(); // When suspension was forced, the suspensionTimer can be reset.
                         }
                     }
-                    else timer.Restart(); // When step ran async the suspensionTimer can be reset.
+                    else timer = new TimeKeeper(); // When step ran async the suspensionTimer can be reset.
 
                     running = await stepTask;
                 } while (running);

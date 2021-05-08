@@ -59,10 +59,10 @@ namespace FeatureLoom.RPC
             Assert.True(callFlag);
         }
 
-        private struct TestParameters
+        private readonly struct TestParameters
         {
-            public string str;
-            public int num;
+            public readonly string str;
+            public readonly int num;
 
             public TestParameters(string str, int num)
             {

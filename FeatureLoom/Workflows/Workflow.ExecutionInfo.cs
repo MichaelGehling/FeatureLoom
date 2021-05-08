@@ -2,7 +2,7 @@
 {
     public abstract partial class Workflow
     {
-        public struct ExecutionInfo
+        public readonly struct ExecutionInfo
         {
             public readonly Workflow workflow;
             public readonly string executionEvent;
