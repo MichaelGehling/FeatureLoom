@@ -20,7 +20,7 @@ namespace FeatureLoom.Synchronization
     /// and SemaphoreSlim for asynchronous contexts). Though reentrant locking in synchronous contexts using FeatureLock
     /// is slower than with Monitor/ReaderWriterLock, but it also allows reentrancy for asynchronous contexts and even mixed contexts.
     /// </summary>
-    public sealed class FeatureLock : ISupervisor
+    public sealed class FeatureLock : ISupervision
     {
         #region ConstructorAndSettings
         /// <summary>
@@ -1616,11 +1616,11 @@ namespace FeatureLoom.Synchronization
 
         #region Supervision        
 
-        bool ISupervisor.IsActive => isSupervisionActive;
+        bool ISupervision.IsActive => isSupervisionActive;
 
-        TimeSpan ISupervisor.MaxDelay => (0.0005 * Settings.supervisionDelayFactor).Milliseconds();
+        TimeSpan ISupervision.MaxDelay => (0.0005 * Settings.supervisionDelayFactor).Milliseconds();
 
-        void ISupervisor.Handle()
+        void ISupervision.Handle()
         {
             if (queueHead == null)
             {
@@ -1779,7 +1779,7 @@ namespace FeatureLoom.Synchronization
             finally
             {
                 sleepLock.Exit();
-                if (addSupervisor) SupervisionService.AddSupervisor(this);
+                if (addSupervisor) SupervisionService.AddSupervision(this);
             }
         }
 

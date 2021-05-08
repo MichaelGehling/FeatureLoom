@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Time;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,13 +35,19 @@ namespace FeatureLoom.Diagnostics
 
         public void Post<M>(in M message)
         {
-            Thread.Sleep(delay);
+            AppTime.Wait(delay);
             sourceHelper.Forward(message);
+        }
+
+        public void Post<M>(M message)
+        {
+            AppTime.Wait(delay);
+            sourceHelper.Forward(in message);
         }
 
         public async Task PostAsync<M>(M message)
         {
-            await Task.Delay(delay);
+            await AppTime.WaitAsync(delay);
             await sourceHelper.ForwardAsync(message);
         }
 

@@ -70,6 +70,11 @@ namespace FeatureLoom.Logging
 
         public void Post<M>(in M message)
         {
+            ((IDataFlowSink)receiver).Post(in message);
+        }
+
+        public void Post<M>(M message)
+        {
             ((IDataFlowSink)receiver).Post(message);
         }
 

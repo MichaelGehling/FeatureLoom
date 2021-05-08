@@ -283,7 +283,7 @@ namespace FeatureLoom.Storages
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR(this.GetHandle(), "Failed serializing persiting object", e.ToString());
+                    Log.ERROR(this.GetHandle(), "Failed serializing persisting object", e.ToString());
                     bytes = default;
                     return false;
                 }

@@ -52,7 +52,7 @@ namespace FeatureLoom.RPC
                     if (!myRequest.noResponse)
                     {
                         var response = new RpcResponse<R>(myRequest.requestId, result);
-                        target.Send(response);
+                        target.Send(in response);
                     }
                 }
                 catch (Exception e)
@@ -65,7 +65,7 @@ namespace FeatureLoom.RPC
                     {
                         string errorMessage = e.ToString();
                         var response = new RpcErrorResponse(myRequest.requestId, errorMessage);
-                        target.Send(response);
+                        target.Send(in response);
                     }
                 }
             }

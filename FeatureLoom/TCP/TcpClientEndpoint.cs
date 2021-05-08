@@ -270,6 +270,11 @@ namespace FeatureLoom.TCP
 
         public void Post<M>(in M message)
         {
+            SendingToTcpSink.Post(in message);
+        }
+
+        public void Post<M>(M message)
+        {
             SendingToTcpSink.Post(message);
         }
 

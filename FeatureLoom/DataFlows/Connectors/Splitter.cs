@@ -22,6 +22,22 @@ namespace FeatureLoom.DataFlows
                 var output = split(tMsg);
                 foreach (var msg in output)
                 {
+                    sourceHelper.Forward(in msg);
+                    alternative = false;
+                }
+            }
+
+            if (alternative) sourceHelper.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            bool alternative = true;
+            if (message is T tMsg)
+            {
+                var output = split(tMsg);
+                foreach (var msg in output)
+                {
                     sourceHelper.Forward(msg);
                     alternative = false;
                 }

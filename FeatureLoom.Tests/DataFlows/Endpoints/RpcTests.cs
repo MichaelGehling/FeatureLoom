@@ -137,7 +137,7 @@ namespace FeatureLoom.RPC
             calleeB.RegisterMethod("GetValue", () => 99);
 
             var resultReceiver = new QueueReceiver<string>();
-            caller.CallMultiResponse<int>("GetValue", resultReceiver);
+            caller.CallMultiResponse("GetValue", resultReceiver);
             Assert.Equal(2, resultReceiver.CountQueuedMessages);
             Assert.Contains("42", resultReceiver.PeekAll());
             Assert.Contains("99", resultReceiver.PeekAll());

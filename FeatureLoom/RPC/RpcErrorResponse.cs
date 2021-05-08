@@ -2,10 +2,10 @@
 
 namespace FeatureLoom.RPC
 {
-    public struct RpcErrorResponse : IRpcResponse
+    public readonly struct RpcErrorResponse : IRpcResponse
     {
-        public long requestId;
-        public string errorMessage;
+        public readonly long requestId;
+        public readonly string errorMessage;
 
         public RpcErrorResponse(long requestId, string errorMessage)
         {

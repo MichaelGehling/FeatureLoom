@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -8,30 +9,32 @@ using System.Threading;
 namespace FeatureLoom.Supervisions
 {
     public static class SupervisionService
-    {
+    {        
         private static MicroLock myLock = new MicroLock();
-        private static List<ISupervisor> newSupervisors = new List<ISupervisor>();
-        private static List<ISupervisor> activeSupervisors = new List<ISupervisor>();
-        private static List<ISupervisor> handledSupervisors = new List<ISupervisor>();
+        private static List<ISupervision> newSupervisions = new List<ISupervision>();
+        private static List<ISupervision> activeSupervisions = new List<ISupervision>();
+        private static List<ISupervision> handledSupervisions = new List<ISupervision>();
 
-        private static Thread supervisionThread = null;
+        private static Thread supervisorThread = null;
         private static ManualResetEventSlim mre = new ManualResetEventSlim(true);
         private static CancellationTokenSource cts = new CancellationTokenSource();
 
-        public static void AddSupervisor(ISupervisor supervisor)
+        private static TimeSpan minimumDelay = 0.001.Milliseconds();
+
+        public static void AddSupervision(ISupervision supervision)
         {
             using (myLock.Lock())
             {
-                if (supervisionThread == null)
+                if (supervisorThread == null)
                 {
-                    newSupervisors.Add(supervisor);
+                    newSupervisions.Add(supervision);
                     mre.Set();
-                    supervisionThread = new Thread(StartSupervision);
-                    supervisionThread.Start();
+                    supervisorThread = new Thread(StartSupervision);
+                    supervisorThread.Start();
                 }
                 else
                 {
-                    newSupervisors.Add(supervisor);
+                    newSupervisions.Add(supervision);
                     cts.Cancel();
                     mre.Set();
                 }
@@ -40,7 +43,7 @@ namespace FeatureLoom.Supervisions
 
         public static void Supervise(Action supervisionAction, Func<bool> checkValidity, Func<TimeSpan> getDelay = null)
         {
-            AddSupervisor(new Supervisor(supervisionAction, checkValidity, getDelay));
+            AddSupervision(new GenericSupervision(supervisionAction, checkValidity, getDelay));
         }
 
         private static void StartSupervision()
@@ -51,15 +54,14 @@ namespace FeatureLoom.Supervisions
             while (true)
             {
                 if (!CheckForPause(ref stopCounter, ref timingCounter, ref timer)) return;
-                stopCounter = CheckForNewSupervisors(stopCounter);
-                HandleActiveSupervisors();
+                CheckForNewSupervisions(ref stopCounter);
+                HandleActiveSupervisions();
                 SwapHandledToActive();
 
                 TimeSpan delay = GetDelay();
                 if (timingCounter++ == 100_000)
                 {
-                    timingCounter = 0;
-                    //Console.Write($"|{timer.Elapsed.divide(100_000).TotalMilliseconds}|");
+                    timingCounter = 0;                    
                     timer.Restart(timer.StartTime + timer.LastElapsed);
                 }
 
@@ -70,56 +72,52 @@ namespace FeatureLoom.Supervisions
         private static TimeSpan GetDelay()
         {
             TimeSpan minDelay = TimeSpan.MaxValue;
-            foreach (var supervisor in activeSupervisors)
+            foreach (var supervision in activeSupervisions)
             {
-                var delay = supervisor.MaxDelay;
+                var delay = supervision.MaxDelay;
                 if (delay < minDelay) minDelay = delay;
             }
-            return minDelay.Clamp(0.001.Milliseconds(), int.MaxValue.Milliseconds());
+            return minDelay.Clamp(minimumDelay, int.MaxValue.Milliseconds());
         }
 
-        private static void HandleActiveSupervisors()
+        private static void HandleActiveSupervisions()
         {
-            foreach (var supervisor in activeSupervisors)
+            foreach (var supervisor in activeSupervisions)
             {
                 supervisor.Handle();
-                if (supervisor.IsActive) handledSupervisors.Add(supervisor);
+                if (supervisor.IsActive) handledSupervisions.Add(supervisor);
             }
         }
 
-        private static int CheckForNewSupervisors(int stopCounter)
+        private static void CheckForNewSupervisions(ref int stopCounter)
         {
-            if (newSupervisors.Count > 0)
+            if (newSupervisions.Count > 0)
             {
                 using (myLock.Lock())
                 {
                     stopCounter = 0;
-                    activeSupervisors.AddRange(newSupervisors);
-                    newSupervisors.Clear();
+                    activeSupervisions.AddRange(newSupervisions);
+                    newSupervisions.Clear();
                     if (cts.IsCancellationRequested) cts = new CancellationTokenSource();
                 }
             }
-
-            return stopCounter;
         }
 
         private static void SwapHandledToActive()
         {
-            var temp = activeSupervisors;
-            activeSupervisors = handledSupervisors;
-            handledSupervisors = temp;
-            handledSupervisors.Clear();
+            SwapHelper.Swap(ref activeSupervisions, ref handledSupervisions);            
+            handledSupervisions.Clear();
         }
 
         private static bool CheckForPause(ref int stopCounter, ref int timingCounter, ref TimeKeeper timer)
         {
-            if (activeSupervisors.Count == 0 && newSupervisors.Count == 0)
+            if (activeSupervisions.Count == 0 && newSupervisions.Count == 0)
             {
                 if (++stopCounter > 100)
                 {
                     stopCounter = 0;
                     var lockHandle = myLock.Lock();
-                    if (activeSupervisors.Count == 0 && newSupervisors.Count == 0)
+                    if (activeSupervisions.Count == 0 && newSupervisions.Count == 0)
                     {
                         mre.Reset();
                         lockHandle.Exit();
@@ -128,9 +126,9 @@ namespace FeatureLoom.Supervisions
                         {
                             using (myLock.Lock())
                             {
-                                if (activeSupervisors.Count == 0 && newSupervisors.Count == 0)
+                                if (activeSupervisions.Count == 0 && newSupervisions.Count == 0)
                                 {
-                                    supervisionThread = null;
+                                    supervisorThread = null;
                                     return false;
                                 }
                             }
@@ -146,13 +144,13 @@ namespace FeatureLoom.Supervisions
             return true;
         }
 
-        private class Supervisor : ISupervisor
+        private class GenericSupervision : ISupervision
         {
             private Action handleAction;
             private Func<bool> validityCheck;
             private Func<TimeSpan> getDelay = () => TimeSpan.Zero;
 
-            public Supervisor(Action handleAction, Func<bool> validityCheck, Func<TimeSpan> getDelay = null)
+            public GenericSupervision(Action handleAction, Func<bool> validityCheck, Func<TimeSpan> getDelay = null)
             {
                 this.handleAction = handleAction;
                 this.validityCheck = validityCheck;

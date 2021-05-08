@@ -39,6 +39,14 @@ namespace FeatureLoom.Web
             }
         }
 
+        public void Post<M>(M message)
+        {
+            if (translator.TryTranslate(message, out string json))
+            {
+                ringBuffer.Add(json);
+            }
+        }
+
         public Task PostAsync<M>(M message)
         {
             Post(message);

@@ -20,6 +20,11 @@ namespace FeatureLoom.Logging
             if (message is LogMessage logMessage) using (bufferLock.Lock()) buffer.Add(logMessage);
         }
 
+        public void Post<M>(M message)
+        {
+            if (message is LogMessage logMessage) using (bufferLock.Lock()) buffer.Add(logMessage);
+        }
+
         public Task PostAsync<M>(M message)
         {
             if (message is LogMessage logMessage) using (bufferLock.Lock()) buffer.Add(logMessage);

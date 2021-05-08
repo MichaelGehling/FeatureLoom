@@ -86,6 +86,11 @@ namespace FeatureLoom.Web
 
         public void Post<M>(in M message)
         {
+            ((IRequester)rpcCaller).Post(in message);
+        }
+
+        public void Post<M>(M message)
+        {
             ((IRequester)rpcCaller).Post(message);
         }
 

@@ -58,6 +58,12 @@ namespace FeatureLoom.DataFlows
             sourceHelper.Forward(in message);
         }
 
+        public void Post<M>(M message)
+        {
+            if (message is T msgT) using (bufferLock.Lock()) buffer.Add(msgT);
+            sourceHelper.Forward(message);
+        }
+
         public async Task PostAsync<M>(M message)
         {
             var task = sourceHelper.ForwardAsync(message);

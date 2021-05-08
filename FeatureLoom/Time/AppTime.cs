@@ -48,11 +48,11 @@ namespace FeatureLoom.Time
                 if (coarseMillisecondCountBase > lastCoarseMillisecondCount ||
                     lastCoarseMillisecondCount - coarseMillisecondCountBase > 1000 ||
                     newCoarseMillisecondCount < lastCoarseMillisecondCount)
-                {
-                    return ResetCoarseNow(DateTime.UtcNow);
-                }
-                else lastCoarseMillisecondCount = newCoarseMillisecondCount;
-
+                 {
+                     return ResetCoarseNow(DateTime.UtcNow);
+                 }
+                 else lastCoarseMillisecondCount = newCoarseMillisecondCount;
+                 
                 return coarseTimeBase + (lastCoarseMillisecondCount - coarseMillisecondCountBase).Milliseconds();
             }
         }

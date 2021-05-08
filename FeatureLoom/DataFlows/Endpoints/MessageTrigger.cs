@@ -49,13 +49,18 @@ namespace FeatureLoom.DataFlows
             HandleMessage(message);
         }
 
+        public void Post<M>(M message)
+        {
+            HandleMessage(message);
+        }
+
         public Task PostAsync<M>(M message)
         {
             HandleMessage(message);
             return Task.CompletedTask;
         }
 
-        protected virtual void HandleMessage<M>(in M message)
+        protected virtual void HandleMessage<M>(M message)
         {
             if (mode == Mode.Toggle)
             {

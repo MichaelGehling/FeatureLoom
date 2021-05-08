@@ -38,6 +38,12 @@ namespace FeatureLoom.Diagnostics
         public void Post<M>(in M message)
         {
             Count();
+            sourceHelper.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            Count();
             sourceHelper.Forward(message);
         }
 

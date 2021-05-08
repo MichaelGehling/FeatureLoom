@@ -17,6 +17,12 @@ namespace FeatureLoom.DataFlows
         public void Post<M>(in M message)
         {
             if (autoActivationCondition != null) active = autoActivationCondition();
+            if (active) sourceHelper.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            if (autoActivationCondition != null) active = autoActivationCondition();
             if (active) sourceHelper.Forward(message);
         }
 

@@ -38,9 +38,15 @@ namespace FeatureLoom.DataFlows
             _ = sourceHelper.ForwardAsync(message);
         }
 
+        public void Post<M>(M message)
+        {
+            _ = sourceHelper.ForwardAsync(message);
+        }
+
         public Task PostAsync<M>(M message)
         {
-            return sourceHelper.ForwardAsync(message);
+            _ = sourceHelper.ForwardAsync(message);
+            return Task.CompletedTask;
         }
     }
 }

@@ -45,26 +45,15 @@ namespace FeatureLoom.RPC
             }
         }
 
-        public void CallMultiResponse<P, R>(string method, P parameterTuple, IDataFlowSink sink)
+        public void CallMultiResponse(string methodCall, IDataFlowSink sink)
         {
             var requestId = RandomGenerator.Int64();
-            var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
+            string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
             using (responseHandlersLock.Lock())
             {
-                responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
+                responseHandlers.Add(new MultiResponseHandler(requestId, sink, timeout));
             }
-            sourceHelper.Forward(request);
-        }
-
-        public void CallMultiResponse<R>(string method, IDataFlowSink sink)
-        {
-            var requestId = RandomGenerator.Int64();
-            var request = new RpcRequest<bool, R>(requestId, method, true);
-            using (responseHandlersLock.Lock())
-            {
-                responseHandlers.Add(new MultiResponseHandler<R>(requestId, sink, timeout));
-            }
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(serializedRpcRequest);
         }
 
         public Task<string> CallAsync(string methodCall)
@@ -149,6 +138,35 @@ namespace FeatureLoom.RPC
         }
 
         public void Post<M>(in M message)
+        {
+            if (message is RpcErrorResponse errorResponse)
+            {
+                Log.ERROR(this.GetHandle(), "String-RPC call failed!", errorResponse.ErrorMessage);
+            }
+            else if (message is IRpcResponse)
+            {
+                DateTime now = AppTime.Now;
+
+                using (responseHandlersLock.Lock())
+                {
+                    for (int i = 0; i < responseHandlers.Count; i++)
+                    {
+                        if (responseHandlers[i].Handle(message))
+                        {
+                            responseHandlers.RemoveAt(i--);
+                            break;
+                        }
+                        else if (responseHandlers[i].LifeTime.Elapsed(now))
+                        {
+                            responseHandlers[i].Cancel();
+                            responseHandlers.RemoveAt(i--);
+                        }
+                    }
+                }
+            }
+        }
+
+        public void Post<M>(M message)
         {
             if (message is RpcErrorResponse errorResponse)
             {

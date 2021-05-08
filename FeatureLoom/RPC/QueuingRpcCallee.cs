@@ -11,6 +11,14 @@ namespace FeatureLoom.RPC
         {
             if (message is IRpcRequest || message is string)
             {
+                queue.Post(in message);
+            }
+        }
+
+        public override void Post<M>(M message)
+        {
+            if (message is IRpcRequest || message is string)
+            {
                 queue.Post(message);
             }
         }

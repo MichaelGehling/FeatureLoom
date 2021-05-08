@@ -31,6 +31,25 @@ namespace FeatureLoom.DataFlows
                 {
                     if (message is T msgT && option.predicate(msgT))
                     {
+                        option.sender.Forward(in message);
+                        success = true;
+                    }
+                    if (!multiMatch && success) return;
+                }
+            }
+            if (!success) alternativeSendingHelper.ObjIfExists?.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            var options = this.options;
+            bool success = false;
+            if (options != null)
+            {
+                foreach (var option in options)
+                {
+                    if (message is T msgT && option.predicate(msgT))
+                    {
                         option.sender.Forward(message);
                         success = true;
                     }

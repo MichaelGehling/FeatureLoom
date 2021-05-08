@@ -58,6 +58,40 @@ namespace FeatureLoom.DataFlows
                     {
                         if (!processing(msgT))
                         {
+                            alternativeSendingHelper.ObjIfExists?.Forward(in message);
+                        }
+                    }
+                    else
+                    {
+                        bool result;
+                        lock (syncLock)
+                        {
+                            result = processing(msgT);
+                        }
+                        if (!result) alternativeSendingHelper.ObjIfExists?.Forward(in message);
+                    }
+                }
+                else
+                {
+                    if (!processingAsync(msgT).WaitFor())
+                    {
+                        alternativeSendingHelper.ObjIfExists?.Forward(in message);
+                    }
+                }
+            }
+            else alternativeSendingHelper.ObjIfExists?.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            if (message is T msgT)
+            {
+                if (processing != null)
+                {
+                    if (syncLock == null)
+                    {
+                        if (!processing(msgT))
+                        {
                             alternativeSendingHelper.ObjIfExists?.Forward(message);
                         }
                     }

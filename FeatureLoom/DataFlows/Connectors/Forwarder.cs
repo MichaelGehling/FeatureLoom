@@ -29,6 +29,11 @@ namespace FeatureLoom.DataFlows
 
         public virtual void Post<M>(in M message)
         {
+            sourceHelper.Forward(in message);
+        }
+
+        public virtual void Post<M>(M message)
+        {
             sourceHelper.Forward(message);
         }
 

@@ -39,6 +39,22 @@ namespace FeatureLoom.DataFlows
                     readerWakeEvent.Set();
                 }
             }
+            else alternativeSendingHelper.ObjIfExists?.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            if (message is T typedMessage)
+            {
+                if (!readerWakeEvent.IsSet || this.priorityComparer.Compare(receivedMessage, typedMessage) <= 0)
+                {
+                    using (myLock.Lock())
+                    {
+                        receivedMessage = typedMessage;
+                    }
+                    readerWakeEvent.Set();
+                }
+            }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
         }
 

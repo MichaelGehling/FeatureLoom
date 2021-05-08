@@ -7,7 +7,7 @@ namespace FeatureLoom.RPC
 {
     public partial class StringRpcCaller
     {
-        private class MultiResponseHandler<R> : IResponseHandler
+        private class MultiResponseHandler : IResponseHandler
         {
             private readonly long requestId;
             private readonly IDataFlowSink sink;
@@ -24,7 +24,7 @@ namespace FeatureLoom.RPC
 
             public bool Handle<M>(in M message)
             {
-                if (message is RpcResponse<R> myResponse && myResponse.RequestId == this.requestId)
+                if (message is IRpcResponse myResponse && myResponse.RequestId == this.requestId)
                 {
                     sink.Post(myResponse.ResultToJson().Trim('"'.ToSingleEntryArray()));
                 }

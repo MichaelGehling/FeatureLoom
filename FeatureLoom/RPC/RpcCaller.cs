@@ -49,7 +49,7 @@ namespace FeatureLoom.RPC
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
         }
 
         public void CallMultiResponse<R>(string method, IDataFlowSink responseSink)
@@ -60,7 +60,7 @@ namespace FeatureLoom.RPC
             {
                 responseHandlers.Add(new MultiResponseHandler<R>(requestId, responseSink, timeout));
             }
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
         }
 
         public Task<R> CallAsync<P, R>(string method, P parameterTuple)
@@ -72,7 +72,7 @@ namespace FeatureLoom.RPC
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
             return tcs.Task;
         }
 
@@ -85,7 +85,7 @@ namespace FeatureLoom.RPC
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
             return tcs.Task;
         }
 
@@ -98,7 +98,7 @@ namespace FeatureLoom.RPC
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
             }
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
             return tcs.Task;
         }
 
@@ -111,7 +111,7 @@ namespace FeatureLoom.RPC
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
             }
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
             return tcs.Task;
         }
 
@@ -119,31 +119,59 @@ namespace FeatureLoom.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple, true);
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
         }
 
         public void CallNoResponse<P>(string method, P parameterTuple)
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, bool>(requestId, method, parameterTuple, true);
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
         }
 
         public void CallNoResponse<R>(string method)
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true, true);
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
         }
 
         public void CallNoResponse(string method)
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, bool>(requestId, method, true, true);
-            sourceHelper.Forward(request);
+            sourceHelper.Forward(in request);
         }
 
         public void Post<M>(in M message)
+        {
+            if (message is RpcErrorResponse errorResponse)
+            {
+                Log.ERROR(this.GetHandle(), "RPC call failed!", errorResponse.ErrorMessage);
+            }
+            else if (message is IRpcResponse)
+            {
+                DateTime now = AppTime.Now;
+                using (responseHandlersLock.Lock())
+                {
+                    for (int i = 0; i < responseHandlers.Count; i++)
+                    {
+                        if (responseHandlers[i].Handle(message))
+                        {
+                            responseHandlers.RemoveAt(i--);
+                            break;
+                        }
+                        else if (responseHandlers[i].LifeTime.Elapsed(now))
+                        {
+                            responseHandlers[i].Cancel();
+                            responseHandlers.RemoveAt(i--);
+                        }
+                    }
+                }
+            }
+        }
+
+        public void Post<M>(M message)
         {
             if (message is RpcErrorResponse errorResponse)
             {

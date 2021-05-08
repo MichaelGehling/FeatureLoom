@@ -127,6 +127,30 @@ namespace FeatureLoom.Diagnostics
             manualResetEvent.ObjIfExists?.Reset();
         }
 
+        public void Post<M>(M message)
+        {
+            if (!(message is T1 msgT1)) return;
+            if (!(filter?.Invoke(msgT1) ?? true)) return;
+            T2 msgT2 = convert == null ? default : convert(msgT1);
+            using (myLock.Lock())
+            {
+                counter++;
+                messageBuffer?.Add((AppTime.Now, msgT2));
+                timestampBuffer?.Add(AppTime.Now);
+                if (timeSliceCounterBuffer != null)
+                {
+                    if (currentTimeSlice.timeFrame.Elapsed())
+                    {
+                        timeSliceCounterBuffer.Add(currentTimeSlice);
+                        currentTimeSlice = new TimeSliceCounter(timeSliceSize);
+                    }
+                    currentTimeSlice.counter++;
+                }
+            }
+            manualResetEvent.ObjIfExists?.Set();
+            manualResetEvent.ObjIfExists?.Reset();
+        }
+
         public Task PostAsync<M>(M message)
         {
             Post(message);

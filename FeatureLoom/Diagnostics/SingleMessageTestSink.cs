@@ -20,6 +20,16 @@ namespace FeatureLoom.Diagnostics
             }
         }
 
+        public void Post<M>(M message)
+        {
+            if (message is T msgT)
+            {
+                receivedMessage = msgT;
+                received = true;
+                receivedEvent.Set();
+            }
+        }
+
         public Task PostAsync<M>(M message)
         {
             if (message is T msgT)

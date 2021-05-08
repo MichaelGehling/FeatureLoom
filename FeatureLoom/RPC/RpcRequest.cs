@@ -2,12 +2,12 @@
 
 namespace FeatureLoom.RPC
 {
-    public struct RpcRequest<P, R> : IRpcRequest
+    public readonly struct RpcRequest<P, R> : IRpcRequest
     {
-        public string method;
-        public long requestId;
-        public bool noResponse;
-        public P parameterSet;
+        public readonly string method;
+        public readonly long requestId;
+        public readonly bool noResponse;
+        public readonly P parameterSet;
 
         public RpcRequest(long requestId, string method, P parameterSet, bool noResponse = false)
         {

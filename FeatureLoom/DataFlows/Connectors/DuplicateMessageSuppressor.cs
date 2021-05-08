@@ -84,6 +84,11 @@ namespace FeatureLoom.DataFlows
 
         public void Post<M>(in M message)
         {
+            if (!IsSuppressed(message)) sourceHelper.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
             if (!IsSuppressed(message)) sourceHelper.Forward(message);
         }
 

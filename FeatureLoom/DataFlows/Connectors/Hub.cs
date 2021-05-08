@@ -82,11 +82,31 @@ namespace FeatureLoom.DataFlows
 
                 foreach (var socket in sockets)
                 {
+                    if (socket != this) socket.Forward(in message);
+                }
+            }
+
+            public void Post<M>(M message)
+            {
+                if (CheckRemovalByOwner()) return;
+
+                var sockets = hub.sockets;
+                if (sockets.Count == 1) return;
+
+                foreach (var socket in sockets)
+                {
                     if (socket != this) socket.Forward(message);
                 }
             }
 
             private void Forward<M>(in M message)
+            {
+                if (CheckRemovalByOwner()) return;
+
+                sourceHelper.Forward(in message);
+            }
+
+            private void Forward<M>(M message)
             {
                 if (CheckRemovalByOwner()) return;
 

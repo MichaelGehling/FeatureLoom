@@ -42,7 +42,20 @@ namespace FeatureLoom.DataFlows
         {
             if (message is I msgT)
             {
-                sourceHelper.Forward(convertFunc(msgT));
+                O output = convertFunc(msgT);
+                // TODO: It would be good to check if O is a readonly struct and in that case use "sourceHelper.Forward(in output);"
+                sourceHelper.Forward(output);
+            }
+            else sourceHelper.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            if (message is I msgT)
+            {
+                O output = convertFunc(msgT);
+                // TODO: It would be good to check if O is a readonly struct and in that case use "sourceHelper.Forward(in output);"
+                sourceHelper.Forward(output);
             }
             else sourceHelper.Forward(message);
         }

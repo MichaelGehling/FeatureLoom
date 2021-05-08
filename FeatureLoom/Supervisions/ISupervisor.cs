@@ -2,7 +2,7 @@
 
 namespace FeatureLoom.Supervisions
 {
-    public interface ISupervisor
+    public interface ISupervision
     {
         void Handle();
 

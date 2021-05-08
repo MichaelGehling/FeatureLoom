@@ -13,7 +13,7 @@ namespace FeatureLoom.DataFlows
             this.resetCondition = resetCondition;
         }
 
-        protected override void HandleMessage<M>(in M message)
+        protected override void HandleMessage<M>(M message)
         {
             if (message is T trigger && triggerCondition(trigger)) Trigger();
             if (message is R reset && resetCondition != null && resetCondition(reset)) Reset();

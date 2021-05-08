@@ -3,10 +3,10 @@ using Newtonsoft.Json;
 
 namespace FeatureLoom.RPC
 {
-    public struct RpcResponse<R> : IRpcResponse
+    public readonly struct RpcResponse<R> : IRpcResponse
     {
-        public long requestId;
-        public R result;
+        public readonly long requestId;
+        public readonly R result;
 
         public RpcResponse(long requestId, R result)
         {

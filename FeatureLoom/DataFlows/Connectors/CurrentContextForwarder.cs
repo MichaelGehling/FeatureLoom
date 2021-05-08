@@ -30,6 +30,11 @@ namespace FeatureLoom.DataFlows
 
         public override void Post<M>(in M message)
         {
+            receiver.Post(in message);
+        }
+
+        public override void Post<M>(M message)
+        {
             receiver.Post(message);
         }
 

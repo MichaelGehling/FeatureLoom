@@ -90,6 +90,42 @@ namespace FeatureLoom.DataFlows
             {
                 if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
                 {
+                    target.Post(in message);
+                }
+                else
+                {
+                    RemoveInvalidReferences(1);
+                }
+            }
+            else
+            {
+                int invalidReferences = 0;
+                for (int i = currentSinks.Length - 1; i >= 0; i--)
+                {
+                    if (currentSinks[i].TryGetTarget(out IDataFlowSink target))
+                    {
+                        target.Post(in message);
+                    }
+                    else
+                    {
+                        invalidReferences++;
+                    }
+                }
+                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+            }
+        }
+
+        public void Forward<M>(M message)
+        {
+            if (this.sinks == null) return;
+
+            var currentSinks = this.sinks;
+
+            if (currentSinks.Length == 0) return;
+            else if (currentSinks.Length == 1)
+            {
+                if (currentSinks[0].TryGetTarget(out IDataFlowSink target))
+                {
                     target.Post(message);
                 }
                 else

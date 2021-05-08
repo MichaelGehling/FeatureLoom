@@ -47,6 +47,16 @@ namespace FeatureLoom.DataFlows
             if (message is T msgT)
             {
                 if (predicate == null || predicate(msgT)) sourceHelper.Forward(msgT);
+                else alternativeSendingHelper.ObjIfExists?.Forward(in msgT);
+            }
+            else alternativeSendingHelper.ObjIfExists?.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            if (message is T msgT)
+            {
+                if (predicate == null || predicate(msgT)) sourceHelper.Forward(msgT);
                 else alternativeSendingHelper.ObjIfExists?.Forward(msgT);
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);

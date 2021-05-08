@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
+    // TODO: Refactor-> IAggregationData must do the whole work, no func necessary
     public class Aggregator<T, A> : IDataFlowSink<T>, IDataFlowConnection, IAlternativeDataFlow where A : IAggregationData, new()
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
@@ -27,6 +28,27 @@ namespace FeatureLoom.DataFlows
         }
 
         public void Post<M>(in M message)
+        {
+            bool alternative = true;
+            (bool ready, object msg, bool enumerate) output = default;
+            if (message is T validMessage)
+            {
+                using (dataLock.Lock())
+                {
+                    alternative = !aggregate(validMessage, aggregationData);
+                    output = aggregationData.TryCreateOutputMessage();
+                }
+            }
+
+            if (output.ready && output.msg != null)
+            {
+                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sourceHelper.Forward(msg);
+                else sourceHelper.Forward(in output.msg);
+            }
+            if (alternative) alternativeSender.ObjIfExists?.Forward(in message);
+        }
+
+        public void Post<M>(M message)
         {
             bool alternative = true;
             (bool ready, object msg, bool enumerate) output = default;

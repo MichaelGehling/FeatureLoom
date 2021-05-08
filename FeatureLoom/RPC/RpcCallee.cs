@@ -37,7 +37,33 @@ namespace FeatureLoom.RPC
                     }
                 }
 
-                if (!handled && message is IRpcRequest request) sender.Send(new RpcErrorResponse(request.RequestId, $"No matching method registered for {request.Method}"));
+                if (!handled && message is IRpcRequest request)
+                {
+                    var error = new RpcErrorResponse(request.RequestId, $"No matching method registered for {request.Method}");
+                    sender.Send(in error);
+                }
+            }
+        }
+
+        public virtual void Post<M>(M message)
+        {
+            if (message is IRpcRequest || message is string)
+            {
+                bool handled = false;
+                for (int i = 0; i < requestHandlers.Count; i++)
+                {
+                    if (requestHandlers[i].Handle(message))
+                    {
+                        handled = true;
+                        break;
+                    }
+                }
+
+                if (!handled && message is IRpcRequest request)
+                {
+                    var error = new RpcErrorResponse(request.RequestId, $"No matching method registered for {request.Method}");
+                    sender.Send(in error);
+                }
             }
         }
 

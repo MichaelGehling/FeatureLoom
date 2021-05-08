@@ -8,6 +8,8 @@ namespace FeatureLoom.DataFlows
     {
         void Post<M>(in M message);
 
+        void Post<M>(M message);
+
         Task PostAsync<M>(M message);
     }
 

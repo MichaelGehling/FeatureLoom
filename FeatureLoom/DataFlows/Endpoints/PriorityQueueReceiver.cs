@@ -54,6 +54,16 @@ namespace FeatureLoom.DataFlows
                 if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
                 Enqueue(typedMessage);
             }
+            else alternativeSendingHelper.ObjIfExists?.Forward(in message);
+        }
+
+        public void Post<M>(M message)
+        {
+            if (message != null && message is T typedMessage)
+            {
+                if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
+                Enqueue(typedMessage);
+            }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
         }
 

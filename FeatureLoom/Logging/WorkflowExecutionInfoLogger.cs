@@ -27,6 +27,11 @@ namespace FeatureLoom.Logging
             if (message is Workflow.ExecutionInfo executionInfo) LogInfo(executionInfo);
         }
 
+        public void Post<M>(M message)
+        {
+            if (message is Workflow.ExecutionInfo executionInfo) LogInfo(executionInfo);
+        }
+
         public Task PostAsync<M>(M message)
         {
             if (message is Workflow.ExecutionInfo executionInfo) LogInfo(executionInfo);
