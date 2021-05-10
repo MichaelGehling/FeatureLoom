@@ -13,6 +13,8 @@ namespace FeatureLoom.DataFlows
         private LazyValue<SourceHelper> alternativeSendingHelper;
 
         private MicroLock myLock = new MicroLock();
+        
+        public Type ConsumedMessageType => typeof(T);
 
         public Selector(bool multiMatch = false)
         {

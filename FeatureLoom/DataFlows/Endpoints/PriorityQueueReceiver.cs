@@ -26,6 +26,8 @@ namespace FeatureLoom.DataFlows
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;
         public int maxQueueSize = int.MaxValue;
+        
+        public Type ConsumedMessageType => typeof(T);
 
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         private AsyncManualResetEvent writerWakeEvent = new AsyncManualResetEvent(true);

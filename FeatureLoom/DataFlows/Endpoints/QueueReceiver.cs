@@ -21,6 +21,8 @@ namespace FeatureLoom.DataFlows
     {
         private Queue<T> queue = new Queue<T>();
         private MicroLock queueLock = new MicroLock();
+        
+        public Type ConsumedMessageType => typeof(T);
 
         public bool waitOnFullQueue = false;
         public TimeSpan timeoutOnFullQueue;

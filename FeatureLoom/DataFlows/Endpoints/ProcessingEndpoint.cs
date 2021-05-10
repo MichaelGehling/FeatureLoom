@@ -24,6 +24,8 @@ namespace FeatureLoom.DataFlows
 
         //TODO: Better switch to FeatureLock?
         private readonly object syncLock;
+        
+        public Type ConsumedMessageType => typeof(T);
 
         public ProcessingEndpoint(Func<T, bool> processing, object synchronizationLock = null)
         {

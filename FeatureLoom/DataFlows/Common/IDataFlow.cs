@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
@@ -35,11 +36,22 @@ namespace FeatureLoom.DataFlows
         IDataFlowSink[] GetConnectedSinks();
     }
 
-    public interface IDataFlowSink<T> : IDataFlowSink
+
+    public interface ITypedDataFlowSink : IDataFlowSink
+    {
+        Type ConsumedMessageType { get; }
+    }
+
+    public interface IDataFlowSink<T> : ITypedDataFlowSink
     {
     }
 
-    public interface IDataFlowSource<T> : IDataFlowSource
+    public interface ITypedDataFlowSource : IDataFlowSource
+    {
+        Type SentMessageType { get; }
+    }
+
+    public interface IDataFlowSource<T> : ITypedDataFlowSource
     {
     }
 

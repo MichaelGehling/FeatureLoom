@@ -16,6 +16,9 @@ namespace FeatureLoom.DataFlows
         private CancellationTokenSource cts = new CancellationTokenSource();
         private Task forwardingTask;
 
+        public Type SentMessageType => typeof(T);
+        public Type ConsumedMessageType => typeof(T);
+
         public CurrentContextForwarder()
         {
             receiver = new QueueReceiver<T>();

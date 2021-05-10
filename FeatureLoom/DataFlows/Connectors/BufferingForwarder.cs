@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Collections;
 using FeatureLoom.Synchronization;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -17,6 +18,9 @@ namespace FeatureLoom.DataFlows
         private SourceValueHelper sourceHelper;
         private CountingRingBuffer<T> buffer;
         private FeatureLock bufferLock = new FeatureLock();
+
+        public Type SentMessageType => typeof(T);
+        public Type ConsumedMessageType => typeof(T);
 
         public BufferingForwarder(int bufferSize)
         {

@@ -16,6 +16,9 @@ namespace FeatureLoom.DataFlows
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly Func<I, O> convertFunc;
 
+        public Type SentMessageType => typeof(O);
+        public Type ConsumedMessageType => typeof(I);
+
         public MessageConverter(Func<I, O> convertFunc)
         {
             this.convertFunc = convertFunc;

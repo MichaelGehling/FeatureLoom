@@ -20,6 +20,8 @@ namespace FeatureLoom.DataFlows
         public int Count => IsEmpty ? 0 : 1;
         public IAsyncWaitHandle WaitHandle => readerWakeEvent.AsyncWaitHandle;
         private Comparer<T> priorityComparer;
+        
+        public Type ConsumedMessageType => typeof(T);
 
         public PriorityMessageReceiver(Comparer<T> priorityComparer)
         {

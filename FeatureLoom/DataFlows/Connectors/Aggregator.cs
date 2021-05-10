@@ -15,6 +15,8 @@ namespace FeatureLoom.DataFlows
         private A aggregationData = new A();
         private FeatureLock dataLock = new FeatureLock();
         private readonly Func<T, A, bool> aggregate;
+        
+        public Type ConsumedMessageType => typeof(T);
 
         /// <summary> The constructor taking the aggregation function. </summary>
         /// <param name="aggregate">

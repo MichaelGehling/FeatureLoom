@@ -18,6 +18,8 @@ namespace FeatureLoom.DataFlows
         public bool IsFull => false;
         public int Count => IsEmpty ? 0 : 1;
         public IAsyncWaitHandle WaitHandle => readerWakeEvent.AsyncWaitHandle;
+        
+        public Type ConsumedMessageType => typeof(T);
 
         public void Post<M>(in M message)
         {

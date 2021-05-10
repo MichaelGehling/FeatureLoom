@@ -8,6 +8,8 @@ namespace FeatureLoom.DataFlows
     {
         private SourceValueHelper sourceHelper;
         private readonly Func<T, ICollection> split;
+        
+        public Type ConsumedMessageType => typeof(T);
 
         public Splitter(Func<T, ICollection> split)
         {

@@ -58,7 +58,11 @@ namespace FeatureLoom.DataFlows
     {
         protected SourceValueHelper sourceHelper;
 
+        public Type SentMessageType => typeof(T);        
+
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        public Type MessageType => typeof(T);
 
         public IDataFlowSink[] GetConnectedSinks()
         {

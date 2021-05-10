@@ -26,6 +26,8 @@ namespace FeatureLoom.DataFlows
         public volatile int maxIdleMilliseconds;
 
         private volatile int numThreads = 0;
+        public Type SentMessageType => typeof(T);
+        public Type ConsumedMessageType => typeof(T);
 
         public int CountThreads => numThreads;
 

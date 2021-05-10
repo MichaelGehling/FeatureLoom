@@ -18,6 +18,9 @@ namespace FeatureLoom.DataFlows
         protected Func<T, bool> predicate;
         private LazyValue<SourceHelper> alternativeSendingHelper;
 
+        public Type SentMessageType => typeof(T);
+        public Type ConsumedMessageType => typeof(T);
+
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public IDataFlowSink[] GetConnectedSinks()

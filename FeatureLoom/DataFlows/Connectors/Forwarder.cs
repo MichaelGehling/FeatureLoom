@@ -1,10 +1,10 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
     /// <summary>
-    ///     Just forwards messages without processing it. It is thread-safe. Can be used as a
-    ///     hub-element in a dataFlow route.
+    ///     Just forwards messages without processing it. It is thread-safe.
     /// </summary>
     public class Forwarder : IDataFlowSource, IDataFlowConnection
     {
@@ -53,14 +53,55 @@ namespace FeatureLoom.DataFlows
         }
     }
 
-    public class Forwarder<T> : Forwarder, IDataFlowConnection<T>
+
+    /// <summary>
+    ///     Forwards messages if they are of the defined type without processing it. It is thread-safe.
+    /// </summary>
+    public class Forwarder<T> : IDataFlowConnection<T>
     {
-        public override void Post<M>(in M message)
+        protected TypedSourceValueHelper<T> sourceHelper;
+
+        public Type SentMessageType => typeof(T);
+        public Type ConsumedMessageType => typeof(T);
+
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            sourceHelper.ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return sourceHelper.ConnectTo(sink, weakReference);
+        }
+
+        public void DisconnectAll()
+        {
+            sourceHelper.DisconnectAll();
+        }
+
+        public void DisconnectFrom(IDataFlowSink sink)
+        {
+            sourceHelper.DisconnectFrom(sink);
+        }
+
+        public IDataFlowSink[] GetConnectedSinks()
+        {
+            return sourceHelper.GetConnectedSinks();
+        }
+
+        public void Post<M>(in M message)
+        {
+            if (message is T) sourceHelper.Forward(in message);
+        }
+
+        public void Post<M>(M message)
         {
             if (message is T) sourceHelper.Forward(message);
         }
 
-        public override Task PostAsync<M>(M message)
+        public Task PostAsync<M>(M message)
         {
             if (message is T) return sourceHelper.ForwardAsync(message);
             else return Task.CompletedTask;

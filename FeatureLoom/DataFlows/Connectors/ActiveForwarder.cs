@@ -12,6 +12,7 @@ namespace FeatureLoom.DataFlows
     ///     from the ThreadPool. The number of threads is scaled dynamically based on load. The
     ///     scaling parameters can be configured.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
+    ///     Note: When used for struct messages they will be boxed as an object.
     /// </summary>
     public class ActiveForwarder : ActiveForwarder<object>
     {
@@ -27,9 +28,10 @@ namespace FeatureLoom.DataFlows
     ///     scaling parameters can be configured.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
-    public class ActiveForwarder<T> : Forwarder, IDataFlowConnection<T>
+    public class ActiveForwarder<T> : IDataFlowConnection<T>
     {
-        private readonly QueueReceiver<T> receiver;
+        protected TypedSourceValueHelper<T> sourceHelper;
+        protected QueueReceiver<T> receiver;
         public volatile int threadLimit;
         public volatile int spawnThreshold;
         public volatile int maxIdleMilliseconds;
@@ -37,6 +39,8 @@ namespace FeatureLoom.DataFlows
         private volatile int numThreads = 0;
 
         public int CountThreads => numThreads;
+        public Type SentMessageType => typeof(T);
+        public Type ConsumedMessageType => typeof(T);
 
         /// <summary>
         ///     Creates an active forwarder that queues incoming messages and forwards them in
@@ -74,7 +78,15 @@ namespace FeatureLoom.DataFlows
 
         public int Count => receiver.Count;
 
-        public override void Post<M>(in M message)
+        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        public void Post<M>(in M message)
+        {
+            receiver.Post(in message);
+            ManageThreadCount();
+        }
+
+        public void Post<M>(M message)
         {
             receiver.Post(message);
             ManageThreadCount();
@@ -89,7 +101,7 @@ namespace FeatureLoom.DataFlows
             }
         }
 
-        public override Task PostAsync<M>(M message)
+        public Task PostAsync<M>(M message)
         {
             Task task = receiver.PostAsync(message);
             ManageThreadCount();
@@ -102,7 +114,7 @@ namespace FeatureLoom.DataFlows
             {
                 try
                 {
-                    base.Post(message);
+                    sourceHelper.Forward(message);
                 }
                 catch (Exception e)
                 {
@@ -111,6 +123,31 @@ namespace FeatureLoom.DataFlows
             }
 
             Interlocked.Decrement(ref numThreads);
+        }
+
+        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        {
+            sourceHelper.ConnectTo(sink, weakReference);
+        }
+
+        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        {
+            return sourceHelper.ConnectTo(sink, weakReference);
+        }
+
+        public void DisconnectFrom(IDataFlowSink sink)
+        {
+            sourceHelper.DisconnectFrom(sink);
+        }
+
+        public void DisconnectAll()
+        {
+            sourceHelper.DisconnectAll();
+        }
+
+        public IDataFlowSink[] GetConnectedSinks()
+        {
+            return sourceHelper.GetConnectedSinks();
         }
     }
 }
