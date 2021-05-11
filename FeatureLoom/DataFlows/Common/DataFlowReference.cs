@@ -3,6 +3,13 @@ using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.DataFlows
 {
+    /// <summary>
+    /// Used to store the reference of a connected IDataFlowSink.
+    /// Can either use a strong reference (default) or a weak reference.
+    /// The weak reference will not keep the referenced object alive when it is not referenced
+    /// somewhere else, so the garbage collector can remove it though it is connected
+    /// via the Dataflow.
+    /// </summary>
     public readonly struct DataFlowReference
     {
         private readonly IDataFlowSink strongRefSink;

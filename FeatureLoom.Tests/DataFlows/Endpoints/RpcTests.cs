@@ -117,7 +117,7 @@ namespace FeatureLoom.RPC
 
             var resultReceiver = new QueueReceiver<int>();
             caller.CallMultiResponse<int>("GetValue", resultReceiver);
-            Assert.Equal(2, resultReceiver.CountQueuedMessages);
+            Assert.Equal(2, resultReceiver.Count);
             Assert.Contains(42, resultReceiver.PeekAll());
             Assert.Contains(99, resultReceiver.PeekAll());
         }
@@ -138,7 +138,7 @@ namespace FeatureLoom.RPC
 
             var resultReceiver = new QueueReceiver<string>();
             caller.CallMultiResponse("GetValue", resultReceiver);
-            Assert.Equal(2, resultReceiver.CountQueuedMessages);
+            Assert.Equal(2, resultReceiver.Count);
             Assert.Contains("42", resultReceiver.PeekAll());
             Assert.Contains("99", resultReceiver.PeekAll());
         }

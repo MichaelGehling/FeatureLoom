@@ -6,7 +6,7 @@ namespace FeatureLoom.DataFlows
 {
     public class ActiveForwarderTest
     {
-        [Theory(Skip = "Fails on GitHub test server.")]
+        [Theory]
         [InlineData(42)]
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)

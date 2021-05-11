@@ -45,7 +45,7 @@ namespace FeatureLoom.DataFlows
                 sender.Send(number);
                 sendMessages.Add(number);
             }
-            Assert.Equal(limit.ClampHigh(numMessages), receiver.CountQueuedMessages);
+            Assert.Equal(limit.ClampHigh(numMessages), receiver.Count);
             var receivedMessages = receiver.ReceiveAll();
             Assert.Equal(limit.ClampHigh(numMessages), receivedMessages.Length);
 

@@ -48,7 +48,7 @@ namespace FeatureLoom.DataFlows
                 sender.Send(i);
                 sendMessages.Add(i);
             }
-            Assert.Equal(limit.ClampHigh(numMessages), receiver.CountQueuedMessages);
+            Assert.Equal(limit.ClampHigh(numMessages), receiver.Count);
             var receivedMessages = receiver.ReceiveAll();
             Assert.Equal(limit.ClampHigh(numMessages), receivedMessages.Length);
 
@@ -131,19 +131,19 @@ namespace FeatureLoom.DataFlows
             {
                 sender.Send(i);
             }
-            Assert.Equal(numMessages, receiver.CountQueuedMessages);
+            Assert.Equal(numMessages, receiver.Count);
             for (int i = 0; i < numThreads; i++)
             {
                 int threadIndex = i;
-                tasks[threadIndex] = Task.Run(() =>
+                tasks[threadIndex] = Task.Run((Action)(() =>
                 {
                     while (receiver.TryReceive(out int msg))
                     {
                         threadCounters[threadIndex] = threadCounters[threadIndex] + 1;
                         //Thread.Sleep(20);
                     }
-                    Assert.Equal(0, receiver.CountQueuedMessages);
-                });
+                    Assert.Equal(0, (int)receiver.Count);
+                }));
             }
 
             Task.WhenAll(tasks).WaitFor(false);

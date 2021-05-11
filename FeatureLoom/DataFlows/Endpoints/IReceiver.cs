@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
-    internal interface IReceiver<T>
+    public interface IReceiver<T> : IDataFlowSink<T>
     {
         bool IsEmpty { get; }
         bool IsFull { get; }

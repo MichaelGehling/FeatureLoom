@@ -207,8 +207,6 @@ namespace FeatureLoom.DataFlows
             return ((IAsyncWaitHandle)readerWakeEvent).TryConvertToWaitHandle(out waitHandle);
         }
 
-        public int CountQueuedMessages => Count;
-
         public Task WaitingTask => ((IAsyncWaitHandle)readerWakeEvent).WaitingTask;
     }
 }

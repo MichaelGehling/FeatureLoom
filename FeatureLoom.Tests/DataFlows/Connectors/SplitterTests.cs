@@ -16,7 +16,7 @@ namespace FeatureLoom.DataFlows
             sender.ConnectTo(splitter).ConnectTo(receiver);
 
             sender.Send("HELLO");
-            Assert.Equal(5, receiver.CountQueuedMessages);
+            Assert.Equal(5, receiver.Count);
             Assert.Equal('H', receiver.TryReceive(out char msg1) ? msg1 : ' ');
             Assert.Equal('E', receiver.TryReceive(out char msg2) ? msg2 : ' ');
             Assert.Equal('L', receiver.TryReceive(out char msg3) ? msg3 : ' ');

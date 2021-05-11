@@ -14,13 +14,6 @@ namespace FeatureLoom.DataFlows
         Task PostAsync<M>(M message);
     }
 
-    public interface IDataFlowQueue : IDataFlowSink
-    {
-        int CountQueuedMessages { get; }
-
-        object[] GetQueuedMesssages();
-    }
-
     public interface IDataFlowSource : IDataFlow
     {
         void ConnectTo(IDataFlowSink sink, bool weakReference = false);
@@ -72,10 +65,19 @@ namespace FeatureLoom.DataFlows
         IDataFlowSource Else { get; }
     }
 
-    public interface IReplier : IDataFlowSource, IDataFlowSink { };
+    public interface IReplier : IDataFlowSource, IDataFlowSink
+    {
+    };
 
     public interface IRequester : IDataFlowSource, IDataFlowSink
     {
         void ConnectToAndBack(IReplier replier, bool weakReference = false);
     };
+
+    public interface IDataFlowQueue : IDataFlowSink
+    {
+        int Count { get; }
+
+        object[] GetQueuedMesssages();
+    }
 }

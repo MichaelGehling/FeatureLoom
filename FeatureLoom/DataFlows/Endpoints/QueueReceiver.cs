@@ -188,8 +188,6 @@ namespace FeatureLoom.DataFlows
             if (!IsFull) writerWakeEvent.Set();
         }
 
-        public int CountQueuedMessages => queue.Count;
-
         public Task WaitingTask => WaitHandle.WaitingTask;
 
         public object[] GetQueuedMesssages()

@@ -2,6 +2,7 @@
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Time;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,18 +21,24 @@ namespace FeatureLoom.DataFlows
             : base(threadLimit, maxIdleMilliseconds, spawnThresholdFactor, maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue)
         {
         }
+
+        public ActiveForwarder(Comparer<object> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default) 
+            : base(priorityComparer, threadLimit, maxIdleMilliseconds, spawnThresholdFactor, maxQueueSize, maxWaitOnFullQueue)
+        {
+        }
     }
 
     /// <summary>
     ///     Creates an active forwarder that queues incoming messages and forwards them in threads
     ///     from the ThreadPool. The number of threads is scaled dynamically based on load. The
     ///     scaling parameters can be configured.
+    ///     Optionally, a priority queue can be used to order the incoming messages based on an individual comparer.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
     public class ActiveForwarder<T> : IDataFlowConnection<T>
     {
         protected TypedSourceValueHelper<T> sourceHelper;
-        protected QueueReceiver<T> receiver;
+        protected IReceiver<T> receiver;
         public volatile int threadLimit;
         public volatile int spawnThreshold;
         public volatile int maxIdleMilliseconds;
@@ -76,6 +83,39 @@ namespace FeatureLoom.DataFlows
             if (this.threadLimit < 1) this.threadLimit = 1;
         }
 
+        /// <summary>
+        ///     Creates an active forwarder that queues incoming messages and forwards them in
+        ///     threads from the ThreadPool. The number of threads is scaled dynamically based on
+        ///     load. The scaling parameters can be configured.
+        ///     The incoming messages are ordered by priority before they are forwarded.
+        ///     Note: Using more than one thread may alter the order of forwarded messages!
+        /// </summary>
+        /// <param name="priorityComparer"> Used to compare the priority of incoming messages</param>
+        /// <param name="threadLimit">
+        ///     the maximum number of parallel threads that are fetching messages from the queue and
+        ///     forwarding them
+        /// </param>
+        /// <param name="maxIdleMilliseconds">
+        ///     the maximum time a thread stays idle (when the wueue is empty) before it terminates
+        /// </param>
+        /// <param name="spawnThresholdFactor">
+        ///     a new thread is spawned if the number of queued items exceeds the current number of threads*spawnThresholdFactor
+        /// </param>
+        /// <param name="maxQueueSize"> the maximum number of messages in the queue </param>
+        /// <param name="maxWaitOnFullQueue">
+        ///     the maximum time a sender waits when the queue is full
+        /// </param>
+        public ActiveForwarder(Comparer<T> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
+        {
+            this.receiver = new PriorityQueueReceiver<T>(priorityComparer, maxQueueSize, maxWaitOnFullQueue);
+            this.threadLimit = threadLimit;
+            this.spawnThreshold = spawnThresholdFactor;
+            this.maxIdleMilliseconds = maxIdleMilliseconds;
+
+            if (this.spawnThreshold < 1) this.spawnThreshold = 1;
+            if (this.threadLimit < 1) this.threadLimit = 1;
+        }
+
         public int Count => receiver.Count;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
@@ -94,7 +134,7 @@ namespace FeatureLoom.DataFlows
 
         private void ManageThreadCount()
         {
-            if (numThreads * spawnThreshold < receiver.CountQueuedMessages && numThreads < threadLimit)
+            if (numThreads * spawnThreshold < receiver.Count && numThreads < threadLimit)
             {
                 Interlocked.Increment(ref numThreads);
                 _ = Run();
