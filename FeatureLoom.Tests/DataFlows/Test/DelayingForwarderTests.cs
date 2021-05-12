@@ -14,15 +14,19 @@ namespace FeatureLoom.DataFlows
             TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
-            var forwarder = new DelayingForwarder(20.Milliseconds());
+            var forwarder = new DelayingForwarder(1.Milliseconds());
             var sink = new SingleMessageTestSink<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);
+            Assert.False(sink.received);
+            Assert.True(sink.WaitHandle.Wait(2.Milliseconds()));
             Assert.True(sink.received);
             Assert.Equal(message, sink.receivedMessage);
+
+            Assert.False(TestHelper.HasAnyLogError());
         }
 
-        [Theory(Skip = "Fails on GitHub test server.")]
+        [Theory]
         [InlineData(100, 120)]
         [InlineData(0, 5)]
         public void CanDelayOnForward(int delay, int maxDuration)
@@ -32,11 +36,13 @@ namespace FeatureLoom.DataFlows
             var sender = new Sender();
             var forwarder = new DelayingForwarder(delay.Milliseconds());
             var sink = new SingleMessageTestSink<int>();
-            sender.ConnectTo(forwarder).ConnectTo(sink);
-            var timer = AppTime.TimeKeeper;
+            sender.ConnectTo(forwarder).ConnectTo(sink);            
             sender.Send(42);
+            if (delay > 0) Assert.False(sink.received);
+            Assert.True(sink.WaitHandle.Wait(maxDuration.Milliseconds()));
             Assert.True(sink.received);
-            Assert.InRange(timer.Elapsed, delay.Milliseconds(), (delay + maxDuration).Milliseconds());
+
+            Assert.False(TestHelper.HasAnyLogError());
         }
     }
 }

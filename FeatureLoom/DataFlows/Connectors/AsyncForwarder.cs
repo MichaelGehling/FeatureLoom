@@ -2,6 +2,9 @@
 
 namespace FeatureLoom.DataFlows
 {
+    /// <summary>
+    /// Messages are forwarded async without awaiting.
+    /// </summary>
     public class AsyncForwarder : IDataFlowConnection
     {
         protected SourceValueHelper sourceHelper;

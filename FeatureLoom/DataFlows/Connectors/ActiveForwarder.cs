@@ -44,7 +44,9 @@ namespace FeatureLoom.DataFlows
         public volatile int maxIdleMilliseconds;
 
         private volatile int numThreads = 0;
+        private volatile int maxThreadsOccurred = 0;
 
+        public int MaxThreadsOccurred => maxThreadsOccurred;
         public int CountThreads => numThreads;
         public Type SentMessageType => typeof(T);
         public Type ConsumedMessageType => typeof(T);
@@ -116,10 +118,8 @@ namespace FeatureLoom.DataFlows
             if (this.threadLimit < 1) this.threadLimit = 1;
         }
 
-        public int Count => receiver.Count;
-
-        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
-
+        public int CountConnectedSinks => receiver.Count;        
+       
         public void Post<M>(in M message)
         {
             receiver.Post(in message);
@@ -137,6 +137,7 @@ namespace FeatureLoom.DataFlows
             if (numThreads * spawnThreshold < receiver.Count && numThreads < threadLimit)
             {
                 Interlocked.Increment(ref numThreads);
+                if (numThreads > maxThreadsOccurred) maxThreadsOccurred = numThreads;
                 _ = Run();
             }
         }

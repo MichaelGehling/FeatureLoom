@@ -6,46 +6,37 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
-    // TODO: Refactor-> IAggregationData must do the whole work, no func necessary
-    public class Aggregator<T, A> : IDataFlowSink<T>, IDataFlowConnection, IAlternativeDataFlow where A : IAggregationData, new()
+    
+    public class Aggregator<I, O> : IDataFlowConnection<I, O>, IAlternativeDataFlow
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private LazyValue<SourceHelper> alternativeSender;
 
-        private A aggregationData = new A();
+        private IAggregationData<I,O> aggregationData;
         private FeatureLock dataLock = new FeatureLock();
-        private readonly Func<T, A, bool> aggregate;
-        
-        public Type ConsumedMessageType => typeof(T);
 
-        /// <summary> The constructor taking the aggregation function. </summary>
-        /// <param name="aggregate">
-        ///     The aggregation function must take the following parameters: (T) input message and
-        ///     (A) aggregation object and returns (bool) if the message was used for aggregation
-        ///     (true) or ignored (false).
-        /// </param>
-        public Aggregator(Func<T, A, bool> aggregate)
+        public Aggregator(IAggregationData<I, O> aggregationData)
         {
-            this.aggregate = aggregate;
+            this.aggregationData = aggregationData;
         }
+
+        public Type ConsumedMessageType => typeof(I);
+
 
         public void Post<M>(in M message)
         {
             bool alternative = true;
-            (bool ready, object msg, bool enumerate) output = default;
-            if (message is T validMessage)
+            if (message is I typedMessage)
             {
                 using (dataLock.Lock())
                 {
-                    alternative = !aggregate(validMessage, aggregationData);
-                    output = aggregationData.TryCreateOutputMessage();
+                    alternative = !aggregationData.AddMessage(typedMessage);
+                    while (aggregationData.TryGetAggregatedMessage(out O aggregatedMessage))
+                    {
+                        if (aggregationData.ForwardByRef) sourceHelper.Forward(in aggregatedMessage);
+                        else sourceHelper.Forward(aggregatedMessage);
+                    }
                 }
-            }
-
-            if (output.ready && output.msg != null)
-            {
-                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sourceHelper.Forward(msg);
-                else sourceHelper.Forward(in output.msg);
             }
             if (alternative) alternativeSender.ObjIfExists?.Forward(in message);
         }
@@ -53,20 +44,17 @@ namespace FeatureLoom.DataFlows
         public void Post<M>(M message)
         {
             bool alternative = true;
-            (bool ready, object msg, bool enumerate) output = default;
-            if (message is T validMessage)
+            if (message is I typedMessage)
             {
                 using (dataLock.Lock())
                 {
-                    alternative = !aggregate(validMessage, aggregationData);
-                    output = aggregationData.TryCreateOutputMessage();
+                    alternative = !aggregationData.AddMessage(typedMessage);
+                    while (aggregationData.TryGetAggregatedMessage(out O aggregatedMessage))
+                    {
+                        if (aggregationData.ForwardByRef) sourceHelper.Forward(in aggregatedMessage);
+                        else sourceHelper.Forward(aggregatedMessage);
+                    }
                 }
-            }
-
-            if (output.ready && output.msg != null)
-            {
-                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sourceHelper.Forward(msg);
-                else sourceHelper.Forward(output.msg);
             }
             if (alternative) alternativeSender.ObjIfExists?.Forward(message);
         }
@@ -74,21 +62,17 @@ namespace FeatureLoom.DataFlows
         public Task PostAsync<M>(M message)
         {
             bool alternative = true;
-            (bool ready, object msg, bool enumerate) output = default;
-            if (message is T validMessage)
+            if (message is I typedMessage)
             {
                 using (dataLock.Lock())
                 {
-                    alternative = !aggregate(validMessage, aggregationData);
-                    output = aggregationData.TryCreateOutputMessage();
+                    alternative = !aggregationData.AddMessage(typedMessage);
+                    while (aggregationData.TryGetAggregatedMessage(out O aggregatedMessage))
+                    {
+                        sourceHelper.ForwardAsync(aggregatedMessage);
+                    }
                 }
-            }
-
-            if (output.ready && output.msg != null)
-            {
-                if (output.enumerate && output.msg is IEnumerable outputMessages) foreach (var msg in outputMessages) sourceHelper.Forward(msg);
-                else return sourceHelper.ForwardAsync(output.msg);
-            }
+            }            
             if (alternative) return alternativeSender.ObjIfExists?.ForwardAsync(message);
             return Task.CompletedTask;
         }
@@ -96,6 +80,8 @@ namespace FeatureLoom.DataFlows
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public IDataFlowSource Else => alternativeSender.Obj;
+
+        public Type SentMessageType => typeof(O);
 
         public void DisconnectAll()
         {
@@ -123,19 +109,10 @@ namespace FeatureLoom.DataFlows
         }
     }
 
-    public interface IAggregationData
+    public interface IAggregationData<I, O>
     {
-        /// <summary>
-        ///     If the aggregation data is complete, it generates the resulting output message(s)
-        ///     and resets the aggregationData object if necessary.
-        /// </summary>
-        /// <returns>
-        ///     Returns a tuple consisting of:
-        ///     1. A bool indicating if the aggregation is ready to create the output message(s),
-        ///     2. The output message(s) (if there are multiple resulting messages it returns an
-        ///        enumerable container)
-        ///     3. A bool indicating if there are multiple messages in a container
-        /// </returns>
-        (bool ready, object msg, bool enumerate) TryCreateOutputMessage();
+        bool AddMessage(I message);
+        bool TryGetAggregatedMessage(out O aggregatedMessage);
+        bool ForwardByRef { get; }
     }
 }

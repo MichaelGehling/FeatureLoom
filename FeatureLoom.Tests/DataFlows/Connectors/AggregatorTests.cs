@@ -6,45 +6,65 @@ namespace FeatureLoom.DataFlows
 {
     public class AggregatorTests
     {
-        private class FullNameAggrergationData : IAggregationData
+        private class FullNameAggregationData : IAggregationData<(string key, string val), string>
         {
             public string firstName;
             public string lastName;
+            bool sendVariants = false;
 
-            public (bool ready, object msg, bool enumerate) TryCreateOutputMessage()
+            int variantNumber = 0;
+
+            public FullNameAggregationData(bool sendVariants)
             {
+                this.sendVariants = sendVariants;
+            }
+
+            public bool ForwardByRef => false;
+
+            public bool AddMessage((string key, string val) message)
+            {
+                if (message.key == "firstName") firstName = message.val;
+                else if (message.key == "lastName") lastName = message.val;
+                else return false;
+
+                return true;
+            }
+
+            public bool TryGetAggregatedMessage(out string aggregatedMessage)
+            {
+                aggregatedMessage = null;
                 if (firstName != null && lastName != null)
                 {
-                    var result = (true, firstName + " " + lastName, false);
-                    firstName = null;
-                    lastName = null;
-                    return result;
+                    if (!sendVariants)
+                    {
+                        aggregatedMessage = firstName + " " + lastName;
+                        firstName = null;
+                        lastName = null;
+                        return true;
+                    }
+                    else
+                    {
+                        if (variantNumber == 0)
+                        {
+                            aggregatedMessage = firstName + " " + lastName;
+                            variantNumber++;
+                            return true;
+                        }
+                        else 
+                        {
+                            aggregatedMessage = lastName + ", " + firstName;
+                            variantNumber = 0;
+                            firstName = null;
+                            lastName = null;
+                            return true;
+                        }
+                    }
                 }
-                else return (false, null, false);
+                else return false;
             }
         }
-
-        private class VariantNameAggrergationData : IAggregationData
-        {
-            public string firstName;
-            public string lastName;
-
-            public (bool ready, object msg, bool enumerate) TryCreateOutputMessage()
-            {
-                if (firstName != null && lastName != null)
-                {
-                    List<string> multipleResultMessages = new List<string>();
-                    multipleResultMessages.Add(firstName + " " + lastName);
-                    multipleResultMessages.Add(firstName + "_" + lastName);
-
-                    var result = (true, multipleResultMessages, true);
-                    firstName = null;
-                    lastName = null;
-                    return result;
-                }
-                else return (false, null, false);
-            }
-        }
+        
+        
 
         [Fact]
         public void CanAggregateComplementMessagesToASingleMessage()
@@ -52,15 +72,8 @@ namespace FeatureLoom.DataFlows
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var aggregator = new Aggregator<(string key, string val), FullNameAggrergationData>((msg, aggregation) =>
-            {
-                if (msg.key == "firstName") aggregation.firstName = msg.val;
-                else if (msg.key == "lastName") aggregation.lastName = msg.val;
-                else return false;
-
-                return true;
-            });
-            var sink = new SingleMessageTestSink<string>();
+            var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
+            var sink = new SingleMessageTestSink<string>();            
             sender.ConnectTo(aggregator).ConnectTo(sink);
 
             sender.Send(("bla", "bla"));
@@ -83,50 +96,44 @@ namespace FeatureLoom.DataFlows
         }
 
         [Fact]
-        public void ForwardsUnusedMessagesToElse()
+        public void ForwardsUnusedMessagesToAlternativeOutput()
         {
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var aggregator = new Aggregator<(string key, string val), FullNameAggrergationData>((msg, aggregation) =>
-            {
-                if (msg.key == "firstName") aggregation.firstName = msg.val;
-                else if (msg.key == "lastName") aggregation.lastName = msg.val;
-                else return false;
-
-                return true;
-            });
-            var elseSink = new SingleMessageTestSink<object>();
+            var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
+            var sink = new SingleMessageTestSink<(string key, string val)>();
             sender.ConnectTo(aggregator);
-            aggregator.Else.ConnectTo(elseSink);
+            aggregator.Else.ConnectTo(sink);
 
-            sender.Send(("bla", "bla"));
-            Assert.True(elseSink.received);
-            Assert.Equal(("bla", "bla"), elseSink.receivedMessage);
+            sender.Send(("bla1", "bla2"));
+            Assert.True(sink.received);
+            Assert.Equal("bla1", sink.receivedMessage.key);
+            Assert.Equal("bla2", sink.receivedMessage.val);
         }
 
         [Fact]
-        public void CanProduceMultipleMessagesAsAggregationResult()
+        public void CanAggregateComplementMessagesToAMultipleMessage()
         {
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var aggregator = new Aggregator<(string key, string val), VariantNameAggrergationData>((msg, aggregation) =>
-            {
-                if (msg.key == "firstName") aggregation.firstName = msg.val;
-                else if (msg.key == "lastName") aggregation.lastName = msg.val;
-                else return false;
+            var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(true));
+            var sink = new QueueReceiver<string>();
+            sender.ConnectTo(aggregator).ConnectTo(sink);
 
-                return true;
-            });
-            var receiver = new QueueReceiver<string>();
-            sender.ConnectTo(aggregator).ConnectTo(receiver);
+            sender.Send(("bla", "bla"));
+            Assert.Equal(0, sink.Count);
+            sender.Send(("firstName", "Jim"));
+            Assert.Equal(0, sink.Count);
             sender.Send(("firstName", "John"));
-            Assert.True(receiver.Count == 0);
+            Assert.Equal(0, sink.Count);
             sender.Send(("lastName", "Doe"));
-            Assert.True(receiver.Count == 2);
-            Assert.Equal("John Doe", receiver.TryReceive(out string name1) ? name1 : null);
-            Assert.Equal("John_Doe", receiver.TryReceive(out string name2) ? name2 : null);
+            Assert.Equal(2, sink.Count);
+            var results = sink.ReceiveAll();
+            Assert.Equal("John Doe", results[0]);
+            Assert.Equal("Doe, John", results[1]);
         }
+
     }
 }

@@ -10,10 +10,12 @@ namespace FeatureLoom.Diagnostics
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly TimeSpan delay;
+        private bool blocking;
 
-        public DelayingForwarder(TimeSpan delay)
+        public DelayingForwarder(TimeSpan delay, bool blocking = false)
         {
             this.delay = delay;
+            this.blocking = blocking;
         }
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
@@ -35,20 +37,41 @@ namespace FeatureLoom.Diagnostics
 
         public void Post<M>(in M message)
         {
-            AppTime.Wait(delay);
-            sourceHelper.Forward(message);
+            Post(message);
         }
 
         public void Post<M>(M message)
         {
-            AppTime.Wait(delay);
-            sourceHelper.Forward(in message);
+            if (blocking)
+            {
+                AppTime.Wait(delay);
+                sourceHelper.Forward(message);
+            }
+            else
+            {
+                Task.Run(() =>
+                {
+                    AppTime.Wait(delay);
+                    sourceHelper.Forward(message);
+                });
+            }
         }
 
         public async Task PostAsync<M>(M message)
         {
-            await AppTime.WaitAsync(delay);
-            await sourceHelper.ForwardAsync(message);
+            if (blocking)
+            {
+                await AppTime.WaitAsync(delay);
+                await sourceHelper.ForwardAsync(message);
+            }
+            else
+            {
+                _ = Task.Run(async () =>
+                {
+                    await AppTime.WaitAsync(delay);
+                    await sourceHelper.ForwardAsync(message);
+                });
+            }            
         }
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
