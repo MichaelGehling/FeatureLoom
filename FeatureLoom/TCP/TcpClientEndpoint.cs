@@ -115,7 +115,7 @@ namespace FeatureLoom.TCP
         private TimeFrame reconnectionCheckTimer = new TimeFrame(0.Seconds());
         private bool initialConfigUpdate = true;
 
-        private ActiveForwarder sendingSink = new ActiveForwarder();
+        private QueueForwarder sendingSink = new QueueForwarder();
         private readonly Forwarder receivedMessageSource = new Forwarder();
 
         private MessageConverter<object, byte[]> messageEncoder;

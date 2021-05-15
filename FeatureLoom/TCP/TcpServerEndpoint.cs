@@ -132,7 +132,7 @@ namespace FeatureLoom.TCP
 
         private X509Certificate2 serverCertificate = null;
 
-        private ActiveForwarder sendingSink = new ActiveForwarder();
+        private QueueForwarder sendingSink = new QueueForwarder();
         private readonly MessageConverter<object, object> messageEncoder;
         private AsyncForwarder connectionForwarder = new AsyncForwarder();
 

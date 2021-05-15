@@ -12,17 +12,19 @@ namespace FeatureLoom.DataFlows
     ///     Creates an active forwarder that queues incoming messages and forwards them in threads
     ///     from the ThreadPool. The number of threads is scaled dynamically based on load. The
     ///     scaling parameters can be configured.
+    ///     Optionally, a priority queue can be used to sort the incoming messages based on an individual comparer.
+    ///     If the order and exact number of used threads doesn't matter, consider to use the AsyncForwarder, as it can be more efficient in such scenario.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
-    ///     Note: When used for struct messages they will be boxed as an object.
+    ///     Note: When used for struct messages they will be boxed as an object. If you only have a single struct message type, use the typed QueueForwarder<T> instead to avoid boxing
     /// </summary>
-    public class ActiveForwarder : ActiveForwarder<object>
+    public class QueueForwarder : QueueForwarder<object>
     {
-        public ActiveForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
+        public QueueForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
             : base(threadLimit, maxIdleMilliseconds, spawnThresholdFactor, maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue)
         {
         }
 
-        public ActiveForwarder(Comparer<object> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default) 
+        public QueueForwarder(Comparer<object> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default) 
             : base(priorityComparer, threadLimit, maxIdleMilliseconds, spawnThresholdFactor, maxQueueSize, maxWaitOnFullQueue)
         {
         }
@@ -32,10 +34,11 @@ namespace FeatureLoom.DataFlows
     ///     Creates an active forwarder that queues incoming messages and forwards them in threads
     ///     from the ThreadPool. The number of threads is scaled dynamically based on load. The
     ///     scaling parameters can be configured.
-    ///     Optionally, a priority queue can be used to order the incoming messages based on an individual comparer.
+    ///     If the order and exact number of used threads doesn't matter, consider to use the AsyncForwarder, as it can be more efficient in such scenario.
+    ///     Optionally, a priority queue can be used to sort the incoming messages based on an individual comparer.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
-    public class ActiveForwarder<T> : IDataFlowConnection<T>
+    public class QueueForwarder<T> : IDataFlowConnection<T>
     {
         protected TypedSourceValueHelper<T> sourceHelper;
         protected IReceiver<T> receiver;
@@ -59,7 +62,7 @@ namespace FeatureLoom.DataFlows
         /// </summary>
         /// <param name="threadLimit">
         ///     the maximum number of parallel threads that are fetching messages from the queue and
-        ///     forwarding them
+        ///     forwarding them.
         /// </param>
         /// <param name="maxIdleMilliseconds">
         ///     the maximum time a thread stays idle (when the wueue is empty) before it terminates
@@ -74,7 +77,7 @@ namespace FeatureLoom.DataFlows
         /// <param name="dropLatestMessageOnFullQueue">
         ///     if true, the newest message is dropped when the queue is full, if false the oldest one
         /// </param>
-        public ActiveForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
+        public QueueForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
         {
             this.receiver = new QueueReceiver<T>(maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue);
             this.threadLimit = threadLimit;
@@ -107,7 +110,7 @@ namespace FeatureLoom.DataFlows
         /// <param name="maxWaitOnFullQueue">
         ///     the maximum time a sender waits when the queue is full
         /// </param>
-        public ActiveForwarder(Comparer<T> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
+        public QueueForwarder(Comparer<T> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
         {
             this.receiver = new PriorityQueueReceiver<T>(priorityComparer, maxQueueSize, maxWaitOnFullQueue);
             this.threadLimit = threadLimit;

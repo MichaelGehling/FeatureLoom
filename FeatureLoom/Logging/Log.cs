@@ -21,7 +21,7 @@ namespace FeatureLoom.Logging
         private class ContextData : IServiceContextData
         {
             public readonly Sender<LogMessage> logSender = new Sender<LogMessage>();
-            public readonly ActiveForwarder<LogMessage> logForwarder = new ActiveForwarder<LogMessage>(1, 1000, 10, 10000, TimeSpan.Zero, true);
+            public readonly QueueForwarder<LogMessage> logForwarder = new QueueForwarder<LogMessage>(1, 1000, 10, 10000, TimeSpan.Zero, true);
             public readonly Forwarder<LogMessage> syncForwarder = new Forwarder<LogMessage>();
 
             public ContextData()

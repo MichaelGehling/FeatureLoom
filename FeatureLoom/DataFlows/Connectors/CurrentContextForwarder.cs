@@ -6,10 +6,19 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
+    /// <summary>
+    /// Assures that incoming messages are forwarded within the synchronization context where this CurrentContextForwarder is instantiated.
+    /// This can be used, e.g. to process a message in a ProcessingEndpoint within a UI-Thread, though the message was send from some other thread!
+    /// Note: structs will be boxed. If you only have one message type, you can use the typed CurrentContextForwarder<T> to avoid boxing.
+    /// </summary>
     public class CurrentContextForwarder : CurrentContextForwarder<object>
     {
     }
 
+    /// <summary>
+    /// Assures that incoming messages are forwarded within the synchronization context where this CurrentContextForwarder is instantiated.
+    /// This can be used, e.g. to process a message in a ProcessingEndpoint within a UI-Thread, though the message was send from some other thread!
+    /// </summary>
     public class CurrentContextForwarder<T> : Forwarder, IDataFlowConnection<T>
     {
         private readonly QueueReceiver<T> receiver;

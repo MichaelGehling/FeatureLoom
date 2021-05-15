@@ -1,12 +1,11 @@
 ﻿using FeatureLoom.Diagnostics;
-using System.Collections.Generic;
 using Xunit;
 
 namespace FeatureLoom.DataFlows
 {
     public class AggregatorTests
     {
-        private class FullNameAggregationData : IAggregationData<(string key, string val), string>
+        private class FullNameAggregationData : Aggregator<(string key, string val), string>.IAggregationData
         {
             public string firstName;
             public string lastName;

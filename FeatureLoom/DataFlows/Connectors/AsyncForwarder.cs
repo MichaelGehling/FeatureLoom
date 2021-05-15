@@ -3,7 +3,9 @@
 namespace FeatureLoom.DataFlows
 {
     /// <summary>
-    /// Messages are forwarded async without awaiting.
+    /// Messages are forwarded async without awaiting, so the control is returned immediatly to the sender.
+    /// Be aware that the order of message might change, due to parallel processing.
+    /// If you need to keep the order, please use QueueForwarder.
     /// </summary>
     public class AsyncForwarder : IDataFlowConnection
     {

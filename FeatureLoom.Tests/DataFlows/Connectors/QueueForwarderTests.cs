@@ -4,7 +4,7 @@ using Xunit;
 
 namespace FeatureLoom.DataFlows
 {
-    public class ActiveForwarderTest
+    public class QueueForwarderTest
     {
         [Theory]
         [InlineData(42)]
@@ -14,7 +14,7 @@ namespace FeatureLoom.DataFlows
             TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
-            var forwarder = new ActiveForwarder();
+            var forwarder = new QueueForwarder();
             var sink = new SingleMessageTestSink<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);

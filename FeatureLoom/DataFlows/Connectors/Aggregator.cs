@@ -6,16 +6,21 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.DataFlows
 {
-    
+    /// <summary>
+    /// Feeds incoming messages into an AggregationData object.
+    /// When the aggregation data is complete it will send one or multiple messages to connected sinks.
+    /// </summary>
+    /// <typeparam name="I">The input type. If multiple message types are consumed for aggregation, this must be a common supertype</typeparam>
+    /// <typeparam name="O">The output type. If multiple message types are generated from the aggregated data, this must be a common supertype</typeparam>
     public class Aggregator<I, O> : IDataFlowConnection<I, O>, IAlternativeDataFlow
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private LazyValue<SourceHelper> alternativeSender;
 
-        private IAggregationData<I,O> aggregationData;
+        private IAggregationData aggregationData;
         private FeatureLock dataLock = new FeatureLock();
 
-        public Aggregator(IAggregationData<I, O> aggregationData)
+        public Aggregator(IAggregationData aggregationData)
         {
             this.aggregationData = aggregationData;
         }
@@ -107,12 +112,14 @@ namespace FeatureLoom.DataFlows
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
+
+        public interface IAggregationData
+        {
+            bool AddMessage(I message);
+            bool TryGetAggregatedMessage(out O aggregatedMessage);
+            bool ForwardByRef { get; }
+        }
     }
 
-    public interface IAggregationData<I, O>
-    {
-        bool AddMessage(I message);
-        bool TryGetAggregatedMessage(out O aggregatedMessage);
-        bool ForwardByRef { get; }
-    }
+    
 }
