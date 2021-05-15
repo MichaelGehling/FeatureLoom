@@ -10,11 +10,13 @@ namespace FeatureLoom.Collections
         private long counter = 0;
         private bool cycled = false;
         private AsyncManualResetEvent newEntryEvent;
-        private FeatureLock myLock = new FeatureLock();
+        private MicroValueLock myLock;
+        private bool threadSafe = true;
 
-        public CountingRingBuffer(int bufferSize)
+        public CountingRingBuffer(int bufferSize, bool threadSafe = true)
         {
             buffer = new T[bufferSize];
+            this.threadSafe = true;
         }
 
         public int Length => cycled ? buffer.Length : nextIndex;
@@ -35,7 +37,8 @@ namespace FeatureLoom.Collections
         public long Add(T item)
         {
             long result;
-            using (myLock.Lock())
+            if (threadSafe) myLock.Enter(true);
+            try
             {
                 buffer[nextIndex++] = item;
                 if (nextIndex >= buffer.Length)
@@ -45,6 +48,11 @@ namespace FeatureLoom.Collections
                 }
                 result = counter++;
             }
+            finally
+            {
+                if (threadSafe) myLock.Exit();
+            }
+
             newEntryEvent?.Set();
             newEntryEvent?.Reset(); // TODO: Setting and directly resetting might fail waking up waiting threads!
             return result;
@@ -52,17 +60,23 @@ namespace FeatureLoom.Collections
 
         public void Clear()
         {
-            using (myLock.Lock())
+            if (threadSafe) myLock.Enter(true);
+            try
             {
                 cycled = false;
                 counter = 0;
                 nextIndex = 0;
             }
+            finally
+            {
+                if (threadSafe) myLock.Exit();
+            }
         }
 
         public bool Contains(T item)
         {
-            using (myLock.LockReadOnly())
+            if (threadSafe) myLock.EnterReadOnly(true);
+            try
             {
                 int until = cycled ? buffer.Length : nextIndex;
                 for (int i = 0; i < until; i++)
@@ -71,11 +85,16 @@ namespace FeatureLoom.Collections
                 }
                 return false;
             }
+            finally
+            {
+                if (threadSafe) myLock.ExitReadOnly();
+            }
         }
 
         public T GetLatest()
         {
-            using (myLock.LockReadOnly())
+            if (threadSafe) myLock.EnterReadOnly(true);
+            try
             {
                 if (nextIndex == 0)
                 {
@@ -84,11 +103,16 @@ namespace FeatureLoom.Collections
                 }
                 else return buffer[nextIndex - 1];
             }
+            finally
+            {
+                if (threadSafe) myLock.ExitReadOnly();
+            }
         }
 
         public bool TryGetFromNumber(long number, out T result)
         {
-            using (myLock.LockReadOnly())
+            if (threadSafe) myLock.EnterReadOnly(true);
+            try
             {
                 result = default;
                 if (number >= counter || counter - number > Length) return false;
@@ -98,11 +122,16 @@ namespace FeatureLoom.Collections
                 else result = buffer[buffer.Length - offset];
                 return true;
             }
+            finally
+            {
+                if (threadSafe) myLock.ExitReadOnly();
+            }
         }
 
         public T[] GetAvailableSince(long startNumber, out long missed)
         {
-            using (myLock.LockReadOnly())
+            if (threadSafe) myLock.EnterReadOnly(true);
+            try
             {
                 missed = 0;
                 if (startNumber >= counter) return Array.Empty<T>();
@@ -117,22 +146,36 @@ namespace FeatureLoom.Collections
                 CopyToInternal(result, 0, numberToCopy);
                 return result;
             }
+            finally
+            {
+                if (threadSafe) myLock.ExitReadOnly();
+            }
         }
 
         public void CopyTo(T[] array, int arrayIndex)
         {
-            using (myLock.LockReadOnly())
+            if (threadSafe) myLock.EnterReadOnly(true);
+            try
             {
                 var leftSpace = array.Length - arrayIndex;
                 CopyToInternal(array, arrayIndex, leftSpace > Length ? Length : leftSpace);
+            }
+            finally
+            {
+                if (threadSafe) myLock.ExitReadOnly();
             }
         }
 
         public void CopyTo(T[] array, int arrayIndex, int copyLength)
         {
-            using (myLock.LockReadOnly())
+            if (threadSafe) myLock.EnterReadOnly(true);
+            try
             {
                 CopyToInternal(array, arrayIndex, copyLength);
+            }
+            finally
+            {
+                if (threadSafe) myLock.ExitReadOnly();
             }
         }
 

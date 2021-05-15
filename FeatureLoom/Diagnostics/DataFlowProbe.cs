@@ -30,11 +30,11 @@ namespace FeatureLoom.Diagnostics
             this.filter = filter;
             this.convert = converter;
             this.timeSliceSize = timeSliceSize;
-            if (convert != null && messageBufferSize > 0) messageBuffer = new CountingRingBuffer<(DateTime timestamp, T2 message)>(messageBufferSize);
-            else if (messageBufferSize > 0) timestampBuffer = new CountingRingBuffer<DateTime>(messageBufferSize);
+            if (convert != null && messageBufferSize > 0) messageBuffer = new CountingRingBuffer<(DateTime timestamp, T2 message)>(messageBufferSize, false);
+            else if (messageBufferSize > 0) timestampBuffer = new CountingRingBuffer<DateTime>(messageBufferSize, false);
             if (maxTimeSlices > 0)
             {
-                timeSliceCounterBuffer = new CountingRingBuffer<TimeSliceCounter>(maxTimeSlices);
+                timeSliceCounterBuffer = new CountingRingBuffer<TimeSliceCounter>(maxTimeSlices, false);
                 currentTimeSlice = new TimeSliceCounter(timeSliceSize);
             }
         }

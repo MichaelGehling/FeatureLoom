@@ -24,18 +24,15 @@ namespace FeatureLoom.DataFlows
 
         public BufferingForwarder(int bufferSize)
         {
-            buffer = new CountingRingBuffer<T>(bufferSize);
+            buffer = new CountingRingBuffer<T>(bufferSize, false);
         }
 
         private void OnConnection(IDataFlowSink sink)
         {
-            using (bufferLock.LockReadOnly())
+            var bufferedMessages = buffer.GetAvailableSince(0, out long missed);
+            foreach (var msg in bufferedMessages)
             {
-                var bufferedMessages = buffer.GetAvailableSince(0, out long missed);
-                foreach (var msg in bufferedMessages)
-                {
-                    sink.Post(msg);
-                }
+                sink.Post(msg);
             }
         }
 
@@ -93,13 +90,20 @@ namespace FeatureLoom.DataFlows
 
         public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
         {
-            OnConnection(sink);
-            sourceHelper.ConnectTo(sink, weakReference);
+            using (bufferLock.LockReadOnly())
+            {
+                OnConnection(sink);
+                sourceHelper.ConnectTo(sink, weakReference);
+            }
         }
 
         public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
         {
-            return sourceHelper.ConnectTo(sink, weakReference);
+            using (bufferLock.LockReadOnly())
+            {
+                OnConnection(sink);
+                return sourceHelper.ConnectTo(sink, weakReference);
+            }
         }
     }
 }
