@@ -41,7 +41,7 @@ namespace FeatureLoom.Supervisions
             }
         }
 
-        public static void Supervise(Action supervisionAction, Func<bool> checkValidity, Func<TimeSpan> getDelay = null)
+        public static void Supervise(Action<TimeSpan> supervisionAction, Func<bool> checkValidity, Func<TimeSpan> getDelay = null)
         {
             AddSupervision(new GenericSupervision(supervisionAction, checkValidity, getDelay));
         }
@@ -49,35 +49,46 @@ namespace FeatureLoom.Supervisions
         private static void StartSupervision()
         {
             int stopCounter = 0;
+            TimeKeeper timer = AppTime.TimeKeeper;
+            TimeSpan executionTime = TimeSpan.Zero;
+            TimeSpan lastDelay;
+            TimeSpan delayStart = timer.StartTime;
             while (true)
             {
+                lastDelay = timer.StartTime - delayStart;
+                delayStart = timer.StartTime;
+                TimeSpan executionStart = timer.LastElapsed;
+
                 if (!CheckForPause(ref stopCounter)) return;
                 CheckForNewSupervisions(ref stopCounter);
-                HandleActiveSupervisions();
-                SwapHandledToActive();
+                HandleActiveSupervisions(lastDelay);
+                SwapHandledToActive();                
 
-                TimeSpan delay = GetDelay();
+                TimeSpan executionFinish = timer.Elapsed;
+                executionTime = executionFinish - executionStart;
 
-                AppTime.Wait(delay, cts.Token);
+                timer.Restart(timer.StartTime + timer.LastElapsed);
+                TimeSpan delay = GetDelay(executionTime);
+                AppTime.Wait(delay, ref timer, cts.Token);
             }
         }
 
-        private static TimeSpan GetDelay()
+        private static TimeSpan GetDelay(TimeSpan executionTime)
         {
             TimeSpan minDelay = TimeSpan.MaxValue;
             foreach (var supervision in activeSupervisions)
             {
-                var delay = supervision.MaxDelay;
+                var delay = supervision.MaxDelay - executionTime;
                 if (delay < minDelay) minDelay = delay;
             }
             return minDelay.Clamp(minimumDelay, int.MaxValue.Milliseconds());
         }
 
-        private static void HandleActiveSupervisions()
+        private static void HandleActiveSupervisions(TimeSpan lastDelay)
         {
             foreach (var supervisor in activeSupervisions)
             {
-                supervisor.Handle();
+                supervisor.Handle(lastDelay);
                 if (supervisor.IsActive) handledSupervisions.Add(supervisor);
             }
         }
@@ -136,11 +147,11 @@ namespace FeatureLoom.Supervisions
 
         private class GenericSupervision : ISupervision
         {
-            private Action handleAction;
+            private Action<TimeSpan> handleAction;
             private Func<bool> validityCheck;
             private Func<TimeSpan> getDelay = () => TimeSpan.Zero;
 
-            public GenericSupervision(Action handleAction, Func<bool> validityCheck, Func<TimeSpan> getDelay = null)
+            public GenericSupervision(Action<TimeSpan> handleAction, Func<bool> validityCheck, Func<TimeSpan> getDelay = null)
             {
                 this.handleAction = handleAction;
                 this.validityCheck = validityCheck;
@@ -151,9 +162,9 @@ namespace FeatureLoom.Supervisions
 
             public bool IsActive => validityCheck();
 
-            public void Handle()
+            public void Handle(TimeSpan lastDelay)
             {
-                handleAction();
+                handleAction(lastDelay);
             }
         }
     }

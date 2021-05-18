@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.Supervisions;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -16,6 +17,7 @@ namespace FeatureLoom.DataFlows
         private readonly TimeSpan suppressionTime;
         private readonly TimeSpan cleanupPeriode = 10.Seconds();
         private readonly Func<object, object, bool> isDuplicate;
+        private TimeSpan cleanUpDelay = TimeSpan.Zero;
 
         public DuplicateMessageSuppressor(TimeSpan suppressionTime, Func<object, object, bool> isDuplicate = null, TimeSpan cleanupPeriode = default)
         {
@@ -26,7 +28,19 @@ namespace FeatureLoom.DataFlows
             this.cleanupPeriode = this.cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
 
             // TODO make it testable
-            new Timer(_ => CleanUpSuppressors(AppTime.Now), null, this.cleanupPeriode, this.cleanupPeriode);
+            SupervisionService.Supervise((lastDelay) => 
+            {
+                cleanUpDelay += lastDelay;
+                if (cleanUpDelay > cleanupPeriode)
+                {
+                    using (suppressorsLock.Lock())
+                    {
+                        CleanUpSuppressors(AppTime.Now);
+                    }                    
+                }
+            }, 
+            () => true, // TODO: Supervision must be cancelled if this DuplicateMessageSuppressor is dereferenced... Supervision also keeps reference  :(
+            () => this.cleanupPeriode - cleanUpDelay);
         }
 
         public void AddSuppressor<M>(M suppressorMessage)
@@ -58,6 +72,7 @@ namespace FeatureLoom.DataFlows
 
         private void CleanUpSuppressors(DateTime now)
         {
+            cleanUpDelay = TimeSpan.Zero;
             while (suppressors.Count > 0)
             {
                 if (now > suppressors.Peek().suppressionEnd) suppressors.Dequeue();

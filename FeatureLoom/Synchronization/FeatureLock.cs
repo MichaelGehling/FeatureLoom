@@ -1620,7 +1620,7 @@ namespace FeatureLoom.Synchronization
 
         TimeSpan ISupervision.MaxDelay => (0.0005 * Settings.supervisionDelayFactor).Milliseconds();
 
-        void ISupervision.Handle()
+        void ISupervision.Handle(TimeSpan lastDelay)
         {
             if (queueHead == null)
             {

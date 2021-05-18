@@ -4,7 +4,7 @@ namespace FeatureLoom.Supervisions
 {
     public interface ISupervision
     {
-        void Handle();
+        void Handle(TimeSpan lastDelay);
 
         bool IsActive { get; }
         TimeSpan MaxDelay { get; }
