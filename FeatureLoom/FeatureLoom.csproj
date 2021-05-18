@@ -12,11 +12,13 @@
     <RepositoryUrl>https://github.com/MichaelGehling/FeatureLoom</RepositoryUrl>
     <Description>FeatureLoom is a development framework written in C#. It provides a set of features to simplify and speed-up development while leading to a better structured and extensible architecture allowing for an iterative development approach. FeatureLoom can be used in many contexts like client, server and mobile applications for various platforms as it is build on .Net Standard 2.0 and actively supports synchronous and asynchronous coding.</Description>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>0.1.0</Version>
+    <Version>0.1.0.1</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageTags>c#, state machine, data flow, communication, extensions, workflow,</PackageTags>
-    <PackageReleaseNotes>FeauterLoom is currently in an alpha release state.</PackageReleaseNotes>
+    <PackageReleaseNotes>FeauterLoom is currently in an pre-alpha state.</PackageReleaseNotes>
     <Copyright>Copyright (c) 2020 Michael Gehling</Copyright>
+    <AssemblyVersion>0.1.0.1</AssemblyVersion>
+    <FileVersion>0.1.0.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
