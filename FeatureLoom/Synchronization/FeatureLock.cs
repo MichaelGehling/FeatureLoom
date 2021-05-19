@@ -54,12 +54,26 @@ namespace FeatureLoom.Synchronization
             // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
             // Comes with a quite noticeable performance cost, especially for high frequency locking.
             public bool restrictQueueJumping = false;
+
+            public FeatureLockSettings Clone() => (FeatureLockSettings)this.MemberwiseClone();            
         }
 
         // Predefined settings, default is PerformanceSettings
         private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
         private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20, supervisionDelayFactor = 10 };
+        /// <summary>
+        /// The settings that are used by all FeatureLock instances where settings were not explicitly set in the constructor.
+        /// The DefaultSettings are the same as the prepared PerformanceSettings, but they can be changed, to affect all FeatureLock instances.
+        /// </summary>
+        public static FeatureLockSettings DefaultSettings { get; set; }
+        /// <summary>
+        /// Predefined settings optimized for performance. depending on the application and system, performance can still be improved by further tweaking.
+        /// Fairness is less, but it is guaranteed to avoid endless waiting by favouring longer waiting candidates.
+        /// </summary>
         public static FeatureLockSettings PerformanceSettings => performanceSettings;
+        /// <summary>
+        /// Predefined settings optimized for fairness, forcing to keep the order in near to all cases, but coming with a performance penalty.
+        /// </summary>
         public static FeatureLockSettings FairnessSettings  => fairnessSettings;
         #endregion ConstructorAndSettings
 
@@ -247,7 +261,7 @@ namespace FeatureLoom.Synchronization
 
         #region LocalVariableAccess
         // Provides the active settings of the FeatureLock
-        private FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? PerformanceSettings;
+        private FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? DefaultSettings;
 
         // Keeps the last reentrancyId of the "logical thread".
         // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
