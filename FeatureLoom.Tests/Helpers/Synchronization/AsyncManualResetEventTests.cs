@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using FeatureLoom.Diagnostics;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -10,6 +11,8 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void CanBeAwaitedSyncAndAsync()
         {
+            TestHelper.PrepareTestContext();
+
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
 
             Task syncTask = Task.Run(() =>
@@ -35,6 +38,8 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void PulseAllWillAwakeAll()
         {
+            TestHelper.PrepareTestContext();
+
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
             List<Thread> threads = new List<Thread>();
             int countEnd = 0;

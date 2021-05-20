@@ -58,14 +58,19 @@ namespace FeatureLoom.Synchronization
             public FeatureLockSettings Clone() => (FeatureLockSettings)this.MemberwiseClone();            
         }
 
-        // Predefined settings, default is PerformanceSettings
+        // Predefined settings, default is the same as PerformanceSettings, but can be changed.
+        private static FeatureLockSettings defaultSettings = new FeatureLockSettings();
         private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
         private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20, supervisionDelayFactor = 10 };
         /// <summary>
         /// The settings that are used by all FeatureLock instances where settings were not explicitly set in the constructor.
         /// The DefaultSettings are the same as the prepared PerformanceSettings, but they can be changed, to affect all FeatureLock instances.
         /// </summary>
-        public static FeatureLockSettings DefaultSettings { get; set; }
+        public static FeatureLockSettings DefaultSettings
+        {
+            get => defaultSettings;
+            set => defaultSettings = value;
+        }
         /// <summary>
         /// Predefined settings optimized for performance. depending on the application and system, performance can still be improved by further tweaking.
         /// Fairness is less, but it is guaranteed to avoid endless waiting by favouring longer waiting candidates.

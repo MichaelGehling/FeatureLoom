@@ -10,7 +10,7 @@ namespace FeatureLoom.Synchronization
     {
         [Fact]
         public void LockAttemptBlocksWhileLockInUse()
-        {
+        {            
             var myLock = new MicroLock();
             bool secondLockEntered = false;
             ManualResetEventSlim waiter = new ManualResetEventSlim(false);

@@ -25,6 +25,8 @@ namespace FeatureLoom.DataFlows
         [Fact]
         public void TypedForwarderFailsWhenConnectedToWrongType()
         {
+            TestHelper.PrepareTestContext();
+
             Forwarder<int> intForwarder = new Forwarder<int>();
             Forwarder<int> intForwarder2 = new Forwarder<int>();
             Forwarder<string> stringForwarder = new Forwarder<string>();
