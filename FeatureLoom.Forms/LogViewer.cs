@@ -5,7 +5,9 @@ using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using FeatureLoom.Workflows;
 using System.Drawing;
+using System.Text;
 using System.Windows.Forms;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Forms
 {
@@ -43,6 +45,7 @@ namespace FeatureLoom.Forms
             private QueueReceiver<LogMessage> queue = new QueueReceiver<LogMessage>(10000, default, false);
             private MessageTrigger closingTrigger = new MessageTrigger();
             private WaitHandleCollection waitHandles;
+            private StringBuilder stringBuilder = new StringBuilder();
 
             public WritingLogWorkflow(LogViewer logViewer, IDataFlowSource logMessageSource)
             {
@@ -83,8 +86,8 @@ namespace FeatureLoom.Forms
                                         case Loglevel.INFO: color = Color.DarkBlue; break;
                                         case Loglevel.TRACE: color = Color.Gray; break;
                                     }
-                                    if (color != textBox.ForeColor) textBox.AppendText(msg.Print() + "\n", color);
-                                    else textBox.AppendText(msg.Print() + "\n");
+                                    if (color != textBox.ForeColor) textBox.AppendText(msg.PrintToStringBuilder(c.stringBuilder).Append("\n").GetStringAndClear(), color);
+                                    else textBox.AppendText(msg.PrintToStringBuilder(c.stringBuilder).Append("\n").GetStringAndClear());
 
                                     c.logViewer.logNotificationSender.Send(msg);
                                 }

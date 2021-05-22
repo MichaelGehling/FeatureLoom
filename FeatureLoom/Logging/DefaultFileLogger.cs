@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.DataFlows;
+using FeatureLoom.Extensions;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Storages;
 using FeatureLoom.Time;
@@ -6,6 +7,7 @@ using FeatureLoom.Workflows;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Logging
@@ -60,13 +62,15 @@ namespace FeatureLoom.Logging
             public int delayAfterWritingInMs = 0;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
+            public int bufferingQueueSize = 10000;
         }
 
         public Config config;
 
-        private QueueReceiver<object> receiver = new QueueReceiver<object>(100000);
+        private QueueReceiver<LogMessage> receiver;
         private string logFilePath;
         private string archiveFilePath;
+        private StringBuilder stringBuilder = new StringBuilder();
 
         public void Post<M>(in M message)
         {
@@ -83,8 +87,10 @@ namespace FeatureLoom.Logging
         public DefaultFileLogger(Config config = null)
         {
             this.config = config ?? new Config();
+            this.config.TryUpdateFromStorage(true);
             this.logFilePath = new FileInfo(this.config.logFilePath).FullName;
             this.archiveFilePath = new FileInfo(this.config.archiveFilePath).FullName;
+            receiver = new QueueReceiver<LogMessage>(config.bufferingQueueSize);
         }
 
         private float GetLogFileSize()
@@ -105,7 +111,7 @@ namespace FeatureLoom.Logging
             using (StreamWriter writer = new StreamWriter(stream))
             {
                 if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
-                if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").Print(config.logFileLogFormat));
+                if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear());
 
                 var messages = receiver.ReceiveAll();
                 foreach (var msg in messages)
@@ -114,7 +120,7 @@ namespace FeatureLoom.Logging
                     {
                         if (logMsg.level <= config.logFileLoglevel)
                         {
-                            await writer.WriteLineAsync(logMsg.Print(config.logFileLogFormat));
+                            await writer.WriteLineAsync(logMsg.PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear());
                         }
                     }
                     else await writer.WriteLineAsync(msg.ToString());

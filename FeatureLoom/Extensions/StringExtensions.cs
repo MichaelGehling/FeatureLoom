@@ -194,5 +194,12 @@ namespace FeatureLoom.Extensions
         {
             return (T)Convert.ChangeType(str, typeof(T));
         }
+
+        public static string  GetStringAndClear(this StringBuilder sb)
+        {
+            string str = sb.ToString();
+            sb.Clear();
+            return str;
+        }
     }
 }
