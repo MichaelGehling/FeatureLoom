@@ -23,7 +23,7 @@ namespace FeatureLoom.Logging
 
                 starting.Build()
                     .Step("Load Configuration")
-                        .Do(async c => await c.config.TryUpdateFromStorageAsync(true))
+                        .Do(async c => await c.UpdateConfigAsync())
                     .Step("If NewFileOnStartup is configured force archiving.")
                         .If(c => c.config.newFileOnStartup)
                             .Do(c => c.ArchiveCurrentLogfile())
@@ -32,7 +32,7 @@ namespace FeatureLoom.Logging
 
                 logging.Build("Logging")
                     .Step("Check for config update")
-                        .Do(async c => await c.config.TryUpdateFromStorageAsync(true))
+                        .Do(async c => await c.UpdateConfigAsync())
                     .Step("Wait until receiving logMessages")
                         .WaitFor(c => c.receiver)
                     .Step("Write all logMessages from receiver to file")
@@ -62,12 +62,12 @@ namespace FeatureLoom.Logging
             public int delayAfterWritingInMs = 0;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
-            public int bufferingQueueSize = 10000;
+            public int maxQueueSize = 10000;
         }
 
         public Config config;
 
-        private QueueReceiver<LogMessage> receiver;
+        private QueueReceiver<LogMessage> receiver = new QueueReceiver<LogMessage>();
         private string logFilePath;
         private string archiveFilePath;
         private StringBuilder stringBuilder = new StringBuilder();
@@ -90,7 +90,12 @@ namespace FeatureLoom.Logging
             this.config.TryUpdateFromStorage(true);
             this.logFilePath = new FileInfo(this.config.logFilePath).FullName;
             this.archiveFilePath = new FileInfo(this.config.archiveFilePath).FullName;
-            receiver = new QueueReceiver<LogMessage>(config.bufferingQueueSize);
+        }
+
+        private async Task UpdateConfigAsync()
+        {
+            await config.TryUpdateFromStorageAsync(true);
+            receiver.maxQueueSize = config.maxQueueSize;
         }
 
         private float GetLogFileSize()
