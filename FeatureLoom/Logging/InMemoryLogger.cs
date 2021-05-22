@@ -21,12 +21,12 @@ namespace FeatureLoom.Logging
 
         public void Post<M>(M message)
         {
-            if (message is LogMessage logMessage) buffer.Add(logMessage);
+            Post(in message);
         }
 
         public Task PostAsync<M>(M message)
         {
-            if (message is LogMessage logMessage) buffer.Add(logMessage);
+            Post(in message);
             return Task.CompletedTask;
         }
 

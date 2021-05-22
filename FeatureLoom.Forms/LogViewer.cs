@@ -33,7 +33,7 @@ namespace FeatureLoom.Forms
             };
 
             this.richTextBox1.DoubleClick += (a, b) => keepReading = !keepReading;
-            this.workflow = new WritingLogWorkflow(this, logMessageSource ?? Log.LogForwarder);
+            this.workflow = new WritingLogWorkflow(this, logMessageSource ?? Log.SyncLogSource);
             Log.logRunner.Run(workflow);
         }
 
@@ -61,7 +61,7 @@ namespace FeatureLoom.Forms
                             .WaitForAny(c => c.waitHandles.All ?? c.waitHandles.Init(c.queue, c.closingTrigger))
                         .Step("If the window was closed disconnect and finish the workflow")
                             .If(c => c.closingTrigger.IsTriggered(false) && !c.logViewer.hideOnClosing)
-                                .Do(c => Log.LogForwarder.DisconnectFrom(c.queue))
+                                .Do(c => Log.SyncLogSource.DisconnectFrom(c.queue))
                                 .Finish()
                         .Step("Read logmessages from queue and write them to the textbox for a short time")
                             .Do(c =>

@@ -14,24 +14,27 @@ namespace FeatureLoom.Diagnostics
         public static void PrepareTestContext(bool disconnectLoggers = true, bool useMemoryStorage = true, bool bufferLogErrorsAndWarnings = true)
         {
             ServiceContext.UseNewContexts();
-            if (disconnectLoggers) Log.LogForwarder.DisconnectAll();
+            if (disconnectLoggers)
+            {
+                Log.QueuedLogSource.DisconnectAll();
+                Log.SyncLogSource.DisconnectAll();
+            }
+
+            Log.SyncLogSource.ConnectTo(new ProcessingEndpoint<LogMessage>(msg =>
+            {
+                using (context.Data.contextLock.Lock())
+                {
+                    if (msg.level == Loglevel.ERROR) context.Data.errors.Add(msg);
+                    else if (bufferLogErrorsAndWarnings && msg.level == Loglevel.WARNING) context.Data.warnings.Add(msg);
+                }
+            }));
+
             if (useMemoryStorage)
             {
                 Storage.DefaultReaderFactory = (category) => new MemoryStorage(category);
                 Storage.DefaultWriterFactory = (category) => new MemoryStorage(category);
                 Storage.RemoveAllReaderAndWriter();
-            }
-            if (bufferLogErrorsAndWarnings)
-            {
-                Log.LogForwarder.ConnectTo(new ProcessingEndpoint<LogMessage>(msg =>
-                {
-                    using (context.Data.contextLock.Lock())
-                    {
-                        if (msg.level == Loglevel.ERROR) context.Data.errors.Add(msg);
-                        else if (msg.level == Loglevel.WARNING) context.Data.warnings.Add(msg);
-                    }
-                }));
-            }
+            }            
         }
 
         public static bool HasAnyLogError(bool includeWarnings = true)

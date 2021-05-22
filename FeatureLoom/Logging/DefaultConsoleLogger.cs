@@ -48,27 +48,7 @@ namespace FeatureLoom.Logging
 
         public void Post<M>(M message)
         {
-            if (!hasConsole) return;
-
-            config.TryUpdateFromStorage(true);
-
-            if (message is LogMessage logMessage)
-            {
-                if (logMessage.level <= config.logFileLoglevel)
-                {
-                    string strMsg;
-                    using (stringBuilderLock.Lock())
-                    {
-                        strMsg = logMessage.PrintToStringBuilder(stringBuilder).ToString();
-                        stringBuilder.Clear();
-                    }
-                    Console.WriteLine(strMsg);
-                }
-            }
-            else
-            {
-                Console.WriteLine(message.ToString());
-            }
+            Post(in message);
         }
 
         public static bool CheckHasConsole()

@@ -20,16 +20,16 @@ namespace FeatureLoom.Logging
 
         private class ContextData : IServiceContextData
         {
-            public readonly Sender<LogMessage> logSender = new Sender<LogMessage>();
-            public readonly QueueForwarder<LogMessage> logForwarder = new QueueForwarder<LogMessage>(1, 1000, 10, 10000, TimeSpan.Zero, true);
-            public readonly Forwarder<LogMessage> syncForwarder = new Forwarder<LogMessage>();
+            public readonly Forwarder<LogMessage> logSink = new Forwarder<LogMessage>();
+            public readonly QueueForwarder<LogMessage> queueLogForwarder = new QueueForwarder<LogMessage>(1, 1000, 10, 10000, TimeSpan.Zero, true);
+            public readonly Forwarder<LogMessage> syncLogForwarder = new Forwarder<LogMessage>();
 
             public ContextData()
             {
-                logSender.ConnectTo(logForwarder);
-                logSender.ConnectTo(syncForwarder);
-                logForwarder.ConnectTo(defaultConsoleLogger);
-                logForwarder.ConnectTo(defaultFileLogger);
+                logSink.ConnectTo(queueLogForwarder);
+                logSink.ConnectTo(syncLogForwarder);
+                queueLogForwarder.ConnectTo(defaultConsoleLogger);
+                syncLogForwarder.ConnectTo(defaultFileLogger);
             }
 
             public IServiceContextData Copy()
@@ -41,12 +41,13 @@ namespace FeatureLoom.Logging
 
         private static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
 
-        public static IDataFlowConnection<LogMessage> LogForwarder => context.Data.logForwarder;
-        public static IDataFlowConnection<LogMessage> SyncLogForwarder => context.Data.syncForwarder;
+        public static IDataFlowSource<LogMessage> QueuedLogSource => context.Data.queueLogForwarder;
+        public static IDataFlowSource<LogMessage> SyncLogSource => context.Data.syncLogForwarder;
+        public static IDataFlowSink<LogMessage> LogSink => context.Data.logSink;
 
-        public static void SendLogMessage(LogMessage msg)
+        public static void SendLogMessage(in LogMessage msg)
         {
-            context.Data.logSender.Send(msg);
+            context.Data.logSink.Post(in msg);
         }
 
         public static void ALWAYS(ObjectHandle contextHandle,

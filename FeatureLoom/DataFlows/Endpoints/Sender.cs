@@ -81,6 +81,11 @@ namespace FeatureLoom.DataFlows
 
         public void Send(in T message)
         {
+            sourceHelper.Forward(in message);
+        }
+
+        public void Send(T message)
+        {
             sourceHelper.Forward(message);
         }
 
@@ -92,6 +97,12 @@ namespace FeatureLoom.DataFlows
         public void Send<U>(in U message)
         {
             if (typeof(T).IsAssignableFrom(typeof(U))) sourceHelper.Forward(message);
+            else throw new Exception($"Sender<{typeof(T)}> doesn't allow sending messages of type {typeof(U)}.");
+        }
+
+        public void Send<U>(U message)
+        {
+            if (typeof(T).IsAssignableFrom(typeof(U))) sourceHelper.Forward(in message);
             else throw new Exception($"Sender<{typeof(T)}> doesn't allow sending messages of type {typeof(U)}.");
         }
 
