@@ -13,12 +13,12 @@ namespace FeatureLoom.Logging
 
         public WorkflowExecutionInfoLogger(bool filterDefaultFileLogger = true)
         {
-            filters.Add(msg => !(msg.workflow is DefaultFileLogger));
+            filters.Add(msg => !(msg.workflow is FileLogger));
         }
 
         public WorkflowExecutionInfoLogger(bool filterDefaultFileLogger, params Predicate<Workflow.ExecutionInfo>[] filters)
         {
-            this.filters.Add(msg => !(msg.workflow is DefaultFileLogger));
+            this.filters.Add(msg => !(msg.workflow is FileLogger));
             this.filters.AddRange(filters);
         }
 

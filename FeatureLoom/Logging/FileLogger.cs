@@ -12,9 +12,9 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Logging
 {
-    public class DefaultFileLogger : Workflow<DefaultFileLogger.StateMachine>, IDataFlowSink
+    public class FileLogger : Workflow<FileLogger.StateMachine>, IDataFlowSink
     {
-        public class StateMachine : StateMachine<DefaultFileLogger>
+        public class StateMachine : StateMachine<FileLogger>
         {
             protected override void Init()
             {
@@ -84,7 +84,7 @@ namespace FeatureLoom.Logging
 
         private static readonly Comparer<ZipArchiveEntry> nameComparer = Comparer<ZipArchiveEntry>.Create((f1, f2) => f2.Name.CompareTo(f1.Name));
 
-        public DefaultFileLogger(Config config = null)
+        public FileLogger(Config config = null)
         {
             this.config = config ?? new Config();
             this.config.TryUpdateFromStorage(true);
