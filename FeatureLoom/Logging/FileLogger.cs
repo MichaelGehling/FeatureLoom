@@ -60,7 +60,7 @@ namespace FeatureLoom.Logging
             public int logFilesArchiveLimitInMB = 100;
             public float logFileSizeLimitInMB = 5;
             public CompressionLevel compressionLevel = CompressionLevel.Fastest;
-            public int delayAfterWritingInMs = 0;
+            public int delayAfterWritingInMs = 1000;
             public Loglevel skipDelayLogLevel = Loglevel.ERROR;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
