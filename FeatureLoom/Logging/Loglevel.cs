@@ -2,7 +2,7 @@
 {
     public enum Loglevel
     {
-        ALWAYS = 0,
+        FORCE = 0,
         ERROR = 1,
         WARNING = 2,
         INFO = 3,

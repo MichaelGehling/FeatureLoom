@@ -2,6 +2,7 @@
 using FeatureLoom.Extensions;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Storages;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using FeatureLoom.Workflows;
 using System.Collections.Generic;
@@ -44,7 +45,7 @@ namespace FeatureLoom.Logging
                         .CatchAndDo((c, e) => Log.ERROR(c.GetHandle(), $"{c.Name}: Moving log file to archive failed.", e.ToString()))
                     .Step("Delay before next writing, if configured")
                         .If(c => c.config.delayAfterWritingInMs > 0)
-                            .Wait(c => c.config.delayAfterWritingInMs.Milliseconds())
+                            .WaitFor(c => c.delayBypass, c => c.config.delayAfterWritingInMs.Milliseconds())
                     .Step("Loop logging state")
                         .Loop();
             }
@@ -60,6 +61,7 @@ namespace FeatureLoom.Logging
             public float logFileSizeLimitInMB = 5;
             public CompressionLevel compressionLevel = CompressionLevel.Fastest;
             public int delayAfterWritingInMs = 0;
+            public Loglevel skipDelayLogLevel = Loglevel.ERROR;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
             public int maxQueueSize = 10000;
@@ -71,15 +73,26 @@ namespace FeatureLoom.Logging
         private string logFilePath;
         private string archiveFilePath;
         private StringBuilder stringBuilder = new StringBuilder();
+        private AsyncManualResetEvent delayBypass = new AsyncManualResetEvent(false);
 
         public void Post<M>(in M message)
         {
-            ((IDataFlowSink)receiver).Post(in message);
+            if (message is LogMessage logMessage)
+            {
+                ((IDataFlowSink)receiver).Post(in logMessage);
+                if (logMessage.level <= config.skipDelayLogLevel) delayBypass.Set();
+            }
         }
 
         public void Post<M>(M message)
         {
-            ((IDataFlowSink)receiver).Post(message);
+            Post(in message);
+        }
+
+        public Task PostAsync<M>(M message)
+        {
+            Post(in message);
+            return Task.CompletedTask;
         }
 
         private static readonly Comparer<ZipArchiveEntry> nameComparer = Comparer<ZipArchiveEntry>.Create((f1, f2) => f2.Name.CompareTo(f1.Name));
@@ -118,19 +131,20 @@ namespace FeatureLoom.Logging
                 if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
                 if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear());
 
-                var messages = receiver.ReceiveAll();
-                foreach (var msg in messages)
+                while (!receiver.IsEmpty)
                 {
-                    if (msg is LogMessage logMsg)
+                    var messages = receiver.ReceiveAll();
+                    foreach (var logMsg in messages)
                     {
                         if (logMsg.level <= config.logFileLoglevel)
                         {
                             await writer.WriteLineAsync(logMsg.PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear());
                         }
                     }
-                    else await writer.WriteLineAsync(msg.ToString());
                 }
             }
+
+            delayBypass.Reset();
         }
 
         // TODO: Make async
@@ -163,11 +177,6 @@ namespace FeatureLoom.Logging
                 }
             }
             logFileInfo.Delete();
-        }
-
-        public Task PostAsync<M>(M message)
-        {
-            return ((IDataFlowSink)receiver).PostAsync(message);
         }
     }
 }

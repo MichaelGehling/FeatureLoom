@@ -80,7 +80,7 @@ namespace FeatureLoom.Forms
                                     Color color = textBox.ForeColor;
                                     switch (msg.level)
                                     {
-                                        case Loglevel.ALWAYS: color = Color.Purple; break;
+                                        case Loglevel.FORCE: color = Color.Purple; break;
                                         case Loglevel.ERROR: color = Color.Red; break;
                                         case Loglevel.WARNING: color = Color.OrangeRed; break;
                                         case Loglevel.INFO: color = Color.DarkBlue; break;

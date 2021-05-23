@@ -50,14 +50,14 @@ namespace FeatureLoom.Logging
             context.Data.logSink.Post(in msg);
         }
 
-        public static void ALWAYS(ObjectHandle contextHandle,
+        public static void FORCE(ObjectHandle contextHandle,
                           string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.ALWAYS, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
         public static void ERROR(ObjectHandle contextHandle,
@@ -116,7 +116,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            SendLogMessage(new LogMessage(Loglevel.ALWAYS, shortText, detailText, default, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 
         public static void ERROR(string shortText,

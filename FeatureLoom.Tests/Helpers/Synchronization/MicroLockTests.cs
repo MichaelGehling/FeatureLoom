@@ -167,7 +167,7 @@ namespace FeatureLoom.Synchronization
             }
 
             starter.Set();
-            bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining() + 100.Milliseconds());
+            bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining() + 10.Seconds());
             Assert.True(allFinished);
         }
 

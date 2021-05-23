@@ -11,12 +11,12 @@ namespace FeatureLoom.Logging
     {
         private readonly List<Predicate<Workflow.ExecutionInfo>> filters = new List<Predicate<Workflow.ExecutionInfo>>();
 
-        public WorkflowExecutionInfoLogger(bool filterDefaultFileLogger = true)
+        public WorkflowExecutionInfoLogger(bool filterFileLogger = true)
         {
             filters.Add(msg => !(msg.workflow is FileLogger));
         }
 
-        public WorkflowExecutionInfoLogger(bool filterDefaultFileLogger, params Predicate<Workflow.ExecutionInfo>[] filters)
+        public WorkflowExecutionInfoLogger(bool filterFileLogger, params Predicate<Workflow.ExecutionInfo>[] filters)
         {
             this.filters.Add(msg => !(msg.workflow is FileLogger));
             this.filters.AddRange(filters);
