@@ -303,7 +303,7 @@ namespace FeatureLoom.Synchronization
                 });
                 thread1.Start();
                 waiter.Wait();
-                Thread.Sleep(10);
+                Thread.Sleep(100);
                 thread2 = new Thread(() =>
                 {
                     task2Started = true;
@@ -315,7 +315,7 @@ namespace FeatureLoom.Synchronization
                 });
                 thread2.Start();
                 while (!task1Started || !task2Started) waiter.Wait();
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
             Assert.True(thread1.Join(1.Seconds()));
             Assert.True(thread2.Join(1.Seconds()));
@@ -346,7 +346,7 @@ namespace FeatureLoom.Synchronization
                 });
                 thread1.Start();
                 waiter.Wait();
-                Thread.Sleep(10);
+                Thread.Sleep(100);
                 thread2 = new Thread(async () =>
                 {
                     task2Started = true;
@@ -358,7 +358,7 @@ namespace FeatureLoom.Synchronization
                 });
                 thread2.Start();
                 while (!task1Started || !task2Started) waiter.Wait();
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
             Assert.True(thread1.Join(1.Seconds()));
             Assert.True(thread2.Join(1.Seconds()));
@@ -389,7 +389,7 @@ namespace FeatureLoom.Synchronization
                 });
                 thread1.Start();
                 waiter.Wait();
-                Thread.Sleep(10);
+                Thread.Sleep(100);
                 thread2 = new Thread(() =>
                 {
                     task2Started = true;
@@ -401,7 +401,7 @@ namespace FeatureLoom.Synchronization
                 });
                 thread2.Start();
                 while (!task1Started || !task2Started) waiter.Wait();
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
             Assert.True(thread1.Join(1.Seconds()));
             Assert.True(thread2.Join(1.Seconds()));
@@ -444,7 +444,7 @@ namespace FeatureLoom.Synchronization
                     }
                 }));
             }
-
+            
             for (int i = 0; i < 5; i++)
             {
                 tasks.Add(Task.Run(() =>
@@ -472,9 +472,10 @@ namespace FeatureLoom.Synchronization
                     }
                 }));
             }
+            
 
             starter.Set();
-            bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining() + 100.Milliseconds());
+            bool allFinished = Task.WaitAll(tasks.ToArray(), executionTime.Remaining() + 10.Seconds());
             Assert.True(allFinished);
         }
 

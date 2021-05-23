@@ -125,14 +125,16 @@ namespace FeatureLoom.DataFlows
        
         public void Post<M>(in M message)
         {
-            receiver.Post(in message);
-            ManageThreadCount();
+            if (sourceHelper.CountConnectedSinks > 0)
+            {
+                receiver.Post(in message);
+                ManageThreadCount();
+            }
         }
 
         public void Post<M>(M message)
         {
-            receiver.Post(message);
-            ManageThreadCount();
+            Post(in message);
         }
 
         private void ManageThreadCount()
@@ -147,9 +149,13 @@ namespace FeatureLoom.DataFlows
 
         public Task PostAsync<M>(M message)
         {
-            Task task = receiver.PostAsync(message);
-            ManageThreadCount();
-            return task;
+            if (sourceHelper.CountConnectedSinks > 0)
+            {
+                Task task = receiver.PostAsync(message);
+                ManageThreadCount();
+                return task;
+            }
+            else return Task.CompletedTask;
         }
 
         private async Task Run()
