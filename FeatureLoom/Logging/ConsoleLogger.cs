@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Logging
 {
-    public class DefaultConsoleLogger : IDataFlowSink
+    public class ConsoleLogger : IDataFlowSink
     {
         private readonly bool hasConsole = CheckHasConsole();
         private StringBuilder stringBuilder = new StringBuilder();

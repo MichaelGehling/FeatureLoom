@@ -8,7 +8,7 @@ namespace FeatureLoom.Logging
 {
     public static class Log
     {
-        public static DefaultConsoleLogger defaultConsoleLogger = new DefaultConsoleLogger();
+        public static ConsoleLogger defaultConsoleLogger = new ConsoleLogger();
         public static FileLogger defaultFileLogger = new FileLogger();
         public static IWorkflowRunner logRunner = new SuspendingAsyncRunner();
 
