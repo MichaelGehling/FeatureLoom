@@ -2,17 +2,17 @@
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
-    ///     Messages from a dataFlow source put to the filter are checked in a filter function and
+    ///     Messages from a message source put to the filter are checked in a filter function and
     ///     forwarded to connected sinks if passing the filter. Messages that doesn't match the
     ///     input type are filtered out, too. By omitting the filter function, it is possible to
     ///     filter only on the message's type. It is thread-safe as long as the provided function is
     ///     also thread-safe. Avoid long running functions to avoid blocking the sender
     /// </summary>
     /// <typeparam name="T"> The input type for the filter function </typeparam>
-    public class Filter<T> : IDataFlowConnection<T>, IAlternativeDataFlow
+    public class Filter<T> : IMessageFlowConnection<T>, IAlternativeMessageSource
     {
         protected SourceValueHelper sourceHelper;
         protected Func<T, bool> predicate;
@@ -23,7 +23,7 @@ namespace FeatureLoom.DataFlows
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
@@ -33,14 +33,14 @@ namespace FeatureLoom.DataFlows
             this.predicate = predicate;
         }
 
-        public IDataFlowSource Else => alternativeSendingHelper.Obj;
+        public IMessageSource Else => alternativeSendingHelper.Obj;
 
         public void DisconnectAll()
         {
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
@@ -75,12 +75,12 @@ namespace FeatureLoom.DataFlows
             else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

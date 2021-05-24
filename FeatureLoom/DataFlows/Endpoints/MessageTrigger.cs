@@ -3,9 +3,9 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
-    public class MessageTrigger : IDataFlowSink, IAsyncWaitHandle
+    public class MessageTrigger : IMessageSink, IAsyncWaitHandle
     {
         private AsyncManualResetEvent mre = new AsyncManualResetEvent();
         private readonly Mode mode;

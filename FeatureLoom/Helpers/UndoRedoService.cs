@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Synchronization;
@@ -54,7 +54,7 @@ namespace FeatureLoom.Helpers
         public static bool CurrentlyUndoing => context.Data.undoing;
         public static bool CurrentlyRedoing => context.Data.redoing;
 
-        public static IDataFlowSource<Notification> UpdateNotificationSource => context.Data.updateSender;
+        public static IMessageSource<Notification> UpdateNotificationSource => context.Data.updateSender;
 
         public static void PerformUndo()
         {

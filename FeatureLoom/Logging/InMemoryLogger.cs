@@ -1,11 +1,11 @@
 ﻿using FeatureLoom.Collections;
-using FeatureLoom.DataFlows;
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Synchronization;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Logging
 {
-    public class InMemoryLogger : IDataFlowSink
+    public class InMemoryLogger : IMessageSink
     {
         private CountingRingBuffer<LogMessage> buffer;
 

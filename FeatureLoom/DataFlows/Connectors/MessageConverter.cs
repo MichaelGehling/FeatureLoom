@@ -1,17 +1,17 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
-    ///     Messages from a dataFlow put to the converter are processed in a converter function and
+    ///     Messages from a message put to the converter are processed in a converter function and
     ///     forwarded to connected sinks. Messages that doesn't match the input type are forwarded as they are. It
     ///     is thread-safe as long as the provided function is also thread-safe. Avoid long running
     ///     functions to avoid blocking the sender
     /// </summary>
     /// <typeparam name="I"> The input type for the converter function </typeparam>
     /// <typeparam name="O"> The output type for the converter function </typeparam>
-    public class MessageConverter<I, O> : IDataFlowConnection<I, O>
+    public class MessageConverter<I, O> : IMessageFlowConnection<I, O>
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly Func<I, O> convertFunc;
@@ -26,7 +26,7 @@ namespace FeatureLoom.DataFlows
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
@@ -36,7 +36,7 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
@@ -72,12 +72,12 @@ namespace FeatureLoom.DataFlows
             else return sourceHelper.ForwardAsync(message);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

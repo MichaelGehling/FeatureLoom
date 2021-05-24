@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Synchronization;
 
 namespace FeatureLoom.RPC

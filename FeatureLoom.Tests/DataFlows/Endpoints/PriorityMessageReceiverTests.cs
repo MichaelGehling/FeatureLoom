@@ -1,9 +1,9 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Diagnostics;
 using System.Collections.Generic;
 using Xunit;
 
-namespace FeatureLoom.Tests.DataFlows.Endpoints
+namespace FeatureLoom.Tests.MesssageFlow.Endpoints
 {
     public class PriorityMessageReceiverTests
     {

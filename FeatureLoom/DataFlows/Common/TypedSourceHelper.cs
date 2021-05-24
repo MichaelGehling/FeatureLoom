@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
-    /// <summary> Helps implementing IDataFlowSource and should be used wherever IDataFlowSource is
+    /// <summary> Helps implementing IMessageSource and should be used wherever IMessageSource is
     /// implemented. It is thread safe, but doesn't need any lock while sending, so it will never
     /// block if used concurrently. Anyway, changing the list of connected sinks
     /// (connecting/disconnecting) uses a lock and blocks a short time. Sinks can optionally be stored as weak references
     /// and will then not be kept from being garbage-collected, so it is not necessary to disconnect
     /// sinks that are not needed any more. <summary>
-    public class TypedSourceHelper<T> : IDataFlowSource<T>
+    public class TypedSourceHelper<T> : IMessageSource<T>
     {
         private TypedSourceValueHelper<T> sourceHelper;
 
@@ -17,12 +17,12 @@ namespace FeatureLoom.DataFlows
 
         public Type SentMessageType => typeof(T);
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
@@ -32,12 +32,12 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }

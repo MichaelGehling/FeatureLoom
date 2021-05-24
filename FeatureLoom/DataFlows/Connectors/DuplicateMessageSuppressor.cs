@@ -7,9 +7,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
-    public class DuplicateMessageSuppressor : IDataFlowSource, IDataFlowConnection
+    public class DuplicateMessageSuppressor : IMessageSource, IMessageFlowConnection
     {
         private SourceValueHelper sourceHelper;
         private Queue<(object message, DateTime suppressionEnd)> suppressors = new Queue<(object, DateTime)>();
@@ -87,12 +87,12 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
@@ -113,12 +113,12 @@ namespace FeatureLoom.DataFlows
             else return sourceHelper.ForwardAsync(message);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

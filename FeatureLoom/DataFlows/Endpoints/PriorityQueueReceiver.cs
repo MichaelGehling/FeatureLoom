@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     ///     An endpoint with a queue to receive messages asynchronously ordered by priority and
@@ -18,7 +18,7 @@ namespace FeatureLoom.DataFlows
     /// Uses a normal queue plus locking instead of a concurrent queue because of better performance
     /// in usual scenarios.
     /// <typeparam name="T"> The expected message type </typeparam>
-    public class PriorityQueueReceiver<T> : IDataFlowQueue, IReceiver<T>, IAsyncWaitHandle, IDataFlowSink<T>
+    public class PriorityQueueReceiver<T> : IMessageQueue, IReceiver<T>, IAsyncWaitHandle, IMessageSink<T>
     {
         private PriorityQueue<T> queue;
         private MicroLock queueLock = new MicroLock();
@@ -42,7 +42,7 @@ namespace FeatureLoom.DataFlows
             this.timeoutOnFullQueue = maxWaitOnFullQueue;
         }
 
-        public IDataFlowSource Else => alternativeSendingHelper.Obj;
+        public IMessageSource Else => alternativeSendingHelper.Obj;
 
         public bool IsEmpty => queue.Count == 0;
         public bool IsFull => queue.Count >= maxQueueSize;

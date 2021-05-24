@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.Collections;
-using FeatureLoom.DataFlows;
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
 {
-    public class HttpServerFetchProvider : IDataFlowSink, IWebRequestHandler
+    public class HttpServerFetchProvider : IMessageSink, IWebRequestHandler
     {
         private CountingRingBuffer<string> ringBuffer;
         private readonly string route;

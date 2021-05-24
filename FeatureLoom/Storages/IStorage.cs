@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using System;
 using System.IO;
@@ -18,7 +18,7 @@ namespace FeatureLoom.Storages
 
         Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null);
 
-        bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink);
+        bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink notificationSink);
 
         bool Exists(string uri);
     }

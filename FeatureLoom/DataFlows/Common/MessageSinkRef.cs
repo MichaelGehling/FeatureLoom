@@ -1,28 +1,28 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
-    /// Used to store the reference of a connected IDataFlowSink.
+    /// Used to store the reference of a connected IMessageSink.
     /// Can either use a strong reference (default) or a weak reference.
     /// The weak reference will not keep the referenced object alive when it is not referenced
     /// somewhere else, so the garbage collector can remove it though it is connected
-    /// via the Dataflow.
+    /// via the MessageFlow.
     /// </summary>
-    public readonly struct DataFlowReference
+    public readonly struct MessageSinkRef
     {
-        private readonly IDataFlowSink strongRefSink;
-        private readonly WeakReference<IDataFlowSink> weakRefSink;
+        private readonly IMessageSink strongRefSink;
+        private readonly WeakReference<IMessageSink> weakRefSink;
 
-        public DataFlowReference(IDataFlowSink sink, bool weakReference)
+        public MessageSinkRef(IMessageSink sink, bool weakReference)
         {
-            weakRefSink = weakReference ? new WeakReference<IDataFlowSink>(sink) : null;
+            weakRefSink = weakReference ? new WeakReference<IMessageSink>(sink) : null;
             strongRefSink = weakReference ? null : sink;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetTarget(out IDataFlowSink sink)
+        public bool TryGetTarget(out IMessageSink sink)
         {
             if (weakRefSink == null)
             {

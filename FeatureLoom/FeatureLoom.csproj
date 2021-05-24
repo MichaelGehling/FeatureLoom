@@ -14,7 +14,7 @@
     <NeutralLanguage>en</NeutralLanguage>
     <Version>0.1.0.1</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageTags>c#, state machine, data flow, communication, extensions, workflow,</PackageTags>
+    <PackageTags>c#, state machine, data flow, messaging, communication, extensions, workflow,</PackageTags>
     <PackageReleaseNotes>FeauterLoom is currently in an pre-alpha state.</PackageReleaseNotes>
     <Copyright>Copyright (c) 2020 Michael Gehling</Copyright>
     <AssemblyVersion>0.1.0.1</AssemblyVersion>

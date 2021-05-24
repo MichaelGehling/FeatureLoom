@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
 {
-    public class HttpServerReceiver : IDataFlowSource, IWebRequestHandler
+    public class HttpServerReceiver : IMessageSource, IWebRequestHandler
     {
         private readonly int bufferSize;
         private readonly string route;
@@ -38,12 +38,12 @@ namespace FeatureLoom.Web
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
@@ -78,12 +78,12 @@ namespace FeatureLoom.Web
             return true;
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

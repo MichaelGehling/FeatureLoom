@@ -1,18 +1,18 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     ///     Just forwards messages without processing it. It is thread-safe.
     /// </summary>
-    public class Forwarder : IDataFlowSource, IDataFlowConnection
+    public class Forwarder : IMessageSource, IMessageFlowConnection
     {
         protected SourceValueHelper sourceHelper;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
@@ -22,7 +22,7 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
@@ -42,12 +42,12 @@ namespace FeatureLoom.DataFlows
             return sourceHelper.ForwardAsync(message);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
@@ -57,7 +57,7 @@ namespace FeatureLoom.DataFlows
     /// <summary>
     ///     Forwards messages if they are of the defined type without processing it. It is thread-safe.
     /// </summary>
-    public class Forwarder<T> : IDataFlowConnection<T>
+    public class Forwarder<T> : IMessageFlowConnection<T>
     {
         protected TypedSourceValueHelper<T> sourceHelper;
 
@@ -66,12 +66,12 @@ namespace FeatureLoom.DataFlows
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
@@ -81,12 +81,12 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }

@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -12,6 +12,6 @@ namespace FeatureLoom.Workflows
 
         Task PauseAllWorkflows(bool tryCancelWaitingStep);
 
-        IDataFlowSource ExecutionInfoSource { get; }
+        IMessageSource ExecutionInfoSource { get; }
     }
 }

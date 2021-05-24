@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using System;
 
 namespace FeatureLoom.Synchronization
@@ -32,7 +32,7 @@ namespace FeatureLoom.Synchronization
             this.value = value;
         }
 
-        public IDataFlowSource UpdateNotifications
+        public IMessageSource UpdateNotifications
         {
             get
             {
@@ -140,7 +140,7 @@ namespace FeatureLoom.Synchronization
     public interface ISharedData
     {
         Type ValueType { get; }
-        IDataFlowSource UpdateNotifications { get; }
+        IMessageSource UpdateNotifications { get; }
     }
 
     public readonly struct SharedDataUpdateNotification

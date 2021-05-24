@@ -5,15 +5,15 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
-    public class LatestMessageReceiver<T> : IDataFlowQueue, IDataFlowSink<T>, IReceiver<T>, IAlternativeDataFlow, IAsyncWaitHandle
+    public class LatestMessageReceiver<T> : IMessageQueue, IMessageSink<T>, IReceiver<T>, IAlternativeMessageSource, IAsyncWaitHandle
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         private MicroLock myLock = new MicroLock();
         private T receivedMessage;
         private LazyValue<SourceHelper> alternativeSendingHelper;
-        public IDataFlowSource Else => alternativeSendingHelper.Obj;
+        public IMessageSource Else => alternativeSendingHelper.Obj;
         public bool IsEmpty => !readerWakeEvent.IsSet;
         public bool IsFull => false;
         public int Count => IsEmpty ? 0 : 1;

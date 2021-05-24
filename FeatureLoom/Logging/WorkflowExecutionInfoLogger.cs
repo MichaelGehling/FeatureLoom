@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Workflows;
 using System;
@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Logging
 {
-    public class WorkflowExecutionInfoLogger : IDataFlowSink
+    public class WorkflowExecutionInfoLogger : IMessageSink
     {
         private readonly List<Predicate<Workflow.ExecutionInfo>> filters = new List<Predicate<Workflow.ExecutionInfo>>();
 

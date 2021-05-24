@@ -4,7 +4,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     /// Assures that incoming messages are forwarded within the synchronization context where this CurrentContextForwarder is instantiated.
@@ -19,7 +19,7 @@ namespace FeatureLoom.DataFlows
     /// Assures that incoming messages are forwarded within the synchronization context where this CurrentContextForwarder is instantiated.
     /// This can be used, e.g. to process a message in a ProcessingEndpoint within a UI-Thread, though the message was send from some other thread!
     /// </summary>
-    public class CurrentContextForwarder<T> : Forwarder, IDataFlowConnection<T>
+    public class CurrentContextForwarder<T> : Forwarder, IMessageFlowConnection<T>
     {
         private readonly QueueReceiver<T> receiver;
         private CancellationTokenSource cts = new CancellationTokenSource();

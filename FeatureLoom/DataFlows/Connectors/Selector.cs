@@ -4,9 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
-    public class Selector<T> : IDataFlowSink<T>, IAlternativeDataFlow
+    public class Selector<T> : IMessageSink<T>, IAlternativeMessageSource
     {
         private volatile bool multiMatch = false;
         private List<(Func<T, bool> predicate, SourceHelper sender)> options = null;
@@ -21,7 +21,7 @@ namespace FeatureLoom.DataFlows
             this.multiMatch = multiMatch;
         }
 
-        public IDataFlowSource Else => alternativeSendingHelper.Obj;
+        public IMessageSource Else => alternativeSendingHelper.Obj;
 
         public void Post<M>(in M message)
         {
@@ -87,12 +87,12 @@ namespace FeatureLoom.DataFlows
             else return Task.CompletedTask;
         }
 
-        public IDataFlowSource AddOption(Func<T, bool> predicate)
+        public IMessageSource AddOption(Func<T, bool> predicate)
         {
             return InsertOptionAt(predicate, int.MaxValue);
         }
 
-        public IDataFlowSource InsertOptionAt(Func<T, bool> predicate, int index)
+        public IMessageSource InsertOptionAt(Func<T, bool> predicate, int index)
         {
             (Func<T, bool> predicate, SourceHelper sender) newOption = (predicate, new SourceHelper());
             using (myLock.Lock())
@@ -117,7 +117,7 @@ namespace FeatureLoom.DataFlows
 
         public bool MultiMatch { get => multiMatch; set => multiMatch = value; }
 
-        public IDataFlowSource GetOptionAt(int index)
+        public IMessageSource GetOptionAt(int index)
         {
             if (options != null && options.Count > index)
             {

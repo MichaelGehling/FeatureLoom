@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.Collections;
-using FeatureLoom.DataFlows;
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Diagnostics
 {
-    public class DataFlowProbe<T1, T2> : IDataFlowSink
+    public class MessageFlowProbe<T1, T2> : IMessageSink
     {
         private FeatureLock myLock = new FeatureLock();
         private readonly string name;
@@ -24,7 +24,7 @@ namespace FeatureLoom.Diagnostics
         private CountingRingBuffer<DateTime> timestampBuffer;
         private CountingRingBuffer<TimeSliceCounter> timeSliceCounterBuffer;
 
-        public DataFlowProbe(string name, Predicate<T1> filter = null, Func<T1, T2> converter = null, int messageBufferSize = 0, TimeSpan timeSliceSize = default, int maxTimeSlices = 0)
+        public MessageFlowProbe(string name, Predicate<T1> filter = null, Func<T1, T2> converter = null, int messageBufferSize = 0, TimeSpan timeSliceSize = default, int maxTimeSlices = 0)
         {
             this.name = name;
             this.filter = filter;

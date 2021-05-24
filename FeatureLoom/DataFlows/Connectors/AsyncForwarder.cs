@@ -1,24 +1,24 @@
 ﻿using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     /// Messages are forwarded async without awaiting, so the control is returned immediatly to the sender.
     /// Be aware that the order of message might change, due to parallel processing.
     /// If you need to keep the order, please use QueueForwarder.
     /// </summary>
-    public class AsyncForwarder : IDataFlowConnection
+    public class AsyncForwarder : IMessageFlowConnection
     {
         protected SourceValueHelper sourceHelper;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
@@ -28,12 +28,12 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }

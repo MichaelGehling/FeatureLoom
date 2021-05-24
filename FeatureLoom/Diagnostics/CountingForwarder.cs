@@ -1,11 +1,11 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Synchronization;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Diagnostics
 {
-    public class CountingForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
+    public class CountingForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
     {
         private SourceValueHelper sourceHelper;
 
@@ -69,7 +69,7 @@ namespace FeatureLoom.Diagnostics
             }
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
@@ -79,17 +79,17 @@ namespace FeatureLoom.Diagnostics
             sourceHelper.DisconnectAll();
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

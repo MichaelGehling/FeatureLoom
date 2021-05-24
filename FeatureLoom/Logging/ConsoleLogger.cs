@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using System;
@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Logging
 {
-    public class ConsoleLogger : IDataFlowSink
+    public class ConsoleLogger : IMessageSink
     {
         private readonly bool hasConsole = CheckHasConsole();
         private StringBuilder stringBuilder = new StringBuilder();

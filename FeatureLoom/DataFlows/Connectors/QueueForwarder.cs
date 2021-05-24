@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     ///     Creates an active forwarder that queues incoming messages and forwards them in threads
@@ -38,7 +38,7 @@ namespace FeatureLoom.DataFlows
     ///     Optionally, a priority queue can be used to sort the incoming messages based on an individual comparer.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
-    public class QueueForwarder<T> : IDataFlowConnection<T>
+    public class QueueForwarder<T> : IMessageFlowConnection<T>
     {
         protected TypedSourceValueHelper<T> sourceHelper;
         protected IReceiver<T> receiver;
@@ -175,17 +175,17 @@ namespace FeatureLoom.DataFlows
             Interlocked.Decrement(ref numThreads);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
@@ -195,7 +195,7 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }

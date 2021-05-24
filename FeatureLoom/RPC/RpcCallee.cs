@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.RPC
 {
-    public partial class RpcCallee : IDataFlowSink, IDataFlowSource, IReplier
+    public partial class RpcCallee : IMessageSink, IMessageSource, IReplier
     {
         private Sender sender = new Sender();
         private List<IRpcRequestHandler> requestHandlers = new List<IRpcRequestHandler>();
@@ -80,12 +80,12 @@ namespace FeatureLoom.RPC
             sender.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sender.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sender.GetConnectedSinks();
         }
@@ -157,12 +157,12 @@ namespace FeatureLoom.RPC
             RegisterMethod<(P1, P2, P3, P4, P5), bool>(methodName, p => { method(p.Item1, p.Item2, p.Item3, p.Item4, p.Item5); return true; });
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sender.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sender.ConnectTo(sink, weakReference);
         }

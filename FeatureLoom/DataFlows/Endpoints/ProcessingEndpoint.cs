@@ -3,7 +3,7 @@ using FeatureLoom.Synchronization;
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     ///     Messages put to the processing endpoint are processed in the passed action. The
@@ -16,7 +16,7 @@ namespace FeatureLoom.DataFlows
     ///     blocking the sender.
     /// </summary>
     /// <typeparam name="T"> </typeparam>
-    public class ProcessingEndpoint<T> : IDataFlowSink<T>, IAlternativeDataFlow
+    public class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessageSource
     {
         private readonly Func<T, bool> processing;
         private readonly Func<T, Task<bool>> processingAsync;
@@ -48,7 +48,7 @@ namespace FeatureLoom.DataFlows
             this.processingAsync = processingAsync;
         }
 
-        public IDataFlowSource Else => alternativeSendingHelper.Obj;
+        public IMessageSource Else => alternativeSendingHelper.Obj;
 
         public void Post<M>(in M message)
         {

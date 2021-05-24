@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.RPC
 {
-    public partial class StringRpcCaller : IDataFlowSource, IDataFlowSink, IRequester
+    public partial class StringRpcCaller : IMessageSource, IMessageSink, IRequester
     {
         private SourceValueHelper sourceHelper;
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
@@ -45,7 +45,7 @@ namespace FeatureLoom.RPC
             }
         }
 
-        public void CallMultiResponse(string methodCall, IDataFlowSink sink)
+        public void CallMultiResponse(string methodCall, IMessageSink sink)
         {
             var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
@@ -201,7 +201,7 @@ namespace FeatureLoom.RPC
             return Task.CompletedTask;
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
@@ -211,7 +211,7 @@ namespace FeatureLoom.RPC
             sourceHelper.DisconnectAll();
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
@@ -222,12 +222,12 @@ namespace FeatureLoom.RPC
             replier.ConnectTo(this, weakReference);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

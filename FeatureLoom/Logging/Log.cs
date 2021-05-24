@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Workflows;
@@ -41,9 +41,9 @@ namespace FeatureLoom.Logging
 
         private static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
 
-        public static IDataFlowSource<LogMessage> QueuedLogSource => context.Data.queueLogForwarder;
-        public static IDataFlowSource<LogMessage> SyncLogSource => context.Data.syncLogForwarder;
-        public static IDataFlowSink<LogMessage> LogSink => context.Data.logSink;
+        public static IMessageSource<LogMessage> QueuedLogSource => context.Data.queueLogForwarder;
+        public static IMessageSource<LogMessage> SyncLogSource => context.Data.syncLogForwarder;
+        public static IMessageSink<LogMessage> LogSink => context.Data.logSink;
 
         public static void SendLogMessage(in LogMessage msg)
         {

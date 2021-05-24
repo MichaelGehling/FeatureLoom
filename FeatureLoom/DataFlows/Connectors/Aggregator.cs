@@ -4,7 +4,7 @@ using System;
 using System.Collections;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     /// Feeds incoming messages into an AggregationData object.
@@ -12,7 +12,7 @@ namespace FeatureLoom.DataFlows
     /// </summary>
     /// <typeparam name="I">The input type. If multiple message types are consumed for aggregation, this must be a common supertype</typeparam>
     /// <typeparam name="O">The output type. If multiple message types are generated from the aggregated data, this must be a common supertype</typeparam>
-    public class Aggregator<I, O> : IDataFlowConnection<I, O>, IAlternativeDataFlow
+    public class Aggregator<I, O> : IMessageFlowConnection<I, O>, IAlternativeMessageSource
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private LazyValue<SourceHelper> alternativeSender;
@@ -84,7 +84,7 @@ namespace FeatureLoom.DataFlows
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public IDataFlowSource Else => alternativeSender.Obj;
+        public IMessageSource Else => alternativeSender.Obj;
 
         public Type SentMessageType => typeof(O);
 
@@ -93,22 +93,22 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

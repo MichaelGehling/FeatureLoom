@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
@@ -64,12 +64,12 @@ namespace FeatureLoom.Web
             return true;
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink)
         {
             return ((IRequester)rpcCaller).ConnectTo(sink);
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             ((IRequester)rpcCaller).DisconnectFrom(sink);
         }
@@ -79,7 +79,7 @@ namespace FeatureLoom.Web
             ((IRequester)rpcCaller).DisconnectAll();
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return ((IRequester)rpcCaller).GetConnectedSinks();
         }
@@ -99,14 +99,14 @@ namespace FeatureLoom.Web
             return ((IRequester)rpcCaller).PostAsync(message);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
-            ((IDataFlowSource)rpcCaller).ConnectTo(sink, weakReference);
+            ((IMessageSource)rpcCaller).ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
-            return ((IDataFlowSource)rpcCaller).ConnectTo(sink, weakReference);
+            return ((IMessageSource)rpcCaller).ConnectTo(sink, weakReference);
         }
 
         public void ConnectToAndBack(IReplier replier, bool weakReference = false)

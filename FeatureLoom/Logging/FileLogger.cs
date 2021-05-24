@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Storages;
@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Logging
 {
-    public class FileLogger : Workflow<FileLogger.StateMachine>, IDataFlowSink
+    public class FileLogger : Workflow<FileLogger.StateMachine>, IMessageSink
     {
         public class StateMachine : StateMachine<FileLogger>
         {
@@ -79,7 +79,7 @@ namespace FeatureLoom.Logging
         {
             if (message is LogMessage logMessage)
             {
-                ((IDataFlowSink)receiver).Post(in logMessage);
+                ((IMessageSink)receiver).Post(in logMessage);
                 if (logMessage.level <= config.skipDelayLogLevel) delayBypass.Set();
             }
         }

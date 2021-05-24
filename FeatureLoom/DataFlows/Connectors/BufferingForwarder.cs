@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     public class BufferingForwarder : BufferingForwarder<object>
     {
@@ -13,7 +13,7 @@ namespace FeatureLoom.DataFlows
         }
     }
 
-    public class BufferingForwarder<T> : IDataFlowConnection<T>
+    public class BufferingForwarder<T> : IMessageFlowConnection<T>
     {
         private SourceValueHelper sourceHelper;
         private CountingRingBuffer<T> buffer;
@@ -27,7 +27,7 @@ namespace FeatureLoom.DataFlows
             buffer = new CountingRingBuffer<T>(bufferSize, false);
         }
 
-        private void OnConnection(IDataFlowSink sink)
+        private void OnConnection(IMessageSink sink)
         {
             var bufferedMessages = buffer.GetAvailableSince(0, out long missed);
             foreach (var msg in bufferedMessages)
@@ -43,12 +43,12 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
@@ -88,7 +88,7 @@ namespace FeatureLoom.DataFlows
             }
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             using (bufferLock.LockReadOnly())
             {
@@ -97,7 +97,7 @@ namespace FeatureLoom.DataFlows
             }
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             using (bufferLock.LockReadOnly())
             {

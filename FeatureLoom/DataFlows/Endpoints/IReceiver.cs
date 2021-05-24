@@ -3,9 +3,9 @@ using FeatureLoom.Synchronization;
 using System;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
-    public interface IReceiver<T> : IDataFlowSink<T>
+    public interface IReceiver<T> : IMessageSink<T>
     {
         bool IsEmpty { get; }
         bool IsFull { get; }

@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     ///     A Hub allows to create multiple sockets. Every message send over a socket will be
     ///     forwarded to all other sockets of this hub, but not looped back to the sending socket.
     /// </summary>
-    public class Hub : IDataFlow
+    public class Hub : IMessageFlow
     {
         private List<Socket> sockets = new List<Socket>();
 
@@ -35,7 +35,7 @@ namespace FeatureLoom.DataFlows
             socketToRemove.Dispose();
         }
 
-        public class Socket : IDataFlowSink, IDataFlowSource, IDisposable
+        public class Socket : IMessageSink, IMessageSource, IDisposable
         {
             private Hub hub;
             private WeakReference ownerRef;
@@ -136,7 +136,7 @@ namespace FeatureLoom.DataFlows
                 return sourceHelper.ForwardAsync(message);
             }
 
-            public void DisconnectFrom(IDataFlowSink sink)
+            public void DisconnectFrom(IMessageSink sink)
             {
                 sourceHelper.DisconnectFrom(sink);
             }
@@ -146,7 +146,7 @@ namespace FeatureLoom.DataFlows
                 sourceHelper.DisconnectAll();
             }
 
-            public IDataFlowSink[] GetConnectedSinks()
+            public IMessageSink[] GetConnectedSinks()
             {
                 return sourceHelper.GetConnectedSinks();
             }
@@ -159,12 +159,12 @@ namespace FeatureLoom.DataFlows
                 }
             }
 
-            public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+            public void ConnectTo(IMessageSink sink, bool weakReference = false)
             {
                 sourceHelper.ConnectTo(sink, weakReference);
             }
 
-            public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+            public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
             {
                 return sourceHelper.ConnectTo(sink, weakReference);
             }

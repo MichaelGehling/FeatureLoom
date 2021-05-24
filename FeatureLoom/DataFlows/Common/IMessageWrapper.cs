@@ -1,4 +1,4 @@
-﻿namespace FeatureLoom.DataFlows
+﻿namespace FeatureLoom.MessageFlow
 {
     public interface IMessageWrapper
     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     /// <summary>
     /// Forwarder that can be activated and deactivated. When deactivated it will not forward any message.
@@ -9,7 +9,7 @@ namespace FeatureLoom.DataFlows
     /// automatically be providing a function delegate that checks each time a message is received if
     /// forwarder is active or not. This allows to inhibit communication in specific application states.
     /// </summary>
-    public class DeactivatableForwarder : IDataFlowSink, IDataFlowSource, IDataFlowConnection
+    public class DeactivatableForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
     {
         private SourceValueHelper sourceHelper;
         private bool active = true;
@@ -43,12 +43,12 @@ namespace FeatureLoom.DataFlows
             else return Task.CompletedTask;
         }        
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
@@ -58,12 +58,12 @@ namespace FeatureLoom.DataFlows
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
