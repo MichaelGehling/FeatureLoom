@@ -360,7 +360,9 @@ namespace FeatureLoom.Synchronization
         /// <summary>
         /// Lock was already taken reentrantly in the same context
         /// </summary>
-        public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;        
+        public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;
+
+        public bool IsAnyWaiting => firstRankTicket != 0;
 
         #endregion PublicProperties
 
@@ -1639,7 +1641,7 @@ namespace FeatureLoom.Synchronization
 
         TimeSpan ISupervision.MaxDelay => (0.0005 * Settings.supervisionDelayFactor).Milliseconds();
 
-        void ISupervision.Handle(TimeSpan lastDelay)
+        void ISupervision.Handle(DateTime now)
         {
             if (queueHead == null)
             {

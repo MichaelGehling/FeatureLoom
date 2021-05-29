@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Synchronization;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using Nito.AsyncEx;
 using System;
@@ -22,6 +23,25 @@ namespace Playground
 
         private static void Main(string[] args)
         {
+
+
+            InMemoryCache<string, string> cache = new FeatureLoom.Collections.InMemoryCache<string, string>(str => System.Text.ASCIIEncoding.Unicode.GetByteCount(str),
+                new InMemoryCache<string, string>.CacheSettings() 
+                {
+                    targetCacheSizeInByte= 300,
+                    cacheSizeMarginInByte = 200,
+                    maxUnusedTimeInSeconds = 100
+                });
+                        
+            cache.Add("B", "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
+            cache.Add("A", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+            cache.Add("C", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC");
+            cache.StartCleanUp();
+
+            Console.ReadKey();
+
+
+
             var tk = AppTime.TimeKeeper;
             for(int i=0; i < 1_000_000; i++)
             {

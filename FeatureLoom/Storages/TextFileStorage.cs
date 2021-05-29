@@ -1,4 +1,5 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.DataFlows;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
@@ -9,7 +10,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
-using System.Runtime.Caching;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -29,16 +29,14 @@ namespace FeatureLoom.Storages
             public bool updateCacheForSubscription = true;
             public bool updateCacheOnRead = true;
             public bool updateCacheOnWrite = true;
-            public TimeSpan cacheSlidingExpiration = 10.Minutes();
-            public int cacheSizeInMb = 10;
             public bool logFailedDeserialization = true;
+            public InMemoryCache<string, string>.CacheSettings cacheSettings = new InMemoryCache<string, string>.CacheSettings();
         }
 
         private Config config;
         private readonly string category;
         private DirectoryInfo rootDir;
-        private CacheItemPolicy cacheItemPolicy;
-        private readonly MemoryCache cache;
+        private readonly InMemoryCache<string, string> cache;
         private HashSet<string> fileSet = new HashSet<string>();
         private StorageSubscriptions subscriptions = new StorageSubscriptions();
         public string Category => category;
@@ -68,11 +66,7 @@ namespace FeatureLoom.Storages
             }
             if (config.updateCacheForSubscription || config.updateCacheOnRead || config.updateCacheOnWrite)
             {
-                NameValueCollection cacheConfig = new NameValueCollection();
-                cacheConfig.Add("cacheMemoryLimitMegabytes", config.cacheSizeInMb.ToString());
-                cache = new MemoryCache("FileStorageCache", cacheConfig);
-                cacheItemPolicy = new CacheItemPolicy();
-                cacheItemPolicy.SlidingExpiration = config.cacheSlidingExpiration;
+                cache = new InMemoryCache<string, string>(str => Encoding.UTF8.GetByteCount(str), config.cacheSettings);
             }
         }
 
@@ -258,7 +252,7 @@ namespace FeatureLoom.Storages
                         {
                             if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                             var fileContent = stream.ReadToEnd();
-                            cache?.Add(uri, fileContent, cacheItemPolicy);
+                            cache?.Add(uri, fileContent);
                         }
                     }
                     catch (Exception e)
@@ -433,7 +427,7 @@ namespace FeatureLoom.Storages
                 T data = default;
                 bool success = false;
 
-                if (cache?.Get(uri) is string cacheString)
+                if (cache != null && cache.TryGet(uri, out string cacheString))
                 {
                     success = TryDeserialize(cacheString, out data);
                     if (!success)
@@ -458,7 +452,7 @@ namespace FeatureLoom.Storages
                         if (!success) Log.WARNING(this.GetHandle(), $"Failed deserializing value for URI {uri}! (It will not be cached)");
                         else if (config.updateCacheOnRead)
                         {
-                            cache?.Add(uri, fileContent, cacheItemPolicy);
+                            cache?.Add(uri, fileContent);
                         }
                     }
                 }
@@ -475,7 +469,7 @@ namespace FeatureLoom.Storages
         {
             try
             {
-                if (cache?.Get(uri) is string cacheString)
+                if (cache != null && cache.TryGet(uri, out string cacheString))
                 {
                     var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
                     await consumer(stream);
@@ -500,7 +494,7 @@ namespace FeatureLoom.Storages
                                 await consumer(memoryStream);
                                 memoryStream.Position = 0;
                                 string fileContent = await textReader.ReadToEndAsync();
-                                cache?.Add(uri, fileContent, cacheItemPolicy);
+                                cache?.Add(uri, fileContent);
                             }
                         }
                         else
@@ -531,7 +525,7 @@ namespace FeatureLoom.Storages
                 {
                     if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
                     {
-                        cache?.Add(uri, fileContent, cacheItemPolicy);
+                        cache?.Add(uri, fileContent);
                         if (fileSystemObservationActive)
                         {
                             UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
@@ -582,7 +576,7 @@ namespace FeatureLoom.Storages
                     var textReader = new StreamReader(sourceStream);
                     fileContent = await textReader.ReadToEndAsync();
                     sourceStream.Position = origPosition;
-                    cache?.Add(uri, fileContent, cacheItemPolicy);
+                    cache?.Add(uri, fileContent);
 
                     if (fileSystemObservationActive)
                     {
