@@ -2,7 +2,7 @@
 using FeatureLoom.Time;
 using Xunit;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     public class QueueForwarderTest
     {

@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Time;
 using System;
 
@@ -9,12 +9,12 @@ namespace FeatureLoom.RPC
         private class MultiResponseHandler<R> : IResponseHandler
         {
             private readonly long requestId;
-            private readonly IDataFlowSink sink;
+            private readonly IMessageSink sink;
             public readonly TimeFrame lifeTime;
 
             public TimeFrame LifeTime => lifeTime;
 
-            public MultiResponseHandler(long requestId, IDataFlowSink sink, TimeSpan timeout)
+            public MultiResponseHandler(long requestId, IMessageSink sink, TimeSpan timeout)
             {
                 this.sink = sink;
                 lifeTime = new TimeFrame(timeout);

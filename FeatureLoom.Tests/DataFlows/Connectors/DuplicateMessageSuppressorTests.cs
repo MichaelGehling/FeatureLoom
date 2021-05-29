@@ -4,7 +4,7 @@ using System;
 using System.Threading;
 using Xunit;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     public class DuplicateMessageSuppressorTests
     {

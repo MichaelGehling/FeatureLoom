@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
@@ -7,7 +7,7 @@ using System.IO;
 
 namespace FeatureLoom.Storages
 {
-    public class FileSystemObserver : IDataFlowSource, IDisposable
+    public class FileSystemObserver : IMessageSource, IDisposable
     {
         private SourceValueHelper sourceHelper;
         private FileSystemWatcher fileWatcher;
@@ -91,7 +91,7 @@ namespace FeatureLoom.Storages
             sourceHelper.DisconnectAll();
         }
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             sourceHelper.DisconnectFrom(sink);
         }
@@ -101,17 +101,17 @@ namespace FeatureLoom.Storages
             ((IDisposable)fileWatcher)?.Dispose();
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             sourceHelper.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }

@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
@@ -19,7 +19,7 @@ namespace FeatureLoom.Storages
             }
         }
 
-        public void Add(string uriPattern, IDataFlowSink notificationSink)
+        public void Add(string uriPattern, IMessageSink notificationSink)
         {
             using (subscriptionsLock.Lock())
             {
@@ -71,7 +71,7 @@ namespace FeatureLoom.Storages
             return notified;
         }
 
-        public void Remove(string uriPattern, IDataFlowSink notificationSink)
+        public void Remove(string uriPattern, IMessageSink notificationSink)
         {
             using (subscriptionsLock.Lock())
             {

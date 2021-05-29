@@ -1,5 +1,5 @@
-﻿using FeatureLoom.Collections;
-using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
+using FeatureLoom.Collections;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
@@ -297,7 +297,7 @@ namespace FeatureLoom.Storages
             }
         }
 
-        public bool TrySubscribeForChangeNotifications(string uriPattern, IDataFlowSink notificationSink)
+        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink notificationSink)
         {
             ActivateFileSystemObservation(true);
             subscriptions.Add(uriPattern, notificationSink);

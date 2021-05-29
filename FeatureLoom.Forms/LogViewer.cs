@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers.Forms;
 using FeatureLoom.Logging;
 using FeatureLoom.Synchronization;
@@ -19,7 +19,7 @@ namespace FeatureLoom.Forms
 
         public Sender<LogMessage> logNotificationSender = new Sender<LogMessage>();
 
-        public LogViewer(IDataFlowSource logMessageSource = null, bool hideOnClosing = false, bool startReading = true)
+        public LogViewer(IMessageSource logMessageSource = null, bool hideOnClosing = false, bool startReading = true)
         {
             this.hideOnClosing = hideOnClosing;
             this.keepReading = startReading;
@@ -47,7 +47,7 @@ namespace FeatureLoom.Forms
             private WaitHandleCollection waitHandles;
             private StringBuilder stringBuilder = new StringBuilder();
 
-            public WritingLogWorkflow(LogViewer logViewer, IDataFlowSource logMessageSource)
+            public WritingLogWorkflow(LogViewer logViewer, IMessageSource logMessageSource)
             {
                 this.logViewer = logViewer;
 

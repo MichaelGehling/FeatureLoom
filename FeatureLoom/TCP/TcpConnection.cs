@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Synchronization;
@@ -172,9 +172,9 @@ namespace FeatureLoom.TCP
             receivedMessageSender.DisconnectAll();
         }
 
-        public IDataFlowSink SendingSink => routingFilter;
+        public IMessageSink SendingSink => routingFilter;
 
-        public IDataFlowSource ReceivingSource => receivedMessageSender;
+        public IMessageSource ReceivingSource => receivedMessageSender;
 
         public bool Disconnected => !client.Connected;
         public bool Connected => client.Connected;

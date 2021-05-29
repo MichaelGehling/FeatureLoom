@@ -2,7 +2,7 @@
 using System;
 using Xunit;
 
-namespace FeatureLoom.DataFlows
+namespace FeatureLoom.MessageFlow
 {
     public class ForwarderTests
     {

@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Diagnostics;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
@@ -9,7 +9,7 @@ namespace FeatureLoom.RPC
     public class RpcTests
     {
         [Fact]
-        public void CanCallMethodViaDataFlow()
+        public void CanCallMethodViaMessageFlow()
         {
             TestHelper.PrepareTestContext();
 

@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
@@ -14,9 +14,9 @@ namespace FeatureLoom.Synchronization
         private string uri;
         private DateTime timestamp = AppTime.Now;
         private Sender<DistributedDataUpdate> updateSender = new Sender<DistributedDataUpdate>();
-        public IDataFlowSource UpdateSender => updateSender;
+        public IMessageSource UpdateSender => updateSender;
         private ProcessingEndpoint<DistributedDataUpdate> updateProcessor;
-        public IDataFlowSink UpdateReceiver => updateProcessor;
+        public IMessageSink UpdateReceiver => updateProcessor;
         private ProcessingEndpoint<SharedDataUpdateNotification> changePublisher;
         private long originatorId = RandomGenerator.Int64();
 

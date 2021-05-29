@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 
 using FeatureLoom.MetaDatas;
@@ -27,7 +27,7 @@ namespace FeatureLoom.Workflows
         protected LazyValue<Sender> executionInfoSender;
 
         [JsonIgnore]
-        public IDataFlowSource ExecutionInfoSource => executionInfoSender.Obj;
+        public IMessageSource ExecutionInfoSource => executionInfoSender.Obj;
 
         [JsonIgnore]
         protected virtual IWorkflowRunner DefaultRunner => WorkflowRunnerService.DefaultRunner;

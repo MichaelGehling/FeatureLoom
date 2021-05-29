@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 
 namespace FeatureLoom.Workflows
 {
@@ -6,6 +6,6 @@ namespace FeatureLoom.Workflows
     {
         IStateMachineInfo StateMachineInfo { get; }
         Workflow.ExecutionState CurrentExecutionState { get; }
-        IDataFlowSource ExecutionInfoSource { get; }
+        IMessageSource ExecutionInfoSource { get; }
     }
 }

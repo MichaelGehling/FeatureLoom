@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System.Collections.Generic;
@@ -55,7 +55,7 @@ namespace FeatureLoom.Workflows
             return workflows;
         }
 
-        public static IDataFlowSource ExecutionInfoSource
+        public static IMessageSource ExecutionInfoSource
         {
             get
             {

@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.TCP
 {
-    public class TcpClientEndpoint : Workflow<TcpClientEndpoint.StateMachine>, IDataFlowSink, IDataFlowSource, IRequester, IReplier
+    public class TcpClientEndpoint : Workflow<TcpClientEndpoint.StateMachine>, IMessageSink, IMessageSource, IRequester, IReplier
     {
         public class StateMachine : StateMachine<TcpClientEndpoint>
         {
@@ -246,14 +246,14 @@ namespace FeatureLoom.TCP
             reconnectionCheckTimer = new TimeFrame(config.reconnectionCheckTime);
         }
 
-        private IDataFlowSink SendingToTcpSink => sendingSink;
-        private IDataFlowSource ReceivingFromTcpSource => receivedMessageSource;
+        private IMessageSink SendingToTcpSink => sendingSink;
+        private IMessageSource ReceivingFromTcpSource => receivedMessageSource;
 
         public bool IsConnectedToServer => connection?.Connected ?? false;
 
         public int CountConnectedSinks => ReceivingFromTcpSource.CountConnectedSinks;
 
-        public void DisconnectFrom(IDataFlowSink sink)
+        public void DisconnectFrom(IMessageSink sink)
         {
             ReceivingFromTcpSource.DisconnectFrom(sink);
         }
@@ -263,7 +263,7 @@ namespace FeatureLoom.TCP
             ReceivingFromTcpSource.DisconnectAll();
         }
 
-        public IDataFlowSink[] GetConnectedSinks()
+        public IMessageSink[] GetConnectedSinks()
         {
             return ReceivingFromTcpSource.GetConnectedSinks();
         }
@@ -283,12 +283,12 @@ namespace FeatureLoom.TCP
             return SendingToTcpSink.PostAsync(message);
         }
 
-        public void ConnectTo(IDataFlowSink sink, bool weakReference = false)
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             ReceivingFromTcpSource.ConnectTo(sink, weakReference);
         }
 
-        public IDataFlowSource ConnectTo(IDataFlowConnection sink, bool weakReference = false)
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return ReceivingFromTcpSource.ConnectTo(sink, weakReference);
         }

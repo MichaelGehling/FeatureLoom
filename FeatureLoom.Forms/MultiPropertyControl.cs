@@ -1,4 +1,4 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers.Forms;
 using System;
@@ -61,7 +61,7 @@ namespace FeatureLoom.Forms
         private Dictionary<string, Property> properties = new Dictionary<string, Property>();
         public bool readOnly = false;
         private Sender<PropertyEventNotification> sender = new Sender<PropertyEventNotification>();
-        public IDataFlowSource<PropertyEventNotification> PropertyEventNotifier => sender;
+        public IMessageSource<PropertyEventNotification> PropertyEventNotifier => sender;
 
         public class PropertyEventNotification
         {

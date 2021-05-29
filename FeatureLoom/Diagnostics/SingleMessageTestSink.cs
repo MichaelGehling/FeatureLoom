@@ -1,10 +1,10 @@
-﻿using FeatureLoom.DataFlows;
+﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Synchronization;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Diagnostics
 {
-    public class SingleMessageTestSink<T> : IDataFlowSink
+    public class SingleMessageTestSink<T> : IMessageSink
     {
         private AsyncManualResetEvent receivedEvent = new AsyncManualResetEvent();
         public T receivedMessage;
