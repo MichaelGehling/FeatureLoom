@@ -18,6 +18,7 @@ namespace FeatureLoom.Supervisions
         private static Thread supervisorThread = null;
         private static ManualResetEventSlim mre = new ManualResetEventSlim(true);
         private static CancellationTokenSource cts = new CancellationTokenSource();
+        private static bool stop = false;
 
         private static TimeSpan minimumDelay = 0.001.Milliseconds();
 
@@ -25,11 +26,13 @@ namespace FeatureLoom.Supervisions
         {
             using (myLock.Lock())
             {
+                stop = false;
                 if (supervisorThread == null)
                 {
                     newSupervisions.Add(new WeakReference<ISupervision>(supervision));
                     mre.Set();
                     supervisorThread = new Thread(StartSupervision);
+                    supervisorThread.IsBackground = true;
                     supervisorThread.Start();
                 }
                 else
@@ -54,7 +57,7 @@ namespace FeatureLoom.Supervisions
             {                
                 TimeSpan executionStart = timer.LastElapsed;
 
-                if (!CheckForPause(ref stopCounter)) return;
+                if (!CheckForPause(ref stopCounter) || stop) break;                
                 CheckForNewSupervisions(ref stopCounter);
                 HandleActiveSupervisions();
                 SwapHandledToActive();                
@@ -65,6 +68,14 @@ namespace FeatureLoom.Supervisions
                 TimeSpan delay = GetDelay(executionTime);
                 AppTime.Wait(delay, ref timer, cts.Token);
             }
+        }
+
+        public static bool StopSupervision(TimeSpan timeout)
+        {
+            stop = true;
+            cts.Cancel();
+            mre.Set();
+            return supervisorThread?.Join(timeout) ?? true;
         }
 
         private static TimeSpan GetDelay(TimeSpan executionTime)

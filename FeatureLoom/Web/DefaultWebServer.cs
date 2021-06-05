@@ -57,8 +57,7 @@ namespace FeatureLoom.Web
         public void AddEndpoint(HttpEndpointConfig endpoint)
         {
             using (myLock.Lock())
-            {
-                //if(started) throw new Exception("Endpoints can only be configured before the server is started.");
+            {                
                 endpoints.Add(endpoint);
                 if (started)
                 {
@@ -120,7 +119,6 @@ namespace FeatureLoom.Web
         {
             using (myLock.Lock())
             {
-                if (started) throw new Exception("Endpoints can only be configured before the server is started.");
                 endpoints.Clear();
                 if (started)
                 {
