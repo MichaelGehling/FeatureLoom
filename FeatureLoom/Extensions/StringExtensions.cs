@@ -42,6 +42,32 @@ namespace FeatureLoom.Extensions
             temp += pathExtension;
             return temp;
         }
+        
+        public static string RemoveLastPathElement(this string path, char seperator = '\\')
+        {
+            bool didEndWithSeperator = path.EndsWith(seperator.ToString());            
+            if (didEndWithSeperator)
+            {
+                path = path.TrimEnd(seperator);
+            }
+
+            var index = path.LastIndexOf(seperator);
+            if (index == -1)
+            {
+                if (didEndWithSeperator) return seperator.ToString();
+                else return "";
+            }
+            else
+            {
+                path = path.Substring(0, index + 1);
+
+                bool endsWithSeperator = path.EndsWith(seperator.ToString());
+                if (didEndWithSeperator && !endsWithSeperator) path += seperator;
+                else if (!didEndWithSeperator && endsWithSeperator) path = path.TrimEnd(seperator);
+
+                return path;
+            }            
+        }
 
         public static int FindPatternPos(this byte[] buffer, int startIndex, int count, byte[] pattern)
         {
@@ -201,5 +227,7 @@ namespace FeatureLoom.Extensions
             sb.Clear();
             return str;
         }
+        
     }
+
 }
