@@ -9,7 +9,7 @@ FeatureLoom is a C# development framework that focuses on a lean development and
 
 FeatureLoom comprises the following functional facets:
 * *Communication:*
-  * **MessageFlow**
+  * **MessageFlow**: A very lean local messaging concept consisting of senders, receivers, functional connectors and endpoints that allow synchronous and asyncronous messaging. 
   * **RPC**
   * **TCP**
   * **Web**
