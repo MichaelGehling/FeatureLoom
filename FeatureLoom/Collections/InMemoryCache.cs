@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Supervisions;
+﻿using FeatureLoom.Supervision;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;

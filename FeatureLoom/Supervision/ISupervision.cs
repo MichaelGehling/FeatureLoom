@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace FeatureLoom.Supervisions
+namespace FeatureLoom.Supervision
 {
     public interface ISupervision
     {

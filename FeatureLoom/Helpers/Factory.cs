@@ -8,25 +8,25 @@ namespace FeatureLoom.Helpers
     {
         public static T Create<T>() where T : new()
         {
-            if (OverrideFactory<T>.Create(out T value)) return value;
+            if (OverrideFactory<T>.TryCreate(out T value)) return value;
             else return new T();
         }
 
         public static T Create<T>(string factoryName) where T : new()
         {
-            if (OverrideFactory<T>.Create(factoryName, out T value)) return value;
+            if (OverrideFactory<T>.TryCreate(factoryName, out T value)) return value;
             else return new T();
         }
 
         public static T Create<T>(Func<T> defaultCreate)
         {
-            if (OverrideFactory<T>.Create(out T value)) return value;
+            if (OverrideFactory<T>.TryCreate(out T value)) return value;
             else return defaultCreate();
         }
 
         public static T Create<T>(string factoryName, Func<T> defaultCreate)
         {
-            if (OverrideFactory<T>.Create(factoryName, out T value)) return value;
+            if (OverrideFactory<T>.TryCreate(factoryName, out T value)) return value;
             else return defaultCreate();
         }
 
@@ -68,7 +68,7 @@ namespace FeatureLoom.Helpers
                 context.Data.create = newCreate;
             }
 
-            public static bool Create(out T value)
+            public static bool TryCreate(out T value)
             {
                 value = default;
                 if (context.Data.create == null) return false;
@@ -86,7 +86,7 @@ namespace FeatureLoom.Helpers
                 }
             }
 
-            public static bool Create(string factoryName, out T value)
+            public static bool TryCreate(string factoryName, out T value)
             {
                 value = default;
                 using (context.Data.myLock.Lock())

@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace FeatureLoom.Supervisions
+namespace FeatureLoom.Supervision
 {
     public static class SupervisionService
     {        
@@ -93,7 +93,7 @@ namespace FeatureLoom.Supervisions
         }
 
         private static void HandleActiveSupervisions()
-        {
+        {            
             DateTime now = AppTime.Now;
             foreach (var supervision in activeSupervisions)
             {
@@ -102,7 +102,7 @@ namespace FeatureLoom.Supervisions
                     sv.Handle(now);
                     if (sv.IsActive) handledSupervisions.Add(supervision);
                 }
-            }
+            }            
         }
 
         private static void CheckForNewSupervisions(ref int stopCounter)

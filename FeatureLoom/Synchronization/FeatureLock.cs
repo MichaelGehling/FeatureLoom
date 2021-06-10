@@ -1,7 +1,7 @@
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Time;
-using FeatureLoom.Supervisions;
+using FeatureLoom.Supervision;
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;

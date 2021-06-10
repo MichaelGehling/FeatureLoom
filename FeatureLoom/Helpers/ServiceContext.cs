@@ -81,8 +81,9 @@ namespace FeatureLoom.Helpers
                 if (NoContextSeperationPolicy) return defaultContextData;
                 else
                 {
-                    if (contextData.Value == null) contextData.Value = defaultContextData;
-                    return contextData.Value;
+                    var value = contextData.Value;
+                    if (value == null) contextData.Value = defaultContextData;
+                    return value;
                 }
             }
         }

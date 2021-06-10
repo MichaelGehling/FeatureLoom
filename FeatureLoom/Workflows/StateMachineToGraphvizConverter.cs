@@ -1,7 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Workflows;
 
-namespace FeatureLoom.Helpers
+namespace FeatureLoom.Workflows
 {
     public static class StateMachineToGraphvizConverter
     {

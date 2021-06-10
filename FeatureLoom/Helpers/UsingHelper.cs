@@ -16,5 +16,8 @@ namespace FeatureLoom.Helpers
         {
             after();
         }
+
+        public static UsingHelper Do(Action before, Action after) => new UsingHelper(before, after);
+        public static UsingHelper Do(Action after) => new UsingHelper(null , after);
     }
 }

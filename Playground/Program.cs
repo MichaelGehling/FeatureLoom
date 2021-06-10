@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Collections;
+using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using Nito.AsyncEx;
@@ -17,12 +18,29 @@ namespace Playground
         }
     }
 
+    
+
     partial class Program
     {
-        private static volatile bool done = false;
+
+        public static void BackgroundTest()
+        {
+            var tk = AppTime.TimeKeeper;
+            for (int i = 0; i < 1_000_000; i++)
+            {
+                Thread.CurrentThread.IsBackground = true;
+                Thread.CurrentThread.IsBackground = false;
+            }
+            Console.WriteLine(tk.Elapsed.Ticks * 100 / 1_000_000);
+        }
 
         private static void Main(string[] args)
         {
+
+            var thread = new Thread(BackgroundTest);
+            thread.Start();
+            thread.Join();
+            Console.ReadKey();
 
 
             InMemoryCache<string, string> cache = new FeatureLoom.Collections.InMemoryCache<string, string>(str => System.Text.ASCIIEncoding.Unicode.GetByteCount(str),
