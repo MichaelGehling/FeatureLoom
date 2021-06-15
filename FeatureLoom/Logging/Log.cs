@@ -110,7 +110,7 @@ namespace FeatureLoom.Logging
             SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
-        public static void ALWAYS(string shortText,
+        public static void FORCE(string shortText,
                           string detailText = "",
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",

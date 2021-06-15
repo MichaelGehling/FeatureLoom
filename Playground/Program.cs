@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Collections;
 using FeatureLoom.Helpers;
+using FeatureLoom.Logging;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using Nito.AsyncEx;
@@ -36,10 +37,18 @@ namespace Playground
 
         private static void Main(string[] args)
         {
+            Log.defaultConsoleLogger.config.loglevel = Loglevel.TRACE;
+            Log.FORCE("FORCE");
+            Log.INFO("INFO");
+            Log.TRACE("TRACE");
+            Log.WARNING("WARNING");
+            Log.ERROR("ERROR");
 
-            var thread = new Thread(BackgroundTest);
-            thread.Start();
-            thread.Join();
+            Log.defaultConsoleLogger.config.TryWriteToStorageAsync().WaitFor();
+
+
+
+
             Console.ReadKey();
 
 
