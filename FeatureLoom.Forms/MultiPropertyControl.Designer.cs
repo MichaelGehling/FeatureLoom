@@ -33,9 +33,10 @@
             // 
             // propertyTable
             // 
-            this.propertyTable.ColumnCount = 2;
+            this.propertyTable.ColumnCount = 3;
             this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             this.propertyTable.Dock = System.Windows.Forms.DockStyle.Fill;
             this.propertyTable.Location = new System.Drawing.Point(0, 0);
             this.propertyTable.Name = "propertyTable";

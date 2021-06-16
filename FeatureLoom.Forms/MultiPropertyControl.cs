@@ -15,12 +15,15 @@ namespace FeatureLoom.Forms
         {
             public Label label = new Label();
             public TextBox textbox = new TextBox();
-            public RowStyle rowStyle = new RowStyle();
+            public Control extension = null;
+            public RowStyle rowStyle = new RowStyle();            
             public Predicate<string> verifier = null;
             private static uint count = 0;
 
-            public Property(string labelText, bool readOnly)
+            public Property(string labelText, bool readOnly, Control extensionControl = null)
             {
+                this.extension = extensionControl;
+
                 count++;
 
                 this.label.Anchor = System.Windows.Forms.AnchorStyles.Right;
@@ -41,6 +44,8 @@ namespace FeatureLoom.Forms
                 this.textbox.WordWrap = true;
                 this.textbox.AcceptsReturn = true;
 
+                UpdateExtension(extensionControl);
+
                 textbox.TextChanged += (o, e) =>
                 {
                     var measured = TextRenderer.MeasureText(textbox.Text, textbox.Font);
@@ -49,6 +54,18 @@ namespace FeatureLoom.Forms
 
                     this.TriggerVerify();
                 };
+            }
+
+            public void UpdateExtension(Control newExtension)
+            {
+                if (extension != newExtension)
+                {
+                    extension = newExtension;
+                    if (extension != null)
+                    {
+                        this.extension.Dock = System.Windows.Forms.DockStyle.Fill;
+                    }
+                }
             }
 
             public void TriggerVerify()
@@ -105,9 +122,9 @@ namespace FeatureLoom.Forms
             property.textbox.ReadOnlyChanged += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.ReadOnlyChanged, property.textbox.ReadOnly));
         }
 
-        private void AddProperty(string label, string value)
+        private void AddProperty(string label, string value, Control extensionControl)
         {
-            Property property = new Property(label, readOnly);
+            Property property = new Property(label, readOnly, extensionControl);
             property.textbox.Text = value;
             properties.Add(label, property);
 
@@ -119,6 +136,7 @@ namespace FeatureLoom.Forms
                 propertyTable.RowStyles.Insert(rowIndex, property.rowStyle);
                 propertyTable.Controls.Add(property.label, 0, rowIndex);
                 propertyTable.Controls.Add(property.textbox, 1, rowIndex);
+                if (property.extension != null) propertyTable.Controls.Add(property.extension, 2, rowIndex);
 
                 UpdateSizes();
             }
@@ -143,27 +161,31 @@ namespace FeatureLoom.Forms
             }
         }
 
-        public void SetProperty(string label, string value)
+        public void SetProperty(string label, string value, Control extensionControl = null)
         {
-            if (properties.TryGetValue(label, out var property)) property.textbox.Text = value;
-            else AddProperty(label, value);
+            if (properties.TryGetValue(label, out var property))
+            {
+                property.textbox.Text = value;
+                property.UpdateExtension(extensionControl);
+            }
+            else AddProperty(label, value, extensionControl);
         }
 
-        public void SetProperty(string label, string value, Predicate<string> verifier)
+        public void SetProperty(string label, string value, Predicate<string> verifier, Control extensionControl = null)
         {
-            SetProperty(label, value);
+            SetProperty(label, value, extensionControl);
             SetPropertyVerifier(label, verifier);
         }
 
-        public void SetProperty(string label, string value, bool readOnly, Predicate<string> verifier)
+        public void SetProperty(string label, string value, bool readOnly, Predicate<string> verifier, Control extensionControl = null)
         {
-            SetProperty(label, value, readOnly);
+            SetProperty(label, value, readOnly, extensionControl);
             SetPropertyVerifier(label, verifier);
         }
 
-        public void SetProperty(string label, string value, bool readOnly)
+        public void SetProperty(string label, string value, bool readOnly, Control extensionControl = null)
         {
-            SetProperty(label, value);
+            SetProperty(label, value, extensionControl);
             SetReadOnly(readOnly, label);
         }
 
@@ -185,7 +207,13 @@ namespace FeatureLoom.Forms
 
         public string GetProperty(string label)
         {
-            if (properties.TryGetValue(label, out var prop)) return prop.textbox.Text;
+            if (properties.TryGetValue(label, out var property)) return property.textbox.Text;
+            else return null;
+        }
+
+        public Control GetExtension(string label)
+        {
+            if (properties.TryGetValue(label, out var property)) return property.extension;
             else return null;
         }
 
