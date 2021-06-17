@@ -83,7 +83,7 @@ namespace FeatureLoom.Synchronization
         #endregion ConstructorAndSettings
 
         #region ObjectLock
-        // Stores FeatureLocks associated with objects, for the lifetime of the object
+        // Stores FeatureLocks associated with objects, for the lifetime of the objects
         private static LazyValue<ConditionalWeakTable<object, FeatureLock>> lockObjects;
 
         /// <summary>
@@ -124,12 +124,12 @@ namespace FeatureLoom.Synchronization
         #region Variables
 
         // Additional variables that are used less often, so they are kept in an extra object which is only loaded as required 
-        // in ordr to reduce the memory footprint
+        // in order to reduce the memory footprint
         private LazyValue<LazyVariables> lazy;
 
         // Stored prepared tasks to speed up async calls that can be handeled synchronously.
         // More prepared tasks are in LazyVariables object
-        // Note: failedAttemptTask can be static, because it is the same form all lock instances.
+        // Note: failedAttemptTask can be static, because it is the same for all lock instances.
         private static Task<LockAttempt> failedAttemptTask;
         private Task<LockHandle> writeLockTask;
         private Task<LockAttempt> writeLockAttemptTask;        
@@ -147,7 +147,7 @@ namespace FeatureLoom.Synchronization
 
         // Is used to measure how long it takes until the lock is released again.
         // It is incremented in every waiting cycle by the candidate with the firstRankTicket (rank 0).
-        // When the lock is acquired again, it is reset to 0.
+        // When the lock is acquired again, it is reset to 1.
         private ushort waitCounter = 1;
 
         // After the lock was acquired, the average is updated by including the last waitCounter.
@@ -158,9 +158,8 @@ namespace FeatureLoom.Synchronization
 
         // Contains the oldest ticket number that is currently waiting and therefor has the rank 0. The rank of the other tickets is calculated relative to this one.
         // Will be reset to 0 when the currently oldest candidate acquired the lock. For a short time, it is possible that some newer ticket number
-        // is set until the oldest one reaches the pooint to update.
-        private ushort firstRankTicket = 0;
-        
+        // is set until the actually oldest one reaches the pooint to update.
+        private ushort firstRankTicket = 0;        
 
         // Will be true if a candidate tries to acquire the lock with priority, so the other candidates know that they have to stay back.
         // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate already waits,
@@ -173,11 +172,12 @@ namespace FeatureLoom.Synchronization
         #endregion Variables
 
         #region LazyVariables
-
         internal class LazyVariables
         {
+            // If not using the default settings, the settings are stored here.
             internal LazyValue<FeatureLockSettings> settings;
 
+            // Stored prepared tasks to speed up async calls that can be handeled synchronously.
             private Task<LockHandle> readLockTask;
             private Task<LockHandle> reenterableReadLockTask;
             private Task<LockHandle> reenterableWriteLockTask;
@@ -201,6 +201,7 @@ namespace FeatureLoom.Synchronization
             // The currently valid reentrancyId. It must never be 0, as this is the default value of the reentrancyIndicator.
             internal ushort reentrancyId = 1;
 
+            // The following methods provide the prepared tasks. If not existent yet they create and store them.
             internal Task<LockHandle> GetReadLockTask(FeatureLock parent)
             {
                 if (readLockTask == null) Interlocked.CompareExchange(ref readLockTask, Task.FromResult(new LockHandle(parent, LockMode.ReadLock)), null);
@@ -268,7 +269,7 @@ namespace FeatureLoom.Synchronization
         // Provides the active settings of the FeatureLock
         private FeatureLockSettings Settings => lazy.ObjIfExists?.settings.ObjIfExists ?? DefaultSettings;
 
-        // Keeps the last reentrancyId of the "logical thread".
+        // Access to the last reentrancyId of the "logical thread".
         // A value that differs from the currently valid reentrancyId implies that the lock was not acquired before in this "logical thread",
         // so it must be acquired and cannot simply be reentered.
         private ushort ReentrancyIndicator
@@ -283,6 +284,7 @@ namespace FeatureLoom.Synchronization
                 lazy.Obj.reentrancyIndicator.Obj.Value = value;
             }
         }
+
         // True when the ReentrancyIndicator was already created
         private bool ReentrancyIndicatorExists => lazy.Exists && lazy.Obj.reentrancyIndicator.Exists;
 
@@ -362,6 +364,9 @@ namespace FeatureLoom.Synchronization
         /// </summary>
         public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;
 
+        /// <summary>
+        /// True if anyone is waiting to acquire the already acquired lock (Is not guaranteed to be accurate in every case)
+        /// </summary>
         public bool IsAnyWaiting => firstRankTicket != 0;
 
         #endregion PublicProperties
@@ -369,7 +374,8 @@ namespace FeatureLoom.Synchronization
         #region ReentrancyContext
 
         /// <summary>
-        /// When an async call is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// Only for reentrant locking: 
+        /// When an async call is executed within an acquired lock, but not awaited within it,
         /// reentrancy may lead to collisions, because a parallel executed call will keep its reentrancy context until finished.
         /// This method will remove the reentrancy context before calling the async method, so that a possible locking attempt
         /// will be delayed until the already aquired lock is exited.
@@ -386,7 +392,8 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
-        /// When an async call is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// Only for reentrant locking: 
+        /// When an async call is executed within an acquired lock, but not awaited within it,
         /// reentrancy may lead to collisions, because the parallel executed call will keep its reentrancy context until finished.
         /// This method will remove the reentrancy context before calling the async method, so that a possible locking attempt
         /// will be delayed until the already aquired lock is exited.
@@ -403,7 +410,8 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
-        /// When a new task is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// Only for reentrant locking: 
+        /// When a new task is executed within an acquired lock, but not awaited within it,
         /// reentrancy may lead to collisions, because the parallel executed task will keep its reentrancy context until finished.
         /// This method will run the passed action in a new Task and remove the reentrancy context before,
         /// so that a possible locking attempt will be delayed until the already aquired lock is exited.
@@ -420,7 +428,8 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
-        /// When a new task or an async call is executed within an acquired lock, but not awaited IMMEDIATLY (or not awaited at all),
+        /// Only for reentrant locking: 
+        /// When a new task or an async call is executed within an acquired lock, but not awaited within it,
         /// reentrancy may lead to collisions, because the parallel executed task/call will keep its reentrancy context until finished.
         /// This method will remove the reentrancy context FROM WITHIN the new task or async call,
         /// so that a possible locking attempt will be delayed until the already aquired lock is exited.
@@ -439,15 +448,16 @@ namespace FeatureLoom.Synchronization
 
         #region HelperMethods
 
-        // Used to check if a candidate is allowed trying to acquire the lock without going into the waiting cycle
+        // Used to check if a candidate must go to the waiting cycle, before trying to acquire the lock.
+        // Prioritized candidates may always try for queue jumping, others only if configured so and no prioritized candidate is waiting.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
             return !prioritized && (prioritizedWaiting || (Settings.restrictQueueJumping && (firstRankTicket != 0 || isSupervisionActive)));
         }
 
-        // Invalidates the current reentrancyIndicator by changing the reentrancy ID to compare
-        // without changing the AsyncLocal reentrancyIndicator itself, which would be expensive.
+        // Invalidates the current reentrancyIndicator by changing the reentrancy ID.
+        // That allows to avoid changing the AsyncLocal reentrancyIndicator itself, which would be expensive.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RenewReentrancyId()
         {
@@ -455,7 +465,7 @@ namespace FeatureLoom.Synchronization
             if (++obj.reentrancyId == 0) ++obj.reentrancyId;
         }
 
-        // Yielding a task is very expensive, but must be done to avoid block the thread pool threads.
+        // Yielding a task is very expensive, but must be done to avoid blocking the thread pool threads.
         // This method checks if the task should be yielded or the thread can still be blocked.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustYieldAsyncThread(int rank, bool prioritized, int counter)
@@ -469,6 +479,7 @@ namespace FeatureLoom.Synchronization
             else asyncYieldFrequency = Settings.asyncYieldBaseFrequency / rank;
             if (counter % asyncYieldFrequency.ClampLow(1) != 0) return false;
 
+            // If it is time to yield, we might still be able to skip yielding if the thread pool is barely used.
             ThreadPool.GetAvailableThreads(out int availableThreads, out _);
             ThreadPool.GetMaxThreads(out int maxThreads, out _);
             ThreadPool.GetMinThreads(out int minThreads, out _);
@@ -487,7 +498,7 @@ namespace FeatureLoom.Synchronization
 
         // Creates the a new ticket for a new waiting candidate.
         // It will ensure to never provide the 0, because it is reserved to indicate when the firstRankTicket is undefined.
-        // GetTicket() might be called concurrently and we don't use interlocked, so it might happen that a ticket is provided multiple times,
+        // NOTE: GetTicket() might be called concurrently and we don't use Interlocked, so it can happen that a ticket is provided multiple times,
         // but that is acceptable and will not cause any trouble.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ushort GetTicket()
@@ -566,7 +577,7 @@ namespace FeatureLoom.Synchronization
         {
             // It is allowed for multiple candidates to acquire the lock for readOnly in parallel.
             // The number of candidates that acquired under readOnly restriction is counted in the lockIndicator, starting with FIRST_READ_LOCK,
-            // so we take the current lockIndicator and increase it by try and check if it would be a proper readOnly-value (newLockIndicator >= FIRST_READ_LOCK)
+            // so we take the current lockIndicator and increase it by 1 and check if it would be a proper readOnly-value (newLockIndicator >= FIRST_READ_LOCK)
             // If it is the case we try to actually set the new value to the lockIndicator variable
             int currentLockIndicator = lockIndicator;
             int newLockIndicator = currentLockIndicator + 1;

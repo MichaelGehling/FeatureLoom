@@ -35,7 +35,7 @@ namespace Playground
             Console.WriteLine(tk.Elapsed.Ticks * 100 / 1_000_000);
         }
 
-        private static void Main(string[] args)
+        private static void Main()
         {
             Log.defaultConsoleLogger.config.loglevel = Loglevel.TRACE;
             Log.FORCE("FORCE");

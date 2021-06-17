@@ -1,7 +1,7 @@
 ﻿using FeatureLoom.Workflows;
 using System.Windows.Forms;
 
-namespace FeatureLoom.Helpers.Forms
+namespace FeatureLoom.Forms
 {
     public static partial class FormsExtensions
     {

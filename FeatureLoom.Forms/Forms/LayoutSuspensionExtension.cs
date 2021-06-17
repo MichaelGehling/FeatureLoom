@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
-namespace FeatureLoom.Helpers.Forms
+namespace FeatureLoom.Forms
 {
     public static class LayoutSuspensionExtension
     {

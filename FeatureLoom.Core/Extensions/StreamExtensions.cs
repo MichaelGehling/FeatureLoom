@@ -35,18 +35,16 @@ namespace FeatureLoom.Extensions
             do
             {
                 bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                if (bytesRead == 0) finished = true;
-                else if (bytesRead < buffer.Length)
+                if (bytesRead < buffer.Length) finished = true;
+                if (bytesRead > 0)
                 {
-                    buffer = buffer.AsSpan(0, bytesRead).ToArray();
-                    finished = true;
+                    if (data == null) data = new byte[bytesRead];
+                    data = data.Combine(buffer, bytesRead);
                 }
-                if (data == null) data = buffer;
-                else data = data.Combine(buffer);
             }
             while (!finished);
 
-            return data;
+            return data ?? Array.Empty<Byte>();
         }
     }
 }

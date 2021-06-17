@@ -47,11 +47,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Helpers.Forms\FormsExtensions.cs" />
-    <Compile Include="Helpers.Forms\LayoutSuspensionExtension.cs" />
-    <Compile Include="Helpers.Forms\RichTextBuilder.cs" />
-    <Compile Include="Helpers.Forms\TableLayoutPanelExtensions.cs" />
-    <Compile Include="Helpers.Forms\WorkflowApplicationContext.cs" />
+    <Compile Include="Forms\FormsExtensions.cs" />
+    <Compile Include="Forms\LayoutSuspensionExtension.cs" />
+    <Compile Include="Forms\RichTextBuilder.cs" />
+    <Compile Include="Forms\TableLayoutPanelExtensions.cs" />
+    <Compile Include="Forms\WorkflowApplicationContext.cs" />
     <Compile Include="LogViewer.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -65,7 +65,7 @@
       <DependentUpon>MultiPropertyControl.cs</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Helpers.Forms\RichTextBoxExtensions.cs" />
+    <Compile Include="Forms\RichTextBoxExtensions.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>
   <ItemGroup>
@@ -77,9 +77,12 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FeatureLoom\FeatureLoom.csproj">
-      <Project>{52d3f346-b06a-419c-87e9-11bd1c3155d9}</Project>
-      <Name>FeatureLoom</Name>
+    <None Include="LICENSE" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj">
+      <Project>{c567871f-12f0-4145-8297-acb2523b569a}</Project>
+      <Name>FeatureLoom.Core</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

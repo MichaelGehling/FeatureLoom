@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!--TargetFramework>netcoreapp2.0</TargetFramework-->
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>7.3</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -12,19 +11,20 @@
     <RepositoryUrl>https://github.com/MichaelGehling/FeatureLoom</RepositoryUrl>
     <Description>FeatureLoom is a C# development framework that focuses on a lean development and efficient code, speeds-up development by simplification while offering opt-in for a high level of control, promotes modular and extensible code by introducing means to easily decouple components with asynchronous communication, strives for high performance and a small memory footprint, equally supports synchronous and asynchronous programming to allow the right approach at the right time.</Description>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>0.1.4-alpha</Version>
+    <Version>0.1.5-alpha</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageTags>c#, state machine, data flow, messaging, communication, extensions, workflow,</PackageTags>
+    <PackageTags>c#, state machine, data flow, messaging, communication, extensions, workflow, embedded webserver</PackageTags>
     <PackageReleaseNotes>FeauterLoom is currently in a mixed state.
 Some features are in a ready to release state, some are still in a prototype state.
-Last changes: - ConsoleLogger extended to support coloring.</PackageReleaseNotes>
+Last changes: - Split to FeatureLoom (including kestrel web server) and FeatureLoom.Core without to reduce dependencies</PackageReleaseNotes>
     <Copyright>Copyright (c) 2020 Michael Gehling</Copyright>
-    <AssemblyVersion>0.1.4.0</AssemblyVersion>
-    <FileVersion>0.1.4.0</FileVersion>
+    <AssemblyVersion>0.1.5.0</AssemblyVersion>
+    <FileVersion>0.1.5.0</FileVersion>
     <PackageIcon>FeatureLoom_128.png</PackageIcon>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ApplicationIcon>favicon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,14 +35,10 @@ Last changes: - ConsoleLogger extended to support coloring.</PackageReleaseNotes
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
-    <None Include="..\Resources\FeatureLoom_128.png">
-      <Pack>True</Pack>
+    <None Include="..\Resources\FeatureLoom_128.png" Link="FeatureLoom_128.png">
       <PackagePath></PackagePath>
+      <Pack>True</Pack>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Remove="favicon.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -52,6 +48,10 @@ Last changes: - ConsoleLogger extended to support coloring.</PackageReleaseNotes
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
