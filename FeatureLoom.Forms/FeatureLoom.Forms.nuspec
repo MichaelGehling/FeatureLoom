@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package >
   <metadata>
-    <id>$id$</id>
-    <version>0.1.3-alpha</version>
+    <id>FeatureLoom.Forms</id>
+    <version>0.1.5-alpha</version>
     <title>FeatureLoom.Forms</title>
     <authors>Michael Gehling</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -11,10 +11,10 @@
     <iconUrl>https://github.com/MichaelGehling/FeatureLoom/blob/master/Resources/FeatureLoom_128.png?raw=true</iconUrl>
     <description>A Forms extensions for FeatureLoom framework</description>
     <releaseNotes>fixed dependency problem with debug build</releaseNotes>
-    <copyright>$copyright$</copyright>
+    <copyright>Copyright (c) 2020 Michael Gehling</copyright>
     <tags>FeatureLoom Forms</tags>
     <dependencies>
-      <dependency id="FeatureLoom" version="0.1.1-alpha" />
+      <dependency id="FeatureLoom.Core" version="0.1.5-alpha" />
     </dependencies>
   </metadata>
 </package>
