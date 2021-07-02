@@ -16,19 +16,19 @@ FeatureLoom comprises the following functional facets:
   * **Diagnostics**: Helpers and MessageFlow elements to support testing and to allow runtime statistics of MessageFlow connections. *[FeatureLoom.Core]*
 
 * *Logic:*
-  * **Extensions** A large number of various extension methods to simplify and speed-up implementations. *[FeatureLoom.Core]*
-  * **Helpers** A collection of small helpers (e.g. AsyncOut, LazyValue, UsingHelper, GenericComparer) up to powerful tools (e.g. UndoRedo, Factory, ServiceContext). *[FeatureLoom.Core]*
-  * **Workflows** Highly efficient and performant executable state machines that can be implemented via a very powerful builder pattern. Can be executed in synchronous and asynchronous contexts and also allow for step-by-step execution. *[FeatureLoom.Core]*
-  * **Supervision** Service allowing to register supervision jobs that are cyclically executed with individual cycle times in a shared thread. *[FeatureLoom.Core]*
-  * **Synchronization** Several synchronization features, including extremly performant locks (FeatureLock, MicroValueLock), async features (e.g. AsyncWaitHandle, AsyncManualResetEvent and shared data helpers *[FeatureLoom.Core]*
-  * **Time** A time service (AppTime), extensions to nicely write time values (e.g. 42.Seconds()) and some time measurement helpers (TimeKeeper, TimerFrame) *[FeatureLoom.Core]*
+  * **Extensions**: A large number of various extension methods to simplify and speed-up implementations. *[FeatureLoom.Core]*
+  * **Helpers**: A collection of small helpers (e.g. AsyncOut, LazyValue, UsingHelper, GenericComparer) up to powerful tools (e.g. UndoRedo, Factory, ServiceContext). *[FeatureLoom.Core]*
+  * **Workflows**: Create highly efficient and performant executable state machines via a very powerful builder pattern. Can be executed in synchronous and asynchronous contexts and also allow for step-by-step execution. *[FeatureLoom.Core]*
+  * **Supervision**: Service allowing to register supervision jobs that are cyclically executed with individual cycle times in a shared thread. *[FeatureLoom.Core]*
+  * **Synchronization**: Several synchronization features, including extremly performant locks (FeatureLock, MicroValueLock), async features (e.g. AsyncWaitHandle, AsyncManualResetEvent and shared data helpers *[FeatureLoom.Core]*
+  * **Time**: A time service (AppTime), extensions to nicely write time values (e.g. 42.Seconds()) and some time measurement helpers (TimeKeeper, TimerFrame) *[FeatureLoom.Core]*
 
 * *Data:*
-  * **Serialization** *[FeatureLoom.Core]*
-  * **Storage** *[FeatureLoom.Core]*
-  * **Collections** *[FeatureLoom.Core]*
-  * **MetaData** *[FeatureLoom.Core]*
-  * **Logging** Logging service interface that can be extended via MessageFlow. Includes different loggers (FileLogger, ConsoleLogger, InMemoryLogger) *[FeatureLoom.Core]*
+  * **Serialization**: *[FeatureLoom.Core]*
+  * **Storage**: *[FeatureLoom.Core]*
+  * **Collections**: *[FeatureLoom.Core]*
+  * **MetaData**: *[FeatureLoom.Core]*
+  * **Logging**: Logging service interface that can be extended via MessageFlow. Includes different loggers (FileLogger, ConsoleLogger, InMemoryLogger) *[FeatureLoom.Core]*
 
 * *UI:*
   * **Forms**: Several Helpers for Windows Forms and some Controls (Logging Window, Property Control) *[FeatureLoom.Forms]* 
