@@ -19,7 +19,7 @@ namespace FeatureLoom.Forms
             public Predicate<string> verifier = null;
             private static uint count = 0;
 
-            public Property(string labelText, bool readOnly, Control extensionControl = null)
+            public Property(string labelText, bool readOnly, Sender<PropertyEventNotification>  sender, Control extensionControl = null)
             {
                 this.extension = extensionControl;
 
@@ -42,6 +42,7 @@ namespace FeatureLoom.Forms
                 this.textbox.Multiline = true;
                 this.textbox.WordWrap = true;
                 this.textbox.AcceptsReturn = true;
+                this.textbox.AllowDrop = true;
 
                 UpdateExtension(extensionControl);
 
@@ -52,6 +53,20 @@ namespace FeatureLoom.Forms
                     textbox.FindParent<MultiPropertyControl>()?.UpdateSizes();
 
                     this.TriggerVerify();
+                };
+
+                textbox.DragEnter += (o, e) =>
+                {
+                    if (e.Data.GetDataPresent(DataFormats.Text))
+                        e.Effect = DragDropEffects.Link;
+                    else
+                        e.Effect = DragDropEffects.None;
+                };
+                textbox.DragDrop += (o, e) =>
+                {
+                    string dropText = e.Data.GetData(DataFormats.Text).ToString();
+                    textbox.Text = dropText;
+                    sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.DroppedInValue, textbox.Text));
                 };
             }
 
@@ -75,7 +90,19 @@ namespace FeatureLoom.Forms
         }
 
         private Dictionary<string, Property> properties = new Dictionary<string, Property>();
-        public bool readOnly = false;
+        private bool readOnly = false;
+        public bool ReadOnly
+        {
+            get => readOnly;
+            set 
+            {
+                readOnly = value;
+                foreach(var property in properties.Values)
+                {
+                    property.textbox.ReadOnly = readOnly;
+                }
+            }
+        }
         private Sender<PropertyEventNotification> sender = new Sender<PropertyEventNotification>();
         public IMessageSource<PropertyEventNotification> PropertyEventNotifier => sender;
 
@@ -101,6 +128,7 @@ namespace FeatureLoom.Forms
             Clicked,
             GotFocus,
             LostFocus,
+            DroppedInValue,
             ReadOnlyChanged
         }
 
@@ -123,7 +151,7 @@ namespace FeatureLoom.Forms
 
         private void AddProperty(string label, string value, Control extensionControl)
         {
-            Property property = new Property(label, readOnly, extensionControl);
+            Property property = new Property(label, readOnly, sender, extensionControl);
             property.textbox.Text = value;
             properties.Add(label, property);
 
@@ -165,7 +193,8 @@ namespace FeatureLoom.Forms
             if (properties.TryGetValue(label, out var property))
             {
                 property.textbox.Text = value;
-                property.UpdateExtension(extensionControl);
+                property.TriggerVerify();
+                if (extensionControl != null) property.UpdateExtension(extensionControl);                
             }
             else AddProperty(label, value, extensionControl);
         }
@@ -210,6 +239,18 @@ namespace FeatureLoom.Forms
             else return null;
         }
 
+        public TextBox GetTextBoxControl(string label)
+        {
+            if (properties.TryGetValue(label, out var property)) return property.textbox;
+            else return null;
+        }
+
+        public Label GetLabelControl(string label)
+        {
+            if (properties.TryGetValue(label, out var property)) return property.label;
+            else return null;
+        }
+
         public Control GetExtension(string label)
         {
             if (properties.TryGetValue(label, out var property)) return property.extension;
@@ -230,6 +271,8 @@ namespace FeatureLoom.Forms
             sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Removed, property.textbox.Text));
         }
 
+        public IEnumerable<string> GetPropertyLabels() => properties.Keys;
+
         public void Clear()
         {
             properties.Clear();
@@ -240,7 +283,8 @@ namespace FeatureLoom.Forms
                 propertyTable.RowStyles.Clear();
                 propertyTable.RowCount = 1;
                 propertyTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            }
+                UpdateSizes();
+            }            
         }
 
         public void Clear(params string[] exceptions)
@@ -255,8 +299,9 @@ namespace FeatureLoom.Forms
                     {
                         RemoveProperty(label);
                     }
+                    UpdateSizes();
                 }
-            }
+            }            
         }
     }
 }

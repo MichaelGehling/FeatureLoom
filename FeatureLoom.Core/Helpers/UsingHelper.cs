@@ -14,7 +14,7 @@ namespace FeatureLoom.Helpers
 
         public void Dispose()
         {
-            after();
+            after?.Invoke();
         }
 
         public static UsingHelper Do(Action before, Action after) => new UsingHelper(before, after);

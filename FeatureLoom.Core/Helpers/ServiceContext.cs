@@ -82,7 +82,11 @@ namespace FeatureLoom.Helpers
                 else
                 {
                     var value = contextData.Value;
-                    if (value == null) contextData.Value = defaultContextData;
+                    if (value == null)
+                    {
+                        contextData.Value = defaultContextData;
+                        value = defaultContextData;
+                    }
                     return value;
                 }
             }

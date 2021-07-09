@@ -116,5 +116,10 @@ namespace FeatureLoom.Workflows
         {
             return workflow.WaitUntil(info => info.executionEvent == Workflow.ExecutionEventList.WorkflowFinished, timeout);
         }
+
+        public static bool WaitUntilStopped(this Workflow workflow, TimeSpan timeout = default)
+        {
+            return workflow.WaitUntil(info => info.executionPhase != Workflow.ExecutionPhase.Running && info.executionPhase != Workflow.ExecutionPhase.Waiting, timeout);
+        }
     }
 }

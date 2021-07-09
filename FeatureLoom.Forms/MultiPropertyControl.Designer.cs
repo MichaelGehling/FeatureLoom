@@ -39,21 +39,24 @@
             this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             this.propertyTable.Dock = System.Windows.Forms.DockStyle.Fill;
             this.propertyTable.Location = new System.Drawing.Point(0, 0);
+            this.propertyTable.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.propertyTable.Name = "propertyTable";
             this.propertyTable.RowCount = 1;
             this.propertyTable.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.propertyTable.Size = new System.Drawing.Size(100, 100);
+            this.propertyTable.Size = new System.Drawing.Size(0, 0);
             this.propertyTable.TabIndex = 0;
             // 
             // MultiPropertyControl
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(11F, 24F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoScroll = true;
             this.AutoSize = true;
+            this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.Controls.Add(this.propertyTable);
+            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.Name = "MultiPropertyControl";
-            this.Size = new System.Drawing.Size(100, 100);
+            this.Size = new System.Drawing.Size(0, 0);
             this.ResumeLayout(false);
 
         }

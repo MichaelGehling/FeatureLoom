@@ -87,6 +87,11 @@ namespace FeatureLoom.Storages
             return await Writer.TryWriteAsync(Uri, this);
         }
 
+        public bool TryWriteToStorage()
+        {
+            return Writer.TryWriteAsync(Uri, this).WaitFor();
+        }
+
         public async Task<bool> TryUpdateFromStorageAsync(bool useSubscription)
         {
             bool success = false;

@@ -55,7 +55,7 @@ namespace FeatureLoom.Helpers
 
         public bool TryGetByIndex(int index, out string value)
         {
-            if (index <= args.Length && index >= 0)
+            if (index < args.Length && index >= 0)
             {
                 value = args[index];
                 return true;
