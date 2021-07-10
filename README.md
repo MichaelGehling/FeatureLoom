@@ -23,12 +23,12 @@ FeatureLoom comprises the following functional facets:
   * **Synchronization**: Several synchronization features, including extremly performant locks (FeatureLock, MicroValueLock), async features (e.g. AsyncWaitHandle, AsyncManualResetEvent and shared data helpers *[FeatureLoom.Core]*
   * **Time**: A time service (AppTime), extensions to nicely write time values (e.g. 42.Seconds()) and some time measurement helpers (TimeKeeper, TimerFrame) *[FeatureLoom.Core]*
 
-* *Data:*
-  * **Serialization**: *[FeatureLoom.Core]*
-  * **Storage**: *[FeatureLoom.Core]*
-  * **Collections**: *[FeatureLoom.Core]*
-  * **MetaData**: *[FeatureLoom.Core]*
-  * **Logging**: Logging service interface that can be extended via MessageFlow. Includes different loggers (FileLogger, ConsoleLogger, InMemoryLogger) *[FeatureLoom.Core]*
+* *Data:*  
+  * **Storage**: A generic storage service interface that allows reading and writing objects (identified by URIs) and even allows for change subscriptions with URI filters. Also includes some concrete implementations (TextFileStorage, MemoryStorage, CertificateStorageReader) *[FeatureLoom.Core]*  
+  * **MetaData**: A service interface that allows attaching any kind of meta data to any existing object without changing it. An object handle allows to identify registered objects from outside (e.g. for logging context) *[FeatureLoom.Core]*
+  * **Logging**: A Logging service interface that can be extended via MessageFlow. Includes different loggers (FileLogger, ConsoleLogger, InMemoryLogger) *[FeatureLoom.Core]*
+  * **Collections**: A few additional collections (CountingRingBuffer, InMemoryCache, PriorityQueue) *[FeatureLoom.Core]*
+  * **Serialization**: Currently just JSON support (based on Newtonsoft.Json). This will be changed to a more generic serialization concept in the future. *[FeatureLoom.Core]*
 
 * *UI:*
   * **Forms**: Several Helpers for Windows Forms and some Controls (Logging Window, Property Control) *[FeatureLoom.Forms]* 
