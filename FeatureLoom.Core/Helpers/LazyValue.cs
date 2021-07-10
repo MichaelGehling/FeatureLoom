@@ -6,6 +6,11 @@ namespace FeatureLoom.Helpers
     {
         private T obj;
 
+        public LazyValue(T obj)
+        {
+            this.obj = obj;
+        }        
+
         public T Obj
         {
             get => obj ?? Create();
