@@ -1,43 +1,53 @@
-﻿using FeatureLoom.Synchronization;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Supervision;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Helpers
 {
     public static class RandomGenerator
     {
-        private static Random rnd = new Random();
-        private static MicroLock myLock = new MicroLock();
+        [ThreadStatic]
+        private static Random rnd = new Random(Guid.NewGuid().GetHashCode());
 
         public static int Int32()
         {
-            using (myLock.Lock())
-            {
-                return rnd.Next();
-            }
+            return rnd.Next();
         }
 
         public static int Int32(int min, int max)
         {
-            using (myLock.Lock())
-            {
-                return rnd.Next(min, max);
-            }
+            return rnd.Next(min, max);
         }
 
         public static long Int64()
         {
-            using (myLock.Lock())
-            {
-                return (long)(rnd.NextDouble() * long.MaxValue);
-            }
+            return (long)(Double() * long.MaxValue);            
+        }
+
+        public static long Int64(long min, long max)
+        {
+            return (long)Double(min, max);
         }
 
         public static double Double()
-        {
-            using (myLock.Lock())
-            {
-                return rnd.NextDouble();
-            }
+        {            
+            return rnd.NextDouble();            
         }
+
+        public static double Double(double min, double max)
+        {
+            double sample = rnd.NextDouble();
+            return (max * sample) + (min * (1d - sample));
+        }
+
+        public static Guid GUID()
+        {
+            return Guid.NewGuid();
+        }
+
     }
 }

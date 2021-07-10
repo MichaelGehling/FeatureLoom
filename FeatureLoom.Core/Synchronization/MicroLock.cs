@@ -10,86 +10,86 @@ namespace FeatureLoom.Synchronization
         public bool IsLocked => valueLock.IsLocked;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock Lock(bool prioritized = false, int cyclesBeforeYielding = 0)
+        public LockHandle Lock(bool prioritized = false, int numHotCycles = 0)
         {
-            valueLock.Enter(prioritized, cyclesBeforeYielding);
-            return new AcquiredLock(this, false);
+            valueLock.Enter(prioritized, numHotCycles);
+            return new LockHandle(this, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLock(out LockHandle lockHandle, bool prioritized = false)
         {
             if (valueLock.TryEnter(prioritized))
             {
-                acquiredLock = new AcquiredLock(this, false);
+                lockHandle = new LockHandle(this, false);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                lockHandle = new LockHandle();
                 return false;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out AcquiredLock acquiredLock, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
+        public bool TryLock(out LockHandle lockHandle, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
         {
             if (valueLock.TryEnter(timeout, prioritized, numHotCycles))
             {
-                acquiredLock = new AcquiredLock(this, false);
+                lockHandle = new LockHandle(this, false);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                lockHandle = new LockHandle();
                 return false;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AcquiredLock LockReadOnly(bool prioritized = false, int cyclesBeforeYielding = 0)
+        public LockHandle LockReadOnly(bool prioritized = false, int numHotCycles = 0)
         {
-            valueLock.EnterReadOnly(prioritized, cyclesBeforeYielding);
-            return new AcquiredLock(this, true);
+            valueLock.EnterReadOnly(prioritized, numHotCycles);
+            return new LockHandle(this, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockReadOnly(out AcquiredLock acquiredLock, bool prioritized = false)
+        public bool TryLockReadOnly(out LockHandle lockHandle, bool prioritized = false)
         {
             if (valueLock.TryEnterReadOnly(prioritized))
             {
-                acquiredLock = new AcquiredLock(this, true);
+                lockHandle = new LockHandle(this, true);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                lockHandle = new LockHandle();
                 return false;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockReadOnly(out AcquiredLock acquiredLock, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
+        public bool TryLockReadOnly(out LockHandle lockHandle, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
         {
             if (valueLock.TryEnterReadOnly(timeout, prioritized, numHotCycles))
             {
-                acquiredLock = new AcquiredLock(this, true);
+                lockHandle = new LockHandle(this, true);
                 return true;
             }
             else
             {
-                acquiredLock = new AcquiredLock();
+                lockHandle = new LockHandle();
                 return false;
             }
         }
 
-        public struct AcquiredLock : IDisposable
+        public struct LockHandle : IDisposable
         {
             private MicroLock parentLock;
             private readonly bool readOnly;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal AcquiredLock(MicroLock parentLock, bool readOnly)
+            internal LockHandle(MicroLock parentLock, bool readOnly)
             {
                 this.parentLock = parentLock;
                 this.readOnly = readOnly;

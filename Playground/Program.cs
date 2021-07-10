@@ -37,19 +37,7 @@ namespace Playground
 
         private static void Main()
         {
-            Log.defaultConsoleLogger.config.loglevel = Loglevel.TRACE;
-            Log.FORCE("FORCE");
-            Log.INFO("INFO");
-            Log.TRACE("TRACE");
-            Log.WARNING("WARNING");
-            Log.ERROR("ERROR");
-
-            Log.defaultConsoleLogger.config.TryWriteToStorageAsync().WaitFor();
-
-
-
-
-            Console.ReadKey();
+  
 
 
             InMemoryCache<string, string> cache = new FeatureLoom.Collections.InMemoryCache<string, string>(str => System.Text.ASCIIEncoding.Unicode.GetByteCount(str),
