@@ -11,7 +11,7 @@ FeatureLoom comprises the following functional facets:
 * *Communication:*
   * **MessageFlow**: A very lean local messaging concept consisting of senders, receivers, functional connectors and endpoints that allow synchronous and asyncronous messaging. *[FeatureLoom.Core]*
   * **RPC**: Allows remote procedure calls via MessageFlow connections. Beside normal calls with result response, it is also possible to "fire-and-forget" or even to address multiple targets including receival of multiple return values. *[FeatureLoom.Core]*
-  * **TCP**: MessageFlow endpoints allowing messaging via TCP servers and clients. *[FeatureLoom.Core]*
+  * **TCP**: MessageFlow endpoints allowing remote messaging via TCP servers and clients. *[FeatureLoom.Core]*
   * **Web**: A Kestrel based webserver that can be used to define web endpoints. Also contains MessageFlow endpoints and REST interface for Storage Interface. *[FeatureLoom]*
   * **Diagnostics**: Helpers and MessageFlow elements to support testing and to allow runtime statistics of MessageFlow connections. *[FeatureLoom.Core]*
 
