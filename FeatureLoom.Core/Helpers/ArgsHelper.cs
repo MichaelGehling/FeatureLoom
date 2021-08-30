@@ -9,6 +9,7 @@ namespace FeatureLoom.Helpers
     {
         private string[] args;
         private Dictionary<string, string> namedArgs = new Dictionary<string, string>();
+        private LazyValue<List<string>> unnamedArgs;
         private readonly char bullet;
         private readonly char assignment;
 
@@ -33,6 +34,10 @@ namespace FeatureLoom.Helpers
                     {
                         Add(key, value, overwriteExisting);
                     }
+                }
+                else
+                {
+                    unnamedArgs.Obj.Add(arg);
                 }
             }
         }
@@ -83,5 +88,7 @@ namespace FeatureLoom.Helpers
         {
             return ((IEnumerable<KeyValuePair<string, string>>)namedArgs).GetEnumerator();
         }
+
+        public IEnumerable<string> UnnamedArgs => unnamedArgs.ObjIfExists as IEnumerable<string> ?? Array.Empty<string>();
     }
 }

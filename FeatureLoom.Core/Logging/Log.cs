@@ -163,5 +163,22 @@ namespace FeatureLoom.Logging
         {
             SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
+
+        public static void LogOnException(string actionDescription, Action action, bool logActionStart = false, bool logActionFinished = false, bool rethrowException = true, Loglevel exceptionLogLevel = Loglevel.ERROR)
+        {
+            if (logActionStart) Log.INFO($"Starting: {actionDescription}.");
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                actionDescription = actionDescription ?? "Action";
+                Log.ERROR($"Exception occured while: {actionDescription}! {(rethrowException ? "" : "(Process will continue.)")}", e.ToString());
+                if (rethrowException) throw;
+            }
+
+            if (logActionFinished) Log.INFO($"Finished: {actionDescription}.");
+        }
     }
 }

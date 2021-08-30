@@ -60,5 +60,13 @@ namespace FeatureLoom.Extensions
             }
             return sb.ToString();
         }
+
+        public static T[] AddToCopy<T>(this T[] array, T newElement)
+        {
+            T[] newArray = new T[array.Length + 1];
+            Array.Copy(array, newArray, array.Length);
+            newArray[newArray.Length - 1] = newElement;
+            return newArray;
+        }
     }
 }

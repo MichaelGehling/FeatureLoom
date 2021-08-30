@@ -52,15 +52,11 @@
     <Compile Include="Forms\RichTextBuilder.cs" />
     <Compile Include="Forms\TableLayoutPanelExtensions.cs" />
     <Compile Include="Forms\WorkflowApplicationContext.cs" />
-    <Compile Include="LogViewer.cs">
-      <SubType>Form</SubType>
-    </Compile>
+    <Compile Include="LogViewer.cs" />
     <Compile Include="LogViewer.Designer.cs">
       <DependentUpon>LogViewer.cs</DependentUpon>
     </Compile>
-    <Compile Include="MultiPropertyControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
+    <Compile Include="MultiPropertyControl.cs" />
     <Compile Include="MultiPropertyControl.Designer.cs">
       <DependentUpon>MultiPropertyControl.cs</DependentUpon>
     </Compile>
@@ -78,12 +74,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="LICENSE" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj">
-      <Project>{c567871f-12f0-4145-8297-acb2523b569a}</Project>
-      <Name>FeatureLoom.Core</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
