@@ -123,5 +123,32 @@ namespace FeatureLoom.Helpers
             context.Data.updateSender.Send(Notification.Cleared);
             Log.INFO(context.Data.GetHandle(), "All undo and redo jobs cleared");
         }
+
+        public static bool TryCombineLastUndos(int numUndosToCombine = 2)
+        {
+            var data = context.Data;
+            using (data.myLock.LockReentrant())
+            {
+                if (CurrentlyUndoing) return false;
+                if (numUndosToCombine > NumUndos) return false;
+                if (numUndosToCombine < 2) return false;
+
+                Action[] combinedActions = new Action[numUndosToCombine];
+                for (int i = numUndosToCombine - 1; i >= 0; i--)
+                {
+                    combinedActions[i] = data.redos.Pop();
+                }
+
+                AddUndo(() =>
+                {
+                    foreach(Action action in combinedActions)
+                    {
+                        action();
+                    }
+                });
+
+                return true;
+            }
+        }
     }
 }
