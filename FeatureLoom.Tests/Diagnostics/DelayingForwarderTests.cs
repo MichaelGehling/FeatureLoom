@@ -1,8 +1,9 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Time;
 using Xunit;
 
-namespace FeatureLoom.MessageFlow
+namespace FeatureLoom.Diagnostics
 {
     public class DelayingForwarderTests
     {

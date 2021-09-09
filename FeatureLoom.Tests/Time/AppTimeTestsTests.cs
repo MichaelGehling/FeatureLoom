@@ -2,7 +2,7 @@
 using FeatureLoom.Time;
 using Xunit;
 
-namespace FeatureLoom.Helpers
+namespace FeatureLoom.Time
 {
     public class AppTimeTests
     {

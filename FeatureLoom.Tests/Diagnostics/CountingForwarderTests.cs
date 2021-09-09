@@ -1,8 +1,9 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.MessageFlow;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureLoom.MessageFlow
+namespace FeatureLoom.Diagnostics
 {
     public class CountingForwarderTests
     {

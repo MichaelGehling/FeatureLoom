@@ -2,7 +2,7 @@
 using FeatureLoom.Synchronization;
 using Xunit;
 
-namespace FeatureLoom.Helpers
+namespace FeatureLoom.Synchronization
 {
     public class AppTimeTestsTests
     {

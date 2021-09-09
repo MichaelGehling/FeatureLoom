@@ -1,12 +1,11 @@
 ﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Diagnostics;
-using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureLoom.Helpers
+namespace FeatureLoom.Synchronization
 {
     public class SharedDataTests
     {

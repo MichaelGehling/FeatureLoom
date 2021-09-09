@@ -129,23 +129,58 @@ namespace FeatureLoom.Helpers
             var data = context.Data;
             using (data.myLock.LockReentrant())
             {
-                if (CurrentlyUndoing) return false;
-                if (numUndosToCombine > NumUndos) return false;
-                if (numUndosToCombine < 2) return false;
-
-                Action[] combinedActions = new Action[numUndosToCombine];
-                for (int i = numUndosToCombine - 1; i >= 0; i--)
+                if (CurrentlyUndoing) 
                 {
-                    combinedActions[i] = data.redos.Pop();
-                }
+                    if (numUndosToCombine > NumRedos) return false;
+                    if (numUndosToCombine < 2) return false;
 
-                AddUndo(() =>
-                {
-                    foreach(Action action in combinedActions)
+                    Action[] combinedActions = new Action[numUndosToCombine];
+                    for (int i = 0; i < numUndosToCombine; i++)
                     {
-                        action();
+                        combinedActions[i] = data.redos.Pop();
                     }
-                });
+
+                    AddUndo(() =>
+                    {
+                        int numUndosBefore = NumUndos;
+                        foreach (Action action in combinedActions)
+                        {
+                            action();
+                        }
+
+                        int numNewUndos = NumUndos - numUndosBefore;
+                        if (numNewUndos >= 2)
+                        {
+                            TryCombineLastUndos(numNewUndos);
+                        }
+                    });
+                }
+                else
+                {
+                    if (numUndosToCombine > NumUndos) return false;
+                    if (numUndosToCombine < 2) return false;
+
+                    Action[] combinedActions = new Action[numUndosToCombine];
+                    for (int i = 0; i < numUndosToCombine; i++)
+                    {
+                        combinedActions[i] = data.undos.Pop();
+                    }
+
+                    AddUndo(() =>
+                    {
+                        int numRedosBefore = NumRedos;
+                        foreach (Action action in combinedActions)
+                        {
+                            action();
+                        }
+
+                        int numNewRedos = NumRedos - numRedosBefore;
+                        if (numNewRedos >= 2)
+                        {
+                            TryCombineLastUndos(numNewRedos);
+                        }
+                    });
+                }
 
                 return true;
             }

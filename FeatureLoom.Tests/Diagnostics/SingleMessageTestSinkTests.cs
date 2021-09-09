@@ -1,7 +1,8 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.MessageFlow;
 using Xunit;
 
-namespace FeatureLoom.MessageFlow
+namespace FeatureLoom.Diagnostics
 {
     public class SingleMessageTestSinkTests
     {
