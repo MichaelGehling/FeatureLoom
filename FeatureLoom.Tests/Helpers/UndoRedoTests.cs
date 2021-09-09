@@ -48,6 +48,40 @@ namespace FeatureLoom.Helpers
         }
 
         [Fact]
+        public void CanUndoWithRedoAction()
+        {
+            TestHelper.PrepareTestContext();
+
+            string prevValue1 = data;
+            string newValue1 = "Changed1";
+            data = newValue1;
+            UndoRedoService.AddUndoWithRedo(() => data = prevValue1, () => data = newValue1);
+            
+            string prevValue2 = data;
+            string newValue2 = "Changed2";
+            data = newValue2;
+            UndoRedoService.AddUndoWithRedo(() => data = prevValue2, () => data = newValue2);
+
+            Assert.Equal("Changed2", data);
+            UndoRedoService.PerformUndo();
+            Assert.Equal("Changed1", data);
+            UndoRedoService.PerformUndo();
+            Assert.Equal("Init", data);
+
+            UndoRedoService.PerformRedo();
+            Assert.Equal("Changed1", data);
+            UndoRedoService.PerformRedo();
+            Assert.Equal("Changed2", data);
+
+            UndoRedoService.PerformUndo();
+            Assert.Equal("Changed1", data);
+            UndoRedoService.PerformUndo();
+            Assert.Equal("Init", data);
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
+        [Fact]
         public void CanCombineUndoSteps()
         {
             TestHelper.PrepareTestContext();

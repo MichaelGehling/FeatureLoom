@@ -112,6 +112,15 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        public static void AddUndoWithRedo(Action undo, Action redo)
+        {
+            AddUndo(() =>
+            {
+                undo.Invoke();
+                AddUndoWithRedo(redo, undo);
+            });
+        }
+
         public static void Clear()
         {
             using (context.Data.myLock.LockReentrant())
