@@ -63,8 +63,14 @@ namespace FeatureLoom.Helpers
             using (context.Data.myLock.LockReentrant())
             {
                 context.Data.undoing = true;
-                context.Data.undos.Pop().Invoke();
-                context.Data.undoing = false;
+                try
+                {
+                    context.Data.undos.Pop().Invoke();
+                }
+                finally
+                {
+                    context.Data.undoing = false;
+                }
             }
 
             context.Data.updateSender.Send(Notification.UndoPerformed);
@@ -78,8 +84,15 @@ namespace FeatureLoom.Helpers
             using (context.Data.myLock.LockReentrant())
             {
                 context.Data.redoing = true;
-                context.Data.redos.Pop().Invoke();
-                context.Data.redoing = false;
+                context.Data.undoing = true;
+                try
+                {
+                    context.Data.redos.Pop().Invoke();
+                }
+                finally
+                {
+                    context.Data.redoing = false;
+                }
             }
 
             context.Data.updateSender.Send(Notification.RedoPerformed);
