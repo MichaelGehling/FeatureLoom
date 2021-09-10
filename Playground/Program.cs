@@ -37,65 +37,7 @@ namespace Playground
 
         private static void Main()
         {
-  
-
-
-            InMemoryCache<string, string> cache = new FeatureLoom.Collections.InMemoryCache<string, string>(str => System.Text.ASCIIEncoding.Unicode.GetByteCount(str),
-                new InMemoryCache<string, string>.CacheSettings() 
-                {
-                    targetCacheSizeInByte= 300,
-                    cacheSizeMarginInByte = 200,
-                    maxUnusedTimeInSeconds = 100
-                });
-                        
-            cache.Add("B", "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
-            cache.Add("A", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-            cache.Add("C", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC");
-            cache.StartCleanUp();
-
-            Console.ReadKey();
-
-
-
-            var tk = AppTime.TimeKeeper;
-            for(int i=0; i < 1_000_000; i++)
-            {
-                var x = AppTime.Elapsed;
-            }
-            Console.WriteLine($"SW: { tk.Elapsed.Ticks * 100.0 / 1_000_000}");
-
-            tk = AppTime.TimeKeeper;
-            for (int i = 0; i < 1_000_000; i++)
-            {
-                var x = AppTime.Now;
-            }
-            Console.WriteLine($"UTC: { tk.Elapsed.Ticks * 100.0 / 1_000_000}");
-
-            tk = AppTime.TimeKeeper;
-            for (int i = 0; i < 1_000_000; i++)
-            {
-                var x = AppTime.CoarseNow;
-            }
-            Console.WriteLine($"Coarse: { tk.Elapsed.Ticks * 100.0 / 1_000_000}");
-
-            tk = AppTime.TimeKeeper;
-            for (int i = 0; i < 1_000_000; i++)
-            {
-                //var x = Environment.TickCount;
-                var x = Environment.TickCount.Milliseconds();
-            }
-            Console.WriteLine($"tick: { tk.Elapsed.Ticks * 100.0 / 1_000_000}");
-
-            Console.ReadKey();
-
-
-
-
-
-
-
-
-            int ex = 200_000;
+            int ex = 10_000;
 
             long start_mem = GC.GetTotalMemory(true);
             object[] array = new object[ex];

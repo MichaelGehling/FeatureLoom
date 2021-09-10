@@ -1,5 +1,8 @@
 ﻿using FeatureLoom.Diagnostics;
+using System;
 using Xunit;
+using FeatureLoom.Time;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.MessageFlow
 {
@@ -29,8 +32,16 @@ namespace FeatureLoom.MessageFlow
                 return true;
             }
 
-            public bool TryGetAggregatedMessage(out string aggregatedMessage)
+            public bool TryGetAggregatedMessage(bool timeoutCall, out string aggregatedMessage)
             {
+                if (timeoutCall && lastName != null)
+                {
+                    aggregatedMessage = "Mr. or Mrs. " + lastName;
+                    firstName = null;
+                    lastName = null;
+                    return true;
+                }
+
                 aggregatedMessage = null;
                 if (firstName != null && lastName != null)
                 {
@@ -61,8 +72,38 @@ namespace FeatureLoom.MessageFlow
                 }
                 else return false;
             }
+
+            public bool TryGetTimeout(out TimeSpan timeout)
+            {
+                timeout = 100.Milliseconds();
+                return !lastName.EmptyOrNull();
+            }
         }
         
+        [Fact]
+        public void CanSendAggregationMessageAfterTimeout()
+        {
+            TestHelper.PrepareTestContext();
+
+            var sender = new Sender();
+            var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
+            var sink = new SingleMessageTestSink<string>();
+            sender.ConnectTo(aggregator).ConnectTo(sink);
+
+            sender.Send(("lastName", "Doe"));            
+            Assert.False(sink.received);            
+            sink.WaitHandle.Wait(1.Seconds());
+            Assert.Equal("Mr. or Mrs. Doe", sink.receivedMessage);
+
+            sender.Send(("lastName", "Doe"));
+            sender.Send(("firstName", "Jane"));
+            Assert.True(sink.received);
+            Assert.Equal("Jane Doe", sink.receivedMessage);
+
+            sink.Reset();
+            Assert.False(sink.WaitHandle.Wait(200.Milliseconds()));
+            Assert.Null(sink.receivedMessage);
+        }
         
 
         [Fact]

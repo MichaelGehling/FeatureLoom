@@ -1,5 +1,7 @@
 ﻿using FeatureLoom.Helpers;
+using FeatureLoom.Supervision;
 using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using System;
 using System.Collections;
 using System.Threading.Tasks;
@@ -17,6 +19,8 @@ namespace FeatureLoom.MessageFlow
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private LazyValue<SourceHelper> alternativeSender;
 
+        private TimeFrame nextTimeoutCheck;
+        private bool waitingForTimeout = false;
         private IAggregationData aggregationData;
         private FeatureLock dataLock = new FeatureLock();
 
@@ -27,7 +31,6 @@ namespace FeatureLoom.MessageFlow
 
         public Type ConsumedMessageType => typeof(I);
 
-
         public void Post<M>(in M message)
         {
             bool alternative = true;
@@ -36,14 +39,41 @@ namespace FeatureLoom.MessageFlow
                 using (dataLock.Lock())
                 {
                     alternative = !aggregationData.AddMessage(typedMessage);
-                    while (aggregationData.TryGetAggregatedMessage(out O aggregatedMessage))
+                    while (aggregationData.TryGetAggregatedMessage(false, out O aggregatedMessage))
                     {
                         if (aggregationData.ForwardByRef) sourceHelper.Forward(in aggregatedMessage);
                         else sourceHelper.Forward(aggregatedMessage);
                     }
+                    SetTimeout();
                 }
             }
             if (alternative) alternativeSender.ObjIfExists?.Forward(in message);
+        }
+
+        private void SetTimeout()
+        {
+            waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
+            if (waitingForTimeout)
+            {
+                nextTimeoutCheck = new TimeFrame(timeout);
+                _ = ExecuteTimeoutCallAsync(timeout); // Don't wait for execution, but continue
+            }
+        }
+
+        private async Task ExecuteTimeoutCallAsync(TimeSpan timeout)
+        {            
+            await AppTime.WaitAsync(timeout);
+            using (await dataLock.LockAsync())
+            {
+                if (waitingForTimeout && nextTimeoutCheck.Elapsed())
+                {
+                    while (aggregationData.TryGetAggregatedMessage(true, out O aggregatedMessage))
+                    {
+                        await sourceHelper.ForwardAsync(aggregatedMessage);
+                    }
+                    SetTimeout();
+                }
+            }
         }
 
         public void Post<M>(M message)
@@ -54,32 +84,33 @@ namespace FeatureLoom.MessageFlow
                 using (dataLock.Lock())
                 {
                     alternative = !aggregationData.AddMessage(typedMessage);
-                    while (aggregationData.TryGetAggregatedMessage(out O aggregatedMessage))
+                    while (aggregationData.TryGetAggregatedMessage(false, out O aggregatedMessage))
                     {
                         if (aggregationData.ForwardByRef) sourceHelper.Forward(in aggregatedMessage);
                         else sourceHelper.Forward(aggregatedMessage);
                     }
+                    SetTimeout();
                 }
             }
             if (alternative) alternativeSender.ObjIfExists?.Forward(message);
         }
 
-        public Task PostAsync<M>(M message)
+        public async Task PostAsync<M>(M message)
         {
             bool alternative = true;
             if (message is I typedMessage)
             {
-                using (dataLock.Lock())
+                using (await dataLock.LockAsync())
                 {
                     alternative = !aggregationData.AddMessage(typedMessage);
-                    while (aggregationData.TryGetAggregatedMessage(out O aggregatedMessage))
+                    while (aggregationData.TryGetAggregatedMessage(false, out O aggregatedMessage))
                     {
-                        sourceHelper.ForwardAsync(aggregatedMessage);
+                        await sourceHelper.ForwardAsync(aggregatedMessage);
                     }
+                    SetTimeout();
                 }
             }            
-            if (alternative) return alternativeSender.ObjIfExists?.ForwardAsync(message);
-            return Task.CompletedTask;
+            if (alternative) await alternativeSender.ObjIfExists?.ForwardAsync(message);            
         }
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
@@ -116,7 +147,8 @@ namespace FeatureLoom.MessageFlow
         public interface IAggregationData
         {
             bool AddMessage(I message);
-            bool TryGetAggregatedMessage(out O aggregatedMessage);
+            bool TryGetAggregatedMessage(bool timeoutCall, out O aggregatedMessage);
+            bool TryGetTimeout(out TimeSpan timeout);
             bool ForwardByRef { get; }
         }
     }

@@ -61,20 +61,20 @@ namespace FeatureLoom.Time
 
         public bool Overlaps(TimeFrame otherTimeFrame) => IsInvalid ? false : (utcStartTime >= otherTimeFrame.utcStartTime && utcStartTime < otherTimeFrame.utcEndTime) || (utcEndTime <= otherTimeFrame.utcEndTime && utcEndTime > otherTimeFrame.utcStartTime);
 
-        public Task WaitForStartAsync() => Task.Delay(TimeUntilStart().ClampLow(TimeSpan.Zero));
+        public Task WaitForStartAsync() => AppTime.WaitAsync(TimeUntilStart().ClampLow(TimeSpan.Zero));
 
-        public Task WaitForStartAsync(DateTime now) => Task.Delay(TimeUntilStart(now).ClampLow(TimeSpan.Zero));
+        public Task WaitForStartAsync(DateTime now) => AppTime.WaitAsync(TimeUntilStart(now).ClampLow(TimeSpan.Zero));
 
-        public Task WaitForEndAsync() => Task.Delay(Remaining().ClampLow(TimeSpan.Zero));
+        public Task WaitForEndAsync() => AppTime.WaitAsync(Remaining().ClampLow(TimeSpan.Zero));
 
-        public Task WaitForEndAsync(DateTime now) => Task.Delay(Remaining(now).ClampLow(TimeSpan.Zero));
+        public Task WaitForEndAsync(DateTime now) => AppTime.WaitAsync(Remaining(now).ClampLow(TimeSpan.Zero));
 
-        public void WaitForStart() => Thread.Sleep(TimeUntilStart().ClampLow(TimeSpan.Zero));
+        public void WaitForStart() => AppTime.Wait(TimeUntilStart().ClampLow(TimeSpan.Zero));
 
-        public void WaitForStart(DateTime now) => Thread.Sleep(TimeUntilStart(now).ClampLow(TimeSpan.Zero));
+        public void WaitForStart(DateTime now) => AppTime.Wait(TimeUntilStart(now).ClampLow(TimeSpan.Zero));
 
-        public void WaitForEnd() => Thread.Sleep(Remaining().ClampLow(TimeSpan.Zero));
+        public void WaitForEnd() => AppTime.Wait(Remaining().ClampLow(TimeSpan.Zero));
 
-        public void WaitForEnd(DateTime now) => Thread.Sleep(Remaining(now).ClampLow(TimeSpan.Zero));
+        public void WaitForEnd(DateTime now) => AppTime.Wait(Remaining(now).ClampLow(TimeSpan.Zero));
     }
 }

@@ -84,7 +84,6 @@ namespace FeatureLoom.Helpers
             using (context.Data.myLock.LockReentrant())
             {
                 context.Data.redoing = true;
-                context.Data.undoing = true;
                 try
                 {
                     context.Data.redos.Pop().Invoke();
