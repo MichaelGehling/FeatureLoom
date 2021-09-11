@@ -4,6 +4,9 @@ using FeatureLoom.MetaDatas;
 using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Linq;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Helpers
 {
@@ -15,8 +18,8 @@ namespace FeatureLoom.Helpers
 
             public bool undoing = false;
             public bool redoing = false;
-            public Stack<Action> undos = new Stack<Action>();
-            public Stack<Action> redos = new Stack<Action>();
+            public Stack<UndoRedoAction> undos = new Stack<UndoRedoAction>();
+            public Stack<UndoRedoAction> redos = new Stack<UndoRedoAction>();
             public Sender<Notification> updateSender = new Sender<Notification>();
 
             public IServiceContextData Copy()
@@ -26,8 +29,8 @@ namespace FeatureLoom.Helpers
                     var newContext = new ContextData();
                     newContext.undoing = undoing;
                     newContext.redoing = redoing;
-                    newContext.undos = new Stack<Action>(undos);
-                    newContext.redos = new Stack<Action>(redos);
+                    newContext.undos = new Stack<UndoRedoAction>(undos);
+                    newContext.redos = new Stack<UndoRedoAction>(redos);
                     foreach (var sink in newContext.updateSender.GetConnectedSinks())
                     {
                         updateSender.ConnectTo(sink);
@@ -49,10 +52,68 @@ namespace FeatureLoom.Helpers
             Cleared
         }
 
+        private struct UndoRedoAction
+        {
+            object action;            
+            string description;
+
+            public UndoRedoAction(Func<Task> asyncAction, string description) : this()
+            {
+                this.action = asyncAction;
+                this.description = description;                
+            }
+
+            public UndoRedoAction(Action action, string description) : this()
+            {
+                this.action = action;
+                this.description = description;                
+            }
+
+            public void Execute()
+            {
+                if (action is Action syncAction) syncAction();
+                else if (action is Func<Task> asyncAction) asyncAction().WaitFor();
+            }
+
+            public Task ExecuteAsync()
+            {
+                if (action is Action syncAction) syncAction();
+                else if (action is Func<Task> asyncAction) return asyncAction();
+                
+                return Task.CompletedTask;
+            }
+
+            public string Description => description;
+        }
+
+        public struct Transaction : IDisposable
+        {
+            int numUndosAtStart;
+            FeatureLock.LockHandle lockHandle;
+            string description;
+
+            public Transaction(FeatureLock.LockHandle lockHandle, string description)
+            {
+                this.lockHandle = lockHandle;
+                numUndosAtStart = UndoRedoService.NumUndos;
+                this.description = description;
+            }
+
+            public void Dispose()
+            {
+                int numUndosInTransaction = UndoRedoService.NumUndos - numUndosAtStart;
+                UndoRedoService.TryCombineLastUndos(numUndosInTransaction, description);
+                lockHandle.Dispose();
+            }
+        }
+
         public static int NumUndos => context.Data.undos.Count;
         public static int NumRedos => context.Data.redos.Count;
         public static bool CurrentlyUndoing => context.Data.undoing;
         public static bool CurrentlyRedoing => context.Data.redoing;
+
+        public static Transaction StartTransaction(string description = null) => new Transaction(context.Data.myLock.LockReentrant(), description);
+        public static async Task<Transaction> StartTransactionAsync(string description = null) => new Transaction(await context.Data.myLock.LockReentrantAsync(), description);
 
         public static IMessageSource<Notification> UpdateNotificationSource => context.Data.updateSender;
 
@@ -65,7 +126,7 @@ namespace FeatureLoom.Helpers
                 context.Data.undoing = true;
                 try
                 {
-                    context.Data.undos.Pop().Invoke();
+                    context.Data.undos.Pop().Execute();
                 }
                 finally
                 {
@@ -86,7 +147,7 @@ namespace FeatureLoom.Helpers
                 context.Data.redoing = true;
                 try
                 {
-                    context.Data.redos.Pop().Invoke();
+                    context.Data.redos.Pop().Execute();
                 }
                 finally
                 {
@@ -98,18 +159,18 @@ namespace FeatureLoom.Helpers
             Log.INFO(context.Data.GetHandle(), "Redo permformed");
         }
 
-        public static void AddUndo(Action undo)
+        public static void AddUndo(Action undo, string description = null)
         {
             using (context.Data.myLock.LockReentrant())
             {
                 if (context.Data.undoing)
                 {
-                    context.Data.redos.Push(undo);
+                    context.Data.redos.Push(new UndoRedoAction(undo, description));
                 }
                 else
                 {
                     if (!context.Data.redoing) context.Data.redos.Clear();
-                    context.Data.undos.Push(undo);
+                    context.Data.undos.Push(new UndoRedoAction(undo, description));
                 }
             }
             if (context.Data.undoing)
@@ -124,14 +185,29 @@ namespace FeatureLoom.Helpers
             }
         }
 
-        public static void AddUndoWithRedo(Action undo, Action redo)
+        public static void DoWithUndo(Action doAction, Action undoAction, string description = null)
         {
+            doAction.Invoke();
+
             AddUndo(() =>
             {
-                undo.Invoke();
-                AddUndoWithRedo(redo, undo);
+                undoAction.Invoke();
+                DoWithUndo(undoAction, doAction, description);
+            }, description);
+        }
+
+        /*
+        public static async Task DoWithUndoAsync(Func<Task> doAction, Func<Task> undoAction)
+        {
+            await doAction.Invoke();
+
+            AddUndo(() =>
+            {
+                undoAction.Invoke();
+                DoWithUndo(undoAction, doAction);
             });
         }
+        */
 
         public static void Clear()
         {
@@ -145,7 +221,7 @@ namespace FeatureLoom.Helpers
             Log.INFO(context.Data.GetHandle(), "All undo and redo jobs cleared");
         }
 
-        public static bool TryCombineLastUndos(int numUndosToCombine = 2)
+        public static bool TryCombineLastUndos(int numUndosToCombine = 2, string description = null)
         {
             var data = context.Data;
             using (data.myLock.LockReentrant())
@@ -155,7 +231,7 @@ namespace FeatureLoom.Helpers
                     if (numUndosToCombine > NumRedos) return false;
                     if (numUndosToCombine < 2) return false;
 
-                    Action[] combinedActions = new Action[numUndosToCombine];
+                    UndoRedoAction[] combinedActions = new UndoRedoAction[numUndosToCombine];
                     for (int i = 0; i < numUndosToCombine; i++)
                     {
                         combinedActions[i] = data.redos.Pop();
@@ -164,9 +240,9 @@ namespace FeatureLoom.Helpers
                     AddUndo(() =>
                     {
                         int numUndosBefore = NumUndos;
-                        foreach (Action action in combinedActions)
+                        foreach (UndoRedoAction action in combinedActions)
                         {
-                            action();
+                            action.Execute();
                         }
 
                         int numNewUndos = NumUndos - numUndosBefore;
@@ -174,14 +250,14 @@ namespace FeatureLoom.Helpers
                         {
                             TryCombineLastUndos(numNewUndos);
                         }
-                    });
+                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString("; \n"));
                 }
                 else
                 {
                     if (numUndosToCombine > NumUndos) return false;
                     if (numUndosToCombine < 2) return false;
 
-                    Action[] combinedActions = new Action[numUndosToCombine];
+                    UndoRedoAction[] combinedActions = new UndoRedoAction[numUndosToCombine];
                     for (int i = 0; i < numUndosToCombine; i++)
                     {
                         combinedActions[i] = data.undos.Pop();
@@ -190,9 +266,9 @@ namespace FeatureLoom.Helpers
                     AddUndo(() =>
                     {
                         int numRedosBefore = NumRedos;
-                        foreach (Action action in combinedActions)
+                        foreach (UndoRedoAction action in combinedActions)
                         {
-                            action();
+                            action.Execute();
                         }
 
                         int numNewRedos = NumRedos - numRedosBefore;
@@ -200,7 +276,7 @@ namespace FeatureLoom.Helpers
                         {
                             TryCombineLastUndos(numNewRedos);
                         }
-                    });
+                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString("; \n"));
                 }
 
                 return true;

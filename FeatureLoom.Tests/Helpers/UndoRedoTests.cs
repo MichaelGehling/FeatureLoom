@@ -53,14 +53,12 @@ namespace FeatureLoom.Helpers
             TestHelper.PrepareTestContext();
 
             string prevValue1 = data;
-            string newValue1 = "Changed1";
-            data = newValue1;
-            UndoRedoService.AddUndoWithRedo(() => data = prevValue1, () => data = newValue1);
+            string newValue1 = "Changed1";            
+            UndoRedoService.DoWithUndo(() => data = newValue1, () => data = prevValue1);
             
             string prevValue2 = data;
             string newValue2 = "Changed2";
-            data = newValue2;
-            UndoRedoService.AddUndoWithRedo(() => data = prevValue2, () => data = newValue2);
+            UndoRedoService.DoWithUndo(() => data = newValue2, () => data = prevValue2);
 
             Assert.Equal("Changed2", data);
             UndoRedoService.PerformUndo();
