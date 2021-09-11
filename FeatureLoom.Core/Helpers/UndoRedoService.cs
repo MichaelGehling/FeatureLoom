@@ -117,6 +117,9 @@ namespace FeatureLoom.Helpers
 
         public static IMessageSource<Notification> UpdateNotificationSource => context.Data.updateSender;
 
+        public static IEnumerable<string> UndoDescriptions => context.Data.undos.Select(action => action.Description);
+        public static IEnumerable<string> RedoDescriptions => context.Data.redos.Select(action => action.Description);
+
         public static void PerformUndo()
         {
             if (context.Data.undos.Count == 0) return;

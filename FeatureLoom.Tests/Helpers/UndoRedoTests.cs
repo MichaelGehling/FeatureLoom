@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Diagnostics;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Xunit;
 
@@ -9,15 +10,35 @@ namespace FeatureLoom.Helpers
     
     public class UndoRedoTests
     {
-        string data = "Init";
-        void ChangeDataAndAddUndo(string newValue)
+
+        [Fact]
+        public void CanUndosAndRedosCanHaveDescriptions()        
         {
-            string origValue = data;
-            data = newValue;
-            UndoRedoService.AddUndo(() =>
-            {
-                ChangeDataAndAddUndo(origValue);
-            });
+            TestHelper.PrepareTestContext();
+            string data = "Init";            
+            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");            
+
+            Assert.Contains("Init->Changed1", UndoRedoService.UndoDescriptions);
+            Assert.Contains("Changed1->Changed2", UndoRedoService.UndoDescriptions);
+            Assert.Equal(2, UndoRedoService.UndoDescriptions.Count());
+            Assert.Empty(UndoRedoService.RedoDescriptions);
+
+            UndoRedoService.PerformUndo();
+
+            Assert.Contains("Init->Changed1", UndoRedoService.UndoDescriptions);
+            Assert.Contains("Changed1->Changed2", UndoRedoService.RedoDescriptions);
+            Assert.Single(UndoRedoService.UndoDescriptions);
+            Assert.Single(UndoRedoService.RedoDescriptions);
+
+            UndoRedoService.PerformUndo();
+
+            Assert.Contains("Init->Changed1", UndoRedoService.RedoDescriptions);
+            Assert.Contains("Changed1->Changed2", UndoRedoService.RedoDescriptions);
+            Assert.Empty(UndoRedoService.UndoDescriptions);
+            Assert.Equal(2, UndoRedoService.RedoDescriptions.Count());
+
+            Assert.False(TestHelper.HasAnyLogError());
         }
 
         [Fact]
@@ -25,9 +46,9 @@ namespace FeatureLoom.Helpers
         {
             TestHelper.PrepareTestContext();
 
-            Assert.Equal("Init", data);
-            ChangeDataAndAddUndo("Changed1");
-            ChangeDataAndAddUndo("Changed2");            
+            string data = "Init";
+            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
             Assert.Equal("Changed2", data);
             UndoRedoService.PerformUndo();
@@ -48,17 +69,14 @@ namespace FeatureLoom.Helpers
         }
 
         [Fact]
-        public void CanUndoWithRedoAction()
+        public void CanPerformDoWithUndo()
         {
             TestHelper.PrepareTestContext();
 
-            string prevValue1 = data;
-            string newValue1 = "Changed1";            
-            UndoRedoService.DoWithUndo(() => data = newValue1, () => data = prevValue1);
-            
-            string prevValue2 = data;
-            string newValue2 = "Changed2";
-            UndoRedoService.DoWithUndo(() => data = newValue2, () => data = prevValue2);
+            string data = "Init";
+
+            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
             Assert.Equal("Changed2", data);
             UndoRedoService.PerformUndo();
@@ -84,9 +102,9 @@ namespace FeatureLoom.Helpers
         {
             TestHelper.PrepareTestContext();
 
-            Assert.Equal("Init", data);
-            ChangeDataAndAddUndo("Changed1");
-            ChangeDataAndAddUndo("Changed2");
+            string data = "Init";
+            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
             Assert.True(UndoRedoService.TryCombineLastUndos(2));
 
@@ -104,13 +122,38 @@ namespace FeatureLoom.Helpers
         }
 
         [Fact]
+        public void CanUseTransaction()
+        {
+            TestHelper.PrepareTestContext();
+
+            string data = "Init";
+            using (UndoRedoService.StartTransaction())
+            {                
+                UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+                UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
+            }            
+
+            Assert.Equal("Changed2", data);
+            UndoRedoService.PerformUndo();
+            Assert.Equal("Init", data);
+
+            UndoRedoService.PerformRedo();
+            Assert.Equal("Changed2", data);
+
+            UndoRedoService.PerformUndo();
+            Assert.Equal("Init", data);
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
+        [Fact]
         public void CanClearUndoRedoSteps()
         {
             TestHelper.PrepareTestContext();
 
-            Assert.Equal("Init", data);
-            ChangeDataAndAddUndo("Changed1");
-            ChangeDataAndAddUndo("Changed2");
+            string data = "Init";
+            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
             UndoRedoService.Clear();
 

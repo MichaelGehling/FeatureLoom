@@ -54,6 +54,7 @@ namespace FeatureLoom.Extensions
             bool isFirst = true;
             foreach (var item in collection)
             {
+                if (item == null) continue;
                 if (!isFirst && delimiter != null) sb.Append(delimiter);
                 else isFirst = false;
                 sb.Append(item.ToString());

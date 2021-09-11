@@ -20,10 +20,9 @@ namespace FeatureLoom.Synchronization
         public bool IsLocked => lockIndicator == WRITE_LOCK;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryEnter(bool prioritized = false)
+        public bool TryEnter(bool prioritized = false) 
         {
-            if (lockIndicator == NO_LOCK && (prioritized || !prioritizedWaiting) && Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK) == NO_LOCK) return true;
-            else return false;
+            return (prioritized || !prioritizedWaiting) && Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK) == NO_LOCK;            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

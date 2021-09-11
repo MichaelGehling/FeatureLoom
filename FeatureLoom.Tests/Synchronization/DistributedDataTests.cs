@@ -4,7 +4,7 @@ using Xunit;
 
 namespace FeatureLoom.Synchronization
 {
-    public class AppTimeTestsTests
+    public class AppTimeTests
     {
         [Fact]
         public void ChangedDataWillBePublishedToConnectedDistributedData()
