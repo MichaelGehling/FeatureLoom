@@ -77,7 +77,7 @@ namespace FeatureLoom.Forms
                     extension = newExtension;
                     if (extension != null)
                     {
-                        this.extension.Dock = System.Windows.Forms.DockStyle.Fill;
+                        this.extension.Dock = DockStyle.Fill;
                     }
                 }
             }
@@ -85,7 +85,7 @@ namespace FeatureLoom.Forms
             public void TriggerVerify()
             {
                 if (verifier != null && !verifier(textbox.Text)) textbox.BackColor = Color.LightPink;
-                else textbox.BackColor = TextBox.DefaultBackColor;
+                else textbox.BackColor = Color.Empty;
             }
         }
 
