@@ -161,10 +161,12 @@ namespace FeatureLoom.Extensions
             {
                 startPos = str.IndexOf(startAfter) + startAfter.Length;
             }
+            if (startPos == -1) return "";
             if (!endBefore.EmptyOrNull())
             {
                 endPos = str.IndexOf(endBefore, startPos);
             }
+            if (endPos == -1) return "";
             return str.Substring(startPos, endPos - startPos);
         }
 
@@ -176,10 +178,12 @@ namespace FeatureLoom.Extensions
             {
                 startPos = str.IndexOf(startAfter) + (removeAlsoSearchStrings ? 0 : startAfter.Length);
             }
+            if (startPos == -1) return str;
             if (!endBefore.EmptyOrNull())
             {
                 endPos = str.IndexOf(endBefore, startPos) + (removeAlsoSearchStrings ? endBefore.Length : 0);
             }
+            if (endPos == -1) return str;
             return str.Substring(0, startPos) + replacement + str.Substring(endPos);
         }
 
