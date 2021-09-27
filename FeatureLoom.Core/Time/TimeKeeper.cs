@@ -17,6 +17,7 @@ namespace FeatureLoom.Time
             get
             {
                 lastElapsed = AppTime.Elapsed - startTime;
+                if (lastElapsed < TimeSpan.Zero) lastElapsed = TimeSpan.Zero;
                 return lastElapsed;
             }
         }

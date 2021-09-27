@@ -68,53 +68,31 @@ namespace FeatureLoom.Time
 
         public static void Wait(TimeSpan timeout)
         {
-            var timer = AppTime.TimeKeeper;
-            Wait(timeout, ref timer, CancellationToken.None);
-        }
-
-        public static void Wait(TimeSpan timeout, ref TimeKeeper timer)
-        {
-            Wait(timeout, ref timer, CancellationToken.None);
+            Wait(timeout, CancellationToken.None);
         }
 
         public static void Wait(TimeSpan timeout, CancellationToken cancellationToken)
         {
-            var timer = AppTime.TimeKeeper;
-            Wait(timeout, ref timer, cancellationToken);
-        }
-
-        public static void Wait(TimeSpan timeout, ref TimeKeeper timer, CancellationToken cancellationToken)
-        {
             if (timeout.Ticks <= 1 || cancellationToken.IsCancellationRequested) return;
             else timeout = new TimeSpan(timeout.Ticks - 1);
 
+            var timer = AppTime.TimeKeeper;
             if (timeout > 18.Milliseconds()) cancellationToken.WaitHandle.WaitOne(timeout - 18.Milliseconds());
             else Thread.Sleep(0);
             while (timer.Elapsed < timeout && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
         }
 
         public static Task WaitAsync(TimeSpan timeout)
-        {
-            var timer = AppTime.TimeKeeper;
-            return WaitAsync(timeout, timer, CancellationToken.None);
+        {            
+            return WaitAsync(timeout, CancellationToken.None);
         }
 
-        public static Task<TimeKeeper> WaitAsync(TimeSpan timeout, TimeKeeper timer)
-        {
-            return WaitAsync(timeout, timer, CancellationToken.None);
-        }
-
-        public static Task<TimeKeeper> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
-        {
-            var timer = AppTime.TimeKeeper;
-            return WaitAsync(timeout, timer, cancellationToken);
-        }
-
-        public static async Task<TimeKeeper> WaitAsync(TimeSpan timeout, TimeKeeper timer, CancellationToken cancellationToken)
-        {
+        public static async Task WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {            
             if (timeout.Ticks <= 5) Wait(timeout);
             else
             {
+                var timer = AppTime.TimeKeeper;
                 if (timeout > 18.Milliseconds())
                 {
                     await Task.Delay(timeout - 18.Milliseconds(), cancellationToken);
@@ -136,7 +114,6 @@ namespace FeatureLoom.Time
                     _ = timer.Elapsed;
                 }
             }
-            return timer;
         }
     }
 }
