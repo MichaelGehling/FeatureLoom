@@ -13,7 +13,7 @@ namespace FeatureLoom.Forms
         private class Property
         {
             public Label label = new Label();
-            public TextBox textbox = new TextBox();
+            public ComboBox field = new ComboBox();
             public Control extension = null;
             public RowStyle rowStyle = new RowStyle();            
             public Predicate<string> verifier = null;
@@ -33,40 +33,37 @@ namespace FeatureLoom.Forms
                 //this.label.TabIndex = 0;
                 this.label.Text = labelText;
 
-                this.textbox.Dock = System.Windows.Forms.DockStyle.Fill;
-                this.textbox.Location = new System.Drawing.Point(60, 3);
-                this.textbox.Name = "PropertyTextbox" + count;
-                this.textbox.Size = new System.Drawing.Size(50, 26);
-                this.textbox.TabIndex = 1;
-                this.textbox.ReadOnly = readOnly;
-                this.textbox.Multiline = true;
-                this.textbox.WordWrap = true;
-                this.textbox.AcceptsReturn = true;
-                this.textbox.AllowDrop = true;
+                this.field.Dock = System.Windows.Forms.DockStyle.Fill;
+                this.field.Location = new System.Drawing.Point(60, 3);
+                this.field.Name = "PropertyTextbox" + count;
+                this.field.Size = new System.Drawing.Size(50, 26);
+                this.field.TabIndex = 1;
+                this.field.Enabled = !readOnly;                
+                this.field.AllowDrop = true;
 
                 UpdateExtension(extensionControl);
 
-                textbox.TextChanged += (o, e) =>
+                field.TextChanged += (o, e) =>
                 {
-                    var measured = TextRenderer.MeasureText(textbox.Text, textbox.Font);
-                    textbox.MinimumSize = measured;
-                    textbox.FindParent<MultiPropertyControl>()?.UpdateSizes();
+                    var measured = TextRenderer.MeasureText(field.Text, field.Font);
+                    field.MinimumSize = measured;
+                    field.FindParent<MultiPropertyControl>()?.UpdateSizes();
 
                     this.TriggerVerify();
                 };
 
-                textbox.DragEnter += (o, e) =>
+                field.DragEnter += (o, e) =>
                 {
                     if (e.Data.GetDataPresent(DataFormats.Text))
                         e.Effect = DragDropEffects.Link;
                     else
                         e.Effect = DragDropEffects.None;
                 };
-                textbox.DragDrop += (o, e) =>
+                field.DragDrop += (o, e) =>
                 {
                     string dropText = e.Data.GetData(DataFormats.Text).ToString();
-                    textbox.Text = dropText;
-                    sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.DroppedInValue, textbox.Text));
+                    field.Text = dropText;
+                    sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.DroppedInValue, field.Text));
                 };
             }
 
@@ -78,14 +75,15 @@ namespace FeatureLoom.Forms
                     if (extension != null)
                     {
                         this.extension.Dock = DockStyle.Fill;
+                        this.extension.Enabled = field.Enabled;
                     }
                 }
             }
 
             public void TriggerVerify()
             {
-                if (verifier != null && !verifier(textbox.Text)) textbox.BackColor = Color.LightPink;
-                else textbox.BackColor = Color.Empty;
+                if (verifier != null && !verifier(field.Text)) field.BackColor = Color.LightPink;
+                else field.BackColor = Color.Empty;
             }
         }
 
@@ -99,7 +97,8 @@ namespace FeatureLoom.Forms
                 readOnly = value;
                 foreach(var property in properties.Values)
                 {
-                    property.textbox.ReadOnly = readOnly;
+                    property.field.Enabled = !readOnly;
+                    if (property.extension != null) property.extension.Enabled = !readOnly;
                 }
             }
         }
@@ -141,18 +140,18 @@ namespace FeatureLoom.Forms
 
         private void ConnectPropertyEvents(Property property)
         {
-            property.textbox.TextChanged += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.ValueChanged, property.textbox.Text));
-            property.textbox.GotFocus += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.GotFocus, property.textbox.Text));
-            property.textbox.LostFocus += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.LostFocus, property.textbox.Text));
-            property.textbox.Click += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Clicked));
+            property.field.TextChanged += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.ValueChanged, property.field.Text));
+            property.field.GotFocus += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.GotFocus, property.field.Text));
+            property.field.LostFocus += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.LostFocus, property.field.Text));
+            property.field.Click += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Clicked));
             property.label.Click += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Clicked));
-            property.textbox.ReadOnlyChanged += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.ReadOnlyChanged, property.textbox.ReadOnly));
+            property.field.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.ReadOnlyChanged, !property.field.Enabled));
         }
 
         private void AddProperty(string label, string value, Control extensionControl)
         {
             Property property = new Property(label, readOnly, sender, extensionControl);
-            property.textbox.Text = value;
+            property.field.Text = value;
             properties.Add(label, property);
 
             int rowIndex = propertyTable.RowCount - 1;
@@ -162,7 +161,7 @@ namespace FeatureLoom.Forms
                 propertyTable.RowCount++;
                 propertyTable.RowStyles.Insert(rowIndex, property.rowStyle);
                 propertyTable.Controls.Add(property.label, 0, rowIndex);
-                propertyTable.Controls.Add(property.textbox, 1, rowIndex);
+                propertyTable.Controls.Add(property.field, 1, rowIndex);
                 if (property.extension != null) propertyTable.Controls.Add(property.extension, 2, rowIndex);
 
                 UpdateSizes();
@@ -179,12 +178,12 @@ namespace FeatureLoom.Forms
                 this.readOnly = readOnly;
                 foreach (var property in properties.Values)
                 {
-                    property.textbox.ReadOnly = readOnly;
+                    property.field.Enabled = !readOnly;
                 }
             }
             else if (properties.TryGetValue(label, out var property))
             {
-                property.textbox.ReadOnly = readOnly;
+                property.field.Enabled = !readOnly;
             }
         }
 
@@ -192,7 +191,7 @@ namespace FeatureLoom.Forms
         {
             if (properties.TryGetValue(label, out var property))
             {
-                property.textbox.Text = value;
+                property.field.Text = value;
                 property.TriggerVerify();
                 if (extensionControl != null) property.UpdateExtension(extensionControl);                
             }
@@ -217,6 +216,16 @@ namespace FeatureLoom.Forms
             SetReadOnly(readOnly, label);
         }
 
+        public void SetPropertySelectionList(string label, IEnumerable<string> options, bool restrictToOptions)
+        {
+            if (properties.TryGetValue(label, out var property))
+            {
+                property.field.DataSource = options;
+                if (restrictToOptions) property.field.DropDownStyle = ComboBoxStyle.DropDownList;
+                else property.field.DropDownStyle = ComboBoxStyle.DropDown;
+            }
+        }
+
         public void SetPropertyVerifier(string label, Predicate<string> verifier)
         {
             if (properties.TryGetValue(label, out var property))
@@ -235,13 +244,13 @@ namespace FeatureLoom.Forms
 
         public string GetProperty(string label)
         {
-            if (properties.TryGetValue(label, out var property)) return property.textbox.Text;
+            if (properties.TryGetValue(label, out var property)) return property.field.Text;
             else return null;
         }
 
-        public TextBox GetTextBoxControl(string label)
+        public ComboBox GetFieldControl(string label)
         {
-            if (properties.TryGetValue(label, out var property)) return property.textbox;
+            if (properties.TryGetValue(label, out var property)) return property.field;
             else return null;
         }
 
@@ -268,7 +277,7 @@ namespace FeatureLoom.Forms
                 UpdateSizes();
             }
 
-            sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Removed, property.textbox.Text));
+            sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Removed, property.field.Text));
         }
 
         public IEnumerable<string> GetPropertyLabels() => properties.Keys;

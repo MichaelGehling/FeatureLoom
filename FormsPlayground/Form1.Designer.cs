@@ -31,16 +31,20 @@ namespace FormsPlayground
         {
             this.multiPropertyControl1 = new FeatureLoom.Forms.MultiPropertyControl();
             this.button1 = new System.Windows.Forms.Button();
+            this.comboBox1 = new System.Windows.Forms.ComboBox();
             this.SuspendLayout();
             // 
             // multiPropertyControl1
             // 
             this.multiPropertyControl1.AutoScroll = true;
             this.multiPropertyControl1.AutoSize = true;
+            this.multiPropertyControl1.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.multiPropertyControl1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.multiPropertyControl1.Location = new System.Drawing.Point(0, 0);
+            this.multiPropertyControl1.Margin = new System.Windows.Forms.Padding(5, 5, 5, 5);
             this.multiPropertyControl1.Name = "multiPropertyControl1";
-            this.multiPropertyControl1.Size = new System.Drawing.Size(800, 450);
+            this.multiPropertyControl1.ReadOnly = false;
+            this.multiPropertyControl1.Size = new System.Drawing.Size(978, 540);
             this.multiPropertyControl1.TabIndex = 0;
             // 
             // button1
@@ -52,13 +56,22 @@ namespace FormsPlayground
             this.button1.Text = "button1";
             this.button1.UseVisualStyleBackColor = true;
             // 
+            // comboBox1
+            // 
+            this.comboBox1.FormattingEnabled = true;
+            this.comboBox1.Location = new System.Drawing.Point(552, 215);
+            this.comboBox1.Name = "comboBox1";
+            this.comboBox1.Size = new System.Drawing.Size(335, 32);
+            this.comboBox1.TabIndex = 1;
+            // 
             // Form1
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(11F, 24F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
-            //this.Controls.Add(this.button1);
+            this.ClientSize = new System.Drawing.Size(978, 540);
+            this.Controls.Add(this.comboBox1);
             this.Controls.Add(this.multiPropertyControl1);
+            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.Name = "Form1";
             this.Text = "Form1";
             this.ResumeLayout(false);
@@ -70,6 +83,7 @@ namespace FormsPlayground
 
         private FeatureLoom.Forms.MultiPropertyControl multiPropertyControl1;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.ComboBox comboBox1;
     }
 }
 
