@@ -16,6 +16,7 @@ namespace FeatureLoom.Forms
             private static uint nameCount = 0;
             private static string onFocusText = "";
 
+            private string name;
             private MultiPropertyControl parentControl;
             private TableLayoutPanel propertyTable;
             private int rowIndex;
@@ -26,7 +27,7 @@ namespace FeatureLoom.Forms
             private Predicate<string>[] verifiers;
             private bool readOnly = false;                        
 
-            public Property(MultiPropertyControl parentControl, TableLayoutPanel table, int rowIndex, int numFields, string labelText, Sender<PropertyEventNotification>  sender)
+            public Property(MultiPropertyControl parentControl, TableLayoutPanel table, int rowIndex, int numFields, string name, Sender<PropertyEventNotification>  sender)
             {
                 this.parentControl = parentControl;
                 this.fields = new Control[numFields];
@@ -34,6 +35,7 @@ namespace FeatureLoom.Forms
                 this.propertyTable = table;
                 this.rowIndex = rowIndex;
                 this.sender = sender;
+                this.name = name;
 
                 propertyTable.RowStyles.Insert(rowIndex, rowStyle);
                 propertyTable.Controls.Add(label, 0, rowIndex);
@@ -46,7 +48,7 @@ namespace FeatureLoom.Forms
                 this.label.Location = new System.Drawing.Point(3, 6);
                 this.label.Name = "PropertyLabel" + nameCount;
                 this.label.Size = new System.Drawing.Size(10, 10);
-                this.label.Text = labelText;
+                this.label.Text = name;
 
                 parentControl.UpdateSizes();
             }
@@ -77,11 +79,24 @@ namespace FeatureLoom.Forms
                         fields[i] = oldFields[i];
                     }
                 }
-            }
+            }            
 
             public Label GetLabelControl() => label;
 
             public string Name => label.Text;
+
+            public Property SetLabel(string labelText)
+            {
+                label.Text = labelText;
+                return this;
+            }
+
+            public void Rename(string newName)
+            {
+                parentControl.RenameProperty(name, newName);
+                if (label.Text == this.name) label.Text = newName;
+                name = newName;                
+            }
 
             public Control GetFieldControl(int fieldIndex = 0) => fields[fieldIndex];
 
@@ -292,6 +307,8 @@ namespace FeatureLoom.Forms
 
         }
 
+        
+
         private int numFieldColumns = 0;
         private Dictionary<string, Property> properties = new Dictionary<string, Property>();
 
@@ -410,7 +427,13 @@ namespace FeatureLoom.Forms
             this.MinimumSize = new Size(0, propertyTable.PreferredSize.Height + scrollBarOffset);
             this.AutoScrollMinSize = propertyTable.PreferredSize;
         }
-       
+
+        private void RenameProperty(string name, string newName)
+        {
+            properties[newName] = properties[name];
+            properties.Remove(name);
+        }
+
         public void RemoveProperty(string label)
         {
             var property = properties[label];
