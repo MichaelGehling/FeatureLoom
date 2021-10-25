@@ -23,6 +23,9 @@ namespace FormsPlayground
             button1.Click += (o, e) => this.multiPropertyControl1.SetReadOnly(false, "Hello99");
             this.multiPropertyControl1.SetFieldColumnStyle(1, new ColumnStyle());
             this.multiPropertyControl1.GetProperty("Hello99").SetVerifier(text => text == "A" || text == "B" );
+
+            var x = this.multiPropertyControl1.GetProperties();
+            int y = 0;
         }
     }
 }

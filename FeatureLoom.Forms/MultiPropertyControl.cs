@@ -83,7 +83,14 @@ namespace FeatureLoom.Forms
 
             public Label GetLabelControl() => label;
 
-            public string Name => label.Text;
+            public string Name => name;
+
+            public int RowIndex => rowIndex;
+
+            internal void UpdateRowIndex()
+            {
+                rowIndex = propertyTable.GetRow(label);
+            }
 
             public Property SetLabel(string labelText)
             {
@@ -347,10 +354,6 @@ namespace FeatureLoom.Forms
         {            
             InitializeComponent();
             SetNumFieldColumns(numFieldColumns, defaultColumnStyle);
-
-
-            
-
             Resize += (o, e) => UpdateSizes();
         }        
 
@@ -434,7 +437,9 @@ namespace FeatureLoom.Forms
             properties.Remove(name);
         }
 
-        public void RemoveProperty(string label)
+        public void RemoveProperty(string label) => RemoveProperty(label, true);
+
+        private void RemoveProperty(string label, bool updateRowIndicies)
         {
             var property = properties[label];
             properties.Remove(label);
@@ -444,11 +449,22 @@ namespace FeatureLoom.Forms
                 propertyTable.RemoveRowAt(rowIndex);
                 UpdateSizes();
             }
-
+            if (updateRowIndicies) UpdateRowIndicies();
             sender.Send(new PropertyEventNotification(property.Name, PropertyEvent.Removed));
         }
 
-        public IEnumerable<string> GetPropertyNames() => properties.Keys;
+        private void UpdateRowIndicies()
+        {
+            foreach(var property in properties.Values)
+            {
+                property.UpdateRowIndex();
+            }
+        }
+
+        public IEnumerable<Property> GetProperties()
+        {
+            return properties.Values.OrderBy(property => property.RowIndex);
+        }
 
         public void Clear()
         {
@@ -474,8 +490,9 @@ namespace FeatureLoom.Forms
                     var toRemove = properties.Keys.Except(exceptions).ToArray();
                     foreach (var label in toRemove)
                     {
-                        RemoveProperty(label);
+                        RemoveProperty(label, false);
                     }
+                    UpdateRowIndicies();
                     UpdateSizes();
                 }
             }            
