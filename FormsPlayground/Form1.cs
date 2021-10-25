@@ -16,14 +16,13 @@ namespace FormsPlayground
         {
             InitializeComponent();
 
-            this.multiPropertyControl1.SetProperty("Hello", "World!", button1);
-            this.multiPropertyControl1.SetProperty("Hello2", "World2!");
-            this.multiPropertyControl1.SetProperty("Hello3", "World3!");
-            this.multiPropertyControl1.SetPropertySelectionList("Hello", new String[] { "Aaaa", "Bbbbb", "Ccccc"}, true);
-            this.multiPropertyControl1.SetPropertySelectionList("Hello2", new String[] { "Aaaa", "Bbbbb", "Ccccc" }, false);
-
+            this.multiPropertyControl1.GetProperty("Hello").SetValue("B").SetValueRestrictions(new String[] { "Aaaaa", "B", "Cccc" }).SetCustomFieldControl(button1, 1);
+            this.multiPropertyControl1.GetProperty("Hello2").SetValueRestrictions(new String[] { "A", "B", "C" }).SetValue("C");
+            this.multiPropertyControl1.GetProperty("Hello3").SetValue("World3!");            
             this.multiPropertyControl1.SetReadOnly(true, "Hello2");
-            button1.Click += (o,e) => this.multiPropertyControl1.SetReadOnly(false, "Hello2");
+            button1.Click += (o, e) => this.multiPropertyControl1.SetReadOnly(false, "Hello2");
+            this.multiPropertyControl1.SetFieldColumnStyle(1, new ColumnStyle());
+            this.multiPropertyControl1.GetProperty("Hello2").SetVerifier(text => text == "A" || text == "B" );
         }
     }
 }

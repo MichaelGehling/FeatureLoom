@@ -10,112 +10,307 @@ namespace FeatureLoom.Forms
 {
     public partial class MultiPropertyControl : UserControl
     {
-        private class Property
+
+        public class Property
         {
-            public Label label = new Label();
-            public ComboBox field = new ComboBox();
-            public Control extension = null;
-            public RowStyle rowStyle = new RowStyle();            
-            public Predicate<string> verifier = null;
-            private static uint count = 0;
+            private static uint nameCount = 0;
+            private static string onFocusText = "";
 
-            public Property(string labelText, bool readOnly, Sender<PropertyEventNotification>  sender, Control extensionControl = null)
+            private MultiPropertyControl parentControl;
+            private TableLayoutPanel propertyTable;
+            private int rowIndex;
+            private Sender<PropertyEventNotification> sender;
+            private Label label = new Label();
+            private Control[] fields;            
+            private RowStyle rowStyle = new RowStyle();
+            private Predicate<string>[] verifiers;
+            private bool readOnly = false;                        
+
+            public Property(MultiPropertyControl parentControl, TableLayoutPanel table, int rowIndex, int numFields, string labelText, Sender<PropertyEventNotification>  sender)
             {
-                this.extension = extensionControl;
+                this.parentControl = parentControl;
+                this.fields = new Control[numFields];
+                this.verifiers = new Predicate<string>[numFields];
+                this.propertyTable = table;
+                this.rowIndex = rowIndex;
+                this.sender = sender;
 
-                count++;
+                propertyTable.RowStyles.Insert(rowIndex, rowStyle);
+                propertyTable.Controls.Add(label, 0, rowIndex);
+                label.Click += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.Clicked));
+
+                nameCount++;
 
                 this.label.Anchor = System.Windows.Forms.AnchorStyles.Right;
                 this.label.AutoSize = true;
                 this.label.Location = new System.Drawing.Point(3, 6);
-                this.label.Name = "PropertyLabel" + count;
+                this.label.Name = "PropertyLabel" + nameCount;
                 this.label.Size = new System.Drawing.Size(10, 10);
-                //this.label.TabIndex = 0;
                 this.label.Text = labelText;
 
-                this.field.Dock = System.Windows.Forms.DockStyle.Fill;
-                this.field.Location = new System.Drawing.Point(60, 3);
-                this.field.Name = "PropertyTextbox" + count;
-                this.field.Size = new System.Drawing.Size(50, 26);
-                this.field.TabIndex = 1;
-                this.field.Enabled = !readOnly;                
-                this.field.AllowDrop = true;
-
-                UpdateExtension(extensionControl);
-
-                field.TextChanged += (o, e) =>
-                {
-                    var measured = TextRenderer.MeasureText(field.Text, field.Font);
-                    field.MinimumSize = measured;
-                    field.FindParent<MultiPropertyControl>()?.UpdateSizes();
-
-                    this.TriggerVerify();
-                };
-
-                field.DragEnter += (o, e) =>
-                {
-                    if (e.Data.GetDataPresent(DataFormats.Text))
-                        e.Effect = DragDropEffects.Link;
-                    else
-                        e.Effect = DragDropEffects.None;
-                };
-                field.DragDrop += (o, e) =>
-                {
-                    string dropText = e.Data.GetData(DataFormats.Text).ToString();
-                    field.Text = dropText;
-                    sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.DroppedInValue, field.Text));
-                };
+                parentControl.UpdateSizes();
             }
 
-            public void UpdateExtension(Control newExtension)
+            internal void ChangeNumberOfFields(int numFields)
             {
-                if (extension != newExtension)
+                                
+                if (numFields < fields.Length)
                 {
-                    extension = newExtension;
-                    if (extension != null)
+                    for(int i = numFields; i < fields.Length; i++)
                     {
-                        this.extension.Dock = DockStyle.Fill;
-                        this.extension.Enabled = field.Enabled;
+                        RemoveField(i);
+                    }
+
+                    var oldFields = fields;
+                    fields = new Control[numFields];
+                    for (int i = 0; i < numFields; i++)
+                    {
+                        fields[i] = oldFields[i];
+                    }
+                }
+                else if (numFields > fields.Length)
+                {
+                    var oldFields = fields;
+                    fields = new Control[numFields];
+                    for (int i = 0; i < oldFields.Length; i++)
+                    {
+                        fields[i] = oldFields[i];
                     }
                 }
             }
 
-            public void TriggerVerify()
+            public Label GetLabelControl() => label;
+
+            public string Name => label.Text;
+
+            public Control GetFieldControl(int fieldIndex = 0) => fields[fieldIndex];
+
+            public string GetValue(int fieldIndex = 0) => fields[fieldIndex]?.Text ?? "";
+
+            public Property SetValue(string value, int fieldIndex = 0)
             {
-                if (verifier != null && !verifier(field.Text)) field.BackColor = Color.LightPink;
+                if (fields[fieldIndex] == null)
+                {
+                    TextBox field = new TextBox();
+                    fields[fieldIndex] = field;
+                    propertyTable.Controls.Add(field, fieldIndex + 1, rowIndex);
+
+                    field.Enabled = !readOnly;
+                    field.Dock = DockStyle.Fill;
+                    field.Location = new Point(0, 0);
+                    field.Name = "PropertyField" + nameCount;
+                    field.Size = new Size(50, 26);
+                    field.TabIndex = 1;
+                    field.AllowDrop = true;
+
+                    field.TextChanged += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.ValueChanged, fieldIndex, field.Text));
+                    field.GotFocus += (o, e) =>
+                    {
+                        onFocusText = field.Text;
+                        sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.GotFocus, fieldIndex, field.Text));
+                    };
+                    field.LostFocus += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.LostFocus, fieldIndex, field.Text));
+                    field.Click += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.Clicked, fieldIndex));
+                    field.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.ReadOnlyChanged, fieldIndex, !field.Enabled));
+
+                    field.TextChanged += (o, e) =>
+                    {
+                        var measured = TextRenderer.MeasureText(field.Text, field.Font);
+                        field.MinimumSize = measured;
+                        parentControl.UpdateSizes();
+
+                        this.TriggerVerify(fieldIndex);
+                    };
+
+                    field.DragEnter += (o, e) =>
+                    {
+                        if (e.Data.GetDataPresent(DataFormats.Text))
+                            e.Effect = DragDropEffects.Link;
+                        else
+                            e.Effect = DragDropEffects.None;
+                    };
+
+                    field.DragDrop += (o, e) =>
+                    {
+                        string dropText = e.Data.GetData(DataFormats.Text).ToString();
+                        field.Text = dropText;
+                        sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.DroppedInValue, fieldIndex, field.Text));
+                    };
+                }
+
+                fields[fieldIndex].Text = value;
+                parentControl.UpdateSizes();
+                return this;
+            }
+
+            public Property SetValueRestrictions(IEnumerable<string> options, int fieldIndex =  0)
+            {
+                if (fields[fieldIndex] == null || !(fields[fieldIndex] is ComboBox))
+                {                    
+                    string value = "";
+                    if (fields[fieldIndex] != null) value = fields[fieldIndex].Text;
+                    
+                    RemoveField(fieldIndex);
+
+                    ComboBox field = new ComboBox();
+                    fields[fieldIndex] = field;
+                    propertyTable.Controls.Add(field, fieldIndex + 1, rowIndex);
+
+                    field.Enabled = !readOnly;
+                    field.Dock = DockStyle.Fill;
+                    field.Location = new Point(0, 0);
+                    field.Name = "PropertyField" + nameCount;
+                    field.Size = new Size(50, 26);
+                    field.TabIndex = 1;
+                    field.AllowDrop = true;                    
+                    field.DropDownStyle = ComboBoxStyle.DropDown;                    
+                    field.DataSource = options;
+                    field.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+                    field.AutoCompleteSource = AutoCompleteSource.ListItems;
+
+                    field.TextChanged += (o, e) =>
+                    {
+                        if (field.DataSource is IEnumerable<string> fieldOptions && fieldOptions.Contains(field.Text))
+                        {
+                            sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.ValueChanged, fieldIndex, field.Text));                                 
+                        }
+                        var measured = TextRenderer.MeasureText(field.Text, field.Font);
+                        field.MinimumSize = measured;
+                        parentControl.UpdateSizes();
+                        this.TriggerVerify(fieldIndex);
+                    };
+                    field.GotFocus += (o, e) =>
+                    {
+                        onFocusText = field.Text;
+                        sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.GotFocus, fieldIndex, field.Text));
+                    };
+                    field.LostFocus += (o, e) =>
+                    {
+                        if (field.DataSource is IEnumerable<string> fieldOptions && fieldOptions.Contains(field.Text))
+                        {
+                            sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.LostFocus, fieldIndex, field.Text));
+                        }
+                        else field.Text = onFocusText;
+                    };
+                    field.Click += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.Clicked, fieldIndex));
+                    field.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.ReadOnlyChanged, fieldIndex, !field.Enabled));
+
+
+                    field.Text = value;
+
+                    field.DragEnter += (o, e) =>
+                    {
+                        if (e.Data.GetDataPresent(DataFormats.Text)) e.Effect = DragDropEffects.Link;
+                        else e.Effect = DragDropEffects.None;
+                    };
+
+                    field.DragDrop += (o, e) =>
+                    {
+                        string dropText = e.Data.GetData(DataFormats.Text).ToString();
+                        field.Text = dropText;
+                        sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.DroppedInValue, fieldIndex, field.Text));
+                    };
+
+                    parentControl.UpdateSizes();
+                }
+                else
+                {
+                    ComboBox field = fields[fieldIndex] as ComboBox;                    
+                    field.DataSource = options;
+                    field.Text = "";
+
+                    parentControl.UpdateSizes();
+                }
+
+                return this;
+            }
+
+            public Property SetCustomFieldControl(Control customControl, int fieldIndex = 0)
+            {
+                RemoveField(fieldIndex);
+
+                var field = customControl;
+                fields[fieldIndex] = field;                
+                propertyTable.Controls.Add(field, fieldIndex + 1, rowIndex);
+
+                field.Enabled = !readOnly;
+
+                field.TextChanged += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.ValueChanged, fieldIndex, field.Text));
+                field.GotFocus += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.GotFocus, fieldIndex, field.Text));
+                field.LostFocus += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.LostFocus, fieldIndex, field.Text));
+                field.Click += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.Clicked, fieldIndex));
+                field.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.ReadOnlyChanged, fieldIndex, !field.Enabled));
+                
+                parentControl.UpdateSizes();
+                return this;
+            }
+
+            public Property SetReadOnly(bool readOnly, int fieldIndex)
+            {
+                this.readOnly = readOnly;
+                Control field = fields[fieldIndex];
+                if (field != null) field.Enabled = !readOnly;
+                return this;
+            }
+
+            public Property SetReadOnly(bool readOnly)
+            {
+                foreach(Control field in fields)
+                {
+                    if (field != null) field.Enabled = !readOnly;
+                }
+                return this;
+            }
+
+            public Property RemoveField(int fieldIndex = 0)
+            {
+                if (fields[fieldIndex] != null)
+                {
+                    propertyTable.Controls.Remove(fields[fieldIndex]);
+                    fields[fieldIndex] = null;
+                }
+                return this;
+            }
+
+            public Property SetVerifier(Predicate<string> verifier, int fieldIndex = 0)
+            {
+                verifiers[fieldIndex] = verifier;
+                TriggerVerify(fieldIndex);
+                return this;
+            }
+
+            private void TriggerVerify(int fieldIndex = 0)
+            {
+                var field = fields[fieldIndex];
+                var verifier = verifiers[fieldIndex];
+
+                if (field == null) return;
+                else if (verifier != null && !verifier(field.Text)) field.BackColor = Color.LightPink;
+                else if (field is ComboBox comboBox && comboBox.DataSource is IEnumerable<string> options && !options.Contains(field.Text)) field.BackColor = Color.LightPink;
                 else field.BackColor = Color.Empty;
             }
+
         }
 
+        private int numFieldColumns = 0;
         private Dictionary<string, Property> properties = new Dictionary<string, Property>();
-        private bool readOnly = false;
-        public bool ReadOnly
-        {
-            get => readOnly;
-            set 
-            {
-                readOnly = value;
-                foreach(var property in properties.Values)
-                {
-                    property.field.Enabled = !readOnly;
-                    if (property.extension != null) property.extension.Enabled = !readOnly;
-                }
-            }
-        }
+
         private Sender<PropertyEventNotification> sender = new Sender<PropertyEventNotification>();
         public IMessageSource<PropertyEventNotification> PropertyEventNotifier => sender;
 
         public class PropertyEventNotification
         {
-            public PropertyEventNotification(string propertyName, PropertyEvent @event, object parameter = null)
+            public PropertyEventNotification(string propertyName, PropertyEvent @event, int fieldIndex = -1, object parameter = null)
             {
                 PropertyName = propertyName;
                 Event = @event;
                 Parameter = parameter;
+                FieldIndex = fieldIndex;
             }
 
             public string PropertyName { get; }
             public PropertyEvent Event { get; }
+            public int FieldIndex { get; }
             public object Parameter { get; }
         }
 
@@ -131,107 +326,81 @@ namespace FeatureLoom.Forms
             ReadOnlyChanged
         }
 
-        public MultiPropertyControl()
-        {
+        public MultiPropertyControl(int numFieldColumns = 1, ColumnStyle defaultColumnStyle = null)
+        {            
             InitializeComponent();
+            SetNumFieldColumns(numFieldColumns, defaultColumnStyle);
+
+
+            
+
+            Resize += (o, e) => UpdateSizes();
+        }        
+
+        public void SetNumFieldColumns(int numFieldColumns, ColumnStyle defaultColumnStyle = null)
+        {
+            if (numFieldColumns == this.numFieldColumns) return;
+
+            this.propertyTable.ColumnCount = numFieldColumns + 1;
+            if (numFieldColumns > this.numFieldColumns)
+            {
+                int numColsToAdd = numFieldColumns - this.numFieldColumns;
+                this.numFieldColumns = numFieldColumns;                
+                for (int i = 0; i < numColsToAdd; i++)
+                {
+                    this.propertyTable.ColumnStyles.Add(defaultColumnStyle ?? new ColumnStyle(SizeType.Percent, 100F));
+                }
+            }
+
+            foreach (var property in properties)
+            {
+                property.Value.ChangeNumberOfFields(numFieldColumns);
+            }
 
             Resize += (o, e) => UpdateSizes();
         }
 
-        private void ConnectPropertyEvents(Property property)
+        public void SetFieldColumnStyle(int fieldColumn, ColumnStyle columnStyle)
         {
-            property.field.TextChanged += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.ValueChanged, property.field.Text));
-            property.field.GotFocus += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.GotFocus, property.field.Text));
-            property.field.LostFocus += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.LostFocus, property.field.Text));
-            property.field.Click += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Clicked));
-            property.label.Click += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Clicked));
-            property.field.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.ReadOnlyChanged, !property.field.Enabled));
+            this.propertyTable.ColumnStyles[fieldColumn+1] = columnStyle;
         }
 
-        private void AddProperty(string label, string value, Control extensionControl)
+        public Property GetProperty(string name)
         {
-            Property property = new Property(label, readOnly, sender, extensionControl);
-            property.field.Text = value;
-            properties.Add(label, property);
+            if (!properties.TryGetValue(name, out var property))
+            {
+                property = AddProperty(name);
+            }
+            return property;
+        }
 
-            int rowIndex = propertyTable.RowCount - 1;
-
+        private Property AddProperty(string name)
+        {
+            Property property;
             using (this.LayoutSuspension())
             {
                 propertyTable.RowCount++;
-                propertyTable.RowStyles.Insert(rowIndex, property.rowStyle);
-                propertyTable.Controls.Add(property.label, 0, rowIndex);
-                propertyTable.Controls.Add(property.field, 1, rowIndex);
-                if (property.extension != null) propertyTable.Controls.Add(property.extension, 2, rowIndex);
+                int rowIndex = propertyTable.RowCount - 1;
 
-                UpdateSizes();
+                property = new Property(this, propertyTable, rowIndex, numFieldColumns,  name, sender);
+                properties.Add(name, property);                
             }
-
-            ConnectPropertyEvents(property);
-            sender.Send(new PropertyEventNotification(label, PropertyEvent.Created, value));
+            sender.Send(new PropertyEventNotification(name, PropertyEvent.Created));
+            return property;
         }
 
-        public void SetReadOnly(bool readOnly, string label = null)
+        public void SetReadOnly(bool readOnly, string propertyName = null)
         {
-            if (label == null)
-            {
-                this.readOnly = readOnly;
+            if (propertyName == null)
+            {                
                 foreach (var property in properties.Values)
                 {
-                    property.field.Enabled = !readOnly;
+                    property.SetReadOnly(readOnly);
                 }
             }
-            else if (properties.TryGetValue(label, out var property))
+            else if (properties.TryGetValue(propertyName, out var property))
             {
-                property.field.Enabled = !readOnly;
-            }
-        }
-
-        public void SetProperty(string label, string value, Control extensionControl = null)
-        {
-            if (properties.TryGetValue(label, out var property))
-            {
-                property.field.Text = value;
-                property.TriggerVerify();
-                if (extensionControl != null) property.UpdateExtension(extensionControl);                
-            }
-            else AddProperty(label, value, extensionControl);
-        }
-
-        public void SetProperty(string label, string value, Predicate<string> verifier, Control extensionControl = null)
-        {
-            SetProperty(label, value, extensionControl);
-            SetPropertyVerifier(label, verifier);
-        }
-
-        public void SetProperty(string label, string value, bool readOnly, Predicate<string> verifier, Control extensionControl = null)
-        {
-            SetProperty(label, value, readOnly, extensionControl);
-            SetPropertyVerifier(label, verifier);
-        }
-
-        public void SetProperty(string label, string value, bool readOnly, Control extensionControl = null)
-        {
-            SetProperty(label, value, extensionControl);
-            SetReadOnly(readOnly, label);
-        }
-
-        public void SetPropertySelectionList(string label, IEnumerable<string> options, bool restrictToOptions)
-        {
-            if (properties.TryGetValue(label, out var property))
-            {
-                property.field.DataSource = options;
-                if (restrictToOptions) property.field.DropDownStyle = ComboBoxStyle.DropDownList;
-                else property.field.DropDownStyle = ComboBoxStyle.DropDown;
-            }
-        }
-
-        public void SetPropertyVerifier(string label, Predicate<string> verifier)
-        {
-            if (properties.TryGetValue(label, out var property))
-            {
-                property.verifier = verifier;
-                property.TriggerVerify();
+                property.SetReadOnly(readOnly);
             }
         }
 
@@ -241,46 +410,22 @@ namespace FeatureLoom.Forms
             this.MinimumSize = new Size(0, propertyTable.PreferredSize.Height + scrollBarOffset);
             this.AutoScrollMinSize = propertyTable.PreferredSize;
         }
-
-        public string GetProperty(string label)
-        {
-            if (properties.TryGetValue(label, out var property)) return property.field.Text;
-            else return null;
-        }
-
-        public ComboBox GetFieldControl(string label)
-        {
-            if (properties.TryGetValue(label, out var property)) return property.field;
-            else return null;
-        }
-
-        public Label GetLabelControl(string label)
-        {
-            if (properties.TryGetValue(label, out var property)) return property.label;
-            else return null;
-        }
-
-        public Control GetExtension(string label)
-        {
-            if (properties.TryGetValue(label, out var property)) return property.extension;
-            else return null;
-        }
-
+       
         public void RemoveProperty(string label)
         {
             var property = properties[label];
             properties.Remove(label);
             using (this.LayoutSuspension())
             {
-                int rowIndex = propertyTable.GetPositionFromControl(property.label).Row;
+                int rowIndex = propertyTable.GetPositionFromControl(property.GetLabelControl()).Row;
                 propertyTable.RemoveRowAt(rowIndex);
                 UpdateSizes();
             }
 
-            sender.Send(new PropertyEventNotification(property.label.Text, PropertyEvent.Removed, property.field.Text));
+            sender.Send(new PropertyEventNotification(property.Name, PropertyEvent.Removed));
         }
 
-        public IEnumerable<string> GetPropertyLabels() => properties.Keys;
+        public IEnumerable<string> GetPropertyNames() => properties.Keys;
 
         public void Clear()
         {
