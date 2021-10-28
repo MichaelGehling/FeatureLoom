@@ -11,7 +11,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         public MixedPerformanceTest(int numThreads)
         {
             var x = numThreads - 1;
-            x = 1;
             for (int i = 0; i < numThreads; i++)
             {
                 collection.AddSequence(new LockingSequence()
@@ -43,4 +42,5 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
             collection.Run(lockAction, collection.MaxSteps, 10000.Seconds());
         }
     }
+
 }

@@ -28,9 +28,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);
 
         [Benchmark]
-        public void FairFeatureLock_Lock() => test.Run(fairFeatureLockSubjects.Lock);
-
-        [Benchmark]
         public void Monitor_Lock() => test.Run(monitorSubjects.Lock);
 
         [Benchmark]

@@ -23,6 +23,7 @@ namespace Playground
 
     partial class Program
     {
+        
 
         public static void BackgroundTest()
         {

@@ -199,21 +199,9 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         }
 
         protected void Wait(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
-        {
-            if (time == TimeSpan.Zero) return;
+        {            
             Work(time); return;
-
-            DateTime now = AppTime.Now;
-            var timer = new TimeFrame(now, time);
-            while (!timer.Elapsed(now))
-            {
-                //if (!abortWaitHandle.WouldWait()) return;
-                if (timer.Remaining(now) < 0.002.Milliseconds()) /* do nothing */;
-                else if (timer.Remaining(now) < 16.Milliseconds()) Thread.Sleep(0);
-                else Thread.Sleep(timer.Remaining(now));
-
-                now = AppTime.Now;
-            }
+            //AppTime.Wait(time);
         }
 
         private static void Work(TimeSpan time)
@@ -221,8 +209,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
             for (long i = 0; i < time.Ticks; i++)
             {
                 // Simulating non CPU bound work (e.g. IO)
-                if (i % 100 == 0) Thread.Sleep(0);
-                else
+                //if (i % 100 == 0) Thread.Sleep(0);
+                //else
                 {
                     // simulating CPU bound work
                     for (int j = 0; j < 250; j++)
@@ -235,21 +223,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 
         protected async Task WaitAsync(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {
-            if (time == TimeSpan.Zero) return;
             Work(time); return;
-
-            DateTime now = AppTime.Now;
-            var timer = new TimeFrame(now, time);
-            while (!timer.Elapsed(now))
-            {
-                //if (!abortWaitHandle.WouldWait()) return;
-                if (timer.Remaining(now) < 0.002.Milliseconds()) /* do nothing */;
-                else if (timer.Remaining(now) < 0.02.Milliseconds()) Thread.Sleep(0);
-                else if (timer.Remaining(now) < 16.Milliseconds()) await Task.Yield();
-                else await Task.Delay(timer.Remaining(now));
-
-                now = AppTime.Now;
-            }
+            //AppTime.Wait(time);
         }
     }
 }

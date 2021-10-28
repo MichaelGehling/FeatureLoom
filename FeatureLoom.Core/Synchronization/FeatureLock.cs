@@ -40,11 +40,11 @@ namespace FeatureLoom.Synchronization
         {
             // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
             // 0 means that the wait order will be exactly respected (in nearly all cases), but it comes with a quite noticeable performance cost, especially for high frequency locking.
-            public ushort passiveWaitThreshold = 50;
+            public ushort passiveWaitThreshold = 30;
             // The lower this value, the more candidates will go to sleep (must not be smaller than PassiveWaitThreshold)
-            public ushort sleepWaitThreshold = 30;
+            public ushort sleepWaitThreshold = 50;
             // The lower this value, the later a sleeping candidate is waked up
-            public ushort awakeThreshold = 3;
+            public ushort awakeThreshold = 5;
             // The lower this value, the more often async threads yield
             public ushort asyncYieldBaseFrequency = 100;
             // The weight of the former averageWaitCount vs. the current waitCount (e.g. 3 means 3:1)
@@ -54,6 +54,8 @@ namespace FeatureLoom.Synchronization
             // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
             // Comes with a quite noticeable performance cost, especially for high frequency locking.
             public bool restrictQueueJumping = false;
+            // If true and and waiting async and it is time for async yield and SynchronizationContext is set, it will not just be a Task.Yield(), but a Task.Delay(1);
+            public bool sleepForAsyncYieldInSyncContext = true;            
 
             public FeatureLockSettings Clone() => (FeatureLockSettings)this.MemberwiseClone();            
         }
@@ -61,7 +63,7 @@ namespace FeatureLoom.Synchronization
         // Predefined settings, default is the same as PerformanceSettings, but can be changed.
         private static FeatureLockSettings defaultSettings = new FeatureLockSettings();
         private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
-        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20, supervisionDelayFactor = 10 };
+        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20};
         /// <summary>
         /// The settings that are used by all FeatureLock instances where settings were not explicitly set in the constructor.
         /// The DefaultSettings are the same as the prepared PerformanceSettings, but they can be changed, to affect all FeatureLock instances.
@@ -159,7 +161,7 @@ namespace FeatureLoom.Synchronization
         // Contains the oldest ticket number that is currently waiting and therefor has the rank 0. The rank of the other tickets is calculated relative to this one.
         // Will be reset to 0 when the currently oldest candidate acquired the lock. For a short time, it is possible that some newer ticket number
         // is set until the actually oldest one reaches the pooint to update.
-        private ushort firstRankTicket = 0;        
+        private volatile ushort firstRankTicket = 0;
 
         // Will be true if a candidate tries to acquire the lock with priority, so the other candidates know that they have to stay back.
         // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate already waits,
@@ -367,7 +369,7 @@ namespace FeatureLoom.Synchronization
         /// <summary>
         /// True if anyone is waiting to acquire the already acquired lock (Is not guaranteed to be accurate in every case)
         /// </summary>
-        public bool IsAnyWaiting => firstRankTicket != 0;
+        public bool IsAnyWaiting => firstRankTicket != 0 || isSupervisionActive;
 
         #endregion PublicProperties
 
@@ -453,7 +455,7 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
-            return !prioritized && (prioritizedWaiting || (Settings.restrictQueueJumping && (firstRankTicket != 0 || isSupervisionActive)));
+            return !prioritized && (prioritizedWaiting || (Settings.restrictQueueJumping && IsAnyWaiting));
         }
 
         // Invalidates the current reentrancyIndicator by changing the reentrancy ID.
@@ -467,7 +469,6 @@ namespace FeatureLoom.Synchronization
 
         // Yielding a task is very expensive, but must be done to avoid blocking the thread pool threads.
         // This method checks if the task should be yielded or the thread can still be blocked.
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustYieldAsyncThread(int rank, bool prioritized, int counter)
         {
             // If a special synchronization context is set (e.g. UI-Thread) the task must always be yielded to avoid blocking
@@ -489,12 +490,6 @@ namespace FeatureLoom.Synchronization
             return usedThreads >= minThreads;
         }
 
-        // Checks if a candidate must still remain in the waiting queue or if acquiring would be possible
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool MustStillWait(bool prioritized, bool readOnly)
-        {
-            return (!readOnly && lockIndicator != NO_LOCK) || (readOnly && lockIndicator == WRITE_LOCK) || (!prioritized && prioritizedWaiting);
-        }
 
         // Creates the a new ticket for a new waiting candidate.
         // It will ensure to never provide the 0, because it is reserved to indicate when the firstRankTicket is undefined.
@@ -601,23 +596,30 @@ namespace FeatureLoom.Synchronization
         }
 
         // Increases the waitCounter while avoiding a possible overflow
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void IncWaitCounter(ushort increment = 1)
         {            
             if (ushort.MaxValue - increment <= waitCounter) waitCounter = ushort.MaxValue;
             else waitCounter += increment;
         }
 
+        // Checks if a candidate must still remain in the waiting queue or if acquiring would be possible
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool MustStillWait(bool prioritized, bool readOnly)
+        {
+            return (!readOnly && lockIndicator != NO_LOCK) || (readOnly && lockIndicator == WRITE_LOCK) || (!prioritized && prioritizedWaiting);
+        }
+
         // Checks if the candidate may acquire the lock or must stay back and wait based on its rank
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWaitPassive(bool prioritized, int rank, bool readOnly)
         {
-            if (readOnly && IsReadOnlyLocked) return false;
-            return !prioritized && rank * averageWaitCount > Settings.passiveWaitThreshold;
+            if (prioritized) return false;
+            if (readOnly && IsReadOnlyLocked) return false;            
+            if (rank * averageWaitCount <= Settings.passiveWaitThreshold) return false;
+            return true;
         }
 
         // Checks if the candidate must go to sleep based on its rank
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWaitSleeping(int rank, bool readOnly)
         {            
             if (readOnly && IsReadOnlyLocked) return false;            
@@ -627,7 +629,6 @@ namespace FeatureLoom.Synchronization
         }
 
         // Checks if a sleeping candidate may be waked up
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustAwake(int rank, bool readOnly)
         {
             if (readOnly && IsReadOnlyLocked) return true;
@@ -636,9 +637,8 @@ namespace FeatureLoom.Synchronization
             return rank * waitFactor <= Settings.awakeThreshold;
         }
 
-        // Yields CPU time to wait
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void YieldCpuTime(bool lowerPriority = false)
+        // Yields CPU time to wait synchronously
+        private void YieldCpuTime(bool lowerPriority)
         {
             if (!lowerPriority) Thread.Sleep(0);
             else
@@ -651,8 +651,12 @@ namespace FeatureLoom.Synchronization
             }
         }
 
-
-
+        // Yields thread to wait asynchronously
+        private async Task YieldThreadAsync()
+        {
+            if (Settings.sleepForAsyncYieldInSyncContext && SynchronizationContext.Current != null) await Task.Delay(1);
+            else await Task.Yield();
+        }
         #endregion HelperMethods
 
         #region Lock
@@ -699,7 +703,7 @@ namespace FeatureLoom.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        YieldCpuTime();
+                        YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -735,7 +739,7 @@ namespace FeatureLoom.Synchronization
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, false);
                     else if (MustYieldAsyncThread(rank, prioritized, ++counter)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, true);
-                    else YieldCpuTime();
+                    else YieldCpuTime(true);
                 }
                 else
                 {
@@ -745,7 +749,7 @@ namespace FeatureLoom.Synchronization
                     {
                         if (rank == 0) IncWaitCounter();
                         if (MustYieldAsyncThread(rank, prioritized, ++counter)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, true);
-                        YieldCpuTime();
+                        YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -776,7 +780,7 @@ namespace FeatureLoom.Synchronization
 
         private async Task<LockHandle> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, ushort ticket, bool prioritized, bool readOnly, int counter, bool yieldNow)
         {
-            if (yieldNow) await Task.Yield();
+            if (yieldNow) await YieldThreadAsync();
             int rank;
             bool skip;
             do
@@ -786,8 +790,8 @@ namespace FeatureLoom.Synchronization
                 {
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) await SleepAsync(ticket, readOnly);
-                    else if (MustYieldAsyncThread(rank, prioritized, ++counter)) await Task.Yield();
-                    else YieldCpuTime();
+                    else if (MustYieldAsyncThread(rank, prioritized, ++counter)) await YieldThreadAsync();
+                    else YieldCpuTime(true);
                 }
                 else
                 {
@@ -796,8 +800,8 @@ namespace FeatureLoom.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        if (MustYieldAsyncThread(rank, prioritized, ++counter)) await Task.Yield();
-                        else YieldCpuTime();
+                        if (MustYieldAsyncThread(rank, prioritized, ++counter)) await YieldThreadAsync();
+                        else YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -876,7 +880,7 @@ namespace FeatureLoom.Synchronization
                         if (waitForUpgrade)
                         {
                             prioritizedWaiting = true;
-                            YieldCpuTime();
+                            YieldCpuTime(false);
                         }
                         else
                         {
@@ -931,8 +935,8 @@ namespace FeatureLoom.Synchronization
             while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
                 prioritizedWaiting = true;
-                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await Task.Yield();
-                else YieldCpuTime();
+                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await YieldThreadAsync();
+                else YieldCpuTime(false);
             }
             lazyObj.waitingForUpgrade = FALSE;
             prioritizedWaiting = false;
@@ -1121,7 +1125,7 @@ namespace FeatureLoom.Synchronization
                 {
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) TrySleep(timer, ticket, readOnly);
-                    else YieldCpuTime();
+                    else YieldCpuTime(true);
                 }
                 else
                 {
@@ -1130,7 +1134,7 @@ namespace FeatureLoom.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        YieldCpuTime();
+                        YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -1176,7 +1180,7 @@ namespace FeatureLoom.Synchronization
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, false);
                     if (MustYieldAsyncThread(rank, prioritized, counter++)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, true);
-                    else YieldCpuTime();
+                    else YieldCpuTime(true);
                 }
                 else
                 {
@@ -1186,7 +1190,7 @@ namespace FeatureLoom.Synchronization
                     {
                         if (rank == 0) IncWaitCounter();
                         if (MustYieldAsyncThread(rank, prioritized, counter++)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, true);
-                        YieldCpuTime();
+                        YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -1217,7 +1221,7 @@ namespace FeatureLoom.Synchronization
 
         private async Task<LockAttempt> TryLockAsync_Wait_ContinueWithAwaiting(LockMode mode, TimeFrame timer, ushort ticket, bool prioritized, bool readOnly, int counter, bool yieldNow)
         {
-            if (yieldNow) await Task.Yield();
+            if (yieldNow) await YieldThreadAsync();
             int rank;
             bool skip;
             do
@@ -1233,8 +1237,8 @@ namespace FeatureLoom.Synchronization
                 {
                     skip = true;
                     if (MustWaitSleeping(rank, readOnly)) await TrySleepAsync(timer, ticket, readOnly);
-                    else if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
-                    else YieldCpuTime();
+                    else if (MustYieldAsyncThread(rank, prioritized, counter++)) await YieldThreadAsync();
+                    else YieldCpuTime(true);
                 }
                 else
                 {
@@ -1243,8 +1247,8 @@ namespace FeatureLoom.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await Task.Yield();
-                        else YieldCpuTime();
+                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await YieldThreadAsync();
+                        else YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
                 }
@@ -1356,7 +1360,7 @@ namespace FeatureLoom.Synchronization
                     lazyObj.waitingForUpgrade = FALSE;
                     return false;
                 }
-                YieldCpuTime();
+                YieldCpuTime(false);
             }
             lazyObj.waitingForUpgrade = FALSE;
             return true;
@@ -1406,8 +1410,8 @@ namespace FeatureLoom.Synchronization
                     return new LockAttempt(new LockHandle());
                 }
 
-                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await Task.Yield();
-                else YieldCpuTime();
+                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await YieldThreadAsync();
+                else YieldCpuTime(false);
             }
             lazyObj.waitingForUpgrade = FALSE;
             return new LockAttempt(new LockHandle(this, LockMode.Upgraded));
@@ -1485,7 +1489,7 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReentrantWriteLock()
         {
-            // We simply change the reentrancyId and keep the ReentrancyContext as it is wich also invalidates it. That is a lot cheaper.
+            // We simply change the reentrancyId and keep the ReentrancyContext as it is which also invalidates it. That is a lot cheaper.
             RenewReentrancyId();
             lockIndicator = NO_LOCK;
         }
