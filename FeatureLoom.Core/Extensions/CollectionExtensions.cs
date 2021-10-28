@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Extensions
 {
@@ -68,6 +69,18 @@ namespace FeatureLoom.Extensions
             Array.Copy(array, newArray, array.Length);
             newArray[newArray.Length - 1] = newElement;
             return newArray;
+        }
+
+        public static Task foreachAsync<T>(this IEnumerable<T> items, Func<T, Task> asyncAction)
+        {
+            if (items.EmptyOrNull()) return Task.CompletedTask;
+
+            List<Task> tasks = new List<Task>();
+            foreach (var item in items)
+            {
+                tasks.Add(asyncAction(item));
+            }
+            return Task.WhenAll(tasks);
         }
     }
 }

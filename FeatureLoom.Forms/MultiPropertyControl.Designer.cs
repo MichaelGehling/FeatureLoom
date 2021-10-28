@@ -33,10 +33,8 @@
             // 
             // propertyTable
             // 
-            this.propertyTable.ColumnCount = 3;
-            this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
+            this.propertyTable.ColumnCount = 1;
+            this.propertyTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());       
             this.propertyTable.Dock = System.Windows.Forms.DockStyle.Fill;
             this.propertyTable.Location = new System.Drawing.Point(0, 0);
             this.propertyTable.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);

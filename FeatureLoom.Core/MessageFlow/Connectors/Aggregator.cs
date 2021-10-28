@@ -21,12 +21,45 @@ namespace FeatureLoom.MessageFlow
 
         private TimeFrame nextTimeoutCheck;
         private bool waitingForTimeout = false;
+        private TimeSpan maxSupervisionTimeout = TimeSpan.MaxValue;
         private IAggregationData aggregationData;
         private FeatureLock dataLock = new FeatureLock();
 
-        public Aggregator(IAggregationData aggregationData)
+        public Aggregator(IAggregationData aggregationData, TimeSpan supervisionCycleTime = default)
         {
             this.aggregationData = aggregationData;
+
+            if (supervisionCycleTime != default && supervisionCycleTime != TimeSpan.MaxValue)
+            {
+                PrepareSupervision(aggregationData, supervisionCycleTime);
+            }
+        }
+
+        private void PrepareSupervision(IAggregationData aggregationData, TimeSpan supervisionCycleTime)
+        {
+            this.maxSupervisionTimeout = supervisionCycleTime;
+            WeakReference<Aggregator<I, O>> weakRef = new WeakReference<Aggregator<I, O>>(this);
+            SupervisionService.Supervise(now =>
+            {
+                if (!weakRef.TryGetTarget(out var me)) return;
+                if (!me.waitingForTimeout) return;
+                if (!me.nextTimeoutCheck.Elapsed(now)) return;
+
+                if (me.dataLock.TryLock(out var lockHandle))
+                    using (lockHandle)
+                    {
+                        while (aggregationData.TryGetAggregatedMessage(true, out O aggregatedMessage))
+                        {
+                            me.sourceHelper.Forward(aggregatedMessage);
+                        }
+                        me.waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
+                        if (me.waitingForTimeout) me.nextTimeoutCheck = new TimeFrame(timeout);
+                    }
+            }, () =>
+            {
+                if (weakRef.TryGetTarget(out var me)) return me.maxSupervisionTimeout;
+                else return default;
+            }, () => weakRef.TryGetTarget(out _));
         }
 
         public Type ConsumedMessageType => typeof(I);
@@ -53,27 +86,7 @@ namespace FeatureLoom.MessageFlow
         private void SetTimeout()
         {
             waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
-            if (waitingForTimeout)
-            {
-                nextTimeoutCheck = new TimeFrame(timeout);
-                _ = ExecuteTimeoutCallAsync(timeout); // Don't wait for execution, but continue
-            }
-        }
-
-        private async Task ExecuteTimeoutCallAsync(TimeSpan timeout)
-        {            
-            await AppTime.WaitAsync(timeout);
-            using (await dataLock.LockAsync())
-            {
-                if (waitingForTimeout && nextTimeoutCheck.Elapsed())
-                {
-                    while (aggregationData.TryGetAggregatedMessage(true, out O aggregatedMessage))
-                    {
-                        await sourceHelper.ForwardAsync(aggregatedMessage);
-                    }
-                    SetTimeout();
-                }
-            }
+            if (waitingForTimeout) nextTimeoutCheck = new TimeFrame(timeout);
         }
 
         public void Post<M>(M message)

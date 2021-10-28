@@ -86,7 +86,7 @@ namespace FeatureLoom.MessageFlow
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
+            var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false), 20.Milliseconds());
             var sink = new SingleMessageTestSink<string>();
             sender.ConnectTo(aggregator).ConnectTo(sink);
 

@@ -240,6 +240,8 @@ namespace FeatureLoom.Helpers
                         combinedActions[i] = data.redos.Pop();
                     }
 
+                    if (description.EmptyOrNull()) description = combinedActions.Select(action => action.Description).AllItemsToString("; ");
+
                     AddUndo(() =>
                     {
                         int numUndosBefore = NumUndos;
@@ -251,9 +253,9 @@ namespace FeatureLoom.Helpers
                         int numNewUndos = NumUndos - numUndosBefore;
                         if (numNewUndos >= 2)
                         {
-                            TryCombineLastUndos(numNewUndos);
+                            TryCombineLastUndos(numNewUndos, description);
                         }
-                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString("; \n"));
+                    }, description);
                 }
                 else
                 {
@@ -266,6 +268,8 @@ namespace FeatureLoom.Helpers
                         combinedActions[i] = data.undos.Pop();
                     }
 
+                    if (description.EmptyOrNull()) description = combinedActions.Select(action => action.Description).AllItemsToString("; ");
+
                     AddUndo(() =>
                     {
                         int numRedosBefore = NumRedos;
@@ -277,9 +281,9 @@ namespace FeatureLoom.Helpers
                         int numNewRedos = NumRedos - numRedosBefore;
                         if (numNewRedos >= 2)
                         {
-                            TryCombineLastUndos(numNewRedos);
+                            TryCombineLastUndos(numNewRedos, description);
                         }
-                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString("; \n"));
+                    }, description);
                 }
 
                 return true;

@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>FeatureLoom.Forms</id>
-    <version>0.1.7-alpha</version>
+    <version>0.1.9-alpha</version>
     <title>FeatureLoom.Forms</title>
     <authors>Michael Gehling</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -10,11 +10,11 @@
     <projectUrl>https://github.com/MichaelGehling/FeatureLoom</projectUrl>
     <iconUrl>https://github.com/MichaelGehling/FeatureLoom/blob/master/Resources/FeatureLoom_128.png?raw=true</iconUrl>
     <description>A Forms extensions for FeatureLoom framework</description>
-    <releaseNotes>MultiPropertyControl improved (e.g. drag and drop support)</releaseNotes>
+    <releaseNotes>MultiPropertyControl allows renaming of properties</releaseNotes>
     <copyright>Copyright (c) 2020 Michael Gehling</copyright>
     <tags>FeatureLoom Forms</tags>
     <dependencies>
-      <dependency id="FeatureLoom.Core" version="0.1.7-alpha" />
+      <dependency id="FeatureLoom.Core" version="0.1.10-alpha" />
     </dependencies>
   </metadata>
 </package>

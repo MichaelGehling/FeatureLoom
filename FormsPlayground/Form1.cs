@@ -16,8 +16,16 @@ namespace FormsPlayground
         {
             InitializeComponent();
 
-            this.multiPropertyControl1.SetProperty("Hello", "World!", button1);
-            this.multiPropertyControl1.SetProperty("Hello2", "World2!");
+            this.multiPropertyControl1.GetProperty("Hello").SetValue("B").SetValueRestrictions(new String[] { "Aaaaa", "B", "Cccc" }).SetCustomFieldControl(button1, 1);
+            this.multiPropertyControl1.GetProperty("Hello2").SetValueRestrictions(new String[] { "A", "B", "C" }).SetValue("C").SetLabel("Hello").Rename("Hello99");
+            this.multiPropertyControl1.GetProperty("Hello3").SetValue("World3!");            
+            this.multiPropertyControl1.GetProperty("Hello99").SetReadOnly(true);
+            button1.Click += (o, e) => this.multiPropertyControl1.SetReadOnly(false, "Hello99");
+            this.multiPropertyControl1.SetFieldColumnStyle(1, new ColumnStyle());
+            this.multiPropertyControl1.GetProperty("Hello99").SetVerifier(text => text == "A" || text == "B" );
+
+            var x = this.multiPropertyControl1.GetProperties();
+            int y = 0;
         }
     }
 }

@@ -3,6 +3,7 @@ using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -52,22 +53,17 @@ namespace FeatureLoom.Supervision
 
         private static void StartSupervision()
         {
-            int stopCounter = 0;
-            TimeKeeper timer = AppTime.TimeKeeper;
+            int stopCounter = 0;            
             while (true)
             {                
-                TimeSpan executionStart = timer.LastElapsed;
+                if (!CheckForPause(ref stopCounter) || stop) break;
 
-                if (!CheckForPause(ref stopCounter) || stop) break;                
+                TimeKeeper executionTimer = AppTime.TimeKeeper;
                 CheckForNewSupervisions(ref stopCounter);
                 HandleActiveSupervisions();
                 SwapHandledToActive();                
-
-                TimeSpan executionFinish = timer.Elapsed;
-                TimeSpan executionTime = executionFinish - executionStart;
-                timer.Restart(timer.StartTime + timer.LastElapsed);
-                TimeSpan delay = GetDelay(executionTime);
-                AppTime.Wait(delay, ref timer, cts.Token);
+                TimeSpan delay = GetDelay(executionTimer.Elapsed);
+                AppTime.Wait(delay, cts.Token);
             }
         }
 
@@ -89,6 +85,7 @@ namespace FeatureLoom.Supervision
                     var delay = sv.MaxDelay - executionTime;
                     if (delay < minDelay) minDelay = delay;
                 }
+
             }
             return minDelay.Clamp(minimumDelay, int.MaxValue.Milliseconds());
         }
@@ -163,17 +160,38 @@ namespace FeatureLoom.Supervision
             private Action<DateTime> handleAction;
             private Func<bool> validityCheck;
             private Func<TimeSpan> getDelay = () => TimeSpan.Zero;
+            private static HashSet<GenericSupervision> keepAliveSet = new HashSet<GenericSupervision>();
+            private static FeatureLock keepAliveLock = new FeatureLock();
 
             public GenericSupervision(Action<DateTime> handleAction, Func<TimeSpan> getDelay = null, Func<bool> validityCheck = null)
             {
                 this.handleAction = handleAction;
                 this.validityCheck = validityCheck;
                 this.getDelay = getDelay;
+                if (validityCheck == null || validityCheck())
+                {
+                    using (keepAliveLock.Lock()) keepAliveSet.Add(this);
+                }
             }
 
             public TimeSpan MaxDelay => getDelay != null ? getDelay() : TimeSpan.Zero;
 
-            public bool IsActive => validityCheck != null ? validityCheck() : true;
+            public bool IsActive 
+            {
+                get
+                {
+                    if (validityCheck != null)
+                    {
+                        if (validityCheck()) return true;
+                        else
+                        {
+                            using (keepAliveLock.Lock()) keepAliveSet.Remove(this);
+                            return false;
+                        }
+                    }
+                    else return true;
+                }
+            }
 
             public void Handle(DateTime now)
             {
