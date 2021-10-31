@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Collections;
+using FeatureLoom.Core.Synchronization;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.Synchronization;
@@ -8,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Playground
 {
@@ -38,6 +40,69 @@ namespace Playground
 
         private static void Main()
         {
+
+            object A = new object();
+            object B = new object();
+            object C = new object();
+
+            Console.WriteLine("Thread1 attempts lock A");
+            using(LockOrderDeadlockResolver.Lock(A))
+            {
+                Console.WriteLine("Thread1 took lock A");
+
+                _ = Task.Run(() =>
+                {
+                    Console.WriteLine("Thread2 attempts lock B");
+                    using (LockOrderDeadlockResolver.Lock(B))
+                    {
+                        Console.WriteLine("Thread2 took lock B");
+
+                        _ = Task.Run(() =>
+                        {
+                            Console.WriteLine("Thread3 attempts lock C");
+                            using (LockOrderDeadlockResolver.Lock(C))
+                            {
+                                Console.WriteLine("Thread3 took lock C");
+
+                                Console.WriteLine("Thread3 attempts lock A - blocked");
+                                using (LockOrderDeadlockResolver.Lock(A))
+                                {
+                                    Console.WriteLine("Thread3 took lock A");
+                                }
+                                Console.WriteLine("Thread3 releases lock A");
+                            }
+                            Console.WriteLine("Thread3 releases lock C");
+                        });
+
+                        Thread.Sleep(100);
+
+                        Console.WriteLine("Thread2 attempts lock C - blocked");
+                        using (LockOrderDeadlockResolver.Lock(C))
+                        {
+                            Console.WriteLine("Thread2 took lock C");
+                        }
+                        Console.WriteLine("Thread2 releases lock C");
+                    }
+                    Console.WriteLine("Thread2 releases lock B");
+                });
+
+                Thread.Sleep(200);
+
+                Console.WriteLine("Thread1 attempts lock B");
+                using (LockOrderDeadlockResolver.Lock(B))
+                {
+                    Console.WriteLine("Thread1 took lock B - borrowed");
+                }
+                Console.WriteLine("Thread1 releases lock B");
+            }
+            Console.WriteLine("Thread1 releases lock A");
+
+
+            Console.ReadLine();
+
+
+
+
             int ex = 10_000;
 
             long start_mem = GC.GetTotalMemory(true);
