@@ -34,7 +34,6 @@ namespace FeatureLoom.Supervision
                     mre.Set();
                     supervisorThread = new Thread(StartSupervision);
                     supervisorThread.IsBackground = true;
-                    supervisorThread.Priority = ThreadPriority.BelowNormal;
                     supervisorThread.Start();
                 }
                 else

@@ -2,11 +2,13 @@
 using FeatureLoom.Core.Synchronization;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
+using FeatureLoom.Supervision;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,6 +42,25 @@ namespace Playground
 
         private static void Main()
         {
+            DateTime coarseTime;
+           // SupervisionService.Supervise(now => coarseTime = now);
+
+           // Console.ReadLine();
+
+            while (true)
+            {
+                //TimeKeeper tk = AppTime.TimeKeeper;
+                //Thread.SpinWait(100);
+                //Thread.Sleep(0);
+                AppTime.Wait(1.Milliseconds());
+                //var elapsed =  tk.Elapsed;
+                //Console.WriteLine(elapsed.TotalMilliseconds);
+                //Thread.Sleep(500);
+            }
+
+
+            Console.ReadLine();
+
 
             object A = new object();
             object B = new object();

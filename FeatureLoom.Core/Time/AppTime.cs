@@ -77,8 +77,20 @@ namespace FeatureLoom.Time
             else timeout = new TimeSpan(timeout.Ticks - 1);
 
             var timer = AppTime.TimeKeeper;
+
             if (timeout > 18.Milliseconds()) cancellationToken.WaitHandle.WaitOne(timeout - 18.Milliseconds());
-            else Thread.Sleep(0);
+
+            var oldPriority = Thread.CurrentThread.Priority;
+            try
+            {
+                Thread.CurrentThread.Priority = ThreadPriority.Lowest;
+                while (timer.Elapsed < timeout - 0.1.Milliseconds() && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
+            }
+            finally
+            {
+                Thread.CurrentThread.Priority = oldPriority;
+            }
+
             while (timer.Elapsed < timeout && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
         }
 
