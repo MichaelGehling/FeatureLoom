@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace FeatureLoom.Supervision
+namespace FeatureLoom.Scheduling
 {
-    public interface ISupervision
+    public interface ISchedule
     {
         void Handle(DateTime now);
 

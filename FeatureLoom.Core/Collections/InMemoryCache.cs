@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Supervision;
+﻿using FeatureLoom.Scheduling;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -9,7 +9,7 @@ using System.Linq;
 
 namespace FeatureLoom.Collections
 {
-    public class InMemoryCache<K,V> : ISupervision
+    public class InMemoryCache<K,V> : ISchedule
     {
         class CacheItem
         {
@@ -163,10 +163,10 @@ namespace FeatureLoom.Collections
             });
         }
 
-        bool ISupervision.IsActive => true;
-        TimeSpan ISupervision.MaxDelay => cleanUpDelay;        
+        bool ISchedule.IsActive => true;
+        TimeSpan ISchedule.MaxDelay => cleanUpDelay;        
 
-        void ISupervision.Handle(DateTime now)
+        void ISchedule.Handle(DateTime now)
         {
             if (now > lastCleanUp + settings.cleanUpPeriodeInSeconds.Seconds())
             {

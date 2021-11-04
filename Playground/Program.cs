@@ -2,7 +2,7 @@
 using FeatureLoom.Core.Synchronization;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
-using FeatureLoom.Supervision;
+using FeatureLoom.Scheduling;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using Nito.AsyncEx;

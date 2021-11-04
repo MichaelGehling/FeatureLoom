@@ -1,7 +1,7 @@
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Time;
-using FeatureLoom.Supervision;
+using FeatureLoom.Scheduling;
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -20,7 +20,7 @@ namespace FeatureLoom.Synchronization
     /// and SemaphoreSlim for asynchronous contexts). Though reentrant locking in synchronous contexts using FeatureLock
     /// is slower than with Monitor/ReaderWriterLock, but it also allows reentrancy for asynchronous contexts and even mixed contexts.
     /// </summary>
-    public sealed class FeatureLock : ISupervision
+    public sealed class FeatureLock : ISchedule
     {
         #region ConstructorAndSettings
         /// <summary>
@@ -49,8 +49,8 @@ namespace FeatureLoom.Synchronization
             public ushort asyncYieldBaseFrequency = 100;
             // The weight of the former averageWaitCount vs. the current waitCount (e.g. 3 means 3:1)
             public ushort averageWeighting = 3;
-            // How often the supervision roughly checks to wake up sleeping candidates (100 means 0.05ms)
-            public ushort supervisionDelayFactor = 100;
+            // How often the scheduler roughly checks to wake up sleeping candidates (100 means 0.05ms)
+            public ushort schedulerDelayFactor = 100;
             // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
             // Comes with a quite noticeable performance cost, especially for high frequency locking.
             public bool restrictQueueJumping = false;
@@ -168,8 +168,8 @@ namespace FeatureLoom.Synchronization
         // it must set it back to true in its next cycle. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
         private bool prioritizedWaiting = false;
 
-        // Indicates if supervision is currently observing SleepHandles to wake up the candidates on time
-        private bool isSupervisionActive = false;
+        // Indicates if scheduler is currently observing SleepHandles to wake up the candidates on time
+        private bool isScheduleActive = false;
 
         #endregion Variables
 
@@ -369,7 +369,7 @@ namespace FeatureLoom.Synchronization
         /// <summary>
         /// True if anyone is waiting to acquire the already acquired lock (Is not guaranteed to be accurate in every case)
         /// </summary>
-        public bool IsAnyWaiting => firstRankTicket != 0 || isSupervisionActive;
+        public bool IsAnyWaiting => firstRankTicket != 0 || isScheduleActive;
 
         #endregion PublicProperties
 
@@ -1650,18 +1650,18 @@ namespace FeatureLoom.Synchronization
 
         #endregion LockHandle
 
-        #region Supervision        
+        #region Scheduling        
 
-        bool ISupervision.IsActive => isSupervisionActive;
+        bool ISchedule.IsActive => isScheduleActive;
 
-        TimeSpan ISupervision.MaxDelay => (0.0005 * Settings.supervisionDelayFactor).Milliseconds();
+        TimeSpan ISchedule.MaxDelay => (0.0005 * Settings.schedulerDelayFactor).Milliseconds();
 
-        void ISupervision.Handle(DateTime now)
+        void ISchedule.Handle(DateTime now)
         {
             if (queueHead == null)
             {
                 sleepLock.Enter();
-                isSupervisionActive = queueHead != null;
+                isScheduleActive = queueHead != null;
                 sleepLock.Exit();
             }
 
@@ -1784,7 +1784,7 @@ namespace FeatureLoom.Synchronization
 
         void AddSleepHandle(SleepHandle sleepHandle)
         {
-            bool addSupervisor = false;
+            bool activateSchedule = false;
             sleepLock.Enter();
             try
             {
@@ -1809,13 +1809,13 @@ namespace FeatureLoom.Synchronization
                     }
                 }
 
-                addSupervisor = !isSupervisionActive;
-                isSupervisionActive = true;
+                activateSchedule = !isScheduleActive;
+                isScheduleActive = true;
             }
             finally
             {
                 sleepLock.Exit();
-                if (addSupervisor) SupervisionService.AddSupervision(this);
+                if (activateSchedule) Scheduler.AddSchedule(this);
             }
         }
 
@@ -1853,6 +1853,6 @@ namespace FeatureLoom.Synchronization
             }
         }
 
-        #endregion Supervision
+        #endregion Scheduling
     }
 }

@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.Extensions;
-using FeatureLoom.Supervision;
+using FeatureLoom.Scheduling;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -30,7 +30,7 @@ namespace FeatureLoom.MessageFlow
             this.nextCleanUp = AppTime.Now + this.cleanupPeriode;
             this.cleanUpDelay = this.cleanupPeriode;
 
-            SupervisionService.Supervise((now) => 
+            Scheduler.ScheduleAction((now) => 
             {
                 if (now > this.nextCleanUp)
                 {

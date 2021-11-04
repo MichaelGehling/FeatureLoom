@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.Helpers;
-using FeatureLoom.Supervision;
+using FeatureLoom.Scheduling;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -39,7 +39,7 @@ namespace FeatureLoom.MessageFlow
         {
             this.maxSupervisionTimeout = supervisionCycleTime;
             WeakReference<Aggregator<I, O>> weakRef = new WeakReference<Aggregator<I, O>>(this);
-            SupervisionService.Supervise(now =>
+            Scheduler.ScheduleAction(now =>
             {
                 if (!weakRef.TryGetTarget(out var me)) return;
                 if (!me.waitingForTimeout) return;
