@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>FeatureLoom.Forms</id>
-    <version>0.1.9-alpha</version>
+    <version>0.1.11.3-alpha</version>
     <title>FeatureLoom.Forms</title>
     <authors>Michael Gehling</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/MichaelGehling/FeatureLoom</projectUrl>
     <iconUrl>https://github.com/MichaelGehling/FeatureLoom/blob/master/Resources/FeatureLoom_128.png?raw=true</iconUrl>
     <description>A Forms extensions for FeatureLoom framework</description>
-    <releaseNotes>MultiPropertyControl allows renaming of properties</releaseNotes>
+    <releaseNotes>MultiPropertyControl: Properties can be obtained in order of the rows and RowIndex can be read from Property</releaseNotes>
     <copyright>Copyright (c) 2020 Michael Gehling</copyright>
     <tags>FeatureLoom Forms</tags>
     <dependencies>

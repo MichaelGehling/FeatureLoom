@@ -262,7 +262,7 @@ namespace FeatureLoom.Forms
                 field.LostFocus += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.LostFocus, fieldIndex, field.Text));
                 field.Click += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.Clicked, fieldIndex));
                 field.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(label.Text, PropertyEvent.ReadOnlyChanged, fieldIndex, !field.Enabled));
-                
+
                 parentControl.UpdateSizes();
                 return this;
             }
@@ -314,7 +314,6 @@ namespace FeatureLoom.Forms
 
         }
 
-        
 
         private int numFieldColumns = 0;
         private Dictionary<string, Property> properties = new Dictionary<string, Property>();
@@ -354,7 +353,7 @@ namespace FeatureLoom.Forms
         {            
             InitializeComponent();
             SetNumFieldColumns(numFieldColumns, defaultColumnStyle);
-            Resize += (o, e) => UpdateSizes();
+            Resize += (o, e) => UpdateSizes();                  
         }        
 
         public void SetNumFieldColumns(int numFieldColumns, ColumnStyle defaultColumnStyle = null)
@@ -377,7 +376,7 @@ namespace FeatureLoom.Forms
                 property.Value.ChangeNumberOfFields(numFieldColumns);
             }
 
-            Resize += (o, e) => UpdateSizes();
+            UpdateSizes();
         }
 
         public void SetFieldColumnStyle(int fieldColumn, ColumnStyle columnStyle)
@@ -398,9 +397,8 @@ namespace FeatureLoom.Forms
         {
             Property property;
             using (this.LayoutSuspension())
-            {
-                propertyTable.RowCount++;
-                int rowIndex = propertyTable.RowCount - 1;
+            {                
+                int rowIndex = propertyTable.RowCount++;
 
                 property = new Property(this, propertyTable, rowIndex, numFieldColumns,  name, sender);
                 properties.Add(name, property);                
@@ -426,9 +424,13 @@ namespace FeatureLoom.Forms
 
         private void UpdateSizes()
         {
-            int scrollBarOffset = this.Width > propertyTable.PreferredSize.Width ? 0 : 25;
-            this.MinimumSize = new Size(0, propertyTable.PreferredSize.Height + scrollBarOffset);
-            this.AutoScrollMinSize = propertyTable.PreferredSize;
+            using (this.LayoutSuspension())
+            {
+                int scrollBarOffset = this.Width > propertyTable.PreferredSize.Width ? 0 : 25;
+                this.MinimumSize = new Size(0, propertyTable.PreferredSize.Height + scrollBarOffset);
+                this.AutoScrollMinSize = propertyTable.PreferredSize;
+            }
+            
         }
 
         private void RenameProperty(string name, string newName)
