@@ -12,6 +12,7 @@ namespace FeatureLoom.Time
         private static DateTime coarseTimeBase;
         private static int coarseMillisecondCountBase;
         private static int lastCoarseMillisecondCount;
+        private static TimeSpan lowerSleepLimit = 18.Milliseconds();
 
         static AppTime()
         {
@@ -39,13 +40,16 @@ namespace FeatureLoom.Time
         }
 
         /// <summary>
-        /// A very quick and cheap way to get the current UTC time, but it is between 0 - 20 milliseconds (usually 2-18 ms) behind the actual time.
+        /// A very quick and cheap way (~5-8% cost of DateTime.UtcNow) to get the current UTC time, but it may deviate between -16 to +16 milliseconds from actual UTC time (roughly in a gaussian normal distribution).
+        /// Note: Calling AppTime.Now will reset the CoarseTime to the actual time.
         /// </summary>
         public static DateTime CoarseNow
         {
             get
             {
                 var newCoarseMillisecondCount = Environment.TickCount;
+                if (newCoarseMillisecondCount - lastCoarseMillisecondCount <= 20) return coarseTimeBase;
+
                 if (coarseMillisecondCountBase > lastCoarseMillisecondCount ||
                     lastCoarseMillisecondCount - coarseMillisecondCountBase > 1000 ||
                     newCoarseMillisecondCount < lastCoarseMillisecondCount)
@@ -60,67 +64,72 @@ namespace FeatureLoom.Time
 
         private static DateTime ResetCoarseNow(DateTime now)
         {
-            coarseTimeBase = now - 2.Milliseconds(); // Shift by 2 milliseconds so that the coarse time will (nearly) always be behind the normal UTC time.
+            coarseTimeBase = now;
             coarseMillisecondCountBase = Environment.TickCount;
             lastCoarseMillisecondCount = coarseMillisecondCountBase;
             return coarseTimeBase;
         }
 
-        public static void Wait(TimeSpan timeout)
+        public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout)
         {
-            Wait(timeout, CancellationToken.None);
+            Wait(minTimeout, maxTimeout, CancellationToken.None);
         }
 
-        public static void Wait(TimeSpan timeout, CancellationToken cancellationToken)
+        public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
         {
-            if (timeout.Ticks <= 1 || cancellationToken.IsCancellationRequested) return;
-            else timeout = new TimeSpan(timeout.Ticks - 1);
+            if (minTimeout.Ticks <= 1 || cancellationToken.IsCancellationRequested) return;
+            else minTimeout = new TimeSpan(minTimeout.Ticks - 1);
 
             var timer = AppTime.TimeKeeper;
 
-            if (timeout > 18.Milliseconds()) cancellationToken.WaitHandle.WaitOne(timeout - 18.Milliseconds());
+            if (maxTimeout > lowerSleepLimit) cancellationToken.WaitHandle.WaitOne(minTimeout);
 
-            var oldPriority = Thread.CurrentThread.Priority;
-            try
+            if (timer.Elapsed > minTimeout || cancellationToken.IsCancellationRequested) return;
+
+            if (timer.LastElapsed < minTimeout - 0.1.Milliseconds())
             {
-                Thread.CurrentThread.Priority = ThreadPriority.Lowest;
-                while (timer.Elapsed < timeout - 0.1.Milliseconds() && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
-            }
-            finally
-            {
-                Thread.CurrentThread.Priority = oldPriority;
+                var oldPriority = Thread.CurrentThread.Priority;
+                try
+                {
+                    Thread.CurrentThread.Priority = ThreadPriority.Lowest;
+                    while (timer.Elapsed < minTimeout - 0.1.Milliseconds() && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
+                }
+                finally
+                {
+                    Thread.CurrentThread.Priority = oldPriority;
+                }                
             }
 
-            while (timer.Elapsed < timeout && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
+            while (timer.Elapsed < minTimeout && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
         }
 
-        public static Task WaitAsync(TimeSpan timeout)
+        public static Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout)
         {            
-            return WaitAsync(timeout, CancellationToken.None);
+            return WaitAsync(minTimeout, maxTimeout, CancellationToken.None);
         }
 
-        public static async Task WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        public static async Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
         {            
-            if (timeout.Ticks <= 5) Wait(timeout);
+            if (minTimeout.Ticks <= 5) Wait(minTimeout, maxTimeout);
             else
             {
                 var timer = AppTime.TimeKeeper;
-                if (timeout > 18.Milliseconds())
+                if (maxTimeout > 18.Milliseconds())
                 {
-                    await Task.Delay(timeout - 18.Milliseconds(), cancellationToken);
+                    await Task.Delay(minTimeout, cancellationToken);
                     _ = timer.Elapsed;
                 }
-                while (timer.LastElapsed < timeout - 0.01.Milliseconds() && !cancellationToken.IsCancellationRequested)
+                while (timer.LastElapsed < minTimeout - 0.01.Milliseconds() && !cancellationToken.IsCancellationRequested)
                 {
                     await Task.Yield();
                     _ = timer.Elapsed;
                 }
-                while (timer.LastElapsed.Ticks < timeout.Ticks - 1000 && !cancellationToken.IsCancellationRequested)
+                while (timer.LastElapsed.Ticks < minTimeout.Ticks - 1000 && !cancellationToken.IsCancellationRequested)
                 {
                     await Task.Delay(0);
                     _ = timer.Elapsed;
                 }
-                while (timer.LastElapsed.Ticks < timeout.Ticks - 50 && !cancellationToken.IsCancellationRequested)
+                while (timer.LastElapsed.Ticks < minTimeout.Ticks - 50 && !cancellationToken.IsCancellationRequested)
                 {
                     Thread.Sleep(0);
                     _ = timer.Elapsed;

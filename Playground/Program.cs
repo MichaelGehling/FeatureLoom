@@ -41,21 +41,38 @@ namespace Playground
         }
 
         private static void Main()
-        {
-            DateTime coarseTime;
-           // SupervisionService.Supervise(now => coarseTime = now);
+        {           
+           DateTime coarseTime  = default;
+           Scheduler.ScheduleAction(now => coarseTime = now, () => 0.1.Milliseconds());
 
-           // Console.ReadLine();
+           //Console.ReadLine();
 
             while (true)
             {
                 //TimeKeeper tk = AppTime.TimeKeeper;
                 //Thread.SpinWait(100);
                 //Thread.Sleep(0);
-                AppTime.Wait(1.Milliseconds());
+                //AppTime.Wait(1.Milliseconds());
+                //coarseTime = DateTime.UtcNow;
                 //var elapsed =  tk.Elapsed;
                 //Console.WriteLine(elapsed.TotalMilliseconds);
-                //Thread.Sleep(500);
+
+                var tk = AppTime.TimeKeeper;
+                for(int i=0; i <100_000; i++)
+                {
+                    var x = AppTime.CoarseNow;
+                }
+                long coarseTicks = tk.Elapsed.Ticks;
+                tk.Restart();
+                for (int i = 0; i < 100_000; i++)
+                {
+                    var x = DateTime.UtcNow;
+                }
+                long nowTicks = tk.Elapsed.Ticks;
+                Console.WriteLine($"CoarseNow to Now: {(coarseTicks * 100.0)/nowTicks}%");
+
+                //Console.WriteLine($"CoarseNow Diff: {(DateTime.UtcNow-AppTime.Now).TotalMilliseconds}ms");                
+                Thread.Sleep(500);
             }
 
 

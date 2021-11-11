@@ -61,20 +61,52 @@ namespace FeatureLoom.Time
 
         public bool Overlaps(TimeFrame otherTimeFrame) => IsInvalid ? false : (utcStartTime >= otherTimeFrame.utcStartTime && utcStartTime < otherTimeFrame.utcEndTime) || (utcEndTime <= otherTimeFrame.utcEndTime && utcEndTime > otherTimeFrame.utcStartTime);
 
-        public Task WaitForStartAsync() => AppTime.WaitAsync(TimeUntilStart().ClampLow(TimeSpan.Zero));
+        public Task WaitForStartAsync()
+        {
+            var waitTime = TimeUntilStart().ClampLow(TimeSpan.Zero);
+            return AppTime.WaitAsync(waitTime, waitTime);
+        }
 
-        public Task WaitForStartAsync(DateTime now) => AppTime.WaitAsync(TimeUntilStart(now).ClampLow(TimeSpan.Zero));
+        public Task WaitForStartAsync(DateTime now)
+        {
+            var waitTime = TimeUntilStart(now).ClampLow(TimeSpan.Zero);
+            return AppTime.WaitAsync(waitTime, waitTime);
+        }
 
-        public Task WaitForEndAsync() => AppTime.WaitAsync(Remaining().ClampLow(TimeSpan.Zero));
+        public Task WaitForEndAsync()
+        {
+            var waitTime = Remaining().ClampLow(TimeSpan.Zero);
+            return AppTime.WaitAsync(waitTime, waitTime);
+        }
 
-        public Task WaitForEndAsync(DateTime now) => AppTime.WaitAsync(Remaining(now).ClampLow(TimeSpan.Zero));
+    public Task WaitForEndAsync(DateTime now)
+        {
+            var waitTime = Remaining(now).ClampLow(TimeSpan.Zero);
+            return AppTime.WaitAsync(waitTime, waitTime);
+        }
 
-        public void WaitForStart() => AppTime.Wait(TimeUntilStart().ClampLow(TimeSpan.Zero));
+        public void WaitForStart()
+        {
+            var waitTime = TimeUntilStart().ClampLow(TimeSpan.Zero);
+            AppTime.Wait(waitTime, waitTime);
+        }
+        
+        public void WaitForStart(DateTime now)
+        {
+            var waitTime = TimeUntilStart(now).ClampLow(TimeSpan.Zero);
+            AppTime.Wait(waitTime, waitTime);
+        }
 
-        public void WaitForStart(DateTime now) => AppTime.Wait(TimeUntilStart(now).ClampLow(TimeSpan.Zero));
+        public void WaitForEnd()
+        {
+            var waitTime = Remaining().ClampLow(TimeSpan.Zero);
+            AppTime.Wait(waitTime, waitTime);
+        }
 
-        public void WaitForEnd() => AppTime.Wait(Remaining().ClampLow(TimeSpan.Zero));
-
-        public void WaitForEnd(DateTime now) => AppTime.Wait(Remaining(now).ClampLow(TimeSpan.Zero));
+        public void WaitForEnd(DateTime now)
+        {
+            var waitTime = Remaining(now).ClampLow(TimeSpan.Zero);
+            AppTime.Wait(waitTime, waitTime);
+        }
     }
 }

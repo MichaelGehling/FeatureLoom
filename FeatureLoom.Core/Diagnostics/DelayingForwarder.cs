@@ -9,12 +9,14 @@ namespace FeatureLoom.Diagnostics
     public class DelayingForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
-        private readonly TimeSpan delay;
+        private readonly TimeSpan minDelay;
+        private readonly TimeSpan maxDelay;
         private bool blocking;
 
-        public DelayingForwarder(TimeSpan delay, bool blocking = false)
+        public DelayingForwarder(TimeSpan minDelay, TimeSpan maxDelay = default, bool blocking = false)
         {
-            this.delay = delay;
+            this.minDelay = minDelay;
+            this.maxDelay = maxDelay == default ? minDelay : maxDelay;
             this.blocking = blocking;
         }
 
@@ -44,14 +46,14 @@ namespace FeatureLoom.Diagnostics
         {
             if (blocking)
             {
-                AppTime.Wait(delay);
+                AppTime.Wait(minDelay, maxDelay);
                 sourceHelper.Forward(message);
             }
             else
             {
                 Task.Run(() =>
                 {
-                    AppTime.Wait(delay);
+                    AppTime.Wait(minDelay, maxDelay);
                     sourceHelper.Forward(message);
                 });
             }
@@ -61,14 +63,14 @@ namespace FeatureLoom.Diagnostics
         {
             if (blocking)
             {
-                await AppTime.WaitAsync(delay);
+                await AppTime.WaitAsync(minDelay, maxDelay);
                 await sourceHelper.ForwardAsync(message);
             }
             else
             {
                 _ = Task.Run(async () =>
                 {
-                    await AppTime.WaitAsync(delay);
+                    await AppTime.WaitAsync(minDelay, maxDelay);
                     await sourceHelper.ForwardAsync(message);
                 });
             }            

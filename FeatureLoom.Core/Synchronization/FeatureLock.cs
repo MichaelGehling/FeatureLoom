@@ -49,8 +49,8 @@ namespace FeatureLoom.Synchronization
             public ushort asyncYieldBaseFrequency = 100;
             // The weight of the former averageWaitCount vs. the current waitCount (e.g. 3 means 3:1)
             public ushort averageWeighting = 3;
-            // How often the scheduler roughly checks to wake up sleeping candidates (100 means 0.05ms)
-            public ushort schedulerDelayFactor = 100;
+            // How often the scheduler at least checks to wake up sleeping candidates (100 means 1.0ms). Whenever the lock is released the scheduler is triggered, anyway.
+            public ushort schedulerDelayFactor = 2000;
             // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
             // Comes with a quite noticeable performance cost, especially for high frequency locking.
             public bool restrictQueueJumping = false;
@@ -455,7 +455,7 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
-            return !prioritized && (prioritizedWaiting || (Settings.restrictQueueJumping && IsAnyWaiting));
+            return !prioritized && (prioritizedWaiting || isScheduleActive || (Settings.restrictQueueJumping && firstRankTicket != 0));
         }
 
         // Invalidates the current reentrancyIndicator by changing the reentrancy ID.
@@ -592,7 +592,7 @@ namespace FeatureLoom.Synchronization
                 averageWaitCount = (ushort)(((uint)averageWaitCount * averageWeighting + waitCounter) / (averageWeighting + 1));
                 // Reset the waitCounter to 1 (not 0), so that averageWaitCount will never be 0, which would never allow PassiveWaiting and Sleeping, even with a very high rank
                 waitCounter = 1;
-            }
+            }            
         }
 
         // Increases the waitCounter while avoiding a possible overflow
@@ -1478,12 +1478,14 @@ namespace FeatureLoom.Synchronization
         private void ExitReadLock()
         {
             int newLockIndicator = Interlocked.Decrement(ref lockIndicator);
+            if (isScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
             lockIndicator = NO_LOCK;
+            if (isScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1492,6 +1494,7 @@ namespace FeatureLoom.Synchronization
             // We simply change the reentrancyId and keep the ReentrancyContext as it is which also invalidates it. That is a lot cheaper.
             RenewReentrancyId();
             lockIndicator = NO_LOCK;
+            if (isScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1500,18 +1503,21 @@ namespace FeatureLoom.Synchronization
             // We must clear the ReentrancyContext, because the lock might be used by multiple reader, so we can't change the current reentrancyId, though it would be cheaper.
             RemoveReentrancyContext();
             Interlocked.Decrement(ref lockIndicator);
+            if (isScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReenteredLock()
         {
             // Nothing to do!
+            if (isScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DowngradeReentering()
         {
             lockIndicator = FIRST_READ_LOCK;
+            if (isScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1654,7 +1660,7 @@ namespace FeatureLoom.Synchronization
 
         bool ISchedule.IsActive => isScheduleActive;
 
-        TimeSpan ISchedule.MaxDelay => (0.0005 * Settings.schedulerDelayFactor).Milliseconds();
+        TimeSpan ISchedule.MaxDelay => (0.01 * Settings.schedulerDelayFactor).Milliseconds();
 
         void ISchedule.Handle(DateTime now)
         {

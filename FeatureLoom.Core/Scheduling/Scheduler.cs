@@ -21,7 +21,7 @@ namespace FeatureLoom.Scheduling
         private static CancellationTokenSource cts = new CancellationTokenSource();
         private static bool stop = false;
 
-        private static TimeSpan minimumDelay = 0.001.Milliseconds();
+        private static TimeSpan minimumDelay = 0.01.Milliseconds();
 
         public static void AddSchedule(ISchedule schedule)
         {
@@ -60,10 +60,17 @@ namespace FeatureLoom.Scheduling
                 TimeKeeper executionTimer = AppTime.TimeKeeper;
                 CheckForNewSchedules(ref stopCounter);
                 HandleActiveSchedules();
+                if (cts.IsCancellationRequested) cts = new CancellationTokenSource();
                 SwapHandledToActive();                
                 TimeSpan delay = GetDelay(executionTimer.Elapsed);
-                AppTime.Wait(delay, cts.Token);
+                AppTime.Wait(minimumDelay, delay, cts.Token);
+                //cts.Token.WaitHandle.WaitOne(delay);
             }
+        }
+
+        public static void InterruptWaiting()
+        {
+            cts.Cancel();
         }
 
         public static bool StopScheduling(TimeSpan timeout)
@@ -110,8 +117,7 @@ namespace FeatureLoom.Scheduling
                 {
                     stopCounter = 0;
                     activeSchedules.AddRange(newSchedules);
-                    newSchedules.Clear();
-                    if (cts.IsCancellationRequested) cts = new CancellationTokenSource();
+                    newSchedules.Clear();                    
                 }
             }
         }
