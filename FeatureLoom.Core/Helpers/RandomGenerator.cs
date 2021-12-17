@@ -11,16 +11,25 @@ namespace FeatureLoom.Helpers
     public static class RandomGenerator
     {
         [ThreadStatic]
-        private static Random rnd = new Random(Guid.NewGuid().GetHashCode());
+        private static Random rnd;
+
+        private static Random Rnd
+        {
+            get 
+            {
+                if (rnd == null) rnd = new Random(Guid.NewGuid().GetHashCode());
+                return rnd;
+            }
+        }
 
         public static int Int32()
         {
-            return rnd.Next();
+            return Rnd.Next();
         }
 
         public static int Int32(int min, int max)
         {
-            return rnd.Next(min, max);
+            return Rnd.Next(min, max);
         }
 
         public static long Int64()
@@ -35,12 +44,12 @@ namespace FeatureLoom.Helpers
 
         public static double Double()
         {            
-            return rnd.NextDouble();            
+            return Rnd.NextDouble();            
         }
 
         public static double Double(double min, double max)
         {
-            double sample = rnd.NextDouble();
+            double sample = Rnd.NextDouble();
             return (max * sample) + (min * (1d - sample));
         }
 

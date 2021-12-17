@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace FeatureLoom.Extensions
 {
@@ -81,6 +82,20 @@ namespace FeatureLoom.Extensions
                 tasks.Add(asyncAction(item));
             }
             return Task.WhenAll(tasks);
+        }
+
+        public static bool TryFindFirst<T>(this IEnumerable<T> items, Func<T, bool> predicate, out T item)
+        {
+            if (!items.Any())
+            {
+                item = default;
+                return false;
+            }
+            else
+            {
+                item = items.FirstOrDefault(predicate);
+                return predicate(item);
+            }
         }
     }
 }

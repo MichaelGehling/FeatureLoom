@@ -13,11 +13,13 @@ namespace FeatureLoom.Forms
         public class WorkflowApplicationContext : ApplicationContext
         {
             private Workflow workflow;
-            private SuspendingAsyncRunner runner = new SuspendingAsyncRunner();
+            private IWorkflowRunner runner;
 
-            public WorkflowApplicationContext(Workflow workflow)
+            public WorkflowApplicationContext(Workflow workflow, IWorkflowRunner runner = null)
             {
                 this.workflow = workflow;
+                if (runner != null) this.runner = runner;
+                else this.runner = new SuspendingAsyncRunner();
                 Application.Idle += StartWorkflow;
             }
 

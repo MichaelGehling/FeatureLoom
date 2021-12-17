@@ -80,6 +80,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj">
+      <Project>{c567871f-12f0-4145-8297-acb2523b569a}</Project>
+      <Name>FeatureLoom.Core</Name>
+    </ProjectReference>
     <ProjectReference Include="..\FeatureLoom.Forms\FeatureLoom.Forms.csproj">
       <Project>{6abb1fcc-6e5a-4934-9782-7381b2f492b6}</Project>
       <Name>FeatureLoom.Forms</Name>

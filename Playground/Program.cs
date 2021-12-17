@@ -41,7 +41,10 @@ namespace Playground
         }
 
         private static void Main()
-        {           
+        {
+            Log.defaultConsoleLogger.config.loglevel = Loglevel.TRACE;
+            Log.INFO("Bla","", true);
+
            DateTime coarseTime  = default;
            Scheduler.ScheduleAction(now => coarseTime = now, () => 0.1.Milliseconds());
 

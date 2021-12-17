@@ -15,6 +15,8 @@ namespace FeatureLoom.Extensions
 
         public static bool Contains(this string str, char c)
         {
+            if (str == null) throw new NullReferenceException();
+
             foreach (var sc in str)
             {
                 if (sc == c) return true;

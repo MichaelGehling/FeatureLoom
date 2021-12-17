@@ -13,7 +13,8 @@ namespace FeatureLoom.Forms
                 control = container.ActiveControl;
                 container = control as IContainerControl;
             }
-            return control;
+            
+            return control.Focused ? control : null;
         }
 
         public static ApplicationContext RunAsApplicationContext(this Workflow workflow)

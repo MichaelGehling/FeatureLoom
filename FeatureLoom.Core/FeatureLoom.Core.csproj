@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>7.3</LangVersion>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
-    <Version>0.1.11-alpha</Version>
+    <Version>0.1.13-alpha</Version>
     <Description>FeatureLoom is a C# development framework that focuses on a lean development and efficient code, speeds-up development by simplification while offering opt-in for a high level of control, promotes modular and extensible code by introducing means to easily decouple components with asynchronous communication, strives for high performance and a small memory footprint, equally supports synchronous and asynchronous programming to allow the right approach at the right time.</Description>
     <Copyright>Copyright (c) 2020 Michael Gehling</Copyright>
     <PackageProjectUrl>https://github.com/MichaelGehling/FeatureLoom</PackageProjectUrl>
@@ -12,16 +12,17 @@
     <PackageTags>c#, state machine, data flow, messaging, communication, extensions, workflow,</PackageTags>
     <PackageReleaseNotes>FeauterLoom is currently in a mixed state.
 Some features are in a ready to release state, some are still in a prototype state.
-Last changes: 
-- LockOrderDeadlockResolver added</PackageReleaseNotes>
+Last important changes: 
+- RandomGenerator: Major crash bug (related to ThreadStatic) fixed 
+- Log: Now allows to add stacktrace</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageIcon>FeatureLoom_128.png</PackageIcon>
-    <AssemblyVersion>0.1.11.0</AssemblyVersion>
-    <FileVersion>0.1.11.0</FileVersion>
+    <AssemblyVersion>0.1.13.0</AssemblyVersion>
+    <FileVersion>0.1.13.0</FileVersion>
     <Authors>Michael Gehling</Authors>
     <Product>FeatureLoom</Product>
   </PropertyGroup>

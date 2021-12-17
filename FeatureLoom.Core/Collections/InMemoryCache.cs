@@ -37,7 +37,7 @@ namespace FeatureLoom.Collections
         FeatureLock storageLock = new FeatureLock();
         long totalSize = 0;
         volatile bool cleanUpActive = false;
-        DateTime lastCleanUp = AppTime.Now;
+        DateTime lastCleanUp = AppTime.CoarseNow;
         TimeSpan cleanUpDelay = TimeSpan.Zero;
 
         public CacheSettings Settings => settings;        
@@ -56,16 +56,18 @@ namespace FeatureLoom.Collections
 
         public void Add(K key, V value, float priorityFactor = 1)
         {
+            int newSize = calculateSize(value);
+
             using (storageLock.Lock())
             {
+                DateTime now = AppTime.CoarseNow;
                 if (!storage.TryGetValue(key, out CacheItem item))
-                {
-                    DateTime now = AppTime.Now;
+                {                    
                     item = new CacheItem()
                     {
                         key = key,
                         value = value,
-                        size = calculateSize(value),
+                        size = newSize,
                         creationTime = now,
                         lastAccessTime = now,
                         accessCount = 0,
@@ -76,11 +78,12 @@ namespace FeatureLoom.Collections
                 }
                 else
                 {
-                    int oldSize = item.size;
-                    int newSize = calculateSize(value);
+                    int oldSize = item.size;                    
 
                     item.value = value;
                     item.size = newSize;
+                    item.lastAccessTime = now;
+                    item.priorityFactor = priorityFactor;
 
                     totalSize += newSize - oldSize;
                 }
@@ -107,7 +110,7 @@ namespace FeatureLoom.Collections
             {
                 if (storage.TryGetValue(key, out var item))
                 {
-                    item.lastAccessTime = AppTime.Now;
+                    item.lastAccessTime = AppTime.CoarseNow;
                     item.accessCount++;
                     value = item.value;
                     return true;
@@ -132,7 +135,7 @@ namespace FeatureLoom.Collections
                     items = storage.Values;
                 }
 
-                DateTime now = AppTime.Now;
+                DateTime now = AppTime.CoarseNow;
                 var orderedItems = items.OrderBy(item =>
                 {
                     if ((now - item.lastAccessTime).TotalSeconds > settings.maxUnusedTimeInSeconds) return 0;

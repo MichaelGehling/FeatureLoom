@@ -35,11 +35,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureLoom.PerformanceTest
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FormsPlayground", "FormsPlayground\FormsPlayground.csproj", "{CDC56769-CCFD-405E-B5DB-EBB5B913BC16}"
 	ProjectSection(ProjectDependencies) = postProject
+		{C567871F-12F0-4145-8297-ACB2523B569A} = {C567871F-12F0-4145-8297-ACB2523B569A}
 		{52D3F346-B06A-419C-87E9-11BD1C3155D9} = {52D3F346-B06A-419C-87E9-11BD1C3155D9}
 		{6ABB1FCC-6E5A-4934-9782-7381B2F492B6} = {6ABB1FCC-6E5A-4934-9782-7381B2F492B6}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureLoom.Core", "FeatureLoom.Core\FeatureLoom.Core.csproj", "{C567871F-12F0-4145-8297-ACB2523B569A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FeatureLoom.Core", "FeatureLoom.Core\FeatureLoom.Core.csproj", "{C567871F-12F0-4145-8297-ACB2523B569A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using FeatureLoom.Time;
 
 namespace FormsPlayground
 {
@@ -16,16 +17,27 @@ namespace FormsPlayground
         {
             InitializeComponent();
 
-            this.multiPropertyControl1.GetProperty("Hello").SetValue("B").SetValueRestrictions(new String[] { "Aaaaa", "B", "Cccc" }).SetCustomFieldControl(button1, 1);
-            this.multiPropertyControl1.GetProperty("Hello2").SetValueRestrictions(new String[] { "A", "B", "C" }).SetValue("C").SetLabel("Hello").Rename("Hello99");
-            this.multiPropertyControl1.GetProperty("Hello3").SetValue("World3!");            
-            this.multiPropertyControl1.GetProperty("Hello99").SetReadOnly(true);
-            button1.Click += (o, e) => this.multiPropertyControl1.SetReadOnly(false, "Hello99");
+            var strings = new String[] { "Aaaaa", "B", "Cccc" };
+            this.multiPropertyControl1.GetProperty("Hello1").SetValue("B").SetValueRestrictions(strings).SetCustomFieldControl(button1, 1);
+            this.multiPropertyControl1.GetProperty("Hello2").SetValueRestrictions(strings).SetValue("D").SetLabel("Hello2a").Rename("Hello2a");
+            this.multiPropertyControl1.GetProperty("Hello3").MoveToPosition(0).SetValue("World3!",0).SetValue("xxx",1).SetValue("<<<", 3);
+            this.multiPropertyControl1.GetProperty("Hello2a").SetReadOnly(true);
+            button1.Click += (o, e) => this.multiPropertyControl1.SetReadOnly(false, "Hello2a");
             this.multiPropertyControl1.SetFieldColumnStyle(1, new ColumnStyle());
-            this.multiPropertyControl1.GetProperty("Hello99").SetVerifier(text => text == "A" || text == "B" );
+            this.multiPropertyControl1.GetProperty("Hello2a").SetVerifier(text => text == "D" || text == "B" );
+
+
 
             var x = this.multiPropertyControl1.GetProperties();
             int y = 0;
+
+            _ = DelayedAction();
+        }
+
+        public async Task DelayedAction()
+        {
+            await Task.Delay(5.Seconds());
+            this.multiPropertyControl1.ResetTypedChanges();
         }
     }
 }

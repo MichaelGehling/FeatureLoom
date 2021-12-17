@@ -29,7 +29,7 @@ namespace FormsPlayground
         /// </summary>
         private void InitializeComponent()
         {
-            this.multiPropertyControl1 = new FeatureLoom.Forms.MultiPropertyControl(2);
+            this.multiPropertyControl1 = new FeatureLoom.Forms.MultiPropertyControl();
             this.button1 = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 

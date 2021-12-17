@@ -25,10 +25,29 @@ namespace FeatureLoom.Forms
                     }
                 }
 
-                int rowStyleIndex = panel.RowCount - 1;
-                if (panel.RowStyles.Count > rowStyleIndex) panel.RowStyles.RemoveAt(rowStyleIndex);
+                if (panel.RowStyles.Count > rowIndex) panel.RowStyles.RemoveAt(rowIndex);
 
                 panel.RowCount--;
+            }
+        }
+
+        public static void InsertRowAt(this TableLayoutPanel panel, int rowIndex, RowStyle rowStyle = null)
+        {
+            if (rowIndex > panel.RowCount) return;
+
+            using (panel.LayoutSuspension())
+            {
+                panel.RowCount++;
+                panel.RowStyles.Insert(rowIndex, rowStyle ?? new RowStyle());
+                                                             
+                for (int row = panel.RowCount - 2; row >= rowIndex; row--)
+                {
+                    for (int col = 0; col < panel.ColumnCount; col++)
+                    {
+                        var control = panel.GetControlFromPosition(col, row);
+                        if (control != null) panel.SetCellPosition(control, new TableLayoutPanelCellPosition(col, row + 1));
+                    }
+                }
             }
         }
     }
