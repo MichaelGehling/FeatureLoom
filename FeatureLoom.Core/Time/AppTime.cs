@@ -82,7 +82,7 @@ namespace FeatureLoom.Time
 
             var timer = AppTime.TimeKeeper;
 
-            if (maxTimeout > lowerSleepLimit) cancellationToken.WaitHandle.WaitOne(minTimeout);
+            if (maxTimeout > lowerSleepLimit) cancellationToken.WaitHandle.WaitOne(maxTimeout);
 
             if (timer.Elapsed > minTimeout || cancellationToken.IsCancellationRequested) return;
 

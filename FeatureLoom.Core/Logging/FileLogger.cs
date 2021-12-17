@@ -100,7 +100,7 @@ namespace FeatureLoom.Logging
         public FileLogger(Config config = null)
         {
             this.config = config ?? new Config();
-            this.config.TryUpdateFromStorage(true);
+            this.config.TryUpdateFromStorage(false);
             this.logFilePath = new FileInfo(this.config.logFilePath).FullName;
             this.archiveFilePath = new FileInfo(this.config.archiveFilePath).FullName;
         }

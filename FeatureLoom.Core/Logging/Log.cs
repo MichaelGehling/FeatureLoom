@@ -10,12 +10,15 @@ namespace FeatureLoom.Logging
 {
     public static class Log
     {
-        public static ConsoleLogger defaultConsoleLogger = new ConsoleLogger();
-        public static FileLogger defaultFileLogger = new FileLogger();
-        public static IWorkflowRunner logRunner = new SuspendingAsyncRunner();
+        public static ConsoleLogger defaultConsoleLogger;
+        public static FileLogger defaultFileLogger;
+        public static IWorkflowRunner logRunner;
 
         static Log()
-        {
+        {            
+            defaultConsoleLogger = new ConsoleLogger();
+            defaultFileLogger = new FileLogger();
+            logRunner = new SuspendingAsyncRunner();
             WorkflowRunnerService.Unregister(logRunner);
             logRunner.Run(defaultFileLogger);
         }
@@ -62,7 +65,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
@@ -74,7 +77,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace || context.Data.settings.addStackTraceToErrors) detailText += $"{(detailText.EmptyOrNull()?"":"\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace || context.Data.settings.addStackTraceToErrors) detailText = $"{(detailText.EmptyOrNull()?"":"\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
@@ -86,7 +89,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
@@ -98,7 +101,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
@@ -110,7 +113,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
@@ -122,7 +125,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
@@ -133,7 +136,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 
@@ -144,7 +147,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace || context.Data.settings.addStackTraceToErrors) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace || context.Data.settings.addStackTraceToErrors) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 
@@ -155,7 +158,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 
@@ -166,7 +169,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 
@@ -177,7 +180,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 
@@ -188,7 +191,7 @@ namespace FeatureLoom.Logging
                                  [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                                  [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText += $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
+            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
             SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 

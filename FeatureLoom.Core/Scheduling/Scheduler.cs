@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
+using FeatureLoom.Logging;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -27,9 +28,11 @@ namespace FeatureLoom.Scheduling
         {
             using (myLock.Lock())
             {
+                Log.TRACE($"Adding Schedule ({schedule.GetType().Name}).");
                 stop = false;
                 if (schedulerThread == null)
                 {
+                    Log.TRACE($"Spawning Scheduler thread.");
                     newSchedules.Add(new WeakReference<ISchedule>(schedule));
                     mre.Set();
                     schedulerThread = new Thread(StartScheduling);
@@ -61,10 +64,9 @@ namespace FeatureLoom.Scheduling
                 CheckForNewSchedules(ref stopCounter);
                 HandleActiveSchedules();
                 if (cts.IsCancellationRequested) cts = new CancellationTokenSource();
-                SwapHandledToActive();                
+                SwapHandledToActive();
                 TimeSpan delay = GetDelay(executionTimer.Elapsed);
-                AppTime.Wait(minimumDelay, delay, cts.Token);
-                //cts.Token.WaitHandle.WaitOne(delay);
+                AppTime.Wait(minimumDelay, delay, cts.Token);                
             }
         }
 
@@ -105,6 +107,7 @@ namespace FeatureLoom.Scheduling
                 {
                     sv.Handle(now);
                     if (sv.IsActive) handledSchedules.Add(schedule);
+                    else Log.TRACE($"Removing schedule ({schedule.GetType().Name}) from Scheduler.");
                 }
             }            
         }
@@ -140,6 +143,7 @@ namespace FeatureLoom.Scheduling
                     {
                         mre.Reset();
                         lockHandle.Exit();
+                        Log.TRACE("Scheduler paused.");
                         bool wokeUp = mre.Wait(10.Seconds());
                         if (!wokeUp)
                         {
@@ -147,11 +151,13 @@ namespace FeatureLoom.Scheduling
                             {
                                 if (activeSchedules.Count == 0 && newSchedules.Count == 0)
                                 {
+                                    Log.INFO("Terminating Scheduler thread.");
                                     schedulerThread = null;
                                     return false;
                                 }
                             }
                         }
+                        else Log.TRACE("Scheduler unpaused.");
                     }
                     else lockHandle.Exit();
                 }

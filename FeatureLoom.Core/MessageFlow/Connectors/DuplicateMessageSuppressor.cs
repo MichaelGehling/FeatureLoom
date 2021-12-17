@@ -19,8 +19,9 @@ namespace FeatureLoom.MessageFlow
         private readonly Func<object, object, bool> isDuplicate;
         private DateTime nextCleanUp;
         private TimeSpan cleanUpDelay;
+        private TimeSpan cleanupTolerance = 1.Seconds();
 
-        public DuplicateMessageSuppressor(TimeSpan suppressionTime, Func<object, object, bool> isDuplicate = null, TimeSpan cleanupPeriode = default)
+        public DuplicateMessageSuppressor(TimeSpan suppressionTime, Func<object, object, bool> isDuplicate = null, TimeSpan cleanupPeriode = default, TimeSpan cleanupTolerance = default)
         {
             this.suppressionTime = suppressionTime;
             if (isDuplicate == null) isDuplicate = (a, b) => a.Equals(b);
@@ -29,10 +30,11 @@ namespace FeatureLoom.MessageFlow
             this.cleanupPeriode = this.cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
             this.nextCleanUp = AppTime.Now + this.cleanupPeriode;
             this.cleanUpDelay = this.cleanupPeriode;
+            if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
             Scheduler.ScheduleAction((now) => 
             {
-                if (now > this.nextCleanUp)
+                if (now > this.nextCleanUp - this.cleanupTolerance)
                 {
                     using (suppressorsLock.Lock())
                     {
