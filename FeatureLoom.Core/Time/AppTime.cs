@@ -11,7 +11,6 @@ namespace FeatureLoom.Time
         private static Stopwatch stopWatch = new Stopwatch();
         private static DateTime coarseTimeBase;
         private static int coarseMillisecondCountBase;
-        private static int lastCoarseMillisecondCount;
         private static TimeSpan lowerSleepLimit = 18.Milliseconds();
 
         static AppTime()
@@ -48,17 +47,15 @@ namespace FeatureLoom.Time
             get
             {
                 var newCoarseMillisecondCount = Environment.TickCount;
-                if (newCoarseMillisecondCount - lastCoarseMillisecondCount <= 20) return coarseTimeBase;
+                if (newCoarseMillisecondCount - coarseMillisecondCountBase <= 20) return coarseTimeBase;
 
-                if (coarseMillisecondCountBase > lastCoarseMillisecondCount ||
-                    lastCoarseMillisecondCount - coarseMillisecondCountBase > 1000 ||
-                    newCoarseMillisecondCount < lastCoarseMillisecondCount)
+                if (coarseMillisecondCountBase > newCoarseMillisecondCount ||
+                    newCoarseMillisecondCount - coarseMillisecondCountBase > 1000 )
                  {
                      return ResetCoarseNow(DateTime.UtcNow);
                  }
-                 else lastCoarseMillisecondCount = newCoarseMillisecondCount;
-                 
-                return coarseTimeBase + (lastCoarseMillisecondCount - coarseMillisecondCountBase).Milliseconds();
+
+                return coarseTimeBase + (newCoarseMillisecondCount - coarseMillisecondCountBase).Milliseconds();
             }
         }
 
@@ -66,7 +63,6 @@ namespace FeatureLoom.Time
         {
             coarseTimeBase = now;
             coarseMillisecondCountBase = Environment.TickCount;
-            lastCoarseMillisecondCount = coarseMillisecondCountBase;
             return coarseTimeBase;
         }
 
@@ -82,7 +78,7 @@ namespace FeatureLoom.Time
 
             var timer = AppTime.TimeKeeper;
 
-            if (maxTimeout > lowerSleepLimit) cancellationToken.WaitHandle.WaitOne(maxTimeout);
+            if (maxTimeout > lowerSleepLimit) cancellationToken.WaitHandle.WaitOne((maxTimeout+minTimeout).Divide(2));
 
             if (timer.Elapsed > minTimeout || cancellationToken.IsCancellationRequested) return;
 

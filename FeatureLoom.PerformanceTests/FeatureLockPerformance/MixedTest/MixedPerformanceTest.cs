@@ -26,8 +26,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
                     .AddWaitingTime(x * 0.001.Milliseconds(), 500)
                     .AddInLockTime(0.0001.Milliseconds(), 5000)
                     .AddWaitingTime(x * 0.0001.Milliseconds(), 5000)
-                    .AddInLockTime(0.Milliseconds(), 20_000)
-                    .AddWaitingTime(0.Milliseconds(), 20_000)
+                    .AddInLockTime(0.Milliseconds(), 50_000)
+                    .AddWaitingTime(0.Milliseconds(), 50_000)
                     .RandomizeSequences(i));
             }
         }

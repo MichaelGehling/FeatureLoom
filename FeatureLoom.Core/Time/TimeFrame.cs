@@ -10,45 +10,57 @@ namespace FeatureLoom.Time
         public readonly DateTime utcStartTime;
         public readonly DateTime utcEndTime;
 
-        public TimeFrame(TimeSpan duration) : this()
+        public TimeFrame(TimeSpan duration)
         {
-            if (duration != default)
+            if (duration >= TimeSpan.Zero)
             {
-                this.utcStartTime = AppTime.Now;
-                this.utcEndTime = duration > TimeSpan.Zero ? utcStartTime + duration : utcStartTime;
+                this.utcStartTime = duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+                this.utcEndTime = utcStartTime + duration;
+            }
+            else
+            {
+                this.utcEndTime = duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+                this.utcStartTime = utcEndTime + duration;
             }
         }
 
         public TimeFrame(DateTime startTime, DateTime endTime)
         {
             startTime = startTime.ToUniversalTime();
-            endTime = startTime.ToUniversalTime();
-            this.utcStartTime = startTime;
+            endTime = startTime.ToUniversalTime();            
+            this.utcStartTime = endTime > startTime ? startTime : endTime;
             this.utcEndTime = endTime > startTime ? endTime : startTime;
         }
 
         public TimeFrame(DateTime startTime, TimeSpan duration)
         {
-            startTime = startTime.ToUniversalTime();
-            this.utcStartTime = startTime;
-            this.utcEndTime = duration > TimeSpan.Zero ? startTime + duration : startTime;
+            if (duration >= TimeSpan.Zero)
+            {
+                this.utcStartTime = startTime.ToUniversalTime();
+                this.utcEndTime = utcStartTime + duration;
+            }
+            else
+            {
+                this.utcEndTime = startTime.ToUniversalTime();
+                this.utcStartTime = utcEndTime + duration;
+            }
         }
 
         public bool IsInvalid => utcStartTime == default;
 
-        public bool Elapsed() => Elapsed(AppTime.Now);
+        public bool Elapsed() => Elapsed(Duration >= 1.Seconds() ? AppTime.CoarseNow :AppTime.Now);
 
-        public bool Elapsed(DateTime now) => IsZero ? true : now >= utcEndTime;
+        public bool Elapsed(DateTime now) => now >= utcEndTime;
 
-        public TimeSpan Remaining() => Remaining(AppTime.Now);
+        public TimeSpan Remaining() => Remaining(Duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now);
 
         public TimeSpan Remaining(DateTime now) => IsInvalid ? TimeSpan.Zero : utcEndTime - now;
 
-        public TimeSpan TimeUntilStart() => TimeUntilStart(AppTime.Now);
+        public TimeSpan TimeUntilStart() => TimeUntilStart(Duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now);
 
         public TimeSpan TimeUntilStart(DateTime now) => IsInvalid ? TimeSpan.Zero : utcStartTime - now;
 
-        public TimeSpan TimeSinceStart() => TimeSinceStart(AppTime.Now);
+        public TimeSpan TimeSinceStart() => TimeSinceStart(Duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now);
 
         public TimeSpan TimeSinceStart(DateTime now) => IsInvalid ? TimeSpan.Zero : now - utcStartTime;
 

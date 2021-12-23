@@ -25,18 +25,18 @@ namespace FeatureLoom.Synchronization
     {
         private FeatureLock myLock = new FeatureLock();
         private T value;
-        private Sender updateSender;
+        private Sender<SharedDataUpdateNotification> updateSender;
 
         public SharedData(T value)
         {
             this.value = value;
         }
 
-        public IMessageSource UpdateNotifications
+        public IMessageSource<SharedDataUpdateNotification> UpdateNotifications
         {
             get
             {
-                if (updateSender == null) updateSender = new Sender();
+                if (updateSender == null) updateSender = new Sender<SharedDataUpdateNotification>();
                 return updateSender;
             }
         }
@@ -140,7 +140,7 @@ namespace FeatureLoom.Synchronization
     public interface ISharedData
     {
         Type ValueType { get; }
-        IMessageSource UpdateNotifications { get; }
+        IMessageSource<SharedDataUpdateNotification> UpdateNotifications { get; }
     }
 
     public readonly struct SharedDataUpdateNotification

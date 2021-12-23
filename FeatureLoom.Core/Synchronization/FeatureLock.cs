@@ -40,11 +40,11 @@ namespace FeatureLoom.Synchronization
         {
             // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
             // 0 means that the wait order will be exactly respected (in nearly all cases), but it comes with a quite noticeable performance cost, especially for high frequency locking.
-            public ushort passiveWaitThreshold = 30;
+            public ushort passiveWaitThreshold = 25;
             // The lower this value, the more candidates will go to sleep (must not be smaller than PassiveWaitThreshold)
-            public ushort sleepWaitThreshold = 50;
+            public ushort sleepWaitThreshold = 25;
             // The lower this value, the later a sleeping candidate is waked up
-            public ushort awakeThreshold = 5;
+            public ushort awakeThreshold = 15;
             // The lower this value, the more often async threads yield
             public ushort asyncYieldBaseFrequency = 100;
             // The weight of the former averageWaitCount vs. the current waitCount (e.g. 3 means 3:1)

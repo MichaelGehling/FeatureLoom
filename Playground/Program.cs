@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.Collections;
-using FeatureLoom.Core.Synchronization;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.Scheduling;
@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using FeatureLoom.MessageFlow;
 
 namespace Playground
 {
@@ -42,24 +43,15 @@ namespace Playground
 
         private static void Main()
         {
-            Log.defaultConsoleLogger.config.loglevel = Loglevel.TRACE;
-            Log.INFO("Bla","", true);
 
-           DateTime coarseTime  = default;
-           Scheduler.ScheduleAction(now => coarseTime = now, () => 0.1.Milliseconds());
+            SharedData<string> shared = new SharedData<string>("KAck");
+            shared.UpdateNotifications.ConnectTo(new ProcessingEndpoint<SharedDataUpdateNotification>(msg => msg.sharedData));
+
 
            //Console.ReadLine();
 
             while (true)
             {
-                //TimeKeeper tk = AppTime.TimeKeeper;
-                //Thread.SpinWait(100);
-                //Thread.Sleep(0);
-                //AppTime.Wait(1.Milliseconds());
-                //coarseTime = DateTime.UtcNow;
-                //var elapsed =  tk.Elapsed;
-                //Console.WriteLine(elapsed.TotalMilliseconds);
-
                 var tk = AppTime.TimeKeeper;
                 for(int i=0; i <100_000; i++)
                 {
@@ -73,9 +65,10 @@ namespace Playground
                 }
                 long nowTicks = tk.Elapsed.Ticks;
                 Console.WriteLine($"CoarseNow to Now: {(coarseTicks * 100.0)/nowTicks}%");
-
-                //Console.WriteLine($"CoarseNow Diff: {(DateTime.UtcNow-AppTime.Now).TotalMilliseconds}ms");                
-                Thread.Sleep(500);
+                
+                
+                Console.WriteLine($"CoarseNow Diff: {(DateTime.UtcNow-AppTime.CoarseNow).TotalMilliseconds}ms");                
+                Thread.Sleep(RandomGenerator.Int32(500,1000));
             }
 
 

@@ -192,6 +192,15 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
                 }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void LockWithLockOrderDeadlockResolution(Action action)
+        {
+            using (perfLock.LockWithLockOrderDeadlockResolution())
+            {
+                action();
+            }
+        }
+
         #endregion EmbracingLock
 
         #region EmptyLock
@@ -322,6 +331,14 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
             if ((await perfLock.TryLockReentrantReadOnlyAsync(TimeSpan.Zero)).Succeeded(out var acquiredLock)) using (acquiredLock)
                 {
                 }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void LockWithLockOrderDeadlockResolution()
+        {
+            using (perfLock.LockWithLockOrderDeadlockResolution())
+            {
+            }
         }
 
         #endregion EmptyLock
