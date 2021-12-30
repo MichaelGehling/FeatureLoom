@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Xunit;
+using FeatureLoom.UndoRedo;
 
-namespace FeatureLoom.Helpers
+namespace FeatureLoom.UndoRedo
 {
     
     public class UndoRedoTests
