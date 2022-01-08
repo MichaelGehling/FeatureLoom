@@ -37,11 +37,9 @@ namespace FeatureLoom.MessageFlow
 
         private void PrepareSupervision(IAggregationData aggregationData, TimeSpan supervisionCycleTime)
         {
-            this.maxSupervisionTimeout = supervisionCycleTime;
-            WeakReference<Aggregator<I, O>> weakRef = new WeakReference<Aggregator<I, O>>(this);
-            Scheduler.ScheduleAction(now =>
-            {
-                if (!weakRef.TryGetTarget(out var me)) return (false, default);
+            this.maxSupervisionTimeout = supervisionCycleTime;            
+            Scheduler.ScheduleAction(this, (me, now) =>
+            {                
                 if (!me.waitingForTimeout) return (true, me.maxSupervisionTimeout);
                 if (!me.nextTimeoutCheck.Elapsed(now)) return (true, me.maxSupervisionTimeout);
 

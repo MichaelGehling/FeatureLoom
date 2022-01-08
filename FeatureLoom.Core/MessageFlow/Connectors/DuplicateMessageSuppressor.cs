@@ -32,11 +32,8 @@ namespace FeatureLoom.MessageFlow
             this.cleanUpDelay = this.cleanupPeriode;
             if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
-            WeakReference<DuplicateMessageSuppressor> weakRef = new WeakReference<DuplicateMessageSuppressor>(this);
-            Scheduler.ScheduleAction(now => 
+            Scheduler.ScheduleAction(this, (me, now) => 
             {
-                if (!weakRef.TryGetTarget(out var me)) return (false, default);
-
                 if (now > me.nextCleanUp - me.cleanupTolerance)
                 {
                     using (me.suppressorsLock.Lock())

@@ -50,9 +50,9 @@ namespace FeatureLoom.Scheduling
             }
         }
 
-        public static ISchedule ScheduleAction(Func<DateTime, (bool, TimeSpan)> triggerAction)
+        public static ISchedule ScheduleAction<T>(T owner, Func<T, DateTime, (bool, TimeSpan)> triggerAction) where T : class
         {
-            var schedule = new ActionSchedule(triggerAction);
+            var schedule = new ActionSchedule<T>(owner, triggerAction);
             AddSchedule(schedule);
             return schedule;
         }
@@ -167,29 +167,34 @@ namespace FeatureLoom.Scheduling
             }
         }
 
-        private class ActionSchedule : ISchedule
+        private class ActionSchedule<T> : ISchedule where T: class
         {
-            private Func<DateTime, (bool, TimeSpan)> triggerAction;
-            private static HashSet<ActionSchedule> keepAliveSet = new HashSet<ActionSchedule>();
-            private static FeatureLock keepAliveLock = new FeatureLock();
+            private Func<T, DateTime, (bool, TimeSpan)> triggerAction;
+            private WeakReference<T> weakOwner;
+            private static HashSet<ActionSchedule<T>> keepAliveSet = new HashSet<ActionSchedule<T>>();
+            private static FeatureLock keepAliveLock = new FeatureLock();            
 
-            public ActionSchedule(Func<DateTime, (bool, TimeSpan)> handleAction)
+            public ActionSchedule(T owner, Func<T, DateTime, (bool, TimeSpan)> triggerAction)
             {
-                this.triggerAction = handleAction;
+                this.triggerAction = triggerAction;
+                this.weakOwner = new WeakReference<T>(owner);
                 using (keepAliveLock.Lock()) keepAliveSet.Add(this);
-            }
-
-            public void Handle(DateTime now)
-            {
-                triggerAction(now);
-            }
+            }            
 
             public bool Trigger(DateTime now, out TimeSpan maxDelay)
             {
-                (bool active, TimeSpan delay) = triggerAction(now);
-                if (!active) using (keepAliveLock.Lock()) keepAliveSet.Remove(this);
-                maxDelay = delay;
-                return active;
+                if (weakOwner.TryGetTarget(out T owner))
+                {
+                    (bool active, TimeSpan delay) = triggerAction(owner, now);
+                    if (!active) using (keepAliveLock.Lock()) keepAliveSet.Remove(this);
+                    maxDelay = delay;
+                    return active;
+                }
+                else
+                {
+                    maxDelay = default;
+                    return false;
+                }
             }
         }
     }
