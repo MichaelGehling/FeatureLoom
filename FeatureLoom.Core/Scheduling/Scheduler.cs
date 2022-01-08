@@ -6,6 +6,7 @@ using FeatureLoom.Time;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace FeatureLoom.Scheduling
@@ -13,16 +14,17 @@ namespace FeatureLoom.Scheduling
     public static class Scheduler
     {        
         private static MicroLock myLock = new MicroLock();
-        private static List<WeakReference<ISchedule>> newSchedules = new List<WeakReference<ISchedule>>();
+        private static List<ISchedule> newSchedules = new List<ISchedule>();
+        private static bool newScheduleAvailable = false;
         private static List<WeakReference<ISchedule>> activeSchedules = new List<WeakReference<ISchedule>>();
         private static List<WeakReference<ISchedule>> handledSchedules = new List<WeakReference<ISchedule>>();
 
         private static Thread schedulerThread = null;
         private static ManualResetEventSlim mre = new ManualResetEventSlim(true);
         private static CancellationTokenSource cts = new CancellationTokenSource();
-        private static bool stop = false;
+        private static bool stop = false;        
 
-        private static TimeSpan minimumDelay = 0.01.Milliseconds();
+        private static TimeSpan minimumDelay = 0.01.Milliseconds();        
 
         public static void AddSchedule(ISchedule schedule)
         {
@@ -31,7 +33,8 @@ namespace FeatureLoom.Scheduling
                 stop = false;
                 if (schedulerThread == null)
                 {
-                    newSchedules.Add(new WeakReference<ISchedule>(schedule));
+                    newScheduleAvailable = true;
+                    newSchedules.Add(schedule);
                     mre.Set();
                     schedulerThread = new Thread(StartScheduling);
                     schedulerThread.IsBackground = true;
@@ -39,32 +42,43 @@ namespace FeatureLoom.Scheduling
                 }
                 else
                 {
-                    newSchedules.Add(new WeakReference<ISchedule>(schedule));
+                    newScheduleAvailable = true;
+                    newSchedules.Add(schedule);
                     cts.Cancel();
                     mre.Set();
                 }
             }
         }
 
-        public static void ScheduleAction(Action<DateTime> scheduleAction, Func<TimeSpan> getDelay = null, Func<bool> checkValidity = null)
+        public static ISchedule ScheduleAction(Func<DateTime, (bool, TimeSpan)> triggerAction)
         {
-            AddSchedule(new ActionSchedule(scheduleAction, getDelay, checkValidity));
+            var schedule = new ActionSchedule(triggerAction);
+            AddSchedule(schedule);
+            return schedule;
         }
 
         private static void StartScheduling()
-        {
-            int stopCounter = 0;            
+        {       
             while (true)
-            {                
-                if (!CheckForPause(ref stopCounter) || stop) break;
-
+            {
                 TimeKeeper executionTimer = AppTime.TimeKeeper;
-                CheckForNewSchedules(ref stopCounter);
-                HandleActiveSchedules();
-                if (cts.IsCancellationRequested) cts = new CancellationTokenSource();
+
+                CheckForNewSchedules();
+                TimeSpan delay = HandleActiveSchedules();                
                 SwapHandledToActive();
-                TimeSpan delay = GetDelay(executionTimer.Elapsed);
-                AppTime.Wait(minimumDelay, delay, cts.Token);                
+
+                if (cts.IsCancellationRequested && !newScheduleAvailable) cts = new CancellationTokenSource();
+                if (activeSchedules.Count > 0)
+                {
+                    delay = delay - executionTimer.Elapsed;
+                    delay = delay.Clamp(minimumDelay, int.MaxValue.Milliseconds());
+                    AppTime.Wait(minimumDelay, delay, cts.Token);
+                }
+                else
+                {
+                    WaitForSchedulesOrStop();
+                    if (stop) break;
+                }
             }
         }
 
@@ -81,43 +95,42 @@ namespace FeatureLoom.Scheduling
             return schedulerThread?.Join(timeout) ?? true;
         }
 
-        private static TimeSpan GetDelay(TimeSpan executionTime)
+
+        private static TimeSpan HandleActiveSchedules()
         {
-            TimeSpan minDelay = TimeSpan.MaxValue;
-            foreach (var schedule in activeSchedules)
-            {
-                if (schedule.TryGetTarget(out var sv))
-                {
-                    var delay = sv.MaxDelay - executionTime;
-                    if (delay < minDelay) minDelay = delay;
-                }
-
-            }
-            return minDelay.Clamp(minimumDelay, int.MaxValue.Milliseconds());
-        }
-
-        private static void HandleActiveSchedules()
-        {            
+            TimeSpan delay = TimeSpan.MaxValue;
             DateTime now = AppTime.Now;
             foreach (var schedule in activeSchedules)
             {
                 if (schedule.TryGetTarget(out var sv))
                 {
-                    sv.Handle(now);
-                    if (sv.IsActive) handledSchedules.Add(schedule);
+                    bool stillActive = sv.Trigger(now, out TimeSpan maxDelay);
+                    if (stillActive)
+                    {
+                        handledSchedules.Add(schedule);
+                        if (maxDelay < delay) delay = maxDelay;
+                    }
                 }
-            }            
+            }
+
+            return delay;
         }
 
-        private static void CheckForNewSchedules(ref int stopCounter)
+        private static void CheckForNewSchedules()
         {
-            if (newSchedules.Count > 0)
+            if (newScheduleAvailable)
             {
                 using (myLock.Lock())
                 {
-                    stopCounter = 0;
-                    activeSchedules.AddRange(newSchedules);
-                    newSchedules.Clear();                    
+                    foreach (var newSchedule in newSchedules)
+                    {
+                        if (!activeSchedules.Any(weak => weak.TryGetTarget(out var schedule) && schedule == newSchedule))
+                        {
+                            activeSchedules.Add(new WeakReference<ISchedule>(newSchedule));
+                        }
+                    }
+                    newSchedules.Clear();
+                    newScheduleAvailable = false;
                 }
             }
         }
@@ -128,79 +141,55 @@ namespace FeatureLoom.Scheduling
             handledSchedules.Clear();
         }
 
-        private static bool CheckForPause(ref int stopCounter)
+        private static void WaitForSchedulesOrStop()
         {
             if (activeSchedules.Count == 0 && newSchedules.Count == 0)
             {
-                if (++stopCounter > 100)
+                var lockHandle = myLock.Lock();
+                if (activeSchedules.Count == 0 && newSchedules.Count == 0)
                 {
-                    stopCounter = 0;
-                    var lockHandle = myLock.Lock();
-                    if (activeSchedules.Count == 0 && newSchedules.Count == 0)
+                    mre.Reset();
+                    lockHandle.Exit();
+                    bool wokeUp = mre.Wait(10.Seconds());
+                    if (!wokeUp)
                     {
-                        mre.Reset();
-                        lockHandle.Exit();
-                        bool wokeUp = mre.Wait(10.Seconds());
-                        if (!wokeUp)
+                        using (myLock.Lock())
                         {
-                            using (myLock.Lock())
+                            if (activeSchedules.Count == 0 && newSchedules.Count == 0)
                             {
-                                if (activeSchedules.Count == 0 && newSchedules.Count == 0)
-                                {
-                                    schedulerThread = null;
-                                    return false;
-                                }
+                                schedulerThread = null;
+                                stop = true;
                             }
                         }
                     }
-                    else lockHandle.Exit();
                 }
+                else lockHandle.Exit();
             }
-
-            return true;
         }
 
         private class ActionSchedule : ISchedule
         {
-            private Action<DateTime> handleAction;
-            private Func<bool> validityCheck;
-            private Func<TimeSpan> getDelay = () => TimeSpan.Zero;
+            private Func<DateTime, (bool, TimeSpan)> triggerAction;
             private static HashSet<ActionSchedule> keepAliveSet = new HashSet<ActionSchedule>();
             private static FeatureLock keepAliveLock = new FeatureLock();
 
-            public ActionSchedule(Action<DateTime> handleAction, Func<TimeSpan> getDelay = null, Func<bool> validityCheck = null)
+            public ActionSchedule(Func<DateTime, (bool, TimeSpan)> handleAction)
             {
-                this.handleAction = handleAction;
-                this.validityCheck = validityCheck;
-                this.getDelay = getDelay;
-                if (validityCheck == null || validityCheck())
-                {
-                    using (keepAliveLock.Lock()) keepAliveSet.Add(this);
-                }
-            }
-
-            public TimeSpan MaxDelay => getDelay != null ? getDelay() : TimeSpan.Zero;
-
-            public bool IsActive 
-            {
-                get
-                {
-                    if (validityCheck != null)
-                    {
-                        if (validityCheck()) return true;
-                        else
-                        {
-                            using (keepAliveLock.Lock()) keepAliveSet.Remove(this);
-                            return false;
-                        }
-                    }
-                    else return true;
-                }
+                this.triggerAction = handleAction;
+                using (keepAliveLock.Lock()) keepAliveSet.Add(this);
             }
 
             public void Handle(DateTime now)
             {
-                handleAction(now);
+                triggerAction(now);
+            }
+
+            public bool Trigger(DateTime now, out TimeSpan maxDelay)
+            {
+                (bool active, TimeSpan delay) = triggerAction(now);
+                if (!active) using (keepAliveLock.Lock()) keepAliveSet.Remove(this);
+                maxDelay = delay;
+                return active;
             }
         }
     }

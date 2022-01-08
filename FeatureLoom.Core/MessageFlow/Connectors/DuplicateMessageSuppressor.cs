@@ -32,22 +32,26 @@ namespace FeatureLoom.MessageFlow
             this.cleanUpDelay = this.cleanupPeriode;
             if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
-            Scheduler.ScheduleAction((now) => 
+            WeakReference<DuplicateMessageSuppressor> weakRef = new WeakReference<DuplicateMessageSuppressor>(this);
+            Scheduler.ScheduleAction(now => 
             {
-                if (now > this.nextCleanUp - this.cleanupTolerance)
+                if (!weakRef.TryGetTarget(out var me)) return (false, default);
+
+                if (now > me.nextCleanUp - me.cleanupTolerance)
                 {
-                    using (suppressorsLock.Lock())
+                    using (me.suppressorsLock.Lock())
                     {
-                        CleanUpSuppressors(AppTime.Now);
+                        me.CleanUpSuppressors(now);
                     }
-                    cleanUpDelay = this.cleanupPeriode;
+                    me.cleanUpDelay = me.cleanupPeriode;
                 }
                 else
                 {
-                    cleanUpDelay = this.nextCleanUp - now;
+                    me.cleanUpDelay = me.nextCleanUp - now;
                 }
-            }, 
-            () => cleanUpDelay);
+
+                return (true, me.cleanUpDelay);
+            });
         }
 
         public void AddSuppressor<M>(M suppressorMessage)

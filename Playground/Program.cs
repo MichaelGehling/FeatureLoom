@@ -45,7 +45,7 @@ namespace Playground
         {
 
             SharedData<string> shared = new SharedData<string>("KAck");
-            shared.UpdateNotifications.ConnectTo(new ProcessingEndpoint<SharedDataUpdateNotification>(msg => msg.sharedData));
+            //shared.UpdateNotifications.ConnectTo(new ProcessingEndpoint<SharedDataUpdateNotification>(msg => msg.sharedData));
 
 
            //Console.ReadLine();

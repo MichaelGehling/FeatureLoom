@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>8.0</LangVersion>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
     <Version>0.1.14-alpha</Version>
     <Description>FeatureLoom is a C# development framework that focuses on a lean development and efficient code, speeds-up development by simplification while offering opt-in for a high level of control, promotes modular and extensible code by introducing means to easily decouple components with asynchronous communication, strives for high performance and a small memory footprint, equally supports synchronous and asynchronous programming to allow the right approach at the right time.</Description>

@@ -169,7 +169,7 @@ namespace FeatureLoom.Synchronization
         private bool prioritizedWaiting = false;
 
         // Indicates if scheduler is currently observing SleepHandles to wake up the candidates on time
-        private bool isScheduleActive = false;
+        private bool IsScheduleActive => queueHead != null;
 
         #endregion Variables
 
@@ -369,7 +369,7 @@ namespace FeatureLoom.Synchronization
         /// <summary>
         /// True if anyone is waiting to acquire the already acquired lock (Is not guaranteed to be accurate in every case)
         /// </summary>
-        public bool IsAnyWaiting => firstRankTicket != 0 || isScheduleActive;
+        public bool IsAnyWaiting => firstRankTicket != 0 || IsScheduleActive;
 
         #endregion PublicProperties
 
@@ -455,7 +455,7 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
-            return !prioritized && (prioritizedWaiting || isScheduleActive || (Settings.restrictQueueJumping && firstRankTicket != 0));
+            return !prioritized && (prioritizedWaiting || IsScheduleActive || (Settings.restrictQueueJumping && firstRankTicket != 0));
         }
 
         // Invalidates the current reentrancyIndicator by changing the reentrancy ID.
@@ -614,7 +614,8 @@ namespace FeatureLoom.Synchronization
         private bool MustWaitPassive(bool prioritized, int rank, bool readOnly)
         {
             if (prioritized) return false;
-            if (readOnly && IsReadOnlyLocked) return false;            
+            if (readOnly && IsReadOnlyLocked) return false;
+            //if (IsLocked) rank++;
             if (rank * averageWaitCount <= Settings.passiveWaitThreshold) return false;
             return true;
         }
@@ -624,7 +625,7 @@ namespace FeatureLoom.Synchronization
         {            
             if (readOnly && IsReadOnlyLocked) return false;            
             if (sleepLock.IsLocked) return false;
-
+            //if (IsLocked) rank++;
             return rank * averageWaitCount > Settings.sleepWaitThreshold;
         }
 
@@ -632,7 +633,7 @@ namespace FeatureLoom.Synchronization
         private bool MustAwake(int rank, bool readOnly)
         {
             if (readOnly && IsReadOnlyLocked) return true;
-
+            //if (IsLocked) rank++;
             uint waitFactor = Math.Max(averageWaitCount, waitCounter);
             return rank * waitFactor <= Settings.awakeThreshold;
         }
@@ -1478,14 +1479,14 @@ namespace FeatureLoom.Synchronization
         private void ExitReadLock()
         {
             int newLockIndicator = Interlocked.Decrement(ref lockIndicator);
-            if (isScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
             lockIndicator = NO_LOCK;
-            if (isScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1494,7 +1495,7 @@ namespace FeatureLoom.Synchronization
             // We simply change the reentrancyId and keep the ReentrancyContext as it is which also invalidates it. That is a lot cheaper.
             RenewReentrancyId();
             lockIndicator = NO_LOCK;
-            if (isScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1503,21 +1504,21 @@ namespace FeatureLoom.Synchronization
             // We must clear the ReentrancyContext, because the lock might be used by multiple reader, so we can't change the current reentrancyId, though it would be cheaper.
             RemoveReentrancyContext();
             Interlocked.Decrement(ref lockIndicator);
-            if (isScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReenteredLock()
         {
             // Nothing to do!
-            if (isScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DowngradeReentering()
         {
             lockIndicator = FIRST_READ_LOCK;
-            if (isScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1658,23 +1659,14 @@ namespace FeatureLoom.Synchronization
 
         #region Scheduling        
 
-        bool ISchedule.IsActive => isScheduleActive;
-
-        TimeSpan ISchedule.MaxDelay => (0.01 * Settings.schedulerDelayFactor).Milliseconds();
-
-        void ISchedule.Handle(DateTime now)
+        bool ISchedule.Trigger(DateTime now, out TimeSpan maxDelay)
         {
-            if (queueHead == null)
-            {
-                sleepLock.Enter();
-                isScheduleActive = queueHead != null;
-                sleepLock.Exit();
-            }
+            maxDelay = (0.01 * Settings.schedulerDelayFactor).Milliseconds();
 
             SleepHandle firstAwaking = null;
             SleepHandle lastAwaking = null;
             var candidate = queueHead;
-            if (candidate == null || (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly))) return;
+            if (candidate == null || (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly))) return IsScheduleActive;
 
             sleepLock.Enter(true);
             try
@@ -1713,6 +1705,8 @@ namespace FeatureLoom.Synchronization
                 candidate.WakeUp();
                 candidate = candidate.Next;
             }
+
+            return IsScheduleActive;
         }
 
         void Sleep(ushort ticket, bool readOnly)
@@ -1798,6 +1792,7 @@ namespace FeatureLoom.Synchronization
                 {
                     queueHead = sleepHandle;
                     sleepHandle.Next = null;
+                    activateSchedule = true;
                 }
                 else
                 {
@@ -1814,9 +1809,6 @@ namespace FeatureLoom.Synchronization
                         node.Next = sleepHandle;
                     }
                 }
-
-                activateSchedule = !isScheduleActive;
-                isScheduleActive = true;
             }
             finally
             {

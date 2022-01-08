@@ -41,25 +41,24 @@ namespace FeatureLoom.MessageFlow
             WeakReference<Aggregator<I, O>> weakRef = new WeakReference<Aggregator<I, O>>(this);
             Scheduler.ScheduleAction(now =>
             {
-                if (!weakRef.TryGetTarget(out var me)) return;
-                if (!me.waitingForTimeout) return;
-                if (!me.nextTimeoutCheck.Elapsed(now)) return;
+                if (!weakRef.TryGetTarget(out var me)) return (false, default);
+                if (!me.waitingForTimeout) return (true, me.maxSupervisionTimeout);
+                if (!me.nextTimeoutCheck.Elapsed(now)) return (true, me.maxSupervisionTimeout);
 
                 if (me.dataLock.TryLock(out var lockHandle))
+                {
                     using (lockHandle)
                     {
-                        while (aggregationData.TryGetAggregatedMessage(true, out O aggregatedMessage))
+                        while (me.aggregationData.TryGetAggregatedMessage(true, out O aggregatedMessage))
                         {
                             me.sourceHelper.Forward(aggregatedMessage);
                         }
-                        me.waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
+                        me.waitingForTimeout = me.aggregationData.TryGetTimeout(out var timeout);
                         if (me.waitingForTimeout) me.nextTimeoutCheck = new TimeFrame(timeout);
                     }
-            }, () =>
-            {
-                if (weakRef.TryGetTarget(out var me)) return me.maxSupervisionTimeout;
-                else return default;
-            }, () => weakRef.TryGetTarget(out _));
+                }
+                return (true, me.maxSupervisionTimeout);
+            });
         }
 
         public Type ConsumedMessageType => typeof(I);
