@@ -24,6 +24,7 @@ namespace FeatureLoom.MessageFlow
         private TimeSpan maxSupervisionTimeout = TimeSpan.MaxValue;
         private IAggregationData aggregationData;
         private FeatureLock dataLock = new FeatureLock();
+        private ISchedule scheduledAction;
 
         public Aggregator(IAggregationData aggregationData, TimeSpan supervisionCycleTime = default)
         {
@@ -31,31 +32,31 @@ namespace FeatureLoom.MessageFlow
 
             if (supervisionCycleTime != default && supervisionCycleTime != TimeSpan.MaxValue)
             {
-                PrepareSupervision(aggregationData, supervisionCycleTime);
+                PrepareSchedule(aggregationData, supervisionCycleTime);
             }
         }
 
-        private void PrepareSupervision(IAggregationData aggregationData, TimeSpan supervisionCycleTime)
+        private void PrepareSchedule(IAggregationData aggregationData, TimeSpan supervisionCycleTime)
         {
-            this.maxSupervisionTimeout = supervisionCycleTime;            
-            Scheduler.ScheduleAction(this, (me, now) =>
+            this.maxSupervisionTimeout = supervisionCycleTime;
+            this.scheduledAction = Scheduler.ScheduleAction((now) =>
             {                
-                if (!me.waitingForTimeout) return (true, me.maxSupervisionTimeout);
-                if (!me.nextTimeoutCheck.Elapsed(now)) return (true, me.maxSupervisionTimeout);
+                if (!waitingForTimeout) return (true, maxSupervisionTimeout);
+                if (!nextTimeoutCheck.Elapsed(now)) return (true, maxSupervisionTimeout);
 
-                if (me.dataLock.TryLock(out var lockHandle))
+                if (dataLock.TryLock(out var lockHandle))
                 {
                     using (lockHandle)
                     {
-                        while (me.aggregationData.TryGetAggregatedMessage(true, out O aggregatedMessage))
+                        while (aggregationData.TryGetAggregatedMessage(true, out O aggregatedMessage))
                         {
-                            me.sourceHelper.Forward(aggregatedMessage);
+                            sourceHelper.Forward(aggregatedMessage);
                         }
-                        me.waitingForTimeout = me.aggregationData.TryGetTimeout(out var timeout);
-                        if (me.waitingForTimeout) me.nextTimeoutCheck = new TimeFrame(timeout);
+                        waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
+                        if (waitingForTimeout) nextTimeoutCheck = new TimeFrame(timeout);
                     }
                 }
-                return (true, me.maxSupervisionTimeout);
+                return (true, maxSupervisionTimeout);
             });
         }
 

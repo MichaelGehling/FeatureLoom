@@ -110,7 +110,7 @@ namespace FeatureLoom.Time
             else
             {
                 var timer = AppTime.TimeKeeper;
-                if (maxTimeout > 18.Milliseconds())
+                if (maxTimeout > lowerSleepLimit)
                 {
                     await Task.Delay(minTimeout, cancellationToken);
                     _ = timer.Elapsed;

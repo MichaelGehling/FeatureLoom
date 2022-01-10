@@ -1,23 +1,25 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
-using FeatureLoom.Logging;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Scheduling
 {
-    public static class Scheduler
+    /// <summary>
+    /// 
+    /// </summary>
+    public static partial class Scheduler
     {        
         private static MicroLock myLock = new MicroLock();
         private static List<ISchedule> newSchedules = new List<ISchedule>();
         private static bool newScheduleAvailable = false;
         private static List<WeakReference<ISchedule>> activeSchedules = new List<WeakReference<ISchedule>>();
-        private static List<WeakReference<ISchedule>> handledSchedules = new List<WeakReference<ISchedule>>();
+        private static List<WeakReference<ISchedule>> triggeredSchedules = new List<WeakReference<ISchedule>>();
 
         private static Thread schedulerThread = null;
         private static ManualResetEventSlim mre = new ManualResetEventSlim(true);
@@ -27,7 +29,7 @@ namespace FeatureLoom.Scheduling
         private static TimeSpan minimumDelay = 0.01.Milliseconds();        
 
         public static void AddSchedule(ISchedule schedule)
-        {
+        {            
             using (myLock.Lock())
             {
                 stop = false;
@@ -36,7 +38,7 @@ namespace FeatureLoom.Scheduling
                     newScheduleAvailable = true;
                     newSchedules.Add(schedule);
                     mre.Set();
-                    schedulerThread = new Thread(StartScheduling);
+                    schedulerThread = new Thread(RunScheduling);
                     schedulerThread.IsBackground = true;
                     schedulerThread.Start();
                 }
@@ -50,23 +52,23 @@ namespace FeatureLoom.Scheduling
             }
         }
 
-        public static ISchedule ScheduleAction<T>(T owner, Func<T, DateTime, (bool, TimeSpan)> triggerAction) where T : class
+        public static ActionSchedule ScheduleAction(Func<DateTime, (bool, TimeSpan)> triggerAction)
         {
-            var schedule = new ActionSchedule<T>(owner, triggerAction);
+            var schedule = new ActionSchedule(triggerAction);
             AddSchedule(schedule);
             return schedule;
-        }
+        }        
 
-        private static void StartScheduling()
+        private static void RunScheduling()
         {       
-            while (true)
+            while (!stop)
             {
                 TimeKeeper executionTimer = AppTime.TimeKeeper;
 
                 CheckForNewSchedules();
-                TimeSpan delay = HandleActiveSchedules();                
-                SwapHandledToActive();
-
+                TimeSpan delay = TriggerActiveSchedules();                
+                SwapTriggeredToActive();
+                
                 if (cts.IsCancellationRequested && !newScheduleAvailable) cts = new CancellationTokenSource();
                 if (activeSchedules.Count > 0)
                 {
@@ -77,9 +79,9 @@ namespace FeatureLoom.Scheduling
                 else
                 {
                     WaitForSchedulesOrStop();
-                    if (stop) break;
                 }
             }
+            activeSchedules.Clear();
         }
 
         public static void InterruptWaiting()
@@ -87,7 +89,7 @@ namespace FeatureLoom.Scheduling
             cts.Cancel();
         }
 
-        public static bool StopScheduling(TimeSpan timeout)
+        public static bool ClearAllSchedulesAndStop(TimeSpan timeout)
         {
             stop = true;
             cts.Cancel();
@@ -96,7 +98,7 @@ namespace FeatureLoom.Scheduling
         }
 
 
-        private static TimeSpan HandleActiveSchedules()
+        private static TimeSpan TriggerActiveSchedules()
         {
             TimeSpan delay = TimeSpan.MaxValue;
             DateTime now = AppTime.Now;
@@ -107,7 +109,7 @@ namespace FeatureLoom.Scheduling
                     bool stillActive = sv.Trigger(now, out TimeSpan maxDelay);
                     if (stillActive)
                     {
-                        handledSchedules.Add(schedule);
+                        triggeredSchedules.Add(schedule);
                         if (maxDelay < delay) delay = maxDelay;
                     }
                 }
@@ -135,10 +137,10 @@ namespace FeatureLoom.Scheduling
             }
         }
 
-        private static void SwapHandledToActive()
+        private static void SwapTriggeredToActive()
         {
-            SwapHelper.Swap(ref activeSchedules, ref handledSchedules);            
-            handledSchedules.Clear();
+            SwapHelper.Swap(ref activeSchedules, ref triggeredSchedules);            
+            triggeredSchedules.Clear();
         }
 
         private static void WaitForSchedulesOrStop()
@@ -167,35 +169,6 @@ namespace FeatureLoom.Scheduling
             }
         }
 
-        private class ActionSchedule<T> : ISchedule where T: class
-        {
-            private Func<T, DateTime, (bool, TimeSpan)> triggerAction;
-            private WeakReference<T> weakOwner;
-            private static HashSet<ActionSchedule<T>> keepAliveSet = new HashSet<ActionSchedule<T>>();
-            private static FeatureLock keepAliveLock = new FeatureLock();            
-
-            public ActionSchedule(T owner, Func<T, DateTime, (bool, TimeSpan)> triggerAction)
-            {
-                this.triggerAction = triggerAction;
-                this.weakOwner = new WeakReference<T>(owner);
-                using (keepAliveLock.Lock()) keepAliveSet.Add(this);
-            }            
-
-            public bool Trigger(DateTime now, out TimeSpan maxDelay)
-            {
-                if (weakOwner.TryGetTarget(out T owner))
-                {
-                    (bool active, TimeSpan delay) = triggerAction(owner, now);
-                    if (!active) using (keepAliveLock.Lock()) keepAliveSet.Remove(this);
-                    maxDelay = delay;
-                    return active;
-                }
-                else
-                {
-                    maxDelay = default;
-                    return false;
-                }
-            }
-        }
+        
     }
 }

@@ -20,6 +20,7 @@ namespace FeatureLoom.MessageFlow
         private DateTime nextCleanUp;
         private TimeSpan cleanUpDelay;
         private TimeSpan cleanupTolerance = 1.Seconds();
+        private ISchedule scheduledAction;
 
         public DuplicateMessageSuppressor(TimeSpan suppressionTime, Func<object, object, bool> isDuplicate = null, TimeSpan cleanupPeriode = default, TimeSpan cleanupTolerance = default)
         {
@@ -32,22 +33,22 @@ namespace FeatureLoom.MessageFlow
             this.cleanUpDelay = this.cleanupPeriode;
             if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
-            Scheduler.ScheduleAction(this, (me, now) => 
+            this.scheduledAction = Scheduler.ScheduleAction(now => 
             {
-                if (now > me.nextCleanUp - me.cleanupTolerance)
+                if (now > nextCleanUp - cleanupTolerance)
                 {
-                    using (me.suppressorsLock.Lock())
+                    using (suppressorsLock.Lock())
                     {
-                        me.CleanUpSuppressors(now);
+                        CleanUpSuppressors(now);
                     }
-                    me.cleanUpDelay = me.cleanupPeriode;
+                    cleanUpDelay = cleanupPeriode;
                 }
                 else
                 {
-                    me.cleanUpDelay = me.nextCleanUp - now;
+                    cleanUpDelay = nextCleanUp - now;
                 }
 
-                return (true, me.cleanUpDelay);
+                return (true, cleanUpDelay);
             });
         }
 
