@@ -398,11 +398,16 @@ namespace FeatureLoom.Forms
 
                 UpdateTabIndex(fieldIndex);
 
-                control.TextChanged += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.ValueChanged, fieldIndex, control.Text));
-                control.GotFocus += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.GotFocus, fieldIndex, control.Text));
+                control.TextChanged += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.ValueChanged, fieldIndex, control.Text));                
                 control.LostFocus += (o, e) => sender.Send(new PropertyEventNotification(this.name, control.Text == onFocusText ? PropertyEvent.LostFocus : PropertyEvent.LostFocusWithChange, fieldIndex, control.Text));
                 control.Click += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.Clicked, fieldIndex));
                 control.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.ReadOnlyChanged, fieldIndex, !control.Enabled));
+
+                control.GotFocus += (o, e) =>
+                {
+                    onFocusText = control.Text;
+                    sender.Send(new PropertyEventNotification(this.name, PropertyEvent.GotFocus, fieldIndex, control.Text));
+                };
 
                 control.KeyDown += (o, e) =>
                 {

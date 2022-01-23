@@ -7,6 +7,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using FeatureLoom.Forms;
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Time;
 
 namespace FormsPlayground
@@ -17,6 +19,8 @@ namespace FormsPlayground
         {
             InitializeComponent();
 
+            
+
             var strings = new String[] { "Aaaaa", "B", "Cccc" };
             this.multiPropertyControl1.GetProperty("Hello1").SetValue("B").SetValueRestrictions(strings).SetCustomFieldControl(button1, 1);
             this.multiPropertyControl1.GetProperty("Hello2").SetValueRestrictions(strings).SetValue("D").SetLabel("Hello2a").Rename("Hello2a");
@@ -26,12 +30,16 @@ namespace FormsPlayground
             this.multiPropertyControl1.SetFieldColumnStyle(1, new ColumnStyle());
             this.multiPropertyControl1.GetProperty("Hello2a").SetVerifier(text => text == "D" || text == "B" );
 
+            this.multiPropertyControl1.PropertyEventNotifier.ConnectTo(new ProcessingEndpoint<MultiPropertyControl.PropertyEvent>(msg =>
+            {
+                var xaaa = msg;
+            }));
 
 
-            var x = this.multiPropertyControl1.GetProperties();
-            int y = 0;
+            //var x = this.multiPropertyControl1.GetProperties();
+            //int y = 0;
 
-            _ = DelayedAction();
+            //_ = DelayedAction();
         }
 
         public async Task DelayedAction()

@@ -213,13 +213,13 @@ namespace FeatureLoom.Workflows
             var step = this.states.ItemOrNull(context.CurrentExecutionState.stateIndex)?.steps.ItemOrNull(context.CurrentExecutionState.stepIndex);
             if (this.robustExecutionActive)
             {
-                Log.ERROR(context.GetHandle(), $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
+                Log.ERROR(context.GetHandle(), $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.InnerOrSelf().ToString());
                 return nextExecutionState;
             }
             else
             {
-                Log.ERROR(context.GetHandle(), $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.ToString());
-                throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e);
+                Log.ERROR(context.GetHandle(), $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.InnerOrSelf().ToString());
+                throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.InnerOrSelf());
             }
         }
 

@@ -13,6 +13,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using FeatureLoom.MessageFlow;
+using System.Text;
 
 namespace Playground
 {
@@ -40,15 +41,41 @@ namespace Playground
             }
             Console.WriteLine(tk.Elapsed.Ticks * 100 / 1_000_000);
         }
-
+        
         private static void Main()
         {
+            Pool<List<string>>.Borrow( () => new List<string>(), null, l => l.Clear()).Dispose();
+            Pool<List<string>>.Borrow( () => new List<string>(), null, l => l.Clear()).RetainItem();
 
-            SharedData<string> shared = new SharedData<string>("KAck");
-            //shared.UpdateNotifications.ConnectTo(new ProcessingEndpoint<SharedDataUpdateNotification>(msg => msg.sharedData));
+            var timer = AppTime.TimeKeeper;
+            int ii;
+            int iterations = 100;
 
+            while (true)
+            {
+                                
+                timer.Restart();
+                for (ii = 0; ii < iterations; ii++)
+                {
+                    var sb = new List<string>();
+                    for(int jj = 0; jj < 1; jj++) sb.Add(ii.ToString());                  
 
-           //Console.ReadLine();
+                }
+                var newTime = timer.Elapsed;
+
+                timer.Restart();
+                for (ii = 0; ii < iterations; ii++)
+                {
+                    using (Pool<List<string>>.Borrow(out var sb, () => new List<string>(), null, l => l.Clear()))
+                    {
+                        for (int jj = 0; jj < 1; jj++) sb.Add(ii.ToString());
+                    }
+                }
+                var poolTime = timer.Elapsed;
+                Console.WriteLine($"Pool {(poolTime.TotalMilliseconds / newTime.TotalMilliseconds * 100).ToString("0.00") }% of new");
+            }
+
+            Console.ReadLine();
 
             while (true)
             {
