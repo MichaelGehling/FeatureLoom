@@ -19,13 +19,13 @@ namespace FeatureLoom.Storages
             }
         }
 
-        public void Add(string uriPattern, IMessageSink notificationSink)
+        public void Add(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
         {
             using (subscriptionsLock.Lock())
             {
                 if (!subscriptions.TryGetValue(uriPattern, out Subscription subscription))
                 {
-                    subscription = new Subscription(uriPattern, new Sender());
+                    subscription = new Subscription(uriPattern, new Sender<ChangeNotification>());
                     subscriptions.Add(uriPattern, subscription);
                 }
                 subscription.sender.ConnectTo(notificationSink);
@@ -71,7 +71,7 @@ namespace FeatureLoom.Storages
             return notified;
         }
 
-        public void Remove(string uriPattern, IMessageSink notificationSink)
+        public void Remove(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
         {
             using (subscriptionsLock.Lock())
             {
@@ -86,9 +86,9 @@ namespace FeatureLoom.Storages
         private readonly struct Subscription
         {
             public readonly string uriPattern;
-            public readonly Sender sender;
+            public readonly Sender<ChangeNotification> sender;
 
-            public Subscription(string uriPattern, Sender sender)
+            public Subscription(string uriPattern, Sender<ChangeNotification> sender)
             {
                 this.uriPattern = uriPattern;
                 this.sender = sender;

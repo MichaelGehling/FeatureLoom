@@ -156,7 +156,7 @@ namespace FeatureLoom.Storages
             }
         }
 
-        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink notificationSink)
+        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
         {
             subscriptions.Add(uriPattern, notificationSink);
             return true;

@@ -7,7 +7,7 @@ using System.IO;
 
 namespace FeatureLoom.Storages
 {
-    public class FileSystemObserver : IMessageSource, IDisposable
+    public class FileSystemObserver : IMessageSource<FileSystemObserver.ChangeNotification>, IDisposable
     {
         private SourceValueHelper sourceHelper;
         private FileSystemWatcher fileWatcher;
@@ -75,16 +75,18 @@ namespace FeatureLoom.Storages
         private void OnRenamedFile(object sender, RenamedEventArgs e)
         {
             var message = new ChangeNotification(e.ChangeType, e.FullPath, e.OldFullPath);
-            sourceHelper.Forward(message);
+            sourceHelper.ForwardAsync(message);
         }
 
         private void OnChangedFile(object sender, FileSystemEventArgs e)
         {
             var message = new ChangeNotification(e.ChangeType, e.FullPath);
-            sourceHelper.Forward(message);
+            sourceHelper.ForwardAsync(message);
         }
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        public Type SentMessageType => typeof(ChangeNotification);
 
         public void DisconnectAll()
         {

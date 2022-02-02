@@ -30,6 +30,7 @@ namespace FeatureLoom.Storages
             public bool updateCacheOnRead = true;
             public bool updateCacheOnWrite = true;
             public bool logFailedDeserialization = true;
+            public TimeSpan fileChangeNotificationDelay = 0.3.Seconds();
             public InMemoryCache<string, string>.CacheSettings cacheSettings = new InMemoryCache<string, string>.CacheSettings();
         }
 
@@ -87,7 +88,7 @@ namespace FeatureLoom.Storages
                     }
                     else return m1.Equals(m2);
                 });
-                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(ProcessChangeNotification);
+                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(async msg => await ProcessChangeNotification(msg));
                 fileObserver.ConnectTo(duplicateMessageSuppressor).ConnectTo(fileChangeProcessor);
                 fileSystemObservationActive = true;
             }
@@ -101,12 +102,14 @@ namespace FeatureLoom.Storages
             }
         }
 
-        private void ProcessChangeNotification(FileSystemObserver.ChangeNotification notification)
+        private async Task ProcessChangeNotification(FileSystemObserver.ChangeNotification notification)
         {
             if (subscriptions.Count == 0)
             {
                 ActivateFileSystemObservation(false);
             }
+
+            await Task.Delay(config.fileChangeNotificationDelay);
 
             if (notification.changeType.HasFlag(WatcherChangeTypes.Deleted))
             {
@@ -297,7 +300,7 @@ namespace FeatureLoom.Storages
             }
         }
 
-        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink notificationSink)
+        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
         {
             ActivateFileSystemObservation(true);
             subscriptions.Add(uriPattern, notificationSink);

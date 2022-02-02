@@ -82,9 +82,9 @@ namespace FeatureLoom.Storages
         [JsonIgnore]
         public bool HasSubscriptionUpdate => (!subscriptionReceiver.ObjIfExists?.IsEmpty) ?? false;
 
-        public async Task<bool> TryWriteToStorageAsync()
+        public Task<bool> TryWriteToStorageAsync()
         {
-            return await Writer.TryWriteAsync(Uri, this);
+            return Writer.TryWriteAsync(Uri, this);
         }
 
         public bool TryWriteToStorage()

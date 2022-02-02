@@ -20,7 +20,7 @@ namespace FeatureLoom.Forms
             }
 
             private static uint nameCount = 0;
-            private static string onFocusText = "";            
+            private static string onFocusText = "";
 
             private string name;
             private MultiPropertyControl parentControl;
