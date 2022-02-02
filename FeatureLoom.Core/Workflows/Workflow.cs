@@ -97,10 +97,16 @@ namespace FeatureLoom.Workflows
             return WorkflowStateMachine.ExecuteNextStep(this, controller);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsNextStepAsync()
+        {            
+            return WorkflowStateMachine.IsStepAsync(CurrentExecutionState);
+        }
+
         public void Run(IWorkflowRunner runner = null)
         {
             runner = runner ?? this.currentRunner ?? DefaultRunner;
-            runner.Run(this);
+            _ = runner.RunAsync(this);
         }
 
         public void RequestPause(bool tryCancelWaitingStep)

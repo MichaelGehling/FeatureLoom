@@ -35,7 +35,7 @@ namespace FeatureLoom.Forms
 
             this.richTextBox1.DoubleClick += (a, b) => keepReading = !keepReading;
             this.workflow = new WritingLogWorkflow(this, logMessageSource ?? Log.SyncLogSource);
-            Log.logRunner.Run(workflow);
+            _ = Log.logRunner.RunAsync(workflow);
         }
 
         public class WritingLogWorkflow : Workflow<WritingLogWorkflow.SM>

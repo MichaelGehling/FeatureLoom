@@ -4,13 +4,13 @@ namespace FeatureLoom.Web
 {
     public interface IWebServer
     {
-        void Start();
+        Task Run();
 
         Task StopAsync();
 
         void Stop();
 
-        bool Started { get; }
+        bool Running { get; }
 
         void AddRequestHandler(IWebRequestHandler handler);
 
