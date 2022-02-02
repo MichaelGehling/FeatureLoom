@@ -20,7 +20,7 @@ namespace FeatureLoom.Logging
             defaultFileLogger = new FileLogger();
             logRunner = new SuspendingAsyncRunner();
             WorkflowRunnerService.Unregister(logRunner);
-            logRunner.Run(defaultFileLogger);
+            _ = logRunner.RunAsync(defaultFileLogger);
 
             context.Data.queueLogForwarder.ConnectTo(defaultConsoleLogger);
             context.Data.syncLogForwarder.ConnectTo(defaultFileLogger);

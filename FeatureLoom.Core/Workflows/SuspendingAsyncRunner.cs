@@ -23,7 +23,7 @@ namespace FeatureLoom.Workflows
         private readonly TimeSpan suspensionTime;
         private readonly TimeSpan suspensionIntervall;
 
-        public async Task RunAsync(Workflow workflow)
+        public override async Task RunAsync(Workflow workflow)
         {
             AddToRunningWorkflows(workflow);
             try
@@ -70,9 +70,5 @@ namespace FeatureLoom.Workflows
             }
         }
 
-        public override void Run(Workflow workflow)
-        {
-            _ = RunAsync(workflow);
-        }
     }
 }

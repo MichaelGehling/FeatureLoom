@@ -26,7 +26,7 @@ namespace FeatureLoom.Web
 
         private Config config = new Config();
         private FeatureLock myLock = new FeatureLock();
-        public bool started = false;
+        public bool running = false;
         private IWebHost webserver;
 
         //public List<Action<IServiceCollection>> serviceExtensions = new List<Action<IServiceCollection>>();
@@ -43,26 +43,30 @@ namespace FeatureLoom.Web
         {
             if (await config.TryUpdateFromStorageAsync(false))
             {
+                bool wasRunning = running;
+                if (wasRunning) Stop();
                 foreach (var endpoint in config.endpointConfigs.EmptyIfNull())
-                {
+                {                    
                     AddEndpoint(endpoint);
+
                 }
+                if (wasRunning) _ = Run();
                 return true;
             }
             return false;
         }
 
-        public bool Started => started;
+        public bool Running => running;
 
         public void AddEndpoint(HttpEndpointConfig endpoint)
         {
             using (myLock.Lock())
             {                
                 endpoints.Add(endpoint);
-                if (started)
+                if (running)
                 {
                     Stop();
-                    Start();
+                    Run();
                 }
             }
         }
@@ -72,14 +76,9 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
                 requestHandlers.Add(handler.Route, handler);
                 this.requestHandlers = requestHandlers;
-                if (started)
-                {
-                    Stop();
-                    Start();
-                }
             }
         }
 
@@ -88,14 +87,9 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
                 requestHandlers.Remove(handler.Route);
                 this.requestHandlers = requestHandlers;
-                if (started)
-                {
-                    Stop();
-                    Start();
-                }
             }
         }
 
@@ -104,14 +98,10 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>();
                 else requestHandlers.Clear();
                 this.requestHandlers = requestHandlers;
-                if (started)
-                {
-                    Stop();
-                    Start();
-                }
+
             }
         }
 
@@ -120,16 +110,17 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 endpoints.Clear();
-                if (started)
+                if (running)
                 {
                     Stop();
-                    Start();
+                    Run();
                 }
             }
         }
 
-        public void ExecuteHandlers(IApplicationBuilder app)
-        {
+        /*
+        private void ExecuteHandlers(IApplicationBuilder app)
+        {            
             var requestHandlers = this.requestHandlers;
             foreach (var handler in requestHandlers)
             {
@@ -140,19 +131,128 @@ namespace FeatureLoom.Web
                 }));
             }
         }
+        */
+
+
+
+        public Task Run()
+        {
+            return Task.Run(() =>
+            {
+                running = true;
+
+                this.webserver = new WebHostBuilder()
+                .UseKestrel(async options =>
+                {
+                    options.Limits.MaxRequestBodySize = null;
+                    options.AllowSynchronousIO = false;
+                    foreach (var endpoint in endpoints)
+                    {
+                        if (endpoint.address == null) continue;
+
+                        if (endpoint.certificateName != null)
+                        {
+                            if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
+                            {
+                                options.Listen(endpoint.address, endpoint.port, listenOptions =>
+                                {
+                                    listenOptions.UseHttps(certificate);
+                                });
+                            }
+                            else
+                            {
+                                Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
+                            }
+                        }
+                        else
+                        {
+                            options.Listen(endpoint.address, endpoint.port);
+                        }
+                    }
+                })
+                /*.ConfigureServices(services =>
+                {
+                    foreach (var extend in serviceExtensions)
+                    {
+                        extend(services);
+                    }
+                })*/
+                .Configure(app =>
+                {
+                    app.Map("", app2 => app2.Run(async context =>
+                    {
+                        ContextWrapper contextWrapper = new ContextWrapper(context);
+                        IWebRequest request = contextWrapper;
+                        IWebResponse response = contextWrapper;
+
+                        string path = context.Request.Path;                        
+                        bool possibleHandlerReached = false;
+                        bool handled = false;
+                        var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
+                        foreach (var handler in currentRequestHandlers)
+                        {
+                            if (path.StartsWith(handler.Key))
+                            {
+                                contextWrapper.SetRoute(handler.Key);
+                                handled = await handler.Value.HandleRequestAsync(contextWrapper, contextWrapper);
+                                if (handled) break;
+                                possibleHandlerReached = true;
+                            }
+                            else if (possibleHandlerReached) break;
+                            
+                        }
+
+                        if (!handled)
+                        {
+                            if (path == "/favicon.ico")
+                            {
+                                response.StatusCode = HttpStatusCode.OK;
+                                await response.Stream.WriteAsync(Resources.favicon, 0, Resources.favicon.Length);                                
+                            }
+                            else response.StatusCode = HttpStatusCode.NotFound;
+                        }
+                    }));
+                })
+                .Build();
+
+                this.webserver.Run();
+                this.running = false;
+            });
+        }
+
+        public void Stop()
+        {
+            if (webserver != null)
+            {
+                webserver.StopAsync().WaitFor();
+            }
+        }
+
+        public async Task StopAsync()
+        {
+            if (webserver != null)
+            {
+                await webserver.StopAsync();
+            }
+        }
 
         private class ContextWrapper : IWebRequest, IWebResponse
         {
             private HttpContext context;
+            private string route = "";
+
+            public void SetRoute(string route) => this.route = route;
 
             public ContextWrapper(HttpContext context)
             {
                 this.context = context;
             }
 
-            string IWebRequest.BasePath => context.Request.PathBase;
+            string IWebRequest.BasePath => context.Request.PathBase + route;
 
             string IWebRequest.FullPath => context.Request.PathBase + context.Request.Path;
+
+            string IWebRequest.RelativePath => context.Request.Path.ToString().Substring(route.Length);
 
             Stream IWebRequest.Stream => context.Request.Body;
 
@@ -172,9 +272,7 @@ namespace FeatureLoom.Web
 
             bool IWebRequest.IsHead => HttpMethods.IsHead(context.Request.Method);
 
-            string IWebRequest.Method => context.Request.Method;
-
-            string IWebRequest.RelativePath => context.Request.Path;
+            string IWebRequest.Method => context.Request.Method;            
 
             HttpStatusCode IWebResponse.StatusCode { get => (HttpStatusCode)context.Response.StatusCode; set => context.Response.StatusCode = (int)value; }
 
@@ -221,79 +319,12 @@ namespace FeatureLoom.Web
                 }
             }
 
+            IEnumerable<string> IWebRequest.GetAllQueryKeys() => context.Request.Query.Keys;
+
             Task IWebResponse.WriteAsync(string reply)
             {
                 return context.Response.WriteAsync(reply);
             }
-        }
-
-        public void Start()
-        {
-            Task.Run(() =>
-            {
-                started = true;
-
-                this.webserver = new WebHostBuilder()
-                .UseKestrel(async options =>
-                {
-                    options.Limits.MaxRequestBodySize = null;
-                    options.AllowSynchronousIO = false;
-                    foreach (var endpoint in endpoints)
-                    {
-                        if (endpoint.address == null) continue;
-
-                        if (endpoint.certificateName != null)
-                        {
-                            if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
-                            {
-                                options.Listen(endpoint.address, endpoint.port, listenOptions =>
-                                {
-                                    listenOptions.UseHttps(certificate);
-                                });
-                            }
-                            else
-                            {
-                                Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
-                            }
-                        }
-                        else
-                        {
-                            options.Listen(endpoint.address, endpoint.port);
-                        }
-                    }
-                })
-                /*.ConfigureServices(services =>
-                {
-                    foreach (var extend in serviceExtensions)
-                    {
-                        extend(services);
-                    }
-                })*/
-                .Configure(app =>
-                {
-                    app.Map("", ExecuteHandlers);
-                })
-                .Build();
-
-                this.webserver.Run();
-                this.started = false;
-            });
-        }
-
-        public void Stop()
-        {
-            if (webserver != null)
-            {
-                webserver.StopAsync().WaitFor();
-            }
-        }
-
-        public async Task StopAsync()
-        {
-            if (webserver != null)
-            {
-                await webserver.StopAsync();
-            }
-        }
+        }        
     }
 }

@@ -78,6 +78,6 @@ namespace FeatureLoom.Workflows
             }
         }
 
-        public abstract void Run(Workflow workflow);
+        public abstract Task RunAsync(Workflow workflow);
     }
 }
