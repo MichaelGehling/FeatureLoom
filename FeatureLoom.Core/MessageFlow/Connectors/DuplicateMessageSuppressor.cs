@@ -27,10 +27,11 @@ namespace FeatureLoom.MessageFlow
             this.suppressionTime = suppressionTime;
             if (isDuplicate == null) isDuplicate = (a, b) => a.Equals(b);
             this.isDuplicate = isDuplicate;
-            if (cleanupPeriode != default) this.cleanupPeriode = cleanupPeriode;
-            this.cleanupPeriode = this.cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
+            if (cleanupPeriode == default) cleanupPeriode = this.cleanupPeriode;
+            cleanupPeriode = cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
+            this.cleanupPeriode = cleanupPeriode;
             this.nextCleanUp = AppTime.Now + this.cleanupPeriode;
-            this.cleanUpDelay = this.cleanupPeriode;
+            this.cleanUpDelay = cleanupPeriode;            
             if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
             this.scheduledAction = Scheduler.ScheduleAction(now => 

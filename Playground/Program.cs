@@ -17,6 +17,7 @@ using FeatureLoom.Workflows;
 using FeatureLoom.Web;
 using System.Net;
 using FeatureLoom.Storages;
+using FeatureLoom.Security;
 
 namespace Playground
 {
@@ -98,19 +99,60 @@ namespace Playground
             Console.WriteLine($"TestSmartAsync: {tk.Elapsed.TotalMilliseconds}");
         }
 
+        public class TestConfig : Configuration
+        {
+            public string aaa = "Hallo";
+            public int bbb = 99;
+        }    
+
         private static void Main()
         {
+            ICredentialHandler<UsernamePassword> credentialHandler = new UserNamePasswordPBKDF2Handler();
+
+            {
+                Session.CleanUpAsync().WaitFor();
+                IdentityRole guest = new IdentityRole("Guest", new string[] { "GuestThings" });
+                guest.TryStoreAsync().WaitFor();
+                IdentityRole admin = new IdentityRole("Admin", new string[] { "GuestThings", "AdminThings" });
+                admin.TryStoreAsync().WaitFor();                
+
+                Identity mig = new Identity("MiG", credentialHandler.GenerateStoredCredential(new UsernamePassword("MiG", "1234")));                
+                mig.AddRole(admin);
+                mig.TryStoreAsync().WaitFor();
+                Identity paul = new Identity("Paul", credentialHandler.GenerateStoredCredential(new UsernamePassword("Paul", "abc")));                
+                paul.AddRole(guest);
+                paul.TryStoreAsync().WaitFor();
+            }
+
+            SharedWebServer.WebServer.AddRequestInterceptor(new SessionCookieInterceptor());
+
+            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordLoginHandler());
+            SharedWebServer.WebServer.AddRequestHandler(new LogoutHandler());
 
             SharedWebServer.WebServer.HandleRequests("/test", (req, resp) =>
             {
-                int counter = 1;
-                if (req.TryGetCookie("Counter", out string counterStr)) counter = Int32.Parse(counterStr) + 1;
-                resp.AddCookie("Counter", counter.ToString(), new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = 100.Hours() });
-                return counter.ToString();
-            });
-            Storage.RegisterReaderWriter(new TextFileStorage("wwwroot", new TextFileStorage.Config() {basePath="D:\\GitHub", useCategoryFolder = false }));
-            SharedWebServer.WebServer.AddRequestHandler(new StorageWebAccess<string>("/bla", new StorageWebAccess<string>.Config() { }));
-            _ = SharedWebServer.WebServer.Run(IPAddress.Loopback, 80);
+                return Session.Current.LifeTime.Remaining().ToString();
+            }, "Guest*");
+
+            SharedWebServer.WebServer.HandleRequests("/test/xx", (req, resp) =>
+            {
+                if (Session.Current?.Identity?.HasPermission("GuestThings") ?? false)
+                {
+                    return "xx";
+                }
+                else
+                {
+                    resp.StatusCode = HttpStatusCode.Forbidden;
+                    return null;
+                }
+            }, "GuestThings");
+
+            SharedWebServer.WebServer.AddRequestHandler(
+                new RequestHandlerPermissionWrapper(
+                    new StorageWebAccess<string>("/config", new StorageWebAccess<string>.Config() { category = "config" }),
+                    "AdminThings", true));
+
+            _ = SharedWebServer.WebServer.Run(IPAddress.Loopback, 50123);
 
             Console.ReadKey();
 

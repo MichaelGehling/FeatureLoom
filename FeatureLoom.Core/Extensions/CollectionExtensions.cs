@@ -97,5 +97,21 @@ namespace FeatureLoom.Extensions
                 return predicate(item);
             }
         }
+
+        public static bool Replace<T>(this IList<T> list, T item, Predicate<T> predicate, bool replaceOnlyFirst = false)
+        {
+            bool replaced = false;
+            for(int i=0; i < list.Count; i++)
+            {
+                if (predicate(list[i]))
+                {
+                    list[i] = item;
+                    replaced = true;
+                }
+
+                if (replaced && replaceOnlyFirst) break;
+            }
+            return replaced;
+        }
     }
 }

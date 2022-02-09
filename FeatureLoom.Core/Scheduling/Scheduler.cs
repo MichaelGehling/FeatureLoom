@@ -73,8 +73,8 @@ namespace FeatureLoom.Scheduling
                 if (activeSchedules.Count > 0)
                 {
                     delay = delay - executionTimer.Elapsed;
-                    delay = delay.Clamp(minimumDelay, int.MaxValue.Milliseconds());
-                    AppTime.Wait(minimumDelay, delay, cts.Token);
+                    delay = delay.Clamp(minimumDelay, int.MaxValue.Milliseconds());                    
+                    AppTime.Wait(delay.Multiply(0.5).ClampLow(minimumDelay), delay, cts.Token);
                 }
                 else
                 {

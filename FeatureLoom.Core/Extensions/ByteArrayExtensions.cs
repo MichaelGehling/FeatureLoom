@@ -29,5 +29,6 @@ namespace FeatureLoom.Extensions
         {
             return new MemoryStream(buffer);
         }
+
     }
 }

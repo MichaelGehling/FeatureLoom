@@ -17,9 +17,16 @@ namespace FeatureLoom.Web
         void RemoveRequestHandler(IWebRequestHandler handler);
 
         void ClearRequestHandlers();
+        void AddRequestInterceptor(IWebRequestInterceptor interceptor);
+
+        void RemoveRequestInterceptor(IWebRequestInterceptor interceptor);
+
+        void ClearRequestInterceptors();
 
         void AddEndpoint(HttpEndpointConfig endpoint);
 
         void ClearEndpoints();
+
+        void SetIcon(byte[] favicon);
     }
 }

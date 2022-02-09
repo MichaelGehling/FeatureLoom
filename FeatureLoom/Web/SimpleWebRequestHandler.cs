@@ -1,81 +1,91 @@
-﻿using System;
+﻿using FeatureLoom.Security;
+using System;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
 {
     public class SimpleWebRequestHandler : IWebRequestHandler
     {
+        string permissionWildcard;
         string route = "";        
         Func<IWebRequest, IWebResponse, Task<bool>> handleActionAsync;
 
-        public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, Task<bool>> handleActionAsync)
+        public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, Task<bool>> handleActionAsync, string permissionWildcard = null)
         {
             this.route = route ?? "";
             this.handleActionAsync = handleActionAsync;
+            this.permissionWildcard = permissionWildcard;
         }
 
-        public SimpleWebRequestHandler(string route, Func<string> handleAction)
+        public SimpleWebRequestHandler(string route, Func<string> handleAction, string permissionWildcard = null)
         {
             this.route = route ?? "";
+            this.permissionWildcard = permissionWildcard;
             this.handleActionAsync = async (request, response) =>
             {
                 string result = handleAction();
-                await response.WriteAsync(result);
+                if (result != null) await response.WriteAsync(result);
                 return true;
             };
         }
 
-        public SimpleWebRequestHandler(string route, Func<IWebRequest, string> handleAction)
+        public SimpleWebRequestHandler(string route, Func<IWebRequest, string> handleAction, string permissionWildcard = null)
         {
             this.route = route ?? "";
+            this.permissionWildcard = permissionWildcard;
             this.handleActionAsync = async (request, response) =>
             {
                 string result = handleAction(request);
-                await response.WriteAsync(result);
+                if (result != null) await response.WriteAsync(result);
                 return true;
             };
         }
 
-        public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, string> handleAction)
+        public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, string> handleAction, string permissionWildcard = null)
         {
             this.route = route ?? "";
+            this.permissionWildcard = permissionWildcard;
             this.handleActionAsync = async (request, response) =>
             {
                 string result = handleAction(request, response);
-                await response.WriteAsync(result);
+                if (result != null) await response.WriteAsync(result);
                 return true;
             };
         }
 
-        public SimpleWebRequestHandler(string route, Func<Task<string>> handleActionAsync)
+        public SimpleWebRequestHandler(string route, Func<Task<string>> handleActionAsync, string permissionWildcard = null)
         {
             this.route = route ?? "";
+            this.permissionWildcard = permissionWildcard;
             this.handleActionAsync = async (request, response) =>
             {
                 string result = await handleActionAsync();
-                await response.WriteAsync(result);
+                if (result != null) await response.WriteAsync(result);
                 return true;
             };
         }
 
-        public SimpleWebRequestHandler(string route, Func<IWebRequest, Task<string>> handleActionAsync)
+        public SimpleWebRequestHandler(string route, Func<IWebRequest, Task<string>> handleActionAsync, string permissionWildcard = null)
         {
             this.route = route ?? "";
+            this.permissionWildcard = permissionWildcard;
             this.handleActionAsync = async (request, response) =>
             {
                 string result = await handleActionAsync(request);
-                await response.WriteAsync(result);
+                if (result != null) await response.WriteAsync(result);
                 return true;
             };
         }
 
-        public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, Task<string>> handleActionAsync)
+        public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, Task<string>> handleActionAsync, string permissionWildcard = null)
         {
             this.route = route ?? "";
+            this.permissionWildcard = permissionWildcard;
             this.handleActionAsync = async (request, response) =>
             {
                 string result = await handleActionAsync(request, response);
-                await response.WriteAsync(result);
+                if (result != null) await response.WriteAsync(result);
                 return true;
             };
         }
@@ -84,7 +94,19 @@ namespace FeatureLoom.Web
 
         public Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            return handleActionAsync(request, response);
+            if (permissionWildcard != null)
+            {
+                if (Session.Current?.Identity?.HasAnyPermission(permissionWildcard) ?? false)
+                {
+                    return handleActionAsync(request, response);
+                }
+                else
+                {
+                    response.StatusCode = HttpStatusCode.Forbidden;
+                    return Task.FromResult(true);
+                }
+            }
+            else return handleActionAsync(request, response);
         }
     }
 }

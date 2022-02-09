@@ -27,7 +27,7 @@ namespace FeatureLoom.Time
         public TimeFrame(DateTime startTime, DateTime endTime)
         {
             startTime = startTime.ToUniversalTime();
-            endTime = startTime.ToUniversalTime();            
+            endTime = endTime.ToUniversalTime();            
             this.utcStartTime = endTime > startTime ? startTime : endTime;
             this.utcEndTime = endTime > startTime ? endTime : startTime;
         }

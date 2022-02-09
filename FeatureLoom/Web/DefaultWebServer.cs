@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Storages;
@@ -28,9 +29,12 @@ namespace FeatureLoom.Web
         private FeatureLock myLock = new FeatureLock();
         public bool running = false;
         private IWebHost webserver;
+        private byte[] favicon;
 
-        //public List<Action<IServiceCollection>> serviceExtensions = new List<Action<IServiceCollection>>();
-        public SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>();
+        // Invert comparer, so that when one route is the start of the second, the second will come first, so the more specifc before the less specific 
+        static readonly IComparer<string> routeComparer = new GenericComparer<string>((route1, route2) => -route1.CompareTo(route2));
+        public SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
+        public List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
 
         public List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
@@ -76,7 +80,7 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
                 requestHandlers.Add(handler.Route, handler);
                 this.requestHandlers = requestHandlers;
             }
@@ -87,7 +91,7 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
                 requestHandlers.Remove(handler.Route);
                 this.requestHandlers = requestHandlers;
             }
@@ -98,9 +102,43 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>();
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
                 else requestHandlers.Clear();
                 this.requestHandlers = requestHandlers;
+
+            }
+        }
+
+        public void AddRequestInterceptor(IWebRequestInterceptor interceptor)
+        {
+            using (myLock.Lock())
+            {
+                var currentRequestInterceptors = this.requestInterceptors;
+                if (running) currentRequestInterceptors = new List<IWebRequestInterceptor>(currentRequestInterceptors);
+                currentRequestInterceptors.Add(interceptor);
+                this.requestInterceptors = currentRequestInterceptors;
+            }
+        }
+
+        public void RemoveRequestInterceptor(IWebRequestInterceptor interceptor)
+        {
+            using (myLock.Lock())
+            {
+                var currentRequestInterceptors = this.requestInterceptors;
+                if (running) currentRequestInterceptors = new List<IWebRequestInterceptor>(currentRequestInterceptors);
+                currentRequestInterceptors.Remove(interceptor);
+                this.requestInterceptors = currentRequestInterceptors;
+            }
+        }
+
+        public void ClearRequestInterceptors()
+        {
+            using (myLock.Lock())
+            {
+                var currentRequestInterceptors = this.requestInterceptors;
+                if (running) currentRequestInterceptors = new List<IWebRequestInterceptor>();
+                else currentRequestInterceptors.Clear();
+                this.requestInterceptors = currentRequestInterceptors;
 
             }
         }
@@ -117,23 +155,6 @@ namespace FeatureLoom.Web
                 }
             }
         }
-
-        /*
-        private void ExecuteHandlers(IApplicationBuilder app)
-        {            
-            var requestHandlers = this.requestHandlers;
-            foreach (var handler in requestHandlers)
-            {
-                app.Map(handler.Value.Route, app2 => app2.Run(async context =>
-                {
-                    ContextWrapper contextWrapper = new ContextWrapper(context);
-                    await handler.Value.HandleRequestAsync(contextWrapper, contextWrapper);
-                }));
-            }
-        }
-        */
-
-
 
         public Task Run()
         {
@@ -170,13 +191,6 @@ namespace FeatureLoom.Web
                         }
                     }
                 })
-                /*.ConfigureServices(services =>
-                {
-                    foreach (var extend in serviceExtensions)
-                    {
-                        extend(services);
-                    }
-                })*/
                 .Configure(app =>
                 {
                     app.Map("", app2 => app2.Run(async context =>
@@ -185,31 +199,45 @@ namespace FeatureLoom.Web
                         IWebRequest request = contextWrapper;
                         IWebResponse response = contextWrapper;
 
-                        string path = context.Request.Path;                        
-                        bool possibleHandlerReached = false;
-                        bool handled = false;
-                        var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
-                        foreach (var handler in currentRequestHandlers)
+                        try
                         {
-                            if (path.StartsWith(handler.Key))
-                            {
-                                contextWrapper.SetRoute(handler.Key);
-                                handled = await handler.Value.HandleRequestAsync(contextWrapper, contextWrapper);
-                                if (handled) break;
-                                possibleHandlerReached = true;
-                            }
-                            else if (possibleHandlerReached) break;
-                            
-                        }
+                            string path = context.Request.Path;
 
-                        if (!handled)
-                        {
-                            if (path == "/favicon.ico")
+                            if (request.IsGet && path == "/favicon.ico")
                             {
                                 response.StatusCode = HttpStatusCode.OK;
-                                await response.Stream.WriteAsync(Resources.favicon, 0, Resources.favicon.Length);                                
+                                await response.Stream.WriteAsync(this.favicon ?? Resources.favicon, 0, (this.favicon ?? Resources.favicon).Length);
                             }
-                            else response.StatusCode = HttpStatusCode.NotFound;
+
+                            var currentInterceptors = this.requestInterceptors;
+                            foreach (var interceptor in currentInterceptors)
+                            {
+                                if (await interceptor.InterceptRequestAsync(request, response))
+                                {
+                                    return;
+                                }
+                            }
+                            
+                            var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
+                            foreach (var handler in currentRequestHandlers)
+                            {
+                                if (path.StartsWith(handler.Key))
+                                {
+                                    contextWrapper.SetRoute(handler.Key);
+                                    if(await handler.Value.HandleRequestAsync(contextWrapper, contextWrapper))
+                                    {
+                                        return;
+                                    }                                    
+                                }
+
+                            }
+                            
+                            response.StatusCode = HttpStatusCode.NotFound;
+                        }
+                        catch(Exception e)
+                        {
+                            Log.ERROR(this.GetHandle(), "Web request failed with an exception!", e.ToString());
+                            response.StatusCode = HttpStatusCode.InternalServerError;
                         }
                     }));
                 })
@@ -234,6 +262,11 @@ namespace FeatureLoom.Web
             {
                 await webserver.StopAsync();
             }
+        }
+
+        public void SetIcon(byte[] favicon)
+        {
+            this.favicon = favicon;
         }
 
         private class ContextWrapper : IWebRequest, IWebResponse

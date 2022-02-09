@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,7 +22,7 @@ namespace FeatureLoom.MessageFlow
             Assert.True(processed);
         }
 
-        private readonly object locker = new object();
+        private readonly FeatureLock locker = new FeatureLock();
 
         [Fact]
         public void CanLockObjectBeforeProcessing()
@@ -40,16 +41,11 @@ namespace FeatureLoom.MessageFlow
             var processingTask = sender.SendAsync(true);
             var assertionTask = Task.Run(() =>
             {
-                try
-                {
-                    Monitor.Enter(locker);
+                using(locker.Lock())
+                { 
                     Assert.True(processingTask.IsCompleted);
-                    Assert.True(processed);
-                }
-                finally
-                {
-                    Monitor.Exit(locker);
-                }
+                    Assert.True(processed);                                    
+                }                
             });
             Task.WhenAll(processingTask, assertionTask);
         }

@@ -21,6 +21,7 @@ namespace FeatureLoom.Storages
         {
             public bool useCategoryFolder = true;
             public string basePath = ".";
+            public bool preventEscapingRootPath = true;
             public string fileSuffix = "";
             public bool allowSubscription = true;
             public TimeSpan subscriptionSamplingTime = 5.Seconds();
@@ -318,7 +319,13 @@ namespace FeatureLoom.Storages
 
         protected virtual string UriToFilePath(string uri)
         {
-            return Path.Combine(rootDir.FullName, $"{uri}{config.fileSuffix}");
+            string resultingPath = Path.GetFullPath(Path.Combine(rootDir.FullName, $"{uri}{config.fileSuffix}"));
+            if (config.preventEscapingRootPath && !resultingPath.StartsWith(rootDir.FullName))
+            {
+                Log.WARNING(this.GetHandle(), $"Resulting path ({resultingPath}) was not inside root path ({rootDir.FullName})");
+                throw new Exception($"Resulting path ({resultingPath}) was not inside root path ({rootDir.FullName})");
+            }
+            return resultingPath;
         }
 
         protected virtual bool TryDeserialize<T>(string str, out T data)

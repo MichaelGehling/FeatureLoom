@@ -18,7 +18,7 @@ namespace FeatureLoom.Storages
             public bool allowRead = true;
             public bool allowReadUrls = true;
             public bool applyFilter = false;
-            public List<string> filter = new List<string>();
+            public List<string> filterWildcards = new List<string>();
             public string category = "wwwroot";            
         }
 
@@ -49,8 +49,16 @@ namespace FeatureLoom.Storages
             {
                 if (request.IsGet && config.allowReadUrls && request.RelativePath=="")
                 {
-                    if (request.TryGetQueryItem("uris", out string pattern)) return await ReadUrlsAsync(request, response, pattern);
-                    else return await ReadUrlsAsync(request, response, null);
+                    if (request.TryGetQueryItem("uris", out string pattern))
+                    {
+                        response.StatusCode = HttpStatusCode.OK;
+                        return await ReadUrlsAsync(request, response, pattern);
+                    }
+                    else
+                    {
+                        response.StatusCode = HttpStatusCode.OK;
+                        return await ReadUrlsAsync(request, response, null);
+                    }
                 }
                 else if (request.IsGet && config.allowRead) return await ReadAsync(request, response);
                 else if (request.IsPut && config.allowChange) return await WriteAsync(request, response);
@@ -64,6 +72,7 @@ namespace FeatureLoom.Storages
             catch (Exception e)
             {
                 Log.WARNING(this.GetHandle(), $"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());
+                response.StatusCode = HttpStatusCode.InternalServerError;
                 return true;
             }
         }
@@ -80,6 +89,7 @@ namespace FeatureLoom.Storages
                 //JSON.net does not provide async write to stream, so serialization has to be done before
                 string json = uris.ToJson();
                 await response.WriteAsync(json);
+                response.StatusCode = HttpStatusCode.OK;
                 return true;
             }
             else
@@ -93,6 +103,7 @@ namespace FeatureLoom.Storages
         {
             if (await writer.TryDeleteAsync(request.RelativePath.Trim('/')))
             {
+                response.StatusCode = HttpStatusCode.OK;
                 return true;
             }
             else
@@ -109,11 +120,12 @@ namespace FeatureLoom.Storages
             {
                 if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").Trim('/'), request.Stream))
                 {
+                    response.StatusCode = HttpStatusCode.OK;
                     return true;
                 }
                 else
                 {
-                    response.StatusCode = HttpStatusCode.NotAcceptable;
+                    response.StatusCode = HttpStatusCode.InternalServerError;
                     return true;
                 }
             }
@@ -122,11 +134,12 @@ namespace FeatureLoom.Storages
                 T obj = request.Stream.FromJson<T>();
                 if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").Trim('/'), obj))
                 {
+                    response.StatusCode = HttpStatusCode.OK;
                     return true;
                 }
                 else
                 {
-                    response.StatusCode = HttpStatusCode.NotAcceptable;
+                    response.StatusCode = HttpStatusCode.InternalServerError;
                     return true;
                 }
             }
@@ -135,7 +148,7 @@ namespace FeatureLoom.Storages
         private async Task<bool> ReadAsync(IWebRequest request, IWebResponse response)
         {
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
-               typeof(T).IsAssignableFrom(typeof(byte[])))
+                typeof(T).IsAssignableFrom(typeof(byte[])))
             {
                 if (await reader.TryReadAsync(request.RelativePath.Replace("%20", " ").Trim('/'), s => s.CopyToAsync(response.Stream)))
                 {

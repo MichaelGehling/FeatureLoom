@@ -45,7 +45,7 @@ namespace FeatureLoom.MessageFlow
         {
             if (message is I msgT)
             {
-                O output = convertFunc(msgT);
+                O output = convertFunc(msgT);                
                 // TODO: It would be good to check if O is a readonly struct and in that case use "sourceHelper.Forward(in output);"
                 sourceHelper.Forward(output);
             }

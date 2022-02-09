@@ -41,6 +41,7 @@ namespace FeatureLoom.Serialization
                     default_SerializerSettings.Formatting = Formatting.Indented;
                     default_SerializerSettings.TypeNameHandling = TypeNameHandling.None;
                     default_SerializerSettings.ObjectCreationHandling = ObjectCreationHandling.Replace;
+                    default_SerializerSettings.ContractResolver = new MyContractResolver();
                     /*default_SerializerSettings.Error = (sender, args) =>
                     {
                         Log.WARNING($"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
