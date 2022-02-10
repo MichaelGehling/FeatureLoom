@@ -154,7 +154,7 @@ namespace Playground
 
             _ = SharedWebServer.WebServer.Run(IPAddress.Loopback, 50123);
 
-            Console.ReadKey();
+            Console.ReadKey();            
 
             while (true)
             {

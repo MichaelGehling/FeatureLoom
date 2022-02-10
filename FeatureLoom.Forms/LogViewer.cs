@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
 using FeatureLoom.Extensions;
+using System;
 
 namespace FeatureLoom.Forms
 {
@@ -15,6 +16,9 @@ namespace FeatureLoom.Forms
         private WritingLogWorkflow workflow;
         public bool keepReading = true;
         public bool hideOnClosing = false;
+
+        public TimeSpan minDelay = 500.Milliseconds();
+        public TimeSpan maxWorkSlice = 50.Milliseconds();
 
         public Sender<LogMessage> logNotificationSender = new Sender<LogMessage>();
 
@@ -68,7 +72,7 @@ namespace FeatureLoom.Forms
                         .Step("Read logmessages from queue and write them to the textbox for a short time")
                             .Do(c =>
                             {
-                                TimeFrame timeSlice = new TimeFrame(50.Milliseconds());
+                                TimeFrame timeSlice = new TimeFrame(AppTime.CoarseNow, c.logViewer.maxWorkSlice);
                                 var textBox = c.logViewer.richTextBox1;
                                 while (!textBox.IsDisposed &&
                                       !timeSlice.Elapsed(AppTime.CoarseNow) &&
@@ -93,7 +97,7 @@ namespace FeatureLoom.Forms
                             })
                             .Catch()
                         .Step("Loop")
-                            .Wait(20.Milliseconds())
+                            .Wait(c => c.logViewer.minDelay)
                             .Loop();
                 }
             }
