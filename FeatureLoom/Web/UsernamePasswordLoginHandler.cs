@@ -2,6 +2,7 @@
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Security;
 using FeatureLoom.Serialization;
+using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -13,6 +14,7 @@ namespace FeatureLoom.Web
     public class UsernamePasswordLoginHandler : IWebRequestHandler
     {
         public string route = "/Login";
+        public TimeSpan normalizedProcessingTime = 100.Milliseconds();
 
         public string Route => route;
 
@@ -22,6 +24,7 @@ namespace FeatureLoom.Web
         {
             if (request.IsPost)
             {
+                TimeFrame processingTimeFrame = new TimeFrame(normalizedProcessingTime);
                 try
                 {
                     string data = await request.ReadAsync();
@@ -40,27 +43,23 @@ namespace FeatureLoom.Web
                                 Log.INFO(this.GetHandle(), $"Login successful by user [{usernamePassword.username}]");
                                 response.StatusCode = HttpStatusCode.OK;
                                 await response.WriteAsync(session.SessionId);
-                                return true;
                             }
                             else
                             {
                                 Log.ERROR(this.GetHandle(), "Failed to store session!");
                                 response.StatusCode = HttpStatusCode.InternalServerError;
-                                return true;
                             }
                         }
                         else
                         {
                             Log.INFO(this.GetHandle(), "Login failed, due to wrong credentials!");
                             response.StatusCode = HttpStatusCode.Unauthorized;
-                            return true;
                         }
                     }
                     else
                     {
                         Log.INFO(this.GetHandle(), "Login failed, due to unknown user!");
                         response.StatusCode = HttpStatusCode.Unauthorized;
-                        return true;
                     }
 
                 }
@@ -68,9 +67,10 @@ namespace FeatureLoom.Web
                 {
                     Log.WARNING(this.GetHandle(), "Failed to process login data", e.ToString());
                     response.StatusCode = HttpStatusCode.BadRequest;
-                    return true;
                 }
 
+                await processingTimeFrame.WaitForEndAsync();
+                return true;
             }
             else return false;
         }

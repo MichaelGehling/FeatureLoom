@@ -29,10 +29,9 @@ namespace FeatureLoom.Forms
             InitializeComponent();
             FormClosing += (o, e) =>
             {
-                if (hideOnClosing)
+                if (this.hideOnClosing)
                 {
                     Hide();
-                    keepReading = true;
                     e.Cancel = true;
                 }
             };
@@ -71,7 +70,7 @@ namespace FeatureLoom.Forms
                                 .Finish()
                         .Step("Read logmessages from queue and write them to the textbox for a short time")
                             .Do(c =>
-                            {
+                            {                                
                                 TimeFrame timeSlice = new TimeFrame(AppTime.CoarseNow, c.logViewer.maxWorkSlice);
                                 var textBox = c.logViewer.richTextBox1;
                                 while (!textBox.IsDisposed &&
