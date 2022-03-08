@@ -51,6 +51,7 @@
     <Compile Include="Forms\LayoutSuspensionExtension.cs" />
     <Compile Include="Forms\RichTextBuilder.cs" />
     <Compile Include="Forms\TableLayoutPanelExtensions.cs" />
+    <Compile Include="Forms\TooltipExtensions.cs" />
     <Compile Include="Forms\WorkflowApplicationContext.cs" />
     <Compile Include="LogViewer.cs">
       <SubType>Form</SubType>

@@ -7,6 +7,7 @@ using FeatureLoom.Synchronization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
 using System;
@@ -27,19 +28,19 @@ namespace FeatureLoom.Web
 
         private Config config = new Config();
         private FeatureLock myLock = new FeatureLock();
-        public bool running = false;
+        private bool running = false;
         private IWebHost webserver;
         private byte[] favicon;
 
         // Invert comparer, so that when one route is the start of the second, the second will come first, so the more specifc before the less specific 
         static readonly IComparer<string> routeComparer = new GenericComparer<string>((route1, route2) => -route1.CompareTo(route2));
-        public SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
-        public List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
-
-        public List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
+        private SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
+        private List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
+        private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
         public DefaultWebServer()
         {
+            favicon = Resources.favicon;
             TryUpdateConfigAsync().WaitFor();
         }
 
@@ -156,98 +157,6 @@ namespace FeatureLoom.Web
             }
         }
 
-        public Task Run()
-        {
-            return Task.Run(() =>
-            {
-                running = true;
-
-                this.webserver = new WebHostBuilder()
-                .UseKestrel(async options =>
-                {
-                    options.Limits.MaxRequestBodySize = null;
-                    options.AllowSynchronousIO = false;
-                    foreach (var endpoint in endpoints)
-                    {
-                        if (endpoint.address == null) continue;
-
-                        if (endpoint.certificateName != null)
-                        {
-                            if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
-                            {
-                                options.Listen(endpoint.address, endpoint.port, listenOptions =>
-                                {
-                                    listenOptions.UseHttps(certificate);
-                                });
-                            }
-                            else
-                            {
-                                Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
-                            }
-                        }
-                        else
-                        {
-                            options.Listen(endpoint.address, endpoint.port);
-                        }
-                    }
-                })
-                .Configure(app =>
-                {
-                    app.Map("", app2 => app2.Run(async context =>
-                    {
-                        ContextWrapper contextWrapper = new ContextWrapper(context);
-                        IWebRequest request = contextWrapper;
-                        IWebResponse response = contextWrapper;
-
-                        try
-                        {
-                            string path = context.Request.Path;
-
-                            if (request.IsGet && path == "/favicon.ico")
-                            {
-                                response.StatusCode = HttpStatusCode.OK;
-                                await response.Stream.WriteAsync(this.favicon ?? Resources.favicon, 0, (this.favicon ?? Resources.favicon).Length);
-                            }
-
-                            var currentInterceptors = this.requestInterceptors;
-                            foreach (var interceptor in currentInterceptors)
-                            {
-                                if (await interceptor.InterceptRequestAsync(request, response))
-                                {
-                                    return;
-                                }
-                            }
-                            
-                            var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
-                            foreach (var handler in currentRequestHandlers)
-                            {
-                                if (path.StartsWith(handler.Key))
-                                {
-                                    contextWrapper.SetRoute(handler.Key);
-                                    if(await handler.Value.HandleRequestAsync(contextWrapper, contextWrapper))
-                                    {
-                                        return;
-                                    }                                    
-                                }
-
-                            }
-                            
-                            response.StatusCode = HttpStatusCode.NotFound;
-                        }
-                        catch(Exception e)
-                        {
-                            Log.ERROR(this.GetHandle(), "Web request failed with an exception!", e.ToString());
-                            response.StatusCode = HttpStatusCode.InternalServerError;
-                        }
-                    }));
-                })
-                .Build();
-
-                this.webserver.Run();
-                this.running = false;
-            });
-        }
-
         public void Stop()
         {
             if (webserver != null)
@@ -269,10 +178,116 @@ namespace FeatureLoom.Web
             this.favicon = favicon;
         }
 
+        public Task Run()
+        {
+            return Task.Run(() =>
+            {
+                running = true;
+
+                this.webserver = new WebHostBuilder()
+                .UseKestrel(ApplyEndpoints)
+                .Configure(applicationBuilder =>
+                {
+                    applicationBuilder.Map("", _applicationBuilder =>
+                    {
+                        _applicationBuilder.Run(HandleWebRequest);
+                    });
+                })
+                .Build();
+
+                this.webserver.Run();
+                this.running = false;
+            });
+        }
+
+        private async Task HandleWebRequest(HttpContext context)
+        {
+            ContextWrapper contextWrapper = new ContextWrapper(context);
+            IWebRequest request = contextWrapper;
+            IWebResponse response = contextWrapper;
+
+            try
+            {
+                string path = context.Request.Path;
+
+                // Shortcut to deliver icon.
+                // If icon needs to be handled dynamically in a handler, the shortcut can be skipped by setting the favicon to null.
+                if (favicon != null && request.IsGet && path == "/favicon.ico")
+                {
+                    response.StatusCode = HttpStatusCode.OK;
+                    await response.Stream.WriteAsync(this.favicon, 0, favicon.Length);                    
+                    return; // icon was delivered, so finish request handling
+                }
+
+                var currentInterceptors = this.requestInterceptors; // take current reference to avoid change while execution.
+                foreach (var interceptor in currentInterceptors)
+                {
+                    if (await interceptor.InterceptRequestAsync(request, response))
+                    {
+                        return; // request was intercepted, so finish request handling
+                    }
+                }
+
+                var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
+                foreach (var handler in currentRequestHandlers)
+                {
+                    if (path.StartsWith(handler.Key))
+                    {
+                        contextWrapper.SetRoute(handler.Key);
+                        if (await handler.Value.HandleRequestAsync(request, response))
+                        {
+                            return; // request was handled, so finish request handling
+                        }
+                    }
+
+                }
+
+                if (!response.ResponseSent)
+                {
+                    response.StatusCode = HttpStatusCode.NotFound;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.ERROR(this.GetHandle(), "Web request failed with an exception!", e.ToString());
+                response.StatusCode = HttpStatusCode.InternalServerError;
+            }
+        }
+
+        private async void ApplyEndpoints(KestrelServerOptions options)
+        {
+            options.Limits.MaxRequestBodySize = null;
+            options.AllowSynchronousIO = false;
+            foreach (var endpoint in endpoints)
+            {
+                if (endpoint.address == null) continue;
+
+                if (endpoint.certificateName != null)
+                {
+                    if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
+                    {
+                        options.Listen(endpoint.address, endpoint.port, listenOptions =>
+                        {
+                            listenOptions.UseHttps(certificate);
+                        });
+                    }
+                    else
+                    {
+                        Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
+                    }
+                }
+                else
+                {
+                    options.Listen(endpoint.address, endpoint.port);
+                }
+            }
+        }
+
         private class ContextWrapper : IWebRequest, IWebResponse
         {
             private HttpContext context;
             private string route = "";
+            private bool responseSent = false;
 
             public void SetRoute(string route) => this.route = route;
 
@@ -317,6 +332,10 @@ namespace FeatureLoom.Web
                 }
             }
 
+
+            bool IWebResponse.ResponseSent => responseSent;
+
+
             void IWebResponse.AddCookie(string key, string content, CookieOptions options)
             {
                 if (options != null) context.Response.Cookies.Append(key, content, options);
@@ -356,6 +375,7 @@ namespace FeatureLoom.Web
 
             Task IWebResponse.WriteAsync(string reply)
             {
+                responseSent = true;
                 return context.Response.WriteAsync(reply);
             }
         }        

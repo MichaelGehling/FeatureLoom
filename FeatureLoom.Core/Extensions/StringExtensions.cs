@@ -155,6 +155,16 @@ namespace FeatureLoom.Extensions
             return str;
         }
 
+        public static string TrimStart(this string str, string trimStr)
+        {
+            // TODO: Not very efficient when trim is performed multiple times... improve!
+            while (str.StartsWith(trimStr))
+            {
+                str = str.Substring(trimStr.Length);
+            }
+            return str;
+        }
+
         public static string Substring(this string str, string startAfter, string endBefore = null)
         {
             int startPos = 0;

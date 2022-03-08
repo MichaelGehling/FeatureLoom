@@ -16,5 +16,7 @@ namespace FeatureLoom.Web
         void AddCookie(string key, string content, CookieOptions options = null);
 
         void DeleteCookie(string key);
+
+        bool ResponseSent { get; }
     }
 }
