@@ -69,6 +69,7 @@ namespace FeatureLoom.Storages
             if (config.updateCacheForSubscription || config.updateCacheOnRead || config.updateCacheOnWrite)
             {
                 cache = new InMemoryCache<string, string>(str => Encoding.UTF8.GetByteCount(str), config.cacheSettings);
+                ActivateFileSystemObservation(true);
             }
         }
 
@@ -81,8 +82,8 @@ namespace FeatureLoom.Storages
                 {
                     if (m1 is FileSystemObserver.ChangeNotification notification1 &&
                         m2 is FileSystemObserver.ChangeNotification notification2 &&
-                        notification1.changeType == WatcherChangeTypes.Changed &&
-                        notification2.changeType == WatcherChangeTypes.Created &&
+                        notification1.changeType == WatcherChangeTypes.Created &&
+                        notification2.changeType == WatcherChangeTypes.Changed &&
                         notification1.path == notification2.path)
                     {
                         return true;
@@ -105,7 +106,7 @@ namespace FeatureLoom.Storages
 
         private async Task ProcessChangeNotification(FileSystemObserver.ChangeNotification notification)
         {
-            if (subscriptions.Count == 0)
+            if (subscriptions.Count == 0 && cache == null)
             {
                 ActivateFileSystemObservation(false);
             }
@@ -167,6 +168,10 @@ namespace FeatureLoom.Storages
         {
             if (notification.changeType.HasFlag(WatcherChangeTypes.Changed))
             {
+                lock (fileSet)
+                {
+                    fileSet.Add(notification.path);
+                }
                 string uri = FilePathToUri(notification.path);
                 if (uri != null)
                 {
@@ -530,27 +535,38 @@ namespace FeatureLoom.Storages
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
+                bool created = !fileInfo.Exists;
 
                 if (TrySerialize(data, out string fileContent))
                 {
                     if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
                     {
                         cache?.Add(uri, fileContent);
-                        if (fileSystemObservationActive)
-                        {
-                            UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
-                            NotifySubscriptions(uri, updateEvent, false);
-                            if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
-                            else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
-                        }
+                    }
+
+                    if (fileSystemObservationActive)
+                    {
+                        if (created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                        else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                     }
 
                     using (var stream = fileInfo.CreateText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         await stream.WriteAsync(fileContent);
-                        return true;
+                        lock (fileSet)
+                        {
+                            fileSet.Add(fileInfo.FullName);
+                        }                        
                     }
+
+                    if (fileSystemObservationActive)
+                    {
+                        UpdateEvent updateEvent = created ? UpdateEvent.Created : UpdateEvent.Updated;
+                        NotifySubscriptions(uri, updateEvent, false);                                                
+                    }
+
+                    return true;
                 }
                 else return false;
             }
@@ -569,6 +585,7 @@ namespace FeatureLoom.Storages
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
+                bool created = !fileInfo.Exists;
 
                 if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
                 {
@@ -586,24 +603,33 @@ namespace FeatureLoom.Storages
                     var textReader = new StreamReader(sourceStream);
                     fileContent = await textReader.ReadToEndAsync();
                     sourceStream.Position = origPosition;
-                    cache?.Add(uri, fileContent);
+                    cache?.Add(uri, fileContent);                                        
+                }
 
-                    if (fileSystemObservationActive)
-                    {
-                        UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
-                        NotifySubscriptions(uri, updateEvent, false);
-                        if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
-                        else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
-                    }
+                if (fileSystemObservationActive)
+                {
+                    if (created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                    else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                 }
 
                 using (var stream = fileInfo.OpenWrite())
                 {
                     if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.SetLength(0);
-                    await sourceStream.CopyToAsync(stream);
-                    return true;
+                    await sourceStream.CopyToAsync(stream);                    
+
+                    lock (fileSet)
+                    {
+                        fileSet.Add(fileInfo.FullName);
+                    }
                 }
+
+                if (fileSystemObservationActive)
+                {
+                    UpdateEvent updateEvent = created ? UpdateEvent.Created : UpdateEvent.Updated;
+                    NotifySubscriptions(uri, updateEvent, false);                        
+                }
+                return true;
             }
             catch (Exception e)
             {
@@ -626,12 +652,15 @@ namespace FeatureLoom.Storages
 
                 if (TrySerialize(data, out string fileContent))
                 {
+                    // TODO: Update Cache etc.
+
                     using (var stream = fileInfo.AppendText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         await stream.WriteAsync(fileContent);
                         return true;
                     }
+
                 }
                 else return false;
             }
@@ -649,6 +678,8 @@ namespace FeatureLoom.Storages
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
+
+                // TODO: Update Cache etc.
 
                 using (var stream = fileInfo.OpenWrite())
                 {
@@ -673,7 +704,25 @@ namespace FeatureLoom.Storages
             try
             {
                 cache?.Remove(uri);
-                if (fileInfo.Exists) fileInfo.Delete();
+
+                if (fileInfo.Exists)
+                {
+                    if (fileSystemObservationActive)
+                    {
+                        duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Deleted, fileInfo.FullName, fileInfo.FullName));                        
+                    }
+
+                    fileInfo.Delete();
+                    lock (fileSet)
+                    {
+                        fileSet.Remove(fileInfo.FullName);
+                    }
+
+                    if (fileSystemObservationActive)
+                    {
+                        NotifySubscriptions(uri, UpdateEvent.Removed, false);
+                    }
+                }
                 return Task.FromResult(true);
             }
             catch (Exception e)

@@ -80,4 +80,14 @@ namespace FeatureLoom.MessageFlow
 
         object[] GetQueuedMesssages();
     }
+
+    public interface IRequestMessage
+    {
+        public long RequestId { get; set; }
+    }
+
+    public interface IResponseMessage
+    {
+        public long RequestId { get; }
+    }
 }

@@ -55,9 +55,19 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        public static short Int16()
+        {
+            return (short)Rng.Next(short.MinValue, short.MaxValue);
+        }
+
         public static int Int32(int min, int max)
         {
             return Rng.Next(min, max);
+        }
+
+        public static short Int16(short min, short max)
+        {
+            return (short) Rng.Next(min, max);
         }
 
         public static long Int64(bool crypto = false)

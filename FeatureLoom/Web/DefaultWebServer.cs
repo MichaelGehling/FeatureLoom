@@ -223,7 +223,7 @@ namespace FeatureLoom.Web
                 foreach (var interceptor in currentInterceptors)
                 {
                     if (await interceptor.InterceptRequestAsync(request, response))
-                    {
+                    {                      
                         return; // request was intercepted, so finish request handling
                     }
                 }
@@ -242,10 +242,17 @@ namespace FeatureLoom.Web
 
                 }
 
+                // Request was not handled so NotFound StatusCode is set, but it has to be ensured that the response stream whas not already written.
                 if (!response.ResponseSent)
                 {
                     response.StatusCode = HttpStatusCode.NotFound;
                 }
+            }
+            catch (WebResponseException e)
+            {
+                if (e.LogLevel.HasValue) Log.SendLogMessage(new LogMessage(e.LogLevel.Value, e.InternalMessage));
+                response.StatusCode = e.StatusCode;
+                if (!e.ResponseMessage.EmptyOrNull()) await response.WriteAsync(e.ResponseMessage);
             }
             catch (Exception e)
             {
@@ -262,7 +269,7 @@ namespace FeatureLoom.Web
             {
                 if (endpoint.address == null) continue;
 
-                if (endpoint.certificateName != null)
+                if (!endpoint.certificateName.EmptyOrNull())
                 {
                     if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
                     {

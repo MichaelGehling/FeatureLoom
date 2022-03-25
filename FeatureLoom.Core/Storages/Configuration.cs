@@ -170,4 +170,15 @@ namespace FeatureLoom.Storages
             return success;
         }
     }
+
+    public static class ConfigurationExtensions
+    {
+        public static async Task TryUpdateFromStorageOrWriteAsync(this Configuration config, bool useSubscription)
+        {
+            if (!await config.TryUpdateFromStorageAsync(useSubscription))
+            {
+                await config.TryWriteToStorageAsync();
+            }
+        }
+    }
 }

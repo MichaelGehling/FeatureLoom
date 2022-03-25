@@ -13,7 +13,7 @@ namespace FeatureLoom.Web
 {
     public class UsernamePasswordLoginHandler : IWebRequestHandler
     {
-        public string route = "/Login";
+        public string route = "/Login/UsernamePassword";
         public TimeSpan normalizedProcessingTime = 100.Milliseconds();
 
         public string Route => route;
@@ -22,7 +22,7 @@ namespace FeatureLoom.Web
 
         public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (request.IsPost)
+            if (request.IsPost && request.RelativePath == "")
             {
                 TimeFrame processingTimeFrame = new TimeFrame(normalizedProcessingTime);
                 try
@@ -39,7 +39,6 @@ namespace FeatureLoom.Web
                             if (await session.TryStoreAsync())
                             {
                                 response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout});
-                                response.StatusCode = HttpStatusCode.OK;
                                 Log.INFO(this.GetHandle(), $"Login successful by user [{usernamePassword.username}]");
                                 response.StatusCode = HttpStatusCode.OK;
                                 await response.WriteAsync(session.SessionId);
@@ -58,7 +57,7 @@ namespace FeatureLoom.Web
                     }
                     else
                     {
-                        Log.INFO(this.GetHandle(), "Login failed, due to unknown user!");
+                        Log.INFO(this.GetHandle(), "Login failed, due to unknown user [{usernamePassword.username}]!");
                         response.StatusCode = HttpStatusCode.Unauthorized;
                     }
 

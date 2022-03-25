@@ -68,7 +68,7 @@ namespace FeatureLoom.Time
 
         public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout)
         {
-            Wait(minTimeout, maxTimeout, CancellationToken.None);
+            Wait(minTimeout, maxTimeout, CancellationToken.None);            
         }
 
         public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)

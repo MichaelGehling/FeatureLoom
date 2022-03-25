@@ -4,6 +4,7 @@ using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.Scheduling;
 using FeatureLoom.Time;
+using FeatureLoom.Extensions;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,8 @@ using FeatureLoom.Web;
 using System.Net;
 using FeatureLoom.Storages;
 using FeatureLoom.Security;
+using System.IO;
+using System.Globalization;
 
 namespace Playground
 {
@@ -107,27 +110,68 @@ namespace Playground
 
         private static void Main()
         {
+
+            var writer = Storage.GetWriter("test");
+            var reader = Storage.GetReader("test");
+
+            while (true)
+            {
+                writer.TryWriteAsync("x/no1", "testabc".ToStream()).WaitFor();
+                writer.TryWriteAsync("x/no2", "testabc".ToStream()).WaitFor();
+                Console.ReadKey();
+                writer.TryDeleteAsync("x/no1").WaitFor();
+                writer.TryDeleteAsync("x/no2").WaitFor();
+                Console.ReadKey();
+            }
+
+
+            CultureInfo culture =  Thread.CurrentThread.CurrentCulture.CloneAndCast<CultureInfo>();
+            culture.NumberFormat.NumberDecimalSeparator = ".";
+            Thread.CurrentThread.CurrentCulture = culture;
+            string path = "Project/Hallo/IntProp=123/pups=12.2";
+            if (path.TryExtract(0, "Project/","/", out string projectName, out int startIndex, true) &&
+                path.TryExtract(startIndex, "IntProp=", "/", out int intProp, out startIndex) &&
+                path.TryExtract(startIndex, "/pups=", "", out float pups, out startIndex))
+            {
+                Console.WriteLine($"Project: {projectName} ,Prop: {intProp} ({intProp.GetType()})");
+            }
+
+            Forwarder sender = new Forwarder();
+
+
+            sender
+                .ConvertMessage<int,string>(i => i.ToString())
+                .FilterMessage<string>(s => !s.EmptyOrNull())
+                .ProcessMessage<string>(s => Console.WriteLine(s));
+
+            sender.Send("abc");
+            sender.Send(123);
+            sender.Send("");
+
+
             ICredentialHandler<UsernamePassword> credentialHandler = new UserNamePasswordPBKDF2Handler();
 
-            {
-                Session.CleanUpAsync().WaitFor();
-                IdentityRole guest = new IdentityRole("Guest", new string[] { "GuestThings" });
-                guest.TryStoreAsync().WaitFor();
-                IdentityRole admin = new IdentityRole("Admin", new string[] { "GuestThings", "AdminThings" });
-                admin.TryStoreAsync().WaitFor();                
+            
+            Session.CleanUpAsync().WaitFor();
+            IdentityRole guest = new IdentityRole("Guest", new string[] { "GuestThings" });
+            guest.TryStoreAsync().WaitFor();
+            IdentityRole admin = new IdentityRole("Admin", new string[] { "GuestThings", "AdminThings", "ManageIdentities" });
+            admin.TryStoreAsync().WaitFor();                
 
-                Identity mig = new Identity("MiG", credentialHandler.GenerateStoredCredential(new UsernamePassword("MiG", "1234")));                
-                mig.AddRole(admin);
-                mig.TryStoreAsync().WaitFor();
-                Identity paul = new Identity("Paul", credentialHandler.GenerateStoredCredential(new UsernamePassword("Paul", "abc")));                
-                paul.AddRole(guest);
-                paul.TryStoreAsync().WaitFor();
-            }
+            Identity mig = new Identity("MiG", credentialHandler.GenerateStoredCredential(new UsernamePassword("MiG", "1234")));                
+            mig.AddRole(admin);
+            mig.TryStoreAsync().WaitFor();
+            Identity paul = new Identity("Paul", credentialHandler.GenerateStoredCredential(new UsernamePassword("Paul", "abc")));                
+            paul.AddRole(guest);
+            paul.TryStoreAsync().WaitFor();
+            
 
             SharedWebServer.WebServer.AddRequestInterceptor(new SessionCookieInterceptor());
 
+            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordSignupHandler() { defaultRole = guest });
             SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordLoginHandler());
             SharedWebServer.WebServer.AddRequestHandler(new LogoutHandler());
+            SharedWebServer.WebServer.AddRequestHandler(new IdentityAndAccessManagementHandler());
 
             SharedWebServer.WebServer.HandleRequests("/test", (req, resp) =>
             {

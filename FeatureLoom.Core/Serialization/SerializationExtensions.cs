@@ -1,6 +1,11 @@
-﻿using Newtonsoft.Json;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Logging;
+using Newtonsoft.Json;
+using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Xml;
+using System.Xml.Serialization;
 
 namespace FeatureLoom.Serialization
 {
@@ -48,6 +53,33 @@ namespace FeatureLoom.Serialization
             if (xmlDoc == null) xmlDoc = new XmlDocument();
             xmlDoc.LoadXml(xml);
             return xmlDoc.DocumentElement;
+        }
+
+        public static bool TryDeserializeXml<T>(this Stream stream, out T xmlObject)
+        {
+            try
+            {
+                XmlSerializer serializer = new XmlSerializer(typeof(T));
+                using (XmlReader reader = XmlReader.Create(stream))
+                {
+                    xmlObject = (T)serializer.Deserialize(reader);
+                }
+                return true;
+            }
+            catch
+            {
+                xmlObject = default;
+                return false;
+            }
+        }
+
+        public static void DeserializeXml<T>(this Stream stream, out T xmlObject)
+        {
+            XmlSerializer serializer = new XmlSerializer(typeof(T));
+            using (XmlReader reader = XmlReader.Create(stream))
+            {
+                xmlObject = (T)serializer.Deserialize(reader);
+            }
         }
     }
 }

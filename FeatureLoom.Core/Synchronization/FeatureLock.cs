@@ -168,6 +168,8 @@ namespace FeatureLoom.Synchronization
         // it must set it back to true in its next cycle. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
         private bool prioritizedWaiting = false;
 
+        private bool reentrancyActive = false;
+
         // Indicates if scheduler is currently observing SleepHandles to wake up the candidates on time
         private bool IsScheduleActive => queueHead != null;
 
@@ -278,7 +280,7 @@ namespace FeatureLoom.Synchronization
         {
             get
             {
-                return lazy.Obj.reentrancyIndicator.Obj.Value;
+                return lazy.Exists ? lazy.Obj.reentrancyIndicator.Obj.Value : default;
             }
 
             set
@@ -764,6 +766,7 @@ namespace FeatureLoom.Synchronization
                 if (mode == LockMode.ReadLockReenterable)
                 {
                     ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
                     return ReenterableReadLockTask;
                 }
                 else return ReadLockTask;
@@ -773,6 +776,7 @@ namespace FeatureLoom.Synchronization
                 if (mode == LockMode.WriteLockReenterable)
                 {
                     ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
                     return ReenterableWriteLockTask;
                 }
                 else return WriteLockTask;
@@ -813,12 +817,20 @@ namespace FeatureLoom.Synchronization
 
             if (readOnly)
             {
-                if (mode == LockMode.ReadLockReenterable) ReentrancyIndicator = ReentrancyId;
+                if (mode == LockMode.ReadLockReenterable)
+                {
+                    ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
+                }
                 return new LockHandle(this, mode);
             }
             else
             {
-                if (mode == LockMode.WriteLockReenterable) ReentrancyIndicator = ReentrancyId;
+                if (mode == LockMode.WriteLockReenterable)
+                {
+                    ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
+                }
                 return new LockHandle(this, mode);
             }
         }
@@ -855,13 +867,14 @@ namespace FeatureLoom.Synchronization
             if (TryReenter(out LockHandle acquiredLock, true, out _)) return acquiredLock;
             if (MustGoToWaiting(prioritized) || !TryAcquireForWriting()) Lock_Wait(prioritized, false);
             ReentrancyIndicator = ReentrancyId;
+            reentrancyActive = true;
             return new LockHandle(this, LockMode.WriteLockReenterable);
         }
 
         private bool TryReenter(out LockHandle acquiredLock, bool waitForUpgrade, out bool upgradePossible)
         {
             var currentLockIndicator = lockIndicator;
-            if (currentLockIndicator != NO_LOCK && HasValidReentrancyContext)
+            if (reentrancyActive && currentLockIndicator != NO_LOCK && HasValidReentrancyContext)
             {
                 if (currentLockIndicator == WRITE_LOCK)
                 {
@@ -921,6 +934,7 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting())
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 return ReenterableWriteLockTask;
             }
             else return LockAsync_Wait(LockMode.WriteLockReenterable, prioritized, false);
@@ -974,13 +988,14 @@ namespace FeatureLoom.Synchronization
             if (MustGoToWaiting(prioritized) || !TryAcquireForReading()) Lock_Wait(prioritized, true);
 
             ReentrancyIndicator = ReentrancyId;
+            reentrancyActive = true;
             return new LockHandle(this, LockMode.ReadLockReenterable);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReenterReadOnly()
         {
-            return lockIndicator != NO_LOCK && HasValidReentrancyContext;
+            return reentrancyActive && lockIndicator != NO_LOCK && HasValidReentrancyContext;
         }
 
         #endregion LockReentrantReadOnly
@@ -995,6 +1010,7 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(prioritized) && TryAcquireForReading())
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 return ReenterableReadLockTask;
             }
             else return LockAsync_Wait(LockMode.ReadLockReenterable, prioritized, true);
@@ -1049,6 +1065,7 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting())
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 acquiredLock = new LockHandle(this, LockMode.WriteLockReenterable);
                 return true;
             }
@@ -1075,6 +1092,7 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(prioritized) && TryAcquireForReading())
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 acquiredLock = new LockHandle(this, LockMode.ReadLockReenterable);
                 return true;
             }
@@ -1205,6 +1223,7 @@ namespace FeatureLoom.Synchronization
                 if (mode == LockMode.ReadLockReenterable)
                 {
                     ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
                     return ReenterableReadLockAttemptTask;
                 }
                 else return ReadLockAttemptTask;
@@ -1214,6 +1233,7 @@ namespace FeatureLoom.Synchronization
                 if (mode == LockMode.WriteLockReenterable)
                 {
                     ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
                     return ReenterableWriteLockAttemptTask;
                 }
                 else return WriteLockAttemptTask;
@@ -1260,12 +1280,20 @@ namespace FeatureLoom.Synchronization
 
             if (readOnly)
             {
-                if (mode == LockMode.ReadLockReenterable) ReentrancyIndicator = ReentrancyId;
+                if (mode == LockMode.ReadLockReenterable)
+                {
+                    ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
+                }
                 return new LockAttempt(new LockHandle(this, mode));
             }
             else
             {
-                if (mode == LockMode.WriteLockReenterable) ReentrancyIndicator = ReentrancyId;
+                if (mode == LockMode.WriteLockReenterable)
+                {
+                    ReentrancyIndicator = ReentrancyId;
+                    reentrancyActive = true;
+                }
                 return new LockAttempt(new LockHandle(this, mode));
             }
         }
@@ -1330,12 +1358,14 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(prioritized) && TryAcquireForWriting())
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 acquiredLock = new LockHandle(this, LockMode.WriteLockReenterable);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout, prioritized, false))
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 acquiredLock = new LockHandle(this, LockMode.WriteLockReenterable);
                 return true;
             }
@@ -1388,6 +1418,7 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(prioritized) && NO_LOCK == Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, NO_LOCK))
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 return ReenterableWriteLockAttemptTask;
             }
             else if (timeout > TimeSpan.Zero) return TryLockAsync_Wait(LockMode.WriteLockReenterable, timeout, prioritized, false);
@@ -1435,12 +1466,14 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(false) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 acquiredLock = new LockHandle(this, LockMode.ReadLockReenterable);
                 return true;
             }
             else if (timeout > TimeSpan.Zero && TryLock_Wait(timeout, prioritized, true))
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 acquiredLock = new LockHandle(this, LockMode.ReadLockReenterable);
                 return true;
             }
@@ -1465,6 +1498,7 @@ namespace FeatureLoom.Synchronization
             if (!MustGoToWaiting(false) && newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator))
             {
                 ReentrancyIndicator = ReentrancyId;
+                reentrancyActive = true;
                 return ReenterableReadLockAttemptTask;
             }
             else if (timeout > TimeSpan.Zero) return TryLockAsync_Wait(LockMode.ReadLockReenterable, timeout, prioritized, true);
@@ -1494,6 +1528,7 @@ namespace FeatureLoom.Synchronization
         {
             // We simply change the reentrancyId and keep the ReentrancyContext as it is which also invalidates it. That is a lot cheaper.
             RenewReentrancyId();
+            reentrancyActive = false;
             lockIndicator = NO_LOCK;
             if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
@@ -1502,8 +1537,8 @@ namespace FeatureLoom.Synchronization
         private void ExitReentrantReadLock()
         {
             // We must clear the ReentrancyContext, because the lock might be used by multiple reader, so we can't change the current reentrancyId, though it would be cheaper.
-            RemoveReentrancyContext();
-            Interlocked.Decrement(ref lockIndicator);
+            RemoveReentrancyContext();            
+            reentrancyActive = Interlocked.Decrement(ref lockIndicator) > 0;
             if (IsScheduleActive) Scheduler.InterruptWaiting();
         }
 

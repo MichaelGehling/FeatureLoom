@@ -1,8 +1,11 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
+using FeatureLoom.MetaDatas;
 using FeatureLoom.Security;
 using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -28,13 +31,23 @@ namespace FeatureLoom.Web
                 if ((await Session.TryLoadSessionAsync(sessionId)).Out(out Session session))
                 {
                     if (session.SessionId == sessionId && !session.LifeTime.Elapsed())
-                    {                        
-                        if (session.Refresh())
+                    {
+                        if (Identity.Exists(session.IdentityId))
                         {
-                            response.AddCookie(cookieName, session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });
+                            if (session.Refresh())
+                            {
+                                response.AddCookie(cookieName, session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });
+                            }
+                            Session.Current = session;
+                            return false;
                         }
-                        Session.Current = session;
-                        return false;
+                        else
+                        {
+                            Log.WARNING(this.GetHandle(), $"Identity {session.IdentityId} of session does not exist! Session will be invalidated.");
+                            await session.TryDeleteFromStorageAsync();
+                            response.DeleteCookie(cookieName);                            
+                            return false;
+                        }
                     }
                     else if (removeExceededSessionAndCookie)
                     {                        

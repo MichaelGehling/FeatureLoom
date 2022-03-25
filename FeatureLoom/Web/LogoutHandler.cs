@@ -15,7 +15,7 @@ namespace FeatureLoom.Web
 
         public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (request.IsPost)
+            if (request.IsPost && request.RelativePath == "")
             {
                 Session session = Session.Current;
                 if (session != null)

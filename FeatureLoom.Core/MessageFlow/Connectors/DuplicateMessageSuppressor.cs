@@ -70,7 +70,7 @@ namespace FeatureLoom.MessageFlow
                 CleanUpSuppressors(now);
                 foreach (var suppressor in suppressors)
                 {
-                    if (isDuplicate(message, suppressor.message))
+                    if (isDuplicate(suppressor.message, message))
                     {
                         return true;
                     }

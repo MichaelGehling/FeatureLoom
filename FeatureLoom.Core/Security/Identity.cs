@@ -19,6 +19,11 @@ namespace FeatureLoom.Security
         {
             return Storage.GetReader(storageCategory).TryReadAsync<Identity>(identityId);
         }
+
+        public static bool Exists(string identityId)
+        {
+            return Storage.GetReader(storageCategory).Exists(identityId);
+        }
         #endregion
 
         string identityId;
@@ -95,6 +100,11 @@ namespace FeatureLoom.Security
         public Task<bool> TryStoreAsync()
         {
             return Storage.GetWriter(storageCategory).TryWriteAsync(identityId, this);
+        }
+
+        public Task<bool> TryRemoveFromStorageAsync()
+        {
+            return Storage.GetWriter(storageCategory).TryDeleteAsync(identityId);
         }
 
         public void AddRole(IdentityRole role)
