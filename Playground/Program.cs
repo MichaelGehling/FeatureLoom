@@ -111,6 +111,8 @@ namespace Playground
         private static void Main()
         {
 
+
+
             var writer = Storage.GetWriter("test");
             var reader = Storage.GetReader("test");
 

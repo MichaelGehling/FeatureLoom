@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Storages
 {
-    public class TextFileStorage : IStorageReaderWriter
+    public class TextFileStorage : IStorageReaderWriter, IDisposable
     {
         public class Config : Configuration
         {
@@ -730,6 +730,11 @@ namespace FeatureLoom.Storages
                 Log.ERROR(this.GetHandle(), $"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
                 return Task.FromResult(false);
             }
+        }
+
+        public void Dispose()
+        {
+            ((IDisposable)fileObserver).Dispose();
         }
 
         private class FileSubscriptionStatus

@@ -1581,7 +1581,33 @@ namespace FeatureLoom.Synchronization
                 }
                 else return false;
             }
+            else if (lockIndicator == WRITE_LOCK) return true;
             else return false;
+        }
+
+        [MethodImpl(MethodImplOptions.NoOptimization)]
+        private void Upgrade(ref LockMode currentLockMode)
+        {
+            if (!TryUpgrade(ref currentLockMode))
+            {
+                if (currentLockMode == LockMode.ReadLock)
+                {
+                    ExitReadLock();
+                    Lock(true);
+                    currentLockMode = LockMode.WriteLock;
+                }
+                else if (currentLockMode == LockMode.ReadLockReenterable)
+                {
+                    ExitReentrantReadLock();
+                    LockReentrant(true);
+                    currentLockMode = LockMode.WriteLockReenterable;
+                }
+                else if (currentLockMode == LockMode.Reentered && lockIndicator >= FIRST_READ_LOCK)
+                {
+                    LockReentrant(true);
+                    currentLockMode = LockMode.Upgraded;
+                }
+            }                                    
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1664,6 +1690,11 @@ namespace FeatureLoom.Synchronization
             public bool TryUpgradeToWriteMode()
             {
                 return parentLock?.TryUpgrade(ref mode) ?? false;
+            }
+
+            public void UpgradeToWriteMode()
+            {
+                parentLock?.Upgrade(ref mode);
             }
 
             public bool TryDowngradeToReadOnlyMode()

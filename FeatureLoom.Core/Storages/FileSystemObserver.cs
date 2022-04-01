@@ -9,7 +9,7 @@ namespace FeatureLoom.Storages
 {
     public class FileSystemObserver : IMessageSource<FileSystemObserver.ChangeNotification>, IDisposable
     {
-        private SourceValueHelper sourceHelper;
+        private IMessageFlowConnection<ChangeNotification> forwarder;
         private FileSystemWatcher fileWatcher;
         private FileSystemWatcher dirWatcher;
         private readonly string path;
@@ -19,11 +19,12 @@ namespace FeatureLoom.Storages
         private readonly bool createDirectoriesIfNotExisting;
         private readonly NotifyFilters notifyFilters;
 
-        public FileSystemObserver(string path,
+        public FileSystemObserver(string path,                                
                                   string filter = "",
                                   bool includeSubdirectories = false,
-                                  NotifyFilters notifyFilters = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
+                                  NotifyFilters notifyFilters = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.CreationTime | NotifyFilters.Size,
                                   bool createDirectoriesIfNotExisting = true,
+                                  bool useQueueForwarder = true,
                                   int bufferSize = 64 * 1024)
         {
             this.createDirectoriesIfNotExisting = createDirectoriesIfNotExisting;
@@ -32,6 +33,8 @@ namespace FeatureLoom.Storages
             this.path = path;
             this.filter = filter;
             this.notifyFilters = notifyFilters;
+            if (useQueueForwarder) forwarder = new QueueForwarder<ChangeNotification>();
+            else forwarder = new Forwarder<ChangeNotification>();
             InitWatchers();
         }
 
@@ -61,7 +64,7 @@ namespace FeatureLoom.Storages
             fileWatcher.Changed += OnChangedFile;
             fileWatcher.Created += OnChangedFile;
             fileWatcher.Deleted += OnChangedFile;
-            fileWatcher.Renamed += OnRenamedFile;
+            fileWatcher.Renamed += OnRenamedFile;            
             fileWatcher.Error += OnError;
             fileWatcher.EnableRaisingEvents = true;
         }
@@ -75,27 +78,27 @@ namespace FeatureLoom.Storages
         private void OnRenamedFile(object sender, RenamedEventArgs e)
         {
             var message = new ChangeNotification(e.ChangeType, e.FullPath, e.OldFullPath);
-            sourceHelper.ForwardAsync(message);
+            forwarder.Post(message);
         }
 
         private void OnChangedFile(object sender, FileSystemEventArgs e)
         {
             var message = new ChangeNotification(e.ChangeType, e.FullPath);
-            sourceHelper.ForwardAsync(message);
+            forwarder.Post(message);
         }
 
-        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+        public int CountConnectedSinks => forwarder.CountConnectedSinks;
 
         public Type SentMessageType => typeof(ChangeNotification);
 
         public void DisconnectAll()
         {
-            sourceHelper.DisconnectAll();
+            forwarder.DisconnectAll();
         }
 
         public void DisconnectFrom(IMessageSink sink)
         {
-            sourceHelper.DisconnectFrom(sink);
+            forwarder.DisconnectFrom(sink);
         }
 
         public void Dispose()
@@ -105,17 +108,17 @@ namespace FeatureLoom.Storages
 
         public IMessageSink[] GetConnectedSinks()
         {
-            return sourceHelper.GetConnectedSinks();
+            return forwarder.GetConnectedSinks();
         }
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
-            sourceHelper.ConnectTo(sink, weakReference);
+            forwarder.ConnectTo(sink, weakReference);
         }
 
         public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
-            return sourceHelper.ConnectTo(sink, weakReference);
+            return forwarder.ConnectTo(sink, weakReference);
         }
 
         public readonly struct ChangeNotification

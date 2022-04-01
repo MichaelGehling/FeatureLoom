@@ -2,6 +2,7 @@
 using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FeatureLoom.Storages
 {
@@ -48,11 +49,18 @@ namespace FeatureLoom.Storages
         {
             var contextData = context.Data;
             using (contextData.categoryToReaderLock.Lock())
-            {
-                contextData.categoryToReader.Clear();
-            }
             using (contextData.categoryToWriterLock.Lock())
             {
+                foreach (IDisposable disposable in contextData.categoryToReader.Values.Where(item => item is IDisposable))
+                {
+                    disposable.Dispose();
+                }
+                contextData.categoryToReader.Clear();
+
+                foreach (IDisposable disposable in contextData.categoryToWriter.Values.Where(item => item is IDisposable))
+                {
+                    disposable.Dispose();
+                }                
                 contextData.categoryToWriter.Clear();
             }
         }
@@ -69,7 +77,7 @@ namespace FeatureLoom.Storages
                     {
                         newReader = contextData.createDefaultReader(category);
                     }
-                    acquiredLock.TryUpgradeToWriteMode(); // can not fail
+                    acquiredLock.UpgradeToWriteMode();
                     contextData.categoryToReader[category] = newReader;
                     return newReader;
                 };
@@ -79,7 +87,7 @@ namespace FeatureLoom.Storages
         public static IStorageWriter GetWriter(string category)
         {
             var contextData = context.Data;
-            using (var acquiredLock = contextData.categoryToWriterLock.Lock())
+            using (var acquiredLock = contextData.categoryToWriterLock.LockReadOnly())
             {
                 if (contextData.categoryToWriter.TryGetValue(category, out IStorageWriter writer)) return writer;
                 else
@@ -88,7 +96,7 @@ namespace FeatureLoom.Storages
                     {
                         newWriter = contextData.createDefaultWriter(category);
                     }
-                    acquiredLock.TryUpgradeToWriteMode(); // can not fail
+                    acquiredLock.UpgradeToWriteMode();
                     contextData.categoryToWriter[category] = newWriter;
                     return newWriter;
                 };
@@ -100,6 +108,7 @@ namespace FeatureLoom.Storages
             var contextData = context.Data;
             using (contextData.categoryToReaderLock.Lock())
             {
+                if (contextData.categoryToReader.TryGetValue(reader.Category, out var old) && old is IDisposable disposable) disposable.Dispose();
                 contextData.categoryToReader[reader.Category] = reader;
             }
         }
@@ -109,6 +118,7 @@ namespace FeatureLoom.Storages
             var contextData = context.Data;
             using (contextData.categoryToWriterLock.Lock())
             {
+                if (contextData.categoryToWriter.TryGetValue(writer.Category, out var old) && old is IDisposable disposable) disposable.Dispose();
                 contextData.categoryToWriter[writer.Category] = writer;
             }
         }
