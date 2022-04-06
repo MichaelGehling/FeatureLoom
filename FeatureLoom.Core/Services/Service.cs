@@ -79,7 +79,7 @@ namespace FeatureLoom.Services
                 Init(createServiceAction);
                 return instanceContainer.Instance;
             }
-            else return null;
+            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
         }
 
         
@@ -104,7 +104,7 @@ namespace FeatureLoom.Services
 
             public T Instance
             {
-                get => localInstance.Exists ? localInstance.Obj.Value : globalInstance;
+                get => localInstance.Exists ? localInstance.Obj.Value ?? globalInstance : globalInstance;
                 set
                 {
                     if (localInstance.Exists) localInstance.Obj.Value = value;

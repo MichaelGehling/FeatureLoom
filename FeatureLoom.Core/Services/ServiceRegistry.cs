@@ -66,7 +66,20 @@ namespace FeatureLoom.Services
         {
             switch(typeof(T))
             {
-                default: createServiceAction = null; return false;
+                default:
+                    {
+                        var contructor = typeof(T).GetConstructor(Type.EmptyTypes);
+                        if (contructor != null)
+                        {
+                            createServiceAction = () => (T) contructor.Invoke(Array.Empty<object>());
+                            return true;
+                        }
+                        else
+                        {
+                            createServiceAction = null;
+                            return false;
+                        }
+                    }
             }
         }
 
