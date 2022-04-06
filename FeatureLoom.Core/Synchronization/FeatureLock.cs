@@ -926,7 +926,7 @@ namespace FeatureLoom.Synchronization
         {
             if (TryReenter(out LockHandle acquiredLock, false, out bool upgradePossible))
             {
-                if (acquiredLock.mode == LockMode.Reentered) return ReenteredLockTask;
+                if (acquiredLock.Mode == LockMode.Reentered) return ReenteredLockTask;
                 else return UpgradedLockTask;
             }
             else if (upgradePossible) return WaitForUpgradeAsync();
@@ -1406,7 +1406,7 @@ namespace FeatureLoom.Synchronization
         {
             if (TryReenter(out LockHandle acquiredLock, false, out bool upgradePossible))
             {
-                if (acquiredLock.mode == LockMode.Reentered) return ReenteredLockAttemptTask;
+                if (acquiredLock.Mode == LockMode.Reentered) return ReenteredLockAttemptTask;
                 else return UpgradedLockAttemptTask;
             }
             else if (upgradePossible)
@@ -1635,6 +1635,7 @@ namespace FeatureLoom.Synchronization
                 }
                 else return false;
             }
+            else if (lockIndicator >= FIRST_READ_LOCK) return true;
             else return false;
         }
 
@@ -1654,7 +1655,7 @@ namespace FeatureLoom.Synchronization
 
         public struct LockHandle : IDisposable
         {
-            internal LockMode mode;
+            private LockMode mode;
             private FeatureLock parentLock;            
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1703,6 +1704,8 @@ namespace FeatureLoom.Synchronization
             }
 
             public bool IsActive => parentLock != null;
+
+            internal LockMode Mode => mode;
         }
 
         public struct LockAttempt

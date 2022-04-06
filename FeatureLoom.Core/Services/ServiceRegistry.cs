@@ -9,7 +9,10 @@ namespace FeatureLoom.Services
     public static class ServiceRegistry
     {
         static Dictionary<Type, IServiceInstanceContainer> registry = new Dictionary<Type, IServiceInstanceContainer>();
-        static FeatureLock registryLock = new FeatureLock();        
+        static FeatureLock registryLock = new FeatureLock();
+        static bool localInstancesForAllServicesActive = false;
+
+        public static bool LocalInstancesForAllServicesActive => localInstancesForAllServicesActive;
 
         internal static void RegisterService(IServiceInstanceContainer service)
         {
@@ -17,7 +20,15 @@ namespace FeatureLoom.Services
             {
                 registry[service.ServiceType] = service;
             }
-        }                
+        }
+
+        internal static void UnregisterService(IServiceInstanceContainer service)
+        {
+            using (registryLock.Lock())
+            {
+                registry.Remove(service.ServiceType);
+            }
+        }
 
         public static IServiceInstanceContainer[] GetLocalServices()
         {
@@ -31,7 +42,8 @@ namespace FeatureLoom.Services
         {
             using (registryLock.Lock())
             {
-                foreach(var service in registry.Values)
+                localInstancesForAllServicesActive = true;
+                foreach (var service in registry.Values)
                 {
                     service.CreateLocalServiceInstance();
                 }
@@ -42,11 +54,21 @@ namespace FeatureLoom.Services
         {
             using (registryLock.Lock())
             {
+                localInstancesForAllServicesActive = false;
                 foreach (var service in registry.Values)
                 {
                     service.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);
                 }
             }
         }
+
+        internal static bool TryGetDefaultServiceCreator<T>(out Func<T> createServiceAction)
+        {
+            switch(typeof(T))
+            {
+                default: createServiceAction = null; return false;
+            }
+        }
+
     }
 }

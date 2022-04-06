@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -11,48 +12,88 @@ namespace FeatureLoom.Services
 
         public static void Init(Func<T> createServiceAction)
         {
-            if (instanceContainer == null) Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create(createServiceAction), null);
+            if (instanceContainer == null)
+            {
+                Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create(createServiceAction), null);
+                if (ServiceRegistry.LocalInstancesForAllServicesActive) instanceContainer.CreateLocalServiceInstance();
+            }
         }
 
-        public static void Init<DFLT>() where DFLT : T, new()
+        public static void Reset()
         {
-            if (instanceContainer == null) Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create<DFLT>(), null);
+            if (instanceContainer != null)
+            {
+                ServiceRegistry.UnregisterService(instanceContainer);
+                instanceContainer = null;
+            }
         }
 
-        public static T GetInstance<DFLT>() where DFLT : T, new()
+        public static bool IsInitialized => instanceContainer != null;
+
+        public static T Instance
         {
-            if (instanceContainer == null) Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create<DFLT>(), null);
-            return instanceContainer.Instance;
-        }
+            get
+            {
+                if (instanceContainer != null) return instanceContainer.Instance;
+                else return HandleUninitializedGet();
+            }
 
-        public static void SetInstance<DFLT>(DFLT serviceInstance) where DFLT : T, new()
-        {            
-            if (instanceContainer == null) Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create<DFLT>(serviceInstance), null);
-            instanceContainer.Instance = serviceInstance;
+            set
+            {
+                if (instanceContainer != null) instanceContainer.Instance = value;
+                else HandleUninitializedSet(value);
+            }
         }
-
-        public static void CreateLocalServiceInstance<DFLT>(DFLT localServiceInstance) where DFLT : T, new()
+        
+        public static void CreateLocalServiceInstance(T localServiceInstance = null)
         {
-            if (instanceContainer == null) Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create<DFLT>(localServiceInstance ?? new DFLT()), null);
-            instanceContainer.CreateLocalServiceInstance(localServiceInstance);
+            if (instanceContainer != null) instanceContainer.CreateLocalServiceInstance(localServiceInstance);
+            else if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction))
+            {
+                Init(createServiceAction);
+                instanceContainer.CreateLocalServiceInstance(localServiceInstance);
+            }
+            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
         }
+
+        public static void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
+        {
+            if (instanceContainer != null) instanceContainer.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);
+            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
+        }
+
+        private static void HandleUninitializedSet(T value)
+        {
+            if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction))
+            {
+                Init(createServiceAction);
+                instanceContainer.Instance = value;
+            }
+            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
+        }
+
+        private static T HandleUninitializedGet()
+        {
+            if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction))
+            {
+                Init(createServiceAction);
+                return instanceContainer.Instance;
+            }
+            else return null;
+        }
+
+        
 
         internal class ServiceInstanceContainer : IServiceInstanceContainer
         {
             T globalInstance;
-            AsyncLocal<T> localInstance;
+            LazyValue<AsyncLocal<T>> localInstance;
             Func<T> createInstance;
 
             private ServiceInstanceContainer()
             {                
             }
 
-            public static ServiceInstanceContainer Create<REAL>(T serviceInstance = null) where REAL:T, new()
-            {
-                var container = new ServiceInstanceContainer() { createInstance = () => new REAL(), globalInstance = serviceInstance ?? new REAL() };                
-                ServiceRegistry.RegisterService(container);
-                return container;
-            }
             public static ServiceInstanceContainer Create(Func<T> createInstance)
             {
                 var container = new ServiceInstanceContainer() { createInstance = createInstance, globalInstance = createInstance() };
@@ -63,36 +104,29 @@ namespace FeatureLoom.Services
 
             public T Instance
             {
-                get => localInstance?.Value ?? globalInstance;                    
+                get => localInstance.Exists ? localInstance.Obj.Value : globalInstance;
                 set
                 {
-                    if (localInstance != null) localInstance.Value = value;
+                    if (localInstance.Exists) localInstance.Obj.Value = value;
                     else globalInstance = value;
                 }
             }
 
             public void CreateLocalServiceInstance(T localServiceInstance)
             {
-                if (localInstance == null)
-                {
-                    Interlocked.CompareExchange(ref localInstance, new AsyncLocal<T>(), null);
-                }
-                localInstance.Value = localServiceInstance;
+
+                localInstance.Obj.Value = localServiceInstance ?? createInstance();
             }
 
             public void CreateLocalServiceInstance()
             {
-                if (localInstance == null)
-                {
-                    Interlocked.CompareExchange(ref localInstance, new AsyncLocal<T>(), null);
-                }
-                localInstance.Value = createInstance();
+                localInstance.Obj.Value = createInstance();
             }
 
             public void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
             {
-                if (useLocalInstanceAsGlobal) globalInstance = localInstance.Value;
-                localInstance = null;
+                if (localInstance.Exists && useLocalInstanceAsGlobal) globalInstance = localInstance.Obj.Value;
+                localInstance.RemoveObj();
             }
 
             public Type ServiceType => typeof(T);

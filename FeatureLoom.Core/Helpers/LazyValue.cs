@@ -33,5 +33,8 @@ namespace FeatureLoom.Helpers
         }        
 
         public static implicit operator T(LazyValue<T> lazy) => lazy.Obj;
+
+        public static implicit operator LazyValue<T>(T obj) => new LazyValue<T>(obj);
     }
+
 }

@@ -38,6 +38,19 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void LockReadOnly()
+        {
+            myLock.EnterReadOnly();
+            try
+            {
+            }
+            finally
+            {
+                myLock.ExitReadOnly();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock()
         {
             if (myLock.TryEnter())

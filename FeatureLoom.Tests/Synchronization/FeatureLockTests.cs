@@ -706,8 +706,6 @@ namespace FeatureLoom.Synchronization
                 Assert.True(myLock.IsWriteLocked);
                 Assert.True(acquiredLock.TryDowngradeToReadOnlyMode());
                 Assert.False(myLock.IsWriteLocked);
-
-                Assert.False(acquiredLock.TryDowngradeToReadOnlyMode());
             }
 
             using (var acquiredLock = myLock.Lock())
@@ -717,8 +715,6 @@ namespace FeatureLoom.Synchronization
                 Assert.False(myLock.IsWriteLocked);
                 Assert.True(acquiredLock.TryUpgradeToWriteMode());
                 Assert.True(myLock.IsWriteLocked);
-
-                Assert.False(acquiredLock.TryUpgradeToWriteMode());
             }
             Assert.False(myLock.IsLocked);
 
