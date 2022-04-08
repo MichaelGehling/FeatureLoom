@@ -43,7 +43,7 @@ namespace FeatureLoom.Services
             Assert.NotNull(testObj);
             Assert.Equal("A", testObj.TestString);
 
-            Factory.OverrideCreate<ITest>(() => new B());
+            Factory.Override<ITest>(() => new B());
             testObj = Factory.Create<ITest>(() => new A());
             Assert.NotNull(testObj);
             Assert.Equal("B", testObj.TestString);
@@ -56,10 +56,24 @@ namespace FeatureLoom.Services
             Assert.NotNull(testObj);
             Assert.Equal("B", testObj.TestString);
 
-            Factory.OverrideCreate<B>(() => new B("X"));
+            Factory.Override<B>(() => new B("X"));
             testObj = Factory.Create<B>(() => new B());
             Assert.NotNull(testObj);
             Assert.Equal("X", testObj.TestString);
+        }
+
+        [Fact]
+        public void OverrideCanBeRemoved()
+        {
+            Factory.Override<ITest>(() => new B());
+            ITest testObj = Factory.Create<ITest>(() => new A());
+            Assert.NotNull(testObj);
+            Assert.Equal("B", testObj.TestString);
+
+            Factory.RemoveOverride<ITest>();
+            testObj = Factory.Create<ITest>(() => new A());
+            Assert.NotNull(testObj);
+            Assert.Equal("A", testObj.TestString);
         }
 
     }

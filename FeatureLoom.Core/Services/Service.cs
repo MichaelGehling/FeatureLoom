@@ -29,6 +29,7 @@ namespace FeatureLoom.Services
         }
 
         public static bool IsInitialized => instanceContainer != null;
+        public static bool UsesLocalInstance => IsInitialized && instanceContainer.UsesLocalInstance;
 
         public static T Instance
         {
@@ -80,9 +81,7 @@ namespace FeatureLoom.Services
                 return instanceContainer.Instance;
             }
             else throw new Exception($"Service<{typeof(T)}> was not initialized.");
-        }
-
-        
+        }        
 
         internal class ServiceInstanceContainer : IServiceInstanceContainer
         {
@@ -101,6 +100,7 @@ namespace FeatureLoom.Services
                 return container;
             }
 
+            public bool UsesLocalInstance => localInstance.Exists;
 
             public T Instance
             {
