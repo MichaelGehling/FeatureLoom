@@ -30,7 +30,7 @@ namespace FeatureLoom.Services
             }
         }
 
-        public static IServiceInstanceContainer[] GetLocalServices()
+        public static IServiceInstanceContainer[] GetAllRegisteredServices()
         {
             using(registryLock.Lock())
             {
