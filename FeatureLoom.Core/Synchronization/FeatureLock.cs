@@ -40,17 +40,19 @@ namespace FeatureLoom.Synchronization
         {
             // The lower this value, the more candidates will wait, but not try to take the lock, in favour of the longer waiting candidates
             // 0 means that the wait order will be exactly respected (in nearly all cases), but it comes with a quite noticeable performance cost, especially for high frequency locking.
-            public ushort passiveWaitThreshold = 25;
+            public ushort passiveWaitThreshold = 35;
+            public ushort passiveWaitThresholdAsync = 35;
             // The lower this value, the more candidates will go to sleep (must not be smaller than PassiveWaitThreshold)
-            public ushort sleepWaitThreshold = 25;
+            public ushort sleepWaitThreshold = 200;
+            public ushort sleepWaitThresholdAsync = 50;
             // The lower this value, the later a sleeping candidate is waked up
             public ushort awakeThreshold = 15;
-            // The lower this value, the more often async threads yield
-            public ushort asyncYieldBaseFrequency = 100;
+            // The lower this value, the earlier the waiter must leave the synchronous path and the more often the waiter must make an async yield
+            public ushort asyncYieldBaseFrequency = 120;
             // The weight of the former averageWaitCount vs. the current waitCount (e.g. 3 means 3:1)
             public ushort averageWeighting = 3;
-            // How often the scheduler at least checks to wake up sleeping candidates (100 means 1.0ms). Whenever the lock is released the scheduler is triggered, anyway.
-            public ushort schedulerDelayFactor = 2000;
+            // How often the scheduler at least checks to wake up sleeping candidates (1 is 0.01ms, so 100 means 1.0ms). Whenever the lock is released the scheduler is triggered, anyway.
+            public ushort schedulerDelayFactor = 2200;
             // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
             // Comes with a quite noticeable performance cost, especially for high frequency locking.
             public bool restrictQueueJumping = false;
@@ -63,7 +65,7 @@ namespace FeatureLoom.Synchronization
         // Predefined settings, default is the same as PerformanceSettings, but can be changed.
         private static FeatureLockSettings defaultSettings = new FeatureLockSettings();
         private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
-        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20};
+        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20, passiveWaitThresholdAsync = 0, sleepWaitThresholdAsync = 20 };
         /// <summary>
         /// The settings that are used by all FeatureLock instances where settings were not explicitly set in the constructor.
         /// The DefaultSettings are the same as the prepared PerformanceSettings, but they can be changed, to affect all FeatureLock instances.
@@ -622,6 +624,16 @@ namespace FeatureLoom.Synchronization
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool MustWaitAsyncPassive(bool prioritized, int rank, bool readOnly)
+        {
+            if (prioritized) return false;
+            if (readOnly && IsReadOnlyLocked) return false;
+            //if (IsLocked) rank++;
+            if (rank * averageWaitCount <= Settings.passiveWaitThresholdAsync) return false;
+            return true;
+        }
+
         // Checks if the candidate must go to sleep based on its rank
         private bool MustWaitSleeping(int rank, bool readOnly)
         {            
@@ -629,6 +641,15 @@ namespace FeatureLoom.Synchronization
             if (sleepLock.IsLocked) return false;
             //if (IsLocked) rank++;
             return rank * averageWaitCount > Settings.sleepWaitThreshold;
+        }
+
+        // Checks if the candidate must go to sleep based on its rank
+        private bool MustWaitAsyncSleeping(int rank, bool readOnly)
+        {
+            if (readOnly && IsReadOnlyLocked) return false;
+            if (sleepLock.IsLocked) return false;
+            //if (IsLocked) rank++;
+            return rank * averageWaitCount > Settings.sleepWaitThresholdAsync;
         }
 
         // Checks if a sleeping candidate may be waked up
@@ -737,10 +758,10 @@ namespace FeatureLoom.Synchronization
             do
             {
                 rank = UpdateRank(ticket);
-                if (MustWaitPassive(prioritized, rank, readOnly))
+                if (MustWaitAsyncPassive(prioritized, rank, readOnly))
                 {
                     skip = true;
-                    if (MustWaitSleeping(rank, readOnly)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, false);
+                    if (MustWaitAsyncSleeping(rank, readOnly)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, false);
                     else if (MustYieldAsyncThread(rank, prioritized, ++counter)) return LockAsync_Wait_ContinueWithAwaiting(mode, ticket, prioritized, readOnly, counter, true);
                     else YieldCpuTime(true);
                 }
@@ -791,10 +812,10 @@ namespace FeatureLoom.Synchronization
             do
             {
                 rank = UpdateRank(ticket);
-                if (MustWaitPassive(prioritized, rank, readOnly))
+                if (MustWaitAsyncPassive(prioritized, rank, readOnly))
                 {
                     skip = true;
-                    if (MustWaitSleeping(rank, readOnly)) await SleepAsync(ticket, readOnly);
+                    if (MustWaitAsyncSleeping(rank, readOnly)) await SleepAsync(ticket, readOnly);
                     else if (MustYieldAsyncThread(rank, prioritized, ++counter)) await YieldThreadAsync();
                     else YieldCpuTime(true);
                 }
@@ -1194,10 +1215,10 @@ namespace FeatureLoom.Synchronization
                     return FailedAttemptTask;
                 }
 
-                if (MustWaitPassive(prioritized, rank, readOnly))
+                if (MustWaitAsyncPassive(prioritized, rank, readOnly))
                 {
                     skip = true;
-                    if (MustWaitSleeping(rank, readOnly)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, false);
+                    if (MustWaitAsyncSleeping(rank, readOnly)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, false);
                     if (MustYieldAsyncThread(rank, prioritized, counter++)) return TryLockAsync_Wait_ContinueWithAwaiting(mode, timer, ticket, prioritized, readOnly, counter, true);
                     else YieldCpuTime(true);
                 }
@@ -1254,10 +1275,10 @@ namespace FeatureLoom.Synchronization
                     return new LockAttempt(new LockHandle());
                 }
 
-                if (MustWaitPassive(prioritized, rank, readOnly))
+                if (MustWaitAsyncPassive(prioritized, rank, readOnly))
                 {
                     skip = true;
-                    if (MustWaitSleeping(rank, readOnly)) await TrySleepAsync(timer, ticket, readOnly);
+                    if (MustWaitAsyncSleeping(rank, readOnly)) await TrySleepAsync(timer, ticket, readOnly);
                     else if (MustYieldAsyncThread(rank, prioritized, counter++)) await YieldThreadAsync();
                     else YieldCpuTime(true);
                 }
@@ -1655,8 +1676,8 @@ namespace FeatureLoom.Synchronization
 
         public struct LockHandle : IDisposable
         {
+            private FeatureLock parentLock;
             private LockMode mode;
-            private FeatureLock parentLock;            
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal LockHandle(FeatureLock parentLock, LockMode mode)

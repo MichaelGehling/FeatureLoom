@@ -207,18 +207,15 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         private static void Work(TimeSpan time)
         {
             for (long i = 0; i < time.Ticks; i++)
-            {
-                // Simulating non CPU bound work (e.g. IO)
-                //if (i % 100 == 0) Thread.Sleep(0);
-                //else
+            {                                                
+                // simulating CPU bound work
+                for (int j = 0; j < 50; j++)
                 {
-                    // simulating CPU bound work
-                    for (int j = 0; j < 250; j++)
-                    {
-                        double x = Math.Sin((double)i * j);
-                    }
-                }
+                    double x = Math.Sin((double)i * j);
+                }                
             }
+            // Simulating non CPU bound work (e.g. IO)
+            if (time >= 0.001.Milliseconds()) Thread.Sleep(0);
         }
 
         protected async Task WaitAsync(TimeSpan time, IAsyncWaitHandle abortWaitHandle)

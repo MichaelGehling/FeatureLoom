@@ -6,7 +6,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
     [HtmlExporter]
-    public class Mixed5_CompareAll
+    public class Mixed1_CompareAll
     {
         private FeatureLockSubjects featureLockSubjects = new FeatureLockSubjects();
         private MonitorSubjects monitorSubjects = new MonitorSubjects();
@@ -20,7 +20,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
         private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
-        private MixedPerformanceTest test = new MixedPerformanceTest(5);
+        private MixedPerformanceTest test = new MixedPerformanceTest(1);
+        
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);
@@ -32,14 +33,13 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         public void FeatureLock_LockAsync_() => test.Run(featureLockSubjects.LockAsync);
 
         [Benchmark]
-        public void SemaphoreSlim_LockAsync_() => test.Run(semaphoreSlimSubjects.LockAsync);        
+        public void SemaphoreSlim_LockAsync_() => test.Run(semaphoreSlimSubjects.LockAsync);
 
         [Benchmark]
         public void MicroValueLock_Lock() => test.Run(microValueLockSubjects.Lock);
 
         [Benchmark]
         public void SpinLock_Lock() => test.Run(spinLockSubjects.Lock);
-
         /*
         [Benchmark]
         public void FeatureLock_LockPrio() => test.Run(featureLockSubjects.LockPrio);

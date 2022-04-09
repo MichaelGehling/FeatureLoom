@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace FeatureLoom.Services
 {
-    public static class Service<T> where T:class
+    public static partial class Service<T> where T:class
     {
         private static ServiceInstanceContainer instanceContainer;
 
@@ -81,56 +81,6 @@ namespace FeatureLoom.Services
                 return instanceContainer.Instance;
             }
             else throw new Exception($"Service<{typeof(T)}> was not initialized.");
-        }        
-
-        internal class ServiceInstanceContainer : IServiceInstanceContainer
-        {
-            T globalInstance;
-            LazyValue<AsyncLocal<T>> localInstance;
-            Func<T> createInstance;
-
-            private ServiceInstanceContainer()
-            {                
-            }
-
-            public static ServiceInstanceContainer Create(Func<T> createInstance)
-            {
-                var container = new ServiceInstanceContainer() { createInstance = createInstance, globalInstance = createInstance() };
-                ServiceRegistry.RegisterService(container);
-                return container;
-            }
-
-            public bool UsesLocalInstance => localInstance.Exists;
-
-            public T Instance
-            {
-                get => localInstance.Exists ? localInstance.Obj.Value ?? globalInstance : globalInstance;
-                set
-                {
-                    if (localInstance.Exists) localInstance.Obj.Value = value;
-                    else globalInstance = value;
-                }
-            }
-
-            public void CreateLocalServiceInstance(T localServiceInstance)
-            {
-
-                localInstance.Obj.Value = localServiceInstance ?? createInstance();
-            }
-
-            public void CreateLocalServiceInstance()
-            {
-                localInstance.Obj.Value = createInstance();
-            }
-
-            public void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
-            {
-                if (localInstance.Exists && useLocalInstanceAsGlobal) globalInstance = localInstance.Obj.Value;
-                localInstance.RemoveObj();
-            }
-
-            public Type ServiceType => typeof(T);
-            object IServiceInstanceContainer.Instance => Instance;
-        }
+        }                      
     }    
 }

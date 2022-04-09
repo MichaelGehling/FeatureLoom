@@ -11,7 +11,7 @@ namespace FeatureLoom.Time
         private static Stopwatch stopWatch = new Stopwatch();
         private static DateTime coarseTimeBase;
         private static int coarseMillisecondCountBase;
-        private static TimeSpan lowerSleepLimit = 18.Milliseconds();
+        private static TimeSpan lowerSleepLimit = 16.Milliseconds();
 
         static AppTime()
         {
@@ -82,13 +82,14 @@ namespace FeatureLoom.Time
 
             if (timer.Elapsed > minTimeout || cancellationToken.IsCancellationRequested) return;
 
-            if (timer.LastElapsed < minTimeout - 0.1.Milliseconds())
+            var lowPrioLimit = minTimeout - 0.1.Milliseconds();
+            if (timer.LastElapsed < lowPrioLimit)
             {
                 var oldPriority = Thread.CurrentThread.Priority;
                 try
                 {
                     Thread.CurrentThread.Priority = ThreadPriority.Lowest;
-                    while (timer.Elapsed < minTimeout - 0.1.Milliseconds() && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
+                    while (timer.Elapsed < lowPrioLimit && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
                 }
                 finally
                 {
