@@ -18,7 +18,7 @@ namespace FeatureLoom.Storages
 
         Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null);
 
-        bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink notificationSink);
+        bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink);
 
         bool Exists(string uri);
     }

@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Workflows;
+using System;
 using System.Windows.Forms;
 
 namespace FeatureLoom.Forms
@@ -36,6 +37,24 @@ namespace FeatureLoom.Forms
             Control parent = control.Parent;
             while (parent != null && !(parent is T) && (name == null || parent.Name != name)) parent = parent.Parent;
             return parent as T;
+        }
+
+        public static ControMaskOut GetMaskOut(this Control control) => new ControMaskOut(control);
+    }    
+
+    public struct ControMaskOut : IDisposable
+    {
+        Control control;
+
+        public ControMaskOut(Control control)
+        {
+            this.control = control;            
+            control.Hide();
+        }
+
+        public void Dispose()
+        {
+            control.Show();
         }
     }
 }

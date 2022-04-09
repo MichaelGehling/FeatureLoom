@@ -1,5 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using FeatureLoom.Synchronization;
+using System.Collections.Generic;
 
 namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
 {
@@ -26,8 +27,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
         private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
-        [Benchmark]
-        public void MicroSpinLock_Lock_() => microSpinLockSubjects.Lock();
+        Dictionary<string, string> dict = new Dictionary<string, string>();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();

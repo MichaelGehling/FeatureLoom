@@ -11,15 +11,17 @@ namespace FeatureLoom.Time
         public readonly DateTime utcEndTime;
 
         public TimeFrame(TimeSpan duration)
-        {
+        {            
             if (duration >= TimeSpan.Zero)
             {
                 this.utcStartTime = duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+                duration = duration.ClampHigh(DateTime.MaxValue.Subtract(utcStartTime));
                 this.utcEndTime = utcStartTime + duration;
             }
             else
             {
                 this.utcEndTime = duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+                duration = duration.ClampLow(DateTime.MaxValue.Subtract(utcEndTime));
                 this.utcStartTime = utcEndTime + duration;
             }
         }
@@ -27,7 +29,7 @@ namespace FeatureLoom.Time
         public TimeFrame(DateTime startTime, DateTime endTime)
         {
             startTime = startTime.ToUniversalTime();
-            endTime = startTime.ToUniversalTime();            
+            endTime = endTime.ToUniversalTime();            
             this.utcStartTime = endTime > startTime ? startTime : endTime;
             this.utcEndTime = endTime > startTime ? endTime : startTime;
         }

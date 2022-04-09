@@ -6,7 +6,7 @@ namespace FeatureLoom.Workflows
 {
     public interface IWorkflowRunner
     {
-        void Run(Workflow workflow);
+        Task RunAsync(Workflow workflow);
 
         IEnumerable<Workflow> RunningWorkflows { get; }
 

@@ -41,6 +41,7 @@ namespace FeatureLoom.Serialization
                     default_SerializerSettings.Formatting = Formatting.Indented;
                     default_SerializerSettings.TypeNameHandling = TypeNameHandling.None;
                     default_SerializerSettings.ObjectCreationHandling = ObjectCreationHandling.Replace;
+                    default_SerializerSettings.ContractResolver = new MyContractResolver();
                     /*default_SerializerSettings.Error = (sender, args) =>
                     {
                         Log.WARNING($"Serializing or deserializing caused an error: {args.ErrorContext.Error.Message}");
@@ -265,19 +266,17 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public class MyContractResolver : Newtonsoft.Json.Serialization.DefaultContractResolver
+        public class MyContractResolver : DefaultContractResolver
         {
             protected override IList<JsonProperty> CreateProperties(Type type, MemberSerialization memberSerialization)
             {
-                var props = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                                .Select(p => base.CreateProperty(p, memberSerialization))
-                            .Union(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                                        .Select(f => base.CreateProperty(f, memberSerialization)))
+                var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => base.CreateProperty(p, memberSerialization))
+                            .Union(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Select(f => base.CreateProperty(f, memberSerialization)))
                             .ToList();
                 props.ForEach(p => { p.Writable = true; p.Readable = true; });
 
                 return props;
             }
         }
-    }
+    }    
 }

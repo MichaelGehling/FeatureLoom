@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Storages;
@@ -6,6 +7,7 @@ using FeatureLoom.Synchronization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
 using System;
@@ -26,16 +28,19 @@ namespace FeatureLoom.Web
 
         private Config config = new Config();
         private FeatureLock myLock = new FeatureLock();
-        public bool started = false;
+        private bool running = false;
         private IWebHost webserver;
+        private byte[] favicon;
 
-        //public List<Action<IServiceCollection>> serviceExtensions = new List<Action<IServiceCollection>>();
-        public SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>();
-
-        public List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
+        // Invert comparer, so that when one route is the start of the second, the second will come first, so the more specifc before the less specific 
+        static readonly IComparer<string> routeComparer = new GenericComparer<string>((route1, route2) => -route1.CompareTo(route2));
+        private SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
+        private List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
+        private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
         public DefaultWebServer()
         {
+            favicon = Resources.favicon;
             TryUpdateConfigAsync().WaitFor();
         }
 
@@ -43,26 +48,30 @@ namespace FeatureLoom.Web
         {
             if (await config.TryUpdateFromStorageAsync(false))
             {
+                bool wasRunning = running;
+                if (wasRunning) Stop();
                 foreach (var endpoint in config.endpointConfigs.EmptyIfNull())
-                {
+                {                    
                     AddEndpoint(endpoint);
+
                 }
+                if (wasRunning) _ = Run();
                 return true;
             }
             return false;
         }
 
-        public bool Started => started;
+        public bool Running => running;
 
         public void AddEndpoint(HttpEndpointConfig endpoint)
         {
             using (myLock.Lock())
             {                
                 endpoints.Add(endpoint);
-                if (started)
+                if (running)
                 {
                     Stop();
-                    Start();
+                    Run();
                 }
             }
         }
@@ -72,14 +81,9 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
                 requestHandlers.Add(handler.Route, handler);
                 this.requestHandlers = requestHandlers;
-                if (started)
-                {
-                    Stop();
-                    Start();
-                }
             }
         }
 
@@ -88,14 +92,9 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
                 requestHandlers.Remove(handler.Route);
                 this.requestHandlers = requestHandlers;
-                if (started)
-                {
-                    Stop();
-                    Start();
-                }
             }
         }
 
@@ -104,14 +103,44 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (started) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers);
+                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
                 else requestHandlers.Clear();
                 this.requestHandlers = requestHandlers;
-                if (started)
-                {
-                    Stop();
-                    Start();
-                }
+
+            }
+        }
+
+        public void AddRequestInterceptor(IWebRequestInterceptor interceptor)
+        {
+            using (myLock.Lock())
+            {
+                var currentRequestInterceptors = this.requestInterceptors;
+                if (running) currentRequestInterceptors = new List<IWebRequestInterceptor>(currentRequestInterceptors);
+                currentRequestInterceptors.Add(interceptor);
+                this.requestInterceptors = currentRequestInterceptors;
+            }
+        }
+
+        public void RemoveRequestInterceptor(IWebRequestInterceptor interceptor)
+        {
+            using (myLock.Lock())
+            {
+                var currentRequestInterceptors = this.requestInterceptors;
+                if (running) currentRequestInterceptors = new List<IWebRequestInterceptor>(currentRequestInterceptors);
+                currentRequestInterceptors.Remove(interceptor);
+                this.requestInterceptors = currentRequestInterceptors;
+            }
+        }
+
+        public void ClearRequestInterceptors()
+        {
+            using (myLock.Lock())
+            {
+                var currentRequestInterceptors = this.requestInterceptors;
+                if (running) currentRequestInterceptors = new List<IWebRequestInterceptor>();
+                else currentRequestInterceptors.Clear();
+                this.requestInterceptors = currentRequestInterceptors;
+
             }
         }
 
@@ -120,39 +149,165 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 endpoints.Clear();
-                if (started)
+                if (running)
                 {
                     Stop();
-                    Start();
+                    Run();
                 }
             }
         }
 
-        public void ExecuteHandlers(IApplicationBuilder app)
+        public void Stop()
         {
-            var requestHandlers = this.requestHandlers;
-            foreach (var handler in requestHandlers)
+            if (webserver != null)
             {
-                app.Map(handler.Value.Route, app2 => app2.Run(async context =>
+                webserver.StopAsync().WaitFor();
+            }
+        }
+
+        public async Task StopAsync()
+        {
+            if (webserver != null)
+            {
+                await webserver.StopAsync();
+            }
+        }
+
+        public void SetIcon(byte[] favicon)
+        {
+            this.favicon = favicon;
+        }
+
+        public Task Run()
+        {
+            return Task.Run(() =>
+            {
+                running = true;
+
+                this.webserver = new WebHostBuilder()
+                .UseKestrel(ApplyEndpoints)
+                .Configure(applicationBuilder =>
                 {
-                    ContextWrapper contextWrapper = new ContextWrapper(context);
-                    await handler.Value.HandleRequestAsync(contextWrapper, contextWrapper);
-                }));
+                    applicationBuilder.Map("", _applicationBuilder =>
+                    {
+                        _applicationBuilder.Run(HandleWebRequest);
+                    });
+                })
+                .Build();
+
+                this.webserver.Run();
+                this.running = false;
+            });
+        }
+
+        private async Task HandleWebRequest(HttpContext context)
+        {
+            ContextWrapper contextWrapper = new ContextWrapper(context);
+            IWebRequest request = contextWrapper;
+            IWebResponse response = contextWrapper;
+
+            try
+            {
+                string path = context.Request.Path;
+
+                // Shortcut to deliver icon.
+                // If icon needs to be handled dynamically in a handler, the shortcut can be skipped by setting the favicon to null.
+                if (favicon != null && request.IsGet && path == "/favicon.ico")
+                {
+                    response.StatusCode = HttpStatusCode.OK;
+                    await response.Stream.WriteAsync(this.favicon, 0, favicon.Length);                    
+                    return; // icon was delivered, so finish request handling
+                }
+
+                var currentInterceptors = this.requestInterceptors; // take current reference to avoid change while execution.
+                foreach (var interceptor in currentInterceptors)
+                {
+                    if (await interceptor.InterceptRequestAsync(request, response))
+                    {                      
+                        return; // request was intercepted, so finish request handling
+                    }
+                }
+
+                var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
+                foreach (var handler in currentRequestHandlers)
+                {
+                    if (path.StartsWith(handler.Key))
+                    {
+                        contextWrapper.SetRoute(handler.Key);
+                        if (await handler.Value.HandleRequestAsync(request, response))
+                        {
+                            return; // request was handled, so finish request handling
+                        }
+                    }
+
+                }
+
+                // Request was not handled so NotFound StatusCode is set, but it has to be ensured that the response stream whas not already written.
+                if (!response.ResponseSent)
+                {
+                    response.StatusCode = HttpStatusCode.NotFound;
+                }
+            }
+            catch (WebResponseException e)
+            {
+                if (e.LogLevel.HasValue) Log.SendLogMessage(new LogMessage(e.LogLevel.Value, e.InternalMessage));
+                response.StatusCode = e.StatusCode;
+                if (!e.ResponseMessage.EmptyOrNull()) await response.WriteAsync(e.ResponseMessage);
+            }
+            catch (Exception e)
+            {
+                Log.ERROR(this.GetHandle(), "Web request failed with an exception!", e.ToString());
+                response.StatusCode = HttpStatusCode.InternalServerError;
+            }
+        }
+
+        private async void ApplyEndpoints(KestrelServerOptions options)
+        {
+            options.Limits.MaxRequestBodySize = null;
+            options.AllowSynchronousIO = false;
+            foreach (var endpoint in endpoints)
+            {
+                if (endpoint.address == null) continue;
+
+                if (!endpoint.certificateName.EmptyOrNull())
+                {
+                    if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
+                    {
+                        options.Listen(endpoint.address, endpoint.port, listenOptions =>
+                        {
+                            listenOptions.UseHttps(certificate);
+                        });
+                    }
+                    else
+                    {
+                        Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
+                    }
+                }
+                else
+                {
+                    options.Listen(endpoint.address, endpoint.port);
+                }
             }
         }
 
         private class ContextWrapper : IWebRequest, IWebResponse
         {
             private HttpContext context;
+            private string route = "";
+            private bool responseSent = false;
+
+            public void SetRoute(string route) => this.route = route;
 
             public ContextWrapper(HttpContext context)
             {
                 this.context = context;
             }
 
-            string IWebRequest.BasePath => context.Request.PathBase;
+            string IWebRequest.BasePath => context.Request.PathBase + route;
 
             string IWebRequest.FullPath => context.Request.PathBase + context.Request.Path;
+
+            string IWebRequest.RelativePath => context.Request.Path.ToString().Substring(route.Length);
 
             Stream IWebRequest.Stream => context.Request.Body;
 
@@ -172,9 +327,7 @@ namespace FeatureLoom.Web
 
             bool IWebRequest.IsHead => HttpMethods.IsHead(context.Request.Method);
 
-            string IWebRequest.Method => context.Request.Method;
-
-            string IWebRequest.RelativePath => context.Request.Path;
+            string IWebRequest.Method => context.Request.Method;            
 
             HttpStatusCode IWebResponse.StatusCode { get => (HttpStatusCode)context.Response.StatusCode; set => context.Response.StatusCode = (int)value; }
 
@@ -185,6 +338,10 @@ namespace FeatureLoom.Web
                     return (context.Request.IsHttps ? "https://" : "http://") + context.Request.Host.Value;
                 }
             }
+
+
+            bool IWebResponse.ResponseSent => responseSent;
+
 
             void IWebResponse.AddCookie(string key, string content, CookieOptions options)
             {
@@ -221,79 +378,13 @@ namespace FeatureLoom.Web
                 }
             }
 
+            IEnumerable<string> IWebRequest.GetAllQueryKeys() => context.Request.Query.Keys;
+
             Task IWebResponse.WriteAsync(string reply)
             {
+                responseSent = true;
                 return context.Response.WriteAsync(reply);
             }
-        }
-
-        public void Start()
-        {
-            Task.Run(() =>
-            {
-                started = true;
-
-                this.webserver = new WebHostBuilder()
-                .UseKestrel(async options =>
-                {
-                    options.Limits.MaxRequestBodySize = null;
-                    options.AllowSynchronousIO = false;
-                    foreach (var endpoint in endpoints)
-                    {
-                        if (endpoint.address == null) continue;
-
-                        if (endpoint.certificateName != null)
-                        {
-                            if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
-                            {
-                                options.Listen(endpoint.address, endpoint.port, listenOptions =>
-                                {
-                                    listenOptions.UseHttps(certificate);
-                                });
-                            }
-                            else
-                            {
-                                Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
-                            }
-                        }
-                        else
-                        {
-                            options.Listen(endpoint.address, endpoint.port);
-                        }
-                    }
-                })
-                /*.ConfigureServices(services =>
-                {
-                    foreach (var extend in serviceExtensions)
-                    {
-                        extend(services);
-                    }
-                })*/
-                .Configure(app =>
-                {
-                    app.Map("", ExecuteHandlers);
-                })
-                .Build();
-
-                this.webserver.Run();
-                this.started = false;
-            });
-        }
-
-        public void Stop()
-        {
-            if (webserver != null)
-            {
-                webserver.StopAsync().WaitFor();
-            }
-        }
-
-        public async Task StopAsync()
-        {
-            if (webserver != null)
-            {
-                await webserver.StopAsync();
-            }
-        }
+        }        
     }
 }

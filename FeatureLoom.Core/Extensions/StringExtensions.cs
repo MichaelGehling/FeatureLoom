@@ -155,20 +155,85 @@ namespace FeatureLoom.Extensions
             return str;
         }
 
+        public static string TrimStart(this string str, string trimStr)
+        {
+            // TODO: Not very efficient when trim is performed multiple times... improve!
+            while (str.StartsWith(trimStr))
+            {
+                str = str.Substring(trimStr.Length);
+            }
+            return str;
+        }
+
+        public static bool TryExtract<T>(this string str, string startExtractAfter, string endExtractBefore, out T extract, out int restStartIndex) where T : IConvertible
+        {
+            return str.TryExtract(0, startExtractAfter, endExtractBefore, out extract, out restStartIndex);
+        }
+
+        /// <summary>
+        /// Extracts a part of a string and converts it to the specified (convertible) type.
+        /// Note: Uses the current threads culture for conversions
+        /// </summary>
+        /// <typeparam name="T">The convertible type the extracted part is converted to</typeparam>
+        /// <param name="str">The input string</param>
+        /// <param name="startIndex">The index where the search for the startmarker starts</param>
+        /// <param name="startExtractAfter"></param>
+        /// <param name="endExtractBefore"></param>
+        /// <param name="extract"></param>
+        /// <param name="restStartIndex"></param>
+        /// <returns></returns>
+        public static bool TryExtract<T>(this string str, int startIndex, string startExtractAfter, string endExtractBefore, out T extract, out int restStartIndex, bool includeSearchStrings = false) where T : IConvertible
+        {
+            extract = default;
+            bool success = true;
+
+            string substring = str.Substring(startIndex, startExtractAfter, endExtractBefore, out restStartIndex, includeSearchStrings);
+            if (substring != null)
+            {
+                if (substring is T extractedStr)
+                {
+                    extract = extractedStr;
+                }
+                else
+                {
+                    extract = substring.ConvertTo<T>();
+                }
+            }
+            else success = false;
+
+            return success;
+        }
+
         public static string Substring(this string str, string startAfter, string endBefore = null)
         {
-            int startPos = 0;
+            return str.Substring(0, startAfter, endBefore, out _);
+        }
+
+        public static string Substring(this string str, int startIndex, string startAfter, string endBefore, out int restStartIndex, bool includeSearchStrings = false)
+        {
+            int startPos = startIndex;
+            restStartIndex = startPos;
             int endPos = str.Length;
+            bool abort = false;
+
             if (!startAfter.EmptyOrNull())
             {
-                startPos = str.IndexOf(startAfter) + startAfter.Length;
+                startPos = str.IndexOf(startAfter, startIndex);
+                abort = startPos == -1;
+                startPos += startAfter.Length;
             }
-            if (startPos == -1) return "";
+            if (abort) return null;
+
             if (!endBefore.EmptyOrNull())
             {
                 endPos = str.IndexOf(endBefore, startPos);
+                abort = endPos == -1;
+                endPos += (includeSearchStrings ? endBefore.Length : 0);
             }
-            if (endPos == -1) return "";
+            if (abort) return null;
+
+            restStartIndex = endPos;
+            if (includeSearchStrings) startPos -= startAfter.Length;
             return str.Substring(startPos, endPos - startPos);
         }
 
@@ -222,18 +287,34 @@ namespace FeatureLoom.Extensions
             return str.IndexOf(searchStr, 0, endPos) >= 0;
         }
 
+        /// <summary>
+        /// Conveerts a string to an convertible type.
+        /// Note: Uses the current threads culture for conversions
+        /// </summary>
         public static T ConvertTo<T>(this string str) where T : IConvertible
-        {
+        {            
             return (T)Convert.ChangeType(str, typeof(T));
         }
 
-        public static string  GetStringAndClear(this StringBuilder sb)
+        public static string GetStringAndClear(this StringBuilder sb)
         {
             string str = sb.ToString();
             sb.Clear();
             return str;
         }
-        
+
+#if NETSTANDARD2_0 
+        public static string[] Split(this string str, char seperator, StringSplitOptions options)
+        {
+            return str.Split(seperator.ToSingleEntryArray(), options);
+        }
+
+        public static string[] Split(this string str, char seperator, int count, StringSplitOptions options)
+        {
+            return str.Split(seperator.ToSingleEntryArray(), count, options);
+        }
+#endif
+
     }
 
 }

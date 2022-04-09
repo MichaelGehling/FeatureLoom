@@ -4,6 +4,7 @@ using FeatureLoom.Logging;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using System.Collections.Generic;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Diagnostics
 {
@@ -13,6 +14,7 @@ namespace FeatureLoom.Diagnostics
 
         public static void PrepareTestContext(bool disconnectLoggers = true, bool useMemoryStorage = true, bool bufferLogErrorsAndWarnings = true)
         {
+            ServiceRegistry.CreateLocalInstancesForAllServices();
             ServiceContext.UseNewContexts();
             if (disconnectLoggers)
             {

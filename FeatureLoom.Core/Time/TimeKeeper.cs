@@ -9,7 +9,8 @@ namespace FeatureLoom.Time
 
         public TimeKeeper(TimeSpan startTime)
         {
-            Restart(startTime);
+            this.startTime = startTime;
+            this.lastElapsed = startTime;
         }
 
         public TimeSpan Elapsed

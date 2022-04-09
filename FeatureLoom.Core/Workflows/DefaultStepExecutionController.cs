@@ -141,7 +141,7 @@ namespace FeatureLoom.Workflows
                     proceed = false;
                     Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
                 }
-                else throw e.InnerOrSelf();
+                else throw;
             }
             context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
@@ -289,7 +289,7 @@ namespace FeatureLoom.Workflows
                     proceed = false;
                     Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
                 }
-                else throw e.InnerOrSelf();
+                else throw;
             }
             context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);

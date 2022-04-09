@@ -7,9 +7,9 @@ namespace FeatureLoom.Workflows
 {
     public class ThreadPoolRunner : AbstractRunner
     {
-        public override void Run(Workflow workflow)
+        public override Task RunAsync(Workflow workflow)
         {
-            Task.Run(() =>
+            return Task.Run(() =>
             {
                 AddToRunningWorkflows(workflow);
                 try

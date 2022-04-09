@@ -42,6 +42,7 @@ namespace FeatureLoom.Web
         {
             this.address = address;
             this.port = port;
+            this.hostAddress = null;
         }
 
         public HttpEndpointConfig(IPAddress address, int port, string certificateName)

@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>FeatureLoom.Forms</id>
-    <version>0.1.14-alpha</version>
+    <version>0.2.1-alpha</version>
     <title>FeatureLoom.Forms</title>
     <authors>Michael Gehling</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -14,7 +14,7 @@
     <copyright>Copyright (c) 2020 Michael Gehling</copyright>
     <tags>FeatureLoom Forms</tags>
     <dependencies>
-      <dependency id="FeatureLoom.Core" version="0.1.14-alpha" />
+      <dependency id="FeatureLoom.Core" version="0.2.0-alpha" />
     </dependencies>
   </metadata>
 </package>

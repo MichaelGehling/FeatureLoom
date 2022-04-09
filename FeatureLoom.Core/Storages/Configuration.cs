@@ -82,9 +82,9 @@ namespace FeatureLoom.Storages
         [JsonIgnore]
         public bool HasSubscriptionUpdate => (!subscriptionReceiver.ObjIfExists?.IsEmpty) ?? false;
 
-        public async Task<bool> TryWriteToStorageAsync()
+        public Task<bool> TryWriteToStorageAsync()
         {
-            return await Writer.TryWriteAsync(Uri, this);
+            return Writer.TryWriteAsync(Uri, this);
         }
 
         public bool TryWriteToStorage()
@@ -168,6 +168,17 @@ namespace FeatureLoom.Storages
                 }
             }
             return success;
+        }
+    }
+
+    public static class ConfigurationExtensions
+    {
+        public static async Task TryUpdateFromStorageOrWriteAsync(this Configuration config, bool useSubscription)
+        {
+            if (!await config.TryUpdateFromStorageAsync(useSubscription))
+            {
+                await config.TryWriteToStorageAsync();
+            }
         }
     }
 }

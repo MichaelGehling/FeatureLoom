@@ -93,6 +93,8 @@ namespace FeatureLoom.Forms
             return property;
         }
 
+        public int CountProperties => properties.Count;
+
         public bool ExistsProperty(string name) => properties.ContainsKey(name);
 
         public bool TryGetProperty(string name, out Property property) => properties.TryGetValue(name, out property);

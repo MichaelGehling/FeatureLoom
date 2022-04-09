@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using Newtonsoft.Json;
@@ -11,7 +12,93 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Serialization
 {
-    public class UnivarsalJsonSerializer : ISerializer
+    public class AdaptableJsonSerializer : ISerializer, IDeserializer
+    {
+
+        private bool TryJTokenToObj<T>(JToken jToken, out T obj)
+        {
+            var result = jToken.ToObject<T>();
+            if (result != null)
+            {
+                obj = result;
+                return true;
+            }
+            else
+            {
+                obj = default;
+                return false;
+            }
+        }
+
+        public bool TryDeserialize<T>(byte[] data, out T obj)
+        {
+            string jsonStr = data.GetString();
+            return TryDeserialize(jsonStr, out obj);
+        }
+
+        public bool TryDeserialize<T>(string data, out T obj)
+        {
+            try
+            {
+                var jToken = JToken.Parse(data);
+                return TryJTokenToObj(jToken, out obj);
+            }
+            catch(Exception e)
+            {
+                Log.WARNING(this.GetHandle(), $"Failed deserializing to JSON", e.ToString());
+                obj = default;
+                return false;
+            }
+        }
+
+        public async Task<AsyncOut<bool, T>> TryDeserializeFromStreamAsync<T>(Stream stream, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                using (TextReader textReader = new StreamReader(stream))
+                using (JsonReader jsonReader = new JsonTextReader(textReader))
+                {
+                    var jToken = await JToken.LoadAsync(jsonReader, cancellationToken);
+                    if (TryJTokenToObj(jToken, out T obj)) return (true, obj);
+                    else return (false, default);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.WARNING(this.GetHandle(), $"Failed reading JSON from Stream", e.ToString());
+                return (false, default);
+            }
+        }
+
+        public bool TrySerialize<T>(T obj, out string data)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TrySerialize<T>(T obj, out byte[] data)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TrySerializeToStreamAsync<T>(T obj, Stream stream)
+        {
+            throw new NotImplementedException();
+        }
+#if NETSTANDARD2_1_OR_GREATER
+        public bool TryDeserialize<T>(ReadOnlySpan<char> data, out T obj)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryDeserialize<T>(ReadOnlySpan<byte> data, out T obj)
+        {
+            throw new NotImplementedException();
+        }
+#endif
+    }
+
+    /*
+    public class UnivarsalJsonSerializer
     {
         private JsonSerializer serializer;
 
@@ -133,4 +220,5 @@ namespace FeatureLoom.Serialization
             }
         }
     }
+    */
 }

@@ -112,7 +112,7 @@ namespace FeatureLoom.Storages
             return Task.FromResult(false);
         }
 
-        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink notificationSink)
+        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
         {
             Log.WARNING(this.GetHandle(), "Subscription is currently not supported!");
             return false;

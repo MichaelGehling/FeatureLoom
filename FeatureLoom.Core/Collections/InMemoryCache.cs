@@ -129,13 +129,15 @@ namespace FeatureLoom.Collections
             else cleanUpActive = true;
             Task.Run(() =>
             {
+                DateTime now = AppTime.CoarseNow;
+                lastCleanUp = now;
+
                 ICollection<CacheItem> items;
                 using (storageLock.Lock())
                 {
                     items = storage.Values;
                 }
-
-                DateTime now = AppTime.CoarseNow;
+                
                 var orderedItems = items.OrderBy(item =>
                 {
                     if ((now - item.lastAccessTime).TotalSeconds > settings.maxUnusedTimeInSeconds) return 0;
@@ -161,7 +163,6 @@ namespace FeatureLoom.Collections
                     else break;
                 }
 
-                lastCleanUp = now;
                 cleanUpActive = false;
             });
         }

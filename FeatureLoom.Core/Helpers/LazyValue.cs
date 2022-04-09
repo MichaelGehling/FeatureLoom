@@ -21,12 +21,20 @@ namespace FeatureLoom.Helpers
 
         public bool Exists => obj != null;
 
+        public void RemoveObj()
+        {
+            obj = default;
+        }
+
         private T Create()
         {
             Interlocked.CompareExchange(ref obj, new T(), null);
             return obj;
-        }
+        }        
 
         public static implicit operator T(LazyValue<T> lazy) => lazy.Obj;
+
+        public static implicit operator LazyValue<T>(T obj) => new LazyValue<T>(obj);
     }
+
 }

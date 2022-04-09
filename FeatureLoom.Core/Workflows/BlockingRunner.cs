@@ -1,8 +1,10 @@
-﻿namespace FeatureLoom.Workflows
+﻿using System.Threading.Tasks;
+
+namespace FeatureLoom.Workflows
 {
     public class BlockingRunner : AbstractRunner
     {
-        public override void Run(Workflow workflow)
+        public override Task RunAsync(Workflow workflow)
         {
             AddToRunningWorkflows(workflow);
             try
@@ -11,8 +13,9 @@
             }
             finally
             {
-                RemoveFromRunningWorkflows(workflow);
+                RemoveFromRunningWorkflows(workflow);                
             }
+            return Task.CompletedTask;
         }
     }
 }

@@ -15,7 +15,7 @@ namespace FeatureLoom.MessageFlow
 
         protected override void HandleMessage<M>(M message)
         {
-            if (message is T trigger && triggerCondition(trigger)) Trigger();
+            if (message is T trigger && (triggerCondition == null || triggerCondition(trigger))) Trigger();
             if (message is R reset && resetCondition != null && resetCondition(reset)) Reset();
         }
     }

@@ -134,7 +134,11 @@ namespace FeatureLoom.MessageFlow
 
         public void Post<M>(M message)
         {
-            Post(in message);
+            if (sourceHelper.CountConnectedSinks > 0)
+            {
+                receiver.Post(message);
+                ManageThreadCount();
+            }
         }
 
         private void ManageThreadCount()
@@ -143,24 +147,20 @@ namespace FeatureLoom.MessageFlow
             {
                 Interlocked.Increment(ref numThreads);
                 if (numThreads > maxThreadsOccurred) maxThreadsOccurred = numThreads;
-                _ = Run();
+                Task.Run(ForwardingLoop);
             }
         }
 
         public Task PostAsync<M>(M message)
         {
-            if (sourceHelper.CountConnectedSinks > 0)
-            {
-                Task task = receiver.PostAsync(message);
-                ManageThreadCount();
-                return task;
-            }
-            else return Task.CompletedTask;
+            Post(message);
+            return Task.CompletedTask;
         }
 
-        private async Task Run()
+        private async Task ForwardingLoop()
         {
-            while ((await receiver.TryReceiveAsync(maxIdleMilliseconds.Milliseconds())).Out(out T message))
+            var timeout = maxIdleMilliseconds.Milliseconds();
+            while ((await receiver.TryReceiveAsync(timeout)).Out(out T message))
             {
                 try
                 {

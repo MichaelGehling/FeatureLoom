@@ -3,8 +3,8 @@ using FeatureLoom.Synchronization;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.Scheduling;
-using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
+using FeatureLoom.Extensions;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -14,6 +14,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using FeatureLoom.MessageFlow;
 using System.Text;
+using FeatureLoom.Workflows;
+using FeatureLoom.Web;
+using System.Net;
+using FeatureLoom.Storages;
+using FeatureLoom.Security;
+using System.IO;
+using System.Globalization;
 
 namespace Playground
 {
@@ -25,11 +32,36 @@ namespace Playground
         }
     }
 
-    
+
+    public class TestWF : Workflow<TestWF.SM>
+    {
+        int iterations = 1_000_000;
+        int currentIteration = -1;
+
+        public class SM : StateMachine<TestWF>
+        {
+            protected override void Init()
+            {
+                var run = State("Run");
+
+                run.Build()
+                    .Step()
+                        .Do(c => c.currentIteration++)
+                    .Step()
+                        .Do(async c => await Task.CompletedTask)
+                    .Step()
+                        .If(c => c.currentIteration < c.iterations)
+                            .Loop()
+                        .Else()
+                            .Finish();
+            }
+        }
+    }
+
 
     partial class Program
     {
-        
+               
 
         public static void BackgroundTest()
         {
@@ -41,41 +73,145 @@ namespace Playground
             }
             Console.WriteLine(tk.Elapsed.Ticks * 100 / 1_000_000);
         }
-        
+
+        static int dummy = 0;
+        static int numIterations = 10_000_000;
+
+
+        public static void TestSync()
+        {
+            var runner = new BlockingRunner();
+            var tk = AppTime.TimeKeeper;            
+            runner.RunAsync(new TestWF()).WaitFor();
+            Console.WriteLine($"TestSync: {tk.Elapsed.TotalMilliseconds}");
+        }
+
+        public static async Task TestAsync()
+        {
+            var runner = new AsyncRunner();
+            var tk = AppTime.TimeKeeper;
+            await runner.RunAsync(new TestWF());
+            Console.WriteLine($"TestAsync: {tk.Elapsed.TotalMilliseconds}");
+        }
+
+        public static async Task TestSmartAsync()
+        {
+            var runner = new SmartAsyncRunner();
+            var tk = AppTime.TimeKeeper;
+            await runner.RunAsync(new TestWF());
+            Console.WriteLine($"TestSmartAsync: {tk.Elapsed.TotalMilliseconds}");
+        }
+
+        public class TestConfig : Configuration
+        {
+            public string aaa = "Hallo";
+            public int bbb = 99;
+        }    
+
         private static void Main()
         {
-            Pool<List<string>>.Borrow( () => new List<string>(), null, l => l.Clear()).Dispose();
-            Pool<List<string>>.Borrow( () => new List<string>(), null, l => l.Clear()).RetainItem();
 
-            var timer = AppTime.TimeKeeper;
-            int ii;
-            int iterations = 100;
+
+
+            var writer = Storage.GetWriter("test");
+            var reader = Storage.GetReader("test");
 
             while (true)
             {
-                                
-                timer.Restart();
-                for (ii = 0; ii < iterations; ii++)
-                {
-                    var sb = new List<string>();
-                    for(int jj = 0; jj < 1; jj++) sb.Add(ii.ToString());                  
-
-                }
-                var newTime = timer.Elapsed;
-
-                timer.Restart();
-                for (ii = 0; ii < iterations; ii++)
-                {
-                    using (Pool<List<string>>.Borrow(out var sb, () => new List<string>(), null, l => l.Clear()))
-                    {
-                        for (int jj = 0; jj < 1; jj++) sb.Add(ii.ToString());
-                    }
-                }
-                var poolTime = timer.Elapsed;
-                Console.WriteLine($"Pool {(poolTime.TotalMilliseconds / newTime.TotalMilliseconds * 100).ToString("0.00") }% of new");
+                writer.TryWriteAsync("x/no1", "testabc".ToStream()).WaitFor();
+                writer.TryWriteAsync("x/no2", "testabc".ToStream()).WaitFor();
+                Console.ReadKey();
+                writer.TryDeleteAsync("x/no1").WaitFor();
+                writer.TryDeleteAsync("x/no2").WaitFor();
+                Console.ReadKey();
             }
 
-            Console.ReadLine();
+
+            CultureInfo culture =  Thread.CurrentThread.CurrentCulture.CloneAndCast<CultureInfo>();
+            culture.NumberFormat.NumberDecimalSeparator = ".";
+            Thread.CurrentThread.CurrentCulture = culture;
+            string path = "Project/Hallo/IntProp=123/pups=12.2";
+            if (path.TryExtract(0, "Project/","/", out string projectName, out int startIndex, true) &&
+                path.TryExtract(startIndex, "IntProp=", "/", out int intProp, out startIndex) &&
+                path.TryExtract(startIndex, "/pups=", "", out float pups, out startIndex))
+            {
+                Console.WriteLine($"Project: {projectName} ,Prop: {intProp} ({intProp.GetType()})");
+            }
+
+            Forwarder sender = new Forwarder();
+
+
+            sender
+                .ConvertMessage<int,string>(i => i.ToString())
+                .FilterMessage<string>(s => !s.EmptyOrNull())
+                .ProcessMessage<string>(s => Console.WriteLine(s));
+
+            sender.Send("abc");
+            sender.Send(123);
+            sender.Send("");
+
+
+            ICredentialHandler<UsernamePassword> credentialHandler = new UserNamePasswordPBKDF2Handler();
+
+            
+            Session.CleanUpAsync().WaitFor();
+            IdentityRole guest = new IdentityRole("Guest", new string[] { "GuestThings" });
+            guest.TryStoreAsync().WaitFor();
+            IdentityRole admin = new IdentityRole("Admin", new string[] { "GuestThings", "AdminThings", "ManageIdentities" });
+            admin.TryStoreAsync().WaitFor();                
+
+            Identity mig = new Identity("MiG", credentialHandler.GenerateStoredCredential(new UsernamePassword("MiG", "1234")));                
+            mig.AddRole(admin);
+            mig.TryStoreAsync().WaitFor();
+            Identity paul = new Identity("Paul", credentialHandler.GenerateStoredCredential(new UsernamePassword("Paul", "abc")));                
+            paul.AddRole(guest);
+            paul.TryStoreAsync().WaitFor();
+            
+
+            SharedWebServer.WebServer.AddRequestInterceptor(new SessionCookieInterceptor());
+
+            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordSignupHandler() { defaultRole = guest });
+            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordLoginHandler());
+            SharedWebServer.WebServer.AddRequestHandler(new LogoutHandler());
+            SharedWebServer.WebServer.AddRequestHandler(new IdentityAndAccessManagementHandler());
+
+            SharedWebServer.WebServer.HandleRequests("/test", (req, resp) =>
+            {
+                return Session.Current.LifeTime.Remaining().ToString();
+            }, "Guest*");
+
+            SharedWebServer.WebServer.HandleRequests("/test/xx", (req, resp) =>
+            {
+                if (Session.Current?.Identity?.HasPermission("GuestThings") ?? false)
+                {
+                    return "xx";
+                }
+                else
+                {
+                    resp.StatusCode = HttpStatusCode.Forbidden;
+                    return null;
+                }
+            }, "GuestThings");
+
+            SharedWebServer.WebServer.AddRequestHandler(
+                new RequestHandlerPermissionWrapper(
+                    new StorageWebAccess<string>("/config", new StorageWebAccess<string>.Config() { category = "config" }),
+                    "AdminThings", true));
+
+            _ = SharedWebServer.WebServer.Run(IPAddress.Loopback, 50123);
+
+            Console.ReadKey();            
+
+            while (true)
+            {
+                TestSync();
+                TestAsync().WaitFor();
+                TestSmartAsync().WaitFor();
+                Console.WriteLine("----");
+            }
+
+            Console.ReadKey();
+
 
             while (true)
             {

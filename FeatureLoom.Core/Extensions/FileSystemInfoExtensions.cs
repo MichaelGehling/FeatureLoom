@@ -34,7 +34,7 @@ namespace FeatureLoom.Extensions
 
         // TODO: check if newer versions of .Net Core provides this method without using threadPool
         public async static Task<FileInfo[]> GetFilesAsync(this DirectoryInfo dir)
-        {
+        {            
             return await Task.Run(() => dir.GetFiles());
         }
 

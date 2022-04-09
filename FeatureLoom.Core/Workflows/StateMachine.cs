@@ -187,6 +187,7 @@ namespace FeatureLoom.Workflows
             return proceed;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool ExecuteNextStep<C>(C context, IStepExecutionController controller)
         {
             if (context is CT ct) return ExecuteNextStep(ct, controller);
@@ -195,6 +196,19 @@ namespace FeatureLoom.Workflows
                 Log.ERROR(context.GetHandle(), $"Wrong context object used for this Statemachine! ({typeof(C)} instead of {typeof(CT)})");
                 return false;
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override bool IsStepAsync(Workflow.ExecutionState state) 
+        {
+            var step = states.ItemOrNull(state.stateIndex)?.steps.ItemOrNull(state.stepIndex);
+            bool isAsync = step.onExceptionAsync != null ||
+                           step.actionAsync != null ||
+                           step.conditionAsync != null ||
+                           step.onExceptionRepeatConditionAsync != null ||
+                           step.waitingAsyncDelegate != null;
+
+            return isAsync;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -270,5 +284,7 @@ namespace FeatureLoom.Workflows
         public abstract Task<bool> ExecuteNextStepAsync<CT>(CT context, IStepExecutionController controller = null) where CT : class;
 
         public abstract bool ExecuteNextStep<CT>(CT context, IStepExecutionController controller = null) where CT : class;
+
+        public abstract bool IsStepAsync(Workflow.ExecutionState state);
     }
 }

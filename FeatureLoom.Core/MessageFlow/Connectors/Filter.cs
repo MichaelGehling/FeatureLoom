@@ -15,7 +15,7 @@ namespace FeatureLoom.MessageFlow
     public class Filter<T> : IMessageFlowConnection<T>, IAlternativeMessageSource
     {
         protected SourceValueHelper sourceHelper;
-        protected Func<T, bool> predicate;
+        protected Predicate<T> predicate;
         private LazyValue<SourceHelper> alternativeSendingHelper;
 
         public Type SentMessageType => typeof(T);
@@ -28,7 +28,7 @@ namespace FeatureLoom.MessageFlow
             return sourceHelper.GetConnectedSinks();
         }
 
-        public Filter(Func<T, bool> predicate = null)
+        public Filter(Predicate<T> predicate = null)
         {
             this.predicate = predicate;
         }

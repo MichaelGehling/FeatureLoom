@@ -11,7 +11,7 @@ namespace FeatureLoom.Time
         private static Stopwatch stopWatch = new Stopwatch();
         private static DateTime coarseTimeBase;
         private static int coarseMillisecondCountBase;
-        private static TimeSpan lowerSleepLimit = 18.Milliseconds();
+        private static TimeSpan lowerSleepLimit = 16.Milliseconds();
 
         static AppTime()
         {
@@ -40,7 +40,7 @@ namespace FeatureLoom.Time
 
         /// <summary>
         /// A very quick and cheap way (~5-8% cost of DateTime.UtcNow) to get the current UTC time, but it may deviate between -16 to +16 milliseconds from actual UTC time (roughly in a gaussian normal distribution).
-        /// Note: Calling AppTime.Now will reset the CoarseTime to the actual time.
+        /// Note: Every second, the coarse time will be reset by calling DateTime.UtcNow. Calling AppTime.Now will also reset the CoarseTime to the actual time.
         /// </summary>
         public static DateTime CoarseNow
         {
@@ -68,7 +68,7 @@ namespace FeatureLoom.Time
 
         public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout)
         {
-            Wait(minTimeout, maxTimeout, CancellationToken.None);
+            Wait(minTimeout, maxTimeout, CancellationToken.None);            
         }
 
         public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
@@ -82,13 +82,14 @@ namespace FeatureLoom.Time
 
             if (timer.Elapsed > minTimeout || cancellationToken.IsCancellationRequested) return;
 
-            if (timer.LastElapsed < minTimeout - 0.1.Milliseconds())
+            var lowPrioLimit = minTimeout - 0.1.Milliseconds();
+            if (timer.LastElapsed < lowPrioLimit)
             {
                 var oldPriority = Thread.CurrentThread.Priority;
                 try
                 {
                     Thread.CurrentThread.Priority = ThreadPriority.Lowest;
-                    while (timer.Elapsed < minTimeout - 0.1.Milliseconds() && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
+                    while (timer.Elapsed < lowPrioLimit && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
                 }
                 finally
                 {

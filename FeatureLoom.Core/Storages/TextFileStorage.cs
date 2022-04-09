@@ -15,12 +15,13 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Storages
 {
-    public class TextFileStorage : IStorageReaderWriter
+    public class TextFileStorage : IStorageReaderWriter, IDisposable
     {
         public class Config : Configuration
         {
             public bool useCategoryFolder = true;
             public string basePath = ".";
+            public bool preventEscapingRootPath = true;
             public string fileSuffix = "";
             public bool allowSubscription = true;
             public TimeSpan subscriptionSamplingTime = 5.Seconds();
@@ -30,6 +31,7 @@ namespace FeatureLoom.Storages
             public bool updateCacheOnRead = true;
             public bool updateCacheOnWrite = true;
             public bool logFailedDeserialization = true;
+            public TimeSpan fileChangeNotificationDelay = 0.3.Seconds();
             public InMemoryCache<string, string>.CacheSettings cacheSettings = new InMemoryCache<string, string>.CacheSettings();
         }
 
@@ -67,6 +69,7 @@ namespace FeatureLoom.Storages
             if (config.updateCacheForSubscription || config.updateCacheOnRead || config.updateCacheOnWrite)
             {
                 cache = new InMemoryCache<string, string>(str => Encoding.UTF8.GetByteCount(str), config.cacheSettings);
+                ActivateFileSystemObservation(true);
             }
         }
 
@@ -79,15 +82,15 @@ namespace FeatureLoom.Storages
                 {
                     if (m1 is FileSystemObserver.ChangeNotification notification1 &&
                         m2 is FileSystemObserver.ChangeNotification notification2 &&
-                        notification1.changeType == WatcherChangeTypes.Changed &&
-                        notification2.changeType == WatcherChangeTypes.Created &&
+                        notification1.changeType == WatcherChangeTypes.Created &&
+                        notification2.changeType == WatcherChangeTypes.Changed &&
                         notification1.path == notification2.path)
                     {
                         return true;
                     }
                     else return m1.Equals(m2);
                 });
-                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(ProcessChangeNotification);
+                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(async msg => await ProcessChangeNotification(msg));
                 fileObserver.ConnectTo(duplicateMessageSuppressor).ConnectTo(fileChangeProcessor);
                 fileSystemObservationActive = true;
             }
@@ -101,12 +104,14 @@ namespace FeatureLoom.Storages
             }
         }
 
-        private void ProcessChangeNotification(FileSystemObserver.ChangeNotification notification)
+        private async Task ProcessChangeNotification(FileSystemObserver.ChangeNotification notification)
         {
-            if (subscriptions.Count == 0)
+            if (subscriptions.Count == 0 && cache == null)
             {
                 ActivateFileSystemObservation(false);
             }
+
+            await Task.Delay(config.fileChangeNotificationDelay);
 
             if (notification.changeType.HasFlag(WatcherChangeTypes.Deleted))
             {
@@ -163,6 +168,10 @@ namespace FeatureLoom.Storages
         {
             if (notification.changeType.HasFlag(WatcherChangeTypes.Changed))
             {
+                lock (fileSet)
+                {
+                    fileSet.Add(notification.path);
+                }
                 string uri = FilePathToUri(notification.path);
                 if (uri != null)
                 {
@@ -297,7 +306,7 @@ namespace FeatureLoom.Storages
             }
         }
 
-        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink notificationSink)
+        public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
         {
             ActivateFileSystemObservation(true);
             subscriptions.Add(uriPattern, notificationSink);
@@ -315,7 +324,13 @@ namespace FeatureLoom.Storages
 
         protected virtual string UriToFilePath(string uri)
         {
-            return Path.Combine(rootDir.FullName, $"{uri}{config.fileSuffix}");
+            string resultingPath = Path.GetFullPath(Path.Combine(rootDir.FullName, $"{uri}{config.fileSuffix}"));
+            if (config.preventEscapingRootPath && !resultingPath.StartsWith(rootDir.FullName))
+            {
+                Log.WARNING(this.GetHandle(), $"Resulting path ({resultingPath}) was not inside root path ({rootDir.FullName})");
+                throw new Exception($"Resulting path ({resultingPath}) was not inside root path ({rootDir.FullName})");
+            }
+            return resultingPath;
         }
 
         protected virtual bool TryDeserialize<T>(string str, out T data)
@@ -520,27 +535,38 @@ namespace FeatureLoom.Storages
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
+                bool created = !fileInfo.Exists;
 
                 if (TrySerialize(data, out string fileContent))
                 {
                     if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
                     {
                         cache?.Add(uri, fileContent);
-                        if (fileSystemObservationActive)
-                        {
-                            UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
-                            NotifySubscriptions(uri, updateEvent, false);
-                            if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
-                            else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
-                        }
+                    }
+
+                    if (fileSystemObservationActive)
+                    {
+                        if (created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                        else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                     }
 
                     using (var stream = fileInfo.CreateText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         await stream.WriteAsync(fileContent);
-                        return true;
+                        lock (fileSet)
+                        {
+                            fileSet.Add(fileInfo.FullName);
+                        }                        
                     }
+
+                    if (fileSystemObservationActive)
+                    {
+                        UpdateEvent updateEvent = created ? UpdateEvent.Created : UpdateEvent.Updated;
+                        NotifySubscriptions(uri, updateEvent, false);                                                
+                    }
+
+                    return true;
                 }
                 else return false;
             }
@@ -559,6 +585,7 @@ namespace FeatureLoom.Storages
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
+                bool created = !fileInfo.Exists;
 
                 if (config.updateCacheOnWrite || (config.updateCacheForSubscription && fileSystemObservationActive))
                 {
@@ -576,24 +603,33 @@ namespace FeatureLoom.Storages
                     var textReader = new StreamReader(sourceStream);
                     fileContent = await textReader.ReadToEndAsync();
                     sourceStream.Position = origPosition;
-                    cache?.Add(uri, fileContent);
+                    cache?.Add(uri, fileContent);                                        
+                }
 
-                    if (fileSystemObservationActive)
-                    {
-                        UpdateEvent updateEvent = fileInfo.Exists ? UpdateEvent.Updated : UpdateEvent.Created;
-                        NotifySubscriptions(uri, updateEvent, false);
-                        if (updateEvent == UpdateEvent.Created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
-                        else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
-                    }
+                if (fileSystemObservationActive)
+                {
+                    if (created) duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Created, fileInfo.FullName, fileInfo.FullName));
+                    else duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Changed, fileInfo.FullName, fileInfo.FullName));
                 }
 
                 using (var stream = fileInfo.OpenWrite())
                 {
                     if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.SetLength(0);
-                    await sourceStream.CopyToAsync(stream);
-                    return true;
+                    await sourceStream.CopyToAsync(stream);                    
+
+                    lock (fileSet)
+                    {
+                        fileSet.Add(fileInfo.FullName);
+                    }
                 }
+
+                if (fileSystemObservationActive)
+                {
+                    UpdateEvent updateEvent = created ? UpdateEvent.Created : UpdateEvent.Updated;
+                    NotifySubscriptions(uri, updateEvent, false);                        
+                }
+                return true;
             }
             catch (Exception e)
             {
@@ -616,12 +652,15 @@ namespace FeatureLoom.Storages
 
                 if (TrySerialize(data, out string fileContent))
                 {
+                    // TODO: Update Cache etc.
+
                     using (var stream = fileInfo.AppendText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                         await stream.WriteAsync(fileContent);
                         return true;
                     }
+
                 }
                 else return false;
             }
@@ -639,6 +678,8 @@ namespace FeatureLoom.Storages
                 string filePath = UriToFilePath(uri);
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
+
+                // TODO: Update Cache etc.
 
                 using (var stream = fileInfo.OpenWrite())
                 {
@@ -663,7 +704,25 @@ namespace FeatureLoom.Storages
             try
             {
                 cache?.Remove(uri);
-                if (fileInfo.Exists) fileInfo.Delete();
+
+                if (fileInfo.Exists)
+                {
+                    if (fileSystemObservationActive)
+                    {
+                        duplicateMessageSuppressor?.AddSuppressor(new FileSystemObserver.ChangeNotification(WatcherChangeTypes.Deleted, fileInfo.FullName, fileInfo.FullName));                        
+                    }
+
+                    fileInfo.Delete();
+                    lock (fileSet)
+                    {
+                        fileSet.Remove(fileInfo.FullName);
+                    }
+
+                    if (fileSystemObservationActive)
+                    {
+                        NotifySubscriptions(uri, UpdateEvent.Removed, false);
+                    }
+                }
                 return Task.FromResult(true);
             }
             catch (Exception e)
@@ -671,6 +730,11 @@ namespace FeatureLoom.Storages
                 Log.ERROR(this.GetHandle(), $"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
                 return Task.FromResult(false);
             }
+        }
+
+        public void Dispose()
+        {
+            ((IDisposable)fileObserver).Dispose();
         }
 
         private class FileSubscriptionStatus
