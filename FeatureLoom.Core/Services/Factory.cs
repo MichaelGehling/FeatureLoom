@@ -30,13 +30,15 @@ namespace FeatureLoom.Services
 
         public static void RemoveOverride<T>()
         {
-            if (Service<FactoryOverride<T>>.UsesLocalInstance) Service<FactoryOverride<T>>.Instance = null;
+            if (Service<FactoryOverride<T>>.UsesLocalInstance) Service<FactoryOverride<T>>.Instance = FactoryOverride<T>.EmptyOverride;
             else Service<FactoryOverride<T>>.Reset();
         }
 
         public class FactoryOverride<T>
         {
             Func<T> create = null;
+            static FactoryOverride<T> empty = new FactoryOverride<T>(null);
+            public static FactoryOverride<T> EmptyOverride => empty;
 
             public FactoryOverride(Func<T> createAction)
             {

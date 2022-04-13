@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,12 +30,7 @@ namespace FeatureLoom.Extensions
             if (encoding == default) encoding = Encoding.UTF8;
             return encoding.GetBytes(str);
         }
-
-        public static string GetString(this byte[] bytes, Encoding encoding = default)
-        {
-            if (encoding == default) encoding = Encoding.UTF8;
-            return encoding.GetString(bytes);
-        }
+        
 
         public static string AddToPath(this string pathBase, string pathExtension, char seperator = '\\')
         {
@@ -71,45 +67,27 @@ namespace FeatureLoom.Extensions
             }            
         }
 
-        public static int FindPatternPos(this byte[] buffer, int startIndex, int count, byte[] pattern)
-        {
-            int patternLen = pattern.Length;
-            int bufLen = buffer.Length;
-            int patternPos = -1;
-            for (int i = startIndex; i < startIndex + count; i++)
-            {
-                for (int j = 0; j < patternLen && i + j < bufLen; j++)
-                {
-                    if (buffer[i + j] != pattern[j]) break;
-                    else if (j == patternLen - 1) patternPos = i;
-                }
-                if (patternPos >= 0) break;
-            }
-            return patternPos;
-        }
-
-        public static string MakeValidFilename(this string fileName)
+        public static string MakeValidFilename(this string fileName, char replacementChar = '_')
         {
             foreach (char c in Path.GetInvalidFileNameChars())
             {
-                fileName = fileName.Replace(c, '_');
+                fileName = fileName.Replace(c, replacementChar);
             }
             return fileName;
         }
 
-        public static string MakeValidFilePath(this string fielPath)
-        {
+        public static string MakeValidFilePath(this string fielPath, char replacementChar = '_')
+        {            
             foreach (char c in Path.GetInvalidPathChars())
             {
-                fielPath = fielPath.Replace(c, '_');
+                fielPath = fielPath.Replace(c, replacementChar);
             }
             return fielPath;
         }
 
         public static string TextWrap(this string input, int maxCharsPerLine, string nextLine)
         {
-            if (input == null) return null;
-            string result = "";
+            if (input == null) return null;            
             bool whiteSpaceFound = false;
             List<int> potentialBreaks = new List<int>();
             for (int i = 0; i < input.Length; i++)
@@ -121,6 +99,8 @@ namespace FeatureLoom.Extensions
                     whiteSpaceFound = false;
                 }
             }
+
+            StringBuilder sb = new StringBuilder();
             int lastBreak = 0;
             for (int i = 0; i < potentialBreaks.Count; i++)
             {
@@ -128,7 +108,12 @@ namespace FeatureLoom.Extensions
                 {
                     if (input.Length - lastBreak > maxCharsPerLine)
                     {
-                        result += input.Substring(lastBreak, potentialBreaks[i] - lastBreak) + nextLine;
+#if NETSTANDARD2_1_OR_GREATER  
+                        sb.Append(input.AsSpan(lastBreak, potentialBreaks[i] - lastBreak));
+#else
+                        sb.Append(input.Substring(lastBreak, potentialBreaks[i] - lastBreak));
+#endif                        
+                        sb.Append(nextLine);
                         lastBreak = potentialBreaks[i];
                     }
                 }
@@ -136,33 +121,48 @@ namespace FeatureLoom.Extensions
                 {
                     if (potentialBreaks[i + 1] - lastBreak > maxCharsPerLine)
                     {
-                        result += input.Substring(lastBreak, potentialBreaks[i] - lastBreak) + nextLine;
+#if NETSTANDARD2_1_OR_GREATER  
+                        sb.Append(input.AsSpan(lastBreak, potentialBreaks[i] - lastBreak));
+#else
+                        sb.Append(input.Substring(lastBreak, potentialBreaks[i] - lastBreak));
+#endif
+                        sb.Append(nextLine);
                         lastBreak = potentialBreaks[i];
                     }
                 }
             }
-            result += input.Substring(lastBreak);
-            return result;
+#if NETSTANDARD2_1_OR_GREATER
+            sb.Append(input.AsSpan(lastBreak));
+#else
+            sb.Append(input.Substring(lastBreak));
+#endif
+            return sb.ToString();
         }
 
         public static string TrimEnd(this string str, string trimStr)
         {
-            // TODO: Not very efficient when trim is performed multiple times... improve!
-            while (str.EndsWith(trimStr))
-            {
-                str = str.Substring(0, str.Length - trimStr.Length);
+            int pos;
+            for (pos = str.Length-trimStr.Length; pos >= 0; pos -= trimStr.Length)
+            {                
+                for (int i=0; i < trimStr.Length; i++)
+                {
+                    if (str[pos + i] != trimStr[i]) return str.Substring(0, pos + trimStr.Length);
+                }
             }
-            return str;
+            return str.Substring(0, pos + trimStr.Length);
         }
 
         public static string TrimStart(this string str, string trimStr)
         {
-            // TODO: Not very efficient when trim is performed multiple times... improve!
-            while (str.StartsWith(trimStr))
+            int pos;
+            for (pos = 0; pos < str.Length; pos += trimStr.Length)
             {
-                str = str.Substring(trimStr.Length);
+                for (int i = 0; i < trimStr.Length; i++)
+                {
+                    if (str[pos + i] != trimStr[i]) return str.Substring(pos);
+                }
             }
-            return str;
+            return str.Substring(0, pos);
         }
 
         public static bool TryExtract<T>(this string str, string startExtractAfter, string endExtractBefore, out T extract, out int restStartIndex) where T : IConvertible
@@ -303,7 +303,7 @@ namespace FeatureLoom.Extensions
             return str;
         }
 
-#if NETSTANDARD2_0 
+#if NETSTANDARD2_0
         public static string[] Split(this string str, char seperator, StringSplitOptions options)
         {
             return str.Split(seperator.ToSingleEntryArray(), options);
