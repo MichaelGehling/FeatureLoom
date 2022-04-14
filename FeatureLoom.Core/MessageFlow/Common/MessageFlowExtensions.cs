@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using System;
 using System.Collections;
 using System.Threading.Tasks;
 
@@ -53,6 +54,60 @@ namespace FeatureLoom.MessageFlow
         public static Task SendAsync<T>(this IMessageSink sink, T message)
         {
             return sink.PostAsync(message);
+        }
+
+        public static bool TryReceiveRequest<T>(this IReceiver<IRequestMessage<T>> receiver, out T message, out long requestId)
+        {
+            if (receiver.TryReceive(out IRequestMessage<T> request))
+            {
+                requestId = request.RequestId;
+                message = request.Content;
+                return true;
+            }
+            else
+            {
+                message = default;
+                requestId = default;
+                return false;
+            }
+        }
+
+        public static async Task<AsyncOut<bool, T, long>> TryReceiveRequestAsync<T>(this IReceiver<IRequestMessage<T>> receiver)
+        {
+            if ((await receiver.TryReceiveAsync()).Out(out IRequestMessage<T> request))
+            {                
+                return (true, request.Content, request.RequestId);
+            }
+            else
+            {
+                return default;
+            }
+        }
+
+        public static void SendResponse<T>(this ISender sender, T message, long requestId)
+        {
+            if (message is IResponseMessage<T> response)
+            {
+                response.RequestId = requestId;
+            }
+            else
+            {
+                response = new ResponseMessage<T>(message, requestId);
+            }
+            sender.Send(response);
+        }
+
+        public static Task SendResponseAsync<T>(this ISender sender, T message, long requestId)
+        {
+            if (message is IResponseMessage<T> response)
+            {
+                response.RequestId = requestId;
+            }
+            else
+            {
+                response = new ResponseMessage<T>(message, requestId);
+            }
+            return sender.SendAsync(response);
         }
 
     }

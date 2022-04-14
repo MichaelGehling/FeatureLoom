@@ -10,13 +10,11 @@ namespace FeatureLoom.MessageFlow
 {
 
 
-    public class RequestSender<REQ, RESP> : IMessageSource<REQ>, IMessageSink<RESP>, IRequester 
-        where REQ : IRequestMessage 
-        where RESP : IResponseMessage
+    public class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<REQ>>, IMessageSink<IResponseMessage<RESP>>, IRequester 
     {
-        TypedSourceValueHelper<REQ> sourceHelper;
+        TypedSourceValueHelper<IRequestMessage<REQ>> sourceHelper;
         List<ResponseHandler> responseHandlers = new List<ResponseHandler>();
-        FeatureLock responseHandlerLock = new FeatureLock();
+        MicroValueLock responseHandlerLock = new MicroValueLock();
         TimeSpan timeout = 1.Seconds();
         short senderId = RandomGenerator.Int16();
 
@@ -33,32 +31,62 @@ namespace FeatureLoom.MessageFlow
         {
         }
 
-        public Task<RESP> SendRequestAsync(REQ request)
+        public Task<RESP> SendRequestAsync(REQ message)
         {
-            var handler = ResponseHandler.Create(CreateRequestId());            
-            using (responseHandlerLock.Lock())
+            var handler = ResponseHandler.Create(CreateRequestId());
+            
+            responseHandlerLock.Enter();
+            responseHandlers.Add(handler);
+            responseHandlerLock.Exit();
+
+            if (message is IRequestMessage<REQ> request) 
             {
-                responseHandlers.Add(handler);
+                request.RequestId = handler.requestId;
             }
-
-            request.RequestId = handler.requestId;
+            else 
+            {
+                request = new RequestMessage<REQ>(message);
+                request.RequestId = handler.requestId;
+            }
+            
             sourceHelper.Forward(request);
-
             return handler.tcs.Task;
         }
 
-        private void HandleResponse(RESP response)
+        public RESP SendRequest(REQ message)
         {
-            if ((short)response.RequestId != senderId) return;
+            var handler = ResponseHandler.Create(CreateRequestId());
+            
+            responseHandlerLock.Enter();
+            responseHandlers.Add(handler);
+            responseHandlerLock.Exit();
 
+            if (message is IRequestMessage<REQ> request)
+            {
+                request.RequestId = handler.requestId;
+            }
+            else
+            {
+                request = new RequestMessage<REQ>(message);
+                request.RequestId = handler.requestId;
+            }
+
+            sourceHelper.Forward(request);
+            return handler.tcs.Task.Result;
+        }
+
+        private void HandleResponse(RESP response, long requestId)
+        {
             var now = AppTime.CoarseNow;
-            using (responseHandlerLock.Lock())
+
+            responseHandlerLock.Enter(true);
+            try
             {
                 for(int i= responseHandlers.Count -1; i >= 0; i--)
                 {
                     var handler = responseHandlers[i];
                     bool remove = false;
-                    if (handler.requestId == response.RequestId)
+                    if (handler.requestId == requestId)
                     {
                         handler.tcs.SetResult(response);
                         remove = true;
@@ -76,12 +104,18 @@ namespace FeatureLoom.MessageFlow
                     if (remove) responseHandlers.RemoveAt(i);
                 }
             }
+            finally
+            {
+                responseHandlerLock.Exit();
+            }
         }
 
         public void CleanupTimeouts()
         {
             var now = AppTime.CoarseNow;
-            using (responseHandlerLock.Lock())
+
+            responseHandlerLock.Enter();
+            try
             {
                 for (int i = responseHandlers.Count - 1; i >= 0; i--)
                 {
@@ -100,6 +134,10 @@ namespace FeatureLoom.MessageFlow
                     if (remove) responseHandlers.RemoveAt(i);
                 }
             }
+            finally
+            {
+                responseHandlerLock.Exit();
+            }
         }
 
         private long CreateRequestId()
@@ -114,7 +152,7 @@ namespace FeatureLoom.MessageFlow
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public Type ConsumedMessageType => throw new NotImplementedException();
+        public Type ConsumedMessageType => typeof(IResponseMessage<RESP>);
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
@@ -150,17 +188,25 @@ namespace FeatureLoom.MessageFlow
 
         public void Post<M>(in M message)
         {
-            if (message is RESP response) HandleResponse(response);
+            PreHandleResponse(message);
+        }
+
+        private void PreHandleResponse<M>(M message)
+        {
+            if (message is IResponseMessage<RESP> responseMessage)
+            {
+                HandleResponse(responseMessage.Content, responseMessage.RequestId);
+            }
         }
 
         public void Post<M>(M message)
         {
-            if (message is RESP response) HandleResponse(response);
+            PreHandleResponse(message);
         }
 
         public Task PostAsync<M>(M message)
         {
-            if (message is RESP response) HandleResponse(response);
+            PreHandleResponse(message);
             return Task.CompletedTask;
         }
 
@@ -178,16 +224,6 @@ namespace FeatureLoom.MessageFlow
             }
 
             public static ResponseHandler Create(long requestId) => new ResponseHandler(requestId, AppTime.CoarseNow, new TaskCompletionSource<RESP>());
-
-            public bool Handle(RESP response)
-            {
-                if (response.RequestId == requestId)
-                {
-                    tcs.SetResult(response);
-                    return true;
-                }
-                else return false;
-            }
         }
     }
 }

@@ -81,13 +81,15 @@ namespace FeatureLoom.MessageFlow
         object[] GetQueuedMesssages();
     }
 
-    public interface IRequestMessage
+    public interface IRequestMessage<T>
     {
         public long RequestId { get; set; }
+        public T Content { get; }
     }
 
-    public interface IResponseMessage
+    public interface IResponseMessage<T>
     {
-        public long RequestId { get; }
+        public long RequestId { get; set; }
+        public T Content { get; }
     }
 }

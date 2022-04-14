@@ -3,12 +3,6 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    internal interface ISender
-    {
-        void Send<T>(in T message);
-
-        Task SendAsync<T>(T message);
-    }
 
     /// <summary> Used to send messages of any type to all connected sinks. It is thread safe. <summary>
     public class Sender : IMessageSource, ISender
