@@ -5,6 +5,7 @@ using FeatureLoom.MetaDatas;
 using System;
 using System.Net;
 using System.Threading.Tasks;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Web
 {
@@ -17,16 +18,13 @@ namespace FeatureLoom.Web
 
         private SourceValueHelper sourceHelper;
 
-        public HttpServerReceiver(string route, IWebMessageTranslator translator, int bufferSize = 1024 * 128, IWebServer webServer = null)
+        public HttpServerReceiver(string route, IWebMessageTranslator translator, int bufferSize = 1024 * 128)
         {
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.route = route;
             this.translator = translator;
-            this.webServer = webServer ?? SharedWebServer.WebServer;
             this.bufferSize = bufferSize;
-
-            this.webServer.AddRequestHandler(this);
         }
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;

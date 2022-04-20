@@ -10,10 +10,11 @@ namespace FeatureLoom.Services
     {
         private static ServiceInstanceContainer instanceContainer;
 
-        public static void Init(Func<T> createServiceAction)
+        public static void Init(Func<T> createServiceAction, bool force = true)
         {
-            if (instanceContainer == null)
+            if (force || instanceContainer == null)
             {
+                Reset();
                 Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create(createServiceAction), null);
                 if (ServiceRegistry.LocalInstancesForAllServicesActive) instanceContainer.CreateLocalServiceInstance();
             }
@@ -75,7 +76,19 @@ namespace FeatureLoom.Services
 
         private static T HandleUninitializedGet()
         {
-            if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction))
+            foreach (var serviceContainer in ServiceRegistry.GetAllRegisteredServices())
+            {
+                if (serviceContainer.Instance is T borrowedInstance && serviceContainer.TryGetCreateServiceAction<T>(out Func<T> borrowedCreateServiceAction))
+                {
+                    if (null == Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create(borrowedCreateServiceAction, borrowedInstance), null))
+                    {                        
+                        if (ServiceRegistry.LocalInstancesForAllServicesActive) instanceContainer.CreateLocalServiceInstance();                        
+                    }
+                    return instanceContainer.Instance;
+                }
+            }
+
+            if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction, false))
             {
                 Init(createServiceAction);
                 return instanceContainer.Instance;

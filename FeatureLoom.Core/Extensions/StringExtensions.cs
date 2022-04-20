@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.Helpers;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,7 +8,7 @@ using System.Text;
 
 namespace FeatureLoom.Extensions
 {
-    public static class StringExtensions
+    public static partial class StringExtensions
     {
         public static bool StartsWith(this string str, char c)
         {
@@ -165,6 +166,141 @@ namespace FeatureLoom.Extensions
             return str.Substring(0, pos);
         }
 
+        private static InMemoryCache<string, PatternExtractor> extractionPatternCache = new InMemoryCache<string, PatternExtractor>(p => 50 + p.Size*25, 
+            new InMemoryCache<string, PatternExtractor>.CacheSettings() 
+            { 
+                targetCacheSizeInByte = 80_000, 
+                cacheSizeMarginInByte = 10_000, 
+                maxUnusedTimeInSeconds = 60 * 60 * 24 * 30,
+                cleanUpPeriodeInSeconds = 60 * 60
+            });
+
+        public static bool TryExtract<T1>(this string str, string pattern, out T1 item1) 
+            where T1 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }
+            return extractor.TryExtract(str, out item1);
+        }
+
+        public static bool TryExtract<T1, T2>(this string str, string pattern, out T1 item1, out T2 item2) 
+            where T1 : IConvertible 
+            where T2 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }
+            return extractor.TryExtract(str, out item1, out item2);
+        }
+
+        public static bool TryExtract<T1, T2, T3>(this string str, string pattern, out T1 item1, out T2 item2, out T3 item3) 
+            where T1 : IConvertible 
+            where T2 : IConvertible
+            where T3 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }
+            return extractor.TryExtract(str, out item1, out item2, out item3);
+        }
+
+        public static bool TryExtract<T1, T2, T3, T4>(this string str, string pattern, out T1 item1, out T2 item2, out T3 item3, out T4 item4)
+            where T1 : IConvertible
+            where T2 : IConvertible
+            where T3 : IConvertible
+            where T4 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }
+            return extractor.TryExtract(str, out item1, out item2, out item3, out item4);
+        }
+
+        public static bool TryExtract<T1, T2, T3, T4, T5>(this string str, string pattern, out T1 item1, out T2 item2, out T3 item3, out T4 item4, out T5 item5)
+            where T1 : IConvertible
+            where T2 : IConvertible
+            where T3 : IConvertible
+            where T4 : IConvertible
+            where T5 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }
+            return extractor.TryExtract(str, out item1, out item2, out item3, out item4, out item5);
+        }
+
+        public static bool TryExtract<T1, T2, T3, T4, T5, T6>(this string str, string pattern, out T1 item1, out T2 item2, out T3 item3, out T4 item4, out T5 item5, out T6 item6)
+            where T1 : IConvertible
+            where T2 : IConvertible
+            where T3 : IConvertible
+            where T4 : IConvertible
+            where T5 : IConvertible
+            where T6 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }
+            return extractor.TryExtract(str, out item1, out item2, out item3, out item4, out item5, out item6);
+        }
+
+        public static bool TryExtract<T1, T2, T3, T4, T5, T6, T7>(this string str, string pattern, out T1 item1, out T2 item2, out T3 item3, out T4 item4, out T5 item5, out T6 item6, out T7 item7)
+            where T1 : IConvertible
+            where T2 : IConvertible
+            where T3 : IConvertible
+            where T4 : IConvertible
+            where T5 : IConvertible
+            where T6 : IConvertible
+            where T7 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }
+            return extractor.TryExtract(str, out item1, out item2, out item3, out item4, out item5, out item6, out item7);
+        }
+
+        public static bool TryExtract<T1, T2, T3, T4, T5, T6, T7, T8>(this string str, string pattern, out T1 item1, out T2 item2, out T3 item3, out T4 item4, out T5 item5, out T6 item6, out T7 item7, out T8 item8)
+            where T1 : IConvertible
+            where T2 : IConvertible
+            where T3 : IConvertible
+            where T4 : IConvertible
+            where T5 : IConvertible
+            where T6 : IConvertible
+            where T7 : IConvertible
+            where T8 : IConvertible
+        {
+            if (!extractionPatternCache.TryGet(pattern, out var extractor))
+            {
+                extractor = new PatternExtractor(pattern);
+                extractionPatternCache.Add(pattern, extractor);
+            }            
+            return extractor.TryExtract(str, out item1, out item2, out item3, out item4, out item5, out item6, out item7, out item8);
+        }
+
+        public static bool TryExtract<T>(this string str, string startExtractAfter, string endExtractBefore, out T extract) where T : IConvertible
+        {
+            return str.TryExtract(0, startExtractAfter, endExtractBefore, out extract, out _);
+        }
+
+        public static bool TryExtract<T>(this string str, int startIndex, string startExtractAfter, string endExtractBefore, out T extract) where T : IConvertible
+        {
+            return str.TryExtract(startIndex, startExtractAfter, endExtractBefore, out extract, out _);
+        }
+
         public static bool TryExtract<T>(this string str, string startExtractAfter, string endExtractBefore, out T extract, out int restStartIndex) where T : IConvertible
         {
             return str.TryExtract(0, startExtractAfter, endExtractBefore, out extract, out restStartIndex);
@@ -196,7 +332,14 @@ namespace FeatureLoom.Extensions
                 }
                 else
                 {
-                    extract = substring.ConvertTo<T>();
+                    try
+                    {
+                        extract = substring.ConvertTo<T>();
+                    }
+                    catch
+                    {
+                        success = false;
+                    }
                 }
             }
             else success = false;

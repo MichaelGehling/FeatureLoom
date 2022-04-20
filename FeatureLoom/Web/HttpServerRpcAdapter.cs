@@ -14,18 +14,15 @@ namespace FeatureLoom.Web
     {
         private StringRpcCaller rpcCaller;
         private readonly string route;
-        private readonly IWebServer webServer;
         private readonly TimeSpan rpcTimeout;
 
-        public HttpServerRpcAdapter(string route, TimeSpan rpcTimeout, IWebServer webServer = null)
+        public HttpServerRpcAdapter(string route, TimeSpan rpcTimeout)
         {
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.rpcTimeout = rpcTimeout;
             rpcCaller = new StringRpcCaller(rpcTimeout);
             this.route = route;
-            this.webServer = webServer ?? SharedWebServer.WebServer;
-            this.webServer.AddRequestHandler(this);
         }
 
         public string Route => route;

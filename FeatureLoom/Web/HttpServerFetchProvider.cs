@@ -8,6 +8,7 @@ using System;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Web
 {
@@ -16,19 +17,15 @@ namespace FeatureLoom.Web
         private CountingRingBuffer<string> ringBuffer;
         private readonly string route;
         private IWebMessageTranslator translator;
-        private readonly IWebServer webServer;
         public string Route => route;
 
-        public HttpServerFetchProvider(string route, IWebMessageTranslator translator, int bufferSize = 100, IWebServer webServer = null)
+        public HttpServerFetchProvider(string route, IWebMessageTranslator translator, int bufferSize = 100)
         {
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.route = route;
             ringBuffer = new CountingRingBuffer<string>(bufferSize);
             this.translator = translator;
-            this.webServer = webServer ?? SharedWebServer.WebServer;
-
-            this.webServer.AddRequestHandler(this);
         }
 
         public void Post<M>(in M message)

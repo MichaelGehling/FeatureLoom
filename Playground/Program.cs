@@ -21,6 +21,7 @@ using FeatureLoom.Storages;
 using FeatureLoom.Security;
 using System.IO;
 using System.Globalization;
+using FeatureLoom.Services;
 
 namespace Playground
 {
@@ -110,22 +111,12 @@ namespace Playground
 
         private static void Main()
         {
-
-
+            string path1 = "Test/abc/123/1,1/xx/yyy";
+            PatternExtractor extractor = new PatternExtractor("{1}/{2}/");
+            extractor.TryExtract("Test/123/", out string item1, out int item2);
 
             var writer = Storage.GetWriter("test");
             var reader = Storage.GetReader("test");
-
-            while (true)
-            {
-                writer.TryWriteAsync("x/no1", "testabc".ToStream()).WaitFor();
-                writer.TryWriteAsync("x/no2", "testabc".ToStream()).WaitFor();
-                Console.ReadKey();
-                writer.TryDeleteAsync("x/no1").WaitFor();
-                writer.TryDeleteAsync("x/no2").WaitFor();
-                Console.ReadKey();
-            }
-
 
             CultureInfo culture =  Thread.CurrentThread.CurrentCulture.CloneAndCast<CultureInfo>();
             culture.NumberFormat.NumberDecimalSeparator = ".";
@@ -166,21 +157,31 @@ namespace Playground
             Identity paul = new Identity("Paul", credentialHandler.GenerateStoredCredential(new UsernamePassword("Paul", "abc")));                
             paul.AddRole(guest);
             paul.TryStoreAsync().WaitFor();
-            
 
-            SharedWebServer.WebServer.AddRequestInterceptor(new SessionCookieInterceptor());
+            Service<DefaultWebServer>.Init(() => new DefaultWebServer());
+            var webServer = Service<IWebServer>.Instance;
 
-            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordSignupHandler() { defaultRole = guest });
-            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordLoginHandler());
-            SharedWebServer.WebServer.AddRequestHandler(new LogoutHandler());
-            SharedWebServer.WebServer.AddRequestHandler(new IdentityAndAccessManagementHandler());
+            webServer.AddRequestInterceptor(new SessionCookieInterceptor());
 
-            SharedWebServer.WebServer.HandleRequests("/test", (req, resp) =>
+            webServer.AddRequestHandler(new UsernamePasswordSignupHandler() { defaultRole = guest });
+            webServer.AddRequestHandler(new UsernamePasswordLoginHandler());
+            webServer.AddRequestHandler(new LogoutHandler());
+            webServer.AddRequestHandler(new IdentityAndAccessManagementHandler());
+
+            webServer.HandleRequest("/customers/", (req) =>
+            {
+                if (req.RelativePath.TryExtract("/customers/", "/", out int id1, out var pos)) id1++;
+                if (req.RelativePath.TryExtract("/customers/", "", out int id)) return id.ToString();
+                
+                return "";
+            });
+
+            webServer.HandleRequest("/test", (req, resp) =>
             {
                 return Session.Current.LifeTime.Remaining().ToString();
             }, "Guest*");
 
-            SharedWebServer.WebServer.HandleRequests("/test/xx", (req, resp) =>
+            webServer.HandleRequest("/test/xx", (req, resp) =>
             {
                 if (Session.Current?.Identity?.HasPermission("GuestThings") ?? false)
                 {
@@ -193,12 +194,12 @@ namespace Playground
                 }
             }, "GuestThings");
 
-            SharedWebServer.WebServer.AddRequestHandler(
+            webServer.AddRequestHandler(
                 new RequestHandlerPermissionWrapper(
                     new StorageWebAccess<string>("/config", new StorageWebAccess<string>.Config() { category = "config" }),
                     "AdminThings", true));
 
-            _ = SharedWebServer.WebServer.Run(IPAddress.Loopback, 50123);
+            _ = webServer.Run(IPAddress.Loopback, 50123);
 
             Console.ReadKey();            
 

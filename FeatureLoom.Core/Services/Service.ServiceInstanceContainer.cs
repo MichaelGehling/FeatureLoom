@@ -23,6 +23,19 @@ namespace FeatureLoom.Services
                 return container;
             }
 
+            public static ServiceInstanceContainer Create(Func<T> createInstance, T instance)
+            {
+                var container = new ServiceInstanceContainer() { createInstance = createInstance, globalInstance = instance };
+                ServiceRegistry.RegisterService(container);
+                return container;
+            }
+
+            public bool TryGetCreateServiceAction<T2>(out Func<T2> createServiceAction)
+            {                
+                createServiceAction = createInstance as Func<T2>;
+                return createServiceAction != null;                
+            }
+
             public bool UsesLocalInstance => localInstance.Exists;
 
             public T Instance
@@ -51,6 +64,8 @@ namespace FeatureLoom.Services
                 if (localInstance.Exists && useLocalInstanceAsGlobal) globalInstance = localInstance.Obj.Value;
                 localInstance.RemoveObj();
             }
+
+            
 
             public Type ServiceType => typeof(T);
             object IServiceInstanceContainer.Instance => Instance;

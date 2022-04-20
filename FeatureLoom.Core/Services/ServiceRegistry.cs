@@ -62,9 +62,21 @@ namespace FeatureLoom.Services
             }
         }
 
-        internal static bool TryGetDefaultServiceCreator<T>(out Func<T> createServiceAction)
+        internal static bool TryGetDefaultServiceCreator<T>(out Func<T> createServiceAction, bool tryBorrow = true)
         {
-            switch(typeof(T))
+            if (tryBorrow)
+            {
+                using (registryLock.Lock())
+                {
+                    Type newType = typeof(T);
+                    foreach (var service in registry.Values)
+                    {
+                        if (service.TryGetCreateServiceAction(out createServiceAction)) return true;
+                    }
+                }
+            }
+
+            switch (typeof(T))
             {
                 default:
                     {
