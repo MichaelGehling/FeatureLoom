@@ -15,16 +15,37 @@ namespace FeatureLoom.Helpers
 
         public PatternExtractor(string pattern)
         {
+            Init(pattern);
+        }
+
+        private void Init(string pattern)
+        {
             this.pattern = pattern;
-            int pos = 0;                
-            while(pattern.TryExtract(pos, null, "{", out string staticPart, out pos))
+            int pos = 0;
+            while (pattern.TryExtract(pos, null, "{", out string staticPart, out pos))
             {
+                if (staticPart == "" && staticParts.Count > 0) throw new Exception($"Pattern ({pattern}) is invalid. There must be at least one character between two placeholders!");
+
                 staticParts.Add(staticPart);
                 size++;
                 while (pattern.Length > pos && pattern[pos++] != '}') ;
             }
             if (pos == pattern.Length) staticParts.Add("");
             else staticParts.Add(pattern.Substring(pos));
+        }
+
+        public PatternExtractor(string pattern, out string firstStaticElement, bool removeFirstStaticElement)
+        {
+            Init(pattern);
+            if (staticParts.Count > 0)
+            {
+                firstStaticElement = staticParts[0];
+                if (removeFirstStaticElement) staticParts[0] = "";
+            }
+            else
+            {
+                firstStaticElement = "";
+            }
         }
 
         public bool TryExtract<T1>(string sourceString, out T1 item1)

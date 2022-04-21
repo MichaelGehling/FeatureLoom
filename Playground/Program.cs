@@ -168,20 +168,24 @@ namespace Playground
             webServer.AddRequestHandler(new LogoutHandler());
             webServer.AddRequestHandler(new IdentityAndAccessManagementHandler());
 
-            webServer.HandleRequest("/customers/", (req) =>
+            webServer.HandleGET("/customers/{1}/{2}", (string name, int num) =>
             {
-                if (req.RelativePath.TryExtract("/customers/", "/", out int id1, out var pos)) id1++;
-                if (req.RelativePath.TryExtract("/customers/", "", out int id)) return id.ToString();
-                
-                return "";
+                string result = "";
+                for (int i = 0; i < num; i++) result += name;
+                return result;
             });
 
-            webServer.HandleRequest("/test", (req, resp) =>
+            webServer.HandlePOST("/customers/{name}", (string name) =>
+            {
+                return name+"POSTED";
+            });
+
+            webServer.HandleGET("/test", (req, resp) =>
             {
                 return Session.Current.LifeTime.Remaining().ToString();
             }, "Guest*");
 
-            webServer.HandleRequest("/test/xx", (req, resp) =>
+            webServer.HandleGET("/test/xx", (req, resp) =>
             {
                 if (Session.Current?.Identity?.HasPermission("GuestThings") ?? false)
                 {

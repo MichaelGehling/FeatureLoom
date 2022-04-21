@@ -33,8 +33,8 @@ namespace FeatureLoom.Web
         private byte[] favicon;
 
         // Invert comparer, so that when one route is the start of the second, the second will come first, so the more specifc before the less specific 
-        static readonly IComparer<string> routeComparer = new GenericComparer<string>((route1, route2) => -route1.CompareTo(route2));
-        private SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
+        static readonly IComparer<IWebRequestHandler> routeComparer = new GenericComparer<IWebRequestHandler>((handler1, handler2) => -handler1.Route.CompareTo(handler2.Route));
+        private List<IWebRequestHandler> requestHandlers = new List<IWebRequestHandler>();
         private List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
         private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
@@ -81,8 +81,9 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
-                requestHandlers.Add(handler.Route, handler);
+                if (running) requestHandlers = new List<IWebRequestHandler>(requestHandlers);
+                requestHandlers.Add(handler);
+                requestHandlers.Sort(routeComparer);
                 this.requestHandlers = requestHandlers;
             }
         }
@@ -92,8 +93,9 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
-                requestHandlers.Remove(handler.Route);
+                if (running) requestHandlers = new List<IWebRequestHandler>(requestHandlers);
+                requestHandlers.Remove(handler);
+                requestHandlers.Sort(routeComparer);
                 this.requestHandlers = requestHandlers;
             }
         }
@@ -103,7 +105,7 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
+                if (running) requestHandlers = new List<IWebRequestHandler>();
                 else requestHandlers.Clear();
                 this.requestHandlers = requestHandlers;
 
@@ -231,10 +233,10 @@ namespace FeatureLoom.Web
                 var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
                 foreach (var handler in currentRequestHandlers)
                 {
-                    if (path.StartsWith(handler.Key))
+                    if (path.StartsWith(handler.Route))
                     {
-                        contextWrapper.SetRoute(handler.Key);
-                        if (await handler.Value.HandleRequestAsync(request, response))
+                        contextWrapper.SetRoute(handler.Route);
+                        if (await handler.HandleRequestAsync(request, response))
                         {
                             return; // request was handled, so finish request handling
                         }
