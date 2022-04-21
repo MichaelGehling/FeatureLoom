@@ -10,7 +10,7 @@ namespace FeatureLoom.Services
     {
         private static ServiceInstanceContainer instanceContainer;
 
-        public static void Init(Func<T> createServiceAction, bool force = true)
+        public static T Init(Func<T> createServiceAction, bool force = true)
         {
             if (force || instanceContainer == null)
             {
@@ -18,6 +18,7 @@ namespace FeatureLoom.Services
                 Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create(createServiceAction), null);
                 if (ServiceRegistry.LocalInstancesForAllServicesActive) instanceContainer.CreateLocalServiceInstance();
             }
+            return Instance;
         }
 
         public static void Reset()
