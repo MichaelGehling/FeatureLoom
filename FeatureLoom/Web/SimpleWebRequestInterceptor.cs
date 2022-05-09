@@ -5,14 +5,14 @@ namespace FeatureLoom.Web
 {
     public class SimpleWebRequestInterceptor : IWebRequestInterceptor
     {
-        Func<IWebRequest, IWebResponse, Task<bool>> interceptionActionAsync;
+        Func<IWebRequest, IWebResponse, Task<HandlerResult>> interceptionActionAsync;
 
-        public SimpleWebRequestInterceptor(Func<IWebRequest, IWebResponse, Task<bool>> interceptionActionAsync)
+        public SimpleWebRequestInterceptor(Func<IWebRequest, IWebResponse, Task<HandlerResult>> interceptionActionAsync)
         {
             this.interceptionActionAsync = interceptionActionAsync;
         }
 
-        public Task<bool> InterceptRequestAsync(IWebRequest request, IWebResponse response)
+        public Task<HandlerResult> InterceptRequestAsync(IWebRequest request, IWebResponse response)
         {
             return interceptionActionAsync(request, response);
         }

@@ -29,14 +29,9 @@ namespace FeatureLoom.Web
 
         public int CountConnectedSinks => ((IRequester)rpcCaller).CountConnectedSinks;
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (!request.IsPost)
-            {
-                response.StatusCode = HttpStatusCode.MethodNotAllowed;
-                await response.WriteAsync("Use 'POST' to send request messages!");
-                return false;
-            }
+            if (!request.IsPost) return HandlerResult.Handled_MethodNotAllowed();            
 
             try
             {
@@ -45,20 +40,21 @@ namespace FeatureLoom.Web
 
                 string rpcRequest = await request.ReadAsync();
                 rpcRequest = rpcRequest.Trim();
-                string rpcResponse = await rpcCaller.CallAsync(rpcRequest);
-                await response.WriteAsync(rpcResponse);
+                string rpcResponse = await rpcCaller.CallAsync(rpcRequest);                
+
+                return HandlerResult.Handled_OK(rpcResponse);
             }
             catch (TaskCanceledException cancelException)
-            {
-                response.StatusCode = HttpStatusCode.RequestTimeout;
+            {                
                 Log.WARNING(this.GetHandle(), "Web RPC request timed out", cancelException.ToString());
+                return HandlerResult.Handled_RequestTimeout();
             }
             catch (Exception e)
             {
                 Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
+                return HandlerResult.Handled_InternalServerError();
+
             }
-            return true;
         }
 
         public IMessageSource ConnectTo(IMessageFlowConnection sink)

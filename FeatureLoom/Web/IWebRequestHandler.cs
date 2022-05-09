@@ -6,6 +6,6 @@ namespace FeatureLoom.Web
     {
         string Route { get; }
 
-        Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response);
+        Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response);
     }
 }

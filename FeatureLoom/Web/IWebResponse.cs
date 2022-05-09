@@ -18,5 +18,6 @@ namespace FeatureLoom.Web
         void DeleteCookie(string key);
 
         bool ResponseSent { get; }
+        bool StatusCodeSet { get; }
     }
 }

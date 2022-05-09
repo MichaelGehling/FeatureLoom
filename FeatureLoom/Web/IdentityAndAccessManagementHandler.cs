@@ -18,14 +18,10 @@ namespace FeatureLoom.Web
         public string route = "/IdentityAndAccess";
         public string Route => route;
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             Session session = Session.Current;
-            if (session?.Identity == null)
-            {
-                response.StatusCode = HttpStatusCode.Forbidden;
-                return true;
-            }
+            if (session?.Identity == null) HandlerResult.Handled_Forbidden();            
 
             var splits = request.RelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);            
 
@@ -37,53 +33,54 @@ namespace FeatureLoom.Web
                 {                    
                     if (identityId == session.IdentityId)
                     {
+                        bool failed = false;
                         // Delete own identity (also possible without extra access right)
                         if (await session.Identity.TryRemoveFromStorageAsync())
                         {
-                            Log.INFO(this.GetHandle(), $"Successfully deleted identity [{identityId}]");
-                            response.StatusCode = HttpStatusCode.NoContent;
+                            Log.INFO(this.GetHandle(), $"Successfully deleted identity [{identityId}]");                            
                         }
                         else
                         {
                             Log.ERROR(this.GetHandle(), $"Failed deleting identity [{identityId}]");
-                            response.StatusCode = HttpStatusCode.InternalServerError;
+                            failed = true;
                         }
                         
                         //Logout after deleting own identity
                         Session.Current = null;
                         await session.TryDeleteFromStorageAsync();
                         response.DeleteCookie(cookieName);
+
+                        return failed ? HandlerResult.Handled_InternalServerError() : HandlerResult.Handled_OK();
                     }
                     else if (session.Identity.HasPermission(accessRight_ManageIdentities))
                     {
                         if (!Storage.GetReader(Identity.StorageCategory).Exists(identityId))
                         {
                             Log.INFO(this.GetHandle(), $"Could not delete identity [{identityId}], because it does not exist.");
-                            response.StatusCode = HttpStatusCode.NotFound;
+                            return HandlerResult.Handled_NotFound();
                         }
                         else if (await Storage.GetWriter(Identity.StorageCategory).TryDeleteAsync(identityId))
                         {
                             Log.INFO(this.GetHandle(), $"Successfully deleted identity [{identityId}]");
-                            response.StatusCode = HttpStatusCode.NoContent;                            
+                            return HandlerResult.Handled_OK();
                         }
                         else
                         {
                             Log.ERROR(this.GetHandle(), $"Failed deleting identity [{identityId}]");
-                            response.StatusCode = HttpStatusCode.InternalServerError;
+                            return HandlerResult.Handled_InternalServerError();
                         }
                         
                     }
                     else
                     {
                         Log.WARNING(this.GetHandle(), $"Access denied to delete identity [{identityId}]");
-                        response.StatusCode = HttpStatusCode.Forbidden;
+                        return HandlerResult.Handled_Forbidden();
                     }
                 }
 
-                return true;
             }
 
-            return false;
+            return HandlerResult.NotHandled();
         }
     }
 }

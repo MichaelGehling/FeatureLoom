@@ -21,20 +21,19 @@ namespace FeatureLoom.Web
 
         public string Route => handler.Route;
 
-        public Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             if (Session.Current?.Identity?.HasPermission(requiredPermission) ?? false)
             {
                 return handler.HandleRequestAsync(request, response);
             }
             else if (returnForbidden)
-            {
-                response.StatusCode = System.Net.HttpStatusCode.Forbidden;
-                return Task.FromResult(true);
+            {                
+                return Task.FromResult(HandlerResult.Handled_Forbidden());
             }
             else
             {
-                return Task.FromResult(false);
+                return Task.FromResult(HandlerResult.NotHandled());
             }
         }
     }

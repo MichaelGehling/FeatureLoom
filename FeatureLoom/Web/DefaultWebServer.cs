@@ -2,6 +2,7 @@
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
+using FeatureLoom.Serialization;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using Microsoft.AspNetCore.Builder;
@@ -19,7 +20,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
 {
-    public class DefaultWebServer : IWebServer
+    public partial class DefaultWebServer : IWebServer
     {
         public class Config : Configuration
         {
@@ -30,7 +31,7 @@ namespace FeatureLoom.Web
         private FeatureLock myLock = new FeatureLock();
         private bool running = false;
         private IWebHost webserver;
-        private byte[] favicon;
+        private byte[] favicon;        
 
         // Invert comparer, so that when one route is the start of the second, the second will come first, so the more specifc before the less specific 
         static readonly IComparer<IWebRequestHandler> routeComparer = new GenericComparer<IWebRequestHandler>((handler1, handler2) => -handler1.Route.CompareTo(handler2.Route));
@@ -224,28 +225,23 @@ namespace FeatureLoom.Web
                 var currentInterceptors = this.requestInterceptors; // take current reference to avoid change while execution.
                 foreach (var interceptor in currentInterceptors)
                 {
-                    if (await interceptor.InterceptRequestAsync(request, response))
-                    {                      
-                        return; // request was intercepted, so finish request handling
-                    }
+                    var result = await interceptor.InterceptRequestAsync(request, response);
+                    if (await ProcessHandlerResult(response, result)) return;
                 }
 
-                var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
+                var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.                
                 foreach (var handler in currentRequestHandlers)
                 {
                     if (path.StartsWith(handler.Route))
                     {
                         contextWrapper.SetRoute(handler.Route);
-                        if (await handler.HandleRequestAsync(request, response))
-                        {
-                            return; // request was handled, so finish request handling
-                        }
+                        HandlerResult result = await handler.HandleRequestAsync(request, response);
+                        if (await ProcessHandlerResult(response, result)) return;
                     }
-
                 }
 
-                // Request was not handled so NotFound StatusCode is set, but it has to be ensured that the response stream whas not already written.
-                if (!response.ResponseSent)
+                // Request was not handled so NotFound StatusCode is set, but it has to be ensured that the response stream was not already written.
+                if (!response.ResponseSent && !response.StatusCodeSet)
                 {
                     response.StatusCode = HttpStatusCode.NotFound;
                 }
@@ -261,6 +257,23 @@ namespace FeatureLoom.Web
                 Log.ERROR(this.GetHandle(), "Web request failed with an exception!", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;
             }
+        }
+
+        private static async Task<bool> ProcessHandlerResult(IWebResponse response, HandlerResult result)
+        {
+            if (result.statusCode.HasValue) response.StatusCode = result.statusCode.Value;
+            if (result.data != null)
+            {
+                if (!result.statusCode.HasValue) response.StatusCode = HttpStatusCode.OK;
+
+                if (result.data is string str) await response.WriteAsync(str);
+                else if (result.data is byte[] bytes) await response.Stream.WriteAsync(bytes, 0, bytes.Length);
+                else if (result.data is Stream stream) await stream.CopyToAsync(response.Stream);
+                else await response.WriteAsync(Json.SerializeToJson(result.data));
+
+                return true;
+            }
+            return result.requestHandled;
         }
 
         private async void ApplyEndpoints(KestrelServerOptions options)
@@ -291,102 +304,5 @@ namespace FeatureLoom.Web
                 }
             }
         }
-
-        private class ContextWrapper : IWebRequest, IWebResponse
-        {
-            private HttpContext context;
-            private string route = "";
-            private bool responseSent = false;
-
-            public void SetRoute(string route) => this.route = route;
-
-            public ContextWrapper(HttpContext context)
-            {
-                this.context = context;
-            }
-
-            string IWebRequest.BasePath => context.Request.PathBase + route;
-
-            string IWebRequest.FullPath => context.Request.PathBase + context.Request.Path;
-
-            string IWebRequest.RelativePath => context.Request.Path.ToString().Substring(route.Length);
-
-            Stream IWebRequest.Stream => context.Request.Body;
-
-            Stream IWebResponse.Stream => context.Response.Body;
-
-            string IWebRequest.ContentType => context.Request.ContentType;
-
-            string IWebResponse.ContentType { get => context.Response.ContentType; set => context.Response.ContentType = value; }
-
-            bool IWebRequest.IsGet => HttpMethods.IsGet(context.Request.Method);
-
-            bool IWebRequest.IsPost => HttpMethods.IsPost(context.Request.Method);
-
-            bool IWebRequest.IsPut => HttpMethods.IsPut(context.Request.Method);
-
-            bool IWebRequest.IsDelete => HttpMethods.IsDelete(context.Request.Method);
-
-            bool IWebRequest.IsHead => HttpMethods.IsHead(context.Request.Method);
-
-            string IWebRequest.Method => context.Request.Method;            
-
-            HttpStatusCode IWebResponse.StatusCode { get => (HttpStatusCode)context.Response.StatusCode; set => context.Response.StatusCode = (int)value; }
-
-            string IWebRequest.HostAddress
-            {
-                get
-                {
-                    return (context.Request.IsHttps ? "https://" : "http://") + context.Request.Host.Value;
-                }
-            }
-
-
-            bool IWebResponse.ResponseSent => responseSent;
-
-
-            void IWebResponse.AddCookie(string key, string content, CookieOptions options)
-            {
-                if (options != null) context.Response.Cookies.Append(key, content, options);
-                else context.Response.Cookies.Append(key, content);
-            }
-
-            void IWebResponse.DeleteCookie(string key)
-            {
-                context.Response.Cookies.Delete(key);
-            }
-
-            Task<string> IWebRequest.ReadAsync()
-            {
-                return context.Request.Body.ReadToStringAsync();
-            }
-
-            bool IWebRequest.TryGetCookie(string key, out string content)
-            {
-                return context.Request.Cookies.TryGetValue(key, out content);
-            }
-
-            bool IWebRequest.TryGetQueryItem(string key, out string item)
-            {
-                if (context.Request.Query.TryGetValue(key, out StringValues values))
-                {
-                    item = values[0];
-                    return true;
-                }
-                else
-                {
-                    item = default;
-                    return false;
-                }
-            }
-
-            IEnumerable<string> IWebRequest.GetAllQueryKeys() => context.Request.Query.Keys;
-
-            Task IWebResponse.WriteAsync(string reply)
-            {
-                responseSent = true;
-                return context.Response.WriteAsync(reply);
-            }
-        }        
     }
 }

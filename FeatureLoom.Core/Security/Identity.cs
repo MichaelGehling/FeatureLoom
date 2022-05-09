@@ -95,7 +95,10 @@ namespace FeatureLoom.Security
         public bool HasRole(string roleName) => Roles.Any(role => role.RoleName == roleName);
 
         public bool HasPermission(string permission) => Roles.Any(role => role.HasPermission(permission));
-        public bool HasAnyPermission(string permissionWildcard) => Roles.Any(role => role.HasAnyPermission(permissionWildcard));
+        public bool HasAnyPermission() => Roles.Any(role => role.HasAnyPermission());
+        public bool HasAnyPermission(IEnumerable<string> checkedPermissions) => Roles.Any(role => role.HasAnyPermission(checkedPermissions));
+        public bool MatchesAnyPermission(string permissionWildcard) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcard));
+        public bool MatchesAnyPermission(IEnumerable<string> permissionWildcards) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcards));
 
         public Task<bool> TryStoreAsync()
         {

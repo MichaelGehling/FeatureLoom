@@ -13,8 +13,7 @@ namespace FeatureLoom.Web
     {
         private readonly int bufferSize;
         private readonly string route;
-        private IWebMessageTranslator translator;
-        private readonly IWebServer webServer;
+        private IWebMessageTranslator translator;        
 
         private SourceValueHelper sourceHelper;
 
@@ -46,14 +45,9 @@ namespace FeatureLoom.Web
             return sourceHelper.GetConnectedSinks();
         }
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (!request.IsPost)
-            {
-                response.StatusCode = HttpStatusCode.MethodNotAllowed;
-                await response.WriteAsync("Use 'POST' to send messages!");
-                return false;
-            }
+            if (!request.IsPost) return HandlerResult.Handled_MethodNotAllowed();            
 
             try
             {
@@ -61,19 +55,19 @@ namespace FeatureLoom.Web
                 if (translator.TryTranslate(bodyString, out object message))
                 {
                     await sourceHelper.ForwardAsync(message);
+                    return HandlerResult.Handled_OK();
                 }
                 else
                 {
                     Log.WARNING(this.GetHandle(), $"Received message could not be translated. Route:{route}");
-                    response.StatusCode = HttpStatusCode.InternalServerError;
+                    return HandlerResult.Handled_BadRequest("Received message could not be translated.");
                 }
             }
             catch (Exception e)
             {
                 Log.ERROR(this.GetHandle(), $"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
+                return HandlerResult.Handled_InternalServerError();
             }
-            return true;
         }
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)

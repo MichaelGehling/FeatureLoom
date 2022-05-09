@@ -111,6 +111,8 @@ namespace Playground
 
         private static void Main()
         {
+
+
             string path1 = "Test/abc/123/1,1/xx/yyy";
             PatternExtractor extractor = new PatternExtractor("{1}/{2}/");
             extractor.TryExtract("Test/123/", out string item1, out int item2);
@@ -172,31 +174,36 @@ namespace Playground
             {
                 string result = "";
                 for (int i = 0; i < num; i++) result += name;
-                return result;
+                return HandlerResult.Handled_OK(result);
             });
+
+            webServer.HandleGET("/throw", (IWebRequest req) =>
+            {
+                (req as IWebServer).Run().WaitFor();
+                return HandlerResult.Handled_OK();
+            }).Catch((NullReferenceException e) => HandlerResult.Handled_Conflict(e.ToString()));
 
             webServer.HandlePOST("/customers/{name}", (string name) =>
             {
-                return name+"POSTED";
+                return HandlerResult.Handled_OK(name +"POSTED");
             });
 
             webServer.HandleGET("/test", (req, resp) =>
             {
-                return Session.Current.LifeTime.Remaining().ToString();
-            }, "Guest*");
+                return HandlerResult.Handled_OK(Session.Current.LifeTime.Remaining().ToString());
+            }).CheckMatchesPermission("Guest*");
 
             webServer.HandleGET("/test/xx", (req, resp) =>
             {
                 if (Session.Current?.Identity?.HasPermission("GuestThings") ?? false)
                 {
-                    return "xx";
+                    return HandlerResult.Handled_OK("xx");
                 }
                 else
-                {
-                    resp.StatusCode = HttpStatusCode.Forbidden;
-                    return null;
+                {                    
+                    return HandlerResult.Handled_Forbidden();
                 }
-            }, "GuestThings");
+            }).CheckHasPermission("GuestThings");
 
             webServer.AddRequestHandler(
                 new RequestHandlerPermissionWrapper(

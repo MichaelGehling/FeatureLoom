@@ -50,14 +50,9 @@ namespace FeatureLoom.Web
             return Task.CompletedTask;
         }
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (!request.IsGet)
-            {
-                response.StatusCode = HttpStatusCode.MethodNotAllowed;
-                await response.WriteAsync("Use 'GET' to fetch messages!");
-                return false;
-            }
+            if (!request.IsGet) return HandlerResult.Handled_MethodNotAllowed();            
 
             try
             {
@@ -104,14 +99,13 @@ $@"{{
                 sb.Append($@"
                    ]
 }}");
-                await response.WriteAsync(sb.ToString());
-                return true;
+                
+                return HandlerResult.Handled_OK(sb.ToString());
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
-                return true;
+                Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());                
+                return HandlerResult.Handled_InternalServerError();
             }
         }
     }

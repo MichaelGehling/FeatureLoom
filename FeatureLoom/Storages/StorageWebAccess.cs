@@ -43,7 +43,7 @@ namespace FeatureLoom.Storages
 
         public string Route => route;
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             try
             {
@@ -51,33 +51,29 @@ namespace FeatureLoom.Storages
                 {
                     if (request.TryGetQueryItem("uris", out string pattern))
                     {
-                        response.StatusCode = HttpStatusCode.OK;
-                        return await ReadUrlsAsync(request, response, pattern);
+                        return await ReadUrlsAsync(pattern);
                     }
                     else
                     {
-                        response.StatusCode = HttpStatusCode.OK;
-                        return await ReadUrlsAsync(request, response, null);
+                        return await ReadUrlsAsync(null);
                     }
                 }
                 else if (request.IsGet && config.allowRead) return await ReadAsync(request, response);
                 else if (request.IsPut && config.allowChange) return await WriteAsync(request, response);
                 else if (request.IsDelete && config.allowChange) return await DeleteAsync(request, response);
                 else
-                {
-                    response.StatusCode = HttpStatusCode.MethodNotAllowed;
-                    return false;
+                {                    
+                    return HandlerResult.Handled_MethodNotAllowed();
                 }
             }
             catch (Exception e)
             {
-                Log.WARNING(this.GetHandle(), $"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
-                return true;
+                Log.WARNING(this.GetHandle(), $"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());                
+                return HandlerResult.Handled_InternalServerError();
             }
         }
 
-        private async Task<bool> ReadUrlsAsync(IWebRequest request, IWebResponse response, string pattern)
+        private async Task<HandlerResult> ReadUrlsAsync(string pattern)
         {
             if (pattern == "") pattern = null;
             if ((await reader.TryListUrisAsync(pattern)).Out(out string[] uris))
@@ -87,46 +83,39 @@ namespace FeatureLoom.Storages
                     uris[i] = request.HostAddress + request.BasePath + "/" + uris[i].Replace("\\", "/");
                 }*/
                 //JSON.net does not provide async write to stream, so serialization has to be done before
-                string json = uris.ToJson();
-                await response.WriteAsync(json);
-                response.StatusCode = HttpStatusCode.OK;
-                return true;
+
+                return HandlerResult.Handled_OK(uris);
             }
             else
             {
-                response.StatusCode = HttpStatusCode.NoContent;
-                return true;
+                return HandlerResult.Handled_OK(Array.Empty<string>());
             }
         }
 
-        private async Task<bool> DeleteAsync(IWebRequest request, IWebResponse response)
+        private async Task<HandlerResult> DeleteAsync(IWebRequest request, IWebResponse response)
         {
             if (await writer.TryDeleteAsync(request.RelativePath.Trim('/')))
-            {
-                response.StatusCode = HttpStatusCode.OK;
-                return true;
+            {                
+                return HandlerResult.Handled_OK();
             }
             else
-            {
-                response.StatusCode = HttpStatusCode.NoContent;
-                return true;
+            {                
+                return HandlerResult.Handled_InternalServerError();
             }
         }
 
-        private async Task<bool> WriteAsync(IWebRequest request, IWebResponse response)
+        private async Task<HandlerResult> WriteAsync(IWebRequest request, IWebResponse response)
         {
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
                typeof(T).IsAssignableFrom(typeof(byte[])))
             {
                 if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").Trim('/'), request.Stream))
-                {
-                    response.StatusCode = HttpStatusCode.OK;
-                    return true;
+                {                    
+                    return HandlerResult.Handled_OK();
                 }
                 else
-                {
-                    response.StatusCode = HttpStatusCode.InternalServerError;
-                    return true;
+                {                    
+                    return HandlerResult.Handled_InternalServerError();
                 }
             }
             else
@@ -134,30 +123,27 @@ namespace FeatureLoom.Storages
                 T obj = request.Stream.FromJson<T>();
                 if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").Trim('/'), obj))
                 {
-                    response.StatusCode = HttpStatusCode.OK;
-                    return true;
+                    return HandlerResult.Handled_OK();
                 }
                 else
                 {
-                    response.StatusCode = HttpStatusCode.InternalServerError;
-                    return true;
+                    return HandlerResult.Handled_InternalServerError();
                 }
             }
         }
 
-        private async Task<bool> ReadAsync(IWebRequest request, IWebResponse response)
+        private async Task<HandlerResult> ReadAsync(IWebRequest request, IWebResponse response)
         {
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
                 typeof(T).IsAssignableFrom(typeof(byte[])))
             {
                 if (await reader.TryReadAsync(request.RelativePath.Replace("%20", " ").Trim('/'), s => s.CopyToAsync(response.Stream)))
                 {
-                    return true;
+                    return HandlerResult.Handled_OK();
                 }
                 else
                 {
-                    response.StatusCode = HttpStatusCode.NoContent;
-                    return true;
+                    return HandlerResult.Handled_NotFound();
                 }
             }
             else
@@ -165,14 +151,11 @@ namespace FeatureLoom.Storages
                 if ((await reader.TryReadAsync<T>(request.RelativePath.Replace("%20", " ").Trim('/'))).Out(out T obj))
                 {
                     //JSON.net does not provide async write to stream, so serialization has to be done before
-                    string json = obj.ToJson();
-                    await response.WriteAsync(json);
-                    return true;
+                    return HandlerResult.Handled_OK(obj);
                 }
                 else
-                {
-                    response.StatusCode = HttpStatusCode.NoContent;
-                    return true;
+                {                    
+                    return HandlerResult.Handled_NotFound();
                 }
             }
         }

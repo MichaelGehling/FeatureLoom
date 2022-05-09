@@ -20,58 +20,64 @@ namespace FeatureLoom.Web
 
         ICredentialHandler<UsernamePassword> credentialHandler = new UserNamePasswordPBKDF2Handler();
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (request.IsPost && request.RelativePath == "")
+            if (request.RelativePath != "") return HandlerResult.NotHandled_NotFound();
+            if (!request.IsPost) return HandlerResult.NotHandled_MethodNotAllowed();            
+            
+            TimeFrame processingTimeFrame = new TimeFrame(normalizedProcessingTime);
+            try
             {
-                TimeFrame processingTimeFrame = new TimeFrame(normalizedProcessingTime);
-                try
-                {
-                    string data = await request.ReadAsync();
-                    var usernamePassword = data.FromJson<UsernamePassword>();
+                string data = await request.ReadAsync();
+                var usernamePassword = data.FromJson<UsernamePassword>();
 
-                    if ((await Identity.TryLoadIdentityAsync(usernamePassword.username)).Out(out Identity identity))
+                if ((await Identity.TryLoadIdentityAsync(usernamePassword.username)).Out(out Identity identity))
+                {
+                    if (identity.TryGetCredential(credentialHandler.CredentialType, out var storedCredential) && 
+                        credentialHandler.VerifyCredential(usernamePassword, storedCredential))
                     {
-                        if (identity.TryGetCredential(credentialHandler.CredentialType, out var storedCredential) && 
-                            credentialHandler.VerifyCredential(usernamePassword, storedCredential))
+                        Session session = new Session(identity);
+                        if (await session.TryStoreAsync())
                         {
-                            Session session = new Session(identity);
-                            if (await session.TryStoreAsync())
-                            {
-                                response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout});
-                                Log.INFO(this.GetHandle(), $"Login successful by user [{usernamePassword.username}]");
-                                response.StatusCode = HttpStatusCode.OK;
-                                await response.WriteAsync(session.SessionId);
-                            }
-                            else
-                            {
-                                Log.ERROR(this.GetHandle(), "Failed to store session!");
-                                response.StatusCode = HttpStatusCode.InternalServerError;
-                            }
+                            response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout});
+                            Log.INFO(this.GetHandle(), $"Login successful by user [{usernamePassword.username}]");
+
+                            await processingTimeFrame.WaitForEndAsync();
+                            return HandlerResult.Handled_OK(session.SessionId);
                         }
                         else
                         {
-                            Log.INFO(this.GetHandle(), "Login failed, due to wrong credentials!");
-                            response.StatusCode = HttpStatusCode.Unauthorized;
+                            Log.ERROR(this.GetHandle(), "Failed to store session!");
+
+                            await processingTimeFrame.WaitForEndAsync();
+                            return HandlerResult.Handled_InternalServerError();
                         }
                     }
                     else
                     {
-                        Log.INFO(this.GetHandle(), "Login failed, due to unknown user [{usernamePassword.username}]!");
-                        response.StatusCode = HttpStatusCode.Unauthorized;
-                    }
+                        Log.INFO(this.GetHandle(), "Login failed, due to wrong credentials!");
 
+                        await processingTimeFrame.WaitForEndAsync();
+                        return HandlerResult.Handled_Unauthorized();
+                    }
                 }
-                catch(Exception e)
+                else
                 {
-                    Log.WARNING(this.GetHandle(), "Failed to process login data", e.ToString());
-                    response.StatusCode = HttpStatusCode.BadRequest;
+                    Log.INFO(this.GetHandle(), "Login failed, due to unknown user [{usernamePassword.username}]!");
+
+                    await processingTimeFrame.WaitForEndAsync();
+                    return HandlerResult.Handled_Unauthorized();
                 }
+
+            }
+            catch(Exception e)
+            {
+                Log.WARNING(this.GetHandle(), "Failed to process login data", e.ToString());
 
                 await processingTimeFrame.WaitForEndAsync();
-                return true;
+                return HandlerResult.Handled_BadRequest();
             }
-            else return false;
+            
         }
     }
 }
