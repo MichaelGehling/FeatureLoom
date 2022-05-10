@@ -86,16 +86,16 @@ namespace FeatureLoom.Extensions
 
         public static bool TryFindFirst<T>(this IEnumerable<T> items, Func<T, bool> predicate, out T item)
         {
-            if (!items.Any())
+            item = default;
+            foreach(var itemToCheck in items)
             {
-                item = default;
-                return false;
+                if (predicate(itemToCheck))
+                {
+                    item = itemToCheck;
+                    return true;
+                }
             }
-            else
-            {
-                item = items.FirstOrDefault(predicate);
-                return predicate(item);
-            }
+            return false;
         }
 
         public static bool Replace<T>(this IList<T> list, T item, Predicate<T> predicate, bool replaceOnlyFirst = false)

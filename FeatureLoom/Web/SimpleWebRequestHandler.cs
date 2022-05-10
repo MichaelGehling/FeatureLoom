@@ -87,29 +87,29 @@ namespace FeatureLoom.Web
 
         public string Route => route;
 
-        public Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             try
             {
-                if (matchRouteExactly && request.RelativePath != "") return Task.FromResult(HandlerResult.NotHandled());
-                if (method != null && method != request.Method) return Task.FromResult(HandlerResult.NotHandled_MethodNotAllowed());
+                if (matchRouteExactly && request.RelativePath != "") return HandlerResult.NotHandled();
+                if (method != null && method != request.Method) return HandlerResult.NotHandled_MethodNotAllowed();
 
                 if (filters.Count > 0)
                 {
                     for (int i = 0; i < filters.Count; i++)
                     {
-                        if (!filters[i].check(request)) return Task.FromResult(filters[i].handlerResult);
+                        if (!filters[i].check(request)) return filters[i].handlerResult;
                     }
                 }
 
-                return handleActionAsync(request, response);
+                return await handleActionAsync(request, response);
             }
             catch(Exception e)
             {
                 foreach(var catchHandler in catchHandlers)
                 {
                     var result = catchHandler.TryCatch(e, request, response);
-                    if (result.requestHandled) return Task.FromResult(result);
+                    if (result.requestHandled) return result;
                 }
                 throw;
             }

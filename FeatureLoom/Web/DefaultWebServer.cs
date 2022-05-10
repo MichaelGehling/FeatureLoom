@@ -254,7 +254,7 @@ namespace FeatureLoom.Web
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Web request failed with an exception!", e.ToString());
+                Log.ERROR(this.GetHandle(), "Web request failed with an unhandled exception!", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;
             }
         }
