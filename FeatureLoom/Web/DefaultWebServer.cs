@@ -37,6 +37,8 @@ namespace FeatureLoom.Web
         static readonly IComparer<IWebRequestHandler> routeComparer = new GenericComparer<IWebRequestHandler>((handler1, handler2) => -handler1.Route.CompareTo(handler2.Route));
         private List<IWebRequestHandler> requestHandlers = new List<IWebRequestHandler>();
         private List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
+        private List<IWebExceptionHandler> exceptionHandlers = new List<IWebExceptionHandler>();
+        private List<IWebResultHandler> resultHandlers = new List<IWebResultHandler>();
         private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
         public DefaultWebServer()
@@ -74,6 +76,74 @@ namespace FeatureLoom.Web
                     Stop();
                     Run();
                 }
+            }
+        }
+
+        public void AddExceptionHandler(IWebExceptionHandler exceptionHandler)
+        {
+            using (myLock.Lock())
+            {
+                var exceptionHandlers = this.exceptionHandlers;
+                if (running) exceptionHandlers = new List<IWebExceptionHandler>(exceptionHandlers);
+                exceptionHandlers.Add(exceptionHandler);
+                this.exceptionHandlers = exceptionHandlers;
+            }
+        }
+
+        public void RemoveExceptionHandler(IWebExceptionHandler exceptionHandler)
+        {
+            using (myLock.Lock())
+            {
+                var exceptionHandlers = this.exceptionHandlers;
+                if (running) exceptionHandlers = new List<IWebExceptionHandler>(exceptionHandlers);
+                exceptionHandlers.Remove(exceptionHandler);
+                this.exceptionHandlers = exceptionHandlers;
+            }
+        }
+
+        public void ClearExceptionHandlers()
+        {
+            using (myLock.Lock())
+            {
+                var exceptionHandlers = this.exceptionHandlers;
+                if (running) exceptionHandlers = new List<IWebExceptionHandler>();
+                else exceptionHandlers.Clear();
+                this.exceptionHandlers = exceptionHandlers;
+
+            }
+        }
+
+        public void AddResultHandler(IWebResultHandler resultHandler)
+        {
+            using (myLock.Lock())
+            {
+                var resultHandlers = this.resultHandlers;
+                if (running) resultHandlers = new List<IWebResultHandler>(resultHandlers);
+                resultHandlers.Add(resultHandler);
+                this.resultHandlers = resultHandlers;
+            }
+        }
+
+        public void RemoveResultHandler(IWebResultHandler resultHandler)
+        {
+            using (myLock.Lock())
+            {
+                var resultHandlers = this.resultHandlers;
+                if (running) resultHandlers = new List<IWebResultHandler>(resultHandlers);
+                resultHandlers.Remove(resultHandler);
+                this.resultHandlers = resultHandlers;
+            }
+        }
+
+        public void ClearResultHandlers()
+        {
+            using (myLock.Lock())
+            {
+                var resultHandlers = this.resultHandlers;
+                if (running) resultHandlers = new List<IWebResultHandler>();
+                else resultHandlers.Clear();
+                this.resultHandlers = resultHandlers;
+
             }
         }
 
@@ -226,7 +296,11 @@ namespace FeatureLoom.Web
                 foreach (var interceptor in currentInterceptors)
                 {
                     var result = await interceptor.InterceptRequestAsync(request, response);
-                    if (await ProcessHandlerResult(response, result)) return;
+                    if (await ProcessHandlerResult(request, response, result))
+                    {
+                        await ReactOnResult(request, response, result);
+                        return;
+                    }
                 }
 
                 var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.                
@@ -236,7 +310,11 @@ namespace FeatureLoom.Web
                     {
                         contextWrapper.SetRoute(handler.Route);
                         HandlerResult result = await handler.HandleRequestAsync(request, response);
-                        if (await ProcessHandlerResult(response, result)) return;
+                        if (await ProcessHandlerResult(request, response, result))
+                        {
+                            await ReactOnResult(request, response, result);
+                            return;
+                        }
                     }
                 }
 
@@ -244,22 +322,38 @@ namespace FeatureLoom.Web
                 if (!response.ResponseSent && !response.StatusCodeSet)
                 {
                     response.StatusCode = HttpStatusCode.NotFound;
+                    await ReactOnResult(request, response, HandlerResult.NotHandled_NotFound());
+                    return;
                 }
             }
             catch (WebResponseException e)
             {
                 if (e.LogLevel.HasValue) Log.SendLogMessage(new LogMessage(e.LogLevel.Value, e.InternalMessage));
                 response.StatusCode = e.StatusCode;
-                if (!e.ResponseMessage.EmptyOrNull()) await response.WriteAsync(e.ResponseMessage);
-            }
+                if (!e.ResponseMessage.EmptyOrNull()) await response.WriteAsync(e.ResponseMessage);                
+                await ReactOnResult(request, response, new HandlerResult(true, e.ResponseMessage, e.StatusCode));
+                return;
+            }            
             catch (Exception e)
             {
+                foreach (var exceptionHanlder in exceptionHandlers)
+                {
+                    var result = await exceptionHanlder.HandleException(e, request, response);
+                    if (await ProcessHandlerResult(request, response, result))
+                    {
+                        await ReactOnResult(request, response, result);
+                        return;
+                    }
+                }
+
                 Log.ERROR(this.GetHandle(), "Web request failed with an unhandled exception!", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
+                response.StatusCode = HttpStatusCode.InternalServerError;                
+                await ReactOnResult(request, response, HandlerResult.NotHandled_InternalServerError());
+                return;
             }
         }
 
-        private static async Task<bool> ProcessHandlerResult(IWebResponse response, HandlerResult result)
+        private  async Task<bool> ProcessHandlerResult(IWebRequest request, IWebResponse response, HandlerResult result)
         {
             if (result.statusCode.HasValue) response.StatusCode = result.statusCode.Value;
             if (result.data != null)
@@ -274,6 +368,14 @@ namespace FeatureLoom.Web
                 return true;
             }
             return result.requestHandled;
+        }
+
+        private async Task ReactOnResult(IWebRequest request, IWebResponse response, HandlerResult result)
+        {
+            foreach (var resultHandler in this.resultHandlers)
+            {
+                await resultHandler.HandleResult(result, request, response);
+            }
         }
 
         private async void ApplyEndpoints(KestrelServerOptions options)
@@ -304,5 +406,6 @@ namespace FeatureLoom.Web
                 }
             }
         }
+
     }
 }

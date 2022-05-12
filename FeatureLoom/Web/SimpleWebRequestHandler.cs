@@ -11,7 +11,7 @@ namespace FeatureLoom.Web
     public class SimpleWebRequestHandler : IExtensibleWebRequestHandler
     {
         private List<Filter> filters = new List<Filter>();
-        private List<ICatchHandler> catchHandlers = new List<ICatchHandler>();
+        private List<IWebExceptionHandler> exceptionHandlers = new List<IWebExceptionHandler>();
         protected string route = "";
         protected Func<IWebRequest, IWebResponse, Task<HandlerResult>> handleActionAsync;
         protected string method = null;
@@ -106,9 +106,9 @@ namespace FeatureLoom.Web
             }
             catch(Exception e)
             {
-                foreach(var catchHandler in catchHandlers)
-                {
-                    var result = catchHandler.TryCatch(e, request, response);
+                foreach(var exceptionHandler in exceptionHandlers)
+                {                    
+                    var result = await exceptionHandler.HandleException(e, request, response);
                     if (result.requestHandled) return result;
                 }
                 throw;
@@ -120,9 +120,9 @@ namespace FeatureLoom.Web
             return this;
         }
 
-        public IExtensibleWebRequestHandler Catch<E>(Func<E, IWebRequest, IWebResponse, HandlerResult> reaction) where E : Exception
+        public IExtensibleWebRequestHandler HandleException<E>(Func<E, IWebRequest, IWebResponse, Task<HandlerResult>> reaction) where E : Exception
         {
-            catchHandlers.Add(new CatchHandler<E>(reaction));
+            exceptionHandlers.Add(new SimpleWebExceptionHandler<E>(reaction));
             return this;
         }
 
@@ -137,32 +137,6 @@ namespace FeatureLoom.Web
                 this.handlerResult = handlerResult;
             }
         }
-
-        private class CatchHandler<E> : ICatchHandler
-        {
-            public readonly Func<E, IWebRequest, IWebResponse, HandlerResult> reaction;
-
-            public CatchHandler(Func<E, IWebRequest, IWebResponse, HandlerResult> reaction)
-            {
-                this.reaction = reaction;
-            }
-
-            public HandlerResult TryCatch<T>(T exception, IWebRequest request, IWebResponse response)
-            {
-                if (exception is E validExeption)
-                {
-                    return reaction(validExeption, request, response);                    
-                }
-                return HandlerResult.NotHandled();
-            }
-        }
-
-        private interface ICatchHandler
-        {
-            public HandlerResult TryCatch<T>(T exception, IWebRequest request, IWebResponse response);
-        }
-
-
     }
 
     public class SimpleWebRequestHandler<T1> : SimpleWebRequestHandler

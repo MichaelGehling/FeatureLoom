@@ -1,12 +1,13 @@
 ﻿using FeatureLoom.Security;
 using System;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
 {
     public interface IExtensibleWebRequestHandler : IWebRequestHandler
     {
         public IExtensibleWebRequestHandler AddFilter(Predicate<IWebRequest> filter, HandlerResult handlerResultIfFiltered);
-        public IExtensibleWebRequestHandler Catch<E>(Func<E, IWebRequest, IWebResponse, HandlerResult> reaction) where E : Exception;
+        public IExtensibleWebRequestHandler HandleException<E>(Func<E, IWebRequest, IWebResponse, Task<HandlerResult>> reaction) where E : Exception;
     }
 
     public static class FilterableWebRequestHandlerExtensions
@@ -16,11 +17,17 @@ namespace FeatureLoom.Web
         public static IExtensibleWebRequestHandler CheckMatchesPermission(this IExtensibleWebRequestHandler handler, string permissionWildcard) => handler.AddFilter(_ => Session.Current?.Identity?.MatchesAnyPermission(permissionWildcard) ?? false, HandlerResult.Handled_Forbidden());
         public static IExtensibleWebRequestHandler CheckMatchesPermission(this IExtensibleWebRequestHandler handler, params string[] permissionWildcards) => handler.AddFilter(_ => Session.Current?.Identity?.MatchesAnyPermission(permissionWildcards) ?? false, HandlerResult.Handled_Forbidden());
 
-        public static IExtensibleWebRequestHandler Catch<E>(this IExtensibleWebRequestHandler handler, Func<E, IWebRequest, HandlerResult> reaction) where E : Exception => handler.Catch((E e, IWebRequest req, IWebResponse resp) => reaction(e, req));
-        public static IExtensibleWebRequestHandler Catch<E>(this IExtensibleWebRequestHandler handler, Func<E, IWebResponse, HandlerResult> reaction) where E : Exception => handler.Catch((E e, IWebRequest req, IWebResponse resp) => reaction(e, resp));
-        public static IExtensibleWebRequestHandler Catch<E>(this IExtensibleWebRequestHandler handler, Func<E, HandlerResult> reaction) where E : Exception => handler.Catch((E e, IWebRequest req, IWebResponse resp) => reaction(e));
-        public static IExtensibleWebRequestHandler Catch<E>(this IExtensibleWebRequestHandler handler, Func<HandlerResult> reaction) where E : Exception => handler.Catch((E e, IWebRequest req, IWebResponse resp) => reaction());
-        public static IExtensibleWebRequestHandler Catch(this IExtensibleWebRequestHandler handler, Func<HandlerResult> reaction) => handler.Catch((Exception e, IWebRequest req, IWebResponse resp) => reaction());        
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<E, IWebRequest, Task<HandlerResult>> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => reaction(e, req));
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<E, IWebResponse, Task<HandlerResult>> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => reaction(e, resp));
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<E, Task<HandlerResult>> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => reaction(e));
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<Task<HandlerResult>> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => reaction());
+        public static IExtensibleWebRequestHandler HandleException(this IExtensibleWebRequestHandler handler, Func<Task<HandlerResult>> reaction) => handler.HandleException((Exception e, IWebRequest req, IWebResponse resp) => reaction());
+
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<E, IWebRequest, HandlerResult> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction(e, req)));
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<E, IWebResponse, HandlerResult> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction(e, resp)));
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<E, HandlerResult> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction(e)));
+        public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<HandlerResult> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction()));
+        public static IExtensibleWebRequestHandler HandleException(this IExtensibleWebRequestHandler handler, Func<HandlerResult> reaction) => handler.HandleException((Exception e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction()));
     }
 
 }

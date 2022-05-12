@@ -9,9 +9,4 @@ namespace FeatureLoom.Web
     {        
         Task<HandlerResult> InterceptRequestAsync(IWebRequest request, IWebResponse response);
     }
-
-    public interface IWebExceptionHandler
-    {
-        Task<HandlerResult> HandleException(Exception e, IWebRequest request, IWebResponse response);
-    }
 }

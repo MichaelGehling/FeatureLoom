@@ -59,7 +59,6 @@ namespace Playground
         }
     }
 
-
     partial class Program
     {
                
@@ -107,7 +106,9 @@ namespace Playground
         {
             public string aaa = "Hallo";
             public int bbb = 99;
-        }    
+        }
+
+        
 
         private static void Main()
         {
@@ -181,7 +182,7 @@ namespace Playground
             {
                 (req as IWebServer).Run().WaitFor();
                 return HandlerResult.Handled_OK();
-            }).Catch((NullReferenceException e) => HandlerResult.Handled_Conflict(e.ToString()));
+            }).HandleException((NullReferenceException e) => HandlerResult.Handled_Conflict(e.ToString()));
 
             webServer.HandlePOST("/customers/{name}", (string name) =>
             {
@@ -205,10 +206,21 @@ namespace Playground
                 }
             }).CheckHasPermission("GuestThings");
 
+
             webServer.AddRequestHandler(
                 new RequestHandlerPermissionWrapper(
                     new StorageWebAccess<string>("/config", new StorageWebAccess<string>.Config() { category = "config" }),
                     "AdminThings", true));
+
+            webServer.HandleException((NullReferenceException e) =>
+            {
+                return HandlerResult.Handled_InternalServerError();
+            });
+
+            webServer.HandleResult((HandlerResult result) =>
+            {
+                if (result.statusCode == HttpStatusCode.BadRequest) Log.WARNING(HttpStatusCode.BadRequest.ToString());
+            });
 
             _ = webServer.Run(IPAddress.Loopback, 50123);
 

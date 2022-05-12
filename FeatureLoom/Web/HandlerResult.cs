@@ -18,6 +18,12 @@ namespace FeatureLoom.Web
             this.statusCode = statusCode;
         }
 
+        public bool IsInformational => statusCode.HasValue && (int)statusCode.Value >= 100 && (int)statusCode.Value < 200;
+        public bool IsSuccessful => statusCode.HasValue && (int)statusCode.Value >= 200 && (int)statusCode.Value < 300;
+        public bool IsRedirection => statusCode.HasValue && (int)statusCode.Value >= 300 && (int)statusCode.Value < 400;
+        public bool IsClientError => statusCode.HasValue && (int)statusCode.Value >= 400 && (int)statusCode.Value < 500;
+        public bool IsServerError => statusCode.HasValue && (int)statusCode.Value >= 500 && (int)statusCode.Value < 600;
+
         public static HandlerResult NotHandled() => new HandlerResult(false, null, null);
         public static HandlerResult NotHandled_Forbidden() => new HandlerResult(false, null, HttpStatusCode.Forbidden);
         public static HandlerResult NotHandled_BadRequest() => new HandlerResult(false, null, HttpStatusCode.BadRequest);

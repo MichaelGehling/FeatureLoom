@@ -17,6 +17,7 @@ namespace FeatureLoom.Web
         public static Task Run(this IWebServer webserver, IPAddress address, int port) => webserver.Run(new HttpEndpointConfig(address, port));
         public static Task Run(this IWebServer webserver, IPAddress address, int port, string certificateName) => webserver.Run(new HttpEndpointConfig(address, port, certificateName));
 
+        #region InterceptRequestExtensions
         public static void InterceptRequest(this IWebServer webserver, Func<IWebRequest, IWebResponse, Task<HandlerResult>> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor(interceptRequest));
         public static void InterceptRequest(this IWebServer webserver, Func<IWebRequest, Task<HandlerResult>> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor((req, resp) => interceptRequest(req)));
         public static void InterceptRequest(this IWebServer webserver, Func<IWebResponse, Task<HandlerResult>> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor((req, resp) => interceptRequest(resp)));
@@ -26,7 +27,31 @@ namespace FeatureLoom.Web
         public static void InterceptRequest(this IWebServer webserver, Func<IWebRequest, HandlerResult> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor((req, resp) => Task.FromResult(interceptRequest(req))));
         public static void InterceptRequest(this IWebServer webserver, Func<IWebResponse, HandlerResult> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor((req, resp) => Task.FromResult(interceptRequest(resp))));
         public static void InterceptRequest(this IWebServer webserver, Func<HandlerResult> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor((req, resp) => Task.FromResult(interceptRequest())));
+        #endregion InterceptRequestExtensions
 
+        #region WebExceptionHandlerExtensions
+        public static void HandleException<T>(this IWebServer webserver, Func<T, IWebRequest, IWebResponse, Task<HandlerResult>> handleException) where T:Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>(handleException));
+        public static void HandleException<T>(this IWebServer webserver, Func<T, IWebRequest, Task<HandlerResult>> handleException) where T : Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>((e, req, resp) => handleException(e, req)));
+        public static void HandleException<T>(this IWebServer webserver, Func<T, IWebResponse, Task<HandlerResult>> handleException) where T : Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>((e, req, resp) => handleException(e, resp)));
+        public static void HandleException<T>(this IWebServer webserver, Func<T, Task<HandlerResult>> handleException) where T : Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>((e, req, resp) => handleException(e)));
+
+        public static void HandleException<T>(this IWebServer webserver, Func<T, IWebRequest, IWebResponse, HandlerResult> handleException) where T : Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>((e, req, resp) => Task.FromResult(handleException(e, req, resp))));
+        public static void HandleException<T>(this IWebServer webserver, Func<T, IWebRequest, HandlerResult> handleException) where T : Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>((e, req, resp) => Task.FromResult(handleException(e, req))));
+        public static void HandleException<T>(this IWebServer webserver, Func<T, IWebResponse, HandlerResult> handleException) where T : Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>((e, req, resp) => Task.FromResult(handleException(e, resp))));
+        public static void HandleException<T>(this IWebServer webserver, Func<T, HandlerResult> handleException) where T : Exception => webserver.AddExceptionHandler(new SimpleWebExceptionHandler<T>((e, req, resp) => Task.FromResult(handleException(e))));
+        #endregion WebExceptionHandlerExtensions
+
+        #region WebResultHandlerExtensions
+        public static void HandleResult(this IWebServer webserver, Func<HandlerResult, IWebRequest, IWebResponse, Task> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler(handleResult));
+        public static void HandleResult(this IWebServer webserver, Func<HandlerResult, IWebRequest, Task> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler((result, req, resp) => handleResult(result, req)));
+        public static void HandleResult(this IWebServer webserver, Func<HandlerResult, IWebResponse, Task> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler((result, req, resp) => handleResult(result, resp)));
+        public static void HandleResult(this IWebServer webserver, Func<HandlerResult, Task> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler((result, req, resp) => handleResult(result)));
+
+        public static void HandleResult(this IWebServer webserver, Action<HandlerResult, IWebRequest, IWebResponse> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler((result, req, resp) => { handleResult(result, req, resp); return Task.CompletedTask; }));
+        public static void HandleResult(this IWebServer webserver, Action<HandlerResult, IWebRequest> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler((result, req, resp) => { handleResult(result, req); return Task.CompletedTask; }));
+        public static void HandleResult(this IWebServer webserver, Action<HandlerResult, IWebResponse> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler((result, req, resp) => { handleResult(result, resp); return Task.CompletedTask; }));
+        public static void HandleResult(this IWebServer webserver, Action<HandlerResult> handleResult) => webserver.AddResultHandler(new SimpleWebResultHandler((result, req, resp) => { handleResult(result); return Task.CompletedTask; }));
+        #endregion WebResultHandlerExtensions
 
         #region HandleRequestExtensions
         public static IExtensibleWebRequestHandler HandleRequest(this IWebServer webserver, string route, Func<IWebRequest, IWebResponse, Task<HandlerResult>> handleAction) { var handler = new SimpleWebRequestHandler(route, handleAction, null); webserver.AddRequestHandler(handler); return handler; }
