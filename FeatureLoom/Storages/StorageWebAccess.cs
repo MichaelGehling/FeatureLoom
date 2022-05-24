@@ -37,8 +37,8 @@ namespace FeatureLoom.Storages
             if (!route.StartsWith("/")) route = "/" + route;            
             this.route = route;
 
-            reader = Storage.GetReader(config.category);
-            writer = Storage.GetWriter(config.category);
+            reader = Storage.GetReader(this.config.category);
+            writer = Storage.GetWriter(this.config.category);
         }
 
         public string Route => route;
@@ -137,6 +137,7 @@ namespace FeatureLoom.Storages
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
                 typeof(T).IsAssignableFrom(typeof(byte[])))
             {
+                response.StatusCode = HttpStatusCode.OK;
                 if (await reader.TryReadAsync(request.RelativePath.Replace("%20", " ").TrimChar('/'), s => s.CopyToAsync(response.Stream)))
                 {
                     return HandlerResult.Handled_OK();

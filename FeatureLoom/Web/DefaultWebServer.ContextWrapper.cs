@@ -44,8 +44,16 @@ namespace FeatureLoom.Web
 
             private string UpdateFullPath()
             {
-                fullPath = context.Request.PathBase + context.Request.Path;
+                fullPath = context.Request.PathBase + context.Request.Path;                
                 return fullPath;
+            }
+
+            void IWebRequest.ChangePath(string newPath)
+            {
+                context.Request.Path = newPath;
+                relativePath = null;
+                basePath = null;
+                fullPath = null;
             }
 
             public ContextWrapper(HttpContext context)
@@ -54,6 +62,8 @@ namespace FeatureLoom.Web
             }
 
             string IWebRequest.BasePath => basePath ?? UpdateBasePath();
+
+            string IWebRequest.Path => context.Request.Path;
 
             string IWebRequest.FullPath => fullPath ?? UpdateFullPath();
 
@@ -82,7 +92,14 @@ namespace FeatureLoom.Web
                 }
             }
 
-            Stream IWebResponse.Stream => context.Response.Body;
+            Stream IWebResponse.Stream
+            {
+                get
+                {
+                    responseSent = true;
+                    return context.Response.Body;
+                }
+            }
             string IWebResponse.ContentType { get => context.Response.ContentType; set => context.Response.ContentType = value; }
 
             HttpStatusCode IWebResponse.StatusCode 

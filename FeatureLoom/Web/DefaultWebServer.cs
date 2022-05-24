@@ -281,11 +281,9 @@ namespace FeatureLoom.Web
 
             try
             {
-                string path = context.Request.Path;
-
                 // Shortcut to deliver icon.
                 // If icon needs to be handled dynamically in a handler, the shortcut can be skipped by setting the favicon to null.
-                if (favicon != null && request.IsGet && path == "/favicon.ico")
+                if (favicon != null && request.IsGet && request.Path == "/favicon.ico")
                 {
                     response.StatusCode = HttpStatusCode.OK;
                     await response.Stream.WriteAsync(this.favicon, 0, favicon.Length);                    
@@ -306,7 +304,7 @@ namespace FeatureLoom.Web
                 var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.                
                 foreach (var handler in currentRequestHandlers)
                 {
-                    if (path.StartsWith(handler.Route))
+                    if (request.Path.StartsWith(handler.Route))
                     {
                         contextWrapper.SetRoute(handler.Route);
                         HandlerResult result = await handler.HandleRequestAsync(request, response);
@@ -355,6 +353,13 @@ namespace FeatureLoom.Web
 
         private  async Task<bool> ProcessHandlerResult(IWebRequest request, IWebResponse response, HandlerResult result)
         {
+            if (response.ResponseSent)
+            {
+                if (result.statusCode != response.StatusCode) Log.WARNING(this.GetHandle(), $"Response was already sent, but status code of result ({result.statusCode}) and response ({response.StatusCode}) differ!");
+                if (result.data != null) Log.WARNING(this.GetHandle(), $"Response was already sent, but result contained data, that cannot be delivered!");
+                return true;
+            }
+
             if (result.statusCode.HasValue) response.StatusCode = result.statusCode.Value;
             if (result.data != null)
             {

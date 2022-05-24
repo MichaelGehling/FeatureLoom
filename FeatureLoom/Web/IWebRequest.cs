@@ -21,9 +21,12 @@ namespace FeatureLoom.Web
         bool IsHead { get; }
         string Method { get; }
         string RelativePath { get; }
+        string Path { get; }
         string BasePath { get; }
         string FullPath { get; }
         string HostAddress { get; }
+
+        void ChangePath(string newPath);
 
         bool TryGetQueryItem(string key, out string item);
         IEnumerable<string> GetAllQueryKeys();
