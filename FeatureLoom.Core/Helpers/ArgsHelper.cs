@@ -79,7 +79,12 @@ namespace FeatureLoom.Helpers
             return namedArgs.TryGetValue(key, out value);
         }
 
-        public IEnumerator<KeyValuePair<string, string>> GetEnumerator()
+        public Dictionary<string, string>.Enumerator GetEnumerator()
+        {
+            return namedArgs.GetEnumerator();
+        }
+
+        IEnumerator<KeyValuePair<string, string>> IEnumerable<KeyValuePair<string, string>>.GetEnumerator()
         {
             return ((IEnumerable<KeyValuePair<string, string>>)namedArgs).GetEnumerator();
         }

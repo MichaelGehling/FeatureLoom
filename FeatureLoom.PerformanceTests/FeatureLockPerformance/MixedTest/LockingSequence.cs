@@ -220,7 +220,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 
         protected async Task WaitAsync(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {
-            Work(time); return;
+            Work(time); 
+            return;
             //AppTime.Wait(time);
         }
     }

@@ -1,4 +1,5 @@
-﻿using FeatureLoom.MetaDatas;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.MetaDatas;
 using FeatureLoom.Time;
 using System;
 using System.Text;
@@ -54,12 +55,12 @@ namespace FeatureLoom.Logging
 
             return sb.AppendFormat(format,
                 timeStamp.ToString(timeStampFormat),
-                level,
+                level.ToName(),
                 shortText,
-                threadId,
-                contextHandle,
-                sourceFile,
-                sourceLine,
+                threadId.ToString(),
+                contextHandle.ToString(),
+                sourceFile.ToString(),
+                sourceLine.ToString(),
                 caller,
                 detailText);
         }

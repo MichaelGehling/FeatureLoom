@@ -80,7 +80,7 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public void AddRangeToBuffer(IEnumerable<T> messages)
+        public void AddRangeToBuffer<TEnum>(TEnum messages) where TEnum : IEnumerable<T>
         {
             using (bufferLock.Lock())
             {

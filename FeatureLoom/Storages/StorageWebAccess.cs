@@ -94,7 +94,7 @@ namespace FeatureLoom.Storages
 
         private async Task<HandlerResult> DeleteAsync(IWebRequest request, IWebResponse response)
         {
-            if (await writer.TryDeleteAsync(request.RelativePath.Trim('/')))
+            if (await writer.TryDeleteAsync(request.RelativePath.TrimChar('/')))
             {                
                 return HandlerResult.Handled_OK();
             }
@@ -109,7 +109,7 @@ namespace FeatureLoom.Storages
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
                typeof(T).IsAssignableFrom(typeof(byte[])))
             {
-                if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").Trim('/'), request.Stream))
+                if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").TrimChar('/'), request.Stream))
                 {                    
                     return HandlerResult.Handled_OK();
                 }
@@ -121,7 +121,7 @@ namespace FeatureLoom.Storages
             else
             {
                 T obj = request.Stream.FromJson<T>();
-                if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").Trim('/'), obj))
+                if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").TrimChar('/'), obj))
                 {
                     return HandlerResult.Handled_OK();
                 }
@@ -137,7 +137,7 @@ namespace FeatureLoom.Storages
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
                 typeof(T).IsAssignableFrom(typeof(byte[])))
             {
-                if (await reader.TryReadAsync(request.RelativePath.Replace("%20", " ").Trim('/'), s => s.CopyToAsync(response.Stream)))
+                if (await reader.TryReadAsync(request.RelativePath.Replace("%20", " ").TrimChar('/'), s => s.CopyToAsync(response.Stream)))
                 {
                     return HandlerResult.Handled_OK();
                 }
@@ -148,9 +148,8 @@ namespace FeatureLoom.Storages
             }
             else
             {
-                if ((await reader.TryReadAsync<T>(request.RelativePath.Replace("%20", " ").Trim('/'))).Out(out T obj))
+                if ((await reader.TryReadAsync<T>(request.RelativePath.Replace("%20", " ").TrimChar('/'))).Out(out T obj))
                 {
-                    //JSON.net does not provide async write to stream, so serialization has to be done before
                     return HandlerResult.Handled_OK(obj);
                 }
                 else

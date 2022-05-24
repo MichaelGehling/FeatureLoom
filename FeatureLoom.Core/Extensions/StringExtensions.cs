@@ -47,7 +47,7 @@ namespace FeatureLoom.Extensions
             bool didEndWithSeperator = path.EndsWith(seperator.ToString());            
             if (didEndWithSeperator)
             {
-                path = path.TrimEnd(seperator);
+                path = path.TrimCharEnd(seperator);
             }
 
             var index = path.LastIndexOf(seperator);
@@ -62,10 +62,18 @@ namespace FeatureLoom.Extensions
 
                 bool endsWithSeperator = path.EndsWith(seperator.ToString());
                 if (didEndWithSeperator && !endsWithSeperator) path += seperator;
-                else if (!didEndWithSeperator && endsWithSeperator) path = path.TrimEnd(seperator);
+                else if (!didEndWithSeperator && endsWithSeperator) path = path.TrimCharEnd(seperator);
 
                 return path;
             }            
+        }
+
+        public static string GetLastPathElement(this string path, char seperator = '\\')
+        {
+            path = path.TrimCharEnd(seperator);
+
+            var index = path.LastIndexOf(seperator);
+            return path.Substring(index + 1);
         }
 
         public static string MakeValidFilename(this string fileName, char replacementChar = '_')
@@ -140,6 +148,64 @@ namespace FeatureLoom.Extensions
             return sb.ToString();
         }
 
+        public static string TrimChar(this string str, char trimChar)
+        {
+            if (str.Length == 0) return str;
+            if (str.Length == 1 && str[0] == trimChar) return "";
+            if (str.Length >= 2)
+            {
+                int numTrimStart = 0;
+                for(int i=0; i < str.Length; i++)
+                {
+                    if (str[i] == trimChar) numTrimStart++;
+                    else break;
+                }
+                if (numTrimStart == str.Length) return "";
+                int numTrimEnd = 0;
+                for(int i=str.Length-1; i >= numTrimStart; i--)
+                {
+                    if (str[i] == trimChar) numTrimEnd++;
+                    else break;
+                }                
+                return str.Substring(numTrimStart, str.Length - numTrimStart - numTrimEnd);
+            }
+            return str;
+        }
+
+        public static string TrimCharStart(this string str, char trimChar)
+        {
+            if (str.Length == 0) return str;
+            if (str.Length == 1 && str[0] == trimChar) return "";
+            if (str.Length >= 2)
+            {
+                int numTrimStart = 0;
+                for (int i = 0; i < str.Length; i++)
+                {
+                    if (str[i] == trimChar) numTrimStart++;
+                    else break;
+                }
+                return str.Substring(numTrimStart, str.Length - numTrimStart);
+            }
+            return str;
+        }
+
+        public static string TrimCharEnd(this string str, char trimChar)
+        {
+            if (str.Length == 0) return str;
+            if (str.Length == 1 && str[0] == trimChar) return "";
+            if (str.Length >= 2)
+            { 
+                int numTrimEnd = 0;
+                for (int i = str.Length - 1; i >= 0; i--)
+                {
+                    if (str[i] == trimChar) numTrimEnd++;
+                    else break;
+                }
+                return str.Substring(0, str.Length - numTrimEnd);
+            }
+            return str;
+        }
+
         public static string TrimEnd(this string str, string trimStr)
         {
             int pos;
@@ -163,7 +229,7 @@ namespace FeatureLoom.Extensions
                     if (str[pos + i] != trimStr[i]) return str.Substring(pos);
                 }
             }
-            return str.Substring(0, pos);
+            return str.Substring(pos);
         }
 
         private static InMemoryCache<string, PatternExtractor> extractionPatternCache = new InMemoryCache<string, PatternExtractor>(p => 50 + p.Size*25, 

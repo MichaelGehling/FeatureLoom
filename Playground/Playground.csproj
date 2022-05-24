@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="Bmbsqd.AsyncLock" Version="0.2.2" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.1.46" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.2.32" />
     <PackageReference Include="NeoSmart.AsyncLock" Version="3.2.1" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
   </ItemGroup>

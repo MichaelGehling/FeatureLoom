@@ -10,6 +10,8 @@ namespace FeatureLoom.Time
         public readonly DateTime utcStartTime;
         public readonly DateTime utcEndTime;
 
+        public static TimeFrame Invalid => new TimeFrame();
+
         public TimeFrame(TimeSpan duration)
         {            
             if (duration >= TimeSpan.Zero)
@@ -48,7 +50,7 @@ namespace FeatureLoom.Time
             }
         }
 
-        public bool IsInvalid => utcStartTime == default;
+        public bool IsInvalid => utcStartTime == default && utcEndTime == default;
 
         public bool Elapsed() => Elapsed(Duration >= 1.Seconds() ? AppTime.CoarseNow :AppTime.Now);
 

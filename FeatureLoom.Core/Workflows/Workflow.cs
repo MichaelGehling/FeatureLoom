@@ -45,7 +45,7 @@ namespace FeatureLoom.Workflows
         public virtual ExecutionEventList ExecutionEvents => executionEvents;
 
         [JsonIgnore]
-        public string Name => $"{this.GetType()}_{this.GetHandle()}";
+        public string Name => $"{this.GetType()}_{this.GetHandle().ToString()}";
 
         [JsonIgnore]
         bool IStateMachineContext.PauseRequested

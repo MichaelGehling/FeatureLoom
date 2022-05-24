@@ -39,7 +39,7 @@ namespace FeatureLoom.MessageFlow
         private void PrepareSchedule(IAggregationData aggregationData, TimeSpan supervisionCycleTime)
         {
             this.maxSupervisionTimeout = supervisionCycleTime;
-            this.scheduledAction = Scheduler.ScheduleAction((now) =>
+            this.scheduledAction = Scheduler.ScheduleAction("Aggregator", (now) =>
             {                
                 if (!waitingForTimeout) return (true, maxSupervisionTimeout);
                 if (!nextTimeoutCheck.Elapsed(now)) return (true, maxSupervisionTimeout);

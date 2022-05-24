@@ -18,7 +18,6 @@ namespace FeatureLoom.MessageFlow
         private readonly TimeSpan cleanupPeriode = 10.Seconds();
         private readonly Func<object, object, bool> isDuplicate;
         private DateTime nextCleanUp;
-        private TimeSpan cleanUpDelay;
         private TimeSpan cleanupTolerance = 1.Seconds();
         private ISchedule scheduledAction;
 
@@ -30,19 +29,19 @@ namespace FeatureLoom.MessageFlow
             if (cleanupPeriode == default) cleanupPeriode = this.cleanupPeriode;
             cleanupPeriode = cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
             this.cleanupPeriode = cleanupPeriode;
-            this.nextCleanUp = AppTime.Now + this.cleanupPeriode;
-            this.cleanUpDelay = cleanupPeriode;            
+            this.nextCleanUp = AppTime.Now + this.cleanupPeriode;        
             if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
-            this.scheduledAction = Scheduler.ScheduleAction(now => 
+            this.scheduledAction = Scheduler.ScheduleAction("DuplicateMessageSuppressor", now => 
             {
-                if (now > nextCleanUp - cleanupTolerance)
+                TimeSpan cleanUpDelay;
+                if (now > nextCleanUp - this.cleanupTolerance)
                 {
                     using (suppressorsLock.Lock())
                     {
                         CleanUpSuppressors(now);
                     }
-                    cleanUpDelay = cleanupPeriode;
+                    cleanUpDelay = this.cleanupPeriode;                    
                 }
                 else
                 {
@@ -82,7 +81,7 @@ namespace FeatureLoom.MessageFlow
 
         private void CleanUpSuppressors(DateTime now)
         {
-            cleanUpDelay = TimeSpan.Zero;
+            nextCleanUp = now + cleanupPeriode;
             while (suppressors.Count > 0)
             {
                 if (now > suppressors.Peek().suppressionEnd) suppressors.Dequeue();

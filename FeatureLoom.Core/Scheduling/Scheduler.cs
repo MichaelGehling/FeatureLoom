@@ -18,8 +18,8 @@ namespace FeatureLoom.Scheduling
         private static MicroLock myLock = new MicroLock();
         private static List<ISchedule> newSchedules = new List<ISchedule>();
         private static bool newScheduleAvailable = false;
-        private static List<WeakReference<ISchedule>> activeSchedules = new List<WeakReference<ISchedule>>();
-        private static List<WeakReference<ISchedule>> triggeredSchedules = new List<WeakReference<ISchedule>>();
+        private static List<ScheduleContainer> activeSchedules = new List<ScheduleContainer>();
+        private static List<ScheduleContainer> triggeredSchedules = new List<ScheduleContainer>();
 
         private static Thread schedulerThread = null;
         private static ManualResetEventSlim mre = new ManualResetEventSlim(true);
@@ -39,6 +39,7 @@ namespace FeatureLoom.Scheduling
                     newSchedules.Add(schedule);
                     mre.Set();
                     schedulerThread = new Thread(RunScheduling);
+                    schedulerThread.Name = "Scheduler";
                     schedulerThread.IsBackground = true;
                     schedulerThread.Start();
                 }
@@ -52,9 +53,9 @@ namespace FeatureLoom.Scheduling
             }
         }
 
-        public static ActionSchedule ScheduleAction(Func<DateTime, (bool, TimeSpan)> triggerAction)
+        public static ActionSchedule ScheduleAction(string name, Func<DateTime, (bool, TimeSpan)> triggerAction)
         {
-            var schedule = new ActionSchedule(triggerAction);
+            var schedule = new ActionSchedule(name, triggerAction);
             AddSchedule(schedule);
             return schedule;
         }        
@@ -104,11 +105,12 @@ namespace FeatureLoom.Scheduling
             DateTime now = AppTime.Now;
             foreach (var schedule in activeSchedules)
             {
-                if (schedule.TryGetTarget(out var sv))
+                if (schedule.TryGetSchedule(out var sv))
                 {
                     bool stillActive = sv.Trigger(now, out TimeSpan maxDelay);
                     if (stillActive)
                     {
+                        schedule.maxDelay = maxDelay;
                         triggeredSchedules.Add(schedule);
                         if (maxDelay < delay) delay = maxDelay;
                     }
@@ -126,9 +128,9 @@ namespace FeatureLoom.Scheduling
                 {
                     foreach (var newSchedule in newSchedules)
                     {
-                        if (!activeSchedules.Any(weak => weak.TryGetTarget(out var schedule) && schedule == newSchedule))
+                        if (!activeSchedules.Any(weak => weak.TryGetSchedule(out var schedule) && schedule == newSchedule))
                         {
-                            activeSchedules.Add(new WeakReference<ISchedule>(newSchedule));
+                            activeSchedules.Add(new ScheduleContainer(newSchedule));
                         }
                     }
                     newSchedules.Clear();
@@ -167,6 +169,32 @@ namespace FeatureLoom.Scheduling
                 }
                 else lockHandle.Exit();
             }
+        }
+
+        private class ScheduleContainer
+        {
+            WeakReference<ISchedule> scheduleRef;
+            string name;
+            public TimeSpan maxDelay;
+            public string Name => name;
+
+
+            public ScheduleContainer(ISchedule schedule)
+            {
+                this.scheduleRef = new WeakReference<ISchedule>(schedule);
+                this.name = schedule.Name;
+            }
+
+            public bool TryGetSchedule(out ISchedule schedule)
+            {                
+                if (scheduleRef.TryGetTarget(out schedule))
+                {
+                    this.name = schedule.Name;
+                    return true;
+                }
+                return false;
+            }
+            
         }
 
         

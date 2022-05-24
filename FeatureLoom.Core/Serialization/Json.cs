@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Logging;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
@@ -195,7 +196,7 @@ namespace FeatureLoom.Serialization
             }
             str = builder.ToString();
             str = str.Trim();
-            str = str.Trim(',');
+            str = str.TrimChar(',');
             if (!str.StartsWith("{") && !str.StartsWith("[")) str = "{" + Environment.NewLine + str;
             if (!str.EndsWith("}") && !str.EndsWith("]")) str = str + Environment.NewLine + "}";
 

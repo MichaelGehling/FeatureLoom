@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Services;
+﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Services;
 using FeatureLoom.Synchronization;
 using System;
 using System.Threading.Tasks;
@@ -65,15 +66,30 @@ namespace FeatureLoom.Services
             Assert.Equal(5, Service<TestService>.Instance.i);
         }
 
-        [Fact]
+        [Fact(Skip ="Cant run in parallel")]
         public void ServicesWithDefaultConstructorDontNeedInit()
-        {            
-            Assert.NotNull(Service<TestService>.Instance);
-
+        {
+            TestHelper.PrepareTestContext();            
+            
             Assert.Throws<Exception>(() => Service<ITestService>.Instance);
+            Assert.NotNull(Service<TestService>.Instance);            
 
             Service<ITestService>.Init(() => new TestService());
             Assert.NotNull(Service<ITestService>.Instance);
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
+        [Fact(Skip = "Cant run in parallel")]
+        public void InitializedServiceAlsoWorksForItsInterfaces()
+        {
+            TestHelper.PrepareTestContext();
+
+            Assert.Throws<Exception>(() => Service<ITestService>.Instance);
+            Service<TestService>.Init(() => new TestService());
+            Assert.NotNull(Service<ITestService>.Instance);
+
+            Assert.False(TestHelper.HasAnyLogError());
         }
 
     }

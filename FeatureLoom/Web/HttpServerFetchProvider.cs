@@ -87,8 +87,8 @@ namespace FeatureLoom.Web
                 StringBuilder sb = new StringBuilder();
                 sb.Append(
 $@"{{
-    ""missed"" : {missed},
-    ""next"" : {next},
+    ""missed"" : {missed.ToString()},
+    ""next"" : {next.ToString()},
     ""messages"" : [
 ");
                 for (int i = 0; i < messages.Length; i++)

@@ -262,7 +262,7 @@ namespace FeatureLoom.UndoRedo
                         {
                             TryCombineLastUndos(numNewUndos);
                         }
-                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString("; \n"));
+                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString<string, IEnumerable<string>>("; \n"));
                 }
                 else
                 {
@@ -288,7 +288,7 @@ namespace FeatureLoom.UndoRedo
                         {
                             TryCombineLastUndos(numNewRedos);
                         }
-                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString("; \n"));
+                    }, description ?? combinedActions.Select(action => action.Description).AllItemsToString<string, IEnumerable<string>>("; \n"));
                 }
 
                 return true;

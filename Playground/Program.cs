@@ -112,7 +112,8 @@ namespace Playground
 
         private static void Main()
         {
-
+            ulong asd = ulong.MaxValue;
+            long unix = (long)asd.ClampHigh((ulong)long.MaxValue);
 
             string path1 = "Test/abc/123/1,1/xx/yyy";
             PatternExtractor extractor = new PatternExtractor("{1}/{2}/");

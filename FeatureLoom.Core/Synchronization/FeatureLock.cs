@@ -1749,6 +1749,7 @@ namespace FeatureLoom.Synchronization
 
         #region Scheduling        
 
+        string ISchedule.Name => "FeatureLock";
         bool ISchedule.Trigger(DateTime now, out TimeSpan maxDelay)
         {
             maxDelay = (0.01 * Settings.schedulerDelayFactor).Milliseconds();

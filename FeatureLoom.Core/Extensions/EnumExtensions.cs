@@ -1,9 +1,15 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using System;
 
 namespace FeatureLoom.Extensions
 {
     public static class EnumExtensions
     {
+        public static string ToName<T>(this T enumValue) where T : struct, Enum => EnumHelper<T>.ToName(enumValue);
+        public static int ToInt<T>(this T enumValue) where T : struct, Enum => EnumHelper<T>.ToInt(enumValue);
+
+        public static bool IsFlagSet<T>(this T enumValue, T enumFlag) where T : struct, Enum => EnumHelper<T>.IsFlagSet(enumValue, enumFlag);
+
         public static T ToEnum<T>(this string value) where T : Enum
         {
             return (T)Enum.Parse(typeof(T), value, true);

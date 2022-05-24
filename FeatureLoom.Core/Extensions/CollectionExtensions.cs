@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Collections;
 
 namespace FeatureLoom.Extensions
 {
@@ -27,7 +28,7 @@ namespace FeatureLoom.Extensions
             return new T[] { item };
         }
 
-        public static int IndexOf<T>(this IEnumerable<T> self, T elementToFind)
+        public static int IndexOf<T, TEnum>(this TEnum self, T elementToFind) where TEnum : IEnumerable<T>
         {
             int i = 0;
             foreach (T element in self)
@@ -40,16 +41,30 @@ namespace FeatureLoom.Extensions
 
         public static T[] ToArray<T>(this IReadOnlyList<T> self)
         {
-            var array = new T[self.Count];
-            int i = 0;
-            foreach (var item in self)
+            var array = new T[self.Count];            
+            for(int i = 0; i< array.Length; i++)
             {
-                array[i++] = item;
+                array[i] = self[i];
             }
             return array;
         }
 
         public static string AllItemsToString<T>(this IEnumerable<T> collection, string delimiter = null)
+        {
+            if (collection.EmptyOrNull()) return "";
+            StringBuilder sb = new StringBuilder();
+            bool isFirst = true;
+            foreach (var item in collection)
+            {
+                if (item == null) continue;
+                if (!isFirst && delimiter != null) sb.Append(delimiter);
+                else isFirst = false;
+                sb.Append(item.ToString());
+            }
+            return sb.ToString();
+        }
+
+        public static string AllItemsToString<T, TEnum>(this TEnum collection, string delimiter = null) where TEnum : IEnumerable<T>
         {
             if (collection.EmptyOrNull()) return "";
             StringBuilder sb = new StringBuilder();
@@ -72,7 +87,7 @@ namespace FeatureLoom.Extensions
             return newArray;
         }
 
-        public static Task foreachAsync<T>(this IEnumerable<T> items, Func<T, Task> asyncAction)
+        public static Task foreachAsync<T, TEnum>(this TEnum items, Func<T, Task> asyncAction) where TEnum : IEnumerable<T>
         {
             if (items.EmptyOrNull()) return Task.CompletedTask;
 
@@ -84,7 +99,7 @@ namespace FeatureLoom.Extensions
             return Task.WhenAll(tasks);
         }
 
-        public static bool TryFindFirst<T>(this IEnumerable<T> items, Func<T, bool> predicate, out T item)
+        public static bool TryFindFirst<T, TEnum>(this TEnum items, Func<T, bool> predicate, out T item) where TEnum : IEnumerable<T>
         {
             item = default;
             foreach(var itemToCheck in items)
@@ -112,6 +127,33 @@ namespace FeatureLoom.Extensions
                 if (replaced && replaceOnlyFirst) break;
             }
             return replaced;
+        }
+
+        public static bool TryConvertAll<T1,T2,TEnum>(this TEnum items, out T2[] convertedItems) where T1 : IConvertible where TEnum : IEnumerable<T1>
+        {
+            convertedItems = new T2[items.Count()];
+            int i = 0;
+            foreach(var item in items)
+            {
+                if (item is T2 casted) convertedItems[i++] = casted;
+                else if (item.TryConvertTo(out T2 converted)) convertedItems[i++] = converted;
+                else return false;
+            }
+            return true;                
+        }
+
+        public static bool TryConvertAll<T, TEnum>(this TEnum items, out T[] convertedItems) where TEnum : IEnumerable
+        {
+            List<T> convertedList = new List<T>();
+            convertedItems = null;
+            foreach (var item in items)
+            {
+                if (item is T casted) convertedList.Add(casted);
+                else if (item is IConvertible convertible && convertible.TryConvertTo(out T converted)) convertedList.Add(converted);
+                else return false;
+            }
+            convertedItems = convertedList.ToArray();
+            return true;
         }
     }
 }
