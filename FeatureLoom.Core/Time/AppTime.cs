@@ -12,12 +12,15 @@ namespace FeatureLoom.Time
         private static DateTime coarseTimeBase;
         private static int coarseMillisecondCountBase;
         private static TimeSpan lowerSleepLimit = 16.Milliseconds();
+        private static readonly DateTime unixTimeBase = new DateTime(1970, 1, 1);
 
         static AppTime()
         {
             stopWatch.Start();
             ResetCoarseNow(DateTime.UtcNow);
         }
+
+        public static DateTime UnixTimeBase => unixTimeBase;
 
         public static TimeSpan Elapsed => stopWatch.Elapsed;
 

@@ -5,24 +5,37 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Time
 {
-    public readonly struct TimeFrame
+    public struct TimeFrame
     {
         public readonly DateTime utcStartTime;
         public readonly DateTime utcEndTime;
+        private DateTime lastTimeSample;
 
         public static TimeFrame Invalid => new TimeFrame();
 
+        public DateTime LastTimeSample => lastTimeSample == default ? GetTime() : lastTimeSample;
+
+        private DateTime GetTime()
+        {
+            lastTimeSample = Duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+            return lastTimeSample;
+        }
+
         public TimeFrame(TimeSpan duration)
-        {            
+        {
+            this.utcStartTime = default;
+            this.utcEndTime = default;
+            lastTimeSample = default;
+
             if (duration >= TimeSpan.Zero)
             {
-                this.utcStartTime = duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+                this.utcStartTime = GetTime();
                 duration = duration.ClampHigh(DateTime.MaxValue.Subtract(utcStartTime));
-                this.utcEndTime = utcStartTime + duration;
+                this.utcEndTime = utcStartTime + duration;                
             }
             else
             {
-                this.utcEndTime = duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+                this.utcEndTime = GetTime();
                 duration = duration.ClampLow(DateTime.MaxValue.Subtract(utcEndTime));
                 this.utcStartTime = utcEndTime + duration;
             }
@@ -30,6 +43,10 @@ namespace FeatureLoom.Time
 
         public TimeFrame(DateTime startTime, DateTime endTime)
         {
+            this.utcStartTime = default;
+            this.utcEndTime = default;
+            lastTimeSample = default;
+
             startTime = startTime.ToUniversalTime();
             endTime = endTime.ToUniversalTime();            
             this.utcStartTime = endTime > startTime ? startTime : endTime;
@@ -38,6 +55,10 @@ namespace FeatureLoom.Time
 
         public TimeFrame(DateTime startTime, TimeSpan duration)
         {
+            this.utcStartTime = default;
+            this.utcEndTime = default;
+            lastTimeSample = default;
+
             if (duration >= TimeSpan.Zero)
             {
                 this.utcStartTime = startTime.ToUniversalTime();
@@ -52,19 +73,19 @@ namespace FeatureLoom.Time
 
         public bool IsInvalid => utcStartTime == default && utcEndTime == default;
 
-        public bool Elapsed() => Elapsed(Duration >= 1.Seconds() ? AppTime.CoarseNow :AppTime.Now);
+        public bool Elapsed() => Elapsed(GetTime());
 
         public bool Elapsed(DateTime now) => now >= utcEndTime;
 
-        public TimeSpan Remaining() => Remaining(Duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now);
+        public TimeSpan Remaining() => Remaining(GetTime());
 
         public TimeSpan Remaining(DateTime now) => IsInvalid ? TimeSpan.Zero : utcEndTime - now;
 
-        public TimeSpan TimeUntilStart() => TimeUntilStart(Duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now);
+        public TimeSpan TimeUntilStart() => TimeUntilStart(GetTime());
 
         public TimeSpan TimeUntilStart(DateTime now) => IsInvalid ? TimeSpan.Zero : utcStartTime - now;
 
-        public TimeSpan TimeSinceStart() => TimeSinceStart(Duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now);
+        public TimeSpan TimeSinceStart() => TimeSinceStart(GetTime());
 
         public TimeSpan TimeSinceStart(DateTime now) => IsInvalid ? TimeSpan.Zero : now - utcStartTime;
 

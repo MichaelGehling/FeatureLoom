@@ -155,5 +155,15 @@ namespace FeatureLoom.Extensions
             convertedItems = convertedList.ToArray();
             return true;
         }
+
+        public static object[] ToArray(this IEnumerable items)
+        {
+            List<object> convertedList = new List<object>();
+            foreach (var item in items)
+            {
+                convertedList.Add(item);
+            }
+            return convertedList.ToArray();            
+        }
     }
 }

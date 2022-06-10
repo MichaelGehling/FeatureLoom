@@ -76,20 +76,6 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public async Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
-        {
-            T message = default;
-            if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
-            using (myLock.Lock(true))
-            {
-                if (IsEmpty) return (false, message);
-                message = receivedMessage;
-                receivedMessage = default;
-                readerWakeEvent.Reset();
-                return (true, message);
-            }
-        }
-
         public T[] ReceiveAll()
         {
             if (IsEmpty) return Array.Empty<T>();
