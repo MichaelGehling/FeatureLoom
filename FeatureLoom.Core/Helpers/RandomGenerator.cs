@@ -41,6 +41,20 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        /// <summary>
+        /// Returns a ramdom bool value.
+        /// </summary>
+        /// <param name="probability">Defines the chance of returning the value 'true'. Must be between 0.0 (never) and 1.0 (always).</param>
+        /// <returns></returns>
+        public static bool Bool(double probability = 0.5)
+        {
+            return Rng.NextDouble() + probability >= 1.0;
+        }
+
+        /// <summary>
+        /// Returns a random signed 32bit integer value in the range of int.MinValue (inclusive) to int.MaxValue (exclusive).
+        /// </summary>
+        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security task.</param>
         public static int Int32(bool crypto = false)
         {
             if (crypto)
@@ -51,25 +65,42 @@ namespace FeatureLoom.Helpers
             }
             else
             {
-                return Rng.Next();
+                return Rng.Next(int.MinValue, int.MaxValue);
             }
         }
 
+        /// <summary>
+        /// Returns a random signed 16bit integer value in the range of short.MinValue (inclusive) to short.MaxValue (exclusive).
+        /// </summary>
         public static short Int16()
         {
             return (short)Rng.Next(short.MinValue, short.MaxValue);
         }
 
+        /// <summary>
+        /// Returns a random signed 32bit integer value in the range of min (inclusive) to max (inclusive).
+        /// </summary>
+        /// <param name="min">the smallest possbile value</param>
+        /// <param name="max">the biggest possible value (must not be bigger than int.MaxValue-1)</param>
         public static int Int32(int min, int max)
         {
-            return Rng.Next(min, max);
+            return Rng.Next(min, max+1);
         }
 
+        /// <summary>
+        /// Returns a random signed 16bit integer value in the range of min (inclusive) to max (inclusive).
+        /// </summary>
+        /// <param name="min">the smallest possbile value</param>
+        /// <param name="max">the biggest possible value</param>
         public static short Int16(short min, short max)
         {
-            return (short) Rng.Next(min, max);
+            return (short) Rng.Next(min, ((int)max)+1);
         }
 
+        /// <summary>
+        /// Returns a random signed 64bit integer value in the range of long.MinValue (inclusive) to long.MaxValue (exclusive).
+        /// </summary>
+        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security task.</param>
         public static long Int64(bool crypto = false)
         {
             if (crypto)
@@ -80,19 +111,29 @@ namespace FeatureLoom.Helpers
             }
             else
             {
-                return (long)(Double() * long.MaxValue);
+                return (long)((Double() * 2.0 - 1.0) * long.MaxValue);
             }
         }
 
+        /// <summary>
+        /// Returns a random signed 64bit integer value in the range of min (inclusive) to max (inclusive).
+        /// </summary>
+        /// <param name="min">the smallest possbile value</param>
+        /// <param name="max">the biggest possible value (must not be bigger than long.MaxValue-1)</param>
         public static long Int64(long min, long max)
         {
-            return (long)Double(min, max);
+            return (long)Double(min, max+1);
         }
 
+        /// <summary>
+        /// Returns a random 64bit floating point value in the range of 0.0 (inclusive) to 1.0 (exclusive).
+        /// Cryptographic values may have any possible value in the range of Double.
+        /// </summary>
+        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security task.</param>
         public static double Double(bool crypto = false)
         {
             if (crypto)
-            {
+            {                
                 byte[] bytes = new byte[8];
                 CryptoRng.GetBytes(bytes);
                 return BitConverter.ToDouble(bytes, 0);
@@ -103,12 +144,21 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        /// <summary>
+        /// Returns a random 64bit floating point value in the range of min (inclusive) to max (inclusive).
+        /// </summary>
+        /// <param name="min">the smallest possbile value</param>
+        /// <param name="max">the biggest possible value</param>
         public static double Double(double min, double max)
         {
             double sample = Rng.NextDouble();
-            return (max * sample) + (min * (1d - sample));
+            return (max * sample) + (min * (1.0 - sample));
         }
 
+        /// <summary>
+        /// Returns a random GUID.
+        /// </summary>        
+        /// <param name="crypto">If true, the GUID is created by a cryptographic number generator and may be used for security task.</param>
         public static Guid GUID(bool crypto = false)
         {
             if (crypto)
@@ -123,6 +173,11 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        /// <summary>
+        /// Returns an array of random byte values.
+        /// </summary>
+        /// <param name="length">The number of bytes in the array</param>
+        /// <param name="crypto">If true, the bytes are created by a cryptographic number generator and may be used for security task.</param>
         public static byte[] Bytes(int length, bool crypto = false)
         {
             if (crypto)
@@ -139,6 +194,14 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        /// <summary>
+        /// Generates random values inside a given byte array.
+        /// </summary>
+        /// <param name="bytes">The byte array to be filled with random values</param>
+        /// <param name="offset">The start index</param>
+        /// <param name="length">The number of generated values</param>
+        /// <param name="crypto">If true, the bytes are created by a cryptographic number generator and may be used for security task.</param>
+        /// <returns>The orginal passed in array parameter</returns>
         public static byte[] Bytes(byte[] bytes, int offset, int length, bool crypto = false)
         {
             if (crypto)
