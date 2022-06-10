@@ -37,12 +37,12 @@ namespace FeatureLoom.Helpers
                     rng = RandomNumberGenerator.Create();
                     _cryptoRng = rng;
                 }
-                return rng;
+                return rng;                
             }
         }
 
         /// <summary>
-        /// Returns a ramdom bool value.
+        /// Returns a random bool value.
         /// </summary>
         /// <param name="probability">Defines the chance of returning the value 'true'. Must be between 0.0 (never) and 1.0 (always).</param>
         /// <returns></returns>
@@ -54,7 +54,7 @@ namespace FeatureLoom.Helpers
         /// <summary>
         /// Returns a random signed 32bit integer value in the range of int.MinValue (inclusive) to int.MaxValue (exclusive).
         /// </summary>
-        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security task.</param>
+        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security tasks.</param>
         public static int Int32(bool crypto = false)
         {
             if (crypto)
@@ -100,7 +100,7 @@ namespace FeatureLoom.Helpers
         /// <summary>
         /// Returns a random signed 64bit integer value in the range of long.MinValue (inclusive) to long.MaxValue (exclusive).
         /// </summary>
-        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security task.</param>
+        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security tasks.</param>
         public static long Int64(bool crypto = false)
         {
             if (crypto)
@@ -129,7 +129,7 @@ namespace FeatureLoom.Helpers
         /// Returns a random 64bit floating point value in the range of 0.0 (inclusive) to 1.0 (exclusive).
         /// Cryptographic values may have any possible value in the range of Double.
         /// </summary>
-        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security task.</param>
+        /// <param name="crypto">If true, the value is created by a cryptographic number generator and may be used for security tasks.</param>
         public static double Double(bool crypto = false)
         {
             if (crypto)
@@ -158,7 +158,7 @@ namespace FeatureLoom.Helpers
         /// <summary>
         /// Returns a random GUID.
         /// </summary>        
-        /// <param name="crypto">If true, the GUID is created by a cryptographic number generator and may be used for security task.</param>
+        /// <param name="crypto">If true, the GUID is created by a cryptographic number generator and may be used for security tasks.</param>
         public static Guid GUID(bool crypto = false)
         {
             if (crypto)
@@ -177,7 +177,7 @@ namespace FeatureLoom.Helpers
         /// Returns an array of random byte values.
         /// </summary>
         /// <param name="length">The number of bytes in the array</param>
-        /// <param name="crypto">If true, the bytes are created by a cryptographic number generator and may be used for security task.</param>
+        /// <param name="crypto">If true, the bytes are created by a cryptographic number generator and may be used for security tasks.</param>
         public static byte[] Bytes(int length, bool crypto = false)
         {
             if (crypto)
@@ -200,7 +200,7 @@ namespace FeatureLoom.Helpers
         /// <param name="bytes">The byte array to be filled with random values</param>
         /// <param name="offset">The start index</param>
         /// <param name="length">The number of generated values</param>
-        /// <param name="crypto">If true, the bytes are created by a cryptographic number generator and may be used for security task.</param>
+        /// <param name="crypto">If true, the bytes are created by a cryptographic number generator and may be used for security tasks.</param>
         /// <returns>The orginal passed in array parameter</returns>
         public static byte[] Bytes(byte[] bytes, int offset, int length, bool crypto = false)
         {
