@@ -5,6 +5,36 @@ namespace FeatureLoom.Time
 {
     public static class TimeSpanExtensions
     {
+        public static TimeSpan Years(this int years)
+        {
+            return TimeSpan.FromTicks((long)years * 10_000 * 1000 * 60 * 60 * 24 * 365);
+        }
+
+        public static TimeSpan Years(this long years)
+        {
+            return TimeSpan.FromTicks(years * 10_000 * 1000 * 60 * 60 * 24 * 365);
+        }
+
+        public static TimeSpan Years(this double years)
+        {
+            return TimeSpan.FromTicks((long)(years * 10_000 * 1000 * 60 * 60 * 24 * 365));
+        }
+
+        public static TimeSpan Days(this int days)
+        {
+            return TimeSpan.FromTicks((long)days * 10_000 * 1000 * 60 * 60 * 24);
+        }
+
+        public static TimeSpan Days(this long days)
+        {
+            return TimeSpan.FromTicks(days * 10_000 * 1000 * 60 * 60 * 24);
+        }
+
+        public static TimeSpan Days(this double days)
+        {
+            return TimeSpan.FromTicks((long)(days * 10_000 * 1000 * 60 * 60 * 24));
+        }
+
         public static TimeSpan Hours(this int hours)
         {            
             return TimeSpan.FromTicks((long)hours * 10_000 * 1000 * 60 * 60);
