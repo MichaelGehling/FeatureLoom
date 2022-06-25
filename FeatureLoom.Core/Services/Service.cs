@@ -38,7 +38,7 @@ namespace FeatureLoom.Services
             get
             {
                 if (instanceContainer != null) return instanceContainer.Instance;
-                else return HandleUninitializedGet();
+                return HandleUninitializedGet();
             }
 
             set
