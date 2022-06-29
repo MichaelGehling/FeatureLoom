@@ -1,4 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
+using System;
+using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
 {
@@ -21,7 +23,12 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
         private MixedPerformanceTest test = new MixedPerformanceTest(1);
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void NoLock(Action action) => action();
+
+        [Benchmark]
+        public void NoLock() => test.Run(NoLock);
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => test.Run(featureLockSubjects.Lock);

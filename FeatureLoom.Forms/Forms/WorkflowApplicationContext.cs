@@ -19,7 +19,7 @@ namespace FeatureLoom.Forms
             {
                 this.workflow = workflow;
                 if (runner != null) this.runner = runner;
-                else this.runner = new SuspendingAsyncRunner();
+                else this.runner = new SmartRunner();
                 Application.Idle += StartWorkflow;
             }
 

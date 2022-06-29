@@ -35,7 +35,7 @@ namespace Playground
 
     public class TestWF : Workflow<TestWF.SM>
     {
-        int iterations = 1_000_000;
+        int iterations = 10_000_000;
         int currentIteration = -1;
 
         public class SM : StateMachine<TestWF>
@@ -46,9 +46,9 @@ namespace Playground
 
                 run.Build()
                     .Step()
-                        .Do(c => c.currentIteration++)
+                        .Do(c => { var x = c.iterations; })
                     .Step()
-                        .Do(async c => await Task.CompletedTask)
+                        .Do(c => c.currentIteration++)                                        
                     .Step()
                         .If(c => c.currentIteration < c.iterations)
                             .Loop()
@@ -96,7 +96,7 @@ namespace Playground
 
         public static async Task TestSmartAsync()
         {
-            var runner = new SmartAsyncRunner();
+            var runner = new SmartRunner();
             var tk = AppTime.TimeKeeper;
             await runner.RunAsync(new TestWF());
             Console.WriteLine($"TestSmartAsync: {tk.Elapsed.TotalMilliseconds}");
@@ -111,7 +111,7 @@ namespace Playground
         private static void Main()
         {
 
-
+            /*
 
             var writer = Storage.GetWriter("test");
             var reader = Storage.GetReader("test");
@@ -201,7 +201,7 @@ namespace Playground
             _ = SharedWebServer.WebServer.Run(IPAddress.Loopback, 50123);
 
             Console.ReadKey();            
-
+            */
             while (true)
             {
                 TestSync();

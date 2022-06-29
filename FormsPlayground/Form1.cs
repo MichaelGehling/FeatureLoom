@@ -10,16 +10,21 @@ using System.Windows.Forms;
 using FeatureLoom.Forms;
 using FeatureLoom.MessageFlow;
 using FeatureLoom.Time;
+using FeatureLoom.Workflows;
 
 namespace FormsPlayground
 {
+
     public partial class Form1 : Form
     {
         public Form1()
         {
             InitializeComponent();
 
-            
+            var wf = new TestWF();
+            wf.PrioritizeUiOverWorkflow();
+            wf.StopWorkflowOnClosedUi();
+
 
             var strings = new String[] { "Aaaaa", "B", "Cccc" };
             this.multiPropertyControl1.GetProperty("Hello1").SetValue("B").SetValueRestrictions(strings).SetCustomFieldControl(button1, 1);
@@ -35,6 +40,12 @@ namespace FormsPlayground
                 var xaaa = msg;
             }));
 
+            button1.Click += (o, e) =>
+            {
+                wf.Run();                
+            };
+
+            
 
             //var x = this.multiPropertyControl1.GetProperties();
             //int y = 0;

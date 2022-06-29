@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Time;
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
@@ -28,15 +29,17 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
                     .AddWaitingTime(x * 0.0001.Milliseconds(), 10_000)
                     .AddInLockTime(0.Milliseconds(), 10_000)
                     .AddWaitingTime(0.Milliseconds(), 10_000)
-                    .RandomizeSequences(i));
+                    .RandomizeSequences(i+100));
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Run(Func<Func<Task>, Task> lockAction)
         {
             collection.Run(lockAction, collection.MaxSteps, 100.Seconds());
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Run(Action<Action> lockAction)
         {
             collection.Run(lockAction, collection.MaxSteps, 100.Seconds());

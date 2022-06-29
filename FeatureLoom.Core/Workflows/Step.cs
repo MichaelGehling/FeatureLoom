@@ -19,6 +19,7 @@ namespace FeatureLoom.Workflows
         public Func<CT, Exception, Task<bool>> onExceptionRepeatConditionAsync;
 
         public List<Func<CT, object>> usingResourcesDelegates;
+        private bool? isAsync = null;
 
         internal Step(StateMachine<CT> parentStateMachine, State<CT> parentState, int stepIndex)
         {
@@ -26,6 +27,23 @@ namespace FeatureLoom.Workflows
             this.parentState = parentState;
             this.stepIndex = stepIndex;
         }
+
+        public bool IsAsync
+        {
+            get
+            {
+                if (!isAsync.HasValue)
+                {
+                    isAsync = onExceptionAsync != null ||
+                              actionAsync != null ||
+                              conditionAsync != null ||
+                              onExceptionRepeatConditionAsync != null ||
+                              waitingAsyncDelegate != null;
+                }
+                return isAsync.Value;
+            }
+        }
+
 
         public string Description => description;
 

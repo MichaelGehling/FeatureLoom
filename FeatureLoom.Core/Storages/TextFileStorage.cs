@@ -24,7 +24,6 @@ namespace FeatureLoom.Storages
             public bool preventEscapingRootPath = true;
             public string fileSuffix = "";
             public bool allowSubscription = true;
-            public TimeSpan subscriptionSamplingTime = 5.Seconds();
             public TimeSpan timeout = TimeSpan.Zero;
             public TimeSpan duplicateFileEventSuppressionTime = 100.Milliseconds();
             public bool updateCacheForSubscription = true;

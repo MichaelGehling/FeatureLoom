@@ -14,7 +14,7 @@ namespace FeatureLoom.Workflows
         {
             get
             {
-                if (context.Data.defaultRunner == null) context.Data.defaultRunner = new SuspendingAsyncRunner();
+                if (context.Data.defaultRunner == null) context.Data.defaultRunner = new SmartRunner();
                 return context.Data.defaultRunner;
             }
         }

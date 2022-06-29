@@ -6,5 +6,6 @@
         IStateInfo[] TargetStates { get; }
         bool MayTerminate { get; }
         int StepIndex { get; }
+        bool IsAsync { get; }
     }
 }

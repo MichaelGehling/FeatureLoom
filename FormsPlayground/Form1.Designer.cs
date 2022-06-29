@@ -1,5 +1,4 @@
-﻿
-namespace FormsPlayground
+﻿namespace FormsPlayground
 {
     partial class Form1
     {

@@ -201,14 +201,8 @@ namespace FeatureLoom.Workflows
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool IsStepAsync(Workflow.ExecutionState state) 
         {
-            var step = states.ItemOrNull(state.stateIndex)?.steps.ItemOrNull(state.stepIndex);
-            bool isAsync = step.onExceptionAsync != null ||
-                           step.actionAsync != null ||
-                           step.conditionAsync != null ||
-                           step.onExceptionRepeatConditionAsync != null ||
-                           step.waitingAsyncDelegate != null;
-
-            return isAsync;
+            var step = states.ItemOrNull(state.stateIndex)?.steps.ItemOrNull(state.stepIndex);            
+            return step.IsAsync;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
