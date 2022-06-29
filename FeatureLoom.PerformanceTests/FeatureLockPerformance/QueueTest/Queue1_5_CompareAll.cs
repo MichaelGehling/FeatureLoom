@@ -51,8 +51,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark(Baseline = true)]
         public void FeatureLock_LockPrioProd() => queueTest.Run(featureLockSubjects.LockPrio, featureLockSubjects.Lock);
 
-        [Benchmark]
-        public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Lock);
+        //[Benchmark]
+        //public void FeatureLock_Lock() => queueTest.Run(featureLockSubjects.Lock);
 
         //[Benchmark]
         //public void FairFeatureLock_Lock() => queueTest.Run(fairFeatureLockSubjects.Lock);
@@ -64,17 +64,19 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
         //public void FastSpinLock_Lock() => queueTest.Run(fastSpinLockSubjects.Lock);
 
         [Benchmark]
-        public void MicroSpinLock_LockPrioProd() => queueTest.Run(microSpinLockSubjects.LockPrio, microSpinLockSubjects.Lock);
+        public void Monitor_Lock() => queueTest.Run(monitorSubjects.Lock);
+
         [Benchmark]
-        public void MicroSpinLock_Lock() => queueTest.Run(microSpinLockSubjects.Lock);
+        public void MicroSpinLock_LockPrioProd() => queueTest.Run(microSpinLockSubjects.LockPrio, microSpinLockSubjects.Lock);
+        //[Benchmark]
+        //public void MicroSpinLock_Lock() => queueTest.Run(microSpinLockSubjects.Lock);
 
         [Benchmark]
         public void SpinLock_Lock() => queueTest.Run(spinLockSubjects.Lock);
 
-        [Benchmark]
-        public void Monitor_Lock() => queueTest.Run(monitorSubjects.Lock);
+        
 
-        /*
+        
         [Benchmark]
         public void SemaphoreSlim_Lock() => queueTest.Run(semaphoreSlimSubjects.Lock);
 
@@ -91,7 +93,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
         //public void NeoSmart_Lock() => queueTest.Run(neoSmartSubjects.Init, neoSmartSubjects.Lock);
 
         
-
+/*
         [Benchmark]
         public void FairFeatureLock_LockAsync_() => queueTest.AsyncRun(fairFeatureLockSubjects.LockAsync);
         
@@ -107,7 +109,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
         [Benchmark]
         public void SemaphoreSlim_LockAsync_() => queueTest.AsyncRun(semaphoreSlimSubjects.LockAsync);
 
-        /*
+        
         [Benchmark]
         public void AsyncEx_LockAsync_() => queueTest.AsyncRun(asyncExSubjects.LockAsync);
 
@@ -122,7 +124,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
 
         [Benchmark]
         public void vSAsyncReaderWriter_LockAsync_() => queueTest.AsyncRun(vSAsyncReaderWriterLockSubjects.LockAsync);
-
+/*
         [Benchmark]
         public void FeatureLock_ReentrantLock() => queueTest.Run(featureLockSubjects.ReentrantLock);
 
@@ -137,6 +139,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
 
         [Benchmark]
         public void FeatureLock_ReentrantPrioLockAsync_() => queueTest.AsyncRun(featureLockSubjects.ReentrantPrioLockAsync);
-        */
+       */ 
     }
 }
