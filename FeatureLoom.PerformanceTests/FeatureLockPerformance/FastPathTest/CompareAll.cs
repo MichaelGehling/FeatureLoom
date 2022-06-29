@@ -7,7 +7,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
     [MaxIterationCount(40)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
-    [RPlotExporter]
+    //[RPlotExporter]
     [HtmlExporter]
     //[SimpleJob(RuntimeMoniker.Net472, baseline: true)]
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
@@ -26,8 +26,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
         private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
         private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
-
-        Dictionary<string, string> dict = new Dictionary<string, string>();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();

@@ -10,8 +10,8 @@ namespace FeatureLoom.Services
     {
         static Dictionary<Type, IServiceInstanceContainer> registry = new Dictionary<Type, IServiceInstanceContainer>();
         static HashSet<Type> declaredServiceTypes = new HashSet<Type>();
-        static FeatureLock registryLock = new FeatureLock();
-        static FeatureLock serviceTypeLock = new FeatureLock();
+        static MicroLock registryLock = new MicroLock();
+        static MicroLock serviceTypeLock = new MicroLock();
         static bool localInstancesForAllServicesActive = false;
 
         public static bool LocalInstancesForAllServicesActive => localInstancesForAllServicesActive;

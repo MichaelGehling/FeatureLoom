@@ -6,7 +6,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
 {
     public class MicroValueLockSubjects
     {
-        private MicroValueLock myLock = new MicroValueLock();
+        private MicroValueLock myLock;
 
         public void Init() => myLock = new MicroValueLock();
 

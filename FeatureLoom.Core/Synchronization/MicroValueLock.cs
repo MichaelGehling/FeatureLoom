@@ -13,11 +13,12 @@ namespace FeatureLoom.Synchronization
 
         private const int DEFAULT_HOT_CYCLES = 0;
 
-        private int lockIndicator;
-        private bool readerBlocked;
-        private bool prioritizedWaiting;
+        // NOTE: The order of the variables matters for performance.
+        private volatile bool readerBlocked;
+        private volatile bool prioritizedWaiting;
+        private volatile int lockIndicator;
 
-        public bool IsLocked => lockIndicator == WRITE_LOCK;
+        public bool IsLocked => lockIndicator != NO_LOCK;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryEnter(bool prioritized = false) 
@@ -28,15 +29,16 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Enter(bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
         {
-            if (!TryEnter(prioritized)) Enter_Wait(prioritized, numHotCycles);
+            if (TryEnter(prioritized)) return;
+            Enter_Wait(prioritized, numHotCycles);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryEnter(TimeSpan timeout, bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
         {
             if (TryEnter(prioritized)) return true;
-            else if (Enter_Wait_Timeout(timeout, prioritized, numHotCycles)) return true;
-            else return false;
+            if (Enter_Wait_Timeout(timeout, prioritized, numHotCycles)) return true;
+            return false;
         }
 
         private void Enter_Wait(bool prioritized, int numHotCycles)
@@ -99,15 +101,16 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnterReadOnly(bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
         {
-            if (!TryEnterReadOnly(prioritized)) EnterReadOnly_Wait(prioritized, numHotCycles);
+            if (TryEnterReadOnly(prioritized)) return;
+            EnterReadOnly_Wait(prioritized, numHotCycles);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryEnterReadOnly(TimeSpan timeout, bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
         {
             if (TryEnterReadOnly(prioritized)) return true;
-            else if (EnterReadOnly_Wait_Timeout(timeout, prioritized, numHotCycles)) return true;
-            else return false;
+            if (EnterReadOnly_Wait_Timeout(timeout, prioritized, numHotCycles)) return true;
+            return false;
         }
 
         private void EnterReadOnly_Wait(bool prioritized, int numHotCycles)

@@ -126,6 +126,8 @@ namespace FeatureLoom.Synchronization
         #endregion Constants
 
         #region Variables
+        // NOTE: The order of the variables matters for performance.
+
 
         // Additional variables that are used less often, so they are kept in an extra object which is only loaded as required 
         // in order to reduce the memory footprint
@@ -147,7 +149,7 @@ namespace FeatureLoom.Synchronization
         // 0 means no lock
         // -1 means write lock
         // >=1 means read lock (number implies the count of parallel readers)
-        private int lockIndicator = NO_LOCK;
+        private volatile int lockIndicator = NO_LOCK;
 
         // Is used to measure how long it takes until the lock is released again.
         // It is incremented in every waiting cycle by the candidate with the firstRankTicket (rank 0).
@@ -168,7 +170,7 @@ namespace FeatureLoom.Synchronization
         // Will be true if a candidate tries to acquire the lock with priority, so the other candidates know that they have to stay back.
         // If a prioritized candidate acquired the lock it will reset this variable, so if another prioritized candidate already waits,
         // it must set it back to true in its next cycle. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
-        private bool prioritizedWaiting = false;
+        private volatile bool prioritizedWaiting = false;
 
         private bool reentrancyActive = false;
 
