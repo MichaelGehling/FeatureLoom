@@ -36,5 +36,25 @@ namespace FeatureLoom.Extensions
             Assert.False(TestHelper.HasAnyLogError());
         }
 
+        [Fact]
+        public void TrimStartCanRemoveWholeString()
+        {
+            TestHelper.PrepareTestContext();
+
+            Assert.Equal("", "Abc".TrimStart("Abc"));            
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
+        [Fact]
+        public void TrimEndCanRemoveWholeString()
+        {
+            TestHelper.PrepareTestContext();
+
+            Assert.Equal("", "Abc".TrimEnd("Abc"));
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
     }
 }

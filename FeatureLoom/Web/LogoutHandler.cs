@@ -13,10 +13,12 @@ namespace FeatureLoom.Web
 
         public string Route => route;
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (request.IsPost && request.RelativePath == "")
+            if (request.RelativePath == "")
             {
+                if (!request.IsPost) return HandlerResult.Handled_MethodNotAllowed();
+
                 Session session = Session.Current;
                 if (session != null)
                 {
@@ -25,9 +27,9 @@ namespace FeatureLoom.Web
                     response.DeleteCookie(cookieName);
                 }
 
-                return true;
+                return HandlerResult.Handled_OK();
             }
-            else return false;
+            else return HandlerResult.NotHandled();
         }
     }
 }

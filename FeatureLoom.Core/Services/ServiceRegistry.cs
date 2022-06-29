@@ -9,7 +9,9 @@ namespace FeatureLoom.Services
     public static class ServiceRegistry
     {
         static Dictionary<Type, IServiceInstanceContainer> registry = new Dictionary<Type, IServiceInstanceContainer>();
+        static HashSet<Type> declaredServiceTypes = new HashSet<Type>();
         static FeatureLock registryLock = new FeatureLock();
+        static FeatureLock serviceTypeLock = new FeatureLock();
         static bool localInstancesForAllServicesActive = false;
 
         public static bool LocalInstancesForAllServicesActive => localInstancesForAllServicesActive;
@@ -38,6 +40,14 @@ namespace FeatureLoom.Services
             }
         }
 
+        public static void DeclareServiceType(Type declaredServiceType)
+        {
+            using(serviceTypeLock.Lock())
+            {
+                declaredServiceTypes.Add(declaredServiceType);
+            }
+        }
+
         public static void CreateLocalInstancesForAllServices()
         {
             using (registryLock.Lock())
@@ -62,24 +72,46 @@ namespace FeatureLoom.Services
             }
         }
 
-        internal static bool TryGetDefaultServiceCreator<T>(out Func<T> createServiceAction)
+        internal static bool TryGetDefaultServiceCreator<T>(out Func<T> createServiceAction, bool tryBorrow = true)
         {
-            switch(typeof(T))
+            if (tryBorrow)
             {
-                default:
+                using (registryLock.Lock())
+                {
+                    Type newType = typeof(T);
+                    foreach (var service in registry.Values)
                     {
-                        var contructor = typeof(T).GetConstructor(Type.EmptyTypes);
-                        if (contructor != null)
-                        {
-                            createServiceAction = () => (T) contructor.Invoke(Array.Empty<object>());
-                            return true;
-                        }
-                        else
-                        {
-                            createServiceAction = null;
-                            return false;
-                        }
+                        if (service.TryGetCreateServiceAction(out createServiceAction)) return true;
                     }
+                }
+            }
+            var tType = typeof(T);
+
+            var constructor = tType.GetConstructor(Type.EmptyTypes);
+            if (constructor == null)
+            {
+                using (serviceTypeLock.Lock())
+                {
+                    var alternativeType = declaredServiceTypes.FirstOrDefault(p => tType.IsAssignableFrom(p) && p.GetConstructor(Type.EmptyTypes) != null);
+                    constructor = alternativeType?.GetConstructor(Type.EmptyTypes);
+                }                
+            }
+            if (constructor == null)
+            {
+                var alternativeType = AppDomain.CurrentDomain.GetAssemblies().SelectMany(s => s.GetTypes())
+                    .FirstOrDefault(p => tType.IsAssignableFrom(p) && p.GetConstructor(Type.EmptyTypes) != null);
+                constructor = alternativeType?.GetConstructor(Type.EmptyTypes);
+            }
+
+            if (constructor != null)
+            {
+                createServiceAction = () => (T) constructor.Invoke(Array.Empty<object>());
+                return true;
+            }
+            else
+            {
+                createServiceAction = null;
+                return false;
             }
         }
 

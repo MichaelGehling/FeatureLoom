@@ -79,8 +79,10 @@ namespace FeatureLoom.MessageFlow
         }
 
         public bool TryReceive(out T message)
-        {
+        {            
             message = default;
+            if (IsEmpty) return false;
+
             using (myLock.Lock())
             {
                 if (IsEmpty) return false;
@@ -91,22 +93,10 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public async Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
-        {
-            T message = default;
-            if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout);
-            using (myLock.Lock())
-            {
-                if (IsEmpty) return new AsyncOut<bool, T>(false, message);
-                message = receivedMessage;
-                receivedMessage = default;
-                readerWakeEvent.Reset();
-                return new AsyncOut<bool, T>(true, message);
-            }
-        }
-
         public T[] ReceiveAll()
         {
+            if (IsEmpty) return Array.Empty<T>();
+
             using (myLock.Lock())
             {
                 if (IsEmpty) return Array.Empty<T>();
@@ -120,6 +110,8 @@ namespace FeatureLoom.MessageFlow
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
+            if (IsEmpty) return false;
+
             using (myLock.Lock())
             {
                 if (IsEmpty) return false;
@@ -130,6 +122,8 @@ namespace FeatureLoom.MessageFlow
 
         public T[] PeekAll()
         {
+            if (IsEmpty) return Array.Empty<T>();
+
             using (myLock.Lock())
             {
                 if (IsEmpty) return Array.Empty<T>();
@@ -149,6 +143,8 @@ namespace FeatureLoom.MessageFlow
 
         public object[] GetQueuedMesssages()
         {
+            if (IsEmpty) return Array.Empty<object>();
+
             using (myLock.Lock())
             {
                 if (IsEmpty) return Array.Empty<object>();

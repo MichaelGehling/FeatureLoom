@@ -178,8 +178,9 @@ namespace FeatureLoom.Synchronization
 
         public async static Task<bool> WaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken)
         {
-            if (task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested) return false;
+            if (task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested || timeout < TimeSpan.Zero) return false;
             else if (task.IsCompleted) return true;
+            if (timeout == TimeSpan.Zero) return false;
 
             try
             {

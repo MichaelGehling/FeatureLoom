@@ -33,7 +33,7 @@ namespace FeatureLoom.Security
 
         public static ISchedule StartCleanupSchedule()
         {
-            cleanupSchedule = Scheduler.ScheduleAction(now =>
+            cleanupSchedule = Scheduler.ScheduleAction("SessionCleanup", now =>
             {
                 if (!cleanupLock.IsLocked)
                 {

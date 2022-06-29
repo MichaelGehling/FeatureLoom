@@ -103,9 +103,9 @@ namespace FeatureLoom.MessageFlow
         public bool TryReceive(out T message)
         {
             message = default;
-            bool success = false;
-
             if (IsEmpty) return false;
+            
+            bool success = false;            
             using (queueLock.Lock())
             {
                 success = queue.TryDequeue(out message);
@@ -115,31 +115,11 @@ namespace FeatureLoom.MessageFlow
             return success;
         }
 
-        public async Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default)
-        {
-            T message = default;
-            bool success = false;
-
-            if (IsEmpty && timeout != default) await WaitHandle.WaitAsync(timeout, CancellationToken.None);
-            if (IsEmpty) return (false, default);
-            using (queueLock.Lock())
-            {
-                success = queue.TryDequeue(out message);
-            }
-            if (IsEmpty) readerWakeEvent.Reset();
-            if (!IsFull) writerWakeEvent.Set();
-            return (success, message);
-        }
-
         public T[] ReceiveAll()
         {
-            if (IsEmpty)
-            {
-                return Array.Empty<T>();
-            }
+            if (IsEmpty) return Array.Empty<T>();
 
             T[] messages;
-
             using (queueLock.Lock())
             {
                 messages = queue.ToArray();
@@ -153,6 +133,8 @@ namespace FeatureLoom.MessageFlow
         public bool TryPeek(out T nextItem)
         {
             nextItem = default;
+            if (IsEmpty) return false;
+
             using (queueLock.Lock())
             {
                 if (IsEmpty) return false;
@@ -163,18 +145,12 @@ namespace FeatureLoom.MessageFlow
 
         public T[] PeekAll()
         {
-            if (IsEmpty)
-            {
-                return new T[0];
-            }
-
-            T[] messages;
+            if (IsEmpty) return Array.Empty<T>();
 
             using (queueLock.Lock())
             {
-                messages = queue.ToArray();
-            }
-            return messages;
+                return queue.ToArray();
+            }            
         }
 
         public void Clear()

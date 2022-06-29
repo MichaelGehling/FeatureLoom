@@ -7,6 +7,6 @@ namespace FeatureLoom.Web
 {
     public interface IWebRequestInterceptor
     {        
-        Task<bool> InterceptRequestAsync(IWebRequest request, IWebResponse response);
+        Task<HandlerResult> InterceptRequestAsync(IWebRequest request, IWebResponse response);
     }
 }

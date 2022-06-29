@@ -9,6 +9,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.TCP
 {
@@ -44,7 +45,7 @@ namespace FeatureLoom.TCP
                         .CatchAndDo((c, e) =>
                         {
                             c.ResetBuffer(false);
-                            Log.ERROR(c.GetHandle(), $"Decoding data from TCP connection {c.GetHandle()} failed! Buffer was reset and all data omitted. (id={c.GetHandle()})", e.ToString());
+                            Log.ERROR(c.GetHandle(), $"Decoding data from TCP connection failed! Buffer was reset and all data omitted.", e.ToString());
                         })
                     .Step("If decoding was completed put message in routing wrapper and send it, else reset buffer, but preserve the unprocessed bytes if chance exists to fit more data into the buffer.")
                         .If(c => c.decodingResult == DecodingResult.Complete)
@@ -58,7 +59,7 @@ namespace FeatureLoom.TCP
                     .Step("Stop connection")
                         .Do(c =>
                         {
-                            Log.INFO(c.GetHandle(), $"Connection was closed! (id={c.GetHandle()})");
+                            Log.INFO(c.GetHandle(), $"Connection was closed!");
                             c.Stop(false);
                         })
                     .Step("Finish workflow")
@@ -96,7 +97,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Could not get stream from tcpClient or stream upgrade failed. (id={this.GetHandle()})", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Could not get stream from tcpClient or stream upgrade failed.", e.ToString());
             }
 
             this.bufferSize = bufferSize;
@@ -128,7 +129,7 @@ namespace FeatureLoom.TCP
         {
             if (Disconnected)
             {
-                Log.WARNING(this.GetHandle(), $"Message was not set over connection because of disconnection! (id={this.GetHandle()})");
+                Log.WARNING(this.GetHandle(), $"Message was not set over connection because of disconnection!");
                 return false;
             }
 
@@ -139,7 +140,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed when writing to stream, closing connection! (id={this.GetHandle()})", e.ToString());
+                Log.ERROR(this.GetHandle(), $"Failed when writing to stream, closing connection!", e.ToString());
                 this.client.Close();
                 return false;
             }
@@ -243,7 +244,7 @@ namespace FeatureLoom.TCP
             if (ignoreFailedAuthentication) return true;
 
             if (sslPolicyErrors == SslPolicyErrors.None) return true;
-            Console.WriteLine("Certificate error: {0}", sslPolicyErrors);
+            Console.WriteLine("Certificate error: {0}", sslPolicyErrors.ToName());
             // refuse connection
             return false;
         }

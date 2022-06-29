@@ -112,7 +112,7 @@ namespace FeatureLoom.Storages
 
             await Task.Delay(config.fileChangeNotificationDelay);
 
-            if (notification.changeType.HasFlag(WatcherChangeTypes.Deleted))
+            if (notification.changeType.IsFlagSet(WatcherChangeTypes.Deleted))
             {
                 ProcessChangeNotification_Delete(notification);
             }
@@ -120,7 +120,7 @@ namespace FeatureLoom.Storages
             {
                 DirectoryInfo directoryInfo = new DirectoryInfo(notification.path);
 
-                if (!directoryInfo.Attributes.HasFlag(FileAttributes.Directory))
+                if (!directoryInfo.Attributes.IsFlagSet(FileAttributes.Directory))
                 {
                     ProcessChangeNotification_File(notification);
                 }
@@ -133,7 +133,7 @@ namespace FeatureLoom.Storages
 
         private void ProcessChangeNotification_Directory(FileSystemObserver.ChangeNotification notification, DirectoryInfo directoryInfo)
         {
-            if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
+            if (notification.changeType.IsFlagSet(WatcherChangeTypes.Created))
             {
                 var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
                 foreach (var fileInfo in addedFileInfos)
@@ -146,7 +146,7 @@ namespace FeatureLoom.Storages
                     NotifySubscriptions(uri, UpdateEvent.Created);
                 }
             }
-            else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
+            else if (notification.changeType.IsFlagSet(WatcherChangeTypes.Renamed))
             {
                 UpdateOnRemovedDir();
 
@@ -165,7 +165,7 @@ namespace FeatureLoom.Storages
 
         private void ProcessChangeNotification_File(FileSystemObserver.ChangeNotification notification)
         {
-            if (notification.changeType.HasFlag(WatcherChangeTypes.Changed))
+            if (notification.changeType.IsFlagSet(WatcherChangeTypes.Changed))
             {
                 lock (fileSet)
                 {
@@ -178,7 +178,7 @@ namespace FeatureLoom.Storages
                     NotifySubscriptions(uri, UpdateEvent.Updated);
                 }
             }
-            else if (notification.changeType.HasFlag(WatcherChangeTypes.Created))
+            else if (notification.changeType.IsFlagSet(WatcherChangeTypes.Created))
             {
                 lock (fileSet)
                 {
@@ -190,7 +190,7 @@ namespace FeatureLoom.Storages
                     NotifySubscriptions(uri, UpdateEvent.Created);
                 }
             }
-            else if (notification.changeType.HasFlag(WatcherChangeTypes.Renamed))
+            else if (notification.changeType.IsFlagSet(WatcherChangeTypes.Renamed))
             {
                 lock (fileSet)
                 {

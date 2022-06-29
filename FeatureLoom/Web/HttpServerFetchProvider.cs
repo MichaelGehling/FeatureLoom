@@ -8,6 +8,7 @@ using System;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Web
 {
@@ -16,19 +17,15 @@ namespace FeatureLoom.Web
         private CountingRingBuffer<string> ringBuffer;
         private readonly string route;
         private IWebMessageTranslator translator;
-        private readonly IWebServer webServer;
         public string Route => route;
 
-        public HttpServerFetchProvider(string route, IWebMessageTranslator translator, int bufferSize = 100, IWebServer webServer = null)
+        public HttpServerFetchProvider(string route, IWebMessageTranslator translator, int bufferSize = 100)
         {
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.route = route;
             ringBuffer = new CountingRingBuffer<string>(bufferSize);
             this.translator = translator;
-            this.webServer = webServer ?? SharedWebServer.WebServer;
-
-            this.webServer.AddRequestHandler(this);
         }
 
         public void Post<M>(in M message)
@@ -53,14 +50,9 @@ namespace FeatureLoom.Web
             return Task.CompletedTask;
         }
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (!request.IsGet)
-            {
-                response.StatusCode = HttpStatusCode.MethodNotAllowed;
-                await response.WriteAsync("Use 'GET' to fetch messages!");
-                return false;
-            }
+            if (!request.IsGet) return HandlerResult.Handled_MethodNotAllowed();            
 
             try
             {
@@ -95,8 +87,8 @@ namespace FeatureLoom.Web
                 StringBuilder sb = new StringBuilder();
                 sb.Append(
 $@"{{
-    ""missed"" : {missed},
-    ""next"" : {next},
+    ""missed"" : {missed.ToString()},
+    ""next"" : {next.ToString()},
     ""messages"" : [
 ");
                 for (int i = 0; i < messages.Length; i++)
@@ -107,14 +99,13 @@ $@"{{
                 sb.Append($@"
                    ]
 }}");
-                await response.WriteAsync(sb.ToString());
-                return true;
+                
+                return HandlerResult.Handled_OK(sb.ToString());
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
-                return true;
+                Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());                
+                return HandlerResult.Handled_InternalServerError();
             }
         }
     }

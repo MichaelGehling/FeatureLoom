@@ -105,7 +105,7 @@ namespace FeatureLoom.Workflows
             }
         }
 
-        public static IEnumerable<IWorkflowRunner> GetAllRunners()
+        public static IWorkflowRunner[] GetAllRunners()
         {
             using (context.Data.runnersLock.LockReadOnly())
             {

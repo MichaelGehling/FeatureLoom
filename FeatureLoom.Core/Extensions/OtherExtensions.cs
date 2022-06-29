@@ -85,5 +85,21 @@ namespace FeatureLoom.Extensions
 
             return converted != null;
         }
+
+        public static bool TryConvertTo<TIN, TOUT>(this TIN obj, out TOUT converted) 
+            where TIN : IConvertible 
+        {
+            if (obj.TryConvertTo(typeof(TOUT), out object convertedObj))
+            {
+                converted = (TOUT) convertedObj;
+                return true;
+            }
+            else
+            {
+                converted = default;
+                return false;
+            }
+
+        }
     }
 }

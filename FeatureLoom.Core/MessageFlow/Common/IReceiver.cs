@@ -14,8 +14,6 @@ namespace FeatureLoom.MessageFlow
 
         bool TryReceive(out T message);
 
-        Task<AsyncOut<bool, T>> TryReceiveAsync(TimeSpan timeout = default);
-
         T[] ReceiveAll();
 
         bool TryPeek(out T nextItem);

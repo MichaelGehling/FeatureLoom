@@ -14,32 +14,24 @@ namespace FeatureLoom.Web
     {
         private StringRpcCaller rpcCaller;
         private readonly string route;
-        private readonly IWebServer webServer;
         private readonly TimeSpan rpcTimeout;
 
-        public HttpServerRpcAdapter(string route, TimeSpan rpcTimeout, IWebServer webServer = null)
+        public HttpServerRpcAdapter(string route, TimeSpan rpcTimeout)
         {
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.rpcTimeout = rpcTimeout;
             rpcCaller = new StringRpcCaller(rpcTimeout);
             this.route = route;
-            this.webServer = webServer ?? SharedWebServer.WebServer;
-            this.webServer.AddRequestHandler(this);
         }
 
         public string Route => route;
 
         public int CountConnectedSinks => ((IRequester)rpcCaller).CountConnectedSinks;
 
-        public async Task<bool> HandleRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
-            if (!request.IsPost)
-            {
-                response.StatusCode = HttpStatusCode.MethodNotAllowed;
-                await response.WriteAsync("Use 'POST' to send request messages!");
-                return false;
-            }
+            if (!request.IsPost) return HandlerResult.Handled_MethodNotAllowed();            
 
             try
             {
@@ -48,20 +40,21 @@ namespace FeatureLoom.Web
 
                 string rpcRequest = await request.ReadAsync();
                 rpcRequest = rpcRequest.Trim();
-                string rpcResponse = await rpcCaller.CallAsync(rpcRequest);
-                await response.WriteAsync(rpcResponse);
+                string rpcResponse = await rpcCaller.CallAsync(rpcRequest);                
+
+                return HandlerResult.Handled_OK(rpcResponse);
             }
             catch (TaskCanceledException cancelException)
-            {
-                response.StatusCode = HttpStatusCode.RequestTimeout;
+            {                
                 Log.WARNING(this.GetHandle(), "Web RPC request timed out", cancelException.ToString());
+                return HandlerResult.Handled_RequestTimeout();
             }
             catch (Exception e)
             {
                 Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
+                return HandlerResult.Handled_InternalServerError();
+
             }
-            return true;
         }
 
         public IMessageSource ConnectTo(IMessageFlowConnection sink)

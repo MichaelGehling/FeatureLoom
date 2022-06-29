@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Synchronization;
 using System;
+using System.Collections.Generic;
 
 namespace FeatureLoom.Collections
 {
@@ -56,6 +57,31 @@ namespace FeatureLoom.Collections
             newEntryEvent?.Set();
             newEntryEvent?.Reset(); // TODO: Setting and directly resetting might fail waking up waiting threads!
             return result;
+        }
+        public long AddRange<IEnum>(IEnum items) where IEnum : IEnumerable<T>
+        {
+            if (threadSafe) myLock.Enter(true);
+            try
+            {
+                foreach (var item in items)
+                {
+                    buffer[nextIndex++] = item;
+                    if (nextIndex >= buffer.Length)
+                    {
+                        nextIndex = 0;
+                        cycled = true;
+                    }
+                    counter++;
+                }
+            }
+            finally
+            {
+                if (threadSafe) myLock.Exit();
+            }
+
+            newEntryEvent?.Set();
+            newEntryEvent?.Reset(); // TODO: Setting and directly resetting might fail waking up waiting threads!
+            return counter;
         }
 
         public void Clear()

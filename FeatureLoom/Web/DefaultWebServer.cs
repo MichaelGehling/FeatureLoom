@@ -2,6 +2,7 @@
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
+using FeatureLoom.Serialization;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using Microsoft.AspNetCore.Builder;
@@ -19,7 +20,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
 {
-    public class DefaultWebServer : IWebServer
+    public partial class DefaultWebServer : IWebServer
     {
         public class Config : Configuration
         {
@@ -30,12 +31,14 @@ namespace FeatureLoom.Web
         private FeatureLock myLock = new FeatureLock();
         private bool running = false;
         private IWebHost webserver;
-        private byte[] favicon;
+        private byte[] favicon;        
 
         // Invert comparer, so that when one route is the start of the second, the second will come first, so the more specifc before the less specific 
-        static readonly IComparer<string> routeComparer = new GenericComparer<string>((route1, route2) => -route1.CompareTo(route2));
-        private SortedList<string, IWebRequestHandler> requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
+        static readonly IComparer<IWebRequestHandler> routeComparer = new GenericComparer<IWebRequestHandler>((handler1, handler2) => -handler1.Route.CompareTo(handler2.Route));
+        private List<IWebRequestHandler> requestHandlers = new List<IWebRequestHandler>();
         private List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
+        private List<IWebExceptionHandler> exceptionHandlers = new List<IWebExceptionHandler>();
+        private List<IWebResultHandler> resultHandlers = new List<IWebResultHandler>();
         private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
         public DefaultWebServer()
@@ -76,13 +79,82 @@ namespace FeatureLoom.Web
             }
         }
 
+        public void AddExceptionHandler(IWebExceptionHandler exceptionHandler)
+        {
+            using (myLock.Lock())
+            {
+                var exceptionHandlers = this.exceptionHandlers;
+                if (running) exceptionHandlers = new List<IWebExceptionHandler>(exceptionHandlers);
+                exceptionHandlers.Add(exceptionHandler);
+                this.exceptionHandlers = exceptionHandlers;
+            }
+        }
+
+        public void RemoveExceptionHandler(IWebExceptionHandler exceptionHandler)
+        {
+            using (myLock.Lock())
+            {
+                var exceptionHandlers = this.exceptionHandlers;
+                if (running) exceptionHandlers = new List<IWebExceptionHandler>(exceptionHandlers);
+                exceptionHandlers.Remove(exceptionHandler);
+                this.exceptionHandlers = exceptionHandlers;
+            }
+        }
+
+        public void ClearExceptionHandlers()
+        {
+            using (myLock.Lock())
+            {
+                var exceptionHandlers = this.exceptionHandlers;
+                if (running) exceptionHandlers = new List<IWebExceptionHandler>();
+                else exceptionHandlers.Clear();
+                this.exceptionHandlers = exceptionHandlers;
+
+            }
+        }
+
+        public void AddResultHandler(IWebResultHandler resultHandler)
+        {
+            using (myLock.Lock())
+            {
+                var resultHandlers = this.resultHandlers;
+                if (running) resultHandlers = new List<IWebResultHandler>(resultHandlers);
+                resultHandlers.Add(resultHandler);
+                this.resultHandlers = resultHandlers;
+            }
+        }
+
+        public void RemoveResultHandler(IWebResultHandler resultHandler)
+        {
+            using (myLock.Lock())
+            {
+                var resultHandlers = this.resultHandlers;
+                if (running) resultHandlers = new List<IWebResultHandler>(resultHandlers);
+                resultHandlers.Remove(resultHandler);
+                this.resultHandlers = resultHandlers;
+            }
+        }
+
+        public void ClearResultHandlers()
+        {
+            using (myLock.Lock())
+            {
+                var resultHandlers = this.resultHandlers;
+                if (running) resultHandlers = new List<IWebResultHandler>();
+                else resultHandlers.Clear();
+                this.resultHandlers = resultHandlers;
+
+            }
+        }
+
         public void AddRequestHandler(IWebRequestHandler handler)
         {
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
-                requestHandlers.Add(handler.Route, handler);
+                if (running) requestHandlers = new List<IWebRequestHandler>(requestHandlers);
+                requestHandlers.Add(handler);
+                requestHandlers.Sort(routeComparer);
                 this.requestHandlers = requestHandlers;
             }
         }
@@ -92,8 +164,9 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(requestHandlers, routeComparer);
-                requestHandlers.Remove(handler.Route);
+                if (running) requestHandlers = new List<IWebRequestHandler>(requestHandlers);
+                requestHandlers.Remove(handler);
+                requestHandlers.Sort(routeComparer);
                 this.requestHandlers = requestHandlers;
             }
         }
@@ -103,7 +176,7 @@ namespace FeatureLoom.Web
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
-                if (running) requestHandlers = new SortedList<string, IWebRequestHandler>(routeComparer);
+                if (running) requestHandlers = new List<IWebRequestHandler>();
                 else requestHandlers.Clear();
                 this.requestHandlers = requestHandlers;
 
@@ -208,11 +281,9 @@ namespace FeatureLoom.Web
 
             try
             {
-                string path = context.Request.Path;
-
                 // Shortcut to deliver icon.
                 // If icon needs to be handled dynamically in a handler, the shortcut can be skipped by setting the favicon to null.
-                if (favicon != null && request.IsGet && path == "/favicon.ico")
+                if (favicon != null && request.IsGet && request.Path == "/favicon.ico")
                 {
                     response.StatusCode = HttpStatusCode.OK;
                     await response.Stream.WriteAsync(this.favicon, 0, favicon.Length);                    
@@ -222,42 +293,93 @@ namespace FeatureLoom.Web
                 var currentInterceptors = this.requestInterceptors; // take current reference to avoid change while execution.
                 foreach (var interceptor in currentInterceptors)
                 {
-                    if (await interceptor.InterceptRequestAsync(request, response))
-                    {                      
-                        return; // request was intercepted, so finish request handling
+                    var result = await interceptor.InterceptRequestAsync(request, response);
+                    if (await ProcessHandlerResult(request, response, result))
+                    {
+                        await ReactOnResult(request, response, result);
+                        return;
                     }
                 }
 
-                var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.
+                var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.                
                 foreach (var handler in currentRequestHandlers)
                 {
-                    if (path.StartsWith(handler.Key))
+                    if (request.Path.StartsWith(handler.Route))
                     {
-                        contextWrapper.SetRoute(handler.Key);
-                        if (await handler.Value.HandleRequestAsync(request, response))
+                        contextWrapper.SetRoute(handler.Route);
+                        HandlerResult result = await handler.HandleRequestAsync(request, response);
+                        if (await ProcessHandlerResult(request, response, result))
                         {
-                            return; // request was handled, so finish request handling
+                            await ReactOnResult(request, response, result);
+                            return;
                         }
                     }
-
                 }
 
-                // Request was not handled so NotFound StatusCode is set, but it has to be ensured that the response stream whas not already written.
-                if (!response.ResponseSent)
+                // Request was not handled so NotFound StatusCode is set, but it has to be ensured that the response stream was not already written.
+                if (!response.ResponseSent && !response.StatusCodeSet)
                 {
                     response.StatusCode = HttpStatusCode.NotFound;
+                    await ReactOnResult(request, response, HandlerResult.NotHandled_NotFound());
+                    return;
                 }
             }
             catch (WebResponseException e)
             {
                 if (e.LogLevel.HasValue) Log.SendLogMessage(new LogMessage(e.LogLevel.Value, e.InternalMessage));
                 response.StatusCode = e.StatusCode;
-                if (!e.ResponseMessage.EmptyOrNull()) await response.WriteAsync(e.ResponseMessage);
-            }
+                if (!e.ResponseMessage.EmptyOrNull()) await response.WriteAsync(e.ResponseMessage);                
+                await ReactOnResult(request, response, new HandlerResult(true, e.ResponseMessage, e.StatusCode));
+                return;
+            }            
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Web request failed with an exception!", e.ToString());
-                response.StatusCode = HttpStatusCode.InternalServerError;
+                foreach (var exceptionHanlder in exceptionHandlers)
+                {
+                    var result = await exceptionHanlder.HandleException(e, request, response);
+                    if (await ProcessHandlerResult(request, response, result))
+                    {
+                        await ReactOnResult(request, response, result);
+                        return;
+                    }
+                }
+
+                Log.ERROR(this.GetHandle(), "Web request failed with an unhandled exception!", e.ToString());
+                response.StatusCode = HttpStatusCode.InternalServerError;                
+                await ReactOnResult(request, response, HandlerResult.NotHandled_InternalServerError());
+                return;
+            }
+        }
+
+        private  async Task<bool> ProcessHandlerResult(IWebRequest request, IWebResponse response, HandlerResult result)
+        {
+            if (response.ResponseSent)
+            {
+                if (result.statusCode != response.StatusCode) Log.WARNING(this.GetHandle(), $"Response was already sent, but status code of result ({result.statusCode}) and response ({response.StatusCode}) differ!");
+                if (result.data != null) Log.WARNING(this.GetHandle(), $"Response was already sent, but result contained data, that cannot be delivered!");
+                return true;
+            }
+
+            if (result.statusCode.HasValue) response.StatusCode = result.statusCode.Value;
+            if (result.data != null)
+            {
+                if (!result.statusCode.HasValue) response.StatusCode = HttpStatusCode.OK;
+
+                if (result.data is string str) await response.WriteAsync(str);
+                else if (result.data is byte[] bytes) await response.Stream.WriteAsync(bytes, 0, bytes.Length);
+                else if (result.data is Stream stream) await stream.CopyToAsync(response.Stream);
+                else await response.WriteAsync(Json.SerializeToJson(result.data));
+
+                return true;
+            }
+            return result.requestHandled;
+        }
+
+        private async Task ReactOnResult(IWebRequest request, IWebResponse response, HandlerResult result)
+        {
+            foreach (var resultHandler in this.resultHandlers)
+            {
+                await resultHandler.HandleResult(result, request, response);
             }
         }
 
@@ -290,101 +412,5 @@ namespace FeatureLoom.Web
             }
         }
 
-        private class ContextWrapper : IWebRequest, IWebResponse
-        {
-            private HttpContext context;
-            private string route = "";
-            private bool responseSent = false;
-
-            public void SetRoute(string route) => this.route = route;
-
-            public ContextWrapper(HttpContext context)
-            {
-                this.context = context;
-            }
-
-            string IWebRequest.BasePath => context.Request.PathBase + route;
-
-            string IWebRequest.FullPath => context.Request.PathBase + context.Request.Path;
-
-            string IWebRequest.RelativePath => context.Request.Path.ToString().Substring(route.Length);
-
-            Stream IWebRequest.Stream => context.Request.Body;
-
-            Stream IWebResponse.Stream => context.Response.Body;
-
-            string IWebRequest.ContentType => context.Request.ContentType;
-
-            string IWebResponse.ContentType { get => context.Response.ContentType; set => context.Response.ContentType = value; }
-
-            bool IWebRequest.IsGet => HttpMethods.IsGet(context.Request.Method);
-
-            bool IWebRequest.IsPost => HttpMethods.IsPost(context.Request.Method);
-
-            bool IWebRequest.IsPut => HttpMethods.IsPut(context.Request.Method);
-
-            bool IWebRequest.IsDelete => HttpMethods.IsDelete(context.Request.Method);
-
-            bool IWebRequest.IsHead => HttpMethods.IsHead(context.Request.Method);
-
-            string IWebRequest.Method => context.Request.Method;            
-
-            HttpStatusCode IWebResponse.StatusCode { get => (HttpStatusCode)context.Response.StatusCode; set => context.Response.StatusCode = (int)value; }
-
-            string IWebRequest.HostAddress
-            {
-                get
-                {
-                    return (context.Request.IsHttps ? "https://" : "http://") + context.Request.Host.Value;
-                }
-            }
-
-
-            bool IWebResponse.ResponseSent => responseSent;
-
-
-            void IWebResponse.AddCookie(string key, string content, CookieOptions options)
-            {
-                if (options != null) context.Response.Cookies.Append(key, content, options);
-                else context.Response.Cookies.Append(key, content);
-            }
-
-            void IWebResponse.DeleteCookie(string key)
-            {
-                context.Response.Cookies.Delete(key);
-            }
-
-            Task<string> IWebRequest.ReadAsync()
-            {
-                return context.Request.Body.ReadToStringAsync();
-            }
-
-            bool IWebRequest.TryGetCookie(string key, out string content)
-            {
-                return context.Request.Cookies.TryGetValue(key, out content);
-            }
-
-            bool IWebRequest.TryGetQueryItem(string key, out string item)
-            {
-                if (context.Request.Query.TryGetValue(key, out StringValues values))
-                {
-                    item = values[0];
-                    return true;
-                }
-                else
-                {
-                    item = default;
-                    return false;
-                }
-            }
-
-            IEnumerable<string> IWebRequest.GetAllQueryKeys() => context.Request.Query.Keys;
-
-            Task IWebResponse.WriteAsync(string reply)
-            {
-                responseSent = true;
-                return context.Response.WriteAsync(reply);
-            }
-        }        
     }
 }

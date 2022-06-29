@@ -40,7 +40,9 @@ namespace FeatureLoom.Collections
         DateTime lastCleanUp = AppTime.CoarseNow;
         TimeSpan cleanUpDelay = TimeSpan.Zero;
 
-        public CacheSettings Settings => settings;        
+        public CacheSettings Settings => settings;
+
+        public string Name => "InMemoryCache";
 
         public InMemoryCache(Func<V, int> calculateSize, CacheSettings settings = null)
         {
@@ -132,7 +134,7 @@ namespace FeatureLoom.Collections
                 DateTime now = AppTime.CoarseNow;
                 lastCleanUp = now;
 
-                ICollection<CacheItem> items;
+                IEnumerable<CacheItem> items;
                 using (storageLock.Lock())
                 {
                     items = storage.Values;

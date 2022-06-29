@@ -5,9 +5,44 @@ namespace FeatureLoom.Time
 {
     public static class TimeSpanExtensions
     {
+        public static TimeSpan Years(this int years)
+        {
+            return TimeSpan.FromTicks((long)years * 10_000 * 1000 * 60 * 60 * 24 * 365);
+        }
+
+        public static TimeSpan Years(this long years)
+        {
+            return TimeSpan.FromTicks(years * 10_000 * 1000 * 60 * 60 * 24 * 365);
+        }
+
+        public static TimeSpan Years(this double years)
+        {
+            return TimeSpan.FromTicks((long)(years * 10_000 * 1000 * 60 * 60 * 24 * 365));
+        }
+
+        public static TimeSpan Days(this int days)
+        {
+            return TimeSpan.FromTicks((long)days * 10_000 * 1000 * 60 * 60 * 24);
+        }
+
+        public static TimeSpan Days(this long days)
+        {
+            return TimeSpan.FromTicks(days * 10_000 * 1000 * 60 * 60 * 24);
+        }
+
+        public static TimeSpan Days(this double days)
+        {
+            return TimeSpan.FromTicks((long)(days * 10_000 * 1000 * 60 * 60 * 24));
+        }
+
         public static TimeSpan Hours(this int hours)
         {            
             return TimeSpan.FromTicks((long)hours * 10_000 * 1000 * 60 * 60);
+        }
+
+        public static TimeSpan Hours(this long hours)
+        {
+            return TimeSpan.FromTicks(hours * 10_000 * 1000 * 60 * 60);
         }
 
         public static TimeSpan Minutes(this int minutes)
@@ -15,14 +50,29 @@ namespace FeatureLoom.Time
             return TimeSpan.FromTicks((long)minutes * 10_000 * 1000 * 60);
         }
 
+        public static TimeSpan Minutes(this long minutes)
+        {
+            return TimeSpan.FromTicks(minutes * 10_000 * 1000 * 60);
+        }
+
         public static TimeSpan Seconds(this int seconds)
         {            
             return TimeSpan.FromTicks((long)seconds * 10_000 * 1000);
         }
 
+        public static TimeSpan Seconds(this long seconds)
+        {
+            return TimeSpan.FromTicks(seconds * 10_000 * 1000);
+        }
+
         public static TimeSpan Milliseconds(this int milliseconds)
         {
             return TimeSpan.FromTicks((long)milliseconds * 10_000);
+        }
+
+        public static TimeSpan Milliseconds(this long milliseconds)
+        {
+            return TimeSpan.FromTicks(milliseconds * 10_000);
         }
 
         public static TimeSpan Ticks(this long ticks)

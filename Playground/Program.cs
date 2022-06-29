@@ -21,6 +21,7 @@ using FeatureLoom.Storages;
 using FeatureLoom.Security;
 using System.IO;
 using System.Globalization;
+using FeatureLoom.Services;
 
 namespace Playground
 {
@@ -57,7 +58,6 @@ namespace Playground
             }
         }
     }
-
 
     partial class Program
     {
@@ -106,26 +106,19 @@ namespace Playground
         {
             public string aaa = "Hallo";
             public int bbb = 99;
-        }    
+        }
+
+        
 
         private static void Main()
         {
+            ulong asd = ulong.MaxValue;
+            long unix = (long)asd.ClampHigh((ulong)long.MaxValue);
 
             /*
 
             var writer = Storage.GetWriter("test");
             var reader = Storage.GetReader("test");
-
-            while (true)
-            {
-                writer.TryWriteAsync("x/no1", "testabc".ToStream()).WaitFor();
-                writer.TryWriteAsync("x/no2", "testabc".ToStream()).WaitFor();
-                Console.ReadKey();
-                writer.TryDeleteAsync("x/no1").WaitFor();
-                writer.TryDeleteAsync("x/no2").WaitFor();
-                Console.ReadKey();
-            }
-
 
             CultureInfo culture =  Thread.CurrentThread.CurrentCulture.CloneAndCast<CultureInfo>();
             culture.NumberFormat.NumberDecimalSeparator = ".";
@@ -166,39 +159,69 @@ namespace Playground
             Identity paul = new Identity("Paul", credentialHandler.GenerateStoredCredential(new UsernamePassword("Paul", "abc")));                
             paul.AddRole(guest);
             paul.TryStoreAsync().WaitFor();
-            
 
-            SharedWebServer.WebServer.AddRequestInterceptor(new SessionCookieInterceptor());
+            Service<DefaultWebServer>.Init(() => new DefaultWebServer());
+            var webServer = Service<IWebServer>.Instance;
 
-            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordSignupHandler() { defaultRole = guest });
-            SharedWebServer.WebServer.AddRequestHandler(new UsernamePasswordLoginHandler());
-            SharedWebServer.WebServer.AddRequestHandler(new LogoutHandler());
-            SharedWebServer.WebServer.AddRequestHandler(new IdentityAndAccessManagementHandler());
+            webServer.AddRequestInterceptor(new SessionCookieInterceptor());
 
-            SharedWebServer.WebServer.HandleRequests("/test", (req, resp) =>
+            webServer.AddRequestHandler(new UsernamePasswordSignupHandler() { defaultRole = guest });
+            webServer.AddRequestHandler(new UsernamePasswordLoginHandler());
+            webServer.AddRequestHandler(new LogoutHandler());
+            webServer.AddRequestHandler(new IdentityAndAccessManagementHandler());
+
+            webServer.HandleGET("/customers/{1}/{2}", (string name, int num) =>
             {
-                return Session.Current.LifeTime.Remaining().ToString();
-            }, "Guest*");
+                string result = "";
+                for (int i = 0; i < num; i++) result += name;
+                return HandlerResult.Handled_OK(result);
+            });
 
-            SharedWebServer.WebServer.HandleRequests("/test/xx", (req, resp) =>
+            webServer.HandleGET("/throw", (IWebRequest req) =>
+            {
+                (req as IWebServer).Run().WaitFor();
+                return HandlerResult.Handled_OK();
+            }).HandleException((NullReferenceException e) => HandlerResult.Handled_Conflict(e.ToString()));
+
+            webServer.HandlePOST("/customers/{name}", (string name) =>
+            {
+                return HandlerResult.Handled_OK(name +"POSTED");
+            });
+
+            webServer.HandleGET("/test", (req, resp) =>
+            {
+                return HandlerResult.Handled_OK(Session.Current.LifeTime.Remaining().ToString());
+            }).CheckMatchesPermission("Guest*");
+
+            webServer.HandleGET("/test/xx", (req, resp) =>
             {
                 if (Session.Current?.Identity?.HasPermission("GuestThings") ?? false)
                 {
-                    return "xx";
+                    return HandlerResult.Handled_OK("xx");
                 }
                 else
-                {
-                    resp.StatusCode = HttpStatusCode.Forbidden;
-                    return null;
+                {                    
+                    return HandlerResult.Handled_Forbidden();
                 }
-            }, "GuestThings");
+            }).CheckHasPermission("GuestThings");
 
-            SharedWebServer.WebServer.AddRequestHandler(
+
+            webServer.AddRequestHandler(
                 new RequestHandlerPermissionWrapper(
                     new StorageWebAccess<string>("/config", new StorageWebAccess<string>.Config() { category = "config" }),
                     "AdminThings", true));
 
-            _ = SharedWebServer.WebServer.Run(IPAddress.Loopback, 50123);
+            webServer.HandleException((NullReferenceException e) =>
+            {
+                return HandlerResult.Handled_InternalServerError();
+            });
+
+            webServer.HandleResult((HandlerResult result) =>
+            {
+                if (result.statusCode == HttpStatusCode.BadRequest) Log.WARNING(HttpStatusCode.BadRequest.ToString());
+            });
+
+            _ = webServer.Run(IPAddress.Loopback, 50123);
 
             Console.ReadKey();            
             */

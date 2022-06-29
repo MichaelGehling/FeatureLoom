@@ -23,7 +23,7 @@ namespace FeatureLoom.Web
         public string anonymousIdentity = "Anonymous";
         public bool supportSessionIdInQueryString = true;
 
-        public async Task<bool> InterceptRequestAsync(IWebRequest request, IWebResponse response)
+        public async Task<HandlerResult> InterceptRequestAsync(IWebRequest request, IWebResponse response)
         {            
             if (request.TryGetCookie(cookieName, out string sessionId) ||
                 (supportSessionIdInQueryString && request.TryGetQueryItem("SessionId", out sessionId)))
@@ -39,14 +39,14 @@ namespace FeatureLoom.Web
                                 response.AddCookie(cookieName, session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });
                             }
                             Session.Current = session;
-                            return false;
+                            return HandlerResult.NotHandled();
                         }
                         else
                         {
                             Log.WARNING(this.GetHandle(), $"Identity {session.IdentityId} of session does not exist! Session will be invalidated.");
                             await session.TryDeleteFromStorageAsync();
-                            response.DeleteCookie(cookieName);                            
-                            return false;
+                            response.DeleteCookie(cookieName);
+                            return HandlerResult.NotHandled();
                         }
                     }
                     else if (removeExceededSessionAndCookie)
@@ -69,7 +69,7 @@ namespace FeatureLoom.Web
                 _ = session.TryStoreAsync();
             }
 
-            return false;
+            return HandlerResult.NotHandled();
         }
     }
 }

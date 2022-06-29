@@ -90,10 +90,10 @@ namespace FeatureLoom.Workflows
         private static string ValidateStep(string findings, State<CT> state, Step<CT> step)
         {
             if (step.description == null || step.description == "")
-                findings += $"State {state.name} has a step at index {step.stepIndex} without description.\n";
+                findings += $"State {state.name} has a step at index {step.stepIndex.ToString()} without description.\n";
 
             if (!(step.hasAction || step.hasWaiting || step.finishStateMachine || step.targetState != null))
-                findings += $"State {state.name} has a step {step.description} at index {step.stepIndex} without any content. Remove or implement! \n";
+                findings += $"State {state.name} has a step {step.description} at index {step.stepIndex.ToString()} without any content. Remove or implement! \n";
             return findings;
         }
 
@@ -175,7 +175,7 @@ namespace FeatureLoom.Workflows
             if (executionPhase == Workflow.ExecutionPhase.Finished ||
                executionPhase == Workflow.ExecutionPhase.Invalid)
             {
-                Log.WARNING(context.GetHandle(), $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToString()}!");
+                Log.WARNING(context.GetHandle(), $"StateMachine was called to execute, but the context's ({context.ContextName}) execution state is in phase {executionPhase.ToName()}!");
                 proceed = false;
             }
             else if (executionPhase != Workflow.ExecutionPhase.Running)
@@ -221,13 +221,13 @@ namespace FeatureLoom.Workflows
             var step = this.states.ItemOrNull(context.CurrentExecutionState.stateIndex)?.steps.ItemOrNull(context.CurrentExecutionState.stepIndex);
             if (this.robustExecutionActive)
             {
-                Log.ERROR(context.GetHandle(), $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.InnerOrSelf().ToString());
+                Log.ERROR(context.GetHandle(), $"An exception was thrown, but the statemachine will continue to run! Problems might persist! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex.ToString()}), StepIndex={step.stepIndex.ToString()}.", e.InnerOrSelf().ToString());
                 return nextExecutionState;
             }
             else
             {
-                Log.ERROR(context.GetHandle(), $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.InnerOrSelf().ToString());
-                throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex}), StepIndex={step.stepIndex}.", e.InnerOrSelf());
+                Log.ERROR(context.GetHandle(), $"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex.ToString()}), StepIndex={step.stepIndex.ToString()}.", e.InnerOrSelf().ToString());
+                throw new Exception($"The state machine stopped, due to an unhandled exception! ContextName={context.ContextName}, StateMachineName={Name}, StateName(Index)={step.parentState.name}({step.parentState.stateIndex.ToString()}), StepIndex={step.stepIndex.ToString()}.", e.InnerOrSelf());
             }
         }
 

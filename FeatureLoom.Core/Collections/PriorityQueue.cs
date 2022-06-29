@@ -98,7 +98,12 @@ namespace FeatureLoom.Collections
             ((ICollection)linkedList).CopyTo(array, index);
         }
 
-        public IEnumerator<T> GetEnumerator()
+        public LinkedList<T>.Enumerator GetEnumerator()
+        {
+            return linkedList.GetEnumerator();
+        }
+
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
         {
             return ((IEnumerable<T>)linkedList).GetEnumerator();
         }
