@@ -19,7 +19,7 @@ using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Crypto.Operators;
 #endif
 
-namespace FeatureLoom.Core.Security
+namespace FeatureLoom.Security
 {
     public class CertificateBuilder
     {

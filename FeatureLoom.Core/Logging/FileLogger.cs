@@ -53,10 +53,10 @@ namespace FeatureLoom.Logging
 
         public class Config : Configuration
         {
-            public string logFilePath = "log.txt";
+            public string logFilePath = "logs/log.txt";
             public bool newFileOnStartup = true;
 
-            public string archiveFilePath = "logArchive.zip";
+            public string archiveFilePath = "logs/logArchive.zip";
             public int logFilesArchiveLimitInMB = 100;
             public float logFileSizeLimitInMB = 5;
             public CompressionLevel compressionLevel = CompressionLevel.Fastest;
@@ -70,8 +70,6 @@ namespace FeatureLoom.Logging
         public Config config;
 
         private QueueReceiver<LogMessage> receiver = new QueueReceiver<LogMessage>();
-        private string logFilePath;
-        private string archiveFilePath;
         private StringBuilder stringBuilder = new StringBuilder();
         private AsyncManualResetEvent delayBypass = new AsyncManualResetEvent(false);
 
@@ -101,8 +99,6 @@ namespace FeatureLoom.Logging
         {
             this.config = config ?? new Config();
             this.config.TryUpdateFromStorage(false);
-            this.logFilePath = new FileInfo(this.config.logFilePath).FullName;
-            this.archiveFilePath = new FileInfo(this.config.archiveFilePath).FullName;
         }
 
         private async Task UpdateConfigAsync()
@@ -113,22 +109,24 @@ namespace FeatureLoom.Logging
 
         private float GetLogFileSize()
         {
-            var logFileInfo = new FileInfo(logFilePath);
-            return logFileInfo.Length;
+            var logFileInfo = new FileInfo(config.logFilePath);
+            return logFileInfo.Exists ? logFileInfo.Length : 0;
         }
 
         private async Task WriteToLogFileAsync()
         {
             if (receiver.IsEmpty) return;
 
-            bool updateCreationTime = false;
-            var logFileInfo = new FileInfo(logFilePath);
-            if (!logFileInfo.Exists) updateCreationTime = true;
+            
+            var logFileInfo = new FileInfo(config.logFilePath);
+            logFileInfo.Directory.Create();
 
-            using (FileStream stream = File.Open(logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            bool updateCreationTime = !logFileInfo.Exists;
+
+            using (FileStream stream = File.Open(logFileInfo.FullName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
             using (StreamWriter writer = new StreamWriter(stream))
             {
-                if (updateCreationTime) logFileInfo.CreationTime = AppTime.Now;
+                if (updateCreationTime) logFileInfo.CreationTime = AppTime.CoarseNow;
                 if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear());
 
                 while (!receiver.IsEmpty)
@@ -150,15 +148,19 @@ namespace FeatureLoom.Logging
         // TODO: Make async
         private void ArchiveCurrentLogfile()
         {
-            var logFileInfo = new FileInfo(logFilePath);
+            var logFileInfo = new FileInfo(config.logFilePath);
+            logFileInfo.Directory.Create();
+            var archiveInfo = new FileInfo(config.archiveFilePath);
+            archiveInfo.Directory.Create();
+
             logFileInfo.Refresh();
             if (!logFileInfo.Exists) return;
 
-            using (var fileStream = new FileStream(archiveFilePath, FileMode.OpenOrCreate))
+            using (var fileStream = new FileStream(archiveInfo.FullName, FileMode.OpenOrCreate))
             {
                 using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
                 {
-                    archive.CreateEntryFromFile(logFilePath, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
+                    archive.CreateEntryFromFile(logFileInfo.FullName, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
                 }
 
                 using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
