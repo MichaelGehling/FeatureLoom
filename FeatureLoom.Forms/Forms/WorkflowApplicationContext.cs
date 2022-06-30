@@ -18,8 +18,17 @@ namespace FeatureLoom.Forms
             public WorkflowApplicationContext(Workflow workflow, IWorkflowRunner runner = null)
             {
                 this.workflow = workflow;
+                this.workflow.PrioritizeUiOverWorkflow();
+
                 if (runner != null) this.runner = runner;
-                else this.runner = new SmartRunner();
+                else
+                {
+                    var smartRunner = new SmartRunner();
+                    smartRunner.OnWorkflowStart = wf => wf.PrioritizeUiOverWorkflow();
+                    smartRunner.OnWorkflowStart = wf => wf.StopWorkflowOnClosedUi();
+                    this.runner = smartRunner;
+                }
+
                 Application.Idle += StartWorkflow;
             }
 

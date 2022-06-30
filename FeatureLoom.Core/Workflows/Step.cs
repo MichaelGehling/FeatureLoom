@@ -28,7 +28,7 @@ namespace FeatureLoom.Workflows
             this.stepIndex = stepIndex;
         }
 
-        public bool IsAsync
+        public new bool IsAsync
         {
             get
             {
@@ -38,7 +38,9 @@ namespace FeatureLoom.Workflows
                               actionAsync != null ||
                               conditionAsync != null ||
                               onExceptionRepeatConditionAsync != null ||
-                              waitingAsyncDelegate != null;
+                              waitingAsyncDelegate != null ||
+                              (doElse?.IsAsync ?? false);
+
                 }
                 return isAsync.Value;
             }
@@ -126,5 +128,8 @@ namespace FeatureLoom.Workflows
 
         public bool finishStateMachine = false;
         public Func<CT, State> targetState;
+
+        public bool IsAsync => actionAsync != null || conditionAsync != null || waitingAsyncDelegate != null;
+        
     }
 }

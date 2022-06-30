@@ -9,9 +9,13 @@ namespace FeatureLoom.Workflows
     public class SmartRunner : AbstractRunner
     {
         ConcurrentDictionary<Type, bool[][]> stateMachineIsAsyncStepCache = new ConcurrentDictionary<Type, bool[][]>();
+        
+        public Action<Workflow> OnWorkflowStart { get; set; }
+        public Action<Workflow> OnWorkflowEnd { get; set; }
 
         public override async Task RunAsync(Workflow workflow)
         {
+            OnWorkflowStart?.Invoke(workflow);
             AddToRunningWorkflows(workflow);
             try
             {
@@ -33,8 +37,10 @@ namespace FeatureLoom.Workflows
             finally
             {
                 RemoveFromRunningWorkflows(workflow);
+                OnWorkflowEnd?.Invoke(workflow);
             }
-        }
+        }        
+        
 
         private static bool[][] PrepareIsAsyncMap(Workflow workflow)
         {
