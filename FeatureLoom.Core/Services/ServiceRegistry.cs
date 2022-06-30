@@ -9,7 +9,9 @@ namespace FeatureLoom.Services
     public static class ServiceRegistry
     {
         static Dictionary<Type, IServiceInstanceContainer> registry = new Dictionary<Type, IServiceInstanceContainer>();
-        static FeatureLock registryLock = new FeatureLock();
+        static HashSet<Type> declaredServiceTypes = new HashSet<Type>();
+        static MicroLock registryLock = new MicroLock();
+        static MicroLock serviceTypeLock = new MicroLock();
         static bool localInstancesForAllServicesActive = false;
 
         public static bool LocalInstancesForAllServicesActive => localInstancesForAllServicesActive;
@@ -35,6 +37,14 @@ namespace FeatureLoom.Services
             using(registryLock.Lock())
             {
                 return registry.Values.ToArray();
+            }
+        }
+
+        public static void DeclareServiceType(Type declaredServiceType)
+        {
+            using(serviceTypeLock.Lock())
+            {
+                declaredServiceTypes.Add(declaredServiceType);
             }
         }
 
@@ -75,23 +85,33 @@ namespace FeatureLoom.Services
                     }
                 }
             }
+            var tType = typeof(T);
 
-            switch (typeof(T))
+            var constructor = tType.GetConstructor(Type.EmptyTypes);
+            if (constructor == null)
             {
-                default:
-                    {
-                        var contructor = typeof(T).GetConstructor(Type.EmptyTypes);
-                        if (contructor != null)
-                        {
-                            createServiceAction = () => (T) contructor.Invoke(Array.Empty<object>());
-                            return true;
-                        }
-                        else
-                        {
-                            createServiceAction = null;
-                            return false;
-                        }
-                    }
+                using (serviceTypeLock.Lock())
+                {
+                    var alternativeType = declaredServiceTypes.FirstOrDefault(p => tType.IsAssignableFrom(p) && p.GetConstructor(Type.EmptyTypes) != null);
+                    constructor = alternativeType?.GetConstructor(Type.EmptyTypes);
+                }                
+            }
+            if (constructor == null)
+            {
+                var alternativeType = AppDomain.CurrentDomain.GetAssemblies().SelectMany(s => s.GetTypes())
+                    .FirstOrDefault(p => tType.IsAssignableFrom(p) && p.GetConstructor(Type.EmptyTypes) != null);
+                constructor = alternativeType?.GetConstructor(Type.EmptyTypes);
+            }
+
+            if (constructor != null)
+            {
+                createServiceAction = () => (T) constructor.Invoke(Array.Empty<object>());
+                return true;
+            }
+            else
+            {
+                createServiceAction = null;
+                return false;
             }
         }
 

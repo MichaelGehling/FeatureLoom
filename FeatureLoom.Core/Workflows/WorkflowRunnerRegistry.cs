@@ -1,4 +1,5 @@
-﻿using FeatureLoom.MessageFlow;
+﻿
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System.Collections.Generic;
@@ -33,7 +34,7 @@ namespace FeatureLoom.Workflows
             {
                 if (defaultRunner == null)
                 {
-                    var newRunner = new SuspendingAsyncRunner();
+                    var newRunner = new SmartRunner();
                     if (Interlocked.CompareExchange(ref defaultRunner, newRunner, null) != null) Unregister(newRunner);
                 }
                 return defaultRunner;
@@ -81,7 +82,7 @@ namespace FeatureLoom.Workflows
         {
             get
             {
-                if (context.Data.defaultRunner == null) context.Data.defaultRunner = new SuspendingAsyncRunner();
+                if (context.Data.defaultRunner == null) context.Data.defaultRunner = new SmartRunner();
                 return context.Data.defaultRunner;
             }
         }

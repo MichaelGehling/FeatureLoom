@@ -3,6 +3,7 @@ using FeatureLoom.Time;
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -198,12 +199,14 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
             this.waitHandle.Set();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void Wait(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {            
             Work(time); return;
             //AppTime.Wait(time);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Work(TimeSpan time)
         {
             for (long i = 0; i < time.Ticks; i++)
@@ -218,6 +221,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
             if (time >= 0.001.Milliseconds()) Thread.Sleep(0);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected async Task WaitAsync(TimeSpan time, IAsyncWaitHandle abortWaitHandle)
         {
             Work(time); 

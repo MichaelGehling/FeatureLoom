@@ -18,7 +18,7 @@ namespace FeatureLoom.Logging
         {            
             defaultConsoleLogger = new ConsoleLogger();
             defaultFileLogger = new FileLogger();
-            logRunner = new SuspendingAsyncRunner();
+            logRunner = new SmartRunner();
             WorkflowRunnerService.Unregister(logRunner);
             _ = logRunner.RunAsync(defaultFileLogger);
 

@@ -9,7 +9,7 @@ using FeatureLoom.UndoRedo;
 namespace FeatureLoom.UndoRedo
 {
     
-    public class StringExtensionsTests
+    public class UndoRedoTests
     {
 
         [Fact]

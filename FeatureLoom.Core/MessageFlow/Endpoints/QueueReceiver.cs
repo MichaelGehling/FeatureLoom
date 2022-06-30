@@ -54,7 +54,7 @@ namespace FeatureLoom.MessageFlow
             if (message != null && message is T typedMessage)
             {
                 if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
-                if (IsFull && dropLatestMessageOnFullQueue) alternativeSendingHelper.ObjIfExists?.Forward(in message);
+                if (dropLatestMessageOnFullQueue && IsFull) alternativeSendingHelper.ObjIfExists?.Forward(in message);
                 else Enqueue(typedMessage);
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(in message);
@@ -65,7 +65,7 @@ namespace FeatureLoom.MessageFlow
             if (message != null && message is T typedMessage)
             {
                 if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
-                if (IsFull && dropLatestMessageOnFullQueue) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                if (dropLatestMessageOnFullQueue && IsFull) alternativeSendingHelper.ObjIfExists?.Forward(message);
                 else Enqueue(typedMessage);
             }
             else alternativeSendingHelper.ObjIfExists?.Forward(message);
@@ -76,7 +76,7 @@ namespace FeatureLoom.MessageFlow
             if (message != null && message is T typedMessage)
             {
                 if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
-                if (IsFull && dropLatestMessageOnFullQueue) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
+                if (dropLatestMessageOnFullQueue && IsFull) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
                 else Enqueue(typedMessage);
             }
             else await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
@@ -109,7 +109,7 @@ namespace FeatureLoom.MessageFlow
             if (IsEmpty) return false;
 
             bool success = false;
-            using (queueLock.Lock())
+            using (queueLock.Lock(true))
             {
                 success = queue.TryDequeue(out message);
             }
@@ -123,7 +123,7 @@ namespace FeatureLoom.MessageFlow
             if (IsEmpty) return Array.Empty<T>();
 
             T[] messages;
-            using (queueLock.Lock())
+            using (queueLock.Lock(true))
             {
                 messages = queue.ToArray();
                 queue.Clear();
@@ -138,7 +138,7 @@ namespace FeatureLoom.MessageFlow
             nextItem = default;
             if (IsEmpty) return false;
 
-            using (queueLock.Lock())
+            using (queueLock.Lock(true))
             {
                 if (IsEmpty) return false;
                 nextItem = queue.Peek();
@@ -150,7 +150,7 @@ namespace FeatureLoom.MessageFlow
         {
             if (IsEmpty) return Array.Empty<T>();
 
-            using (queueLock.Lock())
+            using (queueLock.Lock(true))
             {
                 T[] messages = queue.ToArray();
                 return messages;
@@ -160,7 +160,7 @@ namespace FeatureLoom.MessageFlow
 
         public void Clear()
         {
-            using (queueLock.Lock())
+            using (queueLock.Lock(true))
             {
                 queue.Clear();
             }

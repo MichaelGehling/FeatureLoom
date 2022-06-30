@@ -8,9 +8,10 @@
     <OutputType>Library</OutputType>
     <RootNamespace>FeatureLoom.Forms</RootNamespace>
     <AssemblyName>FeatureLoom.Forms</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -53,6 +54,7 @@
     <Compile Include="Forms\TableLayoutPanelExtensions.cs" />
     <Compile Include="Forms\TooltipExtensions.cs" />
     <Compile Include="Forms\WorkflowApplicationContext.cs" />
+    <Compile Include="Forms\WorkflowExtensions.cs" />
     <Compile Include="LogViewer.cs">
       <SubType>Form</SubType>
     </Compile>

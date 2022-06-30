@@ -7,7 +7,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
     [MaxIterationCount(40)]
     [MemoryDiagnoser]
     [CsvMeasurementsExporter]
-    [RPlotExporter]
+    //[RPlotExporter]
     [HtmlExporter]
     //[SimpleJob(RuntimeMoniker.Net472, baseline: true)]
     //[SimpleJob(RuntimeMoniker.NetCoreApp30)]
@@ -27,13 +27,11 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
         private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
-        Dictionary<string, string> dict = new Dictionary<string, string>();
-
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.Lock();
 
-        [Benchmark]
-        public void FastSpinLock_Lock() => fastSpinLockSubjects.Lock();
+        //[Benchmark]
+        //public void FastSpinLock_Lock() => fastSpinLockSubjects.Lock();
 
         [Benchmark]
         public void MicroSpinLock_Lock() => microSpinLockSubjects.Lock();
@@ -79,7 +77,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
 
         [Benchmark]
         public void NeoSmart_LockAsync_() => neoSmartSubjects.LockAsync().WaitFor();
-
+        /*
         [Benchmark]
         public void ReentrantFeatureLock_Lock() => featureLockSubjects.ReentrantLock();
 
@@ -88,5 +86,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
 
         [Benchmark]
         public void ReentrantFeatureLock_LockAsync_() => featureLockSubjects.ReentrantLockAsync().WaitFor();
+        */
     }
 }

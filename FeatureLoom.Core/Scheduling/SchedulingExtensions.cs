@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Scheduling
 {
-    public static partial class Scheduler
+    public static class SchedulingExtensions
     {        
         public static async Task InvokeDelayed(this Action action, TimeSpan minDelayTime, TimeSpan maxDelayTime, CancellationToken cancellationToken = default)
         {
