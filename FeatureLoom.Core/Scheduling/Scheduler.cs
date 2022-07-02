@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Services;
 using FeatureLoom.Time;
 using System;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Scheduling
 {
@@ -18,10 +19,30 @@ namespace FeatureLoom.Scheduling
         {
             ServiceRegistry.DeclareServiceType(typeof(SchedulerService));
         }
+        /// <summary>
+        /// Adds a schedule object to the scheduler, to be triggered cyclically.
+        /// NOTE: The scheduler only keeps a weak reference to the schedule. If the schedule is not kept in another reference, it will be garbage collected.
+        /// </summary>        
+        public static void AddSchedule(ISchedule schedule) => Service<ISchedulerService>.Instance.AddSchedule(schedule);
 
-        public static void AddSchedule(ISchedule schedule) => Service<IScheduler>.Instance.AddSchedule(schedule);
-        public static bool ClearAllSchedulesAndStop(TimeSpan timeout) => Service<IScheduler>.Instance.ClearAllSchedulesAndStop(timeout);
-        public static void InterruptWaiting() => Service<IScheduler>.Instance.InterruptWaiting();
+        public static void AddSchedule(ISchedule schedule) => Service<ISchedulerService>.Instance.AddSchedule(schedule);
+        /// <summary>
+        /// Resets the scheduler.
+        /// </summary>
+        /// <returns>The returned task completes when the scheduler is reset.</returns>
+        public static Task ClearAllSchedulesAndStop() => Service<ISchedulerService>.Instance.ClearAllSchedulesAndStop();
+        /// <summary>
+        /// Interrupts waiting and immediatly lets the scheduler trigger all schedules.
+        /// </summary>
+        public static void InterruptWaiting() => Service<ISchedulerService>.Instance.InterruptWaiting();
+        /// <summary>
+        /// Creates a new schedule based on a passed lamda function, adds it to the scheduler and returns it.
+        /// NOTE: The scheduler only keeps a weak reference to the created schedule. If the returned schedule is not kept in another reference, it will be garbage collected.
+        /// </summary>
+        /// <param name="name">The name of the new schedule</param>
+        /// <param name="triggerAction">The function takes the current time as input parameter and returns a tuple with two values:
+        /// 1. If the schedule continues (true) or if it finished (false) and 2. the longest possible wait time when it needs to be triggered again.</param>
+        /// <returns>The created schedule.</returns>
         public static ActionSchedule ScheduleAction(string name, Func<DateTime, TimeFrame> triggerAction) => Service<IScheduler>.Instance.ScheduleAction(name, triggerAction);
     }
 }

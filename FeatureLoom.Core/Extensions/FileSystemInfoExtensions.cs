@@ -6,7 +6,7 @@ namespace FeatureLoom.Extensions
 {
     public static class FileSystemInfoExtensions
     {
-        public static T RefreshAnd<T>(this T fileSystemInfo) where T : FileSystemInfo
+        public static FileSystemInfo RefreshAnd(this FileSystemInfo fileSystemInfo)
         {
             fileSystemInfo.Refresh();
             return fileSystemInfo;
