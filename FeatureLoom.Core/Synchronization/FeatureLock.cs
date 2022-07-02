@@ -1752,14 +1752,16 @@ namespace FeatureLoom.Synchronization
         #region Scheduling        
 
         string ISchedule.Name => "FeatureLock";
-        bool ISchedule.Trigger(DateTime now, out TimeSpan maxDelay)
-        {
-            maxDelay = (0.01 * Settings.schedulerDelayFactor).Milliseconds();
+        TimeFrame ISchedule.Trigger(DateTime now)
+        {            
+            if (!IsScheduleActive) return TimeFrame.Invalid;
+            
+            TimeFrame nextTriggerTimeFrame = new TimeFrame(now, (0.01 * Settings.schedulerDelayFactor).Milliseconds());
+            var candidate = queueHead;
+            if (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly)) return nextTriggerTimeFrame;
 
             SleepHandle firstAwaking = null;
-            SleepHandle lastAwaking = null;
-            var candidate = queueHead;
-            if (candidate == null || (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly))) return IsScheduleActive;
+            SleepHandle lastAwaking = null;                                   
 
             sleepLock.Enter(true);
             try
@@ -1799,7 +1801,8 @@ namespace FeatureLoom.Synchronization
                 candidate = candidate.Next;
             }
 
-            return IsScheduleActive;
+            if (IsScheduleActive) return nextTriggerTimeFrame;
+            else return TimeFrame.Invalid;
         }
 
         void Sleep(ushort ticket, bool readOnly)

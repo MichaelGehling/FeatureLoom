@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
 
@@ -6,22 +7,20 @@ namespace FeatureLoom.Scheduling
 {
     public class ActionSchedule: ISchedule 
     {
-        private Func<DateTime, (bool, TimeSpan)> triggerAction;
+        private Func<DateTime, TimeFrame> triggerAction;
         string name;
 
         public string Name => name;
 
-        public ActionSchedule(string name, Func<DateTime, (bool, TimeSpan)> triggerAction)
+        public ActionSchedule(string name, Func<DateTime, TimeFrame> triggerAction)
         {
             this.triggerAction = triggerAction;
             this.name = name;
         }        
 
-        public bool Trigger(DateTime now, out TimeSpan maxDelay)
+        public TimeFrame Trigger(DateTime now)
         {
-            (bool active, TimeSpan delay) = triggerAction(now);
-            maxDelay = delay;
-            return active;
+            return triggerAction(now);            
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Services;
+using FeatureLoom.Time;
 using System;
 
 namespace FeatureLoom.Scheduling
@@ -18,9 +19,9 @@ namespace FeatureLoom.Scheduling
             ServiceRegistry.DeclareServiceType(typeof(SchedulerService));
         }
 
-        public static void AddSchedule(ISchedule schedule) => Service<ISchedulerService>.Instance.AddSchedule(schedule);
-        public static bool ClearAllSchedulesAndStop(TimeSpan timeout) => Service<ISchedulerService>.Instance.ClearAllSchedulesAndStop(timeout);
-        public static void InterruptWaiting() => Service<ISchedulerService>.Instance.InterruptWaiting();
-        public static ActionSchedule ScheduleAction(string name, Func<DateTime, (bool, TimeSpan)> triggerAction) => Service<ISchedulerService>.Instance.ScheduleAction(name, triggerAction);
+        public static void AddSchedule(ISchedule schedule) => Service<IScheduler>.Instance.AddSchedule(schedule);
+        public static bool ClearAllSchedulesAndStop(TimeSpan timeout) => Service<IScheduler>.Instance.ClearAllSchedulesAndStop(timeout);
+        public static void InterruptWaiting() => Service<IScheduler>.Instance.InterruptWaiting();
+        public static ActionSchedule ScheduleAction(string name, Func<DateTime, TimeFrame> triggerAction) => Service<IScheduler>.Instance.ScheduleAction(name, triggerAction);
     }
 }

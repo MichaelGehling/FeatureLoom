@@ -8,11 +8,10 @@ namespace FeatureLoom.Scheduling
     /// The waiting time will most likely not exceed any of the maxDelay values returned by the trigger() calls,
     /// but the time may be a lot shorter.
     /// </summary>
-    public interface ISchedulerService
+    public interface IScheduler
     {
         void AddSchedule(ISchedule schedule);
         bool ClearAllSchedulesAndStop(TimeSpan timeout);
         void InterruptWaiting();
-        ActionSchedule ScheduleAction(string name, Func<DateTime, (bool, TimeSpan)> triggerAction);
     }
 }

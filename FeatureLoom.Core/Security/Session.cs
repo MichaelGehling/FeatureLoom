@@ -35,28 +35,25 @@ namespace FeatureLoom.Security
         {
             cleanupSchedule = Scheduler.ScheduleAction("SessionCleanup", now =>
             {
-                if (!cleanupLock.IsLocked)
+                if (cleanupSchedule == null) return TimeFrame.Invalid;
+
+                TimeFrame timer = new TimeFrame(lastCleanup, cleanupInterval);                
+                if (!cleanupLock.IsLocked && timer.Elapsed(now))
                 {
-                    TimeFrame timer = new TimeFrame(lastCleanup, cleanupInterval);
-                    if (timer.Elapsed(now))
-                    {
-                        _ = CleanUpAsync();
-                    }
-                    else
-                    {
-                        return (cleanupSchedule != null, timer.Remaining(now));
-                    }
-                }
-                return (cleanupSchedule != null, cleanupInterval);
+                    timer = new TimeFrame(now, cleanupInterval);
+                    _ = CleanUpAsync();                    
+                }                
+                return timer;
             });
 
             return cleanupSchedule;
         }        
 
-        public static async Task CleanUpAsync()
+        public static async Task CleanUpAsync(DateTime now = default)
         {
             if (cleanupLock.TryLock(out var lockHandle))
             {
+                lastCleanup = now != default ? now : AppTime.Now;
                 using (lockHandle)
                 {
                     var reader = Storage.GetReader(storageCategory);
@@ -71,7 +68,7 @@ namespace FeatureLoom.Security
                                 if (session.LifeTime.Elapsed()) await writer.TryDeleteAsync(uri);
                             }
                         }
-                    }
+                    }                    
                 }
             }            
         }

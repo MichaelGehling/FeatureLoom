@@ -19,30 +19,21 @@ namespace FeatureLoom.MessageFlow
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private LazyValue<SourceHelper> alternativeSender;
 
-        private TimeFrame nextTimeoutCheck;
-        private bool waitingForTimeout = false;
-        private TimeSpan maxSupervisionTimeout = TimeSpan.MaxValue;
+        private TimeFrame nextTimeoutCheck = TimeFrame.Invalid;
         private IAggregationData aggregationData;
         private FeatureLock dataLock = new FeatureLock();
         private ISchedule scheduledAction;
 
-        public Aggregator(IAggregationData aggregationData, TimeSpan supervisionCycleTime = default)
+        public Aggregator(IAggregationData aggregationData)
         {
             this.aggregationData = aggregationData;
-
-            if (supervisionCycleTime != default && supervisionCycleTime != TimeSpan.MaxValue)
-            {
-                PrepareSchedule(aggregationData, supervisionCycleTime);
-            }
         }
 
-        private void PrepareSchedule(IAggregationData aggregationData, TimeSpan supervisionCycleTime)
+        private void PrepareSchedule()
         {
-            this.maxSupervisionTimeout = supervisionCycleTime;
             this.scheduledAction = Scheduler.ScheduleAction("Aggregator", (now) =>
             {                
-                if (!waitingForTimeout) return (true, maxSupervisionTimeout);
-                if (!nextTimeoutCheck.Elapsed(now)) return (true, maxSupervisionTimeout);
+                if (nextTimeoutCheck.IsInvalid || !nextTimeoutCheck.Elapsed(now)) return nextTimeoutCheck;
 
                 if (dataLock.TryLock(out var lockHandle))
                 {
@@ -52,11 +43,16 @@ namespace FeatureLoom.MessageFlow
                         {
                             sourceHelper.Forward(aggregatedMessage);
                         }
-                        waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
-                        if (waitingForTimeout) nextTimeoutCheck = new TimeFrame(timeout);
+                        bool waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
+                        if (waitingForTimeout) nextTimeoutCheck = new TimeFrame(now, timeout);
+                        else
+                        {
+                            nextTimeoutCheck = TimeFrame.Invalid;
+                            this.scheduledAction = null;
+                        }
                     }
                 }
-                return (true, maxSupervisionTimeout);
+                return nextTimeoutCheck;
             });
         }
 
@@ -83,8 +79,20 @@ namespace FeatureLoom.MessageFlow
 
         private void SetTimeout()
         {
-            waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
-            if (waitingForTimeout) nextTimeoutCheck = new TimeFrame(timeout);
+            bool waitingForTimeout = aggregationData.TryGetTimeout(out var timeout);
+            if (waitingForTimeout)
+            {
+                var prevTimeoutCheck = nextTimeoutCheck;
+                nextTimeoutCheck = new TimeFrame(timeout);
+
+                if (scheduledAction == null) PrepareSchedule();
+                else if (prevTimeoutCheck.IsValid && prevTimeoutCheck.utcEndTime > nextTimeoutCheck.utcEndTime) Scheduler.InterruptWaiting();                                
+            }
+            else
+            {
+                nextTimeoutCheck = TimeFrame.Invalid;
+                this.scheduledAction = null;
+            }
         }
 
         public void Post<M>(M message)

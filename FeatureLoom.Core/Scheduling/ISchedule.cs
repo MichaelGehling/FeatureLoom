@@ -1,10 +1,11 @@
-﻿using System;
+﻿using FeatureLoom.Time;
+using System;
 
 namespace FeatureLoom.Scheduling
 {
     public interface ISchedule
     {
-        bool Trigger(DateTime now, out TimeSpan maxDelay);
+        TimeFrame Trigger(DateTime now);
 
         string Name { get; }
     }

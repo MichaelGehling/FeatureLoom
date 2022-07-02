@@ -32,5 +32,12 @@ namespace FeatureLoom.Scheduling
             await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken);
             return await asyncAction();
         }
+
+        public static ActionSchedule ScheduleAction(this IScheduler scheduler, string name, Func<DateTime, TimeFrame> triggerAction)
+        {
+            var schedule = new ActionSchedule(name, triggerAction);
+            scheduler.AddSchedule(schedule);
+            return schedule;
+        }
     }
 }

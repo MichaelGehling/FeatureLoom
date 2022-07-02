@@ -19,7 +19,7 @@ namespace FeatureLoom.Scheduling
     /// but the time may be a lot shorter.
     /// The Scheduler's loop runs in an own thread which is used to trigger all ISchedule objects. 
     /// </summary>
-    public class SchedulerService : ISchedulerService
+    public class SchedulerService : IScheduler
     {
         private MicroLock myLock = new MicroLock();
         private List<ISchedule> newSchedules = new List<ISchedule>();
@@ -57,13 +57,6 @@ namespace FeatureLoom.Scheduling
                     mre.Set();
                 }
             }
-        }
-
-        public ActionSchedule ScheduleAction(string name, Func<DateTime, (bool, TimeSpan)> triggerAction)
-        {
-            var schedule = new ActionSchedule(name, triggerAction);
-            AddSchedule(schedule);
-            return schedule;
         }
 
         private void RunScheduling()
@@ -113,10 +106,11 @@ namespace FeatureLoom.Scheduling
             {
                 if (schedule.TryGetSchedule(out var sv))
                 {
-                    bool stillActive = sv.Trigger(now, out TimeSpan maxDelay);
-                    if (stillActive)
+                    TimeFrame nextTriggerTimeFrame = sv.Trigger(now);
+                    if (nextTriggerTimeFrame.IsValid)
                     {
-                        schedule.maxDelay = maxDelay;
+                        schedule.nextTriggerTimeFrame = nextTriggerTimeFrame;
+                        TimeSpan maxDelay = nextTriggerTimeFrame.utcEndTime - now;
                         triggeredSchedules.Add(schedule);
                         if (maxDelay < delay) delay = maxDelay;
                     }
@@ -181,7 +175,7 @@ namespace FeatureLoom.Scheduling
         {
             WeakReference<ISchedule> scheduleRef;
             string name;
-            public TimeSpan maxDelay;
+            public TimeFrame nextTriggerTimeFrame;
             public string Name => name;
 
 

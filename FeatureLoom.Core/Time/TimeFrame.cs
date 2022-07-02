@@ -72,6 +72,7 @@ namespace FeatureLoom.Time
         }
 
         public bool IsInvalid => utcStartTime == default && utcEndTime == default;
+        public bool IsValid => utcStartTime != default || utcEndTime != default;
 
         public bool Elapsed() => Elapsed(GetTime());
 

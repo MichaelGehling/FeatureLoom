@@ -34,21 +34,21 @@ namespace FeatureLoom.MessageFlow
 
             this.scheduledAction = Scheduler.ScheduleAction("DuplicateMessageSuppressor", now => 
             {
-                TimeSpan cleanUpDelay;
+                TimeFrame nextTriggerTimeFrame;
                 if (now > nextCleanUp - this.cleanupTolerance)
                 {
                     using (suppressorsLock.Lock())
                     {
                         CleanUpSuppressors(now);
                     }
-                    cleanUpDelay = this.cleanupPeriode;                    
+                    nextTriggerTimeFrame = new TimeFrame(now, this.cleanupPeriode);
                 }
                 else
                 {
-                    cleanUpDelay = nextCleanUp - now;
+                    nextTriggerTimeFrame = new TimeFrame (now, nextCleanUp);
                 }
 
-                return (true, cleanUpDelay);
+                return nextTriggerTimeFrame;
             });
         }
 

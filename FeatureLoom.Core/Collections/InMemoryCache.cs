@@ -169,20 +169,15 @@ namespace FeatureLoom.Collections
             });
         }
 
-        bool ISchedule.Trigger(DateTime now, out TimeSpan maxDelay)
+        TimeFrame ISchedule.Trigger(DateTime now)
         {
             TimeSpan remaining = now - (lastCleanUp + settings.cleanUpPeriodeInSeconds.Seconds());
             if (remaining < 1.Seconds())
             {
                 StartCleanUp();
-                maxDelay = cleanUpDelay;
+                return new TimeFrame(now, cleanUpDelay);                
             }
-            else
-            {
-                maxDelay = remaining;
-            }
-
-            return true;
+            return new TimeFrame(now, remaining);
         }
     }
 }
