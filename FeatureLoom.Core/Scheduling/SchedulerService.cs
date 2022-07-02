@@ -96,12 +96,18 @@ namespace FeatureLoom.Scheduling
             cts.Cancel();
         }
 
-        public bool ClearAllSchedulesAndStop(TimeSpan timeout)
+        public Task ClearAllSchedulesAndStop()
         {
-            stop = true;
-            cts.Cancel();
-            mre.Set();
-            return schedulerThread?.Join(timeout) ?? true;
+            return Task.Run(() =>
+            {
+                using (myLock.Lock())
+                {
+                    stop = true;
+                    cts.Cancel();
+                    mre.Set();
+                    schedulerThread?.Join();
+                }
+            });
         }
 
 
