@@ -19,22 +19,24 @@ namespace FeatureLoom.Scheduling
         {
             ServiceRegistry.DeclareServiceType(typeof(SchedulerService));
         }
+
         /// <summary>
         /// Adds a schedule object to the scheduler, to be triggered cyclically.
         /// NOTE: The scheduler only keeps a weak reference to the schedule. If the schedule is not kept in another reference, it will be garbage collected.
         /// </summary>        
-        public static void AddSchedule(ISchedule schedule) => Service<ISchedulerService>.Instance.AddSchedule(schedule);
+        public static void AddSchedule(ISchedule schedule) => Service<IScheduler>.Instance.AddSchedule(schedule);
 
-        public static void AddSchedule(ISchedule schedule) => Service<ISchedulerService>.Instance.AddSchedule(schedule);
         /// <summary>
         /// Resets the scheduler.
         /// </summary>
         /// <returns>The returned task completes when the scheduler is reset.</returns>
-        public static Task ClearAllSchedulesAndStop() => Service<ISchedulerService>.Instance.ClearAllSchedulesAndStop();
+        public static Task ClearAllSchedulesAndStop() => Service<IScheduler>.Instance.ClearAllSchedulesAndStop();
+
         /// <summary>
         /// Interrupts waiting and immediatly lets the scheduler trigger all schedules.
         /// </summary>
-        public static void InterruptWaiting() => Service<ISchedulerService>.Instance.InterruptWaiting();
+        public static void InterruptWaiting() => Service<IScheduler>.Instance.InterruptWaiting();
+
         /// <summary>
         /// Creates a new schedule based on a passed lamda function, adds it to the scheduler and returns it.
         /// NOTE: The scheduler only keeps a weak reference to the created schedule. If the returned schedule is not kept in another reference, it will be garbage collected.
