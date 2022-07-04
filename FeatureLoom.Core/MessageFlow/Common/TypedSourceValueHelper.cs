@@ -135,6 +135,13 @@ namespace FeatureLoom.MessageFlow
         {
             if (sinks == null) return;
 
+            if (sinks.Length == 1)
+            {
+                if (sinks[0].IsValid) return;
+                sinks = null;
+                return;
+            }
+
             var changeList = new List<MessageSinkRef>();
             for (int i = 0; i < sinks.Length; i++)
             {
