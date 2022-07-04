@@ -87,7 +87,7 @@ namespace FeatureLoom.Extensions
             return newArray;
         }
 
-        public static Task foreachAsync<T, TEnum>(this TEnum items, Func<T, Task> asyncAction) where TEnum : IEnumerable<T>
+        public static Task ForeachAsync<T, TEnum>(this TEnum items, Func<T, Task> asyncAction) where TEnum : IEnumerable<T>
         {
             if (items.EmptyOrNull()) return Task.CompletedTask;
 
