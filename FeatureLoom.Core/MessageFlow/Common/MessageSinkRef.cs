@@ -24,15 +24,12 @@ namespace FeatureLoom.MessageFlow
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetTarget(out IMessageSink sink)
         {
-            if (weakRefSink == null)
-            {
-                sink = strongRefSink;
-                return sink != null;
-            }
-            else
-            {
-                return weakRefSink.TryGetTarget(out sink);
-            }
+            sink = strongRefSink;
+            if (sink != null) return true;
+            if (weakRefSink != null) return weakRefSink.TryGetTarget(out sink);
+            return false;
         }
+
+        public bool IsValid => strongRefSink != null || (weakRefSink?.TryGetTarget(out _) ?? false);
     }
 }

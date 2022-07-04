@@ -9,7 +9,7 @@ namespace FeatureLoom.MessageFlow
     /// (connecting/disconnecting) uses a lock and blocks a short time. Sinks can optionally be stored as weak references
     /// and will then not be kept from being garbage-collected, so it is not necessary to disconnect
     /// sinks that are not needed any more. <summary>
-    public class TypedSourceHelper<T> : IMessageSource<T>
+    public sealed class TypedSourceHelper<T> : IMessageSource<T>
     {
         private TypedSourceValueHelper<T> sourceHelper;
 

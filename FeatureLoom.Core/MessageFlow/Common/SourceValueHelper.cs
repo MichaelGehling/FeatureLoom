@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -16,44 +17,24 @@ namespace FeatureLoom.MessageFlow
         public MessageSinkRef[] sinks;
 
         [JsonIgnore]
-        private MicroValueLock myLock;
+        private MicroValueLock changeLock;
 
         public IMessageSink[] GetConnectedSinks()
         {
             var currentSinks = this.sinks;
+            if (currentSinks == null) return Array.Empty<IMessageSink>();
 
-            if (currentSinks == null || currentSinks.Length == 0) return Array.Empty<IMessageSink>();
-            else if (currentSinks.Length == 1)
+            bool anyInvalid = false;
+            List<IMessageSink> resultList = new List<IMessageSink>(currentSinks.Length);
+
+            for (int i = 0; i < currentSinks.Length; i++)
             {
-                if (currentSinks[0].TryGetTarget(out IMessageSink target))
-                {
-                    return new IMessageSink[] { target };
-                }
-                else
-                {
-                    RemoveInvalidReferences(1);
-                    return Array.Empty<IMessageSink>();
-                }
+                if (currentSinks[i].TryGetTarget(out IMessageSink target)) resultList.Add(target);                    
+                else anyInvalid = true;                    
             }
-            else
-            {
-                List<IMessageSink> resultList = null;
-                int invalidReferences = 0;
-                for (int i = currentSinks.Length - 1; i >= 0; i--)
-                {
-                    if (currentSinks[i].TryGetTarget(out IMessageSink target))
-                    {
-                        resultList = resultList ?? new List<IMessageSink>();
-                        resultList.Add(target);
-                    }
-                    else
-                    {
-                        invalidReferences++;
-                    }
-                }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
-                return resultList?.ToArray() ?? Array.Empty<IMessageSink>();
-            }
+
+            if (anyInvalid) LockAndRemoveInvalidReferences();
+            return resultList.ToArray();
         }
 
         public int CountConnectedSinks
@@ -61,104 +42,53 @@ namespace FeatureLoom.MessageFlow
             get
             {
                 var currentSinks = this.sinks;
+                if (currentSinks == null) return 0;
 
-                if (currentSinks == null || currentSinks.Length == 0) return 0;
-                else
+                int count = 0;
+                for (int i = 0; i < currentSinks.Length; i++)
                 {
-                    int invalidReferences = 0;
-                    for (int i = currentSinks.Length - 1; i >= 0; i--)
-                    {
-                        if (!currentSinks[i].TryGetTarget(out IMessageSink target))
-                        {
-                            invalidReferences++;
-                        }
-                    }
-                    if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
-                    return this.sinks.Length;
+                    if (currentSinks[i].IsValid) count++;
                 }
+                if (count != currentSinks.Length) LockAndRemoveInvalidReferences();
+
+                return count;
             }
         }
 
         public void Forward<M>(in M message)
         {
-            if (this.sinks == null) return;
-
             var currentSinks = this.sinks;
+            if (currentSinks == null) return;
 
-            if (currentSinks.Length == 0) return;
-            else if (currentSinks.Length == 1)
+            bool anyInvalid = false;
+            for (int i = 0; i < currentSinks.Length; i++)
             {
-                if (currentSinks[0].TryGetTarget(out IMessageSink target))
-                {
-                    target.Post(in message);
-                }
-                else
-                {
-                    RemoveInvalidReferences(1);
-                }
+                if (currentSinks[i].TryGetTarget(out IMessageSink target)) target.Post(in message);
+                else anyInvalid = true;
             }
-            else
-            {
-                int invalidReferences = 0;
-                for (int i = currentSinks.Length - 1; i >= 0; i--)
-                {
-                    if (currentSinks[i].TryGetTarget(out IMessageSink target))
-                    {
-                        target.Post(in message);
-                    }
-                    else
-                    {
-                        invalidReferences++;
-                    }
-                }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
-            }
+            if (anyInvalid) LockAndRemoveInvalidReferences();
         }
 
         public void Forward<M>(M message)
         {
-            if (this.sinks == null) return;
-
             var currentSinks = this.sinks;
+            if (currentSinks == null) return;
 
-            if (currentSinks.Length == 0) return;
-            else if (currentSinks.Length == 1)
+            bool anyInvalid = false;
+            for (int i = 0; i < currentSinks.Length; i++)
             {
-                if (currentSinks[0].TryGetTarget(out IMessageSink target))
-                {
-                    target.Post(message);
-                }
-                else
-                {
-                    RemoveInvalidReferences(1);
-                }
+                if (currentSinks[i].TryGetTarget(out IMessageSink target)) target.Post(message);
+                else anyInvalid = true;
             }
-            else
-            {
-                int invalidReferences = 0;
-                for (int i = currentSinks.Length - 1; i >= 0; i--)
-                {
-                    if (currentSinks[i].TryGetTarget(out IMessageSink target))
-                    {
-                        target.Post(message);
-                    }
-                    else
-                    {
-                        invalidReferences++;
-                    }
-                }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
-            }
+            if (anyInvalid) LockAndRemoveInvalidReferences();
         }
 
         public Task ForwardAsync<M>(M message)
         {
-            if (this.sinks == null) return Task.CompletedTask;
-
             var currentSinks = this.sinks;
+            if (currentSinks == null) return Task.CompletedTask;
 
-            if (currentSinks.Length == 0) return Task.CompletedTask;
-            else if (currentSinks.Length == 1)
+            if (currentSinks.Length == 1)
             {
                 if (currentSinks[0].TryGetTarget(out IMessageSink target))
                 {
@@ -166,88 +96,73 @@ namespace FeatureLoom.MessageFlow
                 }
                 else
                 {
-                    RemoveInvalidReferences(1);
+                    LockAndRemoveInvalidReferences();
                     return Task.CompletedTask;
                 }
             }
-            else
-            {
-                int invalidReferences = 0;
-                Task[] tasks = new Task[currentSinks.Length];
-                for (int i = currentSinks.Length - 1; i >= 0; i--)
-                {
-                    if (currentSinks[i].TryGetTarget(out IMessageSink target))
-                    {
-                        tasks[i] = target.PostAsync(message);
-                    }
-                    else
-                    {
-                        tasks[i] = Task.CompletedTask;
-                        invalidReferences++;
-                    }
-                }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
-                return Task.WhenAll(tasks);
-            }
+            else return MultipleForwardAsync(message, currentSinks);
         }
 
-        private void RemoveInvalidReferences(int invalidReferences)
+        private async Task MultipleForwardAsync<M>(M message, MessageSinkRef[] currentSinks)
+        {
+            bool anyInvalid = false;
+            for (int i = currentSinks.Length - 1; i >= 0; i--)
+            {
+                if (currentSinks[i].TryGetTarget(out IMessageSink target)) await target.PostAsync(message);                
+                else anyInvalid = true;                
+            }
+            if (anyInvalid) LockAndRemoveInvalidReferences();            
+        }
+
+        private void LockAndRemoveInvalidReferences()
         {
             if (sinks == null) return;
-            myLock.Enter();
+            changeLock.Enter();
             try
             {
-                if (sinks.Length == invalidReferences) sinks = null;
-                else
-                {
-                    MessageSinkRef[] validSinks = new MessageSinkRef[sinks.Length - invalidReferences];
-                    int index = 0;
-                    for (int i = sinks.Length - 1; i >= 0; i--)
-                    {
-                        if (sinks[i].TryGetTarget(out IMessageSink target))
-                        {
-                            validSinks[index++] = sinks[i];
-                        }
-                    }
-                    sinks = validSinks;
-                }
+                RemoveInvalidReferences();
             }
             finally
             {
-                myLock.Exit();
+                changeLock.Exit();
             }
+        }
+
+        // NOTE: Lock must already be acquired!
+        private void RemoveInvalidReferences()
+        {
+            if (sinks == null) return;
+
+            var changeList = new List<MessageSinkRef>();
+            for (int i = 0; i < sinks.Length; i++)
+            {
+                if (sinks[i].IsValid) changeList.Add(sinks[i]);                
+            }            
+            sinks = changeList.Count == 0 ? null : changeList.ToArray();
         }
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             if (sink == null) return;
 
-            if (sinks == null)
+            changeLock.Enter();
+            try
             {
-                myLock.Enter();
-                try
-                {
-                    sinks = new MessageSinkRef[] { new MessageSinkRef(sink, weakReference) };
+                if (sinks == null)
+                {                
+                    sinks = new MessageSinkRef[] { new MessageSinkRef(sink, weakReference) };                
                 }
-                finally
-                {
-                    myLock.Exit();
-                }
-            }
-            else
-            {
-                myLock.Enter();
-                try
+                else
                 {
                     MessageSinkRef[] newSinks = new MessageSinkRef[sinks.Length + 1];
                     sinks.CopyTo(newSinks, 0);
                     newSinks[newSinks.Length - 1] = new MessageSinkRef(sink, weakReference);
                     sinks = newSinks;
                 }
-                finally
-                {
-                    myLock.Exit();
-                }
+            }
+            finally
+            {
+                changeLock.Exit();
             }
         }
 
@@ -261,38 +176,47 @@ namespace FeatureLoom.MessageFlow
         {
             if (sinks == null) return;
 
-            myLock.Enter();
+            changeLock.Enter();
             sinks = null;
-            myLock.Exit();
+            changeLock.Exit();
         }
 
         public void DisconnectFrom(IMessageSink sink)
         {
             if (sinks == null) return;
 
-            if (sinks.Length == 1)
+            changeLock.Enter();
+            try
             {
-                if (!sinks[0].TryGetTarget(out IMessageSink target) || target == sink)
+                if (sinks.Length == 1)
                 {
-                    RemoveInvalidReferences(1);
-                }
-            }
-            else
-            {
-                int invalidReferences = 0;
-                for (int i = sinks.Length - 1; i >= 0; i--)
-                {
-                    if (sinks[i].TryGetTarget(out IMessageSink target))
+                    if (!sinks[0].TryGetTarget(out IMessageSink target) || target == sink)
                     {
-                        if (target == sink)
+                        sinks = null;
+                    }
+                }
+                else
+                {
+                    int? index = null;
+                    for (int i = 0; i < sinks.Length; i++)
+                    {
+                        if (sinks[i].TryGetTarget(out IMessageSink target) && target == sink)
                         {
-                            sinks[i] = new MessageSinkRef();
-                            invalidReferences++;
+                            index = i;
+                            break;
                         }
                     }
-                    else invalidReferences++;
+                    if (!index.HasValue) return;
+
+                    MessageSinkRef[] newSinks = new MessageSinkRef[sinks.Length - 1];
+                    Array.Copy(sinks, 0, newSinks, 0, index.Value);
+                    Array.Copy(sinks, index.Value + 1, newSinks, index.Value, newSinks.Length - index.Value);
+                    sinks = newSinks;
                 }
-                if (invalidReferences > 0) RemoveInvalidReferences(invalidReferences);
+            }
+            finally
+            {
+                changeLock.Exit();
             }
         }
     }
