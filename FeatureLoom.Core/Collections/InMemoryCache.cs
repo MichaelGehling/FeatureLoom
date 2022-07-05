@@ -53,7 +53,10 @@ namespace FeatureLoom.Collections
 
         public bool Contains(K key)
         {
-            using (storageLock.Lock()) return storage.ContainsKey(key);
+            using (storageLock.Lock())
+            {
+                return storage.ContainsKey(key);
+            }
         }
 
         public void Add(K key, V value, float priorityFactor = 1)

@@ -1,4 +1,5 @@
 using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow
@@ -13,11 +14,11 @@ namespace FeatureLoom.MessageFlow
             TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
-            var sink = new SingleMessageTestSink<T>();
+            var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(sink);
             sender.Send(message);
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -26,9 +27,9 @@ namespace FeatureLoom.MessageFlow
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var sinkInt1 = new SingleMessageTestSink<int>();
-            var sinkInt2 = new SingleMessageTestSink<int>();
-            var sinkString = new SingleMessageTestSink<string>();
+            var sinkInt1 = new LatestMessageReceiver<int>();
+            var sinkInt2 = new LatestMessageReceiver<int>();
+            var sinkString = new LatestMessageReceiver<string>();
             sender.ConnectTo(sinkInt1);
             sender.ConnectTo(sinkInt2);
             sender.ConnectTo(sinkString);
@@ -38,12 +39,12 @@ namespace FeatureLoom.MessageFlow
             sender.Send(42);
             sender.Send("test string");
 
-            Assert.True(sinkInt1.received);
-            Assert.Equal(42, sinkInt1.receivedMessage);
-            Assert.True(sinkInt2.received);
-            Assert.Equal(42, sinkInt2.receivedMessage);
-            Assert.True(sinkString.received);
-            Assert.Equal("test string", sinkString.receivedMessage);
+            Assert.True(sinkInt1.HasMessage);
+            Assert.Equal(42, sinkInt1.LatestMessageOrDefault);
+            Assert.True(sinkInt2.HasMessage);
+            Assert.Equal(42, sinkInt2.LatestMessageOrDefault);
+            Assert.True(sinkString.HasMessage);
+            Assert.Equal("test string", sinkString.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -52,8 +53,8 @@ namespace FeatureLoom.MessageFlow
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var sinkInt1 = new SingleMessageTestSink<int>();
-            var sinkInt2 = new SingleMessageTestSink<int>();
+            var sinkInt1 = new LatestMessageReceiver<int>();
+            var sinkInt2 = new LatestMessageReceiver<int>();
             sender.ConnectTo(sinkInt1);
             sender.ConnectTo(sinkInt2);
             Assert.Equal(2, sender.CountConnectedSinks);
@@ -62,10 +63,10 @@ namespace FeatureLoom.MessageFlow
 
             sender.Send(42);
 
-            Assert.True(sinkInt1.received);
-            Assert.Equal(42, sinkInt1.receivedMessage);
-            Assert.False(sinkInt2.received);
-            Assert.NotEqual(42, sinkInt2.receivedMessage);
+            Assert.True(sinkInt1.HasMessage);
+            Assert.Equal(42, sinkInt1.LatestMessageOrDefault);
+            Assert.False(sinkInt2.HasMessage);
+            Assert.NotEqual(42, sinkInt2.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -74,8 +75,8 @@ namespace FeatureLoom.MessageFlow
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var sinkInt1 = new SingleMessageTestSink<int>();
-            var sinkInt2 = new SingleMessageTestSink<int>();
+            var sinkInt1 = new LatestMessageReceiver<int>();
+            var sinkInt2 = new LatestMessageReceiver<int>();
             sender.ConnectTo(sinkInt1);
             sender.ConnectTo(sinkInt2);
             Assert.Contains(sinkInt1, sender.GetConnectedSinks());

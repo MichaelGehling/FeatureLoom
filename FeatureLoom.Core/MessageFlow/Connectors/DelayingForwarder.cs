@@ -4,7 +4,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.Diagnostics
+namespace FeatureLoom.MessageFlow
 {
     public class DelayingForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
     {
@@ -51,9 +51,10 @@ namespace FeatureLoom.Diagnostics
             }
             else
             {
+                var tk = AppTime.TimeKeeper;
                 Task.Run(() =>
                 {
-                    AppTime.Wait(minDelay, maxDelay);
+                    AppTime.Wait(minDelay - tk.Elapsed, maxDelay - tk.LastElapsed);
                     sourceHelper.Forward(message);
                 });
             }
@@ -68,9 +69,10 @@ namespace FeatureLoom.Diagnostics
             }
             else
             {
+                var tk = AppTime.TimeKeeper;
                 _ = Task.Run(async () =>
                 {
-                    await AppTime.WaitAsync(minDelay, maxDelay);
+                    await AppTime.WaitAsync(minDelay - tk.Elapsed, maxDelay - tk.LastElapsed);
                     await sourceHelper.ForwardAsync(message);
                 });
             }            

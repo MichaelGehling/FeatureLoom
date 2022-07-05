@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using FeatureLoom.Time;
 using System;
 using System.Threading;
@@ -17,11 +18,11 @@ namespace FeatureLoom.MessageFlow
 
             var sender = new Sender<T>();
             var suppressor = new DuplicateMessageSuppressor(100.Milliseconds());
-            var sink = new SingleMessageTestSink<T>();
+            var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(suppressor).ConnectTo(sink);
             sender.Send(message);
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -32,7 +33,7 @@ namespace FeatureLoom.MessageFlow
             var suppressionTime = 100.Milliseconds();
             var sender = new Sender();
             var suppressor = new DuplicateMessageSuppressor(suppressionTime);
-            var counter = new CountingForwarder();
+            var counter = new MessageCounter();
             sender.ConnectTo(suppressor).ConnectTo(counter);
 
             sender.Send(42);
@@ -69,7 +70,7 @@ namespace FeatureLoom.MessageFlow
                     }
                     return a == b;
                 });
-            var counter = new CountingForwarder();
+            var counter = new MessageCounter();
             sender.ConnectTo(suppressor).ConnectTo(counter);
 
             sender.Send(42);

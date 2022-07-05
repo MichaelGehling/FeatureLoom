@@ -1,9 +1,9 @@
 ﻿using FeatureLoom.Diagnostics;
-using FeatureLoom.MessageFlow;
+using FeatureLoom.Helpers;
 using FeatureLoom.Time;
 using Xunit;
 
-namespace FeatureLoom.Diagnostics
+namespace FeatureLoom.MessageFlow
 {
     public class DelayingForwarderTests
     {
@@ -16,13 +16,13 @@ namespace FeatureLoom.Diagnostics
 
             var sender = new Sender<T>();
             var forwarder = new DelayingForwarder(1.Milliseconds());
-            var sink = new SingleMessageTestSink<T>();
+            var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);
-            Assert.False(sink.received);
+            Assert.False(sink.HasMessage);
             Assert.True(sink.WaitHandle.Wait(2.Milliseconds()));
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
 
             Assert.False(TestHelper.HasAnyLogError());
         }
@@ -36,12 +36,12 @@ namespace FeatureLoom.Diagnostics
 
             var sender = new Sender();
             var forwarder = new DelayingForwarder(delay.Milliseconds());
-            var sink = new SingleMessageTestSink<int>();
+            var sink = new LatestMessageReceiver<int>();
             sender.ConnectTo(forwarder).ConnectTo(sink);            
             sender.Send(42);
-            if (delay > 0) Assert.False(sink.received);
+            if (delay > 0) Assert.False(sink.HasMessage);
             Assert.True(sink.WaitHandle.Wait(maxDuration.Milliseconds()));
-            Assert.True(sink.received);
+            Assert.True(sink.HasMessage);
 
             Assert.False(TestHelper.HasAnyLogError());
         }

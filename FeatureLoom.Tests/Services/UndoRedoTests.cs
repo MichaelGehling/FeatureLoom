@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Xunit;
 using FeatureLoom.UndoRedo;
+using FeatureLoom.Helpers;
 
 namespace FeatureLoom.UndoRedo
 {

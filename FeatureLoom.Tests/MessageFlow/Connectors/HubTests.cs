@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow
@@ -15,14 +16,14 @@ namespace FeatureLoom.MessageFlow
             var sender = new Sender<T>();
             var hub = new Hub();
             var senderSocket = hub.CreateSocket(sender);
-            var sink = new SingleMessageTestSink<T>();
+            var sink = new LatestMessageReceiver<T>();
             var sinkSocket = hub.CreateSocket(sink);
             sender.ConnectTo(senderSocket);
             sinkSocket.ConnectTo(sink);
 
             sender.Send(message);
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -33,9 +34,9 @@ namespace FeatureLoom.MessageFlow
             var senderA = new Sender();
             var senderB = new Sender();
             var senderC = new Sender();
-            var counterA = new CountingForwarder();
-            var counterB = new CountingForwarder();
-            var counterC = new CountingForwarder();
+            var counterA = new MessageCounter();
+            var counterB = new MessageCounter();
+            var counterC = new MessageCounter();
             var hub = new Hub();
             var socketA = hub.CreateSocket();
             var socketB = hub.CreateSocket();

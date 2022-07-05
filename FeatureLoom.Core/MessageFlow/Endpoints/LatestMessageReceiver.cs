@@ -18,6 +18,9 @@ namespace FeatureLoom.MessageFlow
         public bool IsFull => false;
         public int Count => IsEmpty ? 0 : 1;
         public IAsyncWaitHandle WaitHandle => readerWakeEvent.AsyncWaitHandle;
+
+        public bool HasMessage => !IsEmpty;
+        public T LatestMessageOrDefault => receivedMessage;
         
         public Type ConsumedMessageType => typeof(T);
 

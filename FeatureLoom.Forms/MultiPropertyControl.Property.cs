@@ -248,7 +248,7 @@ namespace FeatureLoom.Forms
                     };
                 }
 
-                fields[fieldIndex].control.Text = value;
+                if (fields[fieldIndex].control.Text != value) fields[fieldIndex].control.Text = value;
                 SetCursorToEnd(fields[fieldIndex].control);
                 parentControl.UpdateSizes();
                 return this;
@@ -258,12 +258,12 @@ namespace FeatureLoom.Forms
             {
                 if (control is TextBoxBase textBox)
                 {
-                    textBox.SelectionStart = control.Text.Length;
+                    textBox.SelectionStart = control.Text.Length-1;
                     textBox.SelectionLength = 0;
                 }
                 else if (control is ComboBox comboBox)
                 {
-                    comboBox.SelectionStart = control.Text.Length;
+                    comboBox.SelectionStart = control.Text.Length-1;
                     comboBox.SelectionLength = 0;
                 }
             }

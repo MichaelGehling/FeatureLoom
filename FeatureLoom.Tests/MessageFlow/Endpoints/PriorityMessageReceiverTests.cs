@@ -2,6 +2,7 @@
 using FeatureLoom.Diagnostics;
 using System.Collections.Generic;
 using Xunit;
+using FeatureLoom.Helpers;
 
 namespace FeatureLoom.Tests.MesssageFlow.Endpoints
 {

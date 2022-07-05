@@ -1,37 +1,22 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using FeatureLoom.MessageFlow;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace FeatureLoom.Diagnostics
 {
-    public class CountingForwarderTests
+    public class MessageCounterTests
     {
-        [Theory]
-        [InlineData(42)]
-        [InlineData("test string")]
-        public void CanForwardObjectsAndValues<T>(T message)
-        {
-            TestHelper.PrepareTestContext();
-
-            var sender = new Sender<T>();
-            var forwarder = new CountingForwarder();
-            var sink = new SingleMessageTestSink<T>();
-            sender.ConnectTo(forwarder).ConnectTo(sink);
-            sender.Send(message);
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
-        }
 
         [Fact]
-        public void CountsTheForwardedMessages()
+        public void CountsTheMessages()
         {
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var forwarder = new CountingForwarder();
-            var sink = new SingleMessageTestSink<object>();
-            sender.ConnectTo(forwarder).ConnectTo(sink);
+            var forwarder = new MessageCounter();            
+            sender.ConnectTo(forwarder);
             sender.Send(41);
             Assert.Equal(1, forwarder.Counter);
             sender.Send(42);
@@ -46,12 +31,11 @@ namespace FeatureLoom.Diagnostics
             TestHelper.PrepareTestContext();
 
             var sender = new Sender();
-            var forwarder = new CountingForwarder();
-            var sink = new SingleMessageTestSink<object>();
-            sender.ConnectTo(forwarder).ConnectTo(sink);
+            var forwarder = new MessageCounter();
+            sender.ConnectTo(forwarder);
 
-            Task waitFor1 = forwarder.WaitForAsync(1);
-            Task waitFor3 = forwarder.WaitForAsync(3);
+            Task waitFor1 = forwarder.WaitForCountAsync(1);
+            Task waitFor3 = forwarder.WaitForCountAsync(3);
             Assert.False(waitFor1.IsCompleted);
             Assert.False(waitFor3.IsCompleted);
             sender.Send(41);

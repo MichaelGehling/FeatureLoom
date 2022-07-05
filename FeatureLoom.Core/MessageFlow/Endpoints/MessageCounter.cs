@@ -3,24 +3,26 @@ using FeatureLoom.Synchronization;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.Diagnostics
+namespace FeatureLoom.MessageFlow
 {
-    public class CountingForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
+    public class MessageCounter : IMessageSink
     {
-        private SourceValueHelper sourceHelper;
-
         private volatile int counter;
         private FeatureLock myLock = new FeatureLock();
         private List<(int expectedCount, TaskCompletionSource<int> tcs)> waitings = new List<(int, TaskCompletionSource<int>)>();
 
         public int Counter
         {
-            get { using (myLock.LockReadOnly()) return counter; }
+            get 
+            {
+                using (myLock.LockReadOnly())
+                {
+                    return counter;
+                }
+            }
         }
 
-        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
-
-        public Task<int> WaitForAsync(int numMessages)
+        public Task<int> WaitForCountAsync(int numMessages)
         {
             using (myLock.Lock())
             {
@@ -38,19 +40,17 @@ namespace FeatureLoom.Diagnostics
         public void Post<M>(in M message)
         {
             Count();
-            sourceHelper.Forward(in message);
         }
 
         public void Post<M>(M message)
         {
             Count();
-            sourceHelper.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
         {
             Count();
-            return sourceHelper.ForwardAsync(message);
+            return Task.CompletedTask;
         }
 
         private void Count()
@@ -67,31 +67,6 @@ namespace FeatureLoom.Diagnostics
                     }
                 }
             }
-        }
-
-        public void DisconnectFrom(IMessageSink sink)
-        {
-            sourceHelper.DisconnectFrom(sink);
-        }
-
-        public void DisconnectAll()
-        {
-            sourceHelper.DisconnectAll();
-        }
-
-        public IMessageSink[] GetConnectedSinks()
-        {
-            return sourceHelper.GetConnectedSinks();
-        }
-
-        public void ConnectTo(IMessageSink sink, bool weakReference = false)
-        {
-            sourceHelper.ConnectTo(sink, weakReference);
-        }
-
-        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
-        {
-            return sourceHelper.ConnectTo(sink, weakReference);
         }
     }
 }

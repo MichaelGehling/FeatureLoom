@@ -42,10 +42,12 @@ namespace FeatureLoom.Forms
             }
         }
 
-        public readonly struct LayoutResumer : IDisposable
+        public struct LayoutResumer : IDisposable
         {
-            private readonly Control control;
-            private readonly IEnumerable<Control> children;
+            private Control control;
+            private IEnumerable<Control> children;
+
+            public bool IsValid => control != null;            
 
             public LayoutResumer(Control control, IEnumerable<Control> children)
             {
@@ -55,6 +57,8 @@ namespace FeatureLoom.Forms
 
             public void Dispose()
             {
+                if (!IsValid) return;
+
                 if (control is TreeView tree) tree.EndUpdate();
                 control?.ResumeLayout();
                 control?.SetMetaData("LayoutSuspensionActive", false);
@@ -65,6 +69,9 @@ namespace FeatureLoom.Forms
                     child?.ResumeLayout();
                     child?.SetMetaData("LayoutSuspensionActive", false);
                 }
+
+                control = null;
+                children = null;
             }
         }
     }

@@ -1,5 +1,7 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using FeatureLoom.Time;
+using System;
 using Xunit;
 
 namespace FeatureLoom.Time
@@ -11,7 +13,7 @@ namespace FeatureLoom.Time
         {
             TestHelper.PrepareTestContext();
 
-            Assert.True((AppTime.Now - AppTime.CoarseNow).Duration() < 20.Milliseconds());
+            Assert.True((DateTime.UtcNow - AppTime.CoarseNow).Duration() < 20.Milliseconds());
         }
     }
 }

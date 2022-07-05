@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using FeatureLoom.Time;
 using Xunit;
 
@@ -14,13 +15,13 @@ namespace FeatureLoom.MessageFlow
             TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
-            var forwarder = new QueueForwarder();
-            var sink = new SingleMessageTestSink<T>();
+            var forwarder = new QueueForwarder<T>();
+            var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);
             sink.WaitHandle.Wait(2.Seconds());
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
         }
 
     }

@@ -3,6 +3,7 @@ using System;
 using Xunit;
 using FeatureLoom.Time;
 using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 
 namespace FeatureLoom.MessageFlow
 {
@@ -87,22 +88,22 @@ namespace FeatureLoom.MessageFlow
 
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
-            var sink = new SingleMessageTestSink<string>();
+            var sink = new LatestMessageReceiver<string>();
             sender.ConnectTo(aggregator).ConnectTo(sink);
 
             sender.Send(("lastName", "Doe"));            
-            Assert.False(sink.received);            
+            Assert.False(sink.HasMessage);            
             sink.WaitHandle.Wait(1.Seconds());
-            Assert.Equal("Mr. or Mrs. Doe", sink.receivedMessage);
+            Assert.Equal("Mr. or Mrs. Doe", sink.LatestMessageOrDefault);
 
             sender.Send(("lastName", "Doe"));
             sender.Send(("firstName", "Jane"));
-            Assert.True(sink.received);
-            Assert.Equal("Jane Doe", sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal("Jane Doe", sink.LatestMessageOrDefault);
 
-            sink.Reset();
+            sink.Clear();
             Assert.False(sink.WaitHandle.Wait(200.Milliseconds()));
-            Assert.Null(sink.receivedMessage);
+            Assert.Null(sink.LatestMessageOrDefault);
         }
         
 
@@ -113,26 +114,26 @@ namespace FeatureLoom.MessageFlow
 
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
-            var sink = new SingleMessageTestSink<string>();            
+            var sink = new LatestMessageReceiver<string>();            
             sender.ConnectTo(aggregator).ConnectTo(sink);
 
             sender.Send(("bla", "bla"));
-            Assert.False(sink.received);
+            Assert.False(sink.HasMessage);
             sender.Send(("firstName", "Jim"));
-            Assert.False(sink.received);
+            Assert.False(sink.HasMessage);
             sender.Send(("firstName", "John"));
-            Assert.False(sink.received);
+            Assert.False(sink.HasMessage);
             sender.Send(("lastName", "Doe"));
-            Assert.True(sink.received);
-            Assert.Equal("John Doe", sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal("John Doe", sink.LatestMessageOrDefault);
 
-            sink.Reset();
+            sink.Clear();
 
             sender.Send(("firstName", "Jane"));
-            Assert.False(sink.received);
+            Assert.False(sink.HasMessage);
             sender.Send(("lastName", "Doe"));
-            Assert.True(sink.received);
-            Assert.Equal("Jane Doe", sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal("Jane Doe", sink.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -142,14 +143,14 @@ namespace FeatureLoom.MessageFlow
 
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
-            var sink = new SingleMessageTestSink<(string key, string val)>();
+            var sink = new LatestMessageReceiver<(string key, string val)>();
             sender.ConnectTo(aggregator);
             aggregator.Else.ConnectTo(sink);
 
             sender.Send(("bla1", "bla2"));
-            Assert.True(sink.received);
-            Assert.Equal("bla1", sink.receivedMessage.key);
-            Assert.Equal("bla2", sink.receivedMessage.val);
+            Assert.True(sink.HasMessage);
+            Assert.Equal("bla1", sink.LatestMessageOrDefault.key);
+            Assert.Equal("bla2", sink.LatestMessageOrDefault.val);
         }
 
         [Fact]

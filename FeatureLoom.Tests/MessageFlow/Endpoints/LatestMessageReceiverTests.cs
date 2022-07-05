@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow

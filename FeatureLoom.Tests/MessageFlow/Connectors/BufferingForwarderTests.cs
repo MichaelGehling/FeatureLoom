@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow
@@ -14,11 +15,11 @@ namespace FeatureLoom.MessageFlow
 
             var sender = new Sender<T>();
             var forwarder = new BufferingForwarder<object>(10);
-            var sink = new SingleMessageTestSink<T>();
+            var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
         }
 
         [Fact]

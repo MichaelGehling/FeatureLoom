@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
+using FeatureLoom.Helpers;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow
@@ -14,11 +15,11 @@ namespace FeatureLoom.MessageFlow
 
             var sender = new Sender<T>();
             var forwarder = new DeactivatableForwarder();
-            var sink = new SingleMessageTestSink<T>();
+            var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -28,17 +29,17 @@ namespace FeatureLoom.MessageFlow
 
             var sender = new Sender<int>();
             var forwarder = new DeactivatableForwarder();
-            var sink = new SingleMessageTestSink<int>();
+            var sink = new LatestMessageReceiver<int>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
 
             forwarder.Active = false;
             sender.Send(1);
-            Assert.False(sink.received);
+            Assert.False(sink.HasMessage);
 
             forwarder.Active = true;
             sender.Send(2);
-            Assert.True(sink.received);
-            Assert.Equal(2, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(2, sink.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -48,16 +49,16 @@ namespace FeatureLoom.MessageFlow
             bool active = false;
             var sender = new Sender<int>();
             var forwarder = new DeactivatableForwarder(() => active);
-            var sink = new SingleMessageTestSink<int>();
+            var sink = new LatestMessageReceiver<int>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
 
             sender.Send(1);
-            Assert.False(sink.received);
+            Assert.False(sink.HasMessage);
 
             active = true;
             sender.Send(2);
-            Assert.True(sink.received);
-            Assert.Equal(2, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(2, sink.LatestMessageOrDefault);
         }
     }
 }

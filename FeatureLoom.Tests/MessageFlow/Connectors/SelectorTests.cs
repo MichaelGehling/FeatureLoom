@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.Diagnostics;
-
+using FeatureLoom.Helpers;
 using FeatureLoom.Time;
 using Xunit;
 
@@ -17,12 +17,12 @@ namespace FeatureLoom.MessageFlow
             var sender = new Sender<T>();
             var selector = new Selector<T>();
             var trueOption = selector.AddOption(msg => true);
-            var sink = new SingleMessageTestSink<T>();
+            var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(selector);
             trueOption.ConnectTo(sink);
             sender.Send(message);
-            Assert.True(sink.received);
-            Assert.Equal(message, sink.receivedMessage);
+            Assert.True(sink.HasMessage);
+            Assert.Equal(message, sink.LatestMessageOrDefault);
         }
 
         [Fact]
@@ -35,9 +35,9 @@ namespace FeatureLoom.MessageFlow
             sender.ConnectTo(selector);
             var lessThan10Option = selector.AddOption(msg => msg < 10);
             var greaterThan5Option = selector.AddOption(msg => msg > 5);
-            var lessThan10Counter = new CountingForwarder();
-            var greaterThan5Counter = new CountingForwarder();
-            var elseCounter = new CountingForwarder();
+            var lessThan10Counter = new MessageCounter();
+            var greaterThan5Counter = new MessageCounter();
+            var elseCounter = new MessageCounter();
             lessThan10Option.ConnectTo(lessThan10Counter);
             greaterThan5Option.ConnectTo(greaterThan5Counter);
             selector.Else.ConnectTo(elseCounter);

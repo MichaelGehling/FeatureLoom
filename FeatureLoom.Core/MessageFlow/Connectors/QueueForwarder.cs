@@ -12,33 +12,11 @@ namespace FeatureLoom.MessageFlow
     ///     Creates an active forwarder that queues incoming messages and forwards them in threads
     ///     from the ThreadPool. The number of threads is scaled dynamically based on load. The
     ///     scaling parameters can be configured.
-    ///     Optionally, a priority queue can be used to sort the incoming messages based on an individual comparer.
-    ///     If the order and exact number of used threads doesn't matter, consider to use the AsyncForwarder, as it can be more efficient in such scenario.
-    ///     Note: Using more than one thread may alter the order of forwarded messages!
-    ///     Note: When used for struct messages they will be boxed as an object. If you only have a single struct message type, use the typed QueueForwarder<T> instead to avoid boxing
-    /// </summary>
-    public class QueueForwarder : QueueForwarder<object>
-    {
-        public QueueForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
-            : base(threadLimit, maxIdleMilliseconds, spawnThresholdFactor, maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue)
-        {
-        }
-
-        public QueueForwarder(Comparer<object> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default) 
-            : base(priorityComparer, threadLimit, maxIdleMilliseconds, spawnThresholdFactor, maxQueueSize, maxWaitOnFullQueue)
-        {
-        }
-    }
-
-    /// <summary>
-    ///     Creates an active forwarder that queues incoming messages and forwards them in threads
-    ///     from the ThreadPool. The number of threads is scaled dynamically based on load. The
-    ///     scaling parameters can be configured.
     ///     If the order and exact number of used threads doesn't matter, consider to use the AsyncForwarder, as it can be more efficient in such scenario.
     ///     Optionally, a priority queue can be used to sort the incoming messages based on an individual comparer.
     ///     Note: Using more than one thread may alter the order of forwarded messages!
     /// </summary>
-    public class QueueForwarder<T> : IMessageFlowConnection<T>
+    public sealed class QueueForwarder<T> : IMessageFlowConnection<T>
     {
         protected TypedSourceValueHelper<T> sourceHelper;
         protected IReceiver<T> receiver;
