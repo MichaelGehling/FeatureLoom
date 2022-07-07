@@ -1,4 +1,4 @@
-﻿
+﻿/*
 using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace FeatureLoom.Workflows
 {
-
+    
     //TODO: REMOVE or replace WorkflowRunnerService!
     public interface IWorkflowRunnerRegistry
     {
@@ -170,3 +170,4 @@ namespace FeatureLoom.Workflows
         }
     }
 }
+*/
