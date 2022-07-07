@@ -19,8 +19,7 @@ namespace FeatureLoom.Helpers
 
         public static void PrepareTestContext(bool disconnectLoggers = true, bool useMemoryStorage = true, bool bufferLogErrorsAndWarnings = true)
         {
-            ServiceRegistry.CreateLocalInstancesForAllServices();
-            ServiceContext.UseNewContexts();
+            ServiceRegistry.CreateLocalInstancesForAllServices();            
             if (disconnectLoggers)
             {
                 Log.QueuedLogSource.DisconnectAll();
