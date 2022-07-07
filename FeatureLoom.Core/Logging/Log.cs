@@ -5,219 +5,93 @@ using FeatureLoom.Workflows;
 using System;
 using FeatureLoom.Storages;
 using FeatureLoom.Extensions;
+using System.Runtime.CompilerServices;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Logging
 {
     public static class Log
     {
-        public static ConsoleLogger defaultConsoleLogger;
-        public static FileLogger defaultFileLogger;
-        public static IWorkflowRunner logRunner;
+        public static ConsoleLogger DefaultConsoleLogger { get => Service<LogService>.Instance.DefaultConsoleLogger; set => Service<LogService>.Instance.DefaultConsoleLogger = value; }
+        public static FileLogger DefaultFileLogger { get => Service<LogService>.Instance.DefaultFileLogger; set => Service<LogService>.Instance.DefaultFileLogger = value; }
+        public static IWorkflowRunner LogRunner { get => Service<LogService>.Instance.LogRunner; set => Service<LogService>.Instance.LogRunner = value; }
 
-        static Log()
-        {            
-            defaultConsoleLogger = new ConsoleLogger();
-            defaultFileLogger = new FileLogger();
-            logRunner = new SmartRunner();
-            WorkflowRunnerService.Unregister(logRunner);
-            _ = logRunner.RunAsync(defaultFileLogger);
+        public static IMessageSink<LogMessage> LogSink => Service<LogService>.Instance.LogSink;
 
-            context.Data.queueLogForwarder.ConnectTo(defaultConsoleLogger);
-            context.Data.syncLogForwarder.ConnectTo(defaultFileLogger);
-        }
+        public static IMessageSource<LogMessage> QueuedLogSource => Service<LogService>.Instance.QueuedLogSource;
 
-        private class ContextData : IServiceContextData
+        public static LogService.Config Settings => Service<LogService>.Instance.Settings;
+
+        public static IMessageSource<LogMessage> SyncLogSource => Service<LogService>.Instance.SyncLogSource;
+
+        public static void DEBUG(ObjectHandle contextHandle, string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            public readonly Forwarder<LogMessage> logSink = new Forwarder<LogMessage>();
-            public readonly QueueForwarder<LogMessage> queueLogForwarder = new QueueForwarder<LogMessage>(1, 1000, 10, 10000, TimeSpan.Zero, true);
-            public readonly Forwarder<LogMessage> syncLogForwarder = new Forwarder<LogMessage>();
-            public readonly Config settings = new Config();
-
-            public ContextData()
-            {
-                logSink.ConnectTo(queueLogForwarder);
-                logSink.ConnectTo(syncLogForwarder);
-                queueLogForwarder.ConnectTo(defaultConsoleLogger);
-                syncLogForwarder.ConnectTo(defaultFileLogger);
-            }
-
-            public IServiceContextData Copy()
-            {
-                ContextData newContext = new ContextData();
-                return newContext;
-            }
+            Service<LogService>.Instance.DEBUG(contextHandle, shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
-        private static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
-
-        public static IMessageSource<LogMessage> QueuedLogSource => context.Data.queueLogForwarder;
-        public static IMessageSource<LogMessage> SyncLogSource => context.Data.syncLogForwarder;
-        public static IMessageSink<LogMessage> LogSink => context.Data.logSink;
-        public static Config Settings => context.Data.settings;
-
-        public static void SendLogMessage(in LogMessage msg)
-        {            
-            context.Data.logSink.Post(in msg);
-        }
-
-        public static void FORCE(ObjectHandle contextHandle,
-                          string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        public static void DEBUG(string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            Service<LogService>.Instance.DEBUG(shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
-        public static void ERROR(ObjectHandle contextHandle,
-                          string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        public static void ERROR(ObjectHandle contextHandle, string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace || context.Data.settings.addStackTraceToErrors) detailText = $"{(detailText.EmptyOrNull()?"": detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            Service<LogService>.Instance.ERROR(contextHandle, shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
-        public static void WARNING(ObjectHandle contextHandle,
-                          string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        public static void ERROR(string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            Service<LogService>.Instance.ERROR(shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
-        public static void INFO(ObjectHandle contextHandle,
-                          string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        public static void FORCE(ObjectHandle contextHandle, string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            Service<LogService>.Instance.FORCE(contextHandle, shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
-        public static void DEBUG(ObjectHandle contextHandle,
-                          string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        public static void FORCE(string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            Service<LogService>.Instance.FORCE(shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
-        public static void TRACE(ObjectHandle contextHandle,
-                          string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        public static void INFO(ObjectHandle contextHandle, string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            Service<LogService>.Instance.INFO(contextHandle, shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
-        public static void FORCE(string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
+        public static void INFO(string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, default, caller, sourceFile, sourceLine));
-        }
-
-        public static void ERROR(string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
-        {
-            if (addStackTrace || context.Data.settings.addStackTraceToErrors) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText+"\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, default, caller, sourceFile, sourceLine));
-        }
-
-        public static void WARNING(string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
-        {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, default, caller, sourceFile, sourceLine));
-        }
-
-        public static void INFO(string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
-        {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, default, caller, sourceFile, sourceLine));
-        }
-
-        public static void DEBUG(string shortText,
-                          string detailText = "",
-                          bool addStackTrace = false,
-                          [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                          [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                          [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
-        {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, default, caller, sourceFile, sourceLine));
-        }
-
-        public static void TRACE(string shortText,
-                                 string detailText = "",
-                                 bool addStackTrace = false,
-                                 [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
-                                 [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
-                                 [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
-        {
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, default, caller, sourceFile, sourceLine));
+            Service<LogService>.Instance.INFO(shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
 
         public static void LogOnException(string actionDescription, Action action, bool logActionStart = false, bool logActionFinished = false, bool rethrowException = true, Loglevel exceptionLogLevel = Loglevel.ERROR)
         {
-            if (logActionStart) Log.INFO($"Starting: {actionDescription}.");
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                actionDescription = actionDescription ?? "Action";
-                Log.ERROR($"Exception occured while: {actionDescription}! {(rethrowException ? "" : "(Process will continue.)")}", e.ToString());
-                if (rethrowException) throw;
-            }
-
-            if (logActionFinished) Log.INFO($"Finished: {actionDescription}.");
+            Service<LogService>.Instance.LogOnException(actionDescription, action, logActionStart, logActionFinished, rethrowException, exceptionLogLevel);
         }
 
-        public class Config : Configuration
+        public static void SendLogMessage(in LogMessage msg)
         {
-            public bool addStackTraceToErrors = false;
+            Service<LogService>.Instance.SendLogMessage(in msg);
+        }
+
+        public static void TRACE(ObjectHandle contextHandle, string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
+        {
+            Service<LogService>.Instance.TRACE(contextHandle, shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
+        }
+
+        public static void TRACE(string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
+        {
+            Service<LogService>.Instance.TRACE(shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
+        }
+
+        public static void WARNING(ObjectHandle contextHandle, string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
+        {
+            Service<LogService>.Instance.WARNING(contextHandle, shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
+        }
+
+        public static void WARNING(string shortText, string detailText = "", bool addStackTrace = false, [CallerMemberName] string caller = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
+        {
+            Service<LogService>.Instance.WARNING(shortText, detailText, addStackTrace, caller, sourceFile, sourceLine);
         }
     }
 }

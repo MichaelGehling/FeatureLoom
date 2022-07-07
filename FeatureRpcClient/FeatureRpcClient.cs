@@ -112,7 +112,7 @@ namespace FeatureRpcClient
 
         public static int Main(string[] args)
         {
-            Log.QueuedLogSource.DisconnectFrom(Log.defaultConsoleLogger);
+            Log.QueuedLogSource.DisconnectFrom(Log.DefaultConsoleLogger);
             var workflow = new FeatureRpcClient(args.Length >= 1 ? args[0] : null);
             new BlockingRunner().RunAsync(workflow).WaitFor();
             WorkflowRunnerService.PauseAllWorkflowsAsync(true).Wait(1.Seconds());
