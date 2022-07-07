@@ -6,6 +6,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Synchronization
 {
@@ -1536,14 +1537,14 @@ namespace FeatureLoom.Synchronization
         private void ExitReadLock()
         {
             int newLockIndicator = Interlocked.Decrement(ref lockIndicator);
-            if (IsScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
             lockIndicator = NO_LOCK;
-            if (IsScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1553,7 +1554,7 @@ namespace FeatureLoom.Synchronization
             RenewReentrancyId();
             reentrancyActive = false;
             lockIndicator = NO_LOCK;
-            if (IsScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1562,21 +1563,21 @@ namespace FeatureLoom.Synchronization
             // We must clear the ReentrancyContext, because the lock might be used by multiple reader, so we can't change the current reentrancyId, though it would be cheaper.
             RemoveReentrancyContext();            
             reentrancyActive = Interlocked.Decrement(ref lockIndicator) > 0;
-            if (IsScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReenteredLock()
         {
             // Nothing to do!
-            if (IsScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DowngradeReentering()
         {
             lockIndicator = FIRST_READ_LOCK;
-            if (IsScheduleActive) Scheduler.InterruptWaiting();
+            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1909,7 +1910,7 @@ namespace FeatureLoom.Synchronization
             finally
             {
                 sleepLock.Exit();
-                if (activateSchedule) Scheduler.AddSchedule(this);
+                if (activateSchedule) Service<SchedulerService>.Instance.AddSchedule(this);
             }
         }
 

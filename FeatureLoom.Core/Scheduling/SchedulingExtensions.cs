@@ -41,7 +41,7 @@ namespace FeatureLoom.Scheduling
         /// <param name="triggerAction">The function takes the current time as input parameter and returns a tuple with two values:
         /// 1. If the schedule continues (true) or if it finished (false) and 2. the longest possible wait time when it needs to be triggered again.</param>
         /// <returns>The created schedule.</returns>
-        public static ActionSchedule ScheduleAction(this IScheduler scheduler, string name, Func<DateTime, TimeFrame> triggerAction)
+        public static ActionSchedule ScheduleAction(this SchedulerService scheduler, string name, Func<DateTime, TimeFrame> triggerAction)
         {
             var schedule = new ActionSchedule(name, triggerAction);
             scheduler.AddSchedule(schedule);

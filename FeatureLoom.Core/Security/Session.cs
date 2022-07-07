@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Scheduling;
+using FeatureLoom.Services;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
@@ -33,7 +34,7 @@ namespace FeatureLoom.Security
 
         public static ISchedule StartCleanupSchedule()
         {
-            cleanupSchedule = Scheduler.ScheduleAction("SessionCleanup", now =>
+            cleanupSchedule = Service<SchedulerService>.Instance.ScheduleAction("SessionCleanup", now =>
             {
                 if (cleanupSchedule == null) return TimeFrame.Invalid;
 

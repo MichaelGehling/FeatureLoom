@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Helpers;
 using FeatureLoom.Scheduling;
+using FeatureLoom.Services;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -31,7 +32,7 @@ namespace FeatureLoom.MessageFlow
 
         private void PrepareSchedule()
         {
-            this.scheduledAction = Scheduler.ScheduleAction("Aggregator", (now) =>
+            this.scheduledAction = Service<SchedulerService>.Instance.ScheduleAction("Aggregator", (now) =>
             {                
                 if (nextTimeoutCheck.IsInvalid || !nextTimeoutCheck.Elapsed(now)) return nextTimeoutCheck;
 
@@ -86,7 +87,7 @@ namespace FeatureLoom.MessageFlow
                 nextTimeoutCheck = new TimeFrame(timeout);
 
                 if (scheduledAction == null) PrepareSchedule();
-                else if (prevTimeoutCheck.IsValid && prevTimeoutCheck.utcEndTime > nextTimeoutCheck.utcEndTime) Scheduler.InterruptWaiting();                                
+                else if (prevTimeoutCheck.IsValid && prevTimeoutCheck.utcEndTime > nextTimeoutCheck.utcEndTime) Service<SchedulerService>.Instance.InterruptWaiting();                                
             }
             else
             {

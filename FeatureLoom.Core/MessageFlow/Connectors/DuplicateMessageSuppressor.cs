@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Scheduling;
+using FeatureLoom.Services;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -32,7 +33,7 @@ namespace FeatureLoom.MessageFlow
             this.nextCleanUp = AppTime.Now + this.cleanupPeriode;        
             if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
-            this.scheduledAction = Scheduler.ScheduleAction("DuplicateMessageSuppressor", now => 
+            this.scheduledAction = Service<SchedulerService>.Instance.ScheduleAction("DuplicateMessageSuppressor", now => 
             {
                 TimeFrame nextTriggerTimeFrame;
                 if (now > nextCleanUp - this.cleanupTolerance)

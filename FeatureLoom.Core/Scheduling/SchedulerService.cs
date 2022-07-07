@@ -19,7 +19,7 @@ namespace FeatureLoom.Scheduling
     /// but the time may be a lot shorter.
     /// The Scheduler's loop runs in an own thread which is used to trigger all ISchedule objects. 
     /// </summary>
-    public class SchedulerService : IScheduler
+    public class SchedulerService
     {
         private MicroLock myLock = new MicroLock();
         private List<ISchedule> newSchedules = new List<ISchedule>();
