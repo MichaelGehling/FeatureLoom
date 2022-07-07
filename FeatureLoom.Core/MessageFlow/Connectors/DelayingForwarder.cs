@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class DelayingForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
+    public sealed class DelayingForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly TimeSpan minDelay;

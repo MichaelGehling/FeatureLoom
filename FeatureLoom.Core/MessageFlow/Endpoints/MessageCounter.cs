@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class MessageCounter : IMessageSink
+    public sealed class MessageCounter : IMessageSink
     {
         private volatile int counter;
         private FeatureLock myLock = new FeatureLock();

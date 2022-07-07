@@ -17,7 +17,7 @@ namespace FeatureLoom.MessageFlow
     /// Uses a normal queue plus locking instead of a concurrent queue because of better performance
     /// in usual scenarios.
     /// <typeparam name="T"> The expected message type </typeparam>
-    public class QueueReceiver<T> : IMessageQueue, IReceiver<T>, IAlternativeMessageSource, IAsyncWaitHandle, IMessageSink<T>
+    public sealed class QueueReceiver<T> : IMessageQueue, IReceiver<T>, IAlternativeMessageSource, IAsyncWaitHandle, IMessageSink<T>
     {
         private Queue<T> queue = new Queue<T>();
         private MicroLock queueLock = new MicroLock();

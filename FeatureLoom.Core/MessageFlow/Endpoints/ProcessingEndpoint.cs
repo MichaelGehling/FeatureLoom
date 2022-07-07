@@ -16,35 +16,40 @@ namespace FeatureLoom.MessageFlow
     ///     blocking the sender.
     /// </summary>
     /// <typeparam name="T"> </typeparam>
-    public class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessageSource
+    public sealed class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessageSource
     {
         private readonly Func<T, bool> processing;
         private readonly Func<T, Task<bool>> processingAsync;
         private LazyValue<SourceHelper> alternativeSendingHelper;
-
-        private readonly FeatureLock syncLock;
         
         public Type ConsumedMessageType => typeof(T);
 
-        public ProcessingEndpoint(Func<T, bool> processing, FeatureLock synchronizationLock = null)
+        public ProcessingEndpoint(Func<T, bool> processing)
         {
             this.processing = processing;
-            syncLock = synchronizationLock;
         }
 
-        public ProcessingEndpoint(Action<T> processing, FeatureLock synchronizationLock = null)
+        public ProcessingEndpoint(Action<T> processing)
         {
             this.processing = t =>
             {
                 processing(t);
                 return true;
             };
-            syncLock = synchronizationLock;
         }
 
         public ProcessingEndpoint(Func<T, Task<bool>> processingAsync)
         {
             this.processingAsync = processingAsync;
+        }
+
+        public ProcessingEndpoint(Func<T, Task> processingAsync)
+        {
+            this.processingAsync = async t =>
+            {
+                await processingAsync(t);
+                return true;
+            };
         }
 
         public IMessageSource Else => alternativeSendingHelper.Obj;
@@ -55,40 +60,16 @@ namespace FeatureLoom.MessageFlow
             {
                 if (processing != null)
                 {
-                    if (syncLock == null)
+                    if (!processing(msgT))
                     {
-                        if (!processing(msgT))
-                        {
-                            alternativeSendingHelper.ObjIfExists?.Forward(in message);
-                        }
-                    }
-                    else
-                    {
-                        bool result;
-                        using (syncLock.Lock())
-                        {
-                            result = processing(msgT);
-                        }
-                        if (!result) alternativeSendingHelper.ObjIfExists?.Forward(in message);
+                        alternativeSendingHelper.ObjIfExists?.Forward(in message);
                     }
                 }
                 else
                 {
-                    if (syncLock == null)
+                    if (!processingAsync(msgT).WaitFor())
                     {
-                        if (!processingAsync(msgT).WaitFor())
-                        {
-                            alternativeSendingHelper.ObjIfExists?.Forward(in message);
-                        }
-                    }
-                    else
-                    {
-                        bool result;
-                        using (syncLock.Lock())
-                        {
-                            result = processingAsync(msgT).WaitFor();
-                        }
-                        if (!result) alternativeSendingHelper.ObjIfExists?.Forward(in message);
+                        alternativeSendingHelper.ObjIfExists?.Forward(in message);
                     }
                 }
             }
@@ -101,40 +82,16 @@ namespace FeatureLoom.MessageFlow
             {
                 if (processing != null)
                 {
-                    if (syncLock == null)
+                    if (!processing(msgT))
                     {
-                        if (!processing(msgT))
-                        {
-                            alternativeSendingHelper.ObjIfExists?.Forward(message);
-                        }
-                    }
-                    else
-                    {
-                        bool result;
-                        using (syncLock.Lock())
-                        {
-                            result = processing(msgT);
-                        }
-                        if (!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                        alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
                 }
                 else
                 {
-                    if (syncLock == null)
+                    if (!processingAsync(msgT).WaitFor())
                     {
-                        if (!processingAsync(msgT).WaitFor())
-                        {
-                            alternativeSendingHelper.ObjIfExists?.Forward(message);
-                        }
-                    }
-                    else
-                    {
-                        bool result;
-                        using (syncLock.Lock())
-                        {
-                            result = processingAsync(msgT).WaitFor();
-                        }
-                        if (!result) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                        alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }
                 }
             }
@@ -147,40 +104,16 @@ namespace FeatureLoom.MessageFlow
             {
                 if (processing != null)
                 {
-                    if (syncLock == null)
+                    if (!processing(msgT))
                     {
-                        if (!processing(msgT))
-                        {
-                            alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
-                        }
-                    }
-                    else
-                    {
-                        bool result;
-                        using (await syncLock.LockAsync())
-                        {
-                            result = processing(msgT);
-                        }
-                        if (!result) alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
+                        alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
                     }
                 }
                 else
                 {
-                    if (syncLock == null)
+                    if (!await processingAsync(msgT))
                     {
-                        if (!await processingAsync(msgT))
-                        {
-                            await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
-                        }
-                    }
-                    else
-                    {
-                        bool result;
-                        using (await syncLock.LockAsync())
-                        {
-                            result = await processingAsync(msgT);
-                        }
-                        if (!result) await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
+                        await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
                     }
                 }
             }

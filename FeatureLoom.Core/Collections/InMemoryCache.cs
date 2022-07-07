@@ -9,7 +9,7 @@ using System.Linq;
 
 namespace FeatureLoom.Collections
 {
-    public class InMemoryCache<K,V> : ISchedule
+    public sealed class InMemoryCache<K,V> : ISchedule
     {
         class CacheItem
         {

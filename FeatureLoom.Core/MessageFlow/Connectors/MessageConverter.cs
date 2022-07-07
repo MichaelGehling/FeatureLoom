@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
     /// </summary>
     /// <typeparam name="I"> The input type for the converter function </typeparam>
     /// <typeparam name="O"> The output type for the converter function </typeparam>
-    public class MessageConverter<I, O> : IMessageFlowConnection<I, O>
+    public sealed class MessageConverter<I, O> : IMessageFlowConnection<I, O>
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly Func<I, O> convertFunc;

@@ -43,6 +43,10 @@ namespace FeatureLoom.MessageFlow
         {
             sourceHelper.Forward<M>(in message);
         }
+        public void Forward<M>(M message)
+        {
+            sourceHelper.Forward<M>(in message);
+        }
 
         public Task ForwardAsync<M>(M message)
         {

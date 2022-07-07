@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class Splitter<T> : IMessageFlowConnection, IMessageSink<T>
+    public sealed class Splitter<T> : IMessageFlowConnection, IMessageSink<T>
     {
         private SourceValueHelper sourceHelper;
         private readonly Func<T, ICollection> split;

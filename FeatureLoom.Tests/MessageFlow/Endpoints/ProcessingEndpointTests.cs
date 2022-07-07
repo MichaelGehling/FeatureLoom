@@ -23,10 +23,8 @@ namespace FeatureLoom.MessageFlow
             Assert.True(processed);
         }
 
-        private readonly FeatureLock locker = new FeatureLock();
-
         [Fact]
-        public void CanLockObjectBeforeProcessing()
+        public void CanProcessMessageAsync()
         {
             TestHelper.PrepareTestContext();
 
@@ -34,21 +32,12 @@ namespace FeatureLoom.MessageFlow
             var sender = new Sender();
             var processor = new ProcessingEndpoint<bool>(async msg =>
             {
-                await Task.Delay(50.Milliseconds());
+                await Task.Yield();
                 processed = msg;
-            }, locker);
-            sender.ConnectTo(processor);
-
-            var processingTask = sender.SendAsync(true);
-            var assertionTask = Task.Run(() =>
-            {
-                using(locker.Lock())
-                { 
-                    Assert.True(processingTask.IsCompleted);
-                    Assert.True(processed);                                    
-                }                
             });
-            Task.WhenAll(processingTask, assertionTask);
+            sender.ConnectTo(processor);
+            sender.Send(true);
+            Assert.True(processed);
         }
     }
 }

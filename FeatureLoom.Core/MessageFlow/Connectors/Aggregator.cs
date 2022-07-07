@@ -14,7 +14,7 @@ namespace FeatureLoom.MessageFlow
     /// </summary>
     /// <typeparam name="I">The input type. If multiple message types are consumed for aggregation, this must be a common supertype</typeparam>
     /// <typeparam name="O">The output type. If multiple message types are generated from the aggregated data, this must be a common supertype</typeparam>
-    public class Aggregator<I, O> : IMessageFlowConnection<I, O>, IAlternativeMessageSource
+    public sealed class Aggregator<I, O> : IMessageFlowConnection<I, O>, IAlternativeMessageSource
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private LazyValue<SourceHelper> alternativeSender;

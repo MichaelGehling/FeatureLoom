@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class PriorityMessageReceiver<T> : IMessageQueue, IReceiver<T>, IAlternativeMessageSource, IAsyncWaitHandle, IMessageSink<T>
+    public sealed class PriorityMessageReceiver<T> : IMessageQueue, IReceiver<T>, IAlternativeMessageSource, IAsyncWaitHandle, IMessageSink<T>
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         private MicroLock myLock = new MicroLock();

@@ -12,10 +12,10 @@ namespace FeatureLoom.MessageFlow
     ///     also thread-safe. Avoid long running functions to avoid blocking the sender
     /// </summary>
     /// <typeparam name="T"> The input type for the filter function </typeparam>
-    public class Filter<T> : IMessageFlowConnection<T>, IAlternativeMessageSource
+    public sealed class Filter<T> : IMessageFlowConnection<T>, IAlternativeMessageSource
     {
-        protected SourceValueHelper sourceHelper;
-        protected Predicate<T> predicate;
+        private SourceValueHelper sourceHelper;
+        private Predicate<T> predicate;
         private LazyValue<SourceHelper> alternativeSendingHelper;
 
         public Type SentMessageType => typeof(T);

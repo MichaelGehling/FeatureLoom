@@ -6,9 +6,9 @@ namespace FeatureLoom.MessageFlow
     /// <summary>
     ///     Just forwards messages without processing it. It is thread-safe.
     /// </summary>
-    public class Forwarder : IMessageSource, IMessageFlowConnection
+    public sealed class Forwarder : IMessageSource, IMessageFlowConnection
     {
-        protected SourceValueHelper sourceHelper;
+        SourceValueHelper sourceHelper;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
@@ -27,17 +27,17 @@ namespace FeatureLoom.MessageFlow
             sourceHelper.DisconnectFrom(sink);
         }
 
-        public virtual void Post<M>(in M message)
+        public void Post<M>(in M message)
         {
             sourceHelper.Forward(in message);
         }
 
-        public virtual void Post<M>(M message)
+        public void Post<M>(M message)
         {
             sourceHelper.Forward(message);
         }
 
-        public virtual Task PostAsync<M>(M message)
+        public Task PostAsync<M>(M message)
         {
             return sourceHelper.ForwardAsync(message);
         }
@@ -57,9 +57,9 @@ namespace FeatureLoom.MessageFlow
     /// <summary>
     ///     Forwards messages if they are of the defined type without processing it. It is thread-safe.
     /// </summary>
-    public class Forwarder<T> : IMessageFlowConnection<T>
+    public sealed class Forwarder<T> : IMessageFlowConnection<T>
     {
-        protected TypedSourceValueHelper<T> sourceHelper;
+        TypedSourceValueHelper<T> sourceHelper;
 
         public Type SentMessageType => typeof(T);
         public Type ConsumedMessageType => typeof(T);
@@ -93,17 +93,17 @@ namespace FeatureLoom.MessageFlow
 
         public void Post<M>(in M message)
         {
-            if (message is T) sourceHelper.Forward(in message);
+            if (message is T typedMessage) sourceHelper.Forward(in typedMessage);
         }
 
         public void Post<M>(M message)
         {
-            if (message is T) sourceHelper.Forward(message);
+            if (message is T typedMessage) sourceHelper.Forward(typedMessage);
         }
 
         public Task PostAsync<M>(M message)
         {
-            if (message is T) return sourceHelper.ForwardAsync(message);
+            if (message is T typedMessage) return sourceHelper.ForwardAsync(typedMessage);
             else return Task.CompletedTask;
         }
     }

@@ -255,16 +255,16 @@ namespace FeatureLoom.Forms
             }
 
             private static void SetCursorToEnd(Control control)
-            {
+            {                
                 if (control is TextBoxBase textBox)
                 {
-                    textBox.SelectionStart = control.Text.Length-1;
                     textBox.SelectionLength = 0;
+                    textBox.SelectionStart = control.Text.Length;                    
                 }
                 else if (control is ComboBox comboBox)
                 {
-                    comboBox.SelectionStart = control.Text.Length-1;
                     comboBox.SelectionLength = 0;
+                    comboBox.SelectionStart = control.Text.Length;                    
                 }
             }
             
@@ -275,7 +275,7 @@ namespace FeatureLoom.Forms
 
                 if (fields[fieldIndex].control == null || !(fields[fieldIndex].control is ComboBox))
                 {                    
-                    string value = "";
+                    string value = null;
                     if (fields[fieldIndex].control != null) value = fields[fieldIndex].control.Text;
                     
                     RemoveField(fieldIndex);
@@ -294,7 +294,7 @@ namespace FeatureLoom.Forms
                     control.DropDownStyle = ComboBoxStyle.DropDown;                    
                     control.DataSource = options.ToArray(); // make a copy
                     control.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-                    control.AutoCompleteSource = AutoCompleteSource.ListItems;
+                    control.AutoCompleteSource = AutoCompleteSource.ListItems;                                        
 
                     control.TextChanged += (o, e) =>
                     {
@@ -313,6 +313,7 @@ namespace FeatureLoom.Forms
                         onFocusText = control.Text;
                         sender.Send(new PropertyEventNotification(this.name, PropertyEvent.GotFocus, fieldIndex, control.Text));
                     };
+
                     control.LostFocus += (o, e) =>
                     {
                         if (control.DataSource is IEnumerable<string> fieldOptions && fieldOptions.Contains(control.Text))
@@ -321,6 +322,7 @@ namespace FeatureLoom.Forms
                         }
                         else control.Text = onFocusText;
                     };
+
                     control.SelectedIndexChanged += (o, e) =>
                     {
                         if (control.DataSource is IEnumerable<string> fieldOptions && fieldOptions.Contains(control.Text))
@@ -329,11 +331,12 @@ namespace FeatureLoom.Forms
                         }
                         else control.Text = onFocusText;
                     };
+
                     control.Click += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.Clicked, fieldIndex));
                     control.EnabledChanged += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.ReadOnlyChanged, fieldIndex, !control.Enabled));
 
-
-                    control.Text = value;
+                    if (value != null) control.Text = value;
+                    else if (control.Items.Count > 0) control.SelectedIndex = 0;
 
                     control.DragEnter += (o, e) =>
                     {
@@ -373,8 +376,9 @@ namespace FeatureLoom.Forms
                 else
                 {
                     ComboBox control = fields[fieldIndex].control as ComboBox;                    
-                    control.DataSource = options;
-                    control.Text = "";
+                    control.DataSource = options.ToArray();
+                    //control.Text = "";
+                    if (control.Items.Count > 0) control.SelectedIndex = 0;
 
                     parentControl.UpdateSizes();
                 }

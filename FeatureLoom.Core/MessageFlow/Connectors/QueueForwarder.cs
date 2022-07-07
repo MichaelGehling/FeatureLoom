@@ -18,8 +18,20 @@ namespace FeatureLoom.MessageFlow
     /// </summary>
     public sealed class QueueForwarder<T> : IMessageFlowConnection<T>
     {
-        protected TypedSourceValueHelper<T> sourceHelper;
-        protected IReceiver<T> receiver;
+        readonly struct ForwardingMessage
+        {
+            public readonly T message;
+            public readonly ForwardingMethod forwardingMethod;
+
+            public ForwardingMessage(T message, ForwardingMethod forwardingMethod)
+            {
+                this.message = message;
+                this.forwardingMethod = forwardingMethod;
+            }
+        }
+
+        private TypedSourceValueHelper<T> sourceHelper;
+        private IReceiver<ForwardingMessage> receiver;
         public volatile int threadLimit;
         public volatile int spawnThreshold;
         public volatile int maxIdleMilliseconds;
@@ -57,7 +69,7 @@ namespace FeatureLoom.MessageFlow
         /// </param>
         public QueueForwarder(int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default, bool dropLatestMessageOnFullQueue = true)
         {
-            this.receiver = new QueueReceiver<T>(maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue);
+            this.receiver = new QueueReceiver<ForwardingMessage>(maxQueueSize, maxWaitOnFullQueue, dropLatestMessageOnFullQueue);
             this.threadLimit = threadLimit;
             this.spawnThreshold = spawnThresholdFactor;
             this.maxIdleMilliseconds = maxIdleMilliseconds;
@@ -88,9 +100,10 @@ namespace FeatureLoom.MessageFlow
         /// <param name="maxWaitOnFullQueue">
         ///     the maximum time a sender waits when the queue is full
         /// </param>
-        public QueueForwarder(Comparer<T> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
+        public QueueForwarder(IComparer<T> priorityComparer, int threadLimit = 1, int maxIdleMilliseconds = 50, int spawnThresholdFactor = 10, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
         {
-            this.receiver = new PriorityQueueReceiver<T>(priorityComparer, maxQueueSize, maxWaitOnFullQueue);
+            Comparer<ForwardingMessage> forwardingMessageComparer = Comparer<ForwardingMessage>.Create((x, y) => priorityComparer.Compare(x.message, y.message));
+            this.receiver = new PriorityQueueReceiver<ForwardingMessage>(forwardingMessageComparer, maxQueueSize, maxWaitOnFullQueue);
             this.threadLimit = threadLimit;
             this.spawnThreshold = spawnThresholdFactor;
             this.maxIdleMilliseconds = maxIdleMilliseconds;
@@ -103,18 +116,20 @@ namespace FeatureLoom.MessageFlow
        
         public void Post<M>(in M message)
         {
-            if (sourceHelper.CountConnectedSinks > 0)
+            if (message is T typedMessage && sourceHelper.CountConnectedSinks > 0)
             {
-                receiver.Post(in message);
+                ForwardingMessage forwardingMessage = new ForwardingMessage(typedMessage, ForwardingMethod.SynchronousByRef);
+                receiver.Post(in forwardingMessage);
                 ManageThreadCount();
             }
         }
 
         public void Post<M>(M message)
         {
-            if (sourceHelper.CountConnectedSinks > 0)
+            if (message is T typedMessage && sourceHelper.CountConnectedSinks > 0)
             {
-                receiver.Post(message);
+                ForwardingMessage forwardingMessage = new ForwardingMessage(typedMessage, ForwardingMethod.Synchronous);
+                receiver.Post(forwardingMessage);
                 ManageThreadCount();
             }
         }
@@ -131,18 +146,25 @@ namespace FeatureLoom.MessageFlow
 
         public Task PostAsync<M>(M message)
         {
-            Post(message);
+            if (message is T typedMessage && sourceHelper.CountConnectedSinks > 0)
+            {
+                ForwardingMessage forwardingMessage = new ForwardingMessage(typedMessage, ForwardingMethod.Asynchronous);
+                receiver.Post(forwardingMessage);
+                ManageThreadCount();
+            }
             return Task.CompletedTask;
         }
 
         private async Task ForwardingLoop()
         {
             var timeout = maxIdleMilliseconds.Milliseconds();
-            while ((await receiver.TryReceiveAsync(timeout)).Out(out T message))
+            while ((await receiver.TryReceiveAsync(timeout)).Out(out ForwardingMessage forwardingMessage))
             {
                 try
                 {
-                    sourceHelper.Forward(message);
+                    if (forwardingMessage.forwardingMethod == ForwardingMethod.Synchronous) sourceHelper.Forward(forwardingMessage.message);
+                    else if (forwardingMessage.forwardingMethod == ForwardingMethod.SynchronousByRef) sourceHelper.Forward(in forwardingMessage.message);
+                    else if (forwardingMessage.forwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(forwardingMessage.message);
                 }
                 catch (Exception e)
                 {

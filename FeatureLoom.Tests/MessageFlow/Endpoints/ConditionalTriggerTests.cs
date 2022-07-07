@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
         {
             TestHelper.PrepareTestContext();
 
-            MessageTrigger trigger = new ConditionalTrigger<int, int>(m => m >= 42, null);
+            var trigger = new ConditionalTrigger<int, int>(m => m >= 42, null);
             Assert.False(trigger.IsTriggered());
             trigger.Post(41);
             Assert.False(trigger.IsTriggered());
@@ -28,7 +28,7 @@ namespace FeatureLoom.MessageFlow
         {
             TestHelper.PrepareTestContext();
 
-            MessageTrigger trigger = new ConditionalTrigger<int, int>(m => m > 42, m => m < 42);
+            var trigger = new ConditionalTrigger<int, int>(m => m > 42, m => m < 42);
             Assert.False(trigger.IsTriggered());
             trigger.Post(43);
             Assert.True(trigger.IsTriggered());

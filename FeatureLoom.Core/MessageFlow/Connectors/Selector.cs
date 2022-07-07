@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class Selector<T> : IMessageSink<T>, IAlternativeMessageSource
+    public sealed class Selector<T> : IMessageSink<T>, IAlternativeMessageSource
     {
         private volatile bool multiMatch = false;
         private List<(Func<T, bool> predicate, SourceHelper sender)> options = null;
@@ -119,11 +119,14 @@ namespace FeatureLoom.MessageFlow
 
         public IMessageSource GetOptionAt(int index)
         {
-            if (options != null && options.Count > index)
+            using (myLock.Lock())
             {
-                return options[index].sender;
+                if (options != null && options.Count > index)
+                {
+                    return options[index].sender;
+                }
+                else return null;
             }
-            else return null;
         }
 
         public bool RemoveOptionAt(int index)

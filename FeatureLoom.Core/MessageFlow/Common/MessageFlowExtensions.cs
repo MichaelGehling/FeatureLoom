@@ -87,7 +87,33 @@ namespace FeatureLoom.MessageFlow
             sender.Send(response);
         }
 
+        public static void SendResponse<T>(this ISender<IResponseMessage<T>> sender, T message, long requestId)
+        {
+            if (message is IResponseMessage<T> response)
+            {
+                response.RequestId = requestId;
+            }
+            else
+            {
+                response = new ResponseMessage<T>(message, requestId);
+            }
+            sender.Send(response);
+        }
+
         public static Task SendResponseAsync<T>(this ISender sender, T message, long requestId)
+        {
+            if (message is IResponseMessage<T> response)
+            {
+                response.RequestId = requestId;
+            }
+            else
+            {
+                response = new ResponseMessage<T>(message, requestId);
+            }
+            return sender.SendAsync(response);
+        }
+
+        public static Task SendResponseAsync<T>(this ISender<IResponseMessage<T>> sender, T message, long requestId)
         {
             if (message is IResponseMessage<T> response)
             {

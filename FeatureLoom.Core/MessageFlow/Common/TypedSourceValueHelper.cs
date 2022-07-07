@@ -57,8 +57,13 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public void Forward<M>(in M message)
+        public void ValidateMessageType<M>(in M message)
         {
+            if ((message is T)) throw new Exception($"It is not allowed to send a message of type {typeof(M)} via this MessageFlow element, which is restricted to {typeof(T)}!");
+        }
+
+        public void Forward(in T message)
+        {            
             var currentSinks = this.sinks;
             if (currentSinks == null) return;
 
@@ -71,7 +76,7 @@ namespace FeatureLoom.MessageFlow
             if (anyInvalid) LockAndRemoveInvalidReferences();
         }
 
-        public void Forward<M>(M message)
+        public void Forward(T message)
         {
             var currentSinks = this.sinks;
             if (currentSinks == null) return;
@@ -85,7 +90,7 @@ namespace FeatureLoom.MessageFlow
             if (anyInvalid) LockAndRemoveInvalidReferences();
         }
 
-        public Task ForwardAsync<M>(M message)
+        public Task ForwardAsync(T message)
         {
             var currentSinks = this.sinks;
             if (currentSinks == null) return Task.CompletedTask;
@@ -105,7 +110,7 @@ namespace FeatureLoom.MessageFlow
             else return MultipleForwardAsync(message, currentSinks);
         }
 
-        private async Task MultipleForwardAsync<M>(M message, MessageSinkRef[] currentSinks)
+        private async Task MultipleForwardAsync(T message, MessageSinkRef[] currentSinks)
         {
             bool anyInvalid = false;
             for (int i = currentSinks.Length - 1; i >= 0; i--)

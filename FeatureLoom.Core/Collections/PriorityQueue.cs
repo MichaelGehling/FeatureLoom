@@ -4,12 +4,12 @@ using System.Collections.Generic;
 
 namespace FeatureLoom.Collections
 {
-    public class PriorityQueue<T> : IEnumerable<T>, IEnumerable, IReadOnlyCollection<T>, ICollection
+    public sealed class PriorityQueue<T> : IEnumerable<T>, IEnumerable, IReadOnlyCollection<T>, ICollection
     {
         private LinkedList<T> linkedList = new LinkedList<T>();
-        private Comparer<T> comparer;
+        private IComparer<T> comparer;
 
-        public PriorityQueue(Comparer<T> comparer)
+        public PriorityQueue(IComparer<T> comparer)
         {
             this.comparer = comparer;
         }

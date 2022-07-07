@@ -18,7 +18,7 @@ namespace FeatureLoom.MessageFlow
     /// Uses a normal queue plus locking instead of a concurrent queue because of better performance
     /// in usual scenarios.
     /// <typeparam name="T"> The expected message type </typeparam>
-    public class PriorityQueueReceiver<T> : IMessageQueue, IReceiver<T>, IAsyncWaitHandle, IMessageSink<T>
+    public sealed class PriorityQueueReceiver<T> : IMessageQueue, IReceiver<T>, IAsyncWaitHandle, IMessageSink<T>
     {
         private PriorityQueue<T> queue;
         private MicroLock queueLock = new MicroLock();
@@ -34,7 +34,7 @@ namespace FeatureLoom.MessageFlow
 
         private LazyValue<SourceHelper> alternativeSendingHelper;
 
-        public PriorityQueueReceiver(Comparer<T> priorityComparer, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
+        public PriorityQueueReceiver(IComparer<T> priorityComparer, int maxQueueSize = int.MaxValue, TimeSpan maxWaitOnFullQueue = default)
         {
             this.queue = new PriorityQueue<T>(priorityComparer);
             this.maxQueueSize = maxQueueSize;

@@ -8,7 +8,7 @@ namespace FeatureLoom.MessageFlow
     ///     A Hub allows to create multiple sockets. Every message send over a socket will be
     ///     forwarded to all other sockets of this hub, but not looped back to the sending socket.
     /// </summary>
-    public class Hub : IMessageFlow
+    public sealed class Hub : IMessageFlow
     {
         private List<Socket> sockets = new List<Socket>();
 
@@ -35,7 +35,7 @@ namespace FeatureLoom.MessageFlow
             socketToRemove.Dispose();
         }
 
-        public class Socket : IMessageSink, IMessageSource, IDisposable
+        public sealed class Socket : IMessageSink, IMessageSource, IDisposable
         {
             private Hub hub;
             private WeakReference ownerRef;

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class DuplicateMessageSuppressor : IMessageSource, IMessageFlowConnection
+    public sealed class DuplicateMessageSuppressor : IMessageSource, IMessageFlowConnection
     {
         private SourceValueHelper sourceHelper;
         private Queue<(object message, DateTime suppressionEnd)> suppressors = new Queue<(object, DateTime)>();

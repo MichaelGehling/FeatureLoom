@@ -42,14 +42,19 @@ namespace FeatureLoom.MessageFlow
             return sourceHelper.GetConnectedSinks();
         }
 
-        public void Forward<M>(in M message)
+        public void Forward(in T message)
         {
-            sourceHelper.Forward<M>(in message);
+            sourceHelper.Forward(in message);
         }
 
-        public Task ForwardAsync<M>(M message)
+        public void Forward(T message)
         {
-            return sourceHelper.ForwardAsync<M>(message);
+            sourceHelper.Forward(message);
+        }
+
+        public Task ForwardAsync(T message)
+        {
+            return sourceHelper.ForwardAsync(message);
         }
     }
 }

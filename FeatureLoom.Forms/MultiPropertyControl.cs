@@ -103,7 +103,7 @@ namespace FeatureLoom.Forms
         {
             if (property.Position != targetRowIndex)
             {
-                using (this.LayoutSuspension())
+                //using (this.LayoutSuspension())
                 {
                     var rowStyle = propertyTable.RowStyles[property.Position];
                     propertyTable.RemoveRowAt(property.Position);
@@ -121,7 +121,7 @@ namespace FeatureLoom.Forms
         private Property AddProperty(string name)
         {
             Property property;
-            using (this.LayoutSuspension())
+            //using (this.LayoutSuspension())
             {                
                 int rowIndex = propertyTable.RowCount-1;
                 propertyTable.RowCount++;
@@ -166,7 +166,7 @@ namespace FeatureLoom.Forms
 
         private void UpdateSizes()
         {
-            using (this.LayoutSuspension())
+            //using (this.LayoutSuspension())
             {
                 int scrollBarOffset = this.Width > propertyTable.PreferredSize.Width ? 0 : 25;
                 this.MinimumSize = new Size(0, propertyTable.PreferredSize.Height + scrollBarOffset);
@@ -187,7 +187,7 @@ namespace FeatureLoom.Forms
         {
             var property = properties[label];
             properties.Remove(label);
-            using (this.LayoutSuspension())
+            //using (this.LayoutSuspension())
             {
                 int rowIndex = propertyTable.GetPositionFromControl(property.GetLabelControl()).Row;
                 propertyTable.RemoveRowAt(rowIndex);
@@ -213,7 +213,7 @@ namespace FeatureLoom.Forms
         public void Clear()
         {
             properties.Clear();
-            using (this.LayoutSuspension())
+            //using (this.LayoutSuspension())
             {
                 propertyTable.RowCount = 0;
                 propertyTable.Controls.Clear();
@@ -234,7 +234,7 @@ namespace FeatureLoom.Forms
             if (exceptions.EmptyOrNull()) Clear();
             else
             {
-                using (this.LayoutSuspension())
+                //using (this.LayoutSuspension())
                 {
                     var toRemove = properties.Keys.Except(exceptions).ToArray();
                     foreach (var label in toRemove)

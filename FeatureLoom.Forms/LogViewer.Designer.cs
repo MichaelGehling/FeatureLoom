@@ -29,25 +29,25 @@
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(LogViewer));
-            this.richTextBox1 = new System.Windows.Forms.RichTextBox();
+            this.textBox = new System.Windows.Forms.RichTextBox();
             this.SuspendLayout();
             // 
             // richTextBox1
             // 
-            this.richTextBox1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.richTextBox1.Location = new System.Drawing.Point(0, 0);
-            this.richTextBox1.Margin = new System.Windows.Forms.Padding(5, 6, 5, 6);
-            this.richTextBox1.Name = "richTextBox1";
-            this.richTextBox1.Size = new System.Drawing.Size(1467, 830);
-            this.richTextBox1.TabIndex = 0;
-            this.richTextBox1.Text = "";
+            this.textBox.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.textBox.Location = new System.Drawing.Point(0, 0);
+            this.textBox.Margin = new System.Windows.Forms.Padding(5, 6, 5, 6);
+            this.textBox.Name = "richTextBox1";
+            this.textBox.Size = new System.Drawing.Size(1467, 830);
+            this.textBox.TabIndex = 0;
+            this.textBox.Text = "";
             // 
             // LogViewer
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(11F, 24F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1467, 830);
-            this.Controls.Add(this.richTextBox1);
+            this.Controls.Add(this.textBox);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(5, 6, 5, 6);
             this.Name = "LogViewer";
@@ -58,7 +58,7 @@
 
         #endregion
 
-        private System.Windows.Forms.RichTextBox richTextBox1;
+        private System.Windows.Forms.RichTextBox textBox;
     }
 }
 

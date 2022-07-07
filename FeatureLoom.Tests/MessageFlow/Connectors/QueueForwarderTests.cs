@@ -19,7 +19,7 @@ namespace FeatureLoom.MessageFlow
             var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);
-            sink.WaitHandle.Wait(2.Seconds());
+            Assert.True(sink.WaitHandle.Wait(2.Seconds()));
             Assert.True(sink.HasMessage);
             Assert.Equal(message, sink.LatestMessageOrDefault);
         }

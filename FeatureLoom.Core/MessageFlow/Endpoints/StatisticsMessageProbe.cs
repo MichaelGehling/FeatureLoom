@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class StatisticsMessageProbe<T1, T2> : IMessageSink
+    public sealed class StatisticsMessageProbe<T1, T2> : IMessageSink
     {
         private FeatureLock myLock = new FeatureLock();
         private readonly string name;

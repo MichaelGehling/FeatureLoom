@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace FeatureLoom.Collections
 {
-    public class CountingRingBuffer<T>
+    public sealed class CountingRingBuffer<T>
     {
         private T[] buffer;
         private int nextIndex = 0;

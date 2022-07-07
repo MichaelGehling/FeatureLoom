@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class MessageTrigger : IMessageSink, IAsyncWaitHandle
+    public sealed class MessageTrigger : IMessageSink, IAsyncWaitHandle
     {
         private AsyncManualResetEvent mre = new AsyncManualResetEvent();
         private readonly Mode mode;
@@ -60,7 +60,7 @@ namespace FeatureLoom.MessageFlow
             return Task.CompletedTask;
         }
 
-        protected virtual void HandleMessage<M>(M message)
+        void HandleMessage<M>(M message)
         {
             if (mode == Mode.Toggle)
             {

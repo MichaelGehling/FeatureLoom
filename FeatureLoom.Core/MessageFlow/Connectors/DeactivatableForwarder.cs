@@ -9,7 +9,7 @@ namespace FeatureLoom.MessageFlow
     /// automatically be providing a function delegate that checks each time a message is received if
     /// forwarder is active or not. This allows to inhibit communication in specific application states.
     /// </summary>
-    public class DeactivatableForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
+    public sealed class DeactivatableForwarder : IMessageSink, IMessageSource, IMessageFlowConnection
     {
         private SourceValueHelper sourceHelper;
         private bool active = true;

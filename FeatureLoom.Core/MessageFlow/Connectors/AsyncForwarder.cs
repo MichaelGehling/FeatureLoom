@@ -3,13 +3,14 @@
 namespace FeatureLoom.MessageFlow
 {
     /// <summary>
-    /// Messages are forwarded async without awaiting, so the control is returned immediatly to the sender.
+    /// Messages are forwarded async without awaiting, so the control is returned immediatly to the sender if 
+    /// further executed code is async.
     /// Be aware that the order of message might change, due to parallel processing.
     /// If you need to keep the order, please use QueueForwarder.
     /// </summary>
-    public class AsyncForwarder : IMessageFlowConnection
+    public sealed class AsyncForwarder : IMessageFlowConnection
     {
-        protected SourceValueHelper sourceHelper;
+        private SourceValueHelper sourceHelper;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
