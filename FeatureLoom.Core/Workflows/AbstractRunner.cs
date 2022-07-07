@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.MessageFlow;
+using FeatureLoom.Services;
 using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ namespace FeatureLoom.Workflows
 
         protected AbstractRunner()
         {
-            WorkflowRunnerService.Register(this);
+            Service<WorkflowRunnerService>.Instance.Register(this);
         }
 
         public IEnumerable<Workflow> RunningWorkflows

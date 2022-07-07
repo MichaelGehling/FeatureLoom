@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Workflows
 {
@@ -30,7 +31,7 @@ namespace FeatureLoom.Workflows
         public IMessageSource ExecutionInfoSource => executionInfoSender.Obj;
 
         [JsonIgnore]
-        protected virtual IWorkflowRunner DefaultRunner => WorkflowRunnerService.DefaultRunner;
+        protected virtual IWorkflowRunner DefaultRunner => Service<WorkflowRunnerService>.Instance.DefaultRunner;
 
         [JsonIgnore]
         public ExecutionState CurrentExecutionState { get => executionState; set => executionState = value; }

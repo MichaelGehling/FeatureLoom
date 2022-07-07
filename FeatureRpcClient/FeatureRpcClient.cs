@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.RPC;
+using FeatureLoom.Services;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using FeatureLoom.TCP;
@@ -115,7 +116,7 @@ namespace FeatureRpcClient
             Log.QueuedLogSource.DisconnectFrom(Log.DefaultConsoleLogger);
             var workflow = new FeatureRpcClient(args.Length >= 1 ? args[0] : null);
             new BlockingRunner().RunAsync(workflow).WaitFor();
-            WorkflowRunnerService.PauseAllWorkflowsAsync(true).Wait(1.Seconds());
+            Service<WorkflowRunnerService>.Instance.PauseAllWorkflowsAsync(true).Wait(1.Seconds());
             return workflow.errorCode;
         }
     }

@@ -4,6 +4,7 @@ using FeatureLoom.Workflows;
 using System;
 using FeatureLoom.Storages;
 using FeatureLoom.Extensions;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.Logging
 {
@@ -23,7 +24,7 @@ namespace FeatureLoom.Logging
             DefaultConsoleLogger = new ConsoleLogger();
             DefaultFileLogger = new FileLogger();
             LogRunner = new SmartRunner();
-            WorkflowRunnerService.Unregister(LogRunner);
+            Service<WorkflowRunnerService>.Instance.Unregister(LogRunner);
             _ = LogRunner.RunAsync(DefaultFileLogger);
 
             logSink.ConnectTo(queueLogForwarder);

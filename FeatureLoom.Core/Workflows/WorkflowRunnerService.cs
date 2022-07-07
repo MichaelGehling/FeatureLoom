@@ -6,46 +6,49 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Workflows
 {
-    public static class WorkflowRunnerService
+    public class WorkflowRunnerService
     {
-        private static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
+        List<IWorkflowRunner> runners = new List<IWorkflowRunner>();
+        FeatureLock runnersLock = new FeatureLock();
+        IWorkflowRunner defaultRunner;
+        Forwarder executionInfoForwarder = null;
 
-        public static IWorkflowRunner DefaultRunner
+        public IWorkflowRunner DefaultRunner
         {
             get
             {
-                if (context.Data.defaultRunner == null) context.Data.defaultRunner = new SmartRunner();
-                return context.Data.defaultRunner;
+                if (defaultRunner == null) defaultRunner = new SmartRunner();
+                return defaultRunner;
             }
         }
 
-        public static void Register(IWorkflowRunner runner)
+        public void Register(IWorkflowRunner runner)
         {
-            using (context.Data.runnersLock.Lock())
+            using (runnersLock.Lock())
             {
-                context.Data.runners.Add(runner);
-                if (context.Data.executionInfoForwarder != null) runner.ExecutionInfoSource.ConnectTo(context.Data.executionInfoForwarder);
+                runners.Add(runner);
+                if (executionInfoForwarder != null) runner.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
             }
         }
 
-        public static void Unregister(IWorkflowRunner runner)
+        public void Unregister(IWorkflowRunner runner)
         {
-            using (context.Data.runnersLock.Lock())
+            using (runnersLock.Lock())
             {
-                context.Data.runners.Remove(runner);
-                if (context.Data.executionInfoForwarder != null) runner.ExecutionInfoSource.DisconnectFrom(context.Data.executionInfoForwarder);
+                runners.Remove(runner);
+                if (executionInfoForwarder != null) runner.ExecutionInfoSource.DisconnectFrom(executionInfoForwarder);
             }
         }
 
-        public static IWorkflowRunner[] GetAllRunners()
+        public IWorkflowRunner[] GetAllRunners()
         {
-            using (context.Data.runnersLock.LockReadOnly())
+            using (runnersLock.LockReadOnly())
             {
-                return context.Data.runners.ToArray();
+                return runners.ToArray();
             }
         }
 
-        public static IReadOnlyList<Workflow> GetAllRunningWorkflows()
+        public IReadOnlyList<Workflow> GetAllRunningWorkflows()
         {
             List<Workflow> workflows = new List<Workflow>();
             foreach (var runner in GetAllRunners())
@@ -55,23 +58,23 @@ namespace FeatureLoom.Workflows
             return workflows;
         }
 
-        public static IMessageSource ExecutionInfoSource
+        public IMessageSource ExecutionInfoSource
         {
             get
             {
-                if (context.Data.executionInfoForwarder == null)
+                if (executionInfoForwarder == null)
                 {
-                    context.Data.executionInfoForwarder = new Forwarder();
+                    executionInfoForwarder = new Forwarder();
                     foreach (var runner in GetAllRunners())
                     {
-                        runner.ExecutionInfoSource.ConnectTo(context.Data.executionInfoForwarder);
+                        runner.ExecutionInfoSource.ConnectTo(executionInfoForwarder);
                     }
                 }
-                return context.Data.executionInfoForwarder;
+                return executionInfoForwarder;
             }
         }
 
-        public static async Task PauseAllWorkflowsAsync(bool tryCancelWaitingStep)
+        public async Task PauseAllWorkflowsAsync(bool tryCancelWaitingStep)
         {
             List<Task> tasks = new List<Task>();
             foreach (var runner in GetAllRunners())
@@ -81,24 +84,5 @@ namespace FeatureLoom.Workflows
             await Task.WhenAll(tasks.ToArray());
         }
 
-        private class ContextData : IServiceContextData
-        {
-            public List<IWorkflowRunner> runners = new List<IWorkflowRunner>();
-            public FeatureLock runnersLock = new FeatureLock();
-            public IWorkflowRunner defaultRunner;
-            public Forwarder executionInfoForwarder = null;
-
-            public IServiceContextData Copy()
-            {
-                using (runnersLock.LockReadOnly())
-                {
-                    return new ContextData()
-                    {
-                        defaultRunner = this.defaultRunner,
-                        runners = new List<IWorkflowRunner>(this.runners)
-                    };
-                }
-            }
-        }
     }
 }
