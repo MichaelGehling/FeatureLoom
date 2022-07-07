@@ -21,4 +21,8 @@
     <ProjectReference Include="..\FeatureLoom\FeatureLoom.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Helpers\" />
+  </ItemGroup>
+
 </Project>
