@@ -17,28 +17,30 @@ namespace FeatureLoom.UndoRedo
         public void CanUndosAndRedosCanHaveDescriptions()        
         {
             TestHelper.PrepareTestContext();
-            string data = "Init";            
-            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
-            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");            
+            
+            var undoRedo = new UndoRedoService();
+            string data = "Init";
+            undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");            
 
-            Assert.Contains("Init->Changed1", UndoRedoService.UndoDescriptions);
-            Assert.Contains("Changed1->Changed2", UndoRedoService.UndoDescriptions);
-            Assert.Equal(2, UndoRedoService.UndoDescriptions.Count());
-            Assert.Empty(UndoRedoService.RedoDescriptions);
+            Assert.Contains("Init->Changed1", undoRedo.UndoDescriptions);
+            Assert.Contains("Changed1->Changed2", undoRedo.UndoDescriptions);
+            Assert.Equal(2, undoRedo.UndoDescriptions.Count());
+            Assert.Empty(undoRedo.RedoDescriptions);
 
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
 
-            Assert.Contains("Init->Changed1", UndoRedoService.UndoDescriptions);
-            Assert.Contains("Changed1->Changed2", UndoRedoService.RedoDescriptions);
-            Assert.Single(UndoRedoService.UndoDescriptions);
-            Assert.Single(UndoRedoService.RedoDescriptions);
+            Assert.Contains("Init->Changed1", undoRedo.UndoDescriptions);
+            Assert.Contains("Changed1->Changed2", undoRedo.RedoDescriptions);
+            Assert.Single(undoRedo.UndoDescriptions);
+            Assert.Single(undoRedo.RedoDescriptions);
 
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
 
-            Assert.Contains("Init->Changed1", UndoRedoService.RedoDescriptions);
-            Assert.Contains("Changed1->Changed2", UndoRedoService.RedoDescriptions);
-            Assert.Empty(UndoRedoService.UndoDescriptions);
-            Assert.Equal(2, UndoRedoService.RedoDescriptions.Count());
+            Assert.Contains("Init->Changed1", undoRedo.RedoDescriptions);
+            Assert.Contains("Changed1->Changed2", undoRedo.RedoDescriptions);
+            Assert.Empty(undoRedo.UndoDescriptions);
+            Assert.Equal(2, undoRedo.RedoDescriptions.Count());
 
             Assert.False(TestHelper.HasAnyLogError());
         }
@@ -48,23 +50,24 @@ namespace FeatureLoom.UndoRedo
         {
             TestHelper.PrepareTestContext();
 
+            var undoRedo = new UndoRedoService();
             string data = "Init";
-            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
-            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
+            undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
             Assert.Equal("Changed2", data);
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Changed1", data);
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Init", data);
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Init", data);
 
-            UndoRedoService.PerformRedo();
+            undoRedo.PerformRedo();
             Assert.Equal("Changed1", data);
-            UndoRedoService.PerformRedo();
+            undoRedo.PerformRedo();
             Assert.Equal("Changed2", data);
-            UndoRedoService.PerformRedo();
+            undoRedo.PerformRedo();
             Assert.Equal("Changed2", data);
 
             Assert.False(TestHelper.HasAnyLogError());
@@ -75,25 +78,26 @@ namespace FeatureLoom.UndoRedo
         {
             TestHelper.PrepareTestContext();
 
+            var undoRedo = new UndoRedoService();
             string data = "Init";
 
-            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
-            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
+            undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
             Assert.Equal("Changed2", data);
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Changed1", data);
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Init", data);
 
-            UndoRedoService.PerformRedo();
+            undoRedo.PerformRedo();
             Assert.Equal("Changed1", data);
-            UndoRedoService.PerformRedo();
+            undoRedo.PerformRedo();
             Assert.Equal("Changed2", data);
 
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Changed1", data);
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Init", data);
 
             Assert.False(TestHelper.HasAnyLogError());
@@ -104,20 +108,21 @@ namespace FeatureLoom.UndoRedo
         {
             TestHelper.PrepareTestContext();
 
+            var undoRedo = new UndoRedoService();
             string data = "Init";
-            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
-            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
+            undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
-            Assert.True(UndoRedoService.TryCombineLastUndos(2));
+            Assert.True(undoRedo.TryCombineLastUndos(2));
 
             Assert.Equal("Changed2", data);
-            UndoRedoService.PerformUndo();            
-            Assert.Equal("Init", data);            
+            undoRedo.PerformUndo();            
+            Assert.Equal("Init", data);
 
-            UndoRedoService.PerformRedo();            
+            undoRedo.PerformRedo();            
             Assert.Equal("Changed2", data);
 
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Init", data);
 
             Assert.False(TestHelper.HasAnyLogError());
@@ -128,21 +133,22 @@ namespace FeatureLoom.UndoRedo
         {
             TestHelper.PrepareTestContext();
 
+            var undoRedo = new UndoRedoService();
             string data = "Init";
-            using (UndoRedoService.StartTransaction())
-            {                
-                UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
-                UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
+            using (undoRedo.StartTransaction())
+            {
+                undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+                undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
             }            
 
             Assert.Equal("Changed2", data);
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Init", data);
 
-            UndoRedoService.PerformRedo();
+            undoRedo.PerformRedo();
             Assert.Equal("Changed2", data);
 
-            UndoRedoService.PerformUndo();
+            undoRedo.PerformUndo();
             Assert.Equal("Init", data);
 
             Assert.False(TestHelper.HasAnyLogError());
@@ -153,18 +159,19 @@ namespace FeatureLoom.UndoRedo
         {
             TestHelper.PrepareTestContext();
 
+            var undoRedo = new UndoRedoService();
             string data = "Init";
-            UndoRedoService.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
-            UndoRedoService.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
+            undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
+            undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
 
-            UndoRedoService.Clear();
+            undoRedo.Clear();
 
             Assert.Equal("Changed2", data);
 
-            UndoRedoService.PerformUndo();
-            Assert.Equal("Changed2", data);            
+            undoRedo.PerformUndo();
+            Assert.Equal("Changed2", data);
 
-            UndoRedoService.PerformRedo();
+            undoRedo.PerformRedo();
             Assert.Equal("Changed2", data);            
 
             Assert.False(TestHelper.HasAnyLogError());

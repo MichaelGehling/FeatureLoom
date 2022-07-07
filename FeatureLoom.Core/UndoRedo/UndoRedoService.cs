@@ -11,44 +11,22 @@ using FeatureLoom.Helpers;
 
 namespace FeatureLoom.UndoRedo
 {
-    public static class UndoRedoService
+    public class UndoRedoService
     {
-        private class ContextData : IServiceContextData
+        FeatureLock myLock = new FeatureLock();
+
+        bool undoing = false;
+        bool redoing = false;
+        Stack<UndoRedoAction> undos = new Stack<UndoRedoAction>();
+        Stack<UndoRedoAction> redos = new Stack<UndoRedoAction>();
+        Sender<Notification> updateSender = new Sender<Notification>();
+        Forwarder<Notification> updateForwarder = new Forwarder<Notification>();
+        int transactionCounter = 0;
+
+        public UndoRedoService()
         {
-            public FeatureLock myLock = new FeatureLock();
-
-            public bool undoing = false;
-            public bool redoing = false;
-            public Stack<UndoRedoAction> undos = new Stack<UndoRedoAction>();
-            public Stack<UndoRedoAction> redos = new Stack<UndoRedoAction>();
-            public Sender<Notification> updateSender = new Sender<Notification>();            
-            public Forwarder<Notification> updateForwarder = new Forwarder<Notification>();
-            public int transactionCounter = 0;
-            public ContextData()
-            {
-                updateSender.ConnectTo(new DeactivatableForwarder(() => this.transactionCounter == 0)).ConnectTo(updateForwarder);
-            }
-
-            public IServiceContextData Copy()
-            {
-                using (myLock.LockReadOnly())
-                {
-                    var newContext = new ContextData();
-                    newContext.undoing = undoing;
-                    newContext.redoing = redoing;
-                    newContext.undos = new Stack<UndoRedoAction>(undos);
-                    newContext.redos = new Stack<UndoRedoAction>(redos);
-                    foreach (var sink in newContext.updateSender.GetConnectedSinks())
-                    {
-                        updateSender.ConnectTo(sink);
-                    }
-
-                    return newContext;
-                }
-            }
+            updateSender.ConnectTo(new DeactivatableForwarder(() => this.transactionCounter == 0)).ConnectTo(updateForwarder);
         }
-
-        private static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
 
         public enum Notification
         {
@@ -95,109 +73,111 @@ namespace FeatureLoom.UndoRedo
 
         public struct Transaction : IDisposable
         {
+            UndoRedoService serviceInstance;
             int numUndosAtStart;
             FeatureLock.LockHandle lockHandle;
             string description;
 
-            public Transaction(FeatureLock.LockHandle lockHandle, string description)
+            public Transaction(UndoRedoService serviceInstance, FeatureLock.LockHandle lockHandle, string description)
             {
-                UndoRedoService.context.Data.transactionCounter++;
+                this.serviceInstance = serviceInstance;
+                serviceInstance.transactionCounter++;
                 this.lockHandle = lockHandle;
-                numUndosAtStart = UndoRedoService.NumUndos;
+                numUndosAtStart = this.serviceInstance.NumUndos;
                 this.description = description;
             }
 
             public void Dispose()
             {
-                UndoRedoService.context.Data.transactionCounter--;
-                int numUndosInTransaction = UndoRedoService.NumUndos - numUndosAtStart;
-                UndoRedoService.TryCombineLastUndos(numUndosInTransaction, description);                
+                serviceInstance.transactionCounter--;
+                int numUndosInTransaction = this.serviceInstance.NumUndos - numUndosAtStart;
+                this.serviceInstance.TryCombineLastUndos(numUndosInTransaction, description);                
                 lockHandle.Dispose();
             }
         }
 
-        public static int NumUndos => context.Data.undos.Count;
-        public static int NumRedos => context.Data.redos.Count;
-        public static bool CurrentlyUndoing => context.Data.undoing;
-        public static bool CurrentlyRedoing => context.Data.redoing;
+        public int NumUndos => undos.Count;
+        public int NumRedos => redos.Count;
+        public bool CurrentlyUndoing => undoing;
+        public bool CurrentlyRedoing => redoing;
 
-        public static Transaction StartTransaction(string description = null) => new Transaction(context.Data.myLock.LockReentrant(), description);
-        public static async Task<Transaction> StartTransactionAsync(string description = null) => new Transaction(await context.Data.myLock.LockReentrantAsync(), description);
+        public Transaction StartTransaction(string description = null) => new Transaction(this, myLock.LockReentrant(), description);
+        public async Task<Transaction> StartTransactionAsync(string description = null) => new Transaction(this, await myLock.LockReentrantAsync(), description);
 
-        public static IMessageSource<Notification> UpdateNotificationSource => context.Data.updateForwarder;
+        public IMessageSource<Notification> UpdateNotificationSource => updateForwarder;
 
-        public static IEnumerable<string> UndoDescriptions => context.Data.undos.Select(action => action.Description);
-        public static IEnumerable<string> RedoDescriptions => context.Data.redos.Select(action => action.Description);
+        public IEnumerable<string> UndoDescriptions => undos.Select(action => action.Description);
+        public IEnumerable<string> RedoDescriptions => redos.Select(action => action.Description);
 
-        public static void PerformUndo()
+        public void PerformUndo()
         {
-            if (context.Data.undos.Count == 0) return;
+            if (undos.Count == 0) return;
 
-            using (context.Data.myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
-                context.Data.undoing = true;
+                undoing = true;
                 try
                 {
-                    context.Data.undos.Pop().Execute();
+                    undos.Pop().Execute();
                 }
                 finally
                 {
-                    context.Data.undoing = false;
+                    undoing = false;
                 }
             }
 
-            context.Data.updateSender.Send(Notification.UndoPerformed);
-            Log.INFO(context.Data.GetHandle(), "Undo permformed");
+            updateSender.Send(Notification.UndoPerformed);
+            Log.INFO(this.GetHandle(), "Undo permformed");
         }
 
-        public static void PerformRedo()
+        public void PerformRedo()
         {
-            if (context.Data.redos.Count == 0) return;
+            if (redos.Count == 0) return;
 
-            using (context.Data.myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
-                context.Data.redoing = true;
+                redoing = true;
                 try
                 {
-                    context.Data.redos.Pop().Execute();
+                    redos.Pop().Execute();
                 }
                 finally
                 {
-                    context.Data.redoing = false;
+                    redoing = false;
                 }
             }
 
-            context.Data.updateSender.Send(Notification.RedoPerformed);
-            Log.INFO(context.Data.GetHandle(), "Redo permformed");
+            updateSender.Send(Notification.RedoPerformed);
+            Log.INFO(this.GetHandle(), "Redo permformed");
         }
 
-        public static void AddUndo(Action undo, string description = null)
+        public void AddUndo(Action undo, string description = null)
         {
-            using (context.Data.myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
-                if (context.Data.undoing)
+                if (undoing)
                 {
-                    context.Data.redos.Push(new UndoRedoAction(undo, description));
+                    redos.Push(new UndoRedoAction(undo, description));
                 }
                 else
                 {
-                    if (!context.Data.redoing) context.Data.redos.Clear();
-                    context.Data.undos.Push(new UndoRedoAction(undo, description));
+                    if (!redoing) redos.Clear();
+                    undos.Push(new UndoRedoAction(undo, description));
                 }
             }
-            if (context.Data.undoing)
+            if (undoing)
             {
-                context.Data.updateSender.Send(Notification.RedoJobAdded);
-                Log.INFO(context.Data.GetHandle(), "Redo job added");
+                updateSender.Send(Notification.RedoJobAdded);
+                Log.INFO(this.GetHandle(), "Redo job added");
             }
             else
             {
-                context.Data.updateSender.Send(Notification.UndoJobAdded);
-                Log.INFO(context.Data.GetHandle(), "Undo job added");
+                updateSender.Send(Notification.UndoJobAdded);
+                Log.INFO(this.GetHandle(), "Undo job added");
             }
         }
 
-        public static void DoWithUndo(Action doAction, Action undoAction, string description = null)
+        public void DoWithUndo(Action doAction, Action undoAction, string description = null)
         {
             doAction.Invoke();
 
@@ -209,7 +189,7 @@ namespace FeatureLoom.UndoRedo
         }
 
         /*
-        public static async Task DoWithUndoAsync(Func<Task> doAction, Func<Task> undoAction)
+        public async Task DoWithUndoAsync(Func<Task> doAction, Func<Task> undoAction)
         {
             await doAction.Invoke();
 
@@ -221,22 +201,22 @@ namespace FeatureLoom.UndoRedo
         }
         */
 
-        public static void Clear()
+        public void Clear()
         {
-            using (context.Data.myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
-                context.Data.undos.Clear();
-                context.Data.redos.Clear();
+                undos.Clear();
+                redos.Clear();
             }
 
-            context.Data.updateSender.Send(Notification.Cleared);
-            Log.INFO(context.Data.GetHandle(), "All undo and redo jobs cleared");
+            updateSender.Send(Notification.Cleared);
+            Log.INFO(this.GetHandle(), "All undo and redo jobs cleared");
         }
 
-        public static bool TryCombineLastUndos(int numUndosToCombine = 2, string description = null)
+
+        public bool TryCombineLastUndos(int numUndosToCombine = 2, string description = null)
         {
-            var data = context.Data;
-            using (data.myLock.LockReentrant())
+            using (myLock.LockReentrant())
             {
                 if (CurrentlyUndoing) 
                 {
@@ -246,7 +226,7 @@ namespace FeatureLoom.UndoRedo
                     UndoRedoAction[] combinedActions = new UndoRedoAction[numUndosToCombine];
                     for (int i = 0; i < numUndosToCombine; i++)
                     {
-                        combinedActions[i] = data.redos.Pop();
+                        combinedActions[i] = redos.Pop();
                     }
 
                     AddUndo(() =>
@@ -272,7 +252,7 @@ namespace FeatureLoom.UndoRedo
                     UndoRedoAction[] combinedActions = new UndoRedoAction[numUndosToCombine];
                     for (int i = 0; i < numUndosToCombine; i++)
                     {
-                        combinedActions[i] = data.undos.Pop();
+                        combinedActions[i] = undos.Pop();
                     }
 
                     AddUndo(() =>
