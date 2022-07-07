@@ -9,7 +9,13 @@ namespace FeatureLoom.Helpers
 {
     public static class TestHelper
     {
-        private static ServiceContext<ContextData> context = new ServiceContext<ContextData>();
+        private class ContextData
+        {
+            public FeatureLock contextLock = new FeatureLock();
+
+            public List<LogMessage> errors = new List<LogMessage>();
+            public List<LogMessage> warnings = new List<LogMessage>();
+        }
 
         public static void PrepareTestContext(bool disconnectLoggers = true, bool useMemoryStorage = true, bool bufferLogErrorsAndWarnings = true)
         {
@@ -21,14 +27,15 @@ namespace FeatureLoom.Helpers
                 Log.SyncLogSource.DisconnectAll();
             }
 
-            Log.SyncLogSource.ConnectTo(new ProcessingEndpoint<LogMessage>(msg =>
+            Log.SyncLogSource.ProcessMessage<LogMessage>(msg =>
             {
-                using (context.Data.contextLock.Lock())
+                var contextData = Service<ContextData>.Instance;
+                using (contextData.contextLock.Lock())
                 {
-                    if (msg.level == Loglevel.ERROR) context.Data.errors.Add(msg);
-                    else if (bufferLogErrorsAndWarnings && msg.level == Loglevel.WARNING) context.Data.warnings.Add(msg);
+                    if (msg.level == Loglevel.ERROR) contextData.errors.Add(msg);
+                    else if (bufferLogErrorsAndWarnings && msg.level == Loglevel.WARNING) contextData.warnings.Add(msg);
                 }
-            }));
+            });
 
             if (useMemoryStorage)
             {
@@ -40,10 +47,11 @@ namespace FeatureLoom.Helpers
 
         public static bool HasAnyLogError(bool includeWarnings = true)
         {
-            using (context.Data.contextLock.LockReadOnly())
+            var contextData = Service<ContextData>.Instance;
+            using (contextData.contextLock.LockReadOnly())
             {
-                if (includeWarnings) return context.Data.errors.Count > 0 || context.Data.warnings.Count > 0;
-                else return context.Data.errors.Count > 0;
+                if (includeWarnings) return contextData.errors.Count > 0 || contextData.warnings.Count > 0;
+                else return contextData.errors.Count > 0;
             }
         }
 
@@ -51,7 +59,8 @@ namespace FeatureLoom.Helpers
         {
             get
             {
-                using (context.Data.contextLock.LockReadOnly()) return context.Data.errors.ToArray();
+                var contextData = Service<ContextData>.Instance;
+                using (contextData.contextLock.LockReadOnly()) return contextData.errors.ToArray();
             }
         }
 
@@ -59,24 +68,11 @@ namespace FeatureLoom.Helpers
         {
             get
             {
-                using (context.Data.contextLock.LockReadOnly()) return context.Data.warnings.ToArray();
+                var contextData = Service<ContextData>.Instance;
+                using (contextData.contextLock.LockReadOnly()) return contextData.warnings.ToArray();
             }
         }
 
-        private class ContextData : IServiceContextData
-        {
-            public FeatureLock contextLock = new FeatureLock();
-
-            public List<LogMessage> errors = new List<LogMessage>();
-            public List<LogMessage> warnings = new List<LogMessage>();
-
-            public IServiceContextData Copy()
-            {
-                var copy = new ContextData();
-                copy.errors.AddRange(this.errors);
-                copy.warnings.AddRange(this.warnings);
-                return copy;
-            }
-        }
+       
     }
 }
