@@ -45,7 +45,7 @@ namespace FeatureLoom.Workflows
                         proceedStep = DoWaiting(context, step, partialStep);
                     }
 
-                    if (partialStep.targetState != null || partialStep.finishStateMachine)
+                    if (partialStep.targetStates != null || partialStep.finishStateMachine)
                     {
                         DoTransition(context, step, currentExecutionState, ref nextExecutionState, ref nextExecutionPhase, ref proceedStep, partialStep);
                     }
@@ -89,7 +89,7 @@ namespace FeatureLoom.Workflows
                         proceedStep = await DoWaitingAsync(context, step, proceedStep, partialStep);
                     }
 
-                    if (partialStep.targetState != null || partialStep.finishStateMachine)
+                    if (partialStep.targetStates != null || partialStep.finishStateMachine)
                     {
                         DoTransition(context, step, currentExecutionState, ref nextExecutionState, ref nextExecutionPhase, ref proceedStep, partialStep);
                     }
@@ -106,9 +106,9 @@ namespace FeatureLoom.Workflows
 
         private static void DoTransition<C>(C context, Step<C> step, Workflow.ExecutionState currentExecutionState, ref Workflow.ExecutionState nextExecutionState, ref Workflow.ExecutionPhase nextExecutionPhase, ref bool proceed, PartialStep<C> partialStep) where C : class, IStateMachineContext
         {
-            if (partialStep.targetState != null)
+            if (partialStep.targetStates != null)
             {
-                var targetState = partialStep.targetState(context);
+                var targetState = partialStep.targetStates.Length == 1 ? partialStep.targetStates[0] : partialStep.targetStates[partialStep.targetStateIndex(context)];
                 nextExecutionState = (targetState.stateIndex, 0);
                 if (step.parentState != targetState) context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StateTransition, targetState);
                 proceed = false;

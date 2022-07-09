@@ -75,7 +75,7 @@ namespace FeatureLoom.Workflows
                 var validLastStep = false;
                 PartialStep<CT> lastPartialStep = lastStep;
                 while (lastPartialStep.doElse != null) lastPartialStep = lastPartialStep.doElse;
-                if (!lastPartialStep.hasCondition && lastPartialStep.targetState != null) validLastStep = true;
+                if (!lastPartialStep.hasCondition && lastPartialStep.targetStates != null) validLastStep = true;
                 else if (!lastPartialStep.hasCondition && lastPartialStep.finishStateMachine) validLastStep = true;
                 if (!validLastStep)
                 {
@@ -92,7 +92,7 @@ namespace FeatureLoom.Workflows
             if (step.description == null || step.description == "")
                 findings += $"State {state.name} has a step at index {step.stepIndex.ToString()} without description.\n";
 
-            if (!(step.hasAction || step.hasWaiting || step.finishStateMachine || step.targetState != null))
+            if (!(step.hasAction || step.hasWaiting || step.finishStateMachine || step.targetStates != null))
                 findings += $"State {state.name} has a step {step.description} at index {step.stepIndex.ToString()} without any content. Remove or implement! \n";
             return findings;
         }

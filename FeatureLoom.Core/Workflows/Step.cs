@@ -1,4 +1,6 @@
-﻿using System;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -53,32 +55,27 @@ namespace FeatureLoom.Workflows
         {
             get
             {
-                return null;
-                //TODO: How to handle variable targetStates?
-                /*
-                List<IStateInfo> targetStates = null;
+                LazyValue<List<IStateInfo>> result = new LazyValue<List<IStateInfo>>();
                 var nextElse = doElse;
                 while (nextElse != null)
                 {
-                    if (nextElse.targetState != null)
+                    if (nextElse.targetStates != null)
                     {
-                        if (targetStates == null) targetStates = new List<IStateInfo>();
-                        targetStates.Add(nextElse.targetState);
+                        result.Obj.AddRange(nextElse.targetStates);
                     }
                     nextElse = nextElse.doElse;
                 }
 
-                if (targetStates == null)
+                if (!result.Exists)
                 {
-                    if (targetState == null) return Array.Empty<IStateInfo>();
-                    else return new IStateInfo[] { targetState };
+                    if (targetStates == null) return Array.Empty<IStateInfo>();
+                    else return targetStates.ToArray();
                 }
                 else
                 {
-                    if (targetState != null) targetStates.Add(targetState);
-                    return targetStates.ToArray();
+                    if (targetStates != null) result.Obj.AddRange(targetStates);
+                    return result.Obj.ToArray();
                 }
-                */
             }
         }
 
@@ -120,14 +117,13 @@ namespace FeatureLoom.Workflows
 
         public bool hasWaiting = false;
 
-        //public Func<CT, TimeSpan> timeoutDelegate;
-        //public Func<CT, Task> waitingTaskDelegate;
         public Action<CT> waitingDelegate;
 
         public Func<CT, Task> waitingAsyncDelegate;
 
         public bool finishStateMachine = false;
-        public Func<CT, State> targetState;
+        public Func<CT, int> targetStateIndex;
+        public State[] targetStates;
 
         public bool IsAsync => actionAsync != null || conditionAsync != null || waitingAsyncDelegate != null;
         

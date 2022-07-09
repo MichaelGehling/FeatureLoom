@@ -3,6 +3,7 @@ using FeatureLoom.Synchronization;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Workflows
 {
@@ -97,13 +98,14 @@ namespace FeatureLoom.Workflows
 
         public State<CT> Goto(State targetState)
         {
-            CurrentPartialStep.targetState = c => targetState;
+            CurrentPartialStep.targetStates = targetState.ToSingleEntryArray();
             return this.state;
         }
 
-        public State<CT> Goto(Func<CT, State> targetState)
+        public State<CT> Goto(Func<CT, int> targetStateIndex, params State[] targetStates)
         {
-            CurrentPartialStep.targetState = targetState;
+            CurrentPartialStep.targetStateIndex = targetStateIndex;
+            CurrentPartialStep.targetStates = targetStates;
             return this.state;
         }
 
@@ -145,7 +147,7 @@ namespace FeatureLoom.Workflows
 
         public State<CT> Loop()
         {
-            CurrentPartialStep.targetState = c => state;
+            CurrentPartialStep.targetStates = state.ToSingleEntryArray();
             return state;
         }
 
@@ -333,27 +335,27 @@ namespace FeatureLoom.Workflows
             return this;
         }
 
-        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterPreconditionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterPreconditionStateBuilder<CT>.Goto(Func<CT, int> targetStateIndex, params State[] targetStates)
         {
-            this.Goto(targetState);
+            this.Goto(targetStateIndex, targetStates);
             return this;
         }
 
-        IAfterActionStateBuilderWithoutTransition<CT> IAfterActionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterActionStateBuilder<CT>.Goto(Func<CT, int> targetStateIndex, params State[] targetStates)
         {
-            this.Goto(targetState);
+            this.Goto(targetStateIndex, targetStates);
             return this;
         }
 
-        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterConditionedActionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        IAfterConditionedStateBuilderWithoutTransition<CT> IAfterConditionedActionStateBuilder<CT>.Goto(Func<CT, int> targetStateIndex, params State[] targetStates)
         {
-            this.Goto(targetState);
+            this.Goto(targetStateIndex, targetStates);
             return this;
         }
 
-        IAfterActionStateBuilderWithoutTransition<CT> IAfterFinalPreconditionStateBuilder<CT>.Goto(Func<CT, State> targetState)
+        IAfterActionStateBuilderWithoutTransition<CT> IAfterFinalPreconditionStateBuilder<CT>.Goto(Func<CT, int> targetStateIndex, params State[] targetStates)
         {
-            this.Goto(targetState);
+            this.Goto(targetStateIndex, targetStates);
             return this;
         }
 
@@ -435,7 +437,7 @@ namespace FeatureLoom.Workflows
         //Transitions
         State<CT> Goto(State targetState);
 
-        State<CT> Goto(Func<CT, State> targetState);
+        State<CT> Goto(Func<CT, int> targetStateIndex, params State[] targetStates);
 
         State<CT> Loop();
 
@@ -463,7 +465,7 @@ namespace FeatureLoom.Workflows
 
         //Transitions
         IAfterConditionedStateBuilderWithoutTransition<CT> Goto(State targetState);
-        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
+        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(Func<CT, int> targetStateIndex, params State[] targetStates);
 
         IAfterConditionedStateBuilderWithoutTransition<CT> Loop();
 
@@ -508,7 +510,7 @@ namespace FeatureLoom.Workflows
 
         //Transitions
         IAfterActionStateBuilderWithoutTransition<CT> Goto(State targetState);
-        IAfterActionStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
+        IAfterActionStateBuilderWithoutTransition<CT> Goto(Func<CT, int> targetStateIndex, params State[] targetStates);
 
         IAfterActionStateBuilderWithoutTransition<CT> Loop();
 
@@ -528,7 +530,7 @@ namespace FeatureLoom.Workflows
 
         //Transitions
         IAfterConditionedStateBuilderWithoutTransition<CT> Goto(State targetState);
-        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
+        IAfterConditionedStateBuilderWithoutTransition<CT> Goto(Func<CT, int> targetStateIndex, params State[] targetStates);
 
         IAfterConditionedStateBuilderWithoutTransition<CT> Loop();
         IAfterConditionedStateBuilderWithoutTransition<CT> Finish();
@@ -585,7 +587,7 @@ namespace FeatureLoom.Workflows
 
         //Transitions
         IAfterActionStateBuilderWithoutTransition<CT> Goto(State targetState);
-        IAfterActionStateBuilderWithoutTransition<CT> Goto(Func<CT, State> targetState);
+        IAfterActionStateBuilderWithoutTransition<CT> Goto(Func<CT, int> targetStateIndex, params State[] targetStates);
 
         IAfterActionStateBuilderWithoutTransition<CT> Loop();
 
