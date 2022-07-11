@@ -31,6 +31,15 @@ namespace FeatureLoom.RPC
             }
         }
 
+        public bool HandleNextRpcRequest()
+        {
+            if (queue.TryReceive(out object request))
+            {
+                base.Post(request);                
+            }
+            return !queue.IsEmpty;
+        }
+
         public IAsyncWaitHandle WaitHandle => queue.WaitHandle;
         public int Count => queue.Count;
     }
