@@ -17,6 +17,8 @@ namespace FeatureLoom.Web
         public static Task Run(this IWebServer webserver, IPAddress address, int port) => webserver.Run(new HttpEndpointConfig(address, port));
         public static Task Run(this IWebServer webserver, IPAddress address, int port, string certificateName) => webserver.Run(new HttpEndpointConfig(address, port, certificateName));
 
+        public static void MapStorage<T>(this IWebServer webServer, string route, string storageCategory, bool allowRead = true, bool allowChange = false, bool allowReadUrls = false) => webServer.AddRequestHandler(new Storages.StorageWebAccess<T>(route, new Storages.StorageWebAccess<T>.Config() { allowRead = allowRead, allowChange = allowChange, allowReadUrls = allowReadUrls }));
+
         #region InterceptRequestExtensions
         public static void InterceptRequest(this IWebServer webserver, Func<IWebRequest, IWebResponse, Task<HandlerResult>> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor(interceptRequest));
         public static void InterceptRequest(this IWebServer webserver, Func<IWebRequest, Task<HandlerResult>> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor((req, resp) => interceptRequest(req)));

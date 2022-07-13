@@ -115,6 +115,8 @@ namespace Playground
             ulong asd = ulong.MaxValue;
             long unix = (long)asd.ClampHigh((ulong)long.MaxValue);
 
+
+            Service<DefaultWebServer>.Instance.MapStorage<string>("/files", "wwwRoot");
             /*
 
             var writer = Storage.GetWriter("test");
