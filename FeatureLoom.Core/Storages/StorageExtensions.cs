@@ -31,6 +31,6 @@ namespace FeatureLoom.Storages
             var reader = storage.GetReader(sourceCategory);
             var writer = storage.GetWriter(targetCategory);
             return reader.TryCopy(sourceUri, writer, targetUri);
-        }
+        }        
     }
 }

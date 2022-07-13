@@ -4,6 +4,8 @@ namespace FeatureLoom.Extensions
 {
     public static class NetStandardCompatibilityExtensions
     {
+
+#if NETSTANDARD2_0
         // Available since .Net Standard 2.1
         public static bool TryAdd<K, V>(this Dictionary<K, V> dict, K key, V value)
         {
@@ -35,5 +37,6 @@ namespace FeatureLoom.Extensions
         {
             return str.Split(seperator.ToSingleEntryArray(), count);
         }
+#endif
     }
 }

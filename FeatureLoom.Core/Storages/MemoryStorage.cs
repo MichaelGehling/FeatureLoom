@@ -49,34 +49,30 @@ namespace FeatureLoom.Storages
         public async Task<bool> TryAppendAsync<T>(string uri, T data)
         {
             UpdateEvent updateEvent = UpdateEvent.Created;
-            bool success;
+            bool success = TrySerialize(data, out byte[] newData);
+            if (!success) return false;
+
             using (await dataSetLock.LockAsync())
-            {
-                if (TrySerialize(data, out byte[] newData))
+            {            
+                if (dataSet.TryGetValue(uri, out byte[] oldData))
                 {
-                    if (dataSet.TryGetValue(uri, out byte[] oldData))
-                    {
-                        var combined = oldData.Combine(newData);
-                        dataSet[uri] = combined;
-                        updateEvent = UpdateEvent.Updated;
-                    }
-                    else
-                    {
-                        dataSet[uri] = newData;
-                        updateEvent = UpdateEvent.Created;
-                    }
-                    success = true;
+                    var combined = oldData.Combine(newData);
+                    dataSet[uri] = combined;
+                    updateEvent = UpdateEvent.Updated;
                 }
-                else success = false;
+                else
+                {
+                    dataSet[uri] = newData;
+                    updateEvent = UpdateEvent.Created;
+                }
             }
-            if (success) subscriptions.Notify(uri, this.category, updateEvent);
-            return success;
+            subscriptions.Notify(uri, this.category, updateEvent);
+            return true;
         }
 
         public async Task<bool> TryAppendAsync(string uri, Stream sourceStream)
         {
             UpdateEvent updateEvent = UpdateEvent.Created;
-            bool success;
             try
             {
                 var newData = await sourceStream.ReadToByteArrayAsync(config.bufferSize);
@@ -93,17 +89,16 @@ namespace FeatureLoom.Storages
                         updateEvent = UpdateEvent.Updated;
                     }
                     dataSet[uri] = data;
-                    success = true;
                 }
             }
             catch (Exception e)
             {
                 Log.ERROR(this.GetHandle(), $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
-                success = false;
+                return false;
             }
 
-            if (success) subscriptions.Notify(uri, this.category, updateEvent);
-            return success;
+            subscriptions.Notify(uri, this.category, updateEvent);
+            return true;
         }
 
         public async Task<bool> TryDeleteAsync(string uri)
@@ -132,28 +127,29 @@ namespace FeatureLoom.Storages
 
         public async Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
         {
+            byte[] serializedData = null;
             using (await dataSetLock.LockReadOnlyAsync())
             {
-                if (dataSet.TryGetValue(uri, out byte[] serializedData) &&
-                   TryDeserialize(serializedData, out T data))
-                {
-                    return (true, data);
-                }
-                else return (false, default);
+                if (!dataSet.TryGetValue(uri, out serializedData)) return (false, default);                
             }
+
+            if (TryDeserialize(serializedData, out T data)) return (true, data);            
+            else return (false, default);
         }
 
         public async Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer)
         {
+            byte[] serializedData = null;            
             using (await dataSetLock.LockReadOnlyAsync())
             {
-                if (dataSet.TryGetValue(uri, out byte[] serializedData))
-                {
-                    await consumer(serializedData.ToStream());
-                    return true;
-                }
-                else return false;
+                if (!dataSet.TryGetValue(uri, out serializedData)) return false;
+            }            
+
+            using (var stream = serializedData.ToStream())
+            {
+                await consumer(stream);
             }
+            return true;            
         }
 
         public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
@@ -164,35 +160,29 @@ namespace FeatureLoom.Storages
 
         public async Task<bool> TryWriteAsync<T>(string uri, T data)
         {
-            bool success;
             UpdateEvent updateEvent = UpdateEvent.Created;
+            if (!TrySerialize(data, out byte[] serializedData)) return false;
+
             using (await dataSetLock.LockAsync())
-            {
-                if (TrySerialize(data, out byte[] serializedData))
+            {                
+                if (dataSet.TryAdd(uri, serializedData))
                 {
-                    if (dataSet.TryAdd(uri, serializedData))
-                    {
-                        updateEvent = UpdateEvent.Created;
-                    }
-                    else
-                    {
-                        dataSet[uri] = serializedData;
-                        updateEvent = UpdateEvent.Updated;
-                    }
-                    success = true;
+                    updateEvent = UpdateEvent.Created;
                 }
-                else success = false;
+                else
+                {
+                    dataSet[uri] = serializedData;
+                    updateEvent = UpdateEvent.Updated;
+                }
             }
 
-            if (success) subscriptions.Notify(uri, this.category, updateEvent);
-            return success;
+            subscriptions.Notify(uri, this.category, updateEvent);
+            return true;
         }
 
         public async Task<bool> TryWriteAsync(string uri, Stream sourceStream)
         {
-            bool success;
             UpdateEvent updateEvent = UpdateEvent.Created;
-
             try
             {
                 var data = await sourceStream.ReadToByteArrayAsync(config.bufferSize);
@@ -207,29 +197,29 @@ namespace FeatureLoom.Storages
                         dataSet[uri] = data;
                         updateEvent = UpdateEvent.Updated;
                     }
-                    success = true;
                 }
             }
             catch (Exception e)
             {
                 Log.ERROR(this.GetHandle(), $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
-                success = false;
+                return false;
             }
 
-            if (success) subscriptions.Notify(uri, this.category, updateEvent);
-            return success;
+            subscriptions.Notify(uri, this.category, updateEvent);
+            return true;
         }
 
         protected virtual bool TryDeserialize<T>(byte[] bytes, out T data)
         {
             data = default;
 
-            if (bytes is T obj)
+            if (bytes is T byteArray)
             {
-                data = obj;
+                data = byteArray;
                 return true;
             }
-            else if (typeof(T) == typeof(string))
+
+            if (typeof(T) == typeof(string))
             {
                 try
                 {
@@ -244,20 +234,18 @@ namespace FeatureLoom.Storages
                     return false;
                 }
             }
-            else
+
+            try
             {
-                try
-                {
-                    string json = Encoding.UTF8.GetString(bytes);
-                    data = json.FromJson<T>();
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!", e.ToString());
-                    data = default;
-                    return false;
-                }
+                string json = Encoding.UTF8.GetString(bytes);
+                data = json.FromJson<T>();
+                return true;
+            }
+            catch (Exception e)
+            {
+                if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!", e.ToString());
+                data = default;
+                return false;
             }
         }
 
@@ -268,25 +256,24 @@ namespace FeatureLoom.Storages
                 bytes = byteData.Clone() as byte[];
                 return true;
             }
-            else if (data is string str)
+
+            if (data is string str)
             {
                 bytes = str.ToByteArray(Encoding.UTF8);
                 return true;
             }
-            else
+
+            try
             {
-                try
-                {
-                    string json = data.ToJson();
-                    bytes = json.ToByteArray(Encoding.UTF8);
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    Log.ERROR(this.GetHandle(), "Failed serializing persisting object", e.ToString());
-                    bytes = default;
-                    return false;
-                }
+                string json = data.ToJson();
+                bytes = json.ToByteArray(Encoding.UTF8);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Log.ERROR(this.GetHandle(), "Failed serializing persisting object", e.ToString());
+                bytes = default;
+                return false;
             }
         }
     }
