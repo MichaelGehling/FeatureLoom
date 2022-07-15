@@ -39,6 +39,15 @@ namespace FeatureLoom.Extensions
             return -1;
         }
 
+        public static bool Contains<T, TEnum>(this TEnum self, T elementToFind) where TEnum : IEnumerable<T>
+        {            
+            foreach (T element in self)
+            {
+                if (Equals(element, elementToFind)) return true;                
+            }
+            return false;
+        }
+
         public static T[] ToArray<T>(this IReadOnlyList<T> self)
         {
             var array = new T[self.Count];            
@@ -86,6 +95,23 @@ namespace FeatureLoom.Extensions
             newArray[newArray.Length - 1] = newElement;
             return newArray;
         }
+
+        public static T[] RemoveFromCopy<T>(this T[] array, T elementToRemove)
+        {
+            int index = array.IndexOf(elementToRemove);
+            if (index == -1) return array.ToArray();
+            return RemoveIndexFromCopy(array, index);
+        }
+
+        public static T[] RemoveIndexFromCopy<T>(this T[] array, int indexToRemove)
+        {
+            if (indexToRemove < 0 || indexToRemove >= array.Length) return array.ToArray();
+            T[] newArray = new T[array.Length - 1];
+            if (indexToRemove > 0) Array.Copy(array, 0, newArray, 0, indexToRemove);
+            if (indexToRemove+1 < array.Length) Array.Copy(array, indexToRemove+1, newArray, 0, array.Length-indexToRemove);
+            return newArray;
+        }
+
 
         public static Task ForeachAsync<T, TEnum>(this TEnum items, Func<T, Task> asyncAction) where TEnum : IEnumerable<T>
         {

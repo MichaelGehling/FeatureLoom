@@ -15,13 +15,15 @@ namespace FeatureLoom.MessageFlow
     {
         private SourceValueHelper sourceHelper = new SourceValueHelper();
         private readonly Func<I, O> convertFunc;
+        private bool forwardOtherMessages;
 
         public Type SentMessageType => typeof(O);
         public Type ConsumedMessageType => typeof(I);
 
-        public MessageConverter(Func<I, O> convertFunc)
+        public MessageConverter(Func<I, O> convertFunc, bool forwardOtherMessages = true)
         {
             this.convertFunc = convertFunc;
+            this.forwardOtherMessages = forwardOtherMessages;
         }
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
@@ -49,7 +51,7 @@ namespace FeatureLoom.MessageFlow
                 // TODO: It would be good to check if O is a readonly struct and in that case use "sourceHelper.Forward(in output);"
                 sourceHelper.Forward(output);
             }
-            else sourceHelper.Forward(in message);
+            else if (forwardOtherMessages) sourceHelper.Forward(in message);
         }
 
         public void Post<M>(M message)
@@ -60,7 +62,7 @@ namespace FeatureLoom.MessageFlow
                 // TODO: It would be good to check if O is a readonly struct and in that case use "sourceHelper.Forward(in output);"
                 sourceHelper.Forward(output);
             }
-            else sourceHelper.Forward(message);
+            else if (forwardOtherMessages) sourceHelper.Forward(message);
         }
 
         public Task PostAsync<M>(M message)
@@ -69,7 +71,8 @@ namespace FeatureLoom.MessageFlow
             {
                 return sourceHelper.ForwardAsync(convertFunc(msgT));
             }
-            else return sourceHelper.ForwardAsync(message);
+            else if (forwardOtherMessages) return sourceHelper.ForwardAsync(message);
+            return Task.CompletedTask;
         }
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
