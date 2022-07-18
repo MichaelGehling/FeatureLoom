@@ -5,11 +5,11 @@ using System.Text;
 
 namespace FeatureLoom.Web
 {
-    public struct HandlerResult
+    public readonly struct HandlerResult
     {
-        public bool requestHandled;
-        public object data;
-        public HttpStatusCode? statusCode;
+        public readonly object data;
+        public readonly HttpStatusCode? statusCode;
+        public readonly bool requestHandled;                
 
         public HandlerResult(bool requestHandled, object result, HttpStatusCode? statusCode)
         {
