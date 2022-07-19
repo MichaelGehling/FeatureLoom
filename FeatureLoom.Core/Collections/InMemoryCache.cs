@@ -11,6 +11,29 @@ namespace FeatureLoom.Collections
 {
     public sealed class InMemoryCache<K,V> : ISchedule
     {
+        public readonly struct CacheItemInfo
+        {
+            public readonly K key;
+            public readonly V value;
+
+            public readonly int size;
+            public readonly DateTime creationTime;
+            public readonly DateTime lastAccessTime;
+            public readonly int accessCount;
+            public readonly float priorityFactor;
+
+            public CacheItemInfo(K key, V value, int size, DateTime creationTime, DateTime lastAccessTime, int accessCount, float priorityFactor)
+            {
+                this.key = key;
+                this.value = value;
+                this.size = size;
+                this.creationTime = creationTime;
+                this.lastAccessTime = lastAccessTime;
+                this.accessCount = accessCount;
+                this.priorityFactor = priorityFactor;
+            }
+        }
+
         class CacheItem
         {
             public K key;
@@ -21,6 +44,16 @@ namespace FeatureLoom.Collections
             public DateTime lastAccessTime;
             public int accessCount;
             public float priorityFactor;
+
+            public CacheItemInfo Info => new CacheItemInfo(            
+                key,
+                value,
+                size,
+                creationTime,
+                lastAccessTime,
+                accessCount,
+                priorityFactor
+            );
         }
 
         public class CacheSettings
@@ -125,6 +158,25 @@ namespace FeatureLoom.Collections
                     value = default;
                     return false;
                 }                
+            }
+        }
+
+        public bool TryGetInfo(K key, out CacheItemInfo info)
+        {
+            using (storageLock.Lock())
+            {
+                if (storage.TryGetValue(key, out var item))
+                {
+                    item.lastAccessTime = AppTime.CoarseNow;
+                    item.accessCount++;
+                    info = item.Info;
+                    return true;
+                }
+                else
+                {
+                    info = default;
+                    return false;
+                }
             }
         }
 
