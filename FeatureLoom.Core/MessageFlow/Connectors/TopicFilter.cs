@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public class TopicFilter : IMessageSink<TopicMessage>, IMessageSource, IMessageFlowConnection
+    public class TopicFilter : IMessageSink, IMessageSource, IMessageFlowConnection
     {
-        SourceValueHelper sourceHelper = new SourceValueHelper();
+        Forwarder forwarder = new Forwarder();
         string topic;
         bool includesWildcards;
 
@@ -18,74 +18,72 @@ namespace FeatureLoom.MessageFlow
             this.includesWildcards = topic.Contains('*') || topic.Contains('?');
         }
 
-        public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
-
-        public Type ConsumedMessageType => typeof(TopicMessage);
+        public int CountConnectedSinks => forwarder.CountConnectedSinks;
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
-            sourceHelper.ConnectTo(sink, weakReference);
+            forwarder.ConnectTo(sink, weakReference);
         }
 
         public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
-            return sourceHelper.ConnectTo(sink, weakReference);
+            return forwarder.ConnectTo(sink, weakReference);
         }
 
         public void DisconnectAll()
         {
-            sourceHelper.DisconnectAll();
+            forwarder.DisconnectAll();
         }
 
         public void DisconnectFrom(IMessageSink sink)
         {
-            sourceHelper.DisconnectFrom(sink);
+            forwarder.DisconnectFrom(sink);
         }
 
         public IMessageSink[] GetConnectedSinks()
         {
-            return sourceHelper.GetConnectedSinks();
+            return forwarder.GetConnectedSinks();
         }
 
         public void Post<M>(in M message)
         {
-            if (message is TopicMessage topicMessage)
+            if (message is ITopicMessage topicMessage)
             {
                 if (includesWildcards)
                 {
-                    if (topicMessage.topic.MatchesWildcard(topic)) sourceHelper.Forward(in topicMessage.message);
+                    if (topicMessage.Topic.MatchesWildcard(topic)) topicMessage.ForwardMessageByRef(forwarder);
                 }
-                else if (topicMessage.topic == topic) sourceHelper.Forward(in topicMessage.message);
+                else if (topicMessage.Topic == topic) topicMessage.ForwardMessageByRef(forwarder);
             }
         }
 
         public void Post<M>(M message)
         {
-            if (message is TopicMessage topicMessage)
+            if (message is ITopicMessage topicMessage)
             {
                 if (includesWildcards)
                 {
-                    if (topicMessage.topic.MatchesWildcard(topic)) sourceHelper.Forward(topicMessage.message);
+                    if (topicMessage.Topic.MatchesWildcard(topic)) topicMessage.ForwardMessage(forwarder);
                 }
-                else if (topicMessage.topic == topic) sourceHelper.Forward(topicMessage.message);
+                else if (topicMessage.Topic == topic) topicMessage.ForwardMessage(forwarder);
             }
         }
 
         public Task PostAsync<M>(M message)
         {
-            if (message is TopicMessage topicMessage)
+            if (message is ITopicMessage topicMessage)
             {
                 if (includesWildcards)
                 {
-                    if (topicMessage.topic.MatchesWildcard(topic)) return sourceHelper.ForwardAsync(topicMessage.message);
+                    if (topicMessage.Topic.MatchesWildcard(topic)) return topicMessage.ForwardMessageAsync(forwarder);
                 }
-                else if (topicMessage.topic == topic) return sourceHelper.ForwardAsync(topicMessage.message);
+                else if (topicMessage.Topic == topic) return topicMessage.ForwardMessageAsync(forwarder);
             }
             return Task.CompletedTask;
         }
     }
 
-    public class TopicFilter<T> : IMessageSink<TopicMessage>, IMessageSource<T>, IMessageFlowConnection
+    public class TopicFilter<T> : IMessageSink<TopicMessage<T>>, IMessageSource<T>, IMessageFlowConnection
     {
         TypedSourceValueHelper<T> sourceHelper = new TypedSourceValueHelper<T>();
         string topic;
@@ -99,7 +97,7 @@ namespace FeatureLoom.MessageFlow
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
-        public Type ConsumedMessageType => typeof(TopicMessage);
+        public Type ConsumedMessageType => typeof(TopicMessage<T>);
 
         public Type SentMessageType => typeof(T);
 
@@ -130,43 +128,38 @@ namespace FeatureLoom.MessageFlow
 
         public void Post<M>(in M message)
         {
-            if (message is TopicMessage topicMessage &&
-                topicMessage.message is T typedMessage)
+            if (message is TopicMessage<T> topicMessage)
             {
-                sourceHelper.Forward(typedMessage);
+                T typedMesage = topicMessage.Message;
                 if (includesWildcards)
                 {
-                    if (topicMessage.topic.MatchesWildcard(topic)) sourceHelper.Forward(in typedMessage);
+                    if (topicMessage.Topic.MatchesWildcard(topic)) sourceHelper.Forward(in typedMesage);
                 }
-                else if (topicMessage.topic == topic) sourceHelper.Forward(in typedMessage);
+                else if (topicMessage.Topic == topic) sourceHelper.Forward(in typedMesage);
             }
         }
 
         public void Post<M>(M message)
         {
-            if (message is TopicMessage topicMessage &&
-                topicMessage.message is T typedMessage)
-            {
-                sourceHelper.Forward( typedMessage);
+            if (message is TopicMessage<T> topicMessage)
+            {                
                 if (includesWildcards)
                 {
-                    if (topicMessage.topic.MatchesWildcard(topic)) sourceHelper.Forward(typedMessage);
+                    if (topicMessage.Topic.MatchesWildcard(topic)) sourceHelper.Forward(topicMessage.Message);
                 }
-                else if (topicMessage.topic == topic) sourceHelper.Forward(typedMessage);
+                else if (topicMessage.Topic == topic) sourceHelper.Forward(topicMessage.Message);
             }
         }
 
         public Task PostAsync<M>(M message)
         {
-            if (message is TopicMessage topicMessage &&
-                topicMessage.message is T typedMessage)
+            if (message is TopicMessage<T> topicMessage)
             {
-                sourceHelper.Forward(typedMessage);
                 if (includesWildcards)
                 {
-                    if (topicMessage.topic.MatchesWildcard(topic)) return sourceHelper.ForwardAsync(typedMessage);
+                    if (topicMessage.Topic.MatchesWildcard(topic)) return sourceHelper.ForwardAsync(topicMessage.Message);
                 }
-                else if (topicMessage.topic == topic) return sourceHelper.ForwardAsync(typedMessage);
+                else if (topicMessage.Topic == topic) return sourceHelper.ForwardAsync(topicMessage.Message);
             }
             return Task.CompletedTask;
         }
