@@ -94,7 +94,7 @@ namespace FeatureLoom.Synchronization
             for(int i=0; i < SpinYieldCyclesForSyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (setCounter != lastSetCount) return true;
             }
 
@@ -122,7 +122,7 @@ namespace FeatureLoom.Synchronization
             for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (setCounter != lastSetCount) return true;
                 if (timer.Elapsed()) return false;
             }
@@ -149,7 +149,7 @@ namespace FeatureLoom.Synchronization
             for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return false;
                 if (setCounter != lastSetCount) return true;
             }
@@ -187,7 +187,7 @@ namespace FeatureLoom.Synchronization
             for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return false;
                 if (setCounter != lastSetCount) return true;
                 if (timer.Elapsed()) return false;
@@ -227,7 +227,7 @@ namespace FeatureLoom.Synchronization
             for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (setCounter != lastSetCount) return storedResult_true;
             }
 
@@ -253,7 +253,7 @@ namespace FeatureLoom.Synchronization
             for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (setCounter != lastSetCount) return storedResult_true;
                 if (timer.Elapsed()) return storedResult_false;
             }
@@ -279,7 +279,7 @@ namespace FeatureLoom.Synchronization
             for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return storedResult_false;
                 if (setCounter != lastSetCount) return storedResult_true;
             }
@@ -308,7 +308,7 @@ namespace FeatureLoom.Synchronization
             for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
             {
                 if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Sleep(0);
+                else Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return storedResult_false;
                 if (setCounter != lastSetCount) return storedResult_true;
                 if (timer.Elapsed()) return storedResult_false;
@@ -348,7 +348,7 @@ namespace FeatureLoom.Synchronization
             {
                 anySyncWaiter = false;
                 lock (monitorObj) Monitor.PulseAll(monitorObj);
-                //Thread.Sleep(0);
+                //Thread.Yield();
             }
             if (eventWaitHandle != null)
             {
@@ -403,11 +403,13 @@ namespace FeatureLoom.Synchronization
                 tcs.SetResult(true);
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
+
+            bool yield = false;
             if (anySyncWaiter)
             {
                 anySyncWaiter = false;
                 lock (monitorObj) Monitor.PulseAll(monitorObj);
-                Thread.Sleep(0);
+                yield = true;
             }
             if (eventWaitHandle != null)
             {
@@ -423,6 +425,10 @@ namespace FeatureLoom.Synchronization
             }
 
             myLock.Exit();
+
+            // If threads are waiting syncronously and PulseAll is called rapidly in a row it might happen that not all waiters will wake up.
+            // Calling yield at the end will avoid this problem.
+            if (yield) Thread.Yield();
         }
 
         /// <summary>

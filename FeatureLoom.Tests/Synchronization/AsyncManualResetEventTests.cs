@@ -234,7 +234,6 @@ namespace FeatureLoom.Synchronization
                     while (!stop)
                     {
                         mre.Wait();
-                        Thread.Yield();
                     }
                     Interlocked.Increment(ref syncEnded);
                 });
@@ -247,7 +246,6 @@ namespace FeatureLoom.Synchronization
                     while (!stop)
                     {
                         await mre.WaitAsync();
-                        Thread.Yield();
                     }
                     Interlocked.Increment(ref asyncEnded);
                 });
