@@ -51,7 +51,7 @@ namespace FeatureLoom.Synchronization
 
                 if (prioritized) prioritizedWaiting = true;
 
-                if (cycleCounter >= numHotCycles) Thread.Sleep(0);
+                if (cycleCounter >= numHotCycles) Thread.Yield();
                 else cycleCounter++;
             } while (!TryEnter(prioritized));
 
@@ -77,7 +77,7 @@ namespace FeatureLoom.Synchronization
                         if (prioritized) prioritizedWaiting = false;
                         return false;
                     }
-                    else Thread.Sleep(0);
+                    else Thread.Yield();
                 }
                 else cycleCounter++;
             } while (!TryEnter(prioritized));
@@ -120,7 +120,7 @@ namespace FeatureLoom.Synchronization
             {
                 if (prioritized) prioritizedWaiting = true;
 
-                if (cycleCounter >= numHotCycles) Thread.Sleep(0);
+                if (cycleCounter >= numHotCycles) Thread.Yield();
                 else cycleCounter++;
             } while (!TryEnterReadOnly(prioritized));
 
@@ -142,7 +142,7 @@ namespace FeatureLoom.Synchronization
                         if (prioritized) prioritizedWaiting = false;
                         return false;
                     }
-                    else Thread.Sleep(0);
+                    else Thread.Yield();
                 }
                 else cycleCounter++;
             } while (!TryEnterReadOnly(prioritized));
