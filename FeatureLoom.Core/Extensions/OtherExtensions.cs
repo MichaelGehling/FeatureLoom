@@ -5,6 +5,8 @@ namespace FeatureLoom.Extensions
 {
     public static class OtherExtensions
     {
+        public static T As<T>(this object obj) where T : class => obj as T;
+
         public static T GetTargetOrDefault<T>(this WeakReference<T> weakRef, T defaultObj = default) where T : class
         {
             if (weakRef.TryGetTarget(out T target)) return target;

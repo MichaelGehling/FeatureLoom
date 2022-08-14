@@ -1,26 +1,62 @@
-﻿using System;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Time;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Synchronization
 {
-    public class AsyncManualResetEvent : IAsyncManualResetEvent
+
+    /// <summary>
+    /// AsyncManualResetEvent allows status based waiting (sync/async) and signalling between multiple threads.
+    /// It can be used as a replacement for the ManualResetEvent/-Slim, but also supporting async waiting.
+    /// With a waiting thread, performance is comparable to ManualResetEventSlim, setting/resetting without any waiting thread and waiting
+    /// in already set state is significantly faster than ManualResetEventSlim.
+    /// </summary>
+    public sealed class AsyncManualResetEvent : IAsyncWaitHandle
     {
-        private const int BARRIER_OPEN = 0;
-        private const int BARRIER_CLOSED = 1;
+        private static Task<bool> storedResult_true = Task.FromResult(true);
+        private static Task<bool> storedResult_false = Task.FromResult(false);
+
+        private MicroValueLock myLock = new MicroValueLock();
 
         private volatile bool isSet = false;
-        private volatile bool isTaskUsed = false;
-        private volatile int barrier = BARRIER_OPEN;
-        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private ManualResetEventSlim mre_active = new ManualResetEventSlim(false, 0);
-        private ManualResetEventSlim mre_wakingUp = new ManualResetEventSlim(true, 0);
+        private volatile bool anyAsyncWaiter = false;
+        private volatile bool anySyncWaiter = false;
+        private volatile byte setCounter = 0;
 
+        /// <summary>
+        /// Before actually going to sleep, the waiting thread may spin/yield some cycles.
+        /// The spin times rise exponentially until the value of 4. 
+        /// Every further cycle is a yield.
+        /// </summary>
+        public ushort SpinYieldCyclesForSyncWait { get; set; } = 20;
+        /// <summary>
+        /// Before actually going to sleep, the waiting thread may spin/yield some cycles.
+        /// The spin times rise exponentially until the value of 4. 
+        /// Every further cycle is a yield.
+        /// NOTE: Spinning and Yielding may speed up async waiting a lot, but it also contradict the purpose
+        /// of async programming, as it blocks the thread for some time. Therefor the default is 0.
+        /// </summary>
+        public ushort SpinYieldCyclesForAsyncWait { get; set; } = 0;
+
+
+        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private object monitorObj = new object();
+        private EventWaitHandle eventWaitHandle = null;
+
+        /// <summary>
+        /// AsyncManualResetEvent allows status based waiting (sync/async) and signalling between multiple threads.
+        /// Initial state is not set.
+        /// </summary>
         public AsyncManualResetEvent()
         {
         }
 
+        /// <summary>
+        /// AsyncManualResetEvent allows status based waiting (sync/async) and signalling between multiple threads.
+        /// </summary>
         public AsyncManualResetEvent(bool initialState)
         {
             if (initialState) Set();
@@ -28,216 +64,400 @@ namespace FeatureLoom.Synchronization
 
         public bool IsSet => isSet;
 
+        /// <summary>
+        /// Returns a task that will be completed when the state is set.
+        /// </summary>
         public Task WaitingTask
         {
             get
             {
-                if (isSet) return Task.CompletedTask;
+                if (isSet) return storedResult_true;
 
-                isTaskUsed = true;
-                Thread.MemoryBarrier();
-                if (isSet) return Task.CompletedTask;
+                anyAsyncWaiter = true;
+                var task = tcs.Task;
+                if (isSet) return storedResult_true;
 
-                return tcs.Task;
+                return task;
             }
         }
 
-        public IAsyncWaitHandle AsyncWaitHandle => this;
-
+        /// <summary>
+        /// Waits until state is set. If already set, the call returns immediatly.
+        /// </summary>
+        /// <returns>Always true</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait()
         {
-            var mre = mre_active;
-            Thread.MemoryBarrier();
+            var lastSetCount = setCounter;
             if (isSet) return true;
-            Thread.MemoryBarrier();
-            mre.Wait();
-            return true;
-        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Wait(TimeSpan timeout)
-        {
-            if (isSet) return true;
-            if (timeout <= TimeSpan.Zero) return false;
-            return mre_active.Wait(timeout);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Wait(CancellationToken cancellationToken)
-        {
-            if (cancellationToken.IsCancellationRequested) return false;
-            if (isSet) return true;
-            mre_active.Wait(cancellationToken);
-            return !cancellationToken.IsCancellationRequested;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Wait(TimeSpan timeout, CancellationToken cancellationToken)
-        {
-            if (cancellationToken.IsCancellationRequested) return false;
-            if (isSet) return true;
-            if (timeout <= TimeSpan.Zero) return false;
-            return mre_active.Wait(timeout, cancellationToken);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync()
-        {
-            if (isSet) return Task.FromResult(true);
-
-            isTaskUsed = true;
-            Thread.MemoryBarrier();
-            if (isSet) return Task.FromResult(true);
-
-            return tcs.Task;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync(TimeSpan timeout)
-        {
-            if (isSet) return Task.FromResult(true);
-            if (timeout <= TimeSpan.Zero) return Task.FromResult(false);
-
-            isTaskUsed = true;
-            Thread.MemoryBarrier();
-            if (isSet) return Task.FromResult(true);
-
-            return tcs.Task.WaitAsync(timeout);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync(CancellationToken cancellationToken)
-        {
-            if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
-            if (isSet) return Task.FromResult(true);
-
-            isTaskUsed = true;
-            Thread.MemoryBarrier();
-            if (isSet) return Task.FromResult(true);
-
-            return tcs.Task.WaitAsync(cancellationToken);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
-        {
-            if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
-            if (isSet) return Task.FromResult(true);
-            if (timeout <= TimeSpan.Zero) return Task.FromResult(false);
-
-            isTaskUsed = true;
-            Thread.MemoryBarrier();
-            if (isSet) return Task.FromResult(true);
-
-            return tcs.Task.WaitAsync(timeout, cancellationToken);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Set()
-        {
-            if (isSet) return false;
-            while (barrier == BARRIER_CLOSED || Interlocked.CompareExchange(ref barrier, BARRIER_CLOSED, BARRIER_OPEN) != BARRIER_OPEN) Thread.Yield();
-            if (isSet)
+            for(int i=0; i < SpinYieldCyclesForSyncWait; i++)
             {
-                barrier = BARRIER_OPEN;
-                return false;
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (setCounter != lastSetCount) return true;
             }
 
+            anySyncWaiter = true;
             Thread.MemoryBarrier();
-            isSet = true;
-            Thread.MemoryBarrier();
+            if (setCounter != lastSetCount) return true;
 
-            if (isTaskUsed) tcs.SetResult(true);
-
-            var mreTemp = mre_active;
-            mre_active = mre_wakingUp;
-            mre_wakingUp = mreTemp;
-            Thread.MemoryBarrier();
-            mre_wakingUp.Set();
-            Thread.MemoryBarrier();
-            barrier = BARRIER_OPEN;
-            return true;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Reset()
-        {
-            if (!isSet) return false;
-            while (barrier == BARRIER_CLOSED || Interlocked.CompareExchange(ref barrier, BARRIER_CLOSED, BARRIER_OPEN) != BARRIER_OPEN) Thread.Yield();
-            if (!isSet)
-            {
-                barrier = BARRIER_OPEN;
-                return false;
-            }
-
-            mre_active.Reset();
-
-            if (tcs.Task.IsCompleted)
-            {
-                //isTaskUsed = false; // TODO: Still in some cases it seems that the task completion source is not renewed when it should.
-                Thread.MemoryBarrier();
-                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
-
-            Thread.MemoryBarrier();
-            isSet = false;
-            Thread.MemoryBarrier();
-
-            barrier = BARRIER_OPEN;
+            lock (monitorObj) Monitor.Wait(monitorObj);
             return true;
         }
 
         /// <summary>
-        /// Everyone waiting for this event is woken up, by setting and resetting in one step.
-        /// If the AsyncManualResetEvent was already set, nothing happens.
-        /// Note: Avoid calling PulseAll twice directly after each other, because it might happen, that not all are woken up.
+        /// Waits until state is set or the timeout exceeds. If already set, the call returns immediatly.
         /// </summary>
+        /// <param name="timeout">Timeout to cancel waiting. The cancallation may be later than the defined timeout.</param>
+        /// <returns>True if set, false if timeout</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Wait(TimeSpan timeout)
+        {
+            var lastSetCount = setCounter;
+            if (isSet) return true;
+            if (timeout <= TimeSpan.Zero) return false;
+
+            TimeFrame timer = new TimeFrame(timeout);
+            for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
+            {
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (setCounter != lastSetCount) return true;
+                if (timer.Elapsed()) return false;
+            }
+
+            anySyncWaiter = true;
+            Thread.MemoryBarrier();
+            if (setCounter != lastSetCount) return true;
+
+            lock (monitorObj) return Monitor.Wait(monitorObj,timer.Remaining());
+        }
+
+        /// <summary>
+        /// Waits until state is set or the call is cancelled. If already set, the call returns immediatly.
+        /// </summary>
+        /// <param name="cancellationToken">May cancel the waiting</param>
+        /// <returns>True if set, false if cancelled</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Wait(CancellationToken cancellationToken)
+        {
+            var lastSetCount = setCounter;
+            if (cancellationToken.IsCancellationRequested) return false;
+            if (isSet) return true;
+
+            for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
+            {
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (cancellationToken.IsCancellationRequested) return false;
+                if (setCounter != lastSetCount) return true;
+            }
+
+            anySyncWaiter = true;
+            Thread.MemoryBarrier();
+            if (setCounter != lastSetCount) return true;
+
+            do
+            {
+                using (cancellationToken.Register(Cancellation, this))
+                {
+                    lock (monitorObj) Monitor.Wait(monitorObj);
+                }
+            }
+            while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
+            return !cancellationToken.IsCancellationRequested;
+        }
+
+        /// <summary>
+        /// Waits until state is set, the call is cancelled or the timeout exceeds. If already set, the call returns immediatly.
+        /// </summary>
+        /// <param name="timeout">Timeout to cancel waiting. The cancallation may be later than the defined timeout.</param>
+        /// <param name="cancellationToken">May cancel the waiting</param>
+        /// <returns>True if set, false if cancelled or timeout exceeded</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Wait(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            var lastSetCount = setCounter;
+            if (cancellationToken.IsCancellationRequested) return false;
+            if (isSet) return true;            
+            if (timeout <= TimeSpan.Zero) return false;
+
+            TimeFrame timer = new TimeFrame(timeout);
+            for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
+            {
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (cancellationToken.IsCancellationRequested) return false;
+                if (setCounter != lastSetCount) return true;
+                if (timer.Elapsed()) return false;
+            }
+
+            anySyncWaiter = true;
+            Thread.MemoryBarrier();
+            if (setCounter != lastSetCount) return true;
+
+            do
+            {
+                using (cancellationToken.Register(Cancellation, this))
+                {
+                    lock (monitorObj) if (!Monitor.Wait(monitorObj, timer.Remaining())) return false;
+                }
+            }
+            while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
+            return !cancellationToken.IsCancellationRequested;
+        }
+
+        private void Cancellation(object self)
+        {
+            var _waitingLockObject = self.As<AsyncManualResetEvent>().monitorObj;
+            lock (_waitingLockObject) Monitor.PulseAll(_waitingLockObject);
+        }
+
+        /// <summary>
+        /// Waits asynchronously until state is set. If already set, the call returns immediatly.
+        /// </summary>
+        /// <returns>Always true</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync()
+        {
+            var lastSetCount = setCounter;
+            if (isSet) return storedResult_true;
+
+            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            {
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (setCounter != lastSetCount) return storedResult_true;
+            }
+
+            anyAsyncWaiter = true;
+            var task = tcs.Task;
+            if (setCounter != lastSetCount) return storedResult_true;
+            return task;
+        }
+
+        /// <summary>
+        /// Waits asynchronously until state is set or the timeout exceeds. If already set, the call returns immediatly.
+        /// </summary>
+        /// <param name="timeout">Timeout to cancel waiting. The cancallation may be later than the defined timeout.</param>
+        /// <returns>True if set, false if timeout</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync(TimeSpan timeout)
+        {
+            var lastSetCount = setCounter;
+            if (isSet) return storedResult_true;
+            if (timeout <= TimeSpan.Zero) return storedResult_false;
+
+            TimeFrame timer = new TimeFrame(timeout);
+            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            {
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (setCounter != lastSetCount) return storedResult_true;
+                if (timer.Elapsed()) return storedResult_false;
+            }
+
+            anyAsyncWaiter = true;
+            var task = tcs.Task.WaitAsync(timeout);
+            if (setCounter != lastSetCount) return storedResult_true;
+            return task;
+        }
+
+        /// <summary>
+        /// Waits asynchronously until state is set or the call is cancelled. If already set, the call returns immediatly.
+        /// </summary>
+        /// <param name="cancellationToken">May cancel the waiting</param>
+        /// <returns>True if set, false if cancelled</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync(CancellationToken cancellationToken)
+        {
+            var lastSetCount = setCounter;
+            if (cancellationToken.IsCancellationRequested) return storedResult_false;
+            if (isSet) return storedResult_true;
+
+            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            {
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (cancellationToken.IsCancellationRequested) return storedResult_false;
+                if (setCounter != lastSetCount) return storedResult_true;
+            }
+
+            anyAsyncWaiter = true;
+            var task = tcs.Task.WaitAsync(cancellationToken);
+            if (setCounter != lastSetCount) return storedResult_true;
+            return task;
+        }
+
+        /// <summary>
+        /// Waits asynchronously until state is set, the call is cancelled or the timeout exceeds. If already set, the call returns immediatly.
+        /// </summary>
+        /// <param name="timeout">Timeout to cancel waiting. The cancallation may be later than the defined timeout.</param>
+        /// <param name="cancellationToken">May cancel the waiting</param>
+        /// <returns>True if set, false if cancelled or timeout exceeded</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            var lastSetCount = setCounter;
+            if (cancellationToken.IsCancellationRequested) return storedResult_false;
+            if (isSet) return storedResult_true;
+            if (timeout <= TimeSpan.Zero) return storedResult_false;
+
+            TimeFrame timer = new TimeFrame(timeout);
+            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            {
+                if (i <= 3) Thread.SpinWait(4 << i);
+                else Thread.Sleep(0);
+                if (cancellationToken.IsCancellationRequested) return storedResult_false;
+                if (setCounter != lastSetCount) return storedResult_true;
+                if (timer.Elapsed()) return storedResult_false;
+            }
+
+            anyAsyncWaiter = true;
+            var task = tcs.Task.WaitAsync(timeout, cancellationToken);
+            if (setCounter != lastSetCount) return storedResult_true;
+            return task;
+        }
+
+        /// <summary>
+        /// Sets the event, so that all waiting threads will procede. Threads will not wait until the event is reset, again.
+        /// </summary>
+        /// <returns>True if event was not set before, false if it was already set.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Set()
+        {
+            if (isSet) return false;
+            myLock.Enter();
+            if (isSet)
+            {
+                myLock.Exit();
+                return false;
+            }
+
+            isSet = true;
+            setCounter++;
+
+            if (anyAsyncWaiter)
+            {
+                anyAsyncWaiter = false;
+                tcs.SetResult(true);
+                tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+            if (anySyncWaiter)
+            {
+                anySyncWaiter = false;
+                lock (monitorObj) Monitor.PulseAll(monitorObj);
+                //Thread.Sleep(0);
+            }
+            if (eventWaitHandle != null)
+            {
+                eventWaitHandle.Set();
+            }
+
+            myLock.Exit();
+            return true;
+        }
+
+        /// <summary>
+        /// Resets the event, so that threads will wait until thw evwnt is set again.
+        /// </summary>
+        /// <returns>True if event was set before, false if it was already reset.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Reset()
+        {
+            if (!isSet) return false;
+            
+            isSet = false;
+            
+            if (eventWaitHandle != null)
+            {
+                eventWaitHandle.Reset();
+            }
+            
+            return true;
+        }
+
+        /// <summary>
+        /// Everyone thread waiting for this event is woken up, by setting and resetting the event in one step.
+        /// If the event is already set, it will only be reset.
+        /// </summary>        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void PulseAll()
         {
-            if (isSet) return;
-            while (barrier == BARRIER_CLOSED || Interlocked.CompareExchange(ref barrier, BARRIER_CLOSED, BARRIER_OPEN) != BARRIER_OPEN) Thread.Yield();
-            if (isSet)
+            if (isSet && Reset()) return;
+            myLock.Enter();
+            if (isSet && Reset())
             {
-                barrier = BARRIER_OPEN;
+                myLock.Exit();
                 return;
             }
 
-            //SET
-            Thread.MemoryBarrier();
+            //SET            
             isSet = true;
-            Thread.MemoryBarrier();
-            if (isTaskUsed) tcs.SetResult(true);
-            var mreTemp = mre_active;
-            mre_active = mre_wakingUp;
-            mre_wakingUp = mreTemp;
-            mre_wakingUp.Set();
+            setCounter++;
 
-            //RESET
-            mre_active.Reset();
-            if (tcs.Task.IsCompleted)
+            if (anyAsyncWaiter)
             {
-                //isTaskUsed = false;  // TODO: Still in some cases it seems that the task completion source is not renewed when it should.
-                Thread.MemoryBarrier();
+                anyAsyncWaiter = false;
+                tcs.SetResult(true);
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
+            if (anySyncWaiter)
+            {
+                anySyncWaiter = false;
+                lock (monitorObj) Monitor.PulseAll(monitorObj);
+                Thread.Sleep(0);
+            }
+            if (eventWaitHandle != null)
+            {
+                eventWaitHandle.Set();
+            }
+
+            //RESET
             Thread.MemoryBarrier();
             isSet = false;
-            Thread.MemoryBarrier();
+            if (eventWaitHandle != null)
+            {
+                eventWaitHandle.Reset();
+            }
 
-            barrier = BARRIER_OPEN;
+            myLock.Exit();
         }
 
+        /// <summary>
+        /// Indicates if a thread would actually wait if one of the wait methods was called. (Invert of IsSet)
+        /// </summary>
+        /// <returns>False if event is set, false otherwise</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool WouldWait()
         {
             return !isSet;
         }
 
+        /// <summary>
+        /// Provides a classic Waithandle that is updated by the AsyncManualResetEvent.
+        /// The WaitHandle must be detached and disposed (DetachAndDisposeWaitHandle) if not needed anymore.
+        /// Do not dispose the WaitHandle before it is detached from the AsyncManualResetEvent.
+        /// </summary>
+        /// <param name="waitHandle">A WaitHandle updated the AsyncManualResetEvent</param>
+        /// <returns>Always true</returns>
         public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
         {
-            waitHandle = mre_active.WaitHandle;
+            if (eventWaitHandle == null) Interlocked.CompareExchange(ref eventWaitHandle, new EventWaitHandle(isSet, EventResetMode.ManualReset), null);
+            
+            waitHandle = eventWaitHandle;
             return true;
+        }
+
+        /// <summary>
+        /// Removes a controlled WaitHandle and disposes it.
+        /// </summary>
+        public void DetachAndDisposeWaitHandle()
+        {
+            var waitHandle = eventWaitHandle;
+            eventWaitHandle = null;
+            waitHandle?.Dispose();
         }
     }
 }

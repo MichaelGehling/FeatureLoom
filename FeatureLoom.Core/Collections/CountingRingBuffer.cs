@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 
@@ -10,7 +11,7 @@ namespace FeatureLoom.Collections
         private int nextIndex = 0;
         private long counter = 0;
         private bool cycled = false;
-        private AsyncManualResetEvent newEntryEvent;
+        private LazyValue<AsyncManualResetEvent> newEntryEvent;
         private MicroValueLock myLock;
         private bool threadSafe = true;
 
@@ -30,8 +31,7 @@ namespace FeatureLoom.Collections
         {
             get
             {
-                if (newEntryEvent == null) newEntryEvent = new AsyncManualResetEvent(false);
-                return newEntryEvent.AsyncWaitHandle;
+                return newEntryEvent.Obj;
             }
         }
 
@@ -54,8 +54,7 @@ namespace FeatureLoom.Collections
                 if (threadSafe) myLock.Exit();
             }
 
-            newEntryEvent?.Set();
-            newEntryEvent?.Reset(); // TODO: Setting and directly resetting might fail waking up waiting threads!
+            newEntryEvent.ObjIfExists?.PulseAll();
             return result;
         }
         public long AddRange<IEnum>(IEnum items) where IEnum : IEnumerable<T>
@@ -79,8 +78,7 @@ namespace FeatureLoom.Collections
                 if (threadSafe) myLock.Exit();
             }
 
-            newEntryEvent?.Set();
-            newEntryEvent?.Reset(); // TODO: Setting and directly resetting might fail waking up waiting threads!
+            newEntryEvent.ObjIfExists?.PulseAll();
             return counter;
         }
 

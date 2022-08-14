@@ -41,7 +41,7 @@ namespace FeatureLoom.MessageFlow
 
         public long Counter => counter;
         public TimeSliceCounter CurrentTimeSlize => currentTimeSlice;
-        public IAsyncWaitHandle WaitHandle => messageBuffer?.WaitHandle ?? timestampBuffer?.WaitHandle ?? timeSliceCounterBuffer?.WaitHandle ?? manualResetEvent.Obj.AsyncWaitHandle;
+        public IAsyncWaitHandle WaitHandle => messageBuffer?.WaitHandle ?? timestampBuffer?.WaitHandle ?? timeSliceCounterBuffer?.WaitHandle ?? manualResetEvent.Obj;
 
         public (DateTime timestamp, T2 message)[] GetBufferedMessages(ref long bufferPosition)
         {

@@ -422,13 +422,14 @@ namespace FeatureLoom.Synchronization
             return WaitHandle.WaitTimeout;
         }
 
-        public static IAsyncWaitHandle NoWaitingHandle { get; } = new AsyncManualResetEvent(true);
+        public static IAsyncWaitHandle NoWaitingHandle { get; } = new AsyncWaitHandle(Task.CompletedTask);
 
         public static IAsyncWaitHandle FromTask(Task task) => task.IsCompleted ? NoWaitingHandle : new AsyncWaitHandle(task);
 
         #endregion static
 
         private Task task;
+        private EventWaitHandle eventWaitHandle = null;
 
         private AsyncWaitHandle(Task task)
         {
@@ -492,8 +493,14 @@ namespace FeatureLoom.Synchronization
             }
             else
             {
-                waitHandle = null;
-                return false;
+                if (eventWaitHandle == null &&
+                    null == Interlocked.CompareExchange(ref eventWaitHandle, new EventWaitHandle(task.IsCompleted, EventResetMode.ManualReset), null))
+                {
+                    task.ContinueWith(task => eventWaitHandle.Set());                    
+                }
+
+                waitHandle = eventWaitHandle;
+                return true;
             }
         }
 

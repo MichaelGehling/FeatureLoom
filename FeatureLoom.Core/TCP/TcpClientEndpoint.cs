@@ -123,7 +123,7 @@ namespace FeatureLoom.TCP
         private IAsyncWaitHandle[] disconnectionAndConfigUpdateWaitHandles = new IAsyncWaitHandle[2];
 
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
-        public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent.AsyncWaitHandle;
+        public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent;
 
         public TcpClientEndpoint(Config config = null, ITcpMessageEncoder encoder = null, ITcpMessageDecoder decoder = null, bool autoRun = true)
         {
