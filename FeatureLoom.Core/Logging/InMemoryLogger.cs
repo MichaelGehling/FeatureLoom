@@ -7,11 +7,11 @@ namespace FeatureLoom.Logging
 {
     public class InMemoryLogger : IMessageSink
     {
-        private CountingRingBuffer<LogMessage> buffer;
+        private CircularLogBuffer<LogMessage> buffer;
 
         public InMemoryLogger(int bufferSize)
         {
-            buffer = new CountingRingBuffer<LogMessage>(bufferSize);
+            buffer = new CircularLogBuffer<LogMessage>(bufferSize);
         }
 
         public void Post<M>(in M message)

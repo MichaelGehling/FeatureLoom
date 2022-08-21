@@ -16,7 +16,7 @@ namespace FeatureLoom.MessageFlow
     public class BufferingForwarder<T> : IMessageFlowConnection<T>
     {
         private SourceValueHelper sourceHelper;
-        private CountingRingBuffer<T> buffer;
+        private CircularLogBuffer<T> buffer;
         private FeatureLock bufferLock = new FeatureLock();
 
         public Type SentMessageType => typeof(T);
@@ -24,7 +24,7 @@ namespace FeatureLoom.MessageFlow
 
         public BufferingForwarder(int bufferSize)
         {
-            buffer = new CountingRingBuffer<T>(bufferSize, false);
+            buffer = new CircularLogBuffer<T>(bufferSize, false);
         }
 
         private void OnConnection(IMessageSink sink)

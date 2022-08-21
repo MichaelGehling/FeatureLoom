@@ -20,9 +20,9 @@ namespace FeatureLoom.MessageFlow
         private LazyValue<AsyncManualResetEvent> manualResetEvent;
 
         private long counter;
-        private CountingRingBuffer<(DateTime timestamp, T2 message)> messageBuffer;
-        private CountingRingBuffer<DateTime> timestampBuffer;
-        private CountingRingBuffer<TimeSliceCounter> timeSliceCounterBuffer;
+        private CircularLogBuffer<(DateTime timestamp, T2 message)> messageBuffer;
+        private CircularLogBuffer<DateTime> timestampBuffer;
+        private CircularLogBuffer<TimeSliceCounter> timeSliceCounterBuffer;
 
         public StatisticsMessageProbe(string name, Predicate<T1> filter = null, Func<T1, T2> converter = null, int messageBufferSize = 0, TimeSpan timeSliceSize = default, int maxTimeSlices = 0)
         {
@@ -30,11 +30,11 @@ namespace FeatureLoom.MessageFlow
             this.filter = filter;
             this.convert = converter;
             this.timeSliceSize = timeSliceSize;
-            if (convert != null && messageBufferSize > 0) messageBuffer = new CountingRingBuffer<(DateTime timestamp, T2 message)>(messageBufferSize, false);
-            else if (messageBufferSize > 0) timestampBuffer = new CountingRingBuffer<DateTime>(messageBufferSize, false);
+            if (convert != null && messageBufferSize > 0) messageBuffer = new CircularLogBuffer<(DateTime timestamp, T2 message)>(messageBufferSize, false);
+            else if (messageBufferSize > 0) timestampBuffer = new CircularLogBuffer<DateTime>(messageBufferSize, false);
             if (maxTimeSlices > 0)
             {
-                timeSliceCounterBuffer = new CountingRingBuffer<TimeSliceCounter>(maxTimeSlices, false);
+                timeSliceCounterBuffer = new CircularLogBuffer<TimeSliceCounter>(maxTimeSlices, false);
                 currentTimeSlice = new TimeSliceCounter(timeSliceSize);
             }
         }

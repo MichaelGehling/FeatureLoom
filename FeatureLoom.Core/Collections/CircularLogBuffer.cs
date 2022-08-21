@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace FeatureLoom.Collections
 {
-    public sealed class CountingRingBuffer<T>
+    public sealed class CircularLogBuffer<T>
     {
         private T[] buffer;
         private int nextIndex = 0;
@@ -15,7 +15,7 @@ namespace FeatureLoom.Collections
         private MicroValueLock myLock;
         private bool threadSafe = true;
 
-        public CountingRingBuffer(int bufferSize, bool threadSafe = true)
+        public CircularLogBuffer(int bufferSize, bool threadSafe = true)
         {
             buffer = new T[bufferSize];
             this.threadSafe = true;

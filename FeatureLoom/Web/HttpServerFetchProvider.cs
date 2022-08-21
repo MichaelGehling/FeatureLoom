@@ -14,7 +14,7 @@ namespace FeatureLoom.Web
 {
     public class HttpServerFetchProvider : IMessageSink, IWebRequestHandler
     {
-        private CountingRingBuffer<string> ringBuffer;
+        private CircularLogBuffer<string> ringBuffer;
         private readonly string route;
         private IWebMessageTranslator translator;
         public string Route => route;
@@ -24,7 +24,7 @@ namespace FeatureLoom.Web
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.route = route;
-            ringBuffer = new CountingRingBuffer<string>(bufferSize);
+            ringBuffer = new CircularLogBuffer<string>(bufferSize);
             this.translator = translator;
         }
 
