@@ -1,10 +1,12 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 
 namespace FeatureLoom.Collections
 {
+
     public sealed class CircularLogBuffer<T>
     {
         private T[] buffer;
@@ -21,11 +23,10 @@ namespace FeatureLoom.Collections
             this.threadSafe = true;
         }
 
-        public int Length => cycled ? buffer.Length : nextIndex;
-        public int MaxLength => buffer.Length;
-        public long Counter => counter;
-        public long Newest => counter - 1;
-        public long Oldest => Newest - Length;
+        public int CurrentSize => cycled ? buffer.Length : nextIndex;
+        public int MaxSize => buffer.Length;
+        public long LatestId => counter - 1;
+        public long OldestAvailableId => LatestId - CurrentSize;
 
         public IAsyncWaitHandle WaitHandle
         {
@@ -82,7 +83,7 @@ namespace FeatureLoom.Collections
             return counter;
         }
 
-        public void Clear()
+        public void Reset()
         {
             if (threadSafe) myLock.Enter(true);
             try
@@ -133,13 +134,13 @@ namespace FeatureLoom.Collections
             }
         }
 
-        public bool TryGetFromNumber(long number, out T result)
+        public bool TryGetFromId(long number, out T result)
         {
             if (threadSafe) myLock.EnterReadOnly(true);
             try
             {
                 result = default;
-                if (number >= counter || counter - number > Length) return false;
+                if (number >= counter || counter - number > CurrentSize) return false;
 
                 int offset = (int)(counter - number);
                 if (nextIndex - offset >= 0) result = buffer[nextIndex - offset];
@@ -152,20 +153,33 @@ namespace FeatureLoom.Collections
             }
         }
 
-        public T[] GetAvailableSince(long startNumber, out long missed)
+        public T[] GetAllAvailable(long firstRequestedId, out long firstProvidedId, out long lastProvidedId) => GetAllAvailable(firstRequestedId, buffer.Length, out firstProvidedId, out lastProvidedId);
+
+        public T[] GetAllAvailable(long firstRequestedId, int maxItems, out long firstProvidedId, out long lastProvidedId)
         {
+            if (firstRequestedId >= counter)
+            {
+                firstProvidedId = -1;
+                lastProvidedId = -1;
+                return Array.Empty<T>();
+            }
+
             if (threadSafe) myLock.EnterReadOnly(true);
             try
             {
-                missed = 0;
-                if (startNumber >= counter) return Array.Empty<T>();
-                long numberToCopyLong = counter - startNumber;
-                if (numberToCopyLong > Length)
+                if (firstRequestedId >= counter)
                 {
-                    missed = numberToCopyLong - Length;
-                    numberToCopyLong = Length;
+                    firstProvidedId = -1;
+                    lastProvidedId = -1;
+                    return Array.Empty<T>();
                 }
-                int numberToCopy = (int)numberToCopyLong;
+
+                if (firstRequestedId < OldestAvailableId) firstProvidedId = OldestAvailableId;
+                else firstProvidedId = firstRequestedId;
+
+                int numberToCopy = (int)(counter - firstRequestedId).ClampHigh(maxItems).ClampHigh(CurrentSize);
+                lastProvidedId = firstRequestedId + numberToCopy;
+
                 T[] result = new T[numberToCopy];
                 CopyToInternal(result, 0, numberToCopy);
                 return result;
@@ -182,7 +196,7 @@ namespace FeatureLoom.Collections
             try
             {
                 var leftSpace = array.Length - arrayIndex;
-                CopyToInternal(array, arrayIndex, leftSpace > Length ? Length : leftSpace);
+                CopyToInternal(array, arrayIndex, leftSpace > CurrentSize ? CurrentSize : leftSpace);
             }
             finally
             {
@@ -206,10 +220,10 @@ namespace FeatureLoom.Collections
         private void CopyToInternal(T[] array, int arrayIndex, int copyLength)
         {
             var leftSpace = array.Length - arrayIndex;
-            if (leftSpace < copyLength || copyLength > Length) throw new ArgumentOutOfRangeException();
+            if (leftSpace < copyLength || copyLength > CurrentSize) throw new ArgumentOutOfRangeException();
 
             int frontBufferSize = nextIndex;
-            int backBufferSize = Length - nextIndex;
+            int backBufferSize = CurrentSize - nextIndex;
             int copyFromFrontBuffer = copyLength >= frontBufferSize ? frontBufferSize : copyLength;
             int frontBufferStartIndex = frontBufferSize - copyFromFrontBuffer;
             int copyFromBackbuffer = copyLength - copyFromFrontBuffer;

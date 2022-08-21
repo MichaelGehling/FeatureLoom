@@ -56,37 +56,38 @@ namespace FeatureLoom.Web
 
             try
             {
-                long requestedStart = 0;
-                if (request.TryGetQueryItem("next", out string requestedStartStr)) long.TryParse(requestedStartStr, out requestedStart);
-                int maxWait = 0;
-                if (request.TryGetQueryItem("maxWait", out string maxWaitStr)) int.TryParse(maxWaitStr, out maxWait);
-                long missed = 0;
-                long next = 0;
-                bool onlyLatest = false;
-                string[] messages = Array.Empty<string>();
+                if (!request.TryGetQueryItem("next", out long requestedStart)) requestedStart = 0;
+                if (!request.TryGetQueryItem("maxWait", out int maxWait)) maxWait = 0;
+                if (!request.TryGetQueryItem("maxItems", out int maxItems)) maxItems = ringBuffer.MaxSize;
 
-                next = ringBuffer.Counter;
-                if (requestedStart > next || requestedStart < 0)
-                {
-                    onlyLatest = true;
-                    requestedStart = next < 0 ? 0 : next - 1;
-                }
-                messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
+                string[] messages = ringBuffer.GetAllAvailable(requestedStart, maxItems, out var firstProvided, out var lastProvided);
 
                 if (messages.Length == 0 && maxWait > 0)
                 {
-                    if (await ringBuffer.WaitHandle.WaitAsync(maxWait.Milliseconds()))
+                    TimeFrame timer = new TimeFrame(maxWait.Milliseconds());                  
+                    while (messages.Length == 0  && await ringBuffer.WaitHandle.WaitAsync(timer.Remaining()))
                     {
-                        messages = ringBuffer.GetAvailableSince(requestedStart, out missed);
-                        next = ringBuffer.Counter;
+                        messages = ringBuffer.GetAllAvailable(requestedStart, maxItems, out firstProvided, out lastProvided);                        
                     }
                 }
 
-                if (onlyLatest) missed = -1;
+                long missed = 0;
+                long next = 0;
+                if (messages.Length > 0)
+                {
+                    missed = firstProvided - requestedStart;
+                    next = lastProvided + 1;
+                }
+                else
+                {
+                    missed = 0;
+                    next = ringBuffer.LatestId+1;
+                }
 
                 StringBuilder sb = new StringBuilder();
                 sb.Append(
 $@"{{
+    ""numItems"" : {messages.Length.ToString()},
     ""missed"" : {missed.ToString()},
     ""next"" : {next.ToString()},
     ""messages"" : [

@@ -49,8 +49,7 @@ namespace FeatureLoom.MessageFlow
             {
                 using (myLock.LockReadOnly())
                 {
-                    var result = messageBuffer.GetAvailableSince(bufferPosition, out _);
-                    bufferPosition = messageBuffer.Counter;
+                    var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
                     return result;
                 }
             }
@@ -67,14 +66,12 @@ namespace FeatureLoom.MessageFlow
             {
                 if (timestampBuffer != null)
                 {
-                    var result = timestampBuffer.GetAvailableSince(bufferPosition, out _);
-                    bufferPosition = timestampBuffer.Counter;
+                    var result = timestampBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
                     return result;
                 }
                 else if (messageBuffer != null)
                 {
-                    var result = messageBuffer.GetAvailableSince(bufferPosition, out _).Select(set => set.timestamp).ToArray();
-                    bufferPosition = messageBuffer.Counter;
+                    var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition).Select(set => set.timestamp).ToArray();
                     return result;
                 }
                 else
@@ -91,8 +88,7 @@ namespace FeatureLoom.MessageFlow
             {
                 using (myLock.LockReadOnly())
                 {
-                    var result = timeSliceCounterBuffer.GetAvailableSince(bufferPosition, out _);
-                    bufferPosition = timeSliceCounterBuffer.Counter;
+                    var result = timeSliceCounterBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
                     return result;
                 }
             }

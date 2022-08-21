@@ -10,6 +10,7 @@ namespace FeatureLoom.MessageFlow
     {
         CircularLogBuffer<T> buffer;
         int storageSize;
+        string categoryName;
 
         public void Post<M>(in M message)
         {
