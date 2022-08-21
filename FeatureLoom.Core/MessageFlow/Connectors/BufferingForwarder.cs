@@ -29,7 +29,7 @@ namespace FeatureLoom.MessageFlow
 
         private void OnConnection(IMessageSink sink)
         {
-            var bufferedMessages = buffer.GetAllAvailable(0, out long missed);
+            var bufferedMessages = buffer.GetAllAvailable(0, out _, out _);
             foreach (var msg in bufferedMessages)
             {
                 sink.Post(msg);
@@ -76,7 +76,7 @@ namespace FeatureLoom.MessageFlow
         {
             using (bufferLock.LockReadOnly())
             {
-                return buffer.GetAllAvailable(0, out _);
+                return buffer.GetAllAvailable(0, out _, out _);
             }
         }
 

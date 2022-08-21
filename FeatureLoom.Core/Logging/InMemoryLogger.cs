@@ -32,7 +32,7 @@ namespace FeatureLoom.Logging
 
         public LogMessage[] GetAllLogMessages()
         {
-            return buffer.GetAllAvailable(0, out _);            
+            return buffer.GetAllAvailable(0, out _, out _);            
         }
     }
 }
