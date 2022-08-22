@@ -7,7 +7,7 @@ using System.Collections.Generic;
 namespace FeatureLoom.Collections
 {
 
-    public sealed class CircularLogBuffer<T>
+    public sealed class CircularLogBuffer<T> : ILogBuffer<T>
     {
         private T[] buffer;
         private int nextIndex = 0;
