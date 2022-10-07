@@ -20,7 +20,7 @@ namespace FeatureLoom.MessageFlow
             sender.ConnectTo(forwarder).ConnectTo(sink);
             sender.Send(message);
             Assert.False(sink.HasMessage);
-            Assert.True(sink.WaitHandle.Wait(2.Milliseconds()));
+            Assert.True(sink.WaitHandle.Wait(10.Milliseconds()));
             Assert.True(sink.HasMessage);
             Assert.Equal(message, sink.LatestMessageOrDefault);
 

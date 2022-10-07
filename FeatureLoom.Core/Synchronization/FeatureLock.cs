@@ -667,13 +667,13 @@ namespace FeatureLoom.Synchronization
         // Yields CPU time to wait synchronously
         private void YieldCpuTime(bool lowerPriority)
         {
-            if (!lowerPriority) Thread.Sleep(0);
+            if (!lowerPriority) Thread.Yield();
             else
             {
                 var currentThread = Thread.CurrentThread;
                 var oldPriority = currentThread.Priority;
                 currentThread.Priority = ThreadPriority.BelowNormal;
-                Thread.Sleep(0);
+                Thread.Yield();
                 currentThread.Priority = oldPriority;
             }
         }

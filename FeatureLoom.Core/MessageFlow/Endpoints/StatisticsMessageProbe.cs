@@ -20,9 +20,9 @@ namespace FeatureLoom.MessageFlow
         private LazyValue<AsyncManualResetEvent> manualResetEvent;
 
         private long counter;
-        private CountingRingBuffer<(DateTime timestamp, T2 message)> messageBuffer;
-        private CountingRingBuffer<DateTime> timestampBuffer;
-        private CountingRingBuffer<TimeSliceCounter> timeSliceCounterBuffer;
+        private CircularLogBuffer<(DateTime timestamp, T2 message)> messageBuffer;
+        private CircularLogBuffer<DateTime> timestampBuffer;
+        private CircularLogBuffer<TimeSliceCounter> timeSliceCounterBuffer;
 
         public StatisticsMessageProbe(string name, Predicate<T1> filter = null, Func<T1, T2> converter = null, int messageBufferSize = 0, TimeSpan timeSliceSize = default, int maxTimeSlices = 0)
         {
@@ -30,18 +30,18 @@ namespace FeatureLoom.MessageFlow
             this.filter = filter;
             this.convert = converter;
             this.timeSliceSize = timeSliceSize;
-            if (convert != null && messageBufferSize > 0) messageBuffer = new CountingRingBuffer<(DateTime timestamp, T2 message)>(messageBufferSize, false);
-            else if (messageBufferSize > 0) timestampBuffer = new CountingRingBuffer<DateTime>(messageBufferSize, false);
+            if (convert != null && messageBufferSize > 0) messageBuffer = new CircularLogBuffer<(DateTime timestamp, T2 message)>(messageBufferSize, false);
+            else if (messageBufferSize > 0) timestampBuffer = new CircularLogBuffer<DateTime>(messageBufferSize, false);
             if (maxTimeSlices > 0)
             {
-                timeSliceCounterBuffer = new CountingRingBuffer<TimeSliceCounter>(maxTimeSlices, false);
+                timeSliceCounterBuffer = new CircularLogBuffer<TimeSliceCounter>(maxTimeSlices, false);
                 currentTimeSlice = new TimeSliceCounter(timeSliceSize);
             }
         }
 
         public long Counter => counter;
         public TimeSliceCounter CurrentTimeSlize => currentTimeSlice;
-        public IAsyncWaitHandle WaitHandle => messageBuffer?.WaitHandle ?? timestampBuffer?.WaitHandle ?? timeSliceCounterBuffer?.WaitHandle ?? manualResetEvent.Obj.AsyncWaitHandle;
+        public IAsyncWaitHandle WaitHandle => messageBuffer?.WaitHandle ?? timestampBuffer?.WaitHandle ?? timeSliceCounterBuffer?.WaitHandle ?? manualResetEvent.Obj;
 
         public (DateTime timestamp, T2 message)[] GetBufferedMessages(ref long bufferPosition)
         {
@@ -49,8 +49,7 @@ namespace FeatureLoom.MessageFlow
             {
                 using (myLock.LockReadOnly())
                 {
-                    var result = messageBuffer.GetAvailableSince(bufferPosition, out _);
-                    bufferPosition = messageBuffer.Counter;
+                    var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
                     return result;
                 }
             }
@@ -67,14 +66,12 @@ namespace FeatureLoom.MessageFlow
             {
                 if (timestampBuffer != null)
                 {
-                    var result = timestampBuffer.GetAvailableSince(bufferPosition, out _);
-                    bufferPosition = timestampBuffer.Counter;
+                    var result = timestampBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
                     return result;
                 }
                 else if (messageBuffer != null)
                 {
-                    var result = messageBuffer.GetAvailableSince(bufferPosition, out _).Select(set => set.timestamp).ToArray();
-                    bufferPosition = messageBuffer.Counter;
+                    var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition).Select(set => set.timestamp).ToArray();
                     return result;
                 }
                 else
@@ -91,8 +88,7 @@ namespace FeatureLoom.MessageFlow
             {
                 using (myLock.LockReadOnly())
                 {
-                    var result = timeSliceCounterBuffer.GetAvailableSince(bufferPosition, out _);
-                    bufferPosition = timeSliceCounterBuffer.Counter;
+                    var result = timeSliceCounterBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
                     return result;
                 }
             }

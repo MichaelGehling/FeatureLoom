@@ -144,7 +144,7 @@ namespace FeatureLoom.TCP
         private Sender connectionEventSender = new Sender();
 
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
-        public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent.AsyncWaitHandle;
+        public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent;
 
         public TcpServerEndpoint(Config config = null, ITcpMessageEncoder encoder = null, ITcpMessageDecoder decoder = null, bool autoRun = true)
         {

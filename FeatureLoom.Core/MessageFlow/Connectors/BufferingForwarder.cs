@@ -16,7 +16,7 @@ namespace FeatureLoom.MessageFlow
     public class BufferingForwarder<T> : IMessageFlowConnection<T>
     {
         private SourceValueHelper sourceHelper;
-        private CountingRingBuffer<T> buffer;
+        private CircularLogBuffer<T> buffer;
         private FeatureLock bufferLock = new FeatureLock();
 
         public Type SentMessageType => typeof(T);
@@ -24,12 +24,12 @@ namespace FeatureLoom.MessageFlow
 
         public BufferingForwarder(int bufferSize)
         {
-            buffer = new CountingRingBuffer<T>(bufferSize, false);
+            buffer = new CircularLogBuffer<T>(bufferSize, false);
         }
 
         private void OnConnection(IMessageSink sink)
         {
-            var bufferedMessages = buffer.GetAvailableSince(0, out long missed);
+            var bufferedMessages = buffer.GetAllAvailable(0, out _, out _);
             foreach (var msg in bufferedMessages)
             {
                 sink.Post(msg);
@@ -76,7 +76,7 @@ namespace FeatureLoom.MessageFlow
         {
             using (bufferLock.LockReadOnly())
             {
-                return buffer.GetAvailableSince(0, out _);
+                return buffer.GetAllAvailable(0, out _, out _);
             }
         }
 

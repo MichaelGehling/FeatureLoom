@@ -145,14 +145,14 @@ namespace FeatureLoom.Mappers
             IMappingConverter[] converters;
             SourceHelper sourceHelper = new SourceHelper();
 
-            public DynamicMultiMappingConverter(Type[] inputTypes, bool forwardUnmappedMessages, IMappingConverter[] converters)
+            internal DynamicMultiMappingConverter(Type[] inputTypes, bool forwardUnmappedMessages, IMappingConverter[] converters)
             {
                 this.inputTypes = inputTypes;
                 this.forwardUnmappedMessages = forwardUnmappedMessages;
                 this.converters = converters;
             }
 
-            public void CheckToAddNewConverter(IMappingConverter newConverter)
+            internal void CheckToAddNewConverter(IMappingConverter newConverter)
             {                
                 if (!inputTypes.EmptyOrNull() && !inputTypes.Contains(newConverter.InType)) return;
 
@@ -163,7 +163,7 @@ namespace FeatureLoom.Mappers
                 converters = newConverters;
             }
 
-            public void CheckToRemoveConverter(IMappingConverter oldConverter)
+            internal void CheckToRemoveConverter(IMappingConverter oldConverter)
             {
                 // Will be locked by ObjectMapper's mappingConvertersLock
                 int index = converters.IndexOf(oldConverter);
@@ -172,7 +172,7 @@ namespace FeatureLoom.Mappers
                 converters = newConverters;
             }
 
-            public void CheckToReplaceConverter(IMappingConverter oldConverter, IMappingConverter newConverter)
+            internal void CheckToReplaceConverter(IMappingConverter oldConverter, IMappingConverter newConverter)
             {
                 // Will be locked by ObjectMapper's mappingConvertersLock
                 int index = converters.IndexOf(oldConverter);

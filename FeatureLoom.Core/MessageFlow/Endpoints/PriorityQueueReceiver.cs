@@ -47,7 +47,7 @@ namespace FeatureLoom.MessageFlow
         public bool IsEmpty => queue.Count == 0;
         public bool IsFull => queue.Count >= maxQueueSize;
         public int Count => queue.Count;
-        public IAsyncWaitHandle WaitHandle => readerWakeEvent.AsyncWaitHandle;
+        public IAsyncWaitHandle WaitHandle => readerWakeEvent;
 
         public void Post<M>(in M message)
         {

@@ -110,8 +110,109 @@ namespace Playground
 
         
 
-        private static void Main()
+        private static async Task Main()
         {
+
+            var amre = new FeatureLoom.Synchronization.AsyncManualResetEvent(false);
+            var amre2 = new Nito.AsyncEx.AsyncManualResetEvent(false);
+            var mre = new ManualResetEvent(false);
+            var mres = new ManualResetEventSlim(false);
+            TimeKeeper tk1 = AppTime.TimeKeeper;
+            int itertions = 1_000_000;
+            bool running = false;
+            int waitCounter = 0;
+            while(true)
+            {
+                Thread.Sleep(1000);
+                running = true;
+                waitCounter = 0;
+                Task task = Task.Run(() => 
+                { 
+                    while (running)
+                    { 
+                        mre.WaitOne();
+                        waitCounter++;
+                        //Thread.Yield();
+                    }
+                });
+                Thread.Sleep(1000);
+                tk1.Restart();
+                for (int i=0; i < itertions; i++)
+                {                    
+                    mre.Set();
+                    mre.Reset();                    
+                }
+                running = false;
+                Console.WriteLine($"  MRE: {tk1.Elapsed.TotalMilliseconds} ms //\t waitCounter: {waitCounter}, {waitCounter/tk1.LastElapsed.Milliseconds}");
+
+                Thread.Sleep(1000);
+                running = true;
+                waitCounter = 0;
+                task = Task.Run(() =>
+                {
+                    while (running)
+                    {
+                        mres.Wait();
+                        waitCounter++;
+                        //Thread.Yield();
+                    }
+                });
+                Thread.Sleep(1000);
+                tk1.Restart();
+                for (int i = 0; i < itertions; i++)
+                {
+                    mres.Set();
+                    mres.Reset();
+                }
+                running = false;
+                Console.WriteLine($" MRES: {tk1.Elapsed.TotalMilliseconds} ms //\t waitCounter: {waitCounter}, {waitCounter / tk1.LastElapsed.Milliseconds}");
+
+                Thread.Sleep(1000);
+                running = true;
+                waitCounter = 0;
+                task = Task.Run(async () =>
+                {
+                    while (running)
+                    {
+                        await amre.WaitAsync();
+                        waitCounter++;
+                        //Thread.Yield();
+                    }
+                });
+                Thread.Sleep(1000);
+                tk1.Restart();
+                for (int i = 0; i < itertions; i++)
+                {
+                    amre.Set();
+                    amre.Reset();
+                }
+                running = false;
+                Console.WriteLine($" AMRE: {tk1.Elapsed.TotalMilliseconds} ms //\t waitCounter: {waitCounter}, {waitCounter / tk1.LastElapsed.Milliseconds}");
+
+                Thread.Sleep(1000);
+                running = true;
+                waitCounter = 0;
+                task = Task.Run(async () =>
+                {
+                    while (running)
+                    {
+                        await amre2.WaitAsync();
+                        waitCounter++;
+                        //Thread.Yield();
+                    }
+                });
+                Thread.Sleep(1000);
+                tk1.Restart();
+                for (int i = 0; i < itertions; i++)
+                {
+                    amre2.Set();
+                    amre2.Reset();
+                }
+                running = false;
+                Console.WriteLine($"AMRE2: {tk1.Elapsed.TotalMilliseconds} ms //\t waitCounter: {waitCounter}, {waitCounter / tk1.LastElapsed.Milliseconds}");
+                Console.WriteLine("----------");
+            }
+
             ulong asd = ulong.MaxValue;
             long unix = (long)asd.ClampHigh((ulong)long.MaxValue);
 

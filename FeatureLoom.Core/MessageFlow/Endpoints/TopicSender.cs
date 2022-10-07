@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 namespace FeatureLoom.MessageFlow
 {
     /// <summary> Used to send messages of any type wrapped as topic messages to all connected sinks. It is thread safe. <summary>
-    public sealed class TopicSender : IMessageSource<TopicMessage>, ISender
+    public sealed class TopicSender : IMessageSource, ISender
     {
-        TypedSourceValueHelper<TopicMessage> sourceHelper;
+        SourceValueHelper sourceHelper;
         string topic;
 
         public TopicSender(string topic)
@@ -18,23 +18,21 @@ namespace FeatureLoom.MessageFlow
 
         public void Send<T>(in T message)
         {
-            var topicMessage = new TopicMessage(topic, message);
+            var topicMessage = new TopicMessage<T>(topic, message);
             sourceHelper.Forward(in topicMessage);
         }
 
         public void Send<T>(T message)
         {
-            var topicMessage = new TopicMessage(topic, message);
+            var topicMessage = new TopicMessage<T>(topic, message);
             sourceHelper.Forward(topicMessage);
         }
 
         public Task SendAsync<T>(T message)
         {
-            var topicMessage = new TopicMessage(topic, message);
+            var topicMessage = new TopicMessage<T>(topic, message);
             return sourceHelper.ForwardAsync(topicMessage);
         }
-
-        public Type SentMessageType => sourceHelper.SentMessageType;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
@@ -65,9 +63,9 @@ namespace FeatureLoom.MessageFlow
     }
 
     /// <summary> Used to send messages of a specific type wrapped as topic messages to all connected sinks. It is thread safe. <summary>
-    public sealed class TopicSender<T> : ISender<T>, IMessageSource<TopicMessage>
+    public sealed class TopicSender<T> : ISender<T>, IMessageSource<TopicMessage<T>>
     {
-        TypedSourceValueHelper<TopicMessage> sourceHelper;
+        TypedSourceValueHelper<TopicMessage<T>> sourceHelper;
         string topic;
 
         public TopicSender(string topic)
@@ -106,19 +104,19 @@ namespace FeatureLoom.MessageFlow
 
         public void Send(in T message)
         {
-            var topicMessage = new TopicMessage(topic, message);
+            var topicMessage = new TopicMessage<T>(topic, message);
             sourceHelper.Forward(in topicMessage);
         }
 
         public void Send(T message)
         {
-            var topicMessage = new TopicMessage(topic, message);
+            var topicMessage = new TopicMessage<T>(topic, message);
             sourceHelper.Forward(topicMessage);
         }
 
         public Task SendAsync(T message)
         {
-            var topicMessage = new TopicMessage(topic, message);
+            var topicMessage = new TopicMessage<T>(topic, message);
             return sourceHelper.ForwardAsync(topicMessage);
         }
 

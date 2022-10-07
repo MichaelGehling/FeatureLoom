@@ -12,6 +12,7 @@ namespace FeatureLoom.Time
         private static DateTime coarseTimeBase;
         private static int coarseMillisecondCountBase;
         private static TimeSpan lowerSleepLimit = 16.Milliseconds();
+        private static TimeSpan lowerAsyncSleepLimit = 16.Milliseconds();
         private static readonly DateTime unixTimeBase = new DateTime(1970, 1, 1);
 
         static AppTime()
@@ -81,7 +82,7 @@ namespace FeatureLoom.Time
 
             var timer = AppTime.TimeKeeper;
 
-            if (maxTimeout > lowerSleepLimit) cancellationToken.WaitHandle.WaitOne((maxTimeout+minTimeout).Divide(2));
+            if (maxTimeout >= lowerSleepLimit) cancellationToken.WaitHandle.WaitOne((maxTimeout+minTimeout).Divide(2));
 
             if (timer.Elapsed > minTimeout || cancellationToken.IsCancellationRequested) return;
 
@@ -114,9 +115,9 @@ namespace FeatureLoom.Time
             else
             {
                 var timer = AppTime.TimeKeeper;
-                if (maxTimeout > lowerSleepLimit)
+                if (maxTimeout >= lowerAsyncSleepLimit)
                 {
-                    await Task.Delay(minTimeout, cancellationToken);
+                    await Task.Delay((maxTimeout + minTimeout).Divide(2), cancellationToken);
                     _ = timer.Elapsed;
                 }
                 while (timer.LastElapsed < minTimeout - 0.01.Milliseconds() && !cancellationToken.IsCancellationRequested)

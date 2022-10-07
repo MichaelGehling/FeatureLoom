@@ -179,7 +179,7 @@ namespace FeatureLoom.TCP
 
         public bool Disconnected => !client.Connected;
         public bool Connected => client.Connected;
-        public IAsyncWaitHandle DisconnectionWaitHandle => disconnectionEvent.AsyncWaitHandle;
+        public IAsyncWaitHandle DisconnectionWaitHandle => disconnectionEvent;
     }
 
     public interface ITcpMessageEncoder

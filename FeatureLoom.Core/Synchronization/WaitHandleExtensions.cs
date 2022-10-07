@@ -7,8 +7,15 @@ namespace FeatureLoom.Synchronization
 {
     public static class WaitHandleExtensions
     {
-        public static async Task<bool> WaitOneAsync(this WaitHandle waitHandle, int millisecondsTimeout, CancellationToken cancellationToken)
+
+        public static Task<bool> WaitOneAsync(this WaitHandle waitHandle, int millisecondsTimeout, CancellationToken cancellationToken)
         {
+            return Task.Run(() =>
+            {
+                return WaitHandle.WaitAny(new[] { waitHandle, cancellationToken.WaitHandle }, millisecondsTimeout) == 0;
+            });
+        }
+        /*{
             bool result = false;
             RegisteredWaitHandle registeredHandle = null;
             CancellationTokenRegistration tokenRegistration = default;
@@ -38,20 +45,23 @@ namespace FeatureLoom.Synchronization
                 tokenRegistration.Dispose();
             }
             return result;
+        }*/
+
+        public static Task<bool> WaitOneAsync(this WaitHandle handle, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            //return await handle.WaitOneAsync(timeout.TotalMilliseconds.ToIntTruncated(), cancellationToken);
+            return Task.Run(() => WaitHandle.WaitAny(new[] { handle, cancellationToken.WaitHandle }, timeout) == 0);
         }
 
-        public async static Task<bool> WaitOneAsync(this WaitHandle handle, TimeSpan timeout, CancellationToken cancellationToken)
+        public static Task<bool> WaitOneAsync(this WaitHandle handle, CancellationToken cancellationToken)
         {
-            return await handle.WaitOneAsync(timeout.TotalMilliseconds.ToIntTruncated(), cancellationToken);
-        }
-
-        public async static Task<bool> WaitOneAsync(this WaitHandle handle, CancellationToken cancellationToken)
-        {
-            return await handle.WaitOneAsync(Timeout.Infinite, cancellationToken);
+            //return await handle.WaitOneAsync(Timeout.Infinite, cancellationToken);
+            return Task.Run(() => WaitHandle.WaitAny(new[] { handle, cancellationToken.WaitHandle }) == 0);
         }
 
         public static async Task<bool> WaitAllAsync(this WaitHandle[] handles, TimeSpan timeout, CancellationToken cancellationToken)
         {
+
             bool completed = true;
             Task[] tasks = new Task[handles.Length];
             for (int i = 0; i < handles.Length; i++)
