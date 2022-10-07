@@ -263,8 +263,8 @@ namespace FeatureLoom.Forms
                 }
                 else if (control is ComboBox comboBox)
                 {
-                    comboBox.SelectionLength = 0;
-                    comboBox.SelectionStart = control.Text.Length;                    
+                    //comboBox.SelectionLength = 0;
+                    //comboBox.SelectionStart = control.Text.Length;                    
                 }
             }
             

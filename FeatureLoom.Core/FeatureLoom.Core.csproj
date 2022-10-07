@@ -4,7 +4,7 @@
     <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
     <LangVersion>9.0</LangVersion>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
-    <Version>0.3.4-alpha</Version>
+    <Version>0.3.4.7-alpha</Version>
     <Description>FeatureLoom is a C# development framework that focuses on a lean development and efficient code, speeds-up development by simplification while offering opt-in for a high level of control, promotes modular and extensible code by introducing means to easily decouple components with asynchronous communication, strives for high performance and a small memory footprint, equally supports synchronous and asynchronous programming to allow the right approach at the right time.</Description>
     <Copyright>Copyright (c) 2020 Michael Gehling</Copyright>
     <PackageProjectUrl>https://github.com/MichaelGehling/FeatureLoom</PackageProjectUrl>

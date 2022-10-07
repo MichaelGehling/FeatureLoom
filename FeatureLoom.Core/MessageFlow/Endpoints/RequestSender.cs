@@ -88,7 +88,7 @@ namespace FeatureLoom.MessageFlow
                     bool remove = false;
                     if (handler.requestId == requestId)
                     {
-                        handler.tcs.SetResult(response);
+                        handler.tcs.TrySetResult(response);
                         remove = true;
                     }
                     else if (handler.tcs.Task.IsCanceled)
@@ -223,7 +223,7 @@ namespace FeatureLoom.MessageFlow
                 this.tcs = tcs;
             }
 
-            public static ResponseHandler Create(long requestId) => new ResponseHandler(requestId, AppTime.CoarseNow, new TaskCompletionSource<RESP>());
+            public static ResponseHandler Create(long requestId) => new ResponseHandler(requestId, AppTime.CoarseNow, new TaskCompletionSource<RESP>(TaskCreationOptions.RunContinuationsAsynchronously));
         }
     }
 }

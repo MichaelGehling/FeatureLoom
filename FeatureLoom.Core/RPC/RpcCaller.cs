@@ -8,6 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using FeatureLoom.Scheduling;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.RPC
 {
@@ -17,17 +19,25 @@ namespace FeatureLoom.RPC
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
         private FeatureLock responseHandlersLock = new FeatureLock();
         private readonly TimeSpan timeout;
-        private readonly Timer timeoutTimer;
+        private readonly ISchedule timeoutSchedule;
+        private TimeFrame timeoutCheckTimer;
 
         public RpcCaller(TimeSpan timeout)
         {
             this.timeout = timeout;
-            this.timeoutTimer = new Timer(CheckForTimeouts, null, timeout, timeout.Multiply(0.5));
+            this.timeoutSchedule = Service<SchedulerService>.Instance.ScheduleAction("StringRpcCaller_Timeout", now =>
+            {
+                if (!this.timeoutCheckTimer.Elapsed(now)) return this.timeoutCheckTimer;
+                CheckForTimeouts(now);
+                this.timeoutCheckTimer = new TimeFrame(now, this.timeout.Multiply(0.5));
+                return this.timeoutCheckTimer;
+            });
         }
 
-        public void CheckForTimeouts(object state)
+        public void CheckForTimeouts(DateTime now)
         {
-            DateTime now = AppTime.Now;
+            if (responseHandlers.Count == 0) return;
+
             using (responseHandlersLock.Lock())
             {
                 for (int i = 0; i < responseHandlers.Count; i++)
@@ -67,7 +77,7 @@ namespace FeatureLoom.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, R>(requestId, method, parameterTuple);
-            TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
+            TaskCompletionSource<R> tcs = new TaskCompletionSource<R>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
@@ -80,7 +90,7 @@ namespace FeatureLoom.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<P, bool>(requestId, method, parameterTuple);
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));
@@ -93,7 +103,7 @@ namespace FeatureLoom.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, R>(requestId, method, true);
-            TaskCompletionSource<R> tcs = new TaskCompletionSource<R>();
+            TaskCompletionSource<R> tcs = new TaskCompletionSource<R>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<R>(requestId, tcs, timeout));
@@ -106,7 +116,7 @@ namespace FeatureLoom.RPC
         {
             var requestId = RandomGenerator.Int64();
             var request = new RpcRequest<bool, bool>(requestId, method, true);
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (responseHandlersLock.Lock())
             {
                 responseHandlers.Add(new ResponseHandler<bool>(requestId, tcs, timeout));

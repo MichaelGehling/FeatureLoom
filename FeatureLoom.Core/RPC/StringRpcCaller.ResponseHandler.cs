@@ -35,7 +35,7 @@ namespace FeatureLoom.RPC
             {
                 if (message is IRpcResponse myResponse && myResponse.RequestId == this.requestId)
                 {
-                    taskCompletionSource.SetResult(myResponse.ResultToJson().Trim('"'.ToSingleEntryArray()));
+                    taskCompletionSource.TrySetResult(myResponse.ResultToJson().Trim('"'.ToSingleEntryArray()));
                     return true;
                 }
                 else return false;
@@ -43,7 +43,7 @@ namespace FeatureLoom.RPC
 
             public void Cancel()
             {
-                taskCompletionSource.SetCanceled();
+                taskCompletionSource.TrySetCanceled();
             }
         }
     }

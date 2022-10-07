@@ -1,4 +1,5 @@
-﻿using FeatureLoom.MessageFlow;
+﻿using FeatureLoom.Core.Helpers;
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using System;
@@ -10,7 +11,7 @@ namespace FeatureLoom.Logging
 {
     public class ConsoleLogger : IMessageSink
     {
-        private readonly bool hasConsole = CheckHasConsole();
+        private readonly bool hasConsole = ConsoleHelper.CheckHasConsole();
         private StringBuilder stringBuilder = new StringBuilder();
         private MicroLock stringBuilderLock = new MicroLock();
 
@@ -50,15 +51,18 @@ namespace FeatureLoom.Logging
                         stringBuilder.Clear();
                     }
 
-                    var oldBgColor = Console.BackgroundColor;
-                    var oldColor = Console.ForegroundColor;                    
-                    Console.BackgroundColor = config.backgroundColor;
-                    if (config.loglevelColors != null && config.loglevelColors.TryGetValue(logMessage.level, out var color)) Console.ForegroundColor = color;                    
+                    ConsoleHelper.UseLocked(() =>
+                    {
+                        var oldBgColor = Console.BackgroundColor;
+                        var oldColor = Console.ForegroundColor;
+                        Console.BackgroundColor = config.backgroundColor;
+                        if (config.loglevelColors != null && config.loglevelColors.TryGetValue(logMessage.level, out var color)) Console.ForegroundColor = color;
 
-                    Console.WriteLine(strMsg);
+                        Console.WriteLine(strMsg);
 
-                    Console.ForegroundColor = oldColor;
-                    Console.BackgroundColor = oldBgColor;
+                        Console.ForegroundColor = oldColor;
+                        Console.BackgroundColor = oldBgColor;
+                    });
                 }
             }
             else
@@ -72,18 +76,7 @@ namespace FeatureLoom.Logging
             Post(in message);
         }
 
-        public static bool CheckHasConsole()
-        {
-            try
-            {
-                var x = Console.WindowHeight;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        
 
         public Task PostAsync<M>(M message)
         {

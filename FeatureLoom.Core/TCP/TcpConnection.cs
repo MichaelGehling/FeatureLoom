@@ -244,7 +244,7 @@ namespace FeatureLoom.TCP
             if (ignoreFailedAuthentication) return true;
 
             if (sslPolicyErrors == SslPolicyErrors.None) return true;
-            Console.WriteLine("Certificate error: {0}", sslPolicyErrors.ToName());
+            Log.ERROR("Certificate error: {0}", sslPolicyErrors.ToName());
             // refuse connection
             return false;
         }

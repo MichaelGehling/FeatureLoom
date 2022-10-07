@@ -27,7 +27,7 @@ namespace FeatureLoom.MessageFlow
             using (myLock.Lock())
             {
                 var currentCounter = counter;
-                TaskCompletionSource<int> waitingTaskSource = new TaskCompletionSource<int>();
+                TaskCompletionSource<int> waitingTaskSource = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
                 if (currentCounter >= numMessages) waitingTaskSource.SetResult(currentCounter);
                 else
                 {

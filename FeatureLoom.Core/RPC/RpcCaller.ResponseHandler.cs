@@ -34,7 +34,7 @@ namespace FeatureLoom.RPC
             {
                 if (message is RpcResponse<R> myResponse && myResponse.RequestId == this.requestId)
                 {
-                    taskCompletionSource.SetResult(myResponse.Result);
+                    taskCompletionSource.TrySetResult(myResponse.Result);
                     return true;
                 }
                 else return false;
@@ -42,7 +42,7 @@ namespace FeatureLoom.RPC
 
             public void Cancel()
             {
-                taskCompletionSource.SetCanceled();
+                taskCompletionSource.TrySetCanceled();
             }
         }
     }

@@ -9,6 +9,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using FeatureLoom.Scheduling;
+using FeatureLoom.Services;
 
 namespace FeatureLoom.RPC
 {
@@ -18,19 +20,26 @@ namespace FeatureLoom.RPC
         private List<IResponseHandler> responseHandlers = new List<IResponseHandler>();
         private MicroLock responseHandlersLock = new MicroLock();
         private readonly TimeSpan timeout;
-        private readonly Timer timeoutTimer;
+        private readonly ISchedule timeoutSchedule;
+        private TimeFrame timeoutCheckTimer;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         public StringRpcCaller(TimeSpan timeout)
         {
             this.timeout = timeout;
-            this.timeoutTimer = new Timer(CheckForTimeouts, null, timeout, timeout.Multiply(0.5));
+            this.timeoutSchedule = Service<SchedulerService>.Instance.ScheduleAction("StringRpcCaller_Timeout", now =>
+            {
+                if (!this.timeoutCheckTimer.Elapsed(now)) return this.timeoutCheckTimer;
+                CheckForTimeouts(now);
+                this.timeoutCheckTimer = new TimeFrame(now, this.timeout.Multiply(0.5));
+                return this.timeoutCheckTimer;
+            });
         }
 
-        public void CheckForTimeouts(object state)
+        public void CheckForTimeouts(DateTime now)
         {
-            DateTime now = AppTime.Now;
+            if (responseHandlers.Count == 0) return;
 
             using (responseHandlersLock.Lock())
             {
@@ -49,7 +58,7 @@ namespace FeatureLoom.RPC
         {
             var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
-            using (responseHandlersLock.Lock())
+            using (responseHandlersLock.Lock(true))
             {
                 responseHandlers.Add(new MultiResponseHandler(requestId, sink, timeout));
             }
@@ -60,8 +69,8 @@ namespace FeatureLoom.RPC
         {
             var requestId = RandomGenerator.Int64();
             string serializedRpcRequest = BuildJsonRpcRequest(methodCall, requestId, false);
-            TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
-            using (responseHandlersLock.Lock())
+            TaskCompletionSource<string> tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (responseHandlersLock.Lock(true))
             {
                 responseHandlers.Add(new ResponseHandler(requestId, tcs, timeout));
             }
@@ -147,7 +156,7 @@ namespace FeatureLoom.RPC
             {
                 DateTime now = AppTime.Now;
 
-                using (responseHandlersLock.Lock())
+                using (responseHandlersLock.Lock(true))
                 {
                     for (int i = 0; i < responseHandlers.Count; i++)
                     {
@@ -176,7 +185,7 @@ namespace FeatureLoom.RPC
             {
                 DateTime now = AppTime.Now;
 
-                using (responseHandlersLock.Lock())
+                using (responseHandlersLock.Lock(true))
                 {
                     for (int i = 0; i < responseHandlers.Count; i++)
                     {

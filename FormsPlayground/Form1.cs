@@ -35,9 +35,9 @@ namespace FormsPlayground
             this.multiPropertyControl1.SetFieldColumnStyle(1, new ColumnStyle());
             this.multiPropertyControl1.GetProperty("Hello2a").SetVerifier(text => text == "D" || text == "B" );
 
-            this.multiPropertyControl1.PropertyEventNotifier.ConnectTo(new ProcessingEndpoint<MultiPropertyControl.PropertyEvent>(msg =>
+            this.multiPropertyControl1.PropertyEventNotifier.ConnectTo(new ProcessingEndpoint<MultiPropertyControl.PropertyEventNotification>(msg =>
             {
-                var xaaa = msg;
+                var xaaa = msg.PropertyName;
             }));
 
             button1.Click += (o, e) =>

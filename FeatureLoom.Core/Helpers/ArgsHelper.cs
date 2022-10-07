@@ -2,67 +2,60 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FeatureLoom.Helpers
 {
     public class ArgsHelper : IEnumerable<KeyValuePair<string, string>>
     {
-        private string[] args;
-        private Dictionary<string, string> namedArgs = new Dictionary<string, string>();
-        private LazyValue<List<string>> unnamedArgs;
-        private readonly char bullet;
-        private readonly char assignment;
+        private List<KeyValuePair<string, string>> namedArgs = new List<KeyValuePair<string, string>>();        
+        private readonly string bullet;
+        private readonly string assignment;
 
         public ArgsHelper(string[] args, char bullet = '-', char assignment = '=')
         {
-            this.args = args;
-            this.bullet = bullet;
-            this.assignment = assignment;
+            this.bullet = bullet.ToString();
+            this.assignment = assignment.ToString();
 
-            Parse();
+            Parse(args);
         }
 
-        private void Parse(bool overwriteExisting = true)
+        private void Parse(string[] args)
         {
             foreach (var arg in args)
             {
                 if (arg.StartsWith(bullet) && arg.Contains(assignment))
                 {
-                    var key = arg.Substring(bullet.ToString(), assignment.ToString());
-                    var value = arg.Substring(assignment.ToString());
-                    if (!key.EmptyOrNull())
-                    {
-                        Add(key, value, overwriteExisting);
-                    }
+                    var key = arg.Substring(bullet, assignment);
+                    var value = arg.Substring(assignment);
+                    Add(key, value);
+                }
+                if (arg.StartsWith(bullet))
+                {
+                    var key = arg.Substring(bullet);
+                    Add(key, "");
                 }
                 else
                 {
-                    unnamedArgs.Obj.Add(arg);
+                    Add("", arg);
                 }
             }
         }
 
-        public void Add(string key, string value, bool overwriteExisting = true)
+        public void Add(string key, string value)
         {
-            if (overwriteExisting || !namedArgs.ContainsKey(key)) namedArgs[key] = value;
+            namedArgs.Add(new KeyValuePair<string, string>(key, value));
         }
 
-        public void Update(string[] args, bool clearAll = true, bool overwriteExisting = true)
-        {
-            this.args = args;
-            if (clearAll) namedArgs.Clear();
-            Parse(overwriteExisting);
-        }
-
-        public int Count => args.Length;
+        public int Count => namedArgs.Count;
 
         public string GetByIndex(int index) => TryGetByIndex(index, out string value) ? value : null;
 
         public bool TryGetByIndex(int index, out string value)
         {
-            if (index < args.Length && index >= 0)
+            if (index < namedArgs.Count && index >= 0)
             {
-                value = args[index];
+                value = namedArgs[index].Value;
                 return true;
             }
             else
@@ -72,28 +65,38 @@ namespace FeatureLoom.Helpers
             }
         }
 
-        public string GetByKey(string key) => TryGetByKey(key, out string value) ? value : null;
+        public string[] GetAllByKey(string key) => namedArgs.Where(pair => pair.Key == key).Select(pair => pair.Value).ToArray();        
 
-        public bool TryGetByKey(string key, out string value)
+        public int FindIndexByKey(string key, int startIndex = 0)
         {
-            return namedArgs.TryGetValue(key, out value);
+            for (int i=startIndex; i< namedArgs.Count; i++)
+            {
+                if (namedArgs[i].Key == key) return i;
+            }
+            return -1;
+        }        
+
+        public string GetFirstByKey(string key) => TryGetFirstByKey(key, out string value) ? value : null;
+
+        public bool TryGetFirstByKey(string key, out string value)
+        {
+            if (namedArgs.TryFindFirst((KeyValuePair<string,string> pair) => pair.Key == key, out var keyValue))
+            {
+                value = keyValue.Value;
+                return true;
+            }
+            value = default;
+            return false;
         }
 
-        public Dictionary<string, string>.Enumerator GetEnumerator()
-        {
-            return namedArgs.GetEnumerator();
-        }
-
-        IEnumerator<KeyValuePair<string, string>> IEnumerable<KeyValuePair<string, string>>.GetEnumerator()
+        public IEnumerator<KeyValuePair<string, string>> GetEnumerator()
         {
             return ((IEnumerable<KeyValuePair<string, string>>)namedArgs).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable<KeyValuePair<string, string>>)namedArgs).GetEnumerator();
+            return ((IEnumerable)namedArgs).GetEnumerator();
         }
-
-        public IEnumerable<string> UnnamedArgs => unnamedArgs.ObjIfExists as IEnumerable<string> ?? Array.Empty<string>();
     }
 }
