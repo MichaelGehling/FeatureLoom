@@ -3,6 +3,8 @@ using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Collections
 {
@@ -190,6 +192,23 @@ namespace FeatureLoom.Collections
             }
         }
 
+        public async Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
+        {
+            await WaitForIdAsync(firstRequestedId, ct);
+            var result = GetAllAvailable(firstRequestedId, maxItems, out long firstProvidedId, out long lastProvidedId);
+            return (result, (firstProvidedId, lastProvidedId));
+        }
+
+        public Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default) => GetAllAvailableAsync(firstRequestedId, buffer.Length, ct);
+
+        public async Task WaitForIdAsync(long number, CancellationToken ct = default)
+        {
+            while (number > counter)
+            {
+                if (!myLock.IsLocked) await newEntryEvent.Obj.WaitAsync(ct);
+            }
+        }
+
         public void CopyTo(T[] array, int arrayIndex)
         {
             if (threadSafe) myLock.EnterReadOnly(true);
@@ -231,5 +250,6 @@ namespace FeatureLoom.Collections
             if (copyFromBackbuffer > 0) Array.Copy(buffer, backBufferStartIndex, array, arrayIndex, copyFromBackbuffer);
             Array.Copy(buffer, frontBufferStartIndex, array, arrayIndex + copyFromBackbuffer, copyFromFrontBuffer);
         }
+
     }
 }

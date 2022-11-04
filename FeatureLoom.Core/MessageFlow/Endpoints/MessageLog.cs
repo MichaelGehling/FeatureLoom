@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Collections;
+using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Synchronization;
@@ -53,6 +54,16 @@ namespace FeatureLoom.MessageFlow
             return ((ILogBuffer<T>)buffer).GetAllAvailable(firstRequestedId, out firstProvidedId, out lastProvidedId);
         }
 
+        public Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
+        {
+            return ((IReadLogBuffer<T>)buffer).GetAllAvailableAsync(firstRequestedId, maxItems, ct);
+        }
+
+        public Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default)
+        {
+            return ((IReadLogBuffer<T>)buffer).GetAllAvailableAsync(firstRequestedId, ct);
+        }
+
         public T GetLatest()
         {
             return ((ILogBuffer<T>)buffer).GetLatest();
@@ -82,6 +93,11 @@ namespace FeatureLoom.MessageFlow
         public bool TryGetFromId(long number, out T result)
         {
             return ((ILogBuffer<T>)buffer).TryGetFromId(number, out result);
+        }
+
+        public Task WaitForIdAsync(long number, CancellationToken ct = default)
+        {
+            return ((IReadLogBuffer<T>)buffer).WaitForIdAsync(number, ct);
         }
     }
 }

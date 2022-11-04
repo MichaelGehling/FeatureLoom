@@ -15,35 +15,29 @@ namespace FeatureLoom.MessageFlow
         IReadLogBuffer<T> messageSource;
         long NextMessageId { get; set; } = 0;
 
-        CancellationToken CancellationToken { get; set; }        
+        CancellationToken CancellationToken { get; set; } = CancellationToken.None;
         Task executionTask = Task.CompletedTask;
-        ForwardingMethod ForwardingMethod { get; set; } = ForwardingMethod.Asynchronous;
+        ForwardingMethod ForwardingMethod { get; set; }
 
 
-        public MessageLogReader(IReadLogBuffer<T> messageSource, CancellationToken ct)
+        public MessageLogReader(IReadLogBuffer<T> messageSource, ForwardingMethod forwardingMethod = ForwardingMethod.Synchronous)
         {
             this.messageSource = messageSource;
-            CancellationToken = ct;
-            if (ct.IsCancellationRequested) return;
-            executionTask = Task.Run(Run);
         }
 
         public Task ExecutionTask => executionTask;
 
-        private Task Run(CancellationToken ct)
+        public Task Run(CancellationToken ct)
         {
-            if (executionTask.IsCompleted || CancellationToken.IsCancellationRequested)
-            {
-                CancellationToken = ct;
-                executionTask = Task.Run(Run);
-            }
-            else CancellationToken = ct;
-
+            if (!executionTask.IsCompleted) throw new Exception("MessageLogReader is already running!");
+            CancellationToken = ct;
+            executionTask = Run();
             return executionTask;
         }
 
 
-        private async void Run()
+
+        private async Task Run()
         {
             ObjectHandle handle = this.GetHandle();
             while(!CancellationToken.IsCancellationRequested)
@@ -56,14 +50,13 @@ namespace FeatureLoom.MessageFlow
                 }
 
                 while(!CancellationToken.IsCancellationRequested && messageSource.TryGetFromId(NextMessageId, out T message))
-                {
+                {                    
                     if (ForwardingMethod == ForwardingMethod.Synchronous) sourceHelper.Forward(message);
                     if (ForwardingMethod == ForwardingMethod.SynchronousByRef) sourceHelper.Forward(in message);
                     if (ForwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(message);
                 }
-
-                // Timeout to handle the rare case that latestId changes between check and waiting
-                while (!CancellationToken.IsCancellationRequested && NextMessageId > messageSource.LatestId) await messageSource.WaitHandle.WaitAsync(1.Seconds(), CancellationToken);
+                
+                await messageSource.WaitForIdAsync(NextMessageId, CancellationToken);
             }
         }
 

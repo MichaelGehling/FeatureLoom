@@ -1,5 +1,8 @@
-﻿using FeatureLoom.Synchronization;
+﻿using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Collections
 {
@@ -26,6 +29,10 @@ namespace FeatureLoom.Collections
         T[] GetAllAvailable(long firstRequestedId, int maxItems, out long firstProvidedId, out long lastProvidedId);
         T[] GetAllAvailable(long firstRequestedId, out long firstProvidedId, out long lastProvidedId);
         T GetLatest();
-        bool TryGetFromId(long number, out T result);
+        bool TryGetFromId(long number, out T result);        
+
+        Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default);
+        Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default);
+        Task WaitForIdAsync(long number, CancellationToken ct = default);
     }
 }
