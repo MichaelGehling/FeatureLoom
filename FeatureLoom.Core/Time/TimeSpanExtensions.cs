@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Time
 {
@@ -122,8 +124,18 @@ namespace FeatureLoom.Time
 
         public static TimeSpan Divide(this TimeSpan time, double divisor)
         {
-            return new TimeSpan((long)(time.Ticks / divisor));
+            return new TimeSpan((long)(time.Ticks / divisor));            
         }
+
+        public static void Wait(this TimeSpan waitTime) => AppTime.Wait(waitTime, waitTime);
+        public static void Wait(this TimeSpan waitTime, CancellationToken ct) => AppTime.Wait(waitTime, waitTime, ct);
+        public static void Wait(this TimeSpan waitTime, TimeSpan tolerance) => AppTime.Wait(waitTime, waitTime + tolerance);
+        public static void Wait(this TimeSpan waitTime, TimeSpan tolerance, CancellationToken ct) => AppTime.Wait(waitTime, waitTime + tolerance, ct);
+
+        public static Task WaitAsync(this TimeSpan waitTime) => AppTime.WaitAsync(waitTime, waitTime);
+        public static Task WaitAsync(this TimeSpan waitTime, CancellationToken ct) => AppTime.WaitAsync(waitTime, waitTime, ct);
+        public static Task WaitAsync(this TimeSpan waitTime, TimeSpan tolerance) => AppTime.WaitAsync(waitTime, waitTime + tolerance);
+        public static Task WaitAsync(this TimeSpan waitTime, TimeSpan tolerance, CancellationToken ct) => AppTime.WaitAsync(waitTime, waitTime + tolerance, ct);
 
     }
 }
