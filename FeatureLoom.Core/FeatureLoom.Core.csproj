@@ -50,8 +50,4 @@ Some features are in a ready to release state, some are still in a prototype sta
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0'">
-    <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
-  </ItemGroup>
-
 </Project>

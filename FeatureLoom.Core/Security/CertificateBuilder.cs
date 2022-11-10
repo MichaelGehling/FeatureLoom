@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using FeatureLoom.Extensions;
 
 #if NETSTANDARD2_0
+/*
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Prng;
 using Org.BouncyCastle.Security;
@@ -17,6 +18,7 @@ using Org.BouncyCastle.Asn1.Pkcs;
 using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Crypto.Operators;
+*/
 #endif
 
 namespace FeatureLoom.Security
@@ -65,7 +67,7 @@ namespace FeatureLoom.Security
 
         public X509Certificate2 GenerateSelfSignedCertificate()
         {
-            const int keyStrength = 2048;
+         /*   const int keyStrength = 2048;
 
             // Generating Random Numbers
             CryptoApiRandomGenerator randomGenerator = new CryptoApiRandomGenerator();
@@ -127,7 +129,8 @@ namespace FeatureLoom.Security
 
             x509.PrivateKey = DotNetUtilities.ToRSA(rsaparams);
             return x509;
-
+            */
+            return null;
         }
 #else
         private HashAlgorithmName ConvertAlgorithmName(Algorithm algorithm)
