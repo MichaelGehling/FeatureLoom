@@ -33,6 +33,7 @@ namespace FeatureLoom.Scheduling
         private bool stop = false;
 
         private TimeSpan minimumDelay = 0.01.Milliseconds();
+        private TimeSpan maximumDelay = 60.Seconds();
 
         public void AddSchedule(ISchedule schedule)
         {
@@ -62,19 +63,20 @@ namespace FeatureLoom.Scheduling
         private void RunScheduling()
         {
             while (!stop)
-            {
-                TimeKeeper executionTimer = AppTime.TimeKeeper;
+            {                
+                DateTime triggerStart = AppTime.Now;
 
                 CheckForNewSchedules();
-                TimeSpan delay = TriggerActiveSchedules();
+                TimeFrame triggerTimeFrame = TriggerActiveSchedules(triggerStart);
                 SwapTriggeredToActive();
 
                 if (cts.IsCancellationRequested && !newScheduleAvailable) cts = new CancellationTokenSource();
                 if (activeSchedules.Count > 0)
                 {
-                    delay = delay - executionTimer.Elapsed;
-                    delay = delay.Clamp(minimumDelay, int.MaxValue.Milliseconds());
-                    AppTime.Wait(delay.Multiply(0.5).ClampLow(minimumDelay), delay, cts.Token);
+                    DateTime triggerEnd = AppTime.Now;
+                    TimeSpan minDelay = triggerTimeFrame.TimeUntilStart(triggerEnd);
+                    TimeSpan maxDelay = triggerTimeFrame.Remaining(triggerEnd);
+                    AppTime.Wait(minDelay, maxDelay, cts.Token);
                 }
                 else
                 {
@@ -104,26 +106,25 @@ namespace FeatureLoom.Scheduling
         }
 
 
-        private TimeSpan TriggerActiveSchedules()
-        {
-            TimeSpan delay = TimeSpan.MaxValue;
-            DateTime now = AppTime.Now;
+        private TimeFrame TriggerActiveSchedules(DateTime now)
+        {            
+            TimeFrame triggerTimeFrame = new TimeFrame(now + maximumDelay, now + maximumDelay);
             foreach (var schedule in activeSchedules)
             {
-                if (schedule.TryGetSchedule(out var sv))
-                {
-                    TimeFrame nextTriggerTimeFrame = sv.Trigger(now);
-                    if (nextTriggerTimeFrame.IsValid)
-                    {
-                        schedule.nextTriggerTimeFrame = nextTriggerTimeFrame;
-                        TimeSpan maxDelay = nextTriggerTimeFrame.utcEndTime - now;
-                        triggeredSchedules.Add(schedule);
-                        if (maxDelay < delay) delay = maxDelay;
-                    }
-                }
-            }
+                if (!schedule.TryGetSchedule(out var sv)) continue;
 
-            return delay;
+                if (schedule.nextTriggerTimeFrame.Started(now))
+                {
+                    schedule.nextTriggerTimeFrame = sv.Trigger(now);                     
+                    if (schedule.nextTriggerTimeFrame.IsInvalid) continue;
+                }
+
+                triggeredSchedules.Add(schedule);
+                triggerTimeFrame = new TimeFrame(triggerTimeFrame.utcStartTime.TheEarlierOne(schedule.nextTriggerTimeFrame.utcStartTime), 
+                                                 triggerTimeFrame.utcEndTime.TheEarlierOne(schedule.nextTriggerTimeFrame.utcEndTime));
+            }
+            triggerTimeFrame = new TimeFrame(triggerTimeFrame.utcStartTime.TheLaterOne(now + minimumDelay), triggerTimeFrame.utcEndTime);
+            return triggerTimeFrame;
         }
 
         private void CheckForNewSchedules()
@@ -189,7 +190,7 @@ namespace FeatureLoom.Scheduling
             {
                 this.scheduleRef = new WeakReference<ISchedule>(schedule);
                 this.name = schedule.Name;
-            }
+            }            
 
             public bool TryGetSchedule(out ISchedule schedule)
             {

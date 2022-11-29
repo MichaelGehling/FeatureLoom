@@ -31,6 +31,24 @@ namespace FeatureLoom.Storages
             var reader = storage.GetReader(sourceCategory);
             var writer = storage.GetWriter(targetCategory);
             return reader.TryCopy(sourceUri, writer, targetUri);
-        }        
+        }
+        
+        public static async Task<bool> TryCopy(this IStorageReader reader, IStorageWriter writer, string uriFilterPattern = null)
+        {
+            if (!(await reader.TryListUrisAsync(uriFilterPattern)).Out(out var uris)) return false;
+            bool success = true;
+            foreach(var uri in uris)
+            {
+                success &= await TryCopy(reader, uri, writer, uri);
+            }
+            return success;
+        }
+
+        public static Task<bool> TryCopy(this StorageService storage, string sourceCategory, string targetCategory, string uriFilterPattern = null)
+        {
+            var reader = storage.GetReader(sourceCategory);
+            var writer = storage.GetWriter(targetCategory);
+            return reader.TryCopy(writer, uriFilterPattern);
+        }
     }
 }

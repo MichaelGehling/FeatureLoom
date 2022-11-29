@@ -78,6 +78,10 @@ namespace FeatureLoom.Time
 
         public bool Elapsed(DateTime now) => now >= utcEndTime;
 
+        public bool Started() => Started(GetTime());
+
+        public bool Started(DateTime now) => now >= utcStartTime;
+
         public TimeSpan Remaining() => Remaining(GetTime());
 
         public TimeSpan Remaining(DateTime now) => IsInvalid ? TimeSpan.Zero : utcEndTime - now;

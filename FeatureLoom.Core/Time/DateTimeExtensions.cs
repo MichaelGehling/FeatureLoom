@@ -22,5 +22,8 @@ namespace FeatureLoom.Time
             return result;
         }
 
+        public static DateTime TheEarlierOne(this DateTime self, DateTime other) => self < other ? self : other;
+        public static DateTime TheLaterOne(this DateTime self, DateTime other) => self > other ? self : other;
+
     }
 }
