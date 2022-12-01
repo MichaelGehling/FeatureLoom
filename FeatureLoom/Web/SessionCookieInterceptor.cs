@@ -28,7 +28,7 @@ namespace FeatureLoom.Web
             if (request.TryGetCookie(cookieName, out string sessionId) ||
                 (supportSessionIdInQueryString && request.TryGetQueryItem("SessionId", out sessionId)))
             {
-                if ((await Session.TryLoadSessionAsync(sessionId)).Out(out Session session))
+                if ((await Session.TryLoadSessionAsync(sessionId)).TryOut(out Session session))
                 {
                     if (session.SessionId == sessionId && !session.LifeTime.Elapsed())
                     {
@@ -59,7 +59,7 @@ namespace FeatureLoom.Web
 
             if (!anonymousIdentity.EmptyOrNull())
             {
-                if (!(await Identity.TryLoadIdentityAsync(anonymousIdentity)).Out(out Identity identity))
+                if (!(await Identity.TryLoadIdentityAsync(anonymousIdentity)).TryOut(out Identity identity))
                 {
                     identity = new Identity(anonymousIdentity, null);
                     _ = identity.TryStoreAsync();

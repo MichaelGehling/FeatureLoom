@@ -15,7 +15,7 @@ namespace FeatureLoom.Security
         static string storageCategory = "Security/Identities";
         public static string StorageCategory { get => storageCategory; set => storageCategory = value; }        
 
-        public static Task<AsyncOut<bool, Identity>> TryLoadIdentityAsync(string identityId)
+        public static Task<(bool, Identity)> TryLoadIdentityAsync(string identityId)
         {
             return Storage.GetReader(storageCategory).TryReadAsync<Identity>(identityId);
         }
@@ -78,7 +78,7 @@ namespace FeatureLoom.Security
                     List<IdentityRole> roles = new List<IdentityRole>();                    
                     foreach (var roleName in roleNames)
                     {
-                        if (IdentityRole.TryLoadIdentityRoleAsync(roleName).WaitFor().Out(out IdentityRole role))
+                        if (IdentityRole.TryLoadIdentityRoleAsync(roleName).WaitFor().TryOut(out IdentityRole role))
                         {
                             roles.Add(role);
                         }

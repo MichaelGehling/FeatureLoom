@@ -393,7 +393,7 @@ namespace FeatureLoom.Web
 
                 if (!endpoint.certificateName.EmptyOrNull())
                 {
-                    if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).Out(out X509Certificate2 certificate))
+                    if ((await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(endpoint.certificateName)).TryOut(out X509Certificate2 certificate))
                     {
                         options.Listen(endpoint.address, endpoint.port, listenOptions =>
                         {

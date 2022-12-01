@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Logging;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Security;
 using FeatureLoom.Serialization;
@@ -31,7 +32,7 @@ namespace FeatureLoom.Web
                 string data = await request.ReadAsync();
                 var usernamePassword = data.FromJson<UsernamePassword>();
 
-                if ((await Identity.TryLoadIdentityAsync(usernamePassword.username)).Out(out Identity identity))
+                if ((await Identity.TryLoadIdentityAsync(usernamePassword.username)).TryOut(out Identity identity))
                 {
                     if (identity.TryGetCredential(credentialHandler.CredentialType, out var storedCredential) && 
                         credentialHandler.VerifyCredential(usernamePassword, storedCredential))

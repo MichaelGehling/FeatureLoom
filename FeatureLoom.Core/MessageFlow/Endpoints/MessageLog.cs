@@ -54,12 +54,12 @@ namespace FeatureLoom.MessageFlow
             return ((ILogBuffer<T>)buffer).GetAllAvailable(firstRequestedId, out firstProvidedId, out lastProvidedId);
         }
 
-        public Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
+        public Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
         {
             return ((IReadLogBuffer<T>)buffer).GetAllAvailableAsync(firstRequestedId, maxItems, ct);
         }
 
-        public Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default)
+        public Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default)
         {
             return ((IReadLogBuffer<T>)buffer).GetAllAvailableAsync(firstRequestedId, ct);
         }

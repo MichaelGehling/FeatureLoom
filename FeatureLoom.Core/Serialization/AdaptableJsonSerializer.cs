@@ -51,7 +51,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public async Task<AsyncOut<bool, T>> TryDeserializeFromStreamAsync<T>(Stream stream, CancellationToken cancellationToken = default)
+        public async Task<(bool, T)> TryDeserializeFromStreamAsync<T>(Stream stream, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -178,7 +178,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public async Task<AsyncOut<bool, T>> TryDeserializeFromStreamAsync<T>(Stream stream, CancellationToken cancellationToken = default)
+        public async Task<(bool, T)> TryDeserializeFromStreamAsync<T>(Stream stream, CancellationToken cancellationToken = default)
         {
             try
             {

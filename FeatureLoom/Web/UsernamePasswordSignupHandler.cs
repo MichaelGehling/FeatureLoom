@@ -28,7 +28,7 @@ namespace FeatureLoom.Web
                 string data = await request.ReadAsync();
                 var usernamePassword = data.FromJson<UsernamePassword>();
 
-                if ((await Identity.TryLoadIdentityAsync(usernamePassword.username)).ReturnValue)
+                if ((await Identity.TryLoadIdentityAsync(usernamePassword.username)).Item1)
                 {                    
                     return HandlerResult.Handled_Conflict($"Username \"{usernamePassword.username}\" already exists.");
                 }

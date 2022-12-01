@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Extensions;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,10 +44,10 @@ namespace FeatureLoom.Synchronization
             else return task.Result;
         }
 
-        public static T WaitFor<T, OUT>(this Task<AsyncOut<T, OUT>> task, out OUT result, bool unwrapExeption = true)
+        public static bool WaitFor<OUT>(this Task<(bool, OUT)> task, out OUT result, bool unwrapExeption = true)
         {
-            if (unwrapExeption) return task.GetAwaiter().GetResult().Out(out result);
-            else return task.Result.Out(out result);
+            if (unwrapExeption) return task.GetAwaiter().GetResult().TryOut(out result);
+            else return task.Result.TryOut(out result);
         }
 
         public async static Task<bool> WaitAsync(this Task task)

@@ -192,14 +192,14 @@ namespace FeatureLoom.Collections
             }
         }
 
-        public async Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
+        public async Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
         {
             await WaitForIdAsync(firstRequestedId, ct);
             var result = GetAllAvailable(firstRequestedId, maxItems, out long firstProvidedId, out long lastProvidedId);
-            return (result, (firstProvidedId, lastProvidedId));
+            return (result, firstProvidedId, lastProvidedId);
         }
 
-        public Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default) => GetAllAvailableAsync(firstRequestedId, buffer.Length, ct);
+        public Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default) => GetAllAvailableAsync(firstRequestedId, buffer.Length, ct);
 
         public async Task WaitForIdAsync(long number, CancellationToken ct = default)
         {

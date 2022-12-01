@@ -31,8 +31,8 @@ namespace FeatureLoom.Collections
         T GetLatest();
         bool TryGetFromId(long number, out T result);        
 
-        Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default);
-        Task<AsyncOut<T[], (long firstProvidedId, long lastProvidedId)>> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default);
+        Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default);
+        Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default);
         Task WaitForIdAsync(long number, CancellationToken ct = default);
     }
 }

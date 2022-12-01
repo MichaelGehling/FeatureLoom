@@ -135,7 +135,7 @@ namespace FeatureLoom.MessageFlow
             return true;
         }
 
-        public static async Task<AsyncOut<bool, T>> TryReceiveAsync<T>(this IReceiver<T> receiver, CancellationToken token)
+        public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, CancellationToken token)
         {
             T message = default;
             while (!receiver.TryReceive(out message))
@@ -159,7 +159,7 @@ namespace FeatureLoom.MessageFlow
             return true;
         }
 
-        public static async Task<AsyncOut<bool, T>> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout)
+        public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout)
         {
             T message = default;
             if (receiver.TryReceive(out message)) return (true, message);
@@ -188,7 +188,7 @@ namespace FeatureLoom.MessageFlow
             return true;
         }
 
-        public static async Task<AsyncOut<bool, T>> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout, CancellationToken token)
+        public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout, CancellationToken token)
         {
             T message = default;
             if (!receiver.TryReceive(out message)) return (true, message);

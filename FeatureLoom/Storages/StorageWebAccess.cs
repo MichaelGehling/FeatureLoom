@@ -76,7 +76,7 @@ namespace FeatureLoom.Storages
         private async Task<HandlerResult> ReadUrlsAsync(string pattern)
         {
             if (pattern == "") pattern = null;
-            if ((await reader.TryListUrisAsync(pattern)).Out(out string[] uris))
+            if ((await reader.TryListUrisAsync(pattern)).TryOut(out string[] uris))
             {
                 /*for(int i = 0; i < uris.Length; i++)
                 {
@@ -149,7 +149,7 @@ namespace FeatureLoom.Storages
             }
             else
             {
-                if ((await reader.TryReadAsync<T>(request.RelativePath.Replace("%20", " ").TrimChar('/'))).Out(out T obj))
+                if ((await reader.TryReadAsync<T>(request.RelativePath.Replace("%20", " ").TrimChar('/'))).TryOut(out T obj))
                 {
                     return HandlerResult.Handled_OK(obj);
                 }

@@ -7,7 +7,7 @@ namespace FeatureLoom.Web
 {
     public static class WebRequestExtensions
     {
-        public static async Task<AsyncOut<bool, T>> TryGetBodyAsync<T>(this IWebRequest request)
+        public static async Task<(bool, T)> TryGetBodyAsync<T>(this IWebRequest request)
         {
             string body = await request.ReadAsync();
             if (body.EmptyOrNull()) return (false, default(T));

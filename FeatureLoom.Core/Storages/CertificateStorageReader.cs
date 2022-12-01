@@ -72,14 +72,14 @@ namespace FeatureLoom.Storages
             return false;
         }
 
-        public async Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
+        public async Task<(bool, T)> TryReadAsync<T>(string uri)
         {
             T data = default;
             await Task.Run(() => TryRead<T>(uri, out data));
             return (true, data);
         }
 
-        public async Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null)
+        public async Task<(bool, string[])> TryListUrisAsync(string pattern = null)
         {
             try
             {

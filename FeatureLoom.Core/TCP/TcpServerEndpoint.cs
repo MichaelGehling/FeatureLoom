@@ -216,7 +216,7 @@ namespace FeatureLoom.TCP
         {
             try
             {
-                if (config.x509CertificateName != null) (await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(config.x509CertificateName)).Out(out this.serverCertificate);
+                if (config.x509CertificateName != null) (await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(config.x509CertificateName)).TryOut(out this.serverCertificate);
 
                 IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns);
 

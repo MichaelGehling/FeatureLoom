@@ -59,7 +59,7 @@ namespace FeatureLoom.Storages
             throw new NotImplementedException();
         }
 
-        public Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
+        public Task<(bool, T)> TryReadAsync<T>(string uri)
         {
             throw new NotImplementedException();
         }

@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Logging;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Time;
 using System;
@@ -158,7 +159,7 @@ namespace FeatureLoom.MessageFlow
         private async Task ForwardingLoop()
         {
             var timeout = maxIdleMilliseconds.Milliseconds();
-            while ((await receiver.TryReceiveAsync(timeout)).Out(out ForwardingMessage forwardingMessage))
+            while ((await receiver.TryReceiveAsync(timeout)).TryOut(out ForwardingMessage forwardingMessage))
             {
                 try
                 {

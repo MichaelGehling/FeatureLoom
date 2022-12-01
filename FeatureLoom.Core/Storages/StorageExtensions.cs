@@ -1,4 +1,5 @@
-﻿using FeatureLoom.MessageFlow;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.MessageFlow;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Storages
@@ -35,7 +36,7 @@ namespace FeatureLoom.Storages
         
         public static async Task<bool> TryCopy(this IStorageReader reader, IStorageWriter writer, string uriFilterPattern = null)
         {
-            if (!(await reader.TryListUrisAsync(uriFilterPattern)).Out(out var uris)) return false;
+            if (!(await reader.TryListUrisAsync(uriFilterPattern)).TryOut(out var uris)) return false;
             bool success = true;
             foreach(var uri in uris)
             {

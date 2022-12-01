@@ -60,11 +60,11 @@ namespace FeatureLoom.Security
                     var reader = Storage.GetReader(storageCategory);
                     var writer = Storage.GetWriter(storageCategory);
 
-                    if ((await reader.TryListUrisAsync()).Out(out var uris))
+                    if ((await reader.TryListUrisAsync()).TryOut(out var uris))
                     {
                         foreach (string uri in uris)
                         {
-                            if ((await reader.TryReadAsync<Session>(uri)).Out(out Session session))
+                            if ((await reader.TryReadAsync<Session>(uri)).TryOut(out Session session))
                             {
                                 if (session.LifeTime.Elapsed()) await writer.TryDeleteAsync(uri);
                             }
@@ -77,7 +77,7 @@ namespace FeatureLoom.Security
         public static Session Current { get => currentSession.IsValueCreated ? currentSession.Value : null; set => currentSession.Value = value; }        
         public static string StorageCategory { get => storageCategory; set => storageCategory = value; }
         public static TimeSpan DefaultTimeout { get => defaultTimeout; set => defaultTimeout = value; }
-        public static Task<AsyncOut<bool, Session>> TryLoadSessionAsync(string sessionId)
+        public static Task<(bool, Session)> TryLoadSessionAsync(string sessionId)
         {
             return Storage.GetReader(storageCategory).TryReadAsync<Session>(sessionId);
         }        
@@ -120,7 +120,7 @@ namespace FeatureLoom.Security
             {
                 if (this.identity == null)
                 {
-                    if (Identity.TryLoadIdentityAsync(identityId).WaitFor().Out(out Identity identity))
+                    if (Identity.TryLoadIdentityAsync(identityId).WaitFor().TryOut(out Identity identity))
                     {
                         this.identity = identity;
                     }

@@ -380,7 +380,7 @@ namespace FeatureLoom.Storages
             }
         }
 
-        public async Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null)
+        public async Task<(bool, string[])> TryListUrisAsync(string pattern = null)
         {
             try
             {
@@ -434,7 +434,7 @@ namespace FeatureLoom.Storages
             return File.Exists(filePath);
         }
 
-        public async Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri)
+        public async Task<(bool, T)> TryReadAsync<T>(string uri)
         {
             try
             {

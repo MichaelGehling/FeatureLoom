@@ -34,7 +34,7 @@ namespace FeatureLoom.Helpers
             }
         }
 
-        public static async Task<AsyncOut<bool, T>> TryAsync<T>(Func<Task<T>> function)
+        public static async Task<(bool, T)> TryAsync<T>(Func<Task<T>> function)
         {
             try
             {

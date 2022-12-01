@@ -112,7 +112,6 @@ namespace Playground
 
         private static async Task Main()
         {
-
             var amre = new FeatureLoom.Synchronization.AsyncManualResetEvent(false);
             var amre2 = new Nito.AsyncEx.AsyncManualResetEvent(false);
             var mre = new ManualResetEvent(false);

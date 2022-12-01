@@ -12,11 +12,11 @@ namespace FeatureLoom.Storages
     {
         string Category { get; }
 
-        Task<AsyncOut<bool, T>> TryReadAsync<T>(string uri);
+        Task<(bool, T)> TryReadAsync<T>(string uri);
 
         Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer);
 
-        Task<AsyncOut<bool, string[]>> TryListUrisAsync(string pattern = null);
+        Task<(bool, string[])> TryListUrisAsync(string pattern = null);
 
         bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink);
 

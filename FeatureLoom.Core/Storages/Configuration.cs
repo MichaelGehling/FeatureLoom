@@ -6,6 +6,7 @@ using FeatureLoom.Serialization;
 using FeatureLoom.Synchronization;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Storages
 {
@@ -20,7 +21,7 @@ namespace FeatureLoom.Storages
         {
             var writer = Storage.GetWriter(defaultCategory);
             var reader = Storage.GetReader(defaultCategory);
-            if ((await reader.TryListUrisAsync()).Out(out string[] uris))
+            if ((await reader.TryListUrisAsync()).TryOut(out string[] uris))
             {
                 foreach (var uri in uris) await writer.TryDeleteAsync(uri);
             }
@@ -100,7 +101,7 @@ namespace FeatureLoom.Storages
             {
                 if (!subscriptionReceiver.Exists)
                 {
-                    success = (await Reader.TryReadAsync<string>(this.Uri)).Out(out json);
+                    success = (await Reader.TryReadAsync<string>(this.Uri)).TryOut(out json);
                     StartSubscription();
                 }
                 else
@@ -114,7 +115,7 @@ namespace FeatureLoom.Storages
             }
             else
             {
-                success = (await Reader.TryReadAsync<string>(this.Uri)).Out(out json);
+                success = (await Reader.TryReadAsync<string>(this.Uri)).TryOut(out json);
             }
             if (success)
             {

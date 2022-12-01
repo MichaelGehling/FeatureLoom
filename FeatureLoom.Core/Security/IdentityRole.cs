@@ -14,7 +14,7 @@ namespace FeatureLoom.Security
         static string storageCategory = "Security/IdentityRoles";
         public static string StorageCategory { get => storageCategory; set => storageCategory = value; }
 
-        public static Task<AsyncOut<bool, IdentityRole>> TryLoadIdentityRoleAsync(string roleName)
+        public static Task<(bool, IdentityRole)> TryLoadIdentityRoleAsync(string roleName)
         {
             return Storage.GetReader(storageCategory).TryReadAsync<IdentityRole>(roleName);
         }
