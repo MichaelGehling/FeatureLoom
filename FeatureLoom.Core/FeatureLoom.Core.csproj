@@ -47,7 +47,7 @@ Some features are in a ready to release state, some are still in a prototype sta
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>
 
 </Project>
