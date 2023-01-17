@@ -73,12 +73,25 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public static void DeserializeXml<T>(this Stream stream, out T xmlObject)
+        public static bool TrySerializeToXmlElement<T>(this T obj, out XmlElement xmlElement)
         {
-            XmlSerializer serializer = new XmlSerializer(typeof(T));
-            using (XmlReader reader = XmlReader.Create(stream))
+            try
             {
-                xmlObject = (T)serializer.Deserialize(reader);
+                XmlSerializer serializer = new XmlSerializer(typeof(T));
+                XmlDocument doc = new XmlDocument();
+
+                using (XmlWriter writer = doc.CreateNavigator().AppendChild())
+                {
+                    serializer.Serialize(writer, obj);
+                }
+
+                xmlElement = doc.DocumentElement;
+                return true;
+            }
+            catch
+            {
+                xmlElement = null;
+                return false;
             }
         }
     }
