@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace FeatureLoom.TCP
 {
-    public class TcpTests
+    public class Tcp2Tests
     {
         public static volatile int testPortCounter = 5_001;
 
@@ -17,11 +17,11 @@ namespace FeatureLoom.TCP
             TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
-            var server = new TcpServerEndpoint(new TcpServerEndpoint.Config()
+            var server = new TcpServerEndpoint2(new TcpServerEndpoint2.Settings()
             {
                 port = testPort
             });
-            var client = new TcpClientEndpoint(new TcpClientEndpoint.Config()
+            var client = new TcpClientEndpoint2(new TcpClientEndpoint2.Settings()
             {
                 port = testPort
             });
@@ -33,23 +33,22 @@ namespace FeatureLoom.TCP
             client.ConnectTo(clientReceiver);
             serverSender.ConnectTo(server);
             server.ConnectTo(serverReceiver);
-
+            
             Assert.True(client.ConnectionWaitHandle.Wait(2.Seconds()));
             Assert.True(server.ConnectionWaitHandle.Wait(2.Seconds()));
-            Assert.True(client.IsConnectedToServer);
-            Assert.Equal(1, server.CountConnectedClients);
 
             var testData1 = new byte[] { 42, 43, 99 };
             clientSender.Send(testData1);
-            Assert.True(serverReceiver.TryReceiveAsync(1.Seconds()).WaitFor(out byte[] receivedData1));
+            Assert.True(serverReceiver.TryReceiveAsync(2.Seconds()).WaitFor(out byte[] receivedData1));
             Assert.Equal(testData1, receivedData1);
 
             var testData2 = new byte[] { 23, 11, 0 };
             serverSender.Send(testData2);
-            Assert.True(clientReceiver.TryReceiveAsync(1.Seconds()).WaitFor(out byte[] receivedData2));
+            Assert.True(clientReceiver.TryReceiveAsync(2.Seconds()).WaitFor(out byte[] receivedData2));
             Assert.Equal(testData2, receivedData2);
 
-            client.DisconnectFromTcpServer();
+            client.Dispose();
+            server.Dispose();
         }
 
         [Fact]
@@ -57,12 +56,11 @@ namespace FeatureLoom.TCP
         {
             TestHelper.PrepareTestContext();
 
-            int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
-            var server = new TcpServerEndpoint(new TcpServerEndpoint.Config()
+            int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);            var server = new TcpServerEndpoint2(new TcpServerEndpoint2.Settings()
             {
                 port = testPort
             });
-            var client = new TcpClientEndpoint(new TcpClientEndpoint.Config()
+            var client = new TcpClientEndpoint2(new TcpClientEndpoint2.Settings()
             {
                 port = testPort
             });
@@ -77,20 +75,19 @@ namespace FeatureLoom.TCP
 
             Assert.True(client.ConnectionWaitHandle.Wait(2.Seconds()));
             Assert.True(server.ConnectionWaitHandle.Wait(2.Seconds()));
-            Assert.True(client.IsConnectedToServer);
-            Assert.Equal(1, server.CountConnectedClients);
 
             var testData1 = "Test Data 1";
             clientSender.Send(testData1);
-            Assert.True(serverReceiver.TryReceiveAsync(1.Seconds()).WaitFor(out string receivedData1));
+            Assert.True(serverReceiver.TryReceiveAsync(2.Seconds()).WaitFor(out string receivedData1));
             Assert.Equal(testData1, receivedData1);
 
             var testData2 = "{ testData: 2 }";
             serverSender.Send(testData2);
-            Assert.True(clientReceiver.TryReceiveAsync(1.Seconds()).WaitFor(out string receivedData2));
+            Assert.True(clientReceiver.TryReceiveAsync(2.Seconds()).WaitFor(out string receivedData2));
             Assert.Equal(testData2, receivedData2);
 
-            client.DisconnectFromTcpServer();
+            client.Dispose();
+            server.Dispose();
         }
     }
 }

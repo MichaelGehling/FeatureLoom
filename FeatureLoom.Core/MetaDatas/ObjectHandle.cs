@@ -1,6 +1,8 @@
-﻿namespace FeatureLoom.MetaDatas
+﻿using System;
+
+namespace FeatureLoom.MetaDatas
 {
-    public readonly struct ObjectHandle
+    public readonly struct ObjectHandle : IEquatable<ObjectHandle>
     {
         public readonly long id;
 
@@ -22,6 +24,35 @@
             else return null;
         }
 
+        public bool TrySetMetaData<D>(string key, D data)
+        {            
+            if (!TryGetObject(out object obj)) return false;
+            obj.SetMetaData(key, data);
+            return true;
+        }
+
+        public bool TryGetMetaData<D>(string key, out D data)
+        {
+            data = default;
+            if (!TryGetObject(out object obj)) return false;
+            return obj.TryGetMetaData(key, out data);
+        }
+
         public bool ObjExists() => MetaData.Exists(this);
+
+        public bool Equals(ObjectHandle other)
+        {
+            return id == other.id;
+        }
+
+        public static bool operator ==(ObjectHandle handle1, ObjectHandle handle2)
+        {
+            return handle1.Equals(handle2);
+        }
+
+        public static bool operator !=(ObjectHandle handle1, ObjectHandle handle2)
+        {
+            return !handle1.Equals(handle2);
+        }
     }
 }

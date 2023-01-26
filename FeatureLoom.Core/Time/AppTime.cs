@@ -75,6 +75,16 @@ namespace FeatureLoom.Time
             Wait(minTimeout, maxTimeout, CancellationToken.None);            
         }
 
+        public static void Wait(TimeSpan timeout)
+        {
+            Wait(timeout, timeout, CancellationToken.None);
+        }
+
+        public static void Wait(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            Wait(timeout, timeout, cancellationToken);
+        }
+
         public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
         {
             if (minTimeout.Ticks <= 1 || cancellationToken.IsCancellationRequested) return;
@@ -107,6 +117,16 @@ namespace FeatureLoom.Time
         public static Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout)
         {            
             return WaitAsync(minTimeout, maxTimeout, CancellationToken.None);
+        }
+
+        public static Task WaitAsync(TimeSpan timeout)
+        {
+            return WaitAsync(timeout, timeout, CancellationToken.None);
+        }
+
+        public static Task WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            return WaitAsync(timeout, timeout, cancellationToken);
         }
 
         public static async Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)

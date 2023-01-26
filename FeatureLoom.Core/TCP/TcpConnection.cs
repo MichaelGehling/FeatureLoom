@@ -10,9 +10,12 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using FeatureLoom.Extensions;
+using System.Threading;
+using Newtonsoft.Json;
 
 namespace FeatureLoom.TCP
 {
+
     public class TcpConnection : Workflow<TcpConnection.StateMachine>
     {
         public class StateMachine : StateMachine<TcpConnection>
@@ -192,61 +195,12 @@ namespace FeatureLoom.TCP
         DecodingResult Decode(byte[] buffer, int bufferFillState, ref int bufferReadPosition, out object decodedMessage, ref object intermediateData);
     }
 
+    
+
     public enum DecodingResult
     {
         Invalid,
         Complete,
         Incomplete
-    }
-
-    public interface IStreamUpgrader
-    {
-        Stream Upgrade(Stream stream);
-    }
-
-    public class ServerSslStreamUpgrader : IStreamUpgrader
-    {
-        private readonly X509Certificate2 serverCertificate;
-
-        public ServerSslStreamUpgrader(X509Certificate2 serverCertificate)
-        {
-            this.serverCertificate = serverCertificate;
-        }
-
-        public Stream Upgrade(Stream stream)
-        {
-            var sslStream = new SslStream(stream, false);
-            sslStream.AuthenticateAsServer(serverCertificate, false, System.Security.Authentication.SslProtocols.None, true);
-            return sslStream;
-        }
-    }
-
-    public class ClientSslStreamUpgrader : IStreamUpgrader
-    {
-        private readonly string serverName;
-        private readonly bool ignoreFailedAuthentication;
-
-        public ClientSslStreamUpgrader(string serverName, bool ignoreFailedAuthentication)
-        {
-            this.serverName = serverName;
-            this.ignoreFailedAuthentication = ignoreFailedAuthentication;
-        }
-
-        public Stream Upgrade(Stream stream)
-        {
-            SslStream sslStream = new SslStream(stream, false, new RemoteCertificateValidationCallback(ValidateServerCertificate), null);
-            sslStream.AuthenticateAsClient(serverName);
-            return sslStream;
-        }
-
-        public bool ValidateServerCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
-        {
-            if (ignoreFailedAuthentication) return true;
-
-            if (sslPolicyErrors == SslPolicyErrors.None) return true;
-            Log.ERROR("Certificate error: {0}", sslPolicyErrors.ToName());
-            // refuse connection
-            return false;
-        }
     }
 }

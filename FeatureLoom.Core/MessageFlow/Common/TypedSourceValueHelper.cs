@@ -158,7 +158,9 @@ namespace FeatureLoom.MessageFlow
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             if (sink == null) return;
-            if (sink is ITypedMessageSink typedSink && !typedSink.ConsumedMessageType.IsAssignableFrom(typeof(T))) throw new Exception("It is not allowed to connect a TypedMessageSource to a TypedMessageSink if the type of the source cannot be assigned to the sink type!");
+            if (sink is ITypedMessageSink typedSink && 
+                (!typedSink.ConsumedMessageType.IsAssignableFrom(typeof(T)) &&
+                 !typeof(T).IsAssignableFrom(typedSink.ConsumedMessageType))) throw new Exception("It is not allowed to connect a TypedMessageSource to a TypedMessageSink if the type of the source will never be of the sink's type!");
 
             changeLock.Enter();
             try

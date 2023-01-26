@@ -1,4 +1,6 @@
 ﻿using FeatureLoom.Helpers;
+using FeatureLoom.Scheduling;
+using FeatureLoom.Services;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -17,6 +19,8 @@ namespace FeatureLoom.MessageFlow
         MicroValueLock responseHandlerLock = new MicroValueLock();
         TimeSpan timeout = 1.Seconds();
         short senderId = RandomGenerator.Int16();
+        ActionSchedule schedule;
+
 
         /// <summary>
         /// 
@@ -25,10 +29,21 @@ namespace FeatureLoom.MessageFlow
         public RequestSender(TimeSpan timeout)
         {
             this.timeout = timeout;
+            StartTimeoutCheck();
         }
 
         public RequestSender()
         {
+            StartTimeoutCheck();
+        }
+
+        private void StartTimeoutCheck()
+        {
+            schedule = Service<SchedulerService>.Instance.ScheduleAction("RequestSenderTimeout", now =>
+            {
+                CleanupTimeouts(now);
+                return new TimeFrame(now, timeout.Multiply(0.5));
+            });
         }
 
         public Task<RESP> SendRequestAsync(REQ message)
@@ -110,9 +125,9 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public void CleanupTimeouts()
+        public void CleanupTimeouts(DateTime now)
         {
-            var now = AppTime.CoarseNow;
+            if (responseHandlers.Count == 0) return;
 
             responseHandlerLock.Enter();
             try

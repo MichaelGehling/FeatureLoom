@@ -35,7 +35,8 @@ namespace FeatureLoom.MessageFlow
 
             Assert.ThrowsAny<Exception>(() => intForwarder.ConnectTo(stringForwarder));
 
-            Assert.ThrowsAny<Exception>(() => objectForwarder.ConnectTo(stringForwarder));
+            objectForwarder.ConnectTo(stringForwarder);
+            Assert.True(objectForwarder.CountConnectedSinks == 1);
 
             intForwarder.ConnectTo(intForwarder2);
             Assert.True(intForwarder.CountConnectedSinks == 1);
