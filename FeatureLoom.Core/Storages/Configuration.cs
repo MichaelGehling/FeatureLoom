@@ -7,6 +7,8 @@ using FeatureLoom.Synchronization;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 using FeatureLoom.Extensions;
+using System;
+using System.Threading;
 
 namespace FeatureLoom.Storages
 {
@@ -69,8 +71,10 @@ namespace FeatureLoom.Storages
             }
         }
 
-        protected void StartSubscription()
+        public void StartSubscription()
         {
+            if (subscriptionReceiver.Exists) return;
+
             if (!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
             {
                 Log.ERROR(this.GetHandle(), "Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
@@ -180,6 +184,24 @@ namespace FeatureLoom.Storages
             {
                 await config.TryWriteToStorageAsync();
             }
+        }
+
+        public static async Task OnUpdateFromStorageApplyAndDo<T>(this T config, Action<T> action, CancellationToken cancellationToken = default) where T : Configuration
+        {
+            config.StartSubscription();
+            await config.SubscriptionWaitHandle.OnEvent(cfg =>
+            {
+                if (cfg.TryUpdateFromStorage(true)) action(cfg);
+            }, config, true, cancellationToken);
+        }
+
+        public static async Task OnUpdateFromStorageApplyAndDo<T>(this T config, Func<T, Task> action, CancellationToken cancellationToken = default) where T : Configuration
+        {
+            config.StartSubscription();
+            await config.SubscriptionWaitHandle.OnEvent(async cfg =>
+            {
+                if (cfg.TryUpdateFromStorage(true)) await action(cfg);
+            }, config, true, cancellationToken);
         }
     }
 }

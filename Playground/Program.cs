@@ -22,6 +22,7 @@ using FeatureLoom.Security;
 using System.IO;
 using System.Globalization;
 using FeatureLoom.Services;
+using FeatureLoom.Serialization;
 
 namespace Playground
 {
@@ -112,6 +113,7 @@ namespace Playground
 
         private static async Task Main()
         {
+
             var amre = new FeatureLoom.Synchronization.AsyncManualResetEvent(false);
             var amre2 = new Nito.AsyncEx.AsyncManualResetEvent(false);
             var mre = new ManualResetEvent(false);

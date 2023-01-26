@@ -11,8 +11,8 @@ namespace FeatureLoom.Synchronization
     /// <summary>
     /// AsyncManualResetEvent allows status based waiting (sync/async) and signalling between multiple threads.
     /// It can be used as a replacement for the ManualResetEvent/-Slim, but also supporting async waiting.
-    /// With a waiting thread, performance is comparable to ManualResetEventSlim, setting/resetting without any waiting thread and waiting
-    /// in already set state is significantly faster than ManualResetEventSlim.
+    /// With an actually waiting thread, performance is comparable to ManualResetEventSlim, setting/resetting 
+    /// without any waiting thread and waiting in already set state is significantly faster than ManualResetEventSlim.
     /// </summary>
     public sealed class AsyncManualResetEvent : IAsyncWaitHandle
     {
@@ -109,7 +109,7 @@ namespace FeatureLoom.Synchronization
         /// <summary>
         /// Waits until state is set or the timeout exceeds. If already set, the call returns immediatly.
         /// </summary>
-        /// <param name="timeout">Timeout to cancel waiting. The cancallation may be later than the defined timeout.</param>
+        /// <param name="timeout">Timeout to cancel waiting. The cancellation may be later than the defined timeout.</param>
         /// <returns>True if set, false if timeout</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout)
@@ -426,7 +426,7 @@ namespace FeatureLoom.Synchronization
 
             myLock.Exit();
 
-            // If threads are waiting syncronously and PulseAll is called rapidly in a row it might happen that not all waiters will wake up.
+            // If threads are waiting synchronously and PulseAll is called rapidly in a row it might happen that not all waiters will wake up.
             // Calling yield at the end will avoid this problem.
             if (yield) Thread.Yield();
         }

@@ -107,5 +107,87 @@ namespace FeatureLoom.Synchronization
             tasks[waitHandles.Length] = extraTask;
             return tasks;
         }
+
+        /// <summary>
+        /// Executes an action when the IAsyncWaithandle is set to true.
+        /// Important: If repeat is true, make sure to reset the wait handle in the action, otherwise it will be executed continuesly in a loop.
+        /// </summary>
+        /// <param name="waitHandle">The wait handle will trigger the action when set</param>
+        /// <param name="action">The action that is executed when the wait handle is set</param>
+        /// <param name="repeat">If false, the action will only be executed once, if true, it will remain active and will always execute as long as the wait handle is set</param>
+        /// <param name="cancellationToken">Allows to abort waiting for the wait handle and also stop potential repeating</param>
+        /// <returns></returns>
+        public static async Task OnEvent(this IAsyncWaitHandle waitHandle, Action action, bool repeat = false, CancellationToken cancellationToken = default)
+        {
+            while(repeat && !cancellationToken.IsCancellationRequested)
+            {
+                if (await waitHandle.WaitAsync(cancellationToken))
+                {
+                    action();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Executes an action when the IAsyncWaithandle is set to true.
+        /// Important: If repeat is true, make sure to reset the wait handle in the action, otherwise it will be executed continuesly in a loop.
+        /// </summary>
+        /// <param name="waitHandle">The wait handle will trigger the action when set</param>
+        /// <param name="action">The action that is executed when the wait handle is set</param>
+        /// <param name="actionArgument">An argument that is passed to the action</param>
+        /// <param name="repeat">If false, the action will only be executed once, if true, it will remain active and will always execute as long as the wait handle is set</param>
+        /// <param name="cancellationToken">Allows to abort waiting for the wait handle and also stop potential repeating</param>
+        /// <returns></returns>
+        public static async Task OnEvent<T>(this IAsyncWaitHandle waitHandle, Action<T> action, T actionArgument, bool repeat = false, CancellationToken cancellationToken = default)
+        {
+            while (repeat && !cancellationToken.IsCancellationRequested)
+            {
+                if (await waitHandle.WaitAsync(cancellationToken))
+                {
+                    action(actionArgument);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Executes an async action when the IAsyncWaithandle is set to true.
+        /// Important: If repeat is true, make sure to reset the wait handle in the action, otherwise it will be executed continuesly in a loop.
+        /// </summary>
+        /// <param name="waitHandle">The wait handle will trigger the action when set</param>
+        /// <param name="action">The async action that is executed when the wait handle is set</param>
+        /// <param name="repeat">If false, the action will only be executed once, if true, it will remain active and will always execute as long as the wait handle is set</param>
+        /// <param name="cancellationToken">Allows to abort waiting for the wait handle and also stop potential repeating</param>
+        /// <returns></returns>
+        public static async Task OnEvent(this IAsyncWaitHandle waitHandle, Func<Task> action, bool repeat = false, CancellationToken cancellationToken = default)
+        {
+            while (repeat && !cancellationToken.IsCancellationRequested)
+            {
+                if (await waitHandle.WaitAsync(cancellationToken))
+                {
+                    await action();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Executes an async action when the IAsyncWaithandle is set to true.
+        /// Important: If repeat is true, make sure to reset the wait handle in the action, otherwise it will be executed continuesly in a loop.
+        /// </summary>
+        /// <param name="waitHandle">The wait handle will trigger the action when set</param>
+        /// <param name="action">The async action that is executed when the wait handle is set</param>
+        /// <param name="actionArgument">An argument that is passed to the action</param>
+        /// <param name="repeat">If false, the action will only be executed once, if true, it will remain active and will always execute as long as the wait handle is set</param>
+        /// <param name="cancellationToken">Allows to abort waiting for the wait handle and also stop potential repeating</param>
+        /// <returns></returns>
+        public static async Task OnEvent<T>(this IAsyncWaitHandle waitHandle, Func<T, Task> action, T actionArgument, bool repeat = false, CancellationToken cancellationToken = default)
+        {
+            while (repeat && !cancellationToken.IsCancellationRequested)
+            {
+                if (await waitHandle.WaitAsync(cancellationToken))
+                {
+                    await action(actionArgument);
+                }
+            }
+        }
     }
 }

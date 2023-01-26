@@ -6,7 +6,7 @@ namespace FeatureLoom.Storages
 {
     public static class StorageExtensions
     {
-        public static bool TrySubscribeForChangeUpdate<T>(this IStorageReader reader, string uriPattern, IMessageSink updateSink)
+        public static bool TrySubscribeForChangeUpdate<T>(this IStorageReader reader, string uriPattern, IMessageSink<ChangeUpdate<T>> updateSink)
         {
             var converter = new MessageConverter<ChangeNotification, ChangeUpdate<T>>(note => new ChangeUpdate<T>(note, reader));
             if (reader.TrySubscribeForChangeNotifications(uriPattern, converter))
