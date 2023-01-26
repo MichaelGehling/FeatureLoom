@@ -14,16 +14,6 @@ namespace FeatureLoom.MessageFlow
             source.ConnectTo(new ProcessingEndpoint<T>(action));
         }
 
-        public static void ForceConnectTo<T1,T2>(this IMessageSource<T1> source, IMessageSink<T2> sink)
-        {
-            source.ConnectTo(new Forwarder()).ConnectTo(sink);
-        }
-
-        public static IMessageSource ForceConnectTo<T1, T2>(this IMessageSource<T1> source, IMessageFlowConnection<T2> sink)
-        {
-            return source.ConnectTo(new Forwarder()).ConnectTo(sink);
-        }
-
         public static void ProcessMessage<T>(this IMessageSource source, Action<T> action, out IMessageSource elseSource)
         {
             var sink = new ProcessingEndpoint<T>(action);
