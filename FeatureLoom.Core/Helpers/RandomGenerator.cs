@@ -144,6 +144,8 @@ namespace FeatureLoom.Helpers
             }
         }
 
+
+
         /// <summary>
         /// Returns a random 64bit floating point value in the range of min (inclusive) to max (inclusive).
         /// </summary>
@@ -153,6 +155,24 @@ namespace FeatureLoom.Helpers
         {
             double sample = Rng.NextDouble();
             return (max * sample) + (min * (1.0 - sample));
+        }
+
+        /// <summary>
+        /// Returns a random 32bit floating point value in the range of 0.0 (inclusive) to 1.0 (exclusive).
+        /// </summary>
+        public static float Float()
+        {
+            return (float)Double();
+        }
+
+        /// <summary>
+        /// Returns a random 32bit floating point value in the range of min (inclusive) to max (inclusive).
+        /// </summary>
+        /// <param name="min">the smallest possbile value</param>
+        /// <param name="max">the biggest possible value</param>
+        public static float Float(float min, float max)
+        {
+            return (float)Double(min, max);
         }
 
         /// <summary>
