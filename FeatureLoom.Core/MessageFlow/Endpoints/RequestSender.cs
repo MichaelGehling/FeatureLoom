@@ -60,8 +60,7 @@ namespace FeatureLoom.MessageFlow
             }
             else 
             {
-                request = new RequestMessage<REQ>(message);
-                request.RequestId = handler.requestId;
+                request = new RequestMessage<REQ>(message, handler.requestId);                
             }
             
             sourceHelper.Forward(request);
@@ -82,8 +81,7 @@ namespace FeatureLoom.MessageFlow
             }
             else
             {
-                request = new RequestMessage<REQ>(message);
-                request.RequestId = handler.requestId;
+                request = new RequestMessage<REQ>(message, handler.requestId);                
             }
 
             sourceHelper.Forward(request);

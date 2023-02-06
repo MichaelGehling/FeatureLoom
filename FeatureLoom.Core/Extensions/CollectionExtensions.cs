@@ -4,11 +4,14 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Collections;
+using FeatureLoom.Core.Collections;
 
 namespace FeatureLoom.Extensions
 {
     public static class CollectionExtensions
     {
+        public static IEnumerator<T> GetEnumerator<T>(this T[] array) => ((IEnumerable<T>)array).GetEnumerator();
+        public static ICollection<T> ToCollection<T>(this IEnumerable<T> enumerable) => new EnumerableAsCollection<T>(enumerable);
         public static int RemoveWhere<T>(this IList<T> list, Predicate<T> predicate)
         {
             int numRemoved = 0;

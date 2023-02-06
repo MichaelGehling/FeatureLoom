@@ -11,7 +11,12 @@
             this.requestId = requestId;
         }
 
-        public T Content => content;
+        public ResponseMessage()
+        {
+
+        }
+
+        public T Content { get => content; set => content = value; }
 
         public long RequestId { get => requestId; set => requestId = value; }
 

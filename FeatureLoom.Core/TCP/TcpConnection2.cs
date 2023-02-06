@@ -74,8 +74,11 @@ namespace FeatureLoom.TCP
                 try
                 {
                     object message = await reader.ReadMessage(stream, cts.Token);
-                    if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, handle);
-                    receivedMessageSender.Send(message);
+                    if (message != null)
+                    {
+                        if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, handle);
+                        receivedMessageSender.Send(message);
+                    }
                 }
                 catch (Exception e)
                 {
