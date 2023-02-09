@@ -39,13 +39,13 @@ namespace FeatureLoom.TCP
 
         public int CountConnectedSinks => readForwarder.CountConnectedSinks;
         public bool IsConnected => connection != null && connection.IsConnected;
-        Func<IMessageStreamReader> createStreamReader = () => new JsonMessageStreamReader();
-        Func<IMessageStreamWriter> createStreamWriter = () => new JsonMessageStreamWriter();
+        Func<IGeneralMessageStreamReader> createStreamReader = () => new JsonMessageStreamReader();
+        Func<IGeneralMessageStreamWriter> createStreamWriter = () => new JsonMessageStreamWriter();
 
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
         public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent;
 
-        public TcpClientEndpoint2(Settings settings = null, bool autoStart = true, Func<IMessageStreamReader> createStreamReaderAction = null, Func<IMessageStreamWriter> createStreamWriterAction = null)
+        public TcpClientEndpoint2(Settings settings = null, bool autoStart = true, Func<IGeneralMessageStreamReader> createStreamReaderAction = null, Func<IGeneralMessageStreamWriter> createStreamWriterAction = null)
         {
             this.settings = settings;
             if (this.settings == null) this.settings = new Settings();

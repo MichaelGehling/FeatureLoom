@@ -46,5 +46,15 @@ namespace FeatureLoom.Extensions
 
             return data ?? Array.Empty<Byte>();
         }
+
+        public static int GetSizeOfLeftData(this MemoryStream memoryStream)
+        {
+            return (int)(memoryStream.Length - memoryStream.Position);
+        }
+
+        public static int GetLeftCapacity(this MemoryStream memoryStream)
+        {
+            return (int)(memoryStream.Capacity - memoryStream.Length);
+        }
     }
 }

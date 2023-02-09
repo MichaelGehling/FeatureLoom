@@ -3,15 +3,18 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Threading;
 using Newtonsoft.Json;
+using FeatureLoom.Core.TCP;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.TCP
 {
-    public class JsonMessageStreamReader : IMessageStreamReader
+    public class JsonMessageStreamReader : IGeneralMessageStreamReader, ISpecificMessageStreamReader
     {
         JsonSerializer serializer = Serialization.Json.ComplexObjectsStructure_Serializer;
         StreamReader streamReader;
         JsonTextReader jsonReader;
-        Stream cachedStream;
+        //byte[] typeInfo = "TypedJSON".ToByteArray();
+        byte[] typeInfo = "".ToByteArray();
 
         public Task<object> ReadMessage(Stream stream, CancellationToken cancellationToken)
         {
@@ -22,10 +25,7 @@ namespace FeatureLoom.TCP
 
         void UpdateStreamReader(Stream stream)
         {
-            if (cachedStream == stream) return;
-            Dispose();
-
-            cachedStream = stream;
+            //if (streamReader?.BaseStream != stream) streamReader = new StreamReader(stream);
             streamReader = new StreamReader(stream);
             jsonReader = new JsonTextReader(streamReader);
         }
@@ -34,9 +34,25 @@ namespace FeatureLoom.TCP
         {
             streamReader?.Dispose();
             ((IDisposable)jsonReader)?.Dispose();
-            cachedStream = null;
             streamReader = null;
             jsonReader = null;
+        }
+
+        public bool CanRead(byte[] typeInfoBuffer, int typeInfoStartIndex, int typeInfoLength)
+        {
+            if (typeInfoLength != typeInfo.Length) return false;
+
+            int index = typeInfoStartIndex;
+            foreach(byte b in typeInfo)
+            {
+                if (typeInfoBuffer[index++] != b) return false;
+            }
+            return true;
+        }
+
+        public Task<object> ReadMessage(Stream stream, int messageLength, CancellationToken cancellationToken)
+        {        
+            return ReadMessage(stream, cancellationToken);
         }
     }
 }

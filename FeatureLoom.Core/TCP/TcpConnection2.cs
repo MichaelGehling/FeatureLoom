@@ -17,8 +17,8 @@ namespace FeatureLoom.TCP
     {
         private readonly TcpClient client;
         private Stream stream;
-        IMessageStreamReader reader;
-        IMessageStreamWriter writer;
+        IGeneralMessageStreamReader reader;
+        IGeneralMessageStreamWriter writer;
         CancellationTokenSource cts = new CancellationTokenSource();
         Sender receivedMessageSender = new Sender();
         ProcessingEndpoint<object> messageWriter;
@@ -33,7 +33,7 @@ namespace FeatureLoom.TCP
         public IMessageSource ReceivedMessages => receivedMessageSender;
         public IMessageSink MessagesToSend => messageWriter;
 
-        public TcpConnection2(TcpClient client, IMessageStreamReader reader, IMessageStreamWriter writer, bool useConnectionMetaDataForMessages, IStreamUpgrader streamUpgrader = null)
+        public TcpConnection2(TcpClient client, IGeneralMessageStreamReader reader, IGeneralMessageStreamWriter writer, bool useConnectionMetaDataForMessages, IStreamUpgrader streamUpgrader = null)
         {
             handle = this.GetHandle();
 

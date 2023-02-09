@@ -1,10 +1,18 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Text;
 
 namespace FeatureLoom.Extensions
 {
     public static class ByteArrayExtensions
     {
+        public static T[] Slice<T>(this T[] data, int offset, int count)
+        {
+            T[] slice = new T[count];
+            Buffer.BlockCopy(data, offset, slice, 0, count);
+            return slice;
+        }
+
         public static int FindPatternPos(this byte[] buffer, byte[] pattern)
         {
             return buffer.FindPatternPos(0, buffer.Length, pattern);
@@ -47,6 +55,19 @@ namespace FeatureLoom.Extensions
         {
             if (encoding == default) encoding = Encoding.UTF8;
             return encoding.GetString(bytes);
+        }
+
+        public static string GetStringOrNull(this byte[] bytes, Encoding encoding = default)
+        {
+            try
+            {
+                if (encoding == default) encoding = Encoding.UTF8;
+                return encoding.GetString(bytes);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public static Stream ToStream(this byte[] buffer)

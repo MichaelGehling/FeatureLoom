@@ -5,7 +5,7 @@ using System;
 
 namespace FeatureLoom.TCP
 {
-    public interface IMessageStreamReader : IDisposable
+    public interface IGeneralMessageStreamReader : IDisposable
     {
         Task<object> ReadMessage(Stream stream, CancellationToken cancellationToken);
     }

@@ -3,17 +3,20 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Threading;
 using Newtonsoft.Json;
+using FeatureLoom.Core.TCP;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.TCP
 {
-    public class JsonMessageStreamWriter : IMessageStreamWriter
+    public class JsonMessageStreamWriter : IGeneralMessageStreamWriter, ISpecificMessageStreamWriter
     {
         JsonSerializer serializer = Serialization.Json.ComplexObjectsStructure_Serializer;
         JsonTextWriter jsonWriter;
         StreamWriter streamWriter;
-        Stream cachedStream;        
+        //byte[] typeInfo = "TypedJSON".ToByteArray();
+        byte[] typeInfo = "".ToByteArray();
 
-        public Task WriteMessage(object message, Stream stream, CancellationToken cancellationToken)
+        public Task WriteMessage<T>(T message, Stream stream, CancellationToken cancellationToken)
         {
             UpdateStreamWriter(stream);
             serializer.Serialize(jsonWriter, message);
@@ -23,10 +26,6 @@ namespace FeatureLoom.TCP
 
         void UpdateStreamWriter(Stream stream)
         {
-            if (cachedStream == stream) return;
-            Dispose();
-
-            cachedStream = stream;
             streamWriter = new StreamWriter(stream);
             jsonWriter = new JsonTextWriter(streamWriter);
         }
@@ -35,9 +34,14 @@ namespace FeatureLoom.TCP
         {            
             streamWriter?.Dispose();
             ((IDisposable)jsonWriter)?.Dispose();
-            cachedStream = null;
             streamWriter = null;
             jsonWriter = null;
+        }
+
+        public bool CanWrite<T>(T message, out byte[] typeInfo)
+        {
+            typeInfo = this.typeInfo;
+            return true;
         }
     }
 }

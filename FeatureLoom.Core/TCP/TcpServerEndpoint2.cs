@@ -33,8 +33,8 @@ namespace FeatureLoom.TCP
         private X509Certificate2 serverCertificate = null;
         List<TcpConnection2> connections = new List<TcpConnection2>();
         FeatureLock connectionsLock = new FeatureLock();
-        Func<IMessageStreamReader> createStreamReader = () => new JsonMessageStreamReader();
-        Func<IMessageStreamWriter> createStreamWriter = () => new JsonMessageStreamWriter();
+        Func<IGeneralMessageStreamReader> createStreamReader = () => new JsonMessageStreamReader();
+        Func<IGeneralMessageStreamWriter> createStreamWriter = () => new JsonMessageStreamWriter();
         QueueForwarder<object> writeForwarder = new QueueForwarder<object>();
         QueueForwarder<object> readForwarder = new QueueForwarder<object>();
         CancellationTokenSource cts;
@@ -43,7 +43,7 @@ namespace FeatureLoom.TCP
         public int CountConnectedClients => connections.Count;
         public int CountConnectedSinks => readForwarder.CountConnectedSinks;
 
-        public TcpServerEndpoint2(Settings settings = null, bool autoStart = true, Func<IMessageStreamReader> createStreamReaderAction = null, Func<IMessageStreamWriter> createStreamWriterAction = null)
+        public TcpServerEndpoint2(Settings settings = null, bool autoStart = true, Func<IGeneralMessageStreamReader> createStreamReaderAction = null, Func<IGeneralMessageStreamWriter> createStreamWriterAction = null)
         {
             this.settings = settings;
             if (this.settings == null) this.settings = new Settings();

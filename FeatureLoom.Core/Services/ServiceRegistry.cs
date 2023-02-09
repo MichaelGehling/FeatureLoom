@@ -77,8 +77,7 @@ namespace FeatureLoom.Services
             if (tryBorrow)
             {
                 using (registryLock.Lock())
-                {
-                    Type newType = typeof(T);
+                {                    
                     foreach (var service in registry.Values)
                     {
                         if (service.TryGetCreateServiceAction(out createServiceAction)) return true;
