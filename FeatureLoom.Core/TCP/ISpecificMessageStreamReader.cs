@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using System;
 
-namespace FeatureLoom.Core.TCP
+namespace FeatureLoom.TCP
 {
     public interface ISpecificMessageStreamReader : IDisposable
     {

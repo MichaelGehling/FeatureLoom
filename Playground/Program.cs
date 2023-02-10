@@ -25,7 +25,7 @@ using FeatureLoom.Services;
 using FeatureLoom.Serialization;
 using FeatureLoom.TCP;
 using System.Runtime.CompilerServices;
-using FeatureLoom.Core.TCP;
+using FeatureLoom.TCP;
 
 namespace Playground
 {
@@ -116,23 +116,13 @@ namespace Playground
 
         private static async Task Main()
         {
-           /* 
             TcpClientEndpoint2 client = new TcpClientEndpoint2(null, true,
-                                                               () => new VariantStreamReader(null, new JsonMessageStreamReader()),
-                                                               () => new VariantStreamWriter(null, new JsonMessageStreamWriter()));
+                                                               () => new VariantStreamReader(null, new TypedJsonMessageStreamReader()),
+                                                               () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter()));
 
             TcpServerEndpoint2 server = new TcpServerEndpoint2(null, true,
-                                                               () => new VariantStreamReader(null, new JsonMessageStreamReader()),
-                                                               () => new VariantStreamWriter(null, new JsonMessageStreamWriter()));
-            */
-
-            TcpClientEndpoint2 client = new TcpClientEndpoint2(null, true,
-                                                               () => new JsonMessageStreamReader(),
-                                                               () => new JsonMessageStreamWriter());
-
-            TcpServerEndpoint2 server = new TcpServerEndpoint2(null, true,
-                                                               () => new JsonMessageStreamReader(),
-                                                               () => new JsonMessageStreamWriter());
+                                                               () => new VariantStreamReader(null, new TypedJsonMessageStreamReader()),
+                                                               () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter()));
 
             client.ConnectionWaitHandle.Wait();
             server.ProcessMessage<object>(msg =>
@@ -140,9 +130,11 @@ namespace Playground
                 var x = msg;
             });
 
-            client.Send(new TestConfig());
+            client.Send(new TestConfig());            
             client.Send(new TestConfig() { aaa = "XX", bbb = 123 });
+            
             client.Send(new TestConfig() { aaa = "XdsfX", bbb = 1233 });
+            
             client.Send(new TestConfig() { aaa = "XdsfX123", bbb = 12332 });
 
             Console.ReadKey();

@@ -3,30 +3,29 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Threading;
 using Newtonsoft.Json;
-using FeatureLoom.Core.TCP;
 using FeatureLoom.Extensions;
+using Newtonsoft.Json.Bson;
+using FeatureLoom.Time;
 
 namespace FeatureLoom.TCP
 {
-    public class JsonMessageStreamWriter : IGeneralMessageStreamWriter, ISpecificMessageStreamWriter
+    public class TypedJsonMessageStreamWriter : ISpecificMessageStreamWriter
     {
         JsonSerializer serializer = Serialization.Json.ComplexObjectsStructure_Serializer;
         JsonTextWriter jsonWriter;
         StreamWriter streamWriter;
-        //byte[] typeInfo = "TypedJSON".ToByteArray();
-        byte[] typeInfo = "".ToByteArray();
+        byte[] typeInfo = "TypedJSON".ToByteArray();
 
-        public Task WriteMessage<T>(T message, Stream stream, CancellationToken cancellationToken)
-        {
-            UpdateStreamWriter(stream);
+        public async Task WriteMessage<T>(T message, Stream stream, CancellationToken cancellationToken)
+        {            
+            UpdateStreamWriter(stream);                        
             serializer.Serialize(jsonWriter, message);
-            jsonWriter.Flush();
-            return Task.CompletedTask;
+            await jsonWriter.FlushAsync();            
         }
 
         void UpdateStreamWriter(Stream stream)
         {
-            streamWriter = new StreamWriter(stream);
+            if (streamWriter?.BaseStream != stream) streamWriter = new StreamWriter(stream);
             jsonWriter = new JsonTextWriter(streamWriter);
         }
 

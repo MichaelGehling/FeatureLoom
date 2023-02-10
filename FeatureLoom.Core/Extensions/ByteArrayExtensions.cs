@@ -74,6 +74,25 @@ namespace FeatureLoom.Extensions
         {
             return new MemoryStream(buffer);
         }
+        
+        public static bool CompareTo(this byte[] self, byte[] other, int ownOffset = 0, int otherOffset = 0, int length = -1)
+        {
+            if (self == other) return true;
+            if (self == null || other == null) return false;
+            if (length == -1)
+            {
+                if (self.Length - ownOffset != other.Length - otherOffset) return false;
+                length = self.Length - ownOffset;
+            }
+            if (self.Length < ownOffset + length) throw new ArgumentException("Offset + length exceeds own length!");
+            if (other.Length < otherOffset + length) return false;
+
+            for(int i=0; i < length; i++)
+            {
+                if (self[i + ownOffset] != other[i + otherOffset]) return false;
+            }
+            return true;
+        }
 
     }
 }

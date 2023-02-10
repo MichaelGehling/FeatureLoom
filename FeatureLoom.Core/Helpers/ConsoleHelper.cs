@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureLoom.Core.Helpers
+namespace FeatureLoom.Helpers
 {
     public static class ConsoleHelper
     {

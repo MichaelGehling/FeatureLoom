@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace FeatureLoom.Core.Collections
+namespace FeatureLoom.Collections
 {
     public class EnumerableAsCollection<T> : ICollection<T>
     {

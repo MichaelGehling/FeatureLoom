@@ -33,8 +33,8 @@ namespace FeatureLoom.TCP
         private X509Certificate2 serverCertificate = null;
         List<TcpConnection2> connections = new List<TcpConnection2>();
         FeatureLock connectionsLock = new FeatureLock();
-        Func<IGeneralMessageStreamReader> createStreamReader = () => new JsonMessageStreamReader();
-        Func<IGeneralMessageStreamWriter> createStreamWriter = () => new JsonMessageStreamWriter();
+        Func<IGeneralMessageStreamReader> createStreamReader = () => new VariantStreamReader(null, new TypedJsonMessageStreamReader());
+        Func<IGeneralMessageStreamWriter> createStreamWriter = () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter());
         QueueForwarder<object> writeForwarder = new QueueForwarder<object>();
         QueueForwarder<object> readForwarder = new QueueForwarder<object>();
         CancellationTokenSource cts;
