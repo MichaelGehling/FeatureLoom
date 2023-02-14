@@ -2,7 +2,7 @@
 using System;
 using System.Threading;
 
-namespace FeatureLoom.Services
+namespace FeatureLoom.DependencyInversion
 {
     public static partial class Service<T> where T:class
     {

@@ -1,12 +1,12 @@
 ﻿using FeatureLoom.Diagnostics;
 using FeatureLoom.Helpers;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 using FeatureLoom.Synchronization;
 using System;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace FeatureLoom.Services
+namespace FeatureLoom.DependencyInversion
 {
     public class FactoryTests
     {

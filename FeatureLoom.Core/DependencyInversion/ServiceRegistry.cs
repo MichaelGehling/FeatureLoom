@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace FeatureLoom.Services
+namespace FeatureLoom.DependencyInversion
 {
     public static class ServiceRegistry
     {

@@ -1,7 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.RPC;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using FeatureLoom.TCP;

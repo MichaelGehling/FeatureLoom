@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using FeatureLoom.Scheduling;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 
 namespace FeatureLoom.RPC
 {

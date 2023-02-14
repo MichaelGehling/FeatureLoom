@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace FeatureLoom.Services
+namespace FeatureLoom.DependencyInversion
 {
     public static class Factory
     {
@@ -34,7 +34,7 @@ namespace FeatureLoom.Services
             else Service<FactoryOverride<T>>.Reset();
         }
 
-        public class FactoryOverride<T>
+        private class FactoryOverride<T>
         {
             Func<T> create = null;
             static FactoryOverride<T> empty = new FactoryOverride<T>(null);

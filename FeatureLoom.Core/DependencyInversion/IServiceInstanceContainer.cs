@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace FeatureLoom.Services
+namespace FeatureLoom.DependencyInversion
 {
     public interface IServiceInstanceContainer
     {

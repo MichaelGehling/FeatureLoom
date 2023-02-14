@@ -6,7 +6,7 @@ using System;
 using FeatureLoom.Storages;
 using FeatureLoom.Extensions;
 using System.Runtime.CompilerServices;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 
 namespace FeatureLoom.Logging
 {

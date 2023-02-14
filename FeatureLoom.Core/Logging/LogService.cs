@@ -4,7 +4,7 @@ using FeatureLoom.Workflows;
 using System;
 using FeatureLoom.Storages;
 using FeatureLoom.Extensions;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 
 namespace FeatureLoom.Logging
 {

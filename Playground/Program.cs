@@ -21,7 +21,7 @@ using FeatureLoom.Storages;
 using FeatureLoom.Security;
 using System.IO;
 using System.Globalization;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 using FeatureLoom.Serialization;
 using FeatureLoom.TCP;
 using System.Runtime.CompilerServices;

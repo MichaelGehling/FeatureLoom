@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.MessageFlow;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;

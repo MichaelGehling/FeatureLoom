@@ -1,6 +1,6 @@
 ﻿using FeatureLoom.Helpers;
 using FeatureLoom.Scheduling;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;

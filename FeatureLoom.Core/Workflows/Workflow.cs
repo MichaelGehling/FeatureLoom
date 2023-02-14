@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 
 namespace FeatureLoom.Workflows
 {

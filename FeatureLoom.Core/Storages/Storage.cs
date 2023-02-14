@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Services;
+﻿using FeatureLoom.DependencyInversion;
 using System;
 
 namespace FeatureLoom.Storages

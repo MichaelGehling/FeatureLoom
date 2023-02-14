@@ -3,7 +3,7 @@ using FeatureLoom.Logging;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using System.Collections.Generic;
-using FeatureLoom.Services;
+using FeatureLoom.DependencyInversion;
 
 namespace FeatureLoom.Helpers
 {
