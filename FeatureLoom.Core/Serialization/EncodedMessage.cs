@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace FeatureLoom.Core.Serialization
+namespace FeatureLoom.Serialization
 {
     public readonly struct EncodedMessage
     {

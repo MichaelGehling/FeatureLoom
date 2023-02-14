@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.Core.TCP
+namespace FeatureLoom.TCP
 {
 
     public class VariantStreamWriter : IGeneralMessageStreamWriter

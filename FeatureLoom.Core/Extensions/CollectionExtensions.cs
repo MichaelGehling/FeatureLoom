@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Collections;
-using FeatureLoom.Core.Collections;
+using FeatureLoom.Collections;
 
 namespace FeatureLoom.Extensions
 {
