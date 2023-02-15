@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Helpers;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,16 +10,13 @@ namespace FeatureLoom.DependencyInversion
     public static partial class Service<T> where T:class
     {
         private static ServiceInstanceContainer instanceContainer;
+        private static bool initialized = false;
 
-        public static T Init(Func<T> createServiceAction, bool force = true)
+        public static void Init(Func<string, T> createServiceAction, bool forceReset = true)
         {
-            if (force || instanceContainer == null)
-            {
-                Reset();
-                Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create(createServiceAction), null);
-                if (ServiceRegistry.LocalInstancesForAllServicesActive) instanceContainer.CreateLocalServiceInstance();
-            }
-            return Instance;
+            if (forceReset) Reset();
+            ServiceRegistry.RegisterCreator(new ServiceInstanceCreator(createServiceAction));
+            initialized = true;
         }
 
         public static void Reset()
@@ -30,71 +28,63 @@ namespace FeatureLoom.DependencyInversion
             }
         }
 
-        public static bool IsInitialized => instanceContainer != null;
-        public static bool UsesLocalInstance => IsInitialized && instanceContainer.UsesLocalInstance;
+        public static bool IsInitialized
+        { 
+            get 
+            {
+                if (!initialized) initialized = ServiceRegistry.TryGetServiceInstanceCreator<T>(out _);
+                return initialized; 
+            } 
+        }
+
+        public static T Get()
+        {
+            if (instanceContainer != null) return instanceContainer.Instance;
+            return HandleUninitializedGet();
+        }
+
+        public static void Set(T serviceInstance)
+        {
+            if (instanceContainer != null) instanceContainer.Instance = serviceInstance;
+            else HandleUninitializedSet(serviceInstance);
+        }
 
         public static T Instance
         {
-            get
-            {
-                if (instanceContainer != null) return instanceContainer.Instance;
-                return HandleUninitializedGet();
-            }
-
-            set
-            {
-                if (instanceContainer != null) instanceContainer.Instance = value;
-                else HandleUninitializedSet(value);
-            }
+            get => Get();
+            set => Set(value);
         }
-        
+
         public static void CreateLocalServiceInstance(T localServiceInstance = null)
         {
-            if (instanceContainer != null) instanceContainer.CreateLocalServiceInstance(localServiceInstance);
-            else if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction))
+            if (instanceContainer == null)
             {
-                Init(createServiceAction);
-                instanceContainer.CreateLocalServiceInstance(localServiceInstance);
-            }
-            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
-        }
+                if (!ServiceRegistry.TryGetServiceInstanceContainer(out ServiceInstanceContainer newContainer)) throw new Exception($"Cannot create Service of type {typeof(T)}. Please initialize it first.");
+                instanceContainer = newContainer;
+            }            
+            instanceContainer.CreateLocalServiceInstance(localServiceInstance);                
+        }               
 
         public static void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
         {
-            if (instanceContainer != null) instanceContainer.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);
-            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
+            if (instanceContainer != null) instanceContainer.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);            
         }
 
         private static void HandleUninitializedSet(T value)
-        {
-            if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction))
-            {
-                Init(createServiceAction);
-                instanceContainer.Instance = value;
-            }
-            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
+        {            
+            if (value == null) return;
+
+            if (!ServiceRegistry.TryGetServiceInstanceCreatorFromType(value.GetType(), out IServiceInstanceCreator creator)) throw new Exception($"Cannot create Service from instance type {value.GetType()}. Please initialize it first.");
+            ServiceInstanceContainer newContainer = new ServiceInstanceContainer(creator);
+            newContainer.Instance = value;
+            ServiceRegistry.RegisterService(newContainer);            
+            instanceContainer = newContainer;
         }
 
         private static T HandleUninitializedGet()
         {
-            foreach (var serviceContainer in ServiceRegistry.GetAllRegisteredServices())
-            {
-                if (serviceContainer.Instance is T borrowedInstance && serviceContainer.TryGetCreateServiceAction<T>(out Func<T> borrowedCreateServiceAction))
-                {
-                    if (null == Interlocked.CompareExchange(ref instanceContainer, ServiceInstanceContainer.Create(borrowedCreateServiceAction, borrowedInstance), null))
-                    {                        
-                        if (ServiceRegistry.LocalInstancesForAllServicesActive) instanceContainer.CreateLocalServiceInstance();                        
-                    }
-                    return instanceContainer.Instance;
-                }
-            }
-
-            if (ServiceRegistry.TryGetDefaultServiceCreator<T>(out var createServiceAction, false))
-            {
-                Init(createServiceAction);
-                return instanceContainer.Instance;
-            }
-            else throw new Exception($"Service<{typeof(T)}> was not initialized.");
+            if (!ServiceRegistry.TryGetServiceInstanceContainer<T>(out instanceContainer)) throw new Exception($"Cannot create Service of type {typeof(T)}. Please initialize it first.");
+            return instanceContainer.Instance;
         }                      
     }    
 }

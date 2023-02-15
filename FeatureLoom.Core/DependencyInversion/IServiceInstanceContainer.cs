@@ -8,6 +8,8 @@ namespace FeatureLoom.DependencyInversion
         void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal);
         Type ServiceType { get; }
         object Instance { get; }
-        bool TryGetCreateServiceAction<T>(out Func<T> createServiceAction);
-    }
+        object GlobalInstance { get; }
+        bool UsesLocalInstance { get; }
+        IServiceInstanceCreator ServiceInstanceCreator { get; }
+    }    
 }

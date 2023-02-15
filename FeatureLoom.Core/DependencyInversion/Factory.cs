@@ -22,7 +22,7 @@ namespace FeatureLoom.DependencyInversion
         {
             if (overrideCreate != null) 
             {
-                if (!Service<FactoryOverride<T>>.IsInitialized) Service<FactoryOverride<T>>.Init(() => new FactoryOverride<T>(overrideCreate));
+                if (!Service<FactoryOverride<T>>.IsInitialized) Service<FactoryOverride<T>>.Init(_ => new FactoryOverride<T>(overrideCreate));
                 else Service<FactoryOverride<T>>.Instance.Reset(overrideCreate);
             }
             else RemoveOverride<T>();
@@ -30,8 +30,7 @@ namespace FeatureLoom.DependencyInversion
 
         public static void RemoveOverride<T>()
         {
-            if (Service<FactoryOverride<T>>.UsesLocalInstance) Service<FactoryOverride<T>>.Instance = FactoryOverride<T>.EmptyOverride;
-            else Service<FactoryOverride<T>>.Reset();
+            Service<FactoryOverride<T>>.Instance = FactoryOverride<T>.EmptyOverride;
         }
 
         private class FactoryOverride<T>

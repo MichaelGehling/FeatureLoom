@@ -50,7 +50,7 @@ Some features are in a ready to release state, some are still in a prototype sta
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.csproj" />
+    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,17 +1,21 @@
-﻿using FeatureLoom.Synchronization;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Synchronization;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace FeatureLoom.DependencyInversion
 {
     public static class ServiceRegistry
     {
-        static Dictionary<Type, IServiceInstanceContainer> registry = new Dictionary<Type, IServiceInstanceContainer>();
-        static HashSet<Type> declaredServiceTypes = new HashSet<Type>();
+        static Dictionary<Type, IServiceInstanceContainer> services = new Dictionary<Type, IServiceInstanceContainer>();
+        static Dictionary<Type, IServiceInstanceCreator> creators = new Dictionary<Type, IServiceInstanceCreator>();
         static MicroLock registryLock = new MicroLock();
-        static MicroLock serviceTypeLock = new MicroLock();
         static bool localInstancesForAllServicesActive = false;
 
         public static bool LocalInstancesForAllServicesActive => localInstancesForAllServicesActive;
@@ -20,7 +24,7 @@ namespace FeatureLoom.DependencyInversion
         {
             using (registryLock.Lock())
             {
-                registry[service.ServiceType] = service;
+                services[service.ServiceType] = service;
             }
         }
 
@@ -28,7 +32,7 @@ namespace FeatureLoom.DependencyInversion
         {
             using (registryLock.Lock())
             {
-                registry.Remove(service.ServiceType);
+                services.Remove(service.ServiceType);
             }
         }
 
@@ -36,15 +40,23 @@ namespace FeatureLoom.DependencyInversion
         {
             using(registryLock.Lock())
             {
-                return registry.Values.ToArray();
+                return services.Values.ToArray();
             }
         }
 
-        public static void DeclareServiceType(Type declaredServiceType)
+        internal static void RegisterCreator(IServiceInstanceCreator creator)
         {
-            using(serviceTypeLock.Lock())
+            using (registryLock.Lock())
             {
-                declaredServiceTypes.Add(declaredServiceType);
+                creators[creator.ServiceType] = creator;
+            }
+        }
+
+        internal static void UnregisterCreator(IServiceInstanceCreator creator)
+        {
+            using (registryLock.Lock())
+            {
+                creators.Remove(creator.ServiceType);
             }
         }
 
@@ -53,7 +65,7 @@ namespace FeatureLoom.DependencyInversion
             using (registryLock.Lock())
             {
                 localInstancesForAllServicesActive = true;
-                foreach (var service in registry.Values)
+                foreach (var service in services.Values)
                 {
                     service.CreateLocalServiceInstance();
                 }
@@ -65,52 +77,101 @@ namespace FeatureLoom.DependencyInversion
             using (registryLock.Lock())
             {
                 localInstancesForAllServicesActive = false;
-                foreach (var service in registry.Values)
+                foreach (var service in services.Values)
                 {
                     service.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);
                 }
             }
         }
 
-        internal static bool TryGetDefaultServiceCreator<T>(out Func<T> createServiceAction, bool tryBorrow = true)
+        internal static bool TryGetServiceInstanceCreatorFromType(Type type, out IServiceInstanceCreator creator)
+        {            
+            MethodInfo method = typeof(ServiceRegistry).GetMethod("GetServiceInstanceCreator");
+            method = method.MakeGenericMethod(type);
+            creator = (IServiceInstanceCreator) method.Invoke(null, Array.Empty<object>());
+            return creator != null;
+        }
+
+        private static IServiceInstanceCreator GetServiceInstanceCreator<T>() where T : class
         {
-            if (tryBorrow)
+            TryGetServiceInstanceCreator<T>(out var creator);
+            return creator;
+        }
+
+        internal static bool TryGetServiceInstanceCreator<T>(out IServiceInstanceCreator creator) where T : class
+        {
+            using(registryLock.Lock())
             {
-                using (registryLock.Lock())
-                {                    
-                    foreach (var service in registry.Values)
-                    {
-                        if (service.TryGetCreateServiceAction(out createServiceAction)) return true;
-                    }
+                return TryGetServiceInstanceCreatorUnsafe<T>(out creator);
+            }
+        }
+
+        private static bool TryGetServiceInstanceCreatorUnsafe<T>(out IServiceInstanceCreator creator) where T : class
+        {
+            var type = typeof(T);
+
+            if (creators.TryGetValue(type, out creator)) return true;
+
+            foreach (var c in creators.Values)
+            {
+                if (type.IsAssignableFrom(c.ServiceType))
+                {
+                    creator = c;
+                    creators[type] = creator;
+                    return true;
                 }
             }
-            var tType = typeof(T);
 
-            var constructor = tType.GetConstructor(Type.EmptyTypes);
+            var constructor = type.GetConstructor(Type.EmptyTypes);
             if (constructor == null)
             {
-                using (serviceTypeLock.Lock())
-                {
-                    var alternativeType = declaredServiceTypes.FirstOrDefault(p => tType.IsAssignableFrom(p) && p.GetConstructor(Type.EmptyTypes) != null);
-                    constructor = alternativeType?.GetConstructor(Type.EmptyTypes);
-                }                
-            }
-            if (constructor == null)
-            {
+                // Searching all assemblies for a Type that fits as a fallback.
+                // NOTE: Be aware that it is not guaranteed which implementation will be used for an interface type, if multiple classes implement it.
+                //       This might also fail with a trimmed binary where unused code is stripped at build time to improve the size of the binary.
+                //       In such cases the wanted service type must be initialized explicitly before the interface type is requested.
                 var alternativeType = AppDomain.CurrentDomain.GetAssemblies().SelectMany(s => s.GetTypes())
-                    .FirstOrDefault(p => tType.IsAssignableFrom(p) && p.GetConstructor(Type.EmptyTypes) != null);
+                    .FirstOrDefault(p => type.IsAssignableFrom(p) && p.GetConstructor(Type.EmptyTypes) != null);
                 constructor = alternativeType?.GetConstructor(Type.EmptyTypes);
             }
 
             if (constructor != null)
             {
-                createServiceAction = () => (T) constructor.Invoke(Array.Empty<object>());
+                creator = new Service<T>.ServiceInstanceCreator(_ => (T)constructor.Invoke(Array.Empty<object>()));
+                creators[type] = creator;
                 return true;
             }
-            else
+            creator = null;
+            return false;
+        }
+
+        internal static bool TryGetServiceInstanceContainer<T>(out Service<T>.ServiceInstanceContainer instanceContainer) where T : class
+        {
+            instanceContainer = null;
+
+            using (registryLock.Lock())
             {
-                createServiceAction = null;
-                return false;
+                var type = typeof(T);
+
+                if (services.TryGetValue(type, out IServiceInstanceContainer container) && container is Service<T>.ServiceInstanceContainer typedContainer)
+                {
+                    instanceContainer = typedContainer;
+                    return true;
+                }
+
+                foreach(var c in services.Values)
+                {
+                    if (type.IsAssignableFrom(c.ServiceType))
+                    {
+                        instanceContainer = new Service<T>.ServiceInstanceContainer(c);
+                        services[type] = instanceContainer;
+                        return true;
+                    }
+                }
+                
+                if (!TryGetServiceInstanceCreatorUnsafe<T>(out IServiceInstanceCreator creator)) return false;
+                instanceContainer = new Service<T>.ServiceInstanceContainer(creator);
+                services[type] = instanceContainer;
+                return true;
             }
         }
 

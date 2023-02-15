@@ -23,9 +23,10 @@ namespace FeatureLoom.DependencyInversion
         }
 
         [Fact]
+        //[Fact(Skip = "Cant run in parallel")]
         public void LocalServiceInstancesAreKeptInLogicalThread()
         {
-            Service<TestService>.Init(() => new TestService());
+            Service<TestService>.Init(_ => new TestService());
             Assert.Equal(0, Service<TestService>.Instance.i);
             Service<TestService>.Instance.i = 42;
             Assert.Equal(42, Service<TestService>.Instance.i);
@@ -67,28 +68,16 @@ namespace FeatureLoom.DependencyInversion
             Assert.Equal(5, Service<TestService>.Instance.i);
         }
 
+        //[Fact]
         [Fact(Skip ="Cant run in parallel")]
         public void ServicesWithDefaultConstructorDontNeedInit()
         {
             TestHelper.PrepareTestContext();            
-            
-            Assert.Throws<Exception>(() => Service<ITestService>.Instance);
-            Assert.NotNull(Service<TestService>.Instance);            
-
-            Service<ITestService>.Init(() => new TestService());
+                        
+            TestService service = Service<TestService>.Instance;
+            Assert.NotNull(service);
             Assert.NotNull(Service<ITestService>.Instance);
-
-            Assert.False(TestHelper.HasAnyLogError());
-        }
-
-        [Fact(Skip = "Cant run in parallel")]
-        public void InitializedServiceAlsoWorksForItsInterfaces()
-        {
-            TestHelper.PrepareTestContext();
-
-            Assert.Throws<Exception>(() => Service<ITestService>.Instance);
-            Service<TestService>.Init(() => new TestService());
-            Assert.NotNull(Service<ITestService>.Instance);
+            Assert.Equal(service, Service<ITestService>.Instance);
 
             Assert.False(TestHelper.HasAnyLogError());
         }

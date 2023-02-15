@@ -125,7 +125,7 @@ namespace FeatureLoom.TCP
                     TcpClient client = await listner.AcceptTcpClientAsync();
                     ConnectClient(client);
                 }
-                catch (InvalidOperationException e)
+                catch (InvalidOperationException)
                 {
                     // listner was stopped
                 }

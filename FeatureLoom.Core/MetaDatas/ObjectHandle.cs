@@ -45,6 +45,17 @@ namespace FeatureLoom.MetaDatas
             return id == other.id;
         }
 
+        public override bool Equals(object obj)
+        {
+            if (!(obj is ObjectHandle otherHandle)) return false;
+            return this.Equals(otherHandle);
+        }
+
+        public override int GetHashCode()
+        {
+            return id.GetHashCode();            
+        }
+
         public static bool operator ==(ObjectHandle handle1, ObjectHandle handle2)
         {
             return handle1.Equals(handle2);

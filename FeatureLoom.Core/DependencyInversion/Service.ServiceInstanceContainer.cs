@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using System;
 using System.Threading;
 
@@ -10,37 +11,59 @@ namespace FeatureLoom.DependencyInversion
         {
             T globalInstance;
             LazyValue<AsyncLocal<T>> localInstance;
-            Func<T> createInstance;
+            IServiceInstanceCreator creator;
+            string serviceInstanceName;
+            MicroLock creationLock = new MicroLock();
 
-            private ServiceInstanceContainer()
-            {                
-            }
-
-            public static ServiceInstanceContainer Create(Func<T> createInstance)
+            public ServiceInstanceContainer(IServiceInstanceCreator creator)
             {
-                var container = new ServiceInstanceContainer() { createInstance = createInstance, globalInstance = createInstance() };
-                ServiceRegistry.RegisterService(container);
-                return container;
+                this.creator = creator;
             }
 
-            public static ServiceInstanceContainer Create(Func<T> createInstance, T instance)
+            internal ServiceInstanceContainer(IServiceInstanceContainer container)
             {
-                var container = new ServiceInstanceContainer() { createInstance = createInstance, globalInstance = instance };
-                ServiceRegistry.RegisterService(container);
-                return container;
+                if (!typeof(T).IsAssignableFrom(container.ServiceType)) throw new Exception("Incompatible ServiceInstanceContainer used!");
+                creator = container.ServiceInstanceCreator;
+                globalInstance = container.GlobalInstance as T;
+                if (container.UsesLocalInstance) CreateLocalServiceInstance(container.Instance as T);
             }
 
-            public bool TryGetCreateServiceAction<T2>(out Func<T2> createServiceAction)
-            {                
-                createServiceAction = createInstance as Func<T2>;
-                return createServiceAction != null;                
-            }
+            public IServiceInstanceCreator ServiceInstanceCreator => creator;
 
             public bool UsesLocalInstance => localInstance.Exists;
 
+            object IServiceInstanceContainer.GlobalInstance => globalInstance;
+
             public T Instance
             {
-                get => localInstance.Exists ? localInstance.Obj.Value ?? globalInstance : globalInstance;
+                get
+                {
+                    if (!localInstance.Exists)
+                    {
+                        if (globalInstance != null) return globalInstance;
+                        using (creationLock.Lock())
+                        {
+                            if (globalInstance != null) return globalInstance;
+                            globalInstance = creator.CreateServiceInstance<T>(serviceInstanceName);
+                            return globalInstance;
+                        }
+                    }
+                    else
+                    {
+                        T instance = localInstance.Obj.Value;
+                        if (instance != null) return instance;
+                        using (creationLock.Lock())
+                        {
+                            instance = localInstance.Obj.Value;
+                            if (instance != null) return instance;
+
+                            if (globalInstance != null) instance = globalInstance;
+                            else instance = creator.CreateServiceInstance<T>(serviceInstanceName);
+                            localInstance.Obj.Value = instance;
+                            return instance;
+                        }
+                    }                                        
+                }
                 set
                 {
                     if (localInstance.Exists) localInstance.Obj.Value = value;
@@ -48,24 +71,21 @@ namespace FeatureLoom.DependencyInversion
                 }
             }
 
-            public void CreateLocalServiceInstance(T localServiceInstance)
+            public void CreateLocalServiceInstance(T localServiceInstance = null)
             {
-
-                localInstance.Obj.Value = localServiceInstance ?? createInstance();
+                localInstance.Obj.Value = localServiceInstance ?? creator.CreateServiceInstance<T>();
             }
 
             public void CreateLocalServiceInstance()
             {
-                localInstance.Obj.Value = createInstance();
+                localInstance.Obj.Value = creator.CreateServiceInstance<T>();
             }
 
             public void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
             {
                 if (localInstance.Exists && useLocalInstanceAsGlobal) globalInstance = localInstance.Obj.Value;
                 localInstance.RemoveObj();
-            }
-
-            
+            }            
 
             public Type ServiceType => typeof(T);
             object IServiceInstanceContainer.Instance => Instance;
