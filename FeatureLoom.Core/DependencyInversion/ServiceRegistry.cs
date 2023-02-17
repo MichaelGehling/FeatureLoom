@@ -13,10 +13,13 @@ namespace FeatureLoom.DependencyInversion
 {
     public static class ServiceRegistry
     {
-        static Dictionary<Type, IServiceInstanceContainer> services = new Dictionary<Type, IServiceInstanceContainer>();
+        
+
+        static Dictionary<TypeAndName, IServiceInstanceContainer> services = new Dictionary<TypeAndName, IServiceInstanceContainer>();
         static Dictionary<Type, IServiceInstanceCreator> creators = new Dictionary<Type, IServiceInstanceCreator>();
         static MicroLock registryLock = new MicroLock();
         static bool localInstancesForAllServicesActive = false;
+        static public bool AllowToSearchAssembly { get; set; } = true;
 
         public static bool LocalInstancesForAllServicesActive => localInstancesForAllServicesActive;
 
@@ -24,15 +27,27 @@ namespace FeatureLoom.DependencyInversion
         {
             using (registryLock.Lock())
             {
-                services[service.ServiceType] = service;
+                if (localInstancesForAllServicesActive && !service.UsesLocalInstance) service.CreateLocalServiceInstance();
+                services[service.GetTypeAndName()] = service;
             }
         }
 
-        internal static void UnregisterService(IServiceInstanceContainer service)
+        internal static void UnregisterService(IServiceInstanceContainer serviceToRemove)
         {
             using (registryLock.Lock())
             {
-                services.Remove(service.ServiceType);
+                services.Remove(serviceToRemove.GetTypeAndName());
+            }
+        }
+
+        internal static void UnregisterServices(IEnumerable<IServiceInstanceContainer> servicesToRemove)
+        {
+            using (registryLock.Lock())
+            {
+                foreach (var serviceToRemove in servicesToRemove)
+                {
+                    services.Remove(serviceToRemove.GetTypeAndName());
+                }
             }
         }
 
@@ -112,18 +127,18 @@ namespace FeatureLoom.DependencyInversion
 
             if (creators.TryGetValue(type, out creator)) return true;
 
-            foreach (var c in creators.Values)
+            foreach (var otherCreator in creators.Values)
             {
-                if (type.IsAssignableFrom(c.ServiceType))
+                if (type.IsAssignableFrom(otherCreator.ServiceType))
                 {
-                    creator = c;
+                    creator = otherCreator;
                     creators[type] = creator;
                     return true;
                 }
             }
 
             var constructor = type.GetConstructor(Type.EmptyTypes);
-            if (constructor == null)
+            if (constructor == null && AllowToSearchAssembly)
             {
                 // Searching all assemblies for a Type that fits as a fallback.
                 // NOTE: Be aware that it is not guaranteed which implementation will be used for an interface type, if multiple classes implement it.
@@ -144,36 +159,73 @@ namespace FeatureLoom.DependencyInversion
             return false;
         }
 
-        internal static bool TryGetServiceInstanceContainer<T>(out Service<T>.ServiceInstanceContainer instanceContainer) where T : class
+        internal static bool TryGetServiceInstanceContainer<T>(string serviceInstanceName, out Service<T>.ServiceInstanceContainer instanceContainer) where T : class
         {
             instanceContainer = null;
 
             using (registryLock.Lock())
             {
-                var type = typeof(T);
+                var typeAndName = new TypeAndName(typeof(T), serviceInstanceName);
 
-                if (services.TryGetValue(type, out IServiceInstanceContainer container) && container is Service<T>.ServiceInstanceContainer typedContainer)
+                if (services.TryGetValue(typeAndName, out IServiceInstanceContainer container) && container is Service<T>.ServiceInstanceContainer typedContainer)
                 {
                     instanceContainer = typedContainer;
                     return true;
                 }
 
-                foreach(var c in services.Values)
+                foreach(var otherService in services.Values)
                 {
-                    if (type.IsAssignableFrom(c.ServiceType))
+                    if (typeAndName.type.IsAssignableFrom(otherService.ServiceType) && 
+                        otherService.ServiceInstanceName == serviceInstanceName)
                     {
-                        instanceContainer = new Service<T>.ServiceInstanceContainer(c);
-                        services[type] = instanceContainer;
+                        instanceContainer = new Service<T>.ServiceInstanceContainer(otherService, serviceInstanceName);
+                        services[typeAndName] = instanceContainer;
                         return true;
                     }
                 }
                 
                 if (!TryGetServiceInstanceCreatorUnsafe<T>(out IServiceInstanceCreator creator)) return false;
-                instanceContainer = new Service<T>.ServiceInstanceContainer(creator);
-                services[type] = instanceContainer;
+                instanceContainer = new Service<T>.ServiceInstanceContainer(creator, serviceInstanceName);
+                services[typeAndName] = instanceContainer;
                 return true;
             }
         }
 
+        static TypeAndName GetTypeAndName(this IServiceInstanceContainer service) => new TypeAndName(service.ServiceType, service.ServiceInstanceName);
+
+        readonly struct TypeAndName : IEquatable<TypeAndName>
+        {
+            public readonly Type type;
+            public readonly string name;
+
+            public TypeAndName(Type type, string name)
+            {
+                this.type = type;
+                this.name = name;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (!(obj is TypeAndName other)) return false;
+                return Equals(other);
+            }
+
+            public bool Equals(TypeAndName other)
+            {
+                if (type != other.type) return false;
+                if (name != other.name) return false;
+                return true;
+            }
+
+            public override int GetHashCode()
+            {
+                return type.GetHashCode() ^ name.GetHashCode();
+            }
+
+            public override string ToString()
+            {
+                return $"{type.ToString()}:{name}";
+            }
+        }
     }
 }

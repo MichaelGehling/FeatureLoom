@@ -10,6 +10,7 @@ namespace FeatureLoom.DependencyInversion
         object Instance { get; }
         object GlobalInstance { get; }
         bool UsesLocalInstance { get; }
+        string ServiceInstanceName { get; }
         IServiceInstanceCreator ServiceInstanceCreator { get; }
     }    
 }

@@ -116,6 +116,18 @@ namespace Playground
 
         private static async Task Main()
         {
+            List<int> l = new List<int>(100);
+            _ = Task.Run(() =>
+            {
+                foreach(int x in l)
+                {
+                    Thread.Sleep(100);
+                }
+            });
+            l = null;
+
+            Console.ReadKey();
+
             TcpClientEndpoint2 client = new TcpClientEndpoint2(null, true,
                                                                () => new VariantStreamReader(null, new TypedJsonMessageStreamReader()),
                                                                () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter()));

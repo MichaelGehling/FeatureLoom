@@ -15,18 +15,23 @@ namespace FeatureLoom.DependencyInversion
             string serviceInstanceName;
             MicroLock creationLock = new MicroLock();
 
-            public ServiceInstanceContainer(IServiceInstanceCreator creator)
+            public ServiceInstanceContainer(IServiceInstanceCreator creator, string serviceInstanceName)
             {
                 this.creator = creator;
+                this.serviceInstanceName = serviceInstanceName;
             }
 
-            internal ServiceInstanceContainer(IServiceInstanceContainer container)
+            internal ServiceInstanceContainer(IServiceInstanceContainer container, string serviceInstanceName)
             {
+                this.serviceInstanceName = serviceInstanceName;
+
                 if (!typeof(T).IsAssignableFrom(container.ServiceType)) throw new Exception("Incompatible ServiceInstanceContainer used!");
                 creator = container.ServiceInstanceCreator;
                 globalInstance = container.GlobalInstance as T;
                 if (container.UsesLocalInstance) CreateLocalServiceInstance(container.Instance as T);
             }
+
+            public string ServiceInstanceName => serviceInstanceName;
 
             public IServiceInstanceCreator ServiceInstanceCreator => creator;
 
@@ -88,6 +93,7 @@ namespace FeatureLoom.DependencyInversion
             }            
 
             public Type ServiceType => typeof(T);
+            public Type ServiceCreatorType => creator.ServiceType;
             object IServiceInstanceContainer.Instance => Instance;
         }
     }    

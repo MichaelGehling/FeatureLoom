@@ -23,6 +23,26 @@ namespace FeatureLoom.DependencyInversion
         }
 
         [Fact]
+        public void NamedAndUnnamedServicesWorkIndependently()
+        {
+            TestHelper.PrepareTestContext();
+
+            TestService unnamed = Service<TestService>.Get();
+            unnamed.i = 123;
+            TestService named = Service<TestService>.Get("Other");
+            Assert.Equal(123, unnamed.i);
+            Assert.Equal(0, named.i);
+
+            named.i = 987;            
+            ITestService iUnnamed = Service<ITestService>.Get();
+            Assert.Equal(123, iUnnamed.I);
+            ITestService iNamed = Service<ITestService>.Get("Other");
+            Assert.Equal(987, iNamed.I);
+            
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
+        [Fact]
         //[Fact(Skip = "Cant run in parallel")]
         public void LocalServiceInstancesAreKeptInLogicalThread()
         {
@@ -68,15 +88,23 @@ namespace FeatureLoom.DependencyInversion
             Assert.Equal(5, Service<TestService>.Instance.i);
         }
 
-        //[Fact]
-        [Fact(Skip ="Cant run in parallel")]
+        [Fact]
+        //[Fact(Skip ="Cant run in parallel")]
         public void ServicesWithDefaultConstructorDontNeedInit()
         {
-            TestHelper.PrepareTestContext();            
-                        
+            TestHelper.PrepareTestContext();
+
+            ServiceRegistry.AllowToSearchAssembly = false;
+            Assert.Throws<Exception>(() => Service<ITestService>.Instance);
+            ServiceRegistry.AllowToSearchAssembly = true;
+            Assert.NotNull(Service<ITestService>.Instance);
+
             TestService service = Service<TestService>.Instance;
             Assert.NotNull(service);
             Assert.NotNull(Service<ITestService>.Instance);
+            Assert.NotEqual(service, Service<ITestService>.Instance);
+
+            Service<ITestService>.Reset();
             Assert.Equal(service, Service<ITestService>.Instance);
 
             Assert.False(TestHelper.HasAnyLogError());
