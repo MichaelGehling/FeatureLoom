@@ -4,52 +4,38 @@ using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace FeatureLoom.MetaDatas
 {
     public class MetaData
     {
         private static ConditionalWeakTable<object, MetaData> objects = new ConditionalWeakTable<object, MetaData>();
-        private static Dictionary<long, MetaData> handles = new Dictionary<long, MetaData>();
+        private static Dictionary<long, WeakReference<MetaData>> handles = new Dictionary<long, WeakReference<MetaData>>();
         private static FeatureLock handlesLock = new FeatureLock();
         private static long handleIdCounter = 0;
-        private static Sender<ObjectHandleInfo> updateSender = new Sender<ObjectHandleInfo>();
+        private static LazyValue<Sender<ObjectHandleInfo>> updateSender;
 
         private readonly ObjectHandle handle;
         private LazyValue<Dictionary<string, object>> data;
         private readonly WeakReference<object> objRef;
         private FeatureLock objLock = new FeatureLock();
-        private Sender<MetaDataUpdateInfo> metaDataUpdateSender;
+        private LazyValue<Sender<MetaDataUpdateInfo>> metaDataUpdateSender;
 
-        public Sender<MetaDataUpdateInfo> MetaDataUpdateSender
-        {
-            get
-            {
-                if (metaDataUpdateSender == null) metaDataUpdateSender = new Sender<MetaDataUpdateInfo>();
-                return metaDataUpdateSender;
-            }
-        }
+        public static Sender<ObjectHandleInfo> UpdateSender => updateSender.Obj;
+        public Sender<MetaDataUpdateInfo> MetaDataUpdateSender => metaDataUpdateSender.Obj;
 
         public MetaData(object obj)
         {
             objRef = new WeakReference<object>(obj);
-            handle = new ObjectHandle(++handleIdCounter);
-        }
-
-        public static Sender<ObjectHandleInfo> UpdateSender
-        {
-            get
-            {
-                if (updateSender == null) updateSender = new Sender<ObjectHandleInfo>();
-                return updateSender;
-            }
-        }
+            handle = new ObjectHandle(Interlocked.Increment(ref handleIdCounter));
+        }        
 
         ~MetaData()
         {
             using (handlesLock.Lock())
             {
-                updateSender?.Send(new ObjectHandleInfo(handle, true));
+                updateSender.ObjIfExists?.Send(new ObjectHandleInfo(handle, true));
 
                 handles.Remove(handle.id);
             }
@@ -60,7 +46,7 @@ namespace FeatureLoom.MetaDatas
             using (handlesLock.LockReadOnly())
             {
                 type = default;
-                return handles.TryGetValue(handle.id, out MetaData metaData) && metaData.TryGetObjectType(out type);
+                return handles.TryGetValue(handle.id, out WeakReference<MetaData> metaDataRef) && metaDataRef.TryGetTarget(out MetaData metaData) && metaData.TryGetObjectType(out type);
             }
         }
 
@@ -121,9 +107,9 @@ namespace FeatureLoom.MetaDatas
             {
                 metaData = new MetaData(obj);
                 objects.Add(obj, metaData);
-                using (handlesLock.Lock()) handles[metaData.handle.id] = metaData;
+                using (handlesLock.Lock()) handles[metaData.handle.id] = new WeakReference<MetaData>(metaData);
 
-                updateSender?.Send(new ObjectHandleInfo(metaData.handle, false));
+                updateSender.ObjIfExists?.Send(new ObjectHandleInfo(metaData.handle, false));
 
                 return metaData;
             }
@@ -138,18 +124,14 @@ namespace FeatureLoom.MetaDatas
         {
             using (handlesLock.LockReadOnly())
             {
-                if (handles.TryGetValue(handle.id, out MetaData metaData) &&
-                   metaData.objRef.TryGetTarget(out object untyped) &&
-                   untyped is T typed)
-                {
-                    obj = typed;
-                    return true;
-                }
-                else
-                {
-                    obj = null;
-                    return false;
-                }
+                obj = null;
+                if (!handles.TryGetValue(handle.id, out WeakReference<MetaData> metaDataRef)) return false;
+                if (!metaDataRef.TryGetTarget(out MetaData metaData)) return false;
+                if (!metaData.objRef.TryGetTarget(out object untyped)) return false;
+                if (!(untyped is T typed)) return false;
+
+                obj = typed;
+                return true;
             }
         }
 
@@ -158,7 +140,7 @@ namespace FeatureLoom.MetaDatas
             var metaData = GetOrCreate(obj);
             using (metaData.objLock.Lock()) metaData.data.Obj[key] = data;
 
-            metaData.metaDataUpdateSender?.Send(new MetaDataUpdateInfo(metaData.handle, key));
+            metaData.metaDataUpdateSender.ObjIfExists?.Send(new MetaDataUpdateInfo(metaData.handle, key));
         }
 
         public static bool TryGetMetaData<D>(object obj, string key, out D data)
@@ -167,14 +149,12 @@ namespace FeatureLoom.MetaDatas
             if (!objects.TryGetValue(obj, out MetaData metaData)) return false;
             using (metaData.objLock.LockReadOnly())
             {
-                if (metaData.data.Exists &&
-                    metaData.data.Obj.TryGetValue(key, out object untypedData) &&
-                    untypedData is D typedData)
-                {
-                    data = typedData;
-                    return true;
-                }
-                else return false;
+                if (!metaData.data.Exists) return false;
+                if (!metaData.data.Obj.TryGetValue(key, out object untypedData)) return false;
+                if (!(untypedData is D typedData)) return false;
+                
+                data = typedData;
+                return true;
             }
         }
 

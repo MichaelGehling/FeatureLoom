@@ -188,9 +188,9 @@ namespace FeatureLoom.DependencyInversion
             }
         }
 
-        static TypeAndName GetTypeAndName(this IServiceInstanceContainer service) => new TypeAndName(service.ServiceType, service.ServiceInstanceName);
+        private static TypeAndName GetTypeAndName(this IServiceInstanceContainer service) => new TypeAndName(service.ServiceType, service.ServiceInstanceName);
 
-        readonly struct TypeAndName : IEquatable<TypeAndName>
+        private readonly struct TypeAndName : IEquatable<TypeAndName>
         {
             public readonly Type type;
             public readonly string name;

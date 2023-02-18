@@ -65,5 +65,7 @@ namespace FeatureLoom.MetaDatas
         {
             return !handle1.Equals(handle2);
         }
+
+        public static implicit operator ObjectHandle(long id) => new ObjectHandle(id);
     }
 }
