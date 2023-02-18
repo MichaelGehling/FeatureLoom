@@ -13,8 +13,6 @@ namespace FeatureLoom.DependencyInversion
 {
     public static class ServiceRegistry
     {
-        
-
         static Dictionary<TypeAndName, IServiceInstanceContainer> services = new Dictionary<TypeAndName, IServiceInstanceContainer>();
         static Dictionary<Type, IServiceInstanceCreator> creators = new Dictionary<Type, IServiceInstanceCreator>();
         static MicroLock registryLock = new MicroLock();
@@ -162,11 +160,10 @@ namespace FeatureLoom.DependencyInversion
         internal static bool TryGetServiceInstanceContainer<T>(string serviceInstanceName, out Service<T>.ServiceInstanceContainer instanceContainer) where T : class
         {
             instanceContainer = null;
+            var typeAndName = new TypeAndName(typeof(T), serviceInstanceName);
 
             using (registryLock.Lock())
-            {
-                var typeAndName = new TypeAndName(typeof(T), serviceInstanceName);
-
+            {                
                 if (services.TryGetValue(typeAndName, out IServiceInstanceContainer container) && container is Service<T>.ServiceInstanceContainer typedContainer)
                 {
                     instanceContainer = typedContainer;

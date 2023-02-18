@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using Newtonsoft.Json.Linq;
 using System;
@@ -62,12 +63,20 @@ namespace FeatureLoom.DependencyInversion
 
         public static T Get(string serviceInstanceName)
         {
+            if (serviceInstanceName.EmptyOrNull()) return Get();
+
             if (namedInstanceContainers.TryGetValue(serviceInstanceName, out ServiceInstanceContainer instanceContainer)) return instanceContainer.Instance;
             return HandleUninitializedGet(serviceInstanceName);
         }
 
         public static void Set(string serviceInstanceName, T serviceInstance)
         {
+            if (serviceInstanceName.EmptyOrNull())
+            {
+                Set(serviceInstance);
+                return;
+            }
+
             if (namedInstanceContainers.TryGetValue(serviceInstanceName, out ServiceInstanceContainer instanceContainer)) instanceContainer.Instance = serviceInstance;
             else HandleUninitializedSet(serviceInstance, serviceInstanceName);
         }
