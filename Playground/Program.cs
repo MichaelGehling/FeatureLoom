@@ -26,6 +26,8 @@ using FeatureLoom.Serialization;
 using FeatureLoom.TCP;
 using System.Runtime.CompilerServices;
 using FeatureLoom.TCP;
+using System.Linq;
+using FeatureLoom.MetaDatas;
 
 namespace Playground
 {
@@ -116,14 +118,18 @@ namespace Playground
 
         private static async Task Main()
         {
-            List<int> l = new List<int>(100);
+            List<int> l = new List<int>(Enumerable.Range(1, 100));            
             _ = Task.Run(() =>
             {
                 foreach(int x in l)
                 {
-                    Thread.Sleep(100);
+                    Console.Write($"{x}, ");
+                    Thread.Sleep(100);                    
                 }
             });
+            Thread.Sleep(1000);
+            
+            Console.Write($"!!!!!!!!");
             l = null;
 
             Console.ReadKey();
