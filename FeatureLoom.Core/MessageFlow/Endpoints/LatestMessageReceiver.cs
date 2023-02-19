@@ -61,7 +61,7 @@ namespace FeatureLoom.MessageFlow
                 readerWakeEvent.Set();
                 return Task.CompletedTask;
             }
-            else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
+            else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask;
         }
 
         public bool TryReceive(out T message)

@@ -190,6 +190,14 @@ namespace FeatureLoom.Synchronization
             public MicroValueLockException(string message) : base(message)
             {
             }
+
+            public MicroValueLockException() : base()
+            {
+            }
+
+            public MicroValueLockException(string message, Exception innerException) : base(message, innerException)
+            {
+            }
         }
     }
 }

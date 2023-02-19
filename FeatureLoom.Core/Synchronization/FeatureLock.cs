@@ -64,9 +64,13 @@ namespace FeatureLoom.Synchronization
         }
 
         // Predefined settings, default is the same as PerformanceSettings, but can be changed.
-        private static FeatureLockSettings defaultSettings = new FeatureLockSettings();
-        private static FeatureLockSettings performanceSettings = new FeatureLockSettings();
-        private static FeatureLockSettings fairnessSettings = new FeatureLockSettings { restrictQueueJumping = true, passiveWaitThreshold = 0, sleepWaitThreshold = 20, passiveWaitThresholdAsync = 0, sleepWaitThresholdAsync = 20 };
+        private static FeatureLockSettings defaultSettings = new();
+        private static readonly FeatureLockSettings performanceSettings = new();        
+        private static readonly FeatureLockSettings fairnessSettings = new() { restrictQueueJumping = true, 
+                                                                               passiveWaitThreshold = 0, 
+                                                                               sleepWaitThreshold = 20, 
+                                                                               passiveWaitThresholdAsync = 0, 
+                                                                               sleepWaitThresholdAsync = 20 };
         /// <summary>
         /// The settings that are used by all FeatureLock instances where settings were not explicitly set in the constructor.
         /// The DefaultSettings are the same as the prepared PerformanceSettings, but they can be changed, to affect all FeatureLock instances.
@@ -144,7 +148,7 @@ namespace FeatureLoom.Synchronization
         // The first element of a linked list of SleepHandles
         private SleepHandle queueHead = null;        
         // Used to safely manage Sleephandles
-        private MicroValueLock sleepLock = new MicroValueLock();
+        private MicroValueLock sleepLock = new();
 
         // the main lock variable, indicating current locking state:
         // 0 means no lock
@@ -283,15 +287,9 @@ namespace FeatureLoom.Synchronization
         // so it must be acquired and cannot simply be reentered.
         private ushort ReentrancyIndicator
         {
-            get
-            {
-                return lazy.Exists ? lazy.Obj.reentrancyIndicator.Obj.Value : default;
-            }
+            get { return lazy.Exists ? lazy.Obj.reentrancyIndicator.Obj.Value : default; }
 
-            set
-            {
-                lazy.Obj.reentrancyIndicator.Obj.Value = value;
-            }
+            set { lazy.Obj.reentrancyIndicator.Obj.Value = value; }
         }
 
         // True when the ReentrancyIndicator was already created
@@ -348,34 +346,22 @@ namespace FeatureLoom.Synchronization
         /// </summary>
         public bool IsLocked => lockIndicator != NO_LOCK;
 
-        /// <summary>
-        /// True if the lock is currently exclusively taken for writing
-        /// </summary>
+        /// <summary>True if the lock is currently exclusively taken for writing</summary>
         public bool IsWriteLocked => lockIndicator == WRITE_LOCK;
 
-        /// <summary>
-        /// True if the lock is currently taken for shared reading
-        /// </summary>
+        /// <summary>True if the lock is currently taken for shared reading</summary>
         public bool IsReadOnlyLocked => lockIndicator >= FIRST_READ_LOCK;
 
-        /// <summary>
-        /// In case of read-lock, it indicates the number of parallel readers
-        /// </summary>
+        /// <summary>In case of read-lock, it indicates the number of parallel readers</summary>
         public int CountParallelReadLocks => IsReadOnlyLocked ? lockIndicator : 0;
 
-        /// <summary>
-        /// True if a reentrant write lock attempt is waiting for upgrading a former reentrant read lock, but other readlocks are in place
-        /// </summary>
+        /// <summary>True if a reentrant write lock attempt is waiting for upgrading a former reentrant read lock, but other readlocks are in place</summary>
         public bool IsWriteLockWaitingForUpgrade => WaitingForUpgrade == TRUE;
 
-        /// <summary>
-        /// Lock was already taken reentrantly in the same context
-        /// </summary>
+        /// <summary>Lock was already taken reentrantly in the same context</summary>
         public bool HasValidReentrancyContext => ReentrancyIndicatorExists && ReentrancyId == ReentrancyIndicator;
 
-        /// <summary>
-        /// True if anyone is waiting to acquire the already acquired lock (Is not guaranteed to be accurate in every case)
-        /// </summary>
+        /// <summary>True if anyone is waiting to acquire the already acquired lock (Is not guaranteed to be accurate in every case)</summary>
         public bool IsAnyWaiting => firstRankTicket != 0 || IsScheduleActive;
 
         #endregion PublicProperties
@@ -586,20 +572,19 @@ namespace FeatureLoom.Synchronization
             return newLockIndicator >= FIRST_READ_LOCK && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator);
         }
 
-        // Must be called after waiting, either when the lock is acquied or when timed out
+        // Must be called after waiting, either when the lock is acquired or when timed out
         // Will reset values where necessary and calculate the average wait count
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void FinishWaiting(bool prioritized, bool acquired, int rank)
         {
             if (rank == 0) firstRankTicket = 0;
             if (prioritized) prioritizedWaiting = false;
-            if (acquired)
-            {
-                var averageWeighting = Settings.averageWeighting;
-                averageWaitCount = (ushort)(((uint)averageWaitCount * averageWeighting + waitCounter) / (averageWeighting + 1));
-                // Reset the waitCounter to 1 (not 0), so that averageWaitCount will never be 0, which would never allow PassiveWaiting and Sleeping, even with a very high rank
-                waitCounter = 1;
-            }            
+            if (!acquired) return;
+
+            var averageWeighting = Settings.averageWeighting;
+            averageWaitCount = (ushort)((((uint)averageWaitCount * averageWeighting) + waitCounter) / (averageWeighting + 1));
+            // Reset the waitCounter to 1 (not 0), so that averageWaitCount will never be 0, which would never allow PassiveWaiting and Sleeping, even with a very high rank
+            waitCounter = 1;
         }
 
         // Increases the waitCounter while avoiding a possible overflow
@@ -1150,7 +1135,7 @@ namespace FeatureLoom.Synchronization
 
         private bool TryLock_Wait(TimeSpan timeout, bool prioritized, bool readOnly)
         {
-            TimeFrame timer = new TimeFrame(timeout);
+            TimeFrame timer = new(timeout);
 
             if (prioritized) prioritizedWaiting = true;
             var ticket = GetTicket();
@@ -1202,7 +1187,7 @@ namespace FeatureLoom.Synchronization
 
         private Task<LockAttempt> TryLockAsync_Wait(LockMode mode, TimeSpan timeout, bool prioritized, bool readOnly)
         {
-            TimeFrame timer = new TimeFrame(timeout);
+            TimeFrame timer = new(timeout);
 
             if (prioritized) prioritizedWaiting = true;
             var ticket = GetTicket();
@@ -1403,7 +1388,7 @@ namespace FeatureLoom.Synchronization
         private bool WaitForUpgrade(TimeSpan timeout)
         {
             var lazyObj = lazy.Obj;
-            TimeFrame timer = new TimeFrame(timeout);
+            TimeFrame timer = new(timeout);
             // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
             if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
 
@@ -1452,7 +1437,7 @@ namespace FeatureLoom.Synchronization
         private async Task<LockAttempt> WaitForUpgradeAttemptAsync(TimeSpan timeout)
         {
             var lazyObj = lazy.Obj;
-            TimeFrame timer = new TimeFrame(timeout);
+            TimeFrame timer = new(timeout);
             // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
             if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
 
@@ -1536,7 +1521,7 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReadLock()
         {
-            int newLockIndicator = Interlocked.Decrement(ref lockIndicator);
+            Interlocked.Decrement(ref lockIndicator);
             if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
         }
 
@@ -1612,26 +1597,25 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.NoOptimization)]
         private void Upgrade(ref LockMode currentLockMode)
         {
-            if (!TryUpgrade(ref currentLockMode))
+            if (TryUpgrade(ref currentLockMode)) return;
+
+            if (currentLockMode == LockMode.ReadLock)
             {
-                if (currentLockMode == LockMode.ReadLock)
-                {
-                    ExitReadLock();
-                    Lock(true);
-                    currentLockMode = LockMode.WriteLock;
-                }
-                else if (currentLockMode == LockMode.ReadLockReenterable)
-                {
-                    ExitReentrantReadLock();
-                    LockReentrant(true);
-                    currentLockMode = LockMode.WriteLockReenterable;
-                }
-                else if (currentLockMode == LockMode.Reentered && lockIndicator >= FIRST_READ_LOCK)
-                {
-                    LockReentrant(true);
-                    currentLockMode = LockMode.Upgraded;
-                }
-            }                                    
+                ExitReadLock();
+                Lock(true);
+                currentLockMode = LockMode.WriteLock;
+            }
+            else if (currentLockMode == LockMode.ReadLockReenterable)
+            {
+                ExitReentrantReadLock();
+                LockReentrant(true);
+                currentLockMode = LockMode.WriteLockReenterable;
+            }
+            else if (currentLockMode == LockMode.Reentered && lockIndicator >= FIRST_READ_LOCK)
+            {
+                LockReentrant(true);
+                currentLockMode = LockMode.Upgraded;
+            }
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1757,7 +1741,7 @@ namespace FeatureLoom.Synchronization
         {            
             if (!IsScheduleActive) return TimeFrame.Invalid;
             
-            TimeFrame nextTriggerTimeFrame = new TimeFrame(now, (0.01 * Settings.schedulerDelayFactor).Milliseconds());
+            TimeFrame nextTriggerTimeFrame = new(now, (0.01 * Settings.schedulerDelayFactor).Milliseconds());
             var candidate = queueHead;
             if (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly)) return nextTriggerTimeFrame;
 

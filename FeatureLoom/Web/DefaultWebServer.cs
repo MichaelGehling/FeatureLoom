@@ -355,7 +355,7 @@ namespace FeatureLoom.Web
         {
             if (response.ResponseSent)
             {
-                if (result.statusCode != response.StatusCode) Log.WARNING(this.GetHandle(), $"Response was already sent, but status code of result ({result.statusCode}) and response ({response.StatusCode}) differ!");
+                if (result.statusCode != response.StatusCode) Log.WARNING(this.GetHandle(), $"Response was already sent, but status code of result ({result.statusCode.ToString()}) and response ({response.StatusCode.ToString()}) differ!");
                 if (result.data != null) Log.WARNING(this.GetHandle(), $"Response was already sent, but result contained data, that cannot be delivered!");
                 return true;
             }

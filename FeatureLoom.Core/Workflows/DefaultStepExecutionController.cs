@@ -134,14 +134,10 @@ namespace FeatureLoom.Workflows
             {
                 partialStep.waitingDelegate?.Invoke(context);
             }
-            catch (Exception e)
+            catch (Exception e) when (e.InnerOrSelf() is TaskCanceledException)
             {
-                if (e.InnerOrSelf() is TaskCanceledException)
-                {
-                    proceed = false;
-                    Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
-                }
-                else throw;
+                proceed = false;
+                Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
             }
             context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);

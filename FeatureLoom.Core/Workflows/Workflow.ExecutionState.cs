@@ -15,7 +15,7 @@
 
             public override string ToString()
             {
-                return $"ExecutionState(stateIndex: {stateIndex}, stepIndex: {stepIndex})";
+                return $"ExecutionState(stateIndex: {stateIndex.ToString()}, stepIndex: {stepIndex.ToString()})";
             }
 
             public static implicit operator ExecutionState((int stateIndex, int stepIndex) tupel) => new ExecutionState(tupel.stateIndex, tupel.stepIndex);

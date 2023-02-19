@@ -10,8 +10,6 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-
-
     public sealed class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<REQ>>, IMessageSink<IResponseMessage<RESP>>, IRequester 
     {
         TypedSourceValueHelper<IRequestMessage<REQ>> sourceHelper;

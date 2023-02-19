@@ -73,7 +73,7 @@ namespace FeatureLoom.TCP
             }
             if (writer == null) throw new Exception($"No writer is able to write message {message}!");
             if (typeInfo == null) typeInfo = Array.Empty<byte>();            
-            if (typeInfo.Length > byte.MaxValue) throw new Exception($"TypeInfo is longer than {byte.MaxValue} bytes!");
+            if (typeInfo.Length > byte.MaxValue) throw new Exception($"TypeInfo is longer than {byte.MaxValue.ToString()} bytes!");
 
             binaryWriter.Write(startMarker);
             binaryWriter.Write((byte)typeInfo.Length);

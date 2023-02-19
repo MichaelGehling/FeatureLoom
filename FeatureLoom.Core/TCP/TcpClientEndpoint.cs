@@ -216,7 +216,7 @@ namespace FeatureLoom.TCP
                     connection = null;
                 }
 
-                Log.INFO(this.GetHandle(), $"Trying to connect to {ipAddress}:{config.port}");
+                Log.INFO(this.GetHandle(), $"Trying to connect to {ipAddress}:{config.port.ToString()}");
                 TcpClient newClient = new TcpClient(ipAddress.AddressFamily);
                 await newClient.ConnectAsync(ipAddress, config.port);
                 if (newClient.Connected)
@@ -231,12 +231,12 @@ namespace FeatureLoom.TCP
             }
             catch (SocketException e)
             {
-                Log.INFO(this.GetHandle(), $"TcpConnection could not be established to target hostname {config.hostAddress} and port {config.port}! Connection will be retried!", e.ToString());
+                Log.INFO(this.GetHandle(), $"TcpConnection could not be established to target hostname {config.hostAddress} and port {config.port.ToString()}! Connection will be retried!", e.ToString());
                 connection?.Stop();
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"TcpConnection failed with target hostname {config.hostAddress} and port {config.port}, due to a general problem!", e.ToString());
+                Log.ERROR(this.GetHandle(), $"TcpConnection failed with target hostname {config.hostAddress} and port {config.port.ToString()}, due to a general problem!", e.ToString());
                 connection?.Stop();
             }
 

@@ -70,9 +70,9 @@ namespace FeatureLoom.MessageFlow
             if (message is T msgT)
             {
                 if (predicate == null || predicate(msgT)) return sourceHelper.ForwardAsync(msgT);
-                else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(msgT);
+                else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(msgT) ?? Task.CompletedTask;
             }
-            else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
+            else return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask;
         }
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)

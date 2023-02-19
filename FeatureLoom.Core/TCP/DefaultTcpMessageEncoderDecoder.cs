@@ -144,7 +144,7 @@ namespace FeatureLoom.TCP
 
                     default:
                         decodedMessage = null;
-                        Log.WARNING(this.GetHandle(), $"Unknown type byte {type} in message buffer!");
+                        Log.WARNING(this.GetHandle(), $"Unknown type byte {type.ToString()} in message buffer!");
                         return DecodingResult.Invalid;
                 }
             }

@@ -83,7 +83,7 @@ namespace FeatureLoom.MessageFlow
                 }
                 if (multiMatch) return Task.WhenAll(tasks);
             }
-            if (!success) return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
+            if (!success) return alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask;
             else return Task.CompletedTask;
         }
 

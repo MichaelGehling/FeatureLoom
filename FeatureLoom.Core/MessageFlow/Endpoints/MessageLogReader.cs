@@ -45,7 +45,7 @@ namespace FeatureLoom.MessageFlow
                 while (!CancellationToken.IsCancellationRequested && NextMessageId < messageSource.OldestAvailableId)
                 {
                     var oldest = messageSource.OldestAvailableId;
-                    Log.WARNING(handle, $"Missed messages with log Ids {NextMessageId} - {oldest - 1}");
+                    Log.WARNING(handle, $"Missed messages with log Ids {NextMessageId.ToString()} - {(oldest - 1).ToString()}");
                     NextMessageId = oldest;
                 }
 

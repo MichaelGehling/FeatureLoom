@@ -18,21 +18,21 @@ namespace FeatureLoom.Workflows
             bool hasEnd = false;
             foreach (var state in states)
             {
-                result += $"subgraph cluster_state{state.StateIndex} {{\n";
+                result += $"subgraph cluster_state{state.StateIndex.ToString()} {{\n";
                 result += $"label=\"{state.Name}\"\n";
                 var steps = state.StepInfos;
                 result += "{ rank = \"same\"\n";
-                result += $"state{state.StateIndex}_anchor [label=\"\", style=invis, width=0]\n";
+                result += $"state{state.StateIndex.ToString()}_anchor [label=\"\", style=invis, width=0]\n";
                 foreach (var step in steps)
                 {
                     string description = step.Description.TextWrap(20, "\\l") + "\\l";
-                    result += $"state{state.StateIndex}_step{step.StepIndex} [label=\"{description}\"]\n";
+                    result += $"state{state.StateIndex.ToString()}_step{step.StepIndex.ToString()} [label=\"{description}\"]\n";
                 }
                 result += "}\n";
-                result += $"state{state.StateIndex}_anchor->state{state.StateIndex}_step0[style = invis]\n";
+                result += $"state{state.StateIndex.ToString()}_anchor->state{state.StateIndex.ToString()}_step0[style = invis]\n";
                 foreach (var step in steps)
                 {
-                    result += $"state{state.StateIndex}_step{step.StepIndex}";
+                    result += $"state{state.StateIndex.ToString()}_step{step.StepIndex.ToString()}";
                     if (step.StepIndex + 1 < steps.Length) result += " -> ";
                 }
                 result += "\n";
@@ -42,21 +42,21 @@ namespace FeatureLoom.Workflows
                     var targets = step.TargetStates;
                     foreach (var target in targets)
                     {
-                        result += $"state{state.StateIndex}_step{step.StepIndex} -> state{target.StateIndex}_step0 [constraint=false]\n";
+                        result += $"state{state.StateIndex.ToString()}_step{step.StepIndex.ToString()} -> state{target.StateIndex.ToString()}_step0 [constraint=false]\n";
                     }
                     if (step.MayTerminate)
                     {
-                        result += $"state{state.StateIndex}_step{step.StepIndex} -> end\n";
+                        result += $"state{state.StateIndex.ToString()}_step{step.StepIndex.ToString()} -> end\n";
                         hasEnd = true;
                     }
                 }
             }
-            result += $"start -> state{stateMachine.StartStateInfo.StateIndex}_step0\n";
+            result += $"start -> state{stateMachine.StartStateInfo.StateIndex.ToString()}_step0\n";
             if (hasEnd) result += "end [style = invis, height=0]\n";
 
             foreach (var state in states)
             {
-                result += $"state{state.StateIndex}_anchor";
+                result += $"state{state.StateIndex.ToString()}_anchor";
                 if (state.StateIndex + 1 < states.Length) result += " -> ";
             }
             result += "[style = invis]\n";

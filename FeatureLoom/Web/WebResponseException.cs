@@ -45,5 +45,17 @@ namespace FeatureLoom.Web
             this.responseMessage = message;
             this.statusCode = statusCode;
         }
+
+        public WebResponseException() : base()
+        {
+        }
+
+        public WebResponseException(string message) : base(message)
+        {
+        }
+
+        public WebResponseException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
     }
 }
