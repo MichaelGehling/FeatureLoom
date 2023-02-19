@@ -19,7 +19,7 @@ namespace FeatureLoom.MetaDatas
         private readonly ObjectHandle handle;
         private LazyValue<Dictionary<string, object>> data;
         private readonly WeakReference<object> objRef;
-        private FeatureLock objLock;
+        private MicroLock objLock = new MicroLock();
         private LazyValue<Sender<MetaDataUpdateInfo>> metaDataUpdateSender;
 
         public static Sender<ObjectHandleInfo> UpdateSender => updateSender.Obj;
@@ -29,7 +29,6 @@ namespace FeatureLoom.MetaDatas
         {
             objRef = new WeakReference<object>(obj);
             handle = new ObjectHandle(Interlocked.Increment(ref handleIdCounter));
-            objLock = FeatureLock.GetLockFor(obj);
         }        
 
         ~MetaData()
@@ -157,12 +156,6 @@ namespace FeatureLoom.MetaDatas
                 data = typedData;
                 return true;
             }
-        }
-
-        public static FeatureLock GetLock(object obj)
-        {
-            var metaData = GetOrCreate(obj);
-            return metaData.objLock;
         }
     }
 }

@@ -19,7 +19,7 @@ namespace FeatureLoom.Synchronization
     /// Example: using(myLock.Lock()) { ... }
     /// In many scenarios the FeatureLock is faster than the build-in locks (e.g. Monitor/ReaderWriterLock for synchronous contexts
     /// and SemaphoreSlim for asynchronous contexts). Though reentrant locking in synchronous contexts using FeatureLock
-    /// is slower than with Monitor/ReaderWriterLock, but it also allows reentrancy for asynchronous contexts and even mixed contexts.
+    /// is slower than with Monitor/ReaderWriterLock, it also allows reentrancy for asynchronous contexts and even mixed contexts.
     /// </summary>
     public sealed class FeatureLock : ISchedule
     {
