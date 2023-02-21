@@ -17,7 +17,28 @@ namespace FeatureLoom.Statemachines
                 this.action = action;
             }
 
+            public State(string name, Func<T, Task<string>> action)
+            {
+                this.name = name;
+                this.action = (c, token)  => action(c);
+            }
+
+            public State(string name, Func<CancellationToken, Task<string>> action)
+            {
+                this.name = name;
+                this.action = (c, token) => action(token);
+            }
+
+            public State(string name, Func<Task<string>> action)
+            {
+                this.name = name;
+                this.action = (c, token) => action();
+            }
+
             public static implicit operator State((string name, Func<T, CancellationToken, Task<string>> action) tuple) => new State(tuple.name, tuple.action);
+            public static implicit operator State((string name, Func<T, Task<string>> action) tuple) => new State(tuple.name, tuple.action);
+            public static implicit operator State((string name, Func<CancellationToken, Task<string>> action) tuple) => new State(tuple.name, tuple.action);
+            public static implicit operator State((string name, Func<Task<string>> action) tuple) => new State(tuple.name, tuple.action);
         }
 
     }

@@ -1,10 +1,11 @@
 ﻿using FeatureLoom.MessageFlow;
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Statemachines
 {
-    public interface IStatemachineJob
+    public interface IStatemachineJob : INotifyCompletion
     {
         ExecutionState ExecutionState { get; set; }
         string CurrentStateName { get; set; }
@@ -15,6 +16,12 @@ namespace FeatureLoom.Statemachines
         Exception Exception { get; }
         IMessageSource<IStatemachineJob> UpdateSource { get; }
         bool PauseRequested { get; set; }
+
+        IStatemachineJob GetAwaiter();
+
+        bool IsCompleted { get; }
+
+        void GetResult();
     }
 
 

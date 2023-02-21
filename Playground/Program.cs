@@ -69,7 +69,6 @@ namespace Playground
 
         private static async Task Main()
         {
-
             Statemachine<Box<int>> statemachine = new Statemachine<Box<int>>(
                 ("Starting", async (c, token) =>
                 {
@@ -108,7 +107,7 @@ namespace Playground
             Console.WriteLine(job.ExecutionState.ToString());
             AppTime.Wait(2.Seconds());
             statemachine.ContinueJob(job, CancellationToken.None);
-            await job.ExecutionTask;
+            await job;
             Console.WriteLine(job.CurrentStateName);
             Console.WriteLine(job.Context);
             Console.WriteLine(job.ExecutionState.ToString());

@@ -27,6 +27,8 @@ namespace FeatureLoom.Statemachines
 
             public T Context { get; set; }
 
+            public bool IsCompleted => ExecutionTask.IsCompleted;
+
             C IStatemachineJob.GetContext<C>() where C : class
             {
                 return Context as C;
@@ -43,6 +45,16 @@ namespace FeatureLoom.Statemachines
                 if (!(context is T typedContext)) throw new ArgumentException($"Passed Context has wrong type: {typeof(C).ToString()} instead of {typeof(T).ToString()}!");
                 Context = typedContext;
             }
+
+            public void OnCompleted(Action continuation)
+            {
+                ExecutionTask.ConfigureAwait(false).GetAwaiter().OnCompleted(continuation);
+            }            
+
+            public IStatemachineJob GetAwaiter() => this;
+
+            public void GetResult() => ExecutionTask.GetAwaiter().GetResult();
+
         }
 
     }
