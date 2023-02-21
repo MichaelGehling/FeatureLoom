@@ -137,7 +137,14 @@ namespace FeatureLoom.Time
                 var timer = AppTime.TimeKeeper;
                 if (maxTimeout >= lowerAsyncSleepLimit)
                 {
-                    await Task.Delay((maxTimeout + minTimeout).Divide(2), cancellationToken);
+                    try
+                    {
+                        await Task.Delay((maxTimeout + minTimeout).Divide(2), cancellationToken);
+                    }
+                    catch(TaskCanceledException)
+                    {
+                        return;
+                    }
                     _ = timer.Elapsed;
                 }
                 while (timer.LastElapsed < minTimeout - 0.01.Milliseconds() && !cancellationToken.IsCancellationRequested)

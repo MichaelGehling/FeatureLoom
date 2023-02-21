@@ -13,7 +13,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using FeatureLoom.MessageFlow;
 using System.Text;
-using FeatureLoom.Workflows;
 using FeatureLoom.Web;
 using System.Net;
 using FeatureLoom.Storages;
@@ -26,6 +25,7 @@ using FeatureLoom.TCP;
 using System.Runtime.CompilerServices;
 using System.Linq;
 using FeatureLoom.MetaDatas;
+using FeatureLoom.Statemachines;
 
 namespace Playground
 {
@@ -37,31 +37,6 @@ namespace Playground
         }
     }
 
-
-    public class TestWF : Workflow<TestWF.SM>
-    {
-        int iterations = 10_000_000;
-        int currentIteration = -1;
-
-        public class SM : StateMachine<TestWF>
-        {
-            protected override void Init()
-            {
-                var run = State("Run");
-
-                run.Build()
-                    .Step()
-                        .Do(c => { var x = c.iterations; })
-                    .Step()
-                        .Do(c => c.currentIteration++)                                        
-                    .Step()
-                        .If(c => c.currentIteration < c.iterations)
-                            .Loop()
-                        .Else()
-                            .Finish();
-            }
-        }
-    }
 
     partial class Program
     {
@@ -82,40 +57,66 @@ namespace Playground
         static int numIterations = 10_000_000;
 
 
-        public static void TestSync()
-        {
-            var runner = new BlockingRunner();
-            var tk = AppTime.TimeKeeper;            
-            runner.RunAsync(new TestWF()).WaitFor();
-            Console.WriteLine($"TestSync: {tk.Elapsed.TotalMilliseconds}");
-        }
-
-        public static async Task TestAsync()
-        {
-            var runner = new AsyncRunner();
-            var tk = AppTime.TimeKeeper;
-            await runner.RunAsync(new TestWF());
-            Console.WriteLine($"TestAsync: {tk.Elapsed.TotalMilliseconds}");
-        }
-
-        public static async Task TestSmartAsync()
-        {
-            var runner = new SmartRunner();
-            var tk = AppTime.TimeKeeper;
-            await runner.RunAsync(new TestWF());
-            Console.WriteLine($"TestSmartAsync: {tk.Elapsed.TotalMilliseconds}");
-        }
+    
 
         public class TestConfig : Configuration
         {
             public string aaa = "Hallo";
-            public int bbb = 99;
+            public int bbb = 3;
         }
 
         
 
         private static async Task Main()
         {
+
+            Statemachine<Box<int>> statemachine = new Statemachine<Box<int>>(
+                ("Starting", async (c, token) =>
+                {
+                    Console.WriteLine($"Statemachine Starting in 1 second...");
+                    await AppTime.WaitAsync(1.Seconds(), token);
+                    return "Counting";
+                }),
+                ("Counting", async (c, token) =>
+                {
+                    Console.WriteLine($"Statemachine Finishing in {c} seconds...");
+                    await AppTime.WaitAsync(1.Seconds(), token);
+                    if (token.IsCancellationRequested) return "Starting";
+                    c.value--;
+                    if (c == 0) return "Ending";
+                    return "Counting";
+                }),
+                ("Ending", async (c, token) =>
+                {
+                    Console.WriteLine($"Statemachine Finished");
+                    return null;
+                }));
+
+            TestConfig c = new TestConfig();
+            c.bbb = 10;
+            CancellationTokenSource cts = new CancellationTokenSource();
+            var job = statemachine.CreateJob(10);
+            job.UpdateSource.ProcessMessage<IStatemachineJob>(job => Console.WriteLine($"Current State: {job.CurrentStateName} Status: {job.ExecutionState.ToString()}"));            
+            statemachine.ForceAsyncRun = false;
+            statemachine.StartJob(job, cts.Token);
+            Console.WriteLine("--------");
+            AppTime.Wait(4.Seconds());
+            cts.Cancel();
+            AppTime.Wait(1.Seconds());
+            Console.WriteLine(job.CurrentStateName);
+            Console.WriteLine(job.Context);
+            Console.WriteLine(job.ExecutionState.ToString());
+            AppTime.Wait(2.Seconds());
+            statemachine.ContinueJob(job, CancellationToken.None);
+            await job.ExecutionTask;
+            Console.WriteLine(job.CurrentStateName);
+            Console.WriteLine(job.Context);
+            Console.WriteLine(job.ExecutionState.ToString());
+
+
+
+            Console.ReadKey();
+
             List<int> l = new List<int>(Enumerable.Range(1, 100));            
             _ = Task.Run(() =>
             {
