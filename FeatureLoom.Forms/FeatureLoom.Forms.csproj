@@ -51,6 +51,7 @@
     <Compile Include="FormsExtensions.cs" />
     <Compile Include="LayoutSuspensionExtension.cs" />
     <Compile Include="RichTextBuilder.cs" />
+    <Compile Include="StatemachineApplicationContext.cs" />
     <Compile Include="TableLayoutPanelExtensions.cs" />
     <Compile Include="TooltipExtensions.cs" />
     <Compile Include="WorkflowApplicationContext.cs" />
