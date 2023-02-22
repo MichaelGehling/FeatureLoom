@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static FeatureLoom.Forms.FormsExtensions;
 
 namespace FeatureLoom.Forms
 {
@@ -38,6 +39,11 @@ namespace FeatureLoom.Forms
             {
                 workflow.ExecutionInfoSource.ConnectTo(stopWorkflowOnCloseUi);
             }
+        }
+
+        public static ApplicationContext RunAsApplicationContext(this Workflow workflow)
+        {
+            return new WorkflowApplicationContext(workflow);
         }
     }
 }

@@ -8,6 +8,7 @@ using System.Windows.Forms;
 
 namespace FeatureLoom.Forms
 {
+
     public static partial class FormsExtensions
     {
         public class WorkflowApplicationContext : ApplicationContext

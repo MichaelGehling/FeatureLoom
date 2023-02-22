@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Workflows;
+﻿using FeatureLoom.MessageFlow;
 using System;
 using System.Windows.Forms;
 
@@ -18,10 +18,7 @@ namespace FeatureLoom.Forms
             return control.Focused ? control : null;
         }
 
-        public static ApplicationContext RunAsApplicationContext(this Workflow workflow)
-        {
-            return new WorkflowApplicationContext(workflow);
-        }
+
 
         public static bool IsShown(this Form myForm)
         {
@@ -40,6 +37,12 @@ namespace FeatureLoom.Forms
         }
 
         public static ControMaskOut GetMaskOut(this Control control) => new ControMaskOut(control);
+
+        public static void HandleUiOnMessage(this IMessageSource source)
+        {
+            source.ConnectTo(new ProcessingEndpoint<object>(_ => Application.DoEvents()));
+        }
+
     }    
 
     public struct ControMaskOut : IDisposable
