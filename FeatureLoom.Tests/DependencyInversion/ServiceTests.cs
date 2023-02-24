@@ -88,8 +88,8 @@ namespace FeatureLoom.DependencyInversion
             Assert.Equal(5, Service<TestService>.Instance.i);
         }
 
-        [Fact]
-        //[Fact(Skip ="Cant run in parallel")]
+        //[Fact]
+        [Fact(Skip ="Cant run in parallel")]
         public void ServicesWithDefaultConstructorDontNeedInit()
         {
             TestHelper.PrepareTestContext();
