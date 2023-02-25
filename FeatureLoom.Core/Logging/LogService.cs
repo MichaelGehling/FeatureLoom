@@ -12,7 +12,6 @@ namespace FeatureLoom.Logging
     {
         public ConsoleLogger DefaultConsoleLogger { get; set; }
         public FileLogger DefaultFileLogger { get; set; }
-        public IWorkflowRunner LogRunner { get; set; }
 
         readonly Forwarder<LogMessage> logSink = new Forwarder<LogMessage>();
         readonly QueueForwarder<LogMessage> queueLogForwarder = new QueueForwarder<LogMessage>(1, 1000, 10, 10000, TimeSpan.Zero, true);
@@ -23,9 +22,6 @@ namespace FeatureLoom.Logging
         {
             DefaultConsoleLogger = new ConsoleLogger();
             DefaultFileLogger = new FileLogger();
-            LogRunner = new SmartRunner();
-            Service<WorkflowRunnerService>.Instance.Unregister(LogRunner);
-            _ = LogRunner.RunAsync(DefaultFileLogger);
 
             logSink.ConnectTo(queueLogForwarder);
             logSink.ConnectTo(syncLogForwarder);

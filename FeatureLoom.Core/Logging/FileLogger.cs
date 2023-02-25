@@ -10,46 +10,13 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Threading.Tasks;
+using System.ComponentModel;
+using System;
 
 namespace FeatureLoom.Logging
 {
-    public class FileLogger : Workflow<FileLogger.StateMachine>, IMessageSink
+    public class FileLogger : IMessageSink
     {
-        public class StateMachine : StateMachine<FileLogger>
-        {
-            protected override void Init()
-            {
-                var starting = State("Starting");
-                var logging = State("Logging");
-
-                starting.Build()
-                    .Step("Load Configuration")
-                        .Do(async c => await c.UpdateConfigAsync())
-                    .Step("If NewFileOnStartup is configured force archiving.")
-                        .If(c => c.config.newFileOnStartup)
-                            .Do(c => c.ArchiveCurrentLogfile())
-                    .Step("Start logging")
-                        .Goto(logging);
-
-                logging.Build("Logging")
-                    .Step("Check for config update")
-                        .Do(async c => await c.UpdateConfigAsync())
-                    .Step("Wait until receiving logMessages")
-                        .WaitFor(c => c.receiver)
-                    .Step("Write all logMessages from receiver to file")
-                        .Do(async c => await c.WriteToLogFileAsync())
-                        .CatchAndDo((c, e) => Log.ERROR(c.GetHandle(), $"{c.Name}: Writing to log file failed.", e.ToString()))
-                    .Step("Do archiving if file limit is exceeded")
-                        .If(c => c.config.logFileSizeLimitInMB * 1024 * 1024 <= c.GetLogFileSize())
-                            .Do(c => c.ArchiveCurrentLogfile())
-                        .CatchAndDo((c, e) => Log.ERROR(c.GetHandle(), $"{c.Name}: Moving log file to archive failed.", e.ToString()))
-                    .Step("Delay before next writing, if configured")
-                        .If(c => c.config.delayAfterWritingInMs > 0)
-                            .WaitFor(c => c.delayBypass, c => c.config.delayAfterWritingInMs.Milliseconds())
-                    .Step("Loop logging state")
-                        .Loop();
-            }
-        }
 
         public class Config : Configuration
         {
@@ -99,6 +66,40 @@ namespace FeatureLoom.Logging
         {
             this.config = config ?? new Config();
             this.config.TryUpdateFromStorage(false);
+            _ = Run();
+        }
+
+        async Task Run()
+        {
+            await Task.Yield();
+
+            await UpdateConfigAsync();
+            if (config.newFileOnStartup) ArchiveCurrentLogfile();
+            while(true)
+            {
+                await UpdateConfigAsync();
+                await receiver.WaitAsync();
+                try
+                {
+                    await WriteToLogFileAsync();
+                }
+                catch(Exception e)
+                {
+                    Log.ERROR(this.GetHandle(), $"Writing to log file failed.", e.ToString());
+                }
+                try
+                {
+                    if (config.logFileSizeLimitInMB * 1024 * 1024 <= GetLogFileSize()) ArchiveCurrentLogfile();
+                }
+                catch(Exception e)
+                {
+                    Log.ERROR(this.GetHandle(), $"Moving log file to archive failed.", e.ToString());
+                }
+                if (config.delayAfterWritingInMs > 0)
+                {
+                    await delayBypass.WaitAsync(config.delayAfterWritingInMs.Milliseconds());
+                }
+            }
         }
 
         private async Task UpdateConfigAsync()

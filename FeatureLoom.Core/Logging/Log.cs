@@ -14,7 +14,6 @@ namespace FeatureLoom.Logging
     {
         public static ConsoleLogger DefaultConsoleLogger { get => Service<LogService>.Instance.DefaultConsoleLogger; set => Service<LogService>.Instance.DefaultConsoleLogger = value; }
         public static FileLogger DefaultFileLogger { get => Service<LogService>.Instance.DefaultFileLogger; set => Service<LogService>.Instance.DefaultFileLogger = value; }
-        public static IWorkflowRunner LogRunner { get => Service<LogService>.Instance.LogRunner; set => Service<LogService>.Instance.LogRunner = value; }
 
         public static IMessageSink<LogMessage> LogSink => Service<LogService>.Instance.LogSink;
 
