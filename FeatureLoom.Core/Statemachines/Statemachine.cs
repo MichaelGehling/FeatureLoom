@@ -11,6 +11,19 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Statemachines
 {
+    /// <summary>
+    /// An executable statemachine.
+    /// The states for the statemachine are defined once via the constructor.
+    /// Each state has a name and a function that takes the defined context object and optionally
+    /// a cancellation token and returns the name of the resulting state or an empty string to finish.
+    /// It is possible to create many light-weight statemachine jobs that can be run
+    /// independently from each other. 
+    /// The statemachine jobs run asynchronously on the thread pool and can be paused or interruped
+    /// via the cancellation token and can be continued later.
+    /// Each state change is published via an IMessageSource as a hook to react from outside the 
+    /// statemachine (e.g. for logging).
+    /// </summary>
+    /// <typeparam name="T">The type of the context object. Can be any reference type.</typeparam>
     public sealed partial class Statemachine<T> where T : class
     {
         readonly Dictionary<string, State> _states = new Dictionary<string, State>();
