@@ -15,7 +15,7 @@ namespace FeatureLoom.Statemachines
     /// An executable statemachine.
     /// The states for the statemachine are defined once via the constructor.
     /// Each state has a name and a function that takes the defined context object and optionally
-    /// a cancellation token and returns the name of the resulting state or an empty string to finish.
+    /// a cancellation token and returns the name of the state to transition to or an empty string to finish the job.
     /// It is possible to create many light-weight statemachine jobs that can be run
     /// independently from each other. 
     /// The statemachine jobs run asynchronously on the thread pool and can be paused or interruped
@@ -28,8 +28,28 @@ namespace FeatureLoom.Statemachines
     {
         readonly Dictionary<string, State> _states = new Dictionary<string, State>();
         string _startStateName;
+        
+        /// <summary>
+        /// Even if all states run synchronous, at start the statemachine is forced to
+        /// run on another thread-pool-thread. (Default is false)
+        /// </summary>
         public bool ForceAsyncRun { get; set; } = false;
 
+        /// <summary>
+        /// An executable statemachine.
+        /// The states for the statemachine are defined once via the constructor.
+        /// Each state has a name and a function that takes the defined context object and optionally
+        /// a cancellation token and returns the name of the state to transition to or an empty string to finish the job.
+        /// It is possible to create many light-weight statemachine jobs that can be run
+        /// independently from each other. 
+        /// The statemachine jobs run asynchronously on the thread pool and can be paused or interruped
+        /// via the cancellation token and can be continued later.
+        /// Each state change is published via an IMessageSource as a hook to react from outside the 
+        /// statemachine (e.g. for logging).
+        /// </summary>
+        /// <param name="startState">The first state to be executed on start</param>
+        /// <param name="otherStates">All other states that can be reached via state transitions</param>
+        /// <exception cref="ArgumentException"></exception>
         public Statemachine(State startState, params State[] otherStates)
         {
             if (startState.name.EmptyOrNull()) throw new ArgumentException("Each state must have a unique name!");            
@@ -43,6 +63,11 @@ namespace FeatureLoom.Statemachines
             }
         }
 
+        /// <summary>
+        /// Creates a new statemachine job that can be started with StartJob()
+        /// </summary>
+        /// <param name="context">The context object, the statemachine works on.</param>
+        /// <returns></returns>
         public Job CreateJob(T context)
         {
             Job job = new Job();
@@ -53,6 +78,12 @@ namespace FeatureLoom.Statemachines
             return job;
         }
 
+        /// <summary>
+        /// Creates a new statemachine job and starts it right away from the start state
+        /// </summary>
+        /// <param name="context">The context object, the statemachine works on.</param>
+        /// <param name="cancellationToken">Allows to interrupt the statemachine job.</param>
+        /// <returns></returns>
         public Job CreateAndStartJob(T context, CancellationToken cancellationToken = default)
         {
             Job job = CreateJob(context);
@@ -60,6 +91,11 @@ namespace FeatureLoom.Statemachines
             return job;
         }
 
+        /// <summary>
+        /// Starts the job from the start state.
+        /// </summary>
+        /// <param name="job">The job to be started.</param>
+        /// <param name="cancellationToken">Allows to interrupt the statemachine job.</param>
         public void StartJob(Job job, CancellationToken cancellationToken = default)
         {
             job.CurrentStateName = _startStateName;
@@ -67,12 +103,22 @@ namespace FeatureLoom.Statemachines
             job.ExecutionTask = Run(job, false);
         }
 
+        /// <summary>
+        /// Starts the job from the start state.
+        /// </summary>
+        /// <param name="job">The job to be started.</param>
+        /// <param name="cancellationToken">Allows to interrupt the statemachine job.</param>
         public void StartJob(IStatemachineJob job, CancellationToken cancellationToken = default)
         {
             if (!(job is Job typedJob)) throw new ArgumentException("Passed job is incompatible to statemachine.");
             StartJob(typedJob, cancellationToken);
         }
 
+        /// <summary>
+        /// Continues a paused or interrupted job.
+        /// </summary>
+        /// <param name="job">The job to be continued.</param>
+        /// <param name="cancellationToken">Allows to interrupt the statemachine job.</param>
         public void ContinueJob(Job job, CancellationToken cancellationToken = default)
         {
             if (job.CurrentStateName.EmptyOrNull()) return;
@@ -80,12 +126,22 @@ namespace FeatureLoom.Statemachines
             job.ExecutionTask = Run(job, false);
         }
 
+        /// <summary>
+        /// Continues a paused or interrupted job.
+        /// </summary>
+        /// <param name="job">The job to be continued.</param>
+        /// <param name="cancellationToken">Allows to interrupt the statemachine job.</param>
         public void ContinueJob(IStatemachineJob job, CancellationToken cancellationToken = default)
         {
             if (!(job is Job typedJob)) throw new ArgumentException("Passed job is incompatible to statemachine.");
             ContinueJob(typedJob, cancellationToken);
         }
 
+        /// <summary>
+        /// Executes only a single state and pauses in the state transition.
+        /// </summary>
+        /// <param name="job">The job to be executed for one state.</param>
+        /// <param name="cancellationToken">Allows to interrupt the statemachine job.</param>
         public void ExecuteNextState(Job job, CancellationToken cancellationToken = default)
         {
             if (job.CurrentStateName.EmptyOrNull()) return;
@@ -93,6 +149,11 @@ namespace FeatureLoom.Statemachines
             job.ExecutionTask = Run(job, true);
         }
 
+        /// <summary>
+        /// Executes only a single state and pauses in the state transition.
+        /// </summary>
+        /// <param name="job">The job to be executed for one state.</param>
+        /// <param name="cancellationToken">Allows to interrupt the statemachine job.</param>
         public void ExecuteNextState(IStatemachineJob job, CancellationToken cancellationToken = default)
         {
             if (!(job is Job typedJob)) throw new ArgumentException("Passed job is incompatible to statemachine.");
