@@ -41,37 +41,14 @@ Some features are in a ready to release state, some are still in a prototype sta
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Resources\favicon.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj" />
+    <ProjectReference Include="..\FeatureLoom.Web\FeatureLoom.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="Microsoft.AspNetCore">
       <HintPath>C:\Program Files\dotnet\sdk\NuGetFallbackFolder\microsoft.aspnetcore\2.1.1\lib\netstandard2.0\Microsoft.AspNetCore.dll</HintPath>
     </Reference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="Resources.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Update="Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

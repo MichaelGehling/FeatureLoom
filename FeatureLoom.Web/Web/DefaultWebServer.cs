@@ -43,7 +43,7 @@ namespace FeatureLoom.Web
 
         public DefaultWebServer()
         {
-            favicon = Resources.favicon;
+            favicon = Resource.favicon;
             TryUpdateConfigAsync().WaitFor();
         }
 

@@ -1,0 +1,77 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0; netstandard2.1</TargetFrameworks>
+	 <LangVersion>9.0</LangVersion>
+	  <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	  <Authors>Michael Gehling</Authors>
+	  <PackageLicenseUrl></PackageLicenseUrl>
+	  <PackageProjectUrl>https://github.com/MichaelGehling/FeatureLoom</PackageProjectUrl>
+	  <PackageIconUrl></PackageIconUrl>
+	  <RepositoryUrl>https://github.com/MichaelGehling/FeatureLoom</RepositoryUrl>
+	  <Description>FeatureLoom is a C# development framework that focuses on a lean development and efficient code, speeds-up development by simplification while offering opt-in for a high level of control, promotes modular and extensible code by introducing means to easily decouple components with asynchronous communication, strives for high performance and a small memory footprint, equally supports synchronous and asynchronous programming to allow the right approach at the right time.</Description>
+	  <NeutralLanguage>en</NeutralLanguage>
+	  <Version>0.3.6-alpha</Version>
+	  <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+	  <PackageTags>c#, state machine, data flow, messaging, communication, extensions, workflow, embedded webserver</PackageTags>
+	  <PackageReleaseNotes>
+		  FeauterLoom is currently in a mixed state.
+		  Some features are in a ready to release state, some are still in a prototype state.
+	  </PackageReleaseNotes>
+	  <Copyright>Copyright (c) 2020 Michael Gehling</Copyright>
+	  <AssemblyVersion></AssemblyVersion>
+	  <FileVersion></FileVersion>
+	  <PackageIcon>FeatureLoom_128.png</PackageIcon>
+	  <PackageLicenseFile>LICENSE</PackageLicenseFile>
+	  <IncludeSymbols>true</IncludeSymbols>
+	  <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	  <ApplicationIcon>favicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+
+	<ItemGroup>
+		<Compile Remove="wwwroot\**" />
+		<EmbeddedResource Remove="wwwroot\**" />
+		<None Remove="wwwroot\**" />
+		<None Include="..\LICENSE">
+			<Pack>True</Pack>
+			<PackagePath></PackagePath>
+		</None>
+		<None Include="..\Resources\FeatureLoom_128.png" Link="FeatureLoom_128.png">
+			<PackagePath></PackagePath>
+			<Pack>True</Pack>
+		</None>
+	</ItemGroup>
+	
+  <ItemGroup>
+    <None Remove="Resources\favicon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\favicon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Resource.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resource.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Resource.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resource.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
