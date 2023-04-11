@@ -5,6 +5,50 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Time
 {
+
+    public static class AppTimeExtensions
+    {
+        public static void Wait(this IAppTime appTime, TimeSpan minTimeout, TimeSpan maxTimeout)
+        {
+            appTime.Wait(minTimeout, maxTimeout, CancellationToken.None);
+        }
+
+        public static void Wait(this IAppTime appTime, TimeSpan timeout)
+        {
+            appTime.Wait(timeout, timeout, CancellationToken.None);
+        }
+
+        public static void Wait(this IAppTime appTime, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            appTime.Wait(timeout, timeout, cancellationToken);
+        }
+
+        public static Task WaitAsync(this IAppTime appTime, TimeSpan minTimeout, TimeSpan maxTimeout)
+        {
+            return appTime.WaitAsync(minTimeout, maxTimeout, CancellationToken.None);
+        }
+
+        public static Task WaitAsync(this IAppTime appTime, TimeSpan timeout)
+        {
+            return appTime.WaitAsync(timeout, timeout, CancellationToken.None);
+        }
+
+        public static Task WaitAsync(this IAppTime appTime, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            return appTime.WaitAsync(timeout, timeout, cancellationToken);
+        }
+
+        public static DateTime LocalNow(this IAppTime appTime)
+        {
+            return appTime.Now.ToLocalTime();
+        }
+
+        public static DateTime LocalCoarseNow(this IAppTime appTime)
+        {
+            return appTime.CoarseNow.ToLocalTime();
+        }               
+    }
+
     public class AppTimeService : IAppTime
     {
         private Stopwatch stopWatch = new Stopwatch();
@@ -12,7 +56,7 @@ namespace FeatureLoom.Time
         private int coarseMillisecondCountBase;
         private TimeSpan lowerSleepLimit = 16.Milliseconds();
         private TimeSpan lowerAsyncSleepLimit = 16.Milliseconds();
-        private DateTime unixTimeBase = new DateTime(1970, 1, 1);
+        private static readonly DateTime unixTimeBase = new DateTime(1970, 1, 1);
 
         public AppTimeService()
         {
@@ -69,21 +113,6 @@ namespace FeatureLoom.Time
             return coarseTimeBase;
         }
 
-        public void Wait(TimeSpan minTimeout, TimeSpan maxTimeout)
-        {
-            Wait(minTimeout, maxTimeout, CancellationToken.None);            
-        }
-
-        public void Wait(TimeSpan timeout)
-        {
-            Wait(timeout, timeout, CancellationToken.None);
-        }
-
-        public void Wait(TimeSpan timeout, CancellationToken cancellationToken)
-        {
-            Wait(timeout, timeout, cancellationToken);
-        }
-
         public void Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
         {
             if (minTimeout.Ticks <= 1 || cancellationToken.IsCancellationRequested) return;
@@ -113,24 +142,10 @@ namespace FeatureLoom.Time
             while (timer.Elapsed < minTimeout && !cancellationToken.IsCancellationRequested) Thread.Sleep(0);
         }
 
-        public Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout)
-        {            
-            return WaitAsync(minTimeout, maxTimeout, CancellationToken.None);
-        }
-
-        public Task WaitAsync(TimeSpan timeout)
-        {
-            return WaitAsync(timeout, timeout, CancellationToken.None);
-        }
-
-        public Task WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
-        {
-            return WaitAsync(timeout, timeout, cancellationToken);
-        }
 
         public async Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
         {            
-            if (minTimeout.Ticks <= 5) Wait(minTimeout, maxTimeout);
+            if (minTimeout.Ticks <= 5) this.Wait(minTimeout, maxTimeout);
             else
             {
                 var timer = TimeKeeper;
