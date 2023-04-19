@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Extensions;
+﻿using FeatureLoom.Core.Collections;
+using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.MessageFlow;
 using FeatureLoom.Synchronization;
@@ -21,14 +22,14 @@ namespace FeatureLoom.Mappers
             var newMappingConverter = new MappingConverter<Tin, Tout>(convertFunc);
             using (mappingConvertersLock.Lock())
             {
-                LazyValue<List<WeakReference<DynamicMultiMappingConverter>>> invalidRefs = new LazyValue<List<WeakReference<DynamicMultiMappingConverter>>>();
+                LazyList<WeakReference<DynamicMultiMappingConverter>> invalidRefs = new LazyList<WeakReference<DynamicMultiMappingConverter>>();
                 if (mappingConverters.TryGetValue(typeof(Tin), out var oldMappingConverter))
                 {
                     mappingConverters[typeof(Tin)] = newMappingConverter;                    
                     foreach (var multiMappingConverterRef in multiMappingConverters)
                     {
                         if (multiMappingConverterRef.TryGetTarget(out var multiMappingConverter)) multiMappingConverter.CheckToReplaceConverter(oldMappingConverter, newMappingConverter);
-                        else invalidRefs.Obj.Add(multiMappingConverterRef);
+                        else invalidRefs.Add(multiMappingConverterRef);
                     }
                 }
                 else
@@ -37,16 +38,13 @@ namespace FeatureLoom.Mappers
                     foreach (var multiMappingConverterRef in multiMappingConverters)
                     {
                         if (multiMappingConverterRef.TryGetTarget(out var multiMappingConverter))  multiMappingConverter.CheckToAddNewConverter(newMappingConverter);
-                        else invalidRefs.Obj.Add(multiMappingConverterRef);
+                        else invalidRefs.Add(multiMappingConverterRef);
                     }
                 }
 
-                if(invalidRefs.Exists)
+                foreach(var invalidRef in invalidRefs)
                 {
-                    foreach(var invalidRef in invalidRefs.Obj)
-                    {
-                        multiMappingConverters.Remove(invalidRef);
-                    }
+                    multiMappingConverters.Remove(invalidRef);
                 }
             }
         }
@@ -55,23 +53,20 @@ namespace FeatureLoom.Mappers
         {
             using (mappingConvertersLock.Lock())
             {
-                LazyValue<List<WeakReference<DynamicMultiMappingConverter>>> invalidRefs = new LazyValue<List<WeakReference<DynamicMultiMappingConverter>>>();
+                LazyList<WeakReference<DynamicMultiMappingConverter>> invalidRefs = new LazyList<WeakReference<DynamicMultiMappingConverter>>();
                 if (mappingConverters.TryGetValue(conversionInputType, out var oldMappingConverter))
                 {
                     mappingConverters.Remove(conversionInputType);
                     foreach (var multiMappingConverterRef in multiMappingConverters)
                     {
                         if (multiMappingConverterRef.TryGetTarget(out var multiMappingConverter)) multiMappingConverter.CheckToRemoveConverter(oldMappingConverter);
-                        else invalidRefs.Obj.Add(multiMappingConverterRef);
+                        else invalidRefs.Add(multiMappingConverterRef);
                     }
                 }
 
-                if (invalidRefs.Exists)
+                foreach (var invalidRef in invalidRefs)
                 {
-                    foreach (var invalidRef in invalidRefs.Obj)
-                    {
-                        multiMappingConverters.Remove(invalidRef);
-                    }
+                    multiMappingConverters.Remove(invalidRef);
                 }
             }
         }
