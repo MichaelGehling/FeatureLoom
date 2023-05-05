@@ -69,6 +69,7 @@ namespace Playground
 
         private static async Task Main()
         {
+
             Log.INFO("InfoTest");
             Log.ERROR("ErrorTest");
             Console.ReadKey();

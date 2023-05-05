@@ -1737,7 +1737,7 @@ namespace FeatureLoom.Synchronization
         #region Scheduling        
 
         string ISchedule.Name => "FeatureLock";
-        TimeFrame ISchedule.Trigger(DateTime now)
+        ScheduleStatus ISchedule.Trigger(DateTime now)
         {            
             if (!IsScheduleActive) return TimeFrame.Invalid;
             

@@ -7,18 +7,18 @@ namespace FeatureLoom.Scheduling
 {
     public class ActionSchedule: ISchedule 
     {
-        private Func<DateTime, TimeFrame> triggerAction;
+        private Func<DateTime, ScheduleStatus> triggerAction;
         string name;
 
         public string Name => name;
 
-        public ActionSchedule(string name, Func<DateTime, TimeFrame> triggerAction)
+        public ActionSchedule(string name, Func<DateTime, ScheduleStatus> triggerAction)
         {
             this.triggerAction = triggerAction;
             this.name = name;
         }        
 
-        public TimeFrame Trigger(DateTime now)
+        public ScheduleStatus Trigger(DateTime now)
         {
             return triggerAction(now);            
         }

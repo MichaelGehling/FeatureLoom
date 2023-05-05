@@ -21,6 +21,12 @@ namespace FeatureLoom.Time
             return lastTimeSample;
         }
 
+        private DateTime GetTime(TimeSpan duration)
+        {
+            lastTimeSample = duration >= 1.Seconds() ? AppTime.CoarseNow : AppTime.Now;
+            return lastTimeSample;
+        }
+
         public TimeFrame(TimeSpan duration)
         {
             this.utcStartTime = default;
@@ -67,6 +73,24 @@ namespace FeatureLoom.Time
             else
             {
                 this.utcEndTime = startTime.ToUniversalTime();
+                this.utcStartTime = utcEndTime + duration;
+            }
+        }
+
+        public TimeFrame(TimeSpan delay, TimeSpan duration)
+        {
+            this.utcStartTime = default;
+            this.utcEndTime = default;
+            lastTimeSample = default;
+
+            if (duration >= TimeSpan.Zero)
+            {
+                this.utcStartTime = GetTime(duration) + delay;
+                this.utcEndTime = utcStartTime + duration;
+            }
+            else
+            {
+                this.utcEndTime = GetTime(duration) + delay;
                 this.utcStartTime = utcEndTime + duration;
             }
         }

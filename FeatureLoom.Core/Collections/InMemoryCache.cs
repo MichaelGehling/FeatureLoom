@@ -224,7 +224,7 @@ namespace FeatureLoom.Collections
             });
         }
 
-        TimeFrame ISchedule.Trigger(DateTime now)
+        ScheduleStatus ISchedule.Trigger(DateTime now)
         {
             TimeSpan remaining = now - (lastCleanUp + settings.cleanUpPeriodeInSeconds.Seconds());
             if (remaining < 1.Seconds())

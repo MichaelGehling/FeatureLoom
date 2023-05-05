@@ -1,0 +1,32 @@
+﻿using FeatureLoom.Time;
+using System;
+
+namespace FeatureLoom.Scheduling
+{
+    public readonly struct ScheduleStatus
+    {
+        public static readonly ScheduleStatus Terminated = new ScheduleStatus();
+        
+        private readonly TimeFrame timeFrame;
+
+        public ScheduleStatus(TimeFrame timeFrame)
+        {
+            this.timeFrame = timeFrame;
+        }
+
+        public ScheduleStatus(TimeSpan minDelay, TimeSpan maxDelay)
+        {            
+            this.timeFrame = new TimeFrame(minDelay, maxDelay - minDelay);
+        }
+
+        public ScheduleStatus(DateTime earliestTriggerTime, DateTime latestTriggerTime)
+        {
+            this.timeFrame = new TimeFrame(earliestTriggerTime, latestTriggerTime);
+        }
+
+        public bool IsTerminated => timeFrame.IsInvalid;
+        public TimeFrame ExecutionTimeFrame => timeFrame;
+
+        public static implicit operator ScheduleStatus(TimeFrame timeFrame) => new ScheduleStatus(timeFrame);
+    }
+}

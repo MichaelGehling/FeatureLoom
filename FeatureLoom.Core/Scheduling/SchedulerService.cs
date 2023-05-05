@@ -113,15 +113,15 @@ namespace FeatureLoom.Scheduling
             {
                 if (!schedule.TryGetSchedule(out var sv)) continue;
 
-                if (schedule.nextTriggerTimeFrame.Started(now))
+                if (schedule.scheduleStatus.ExecutionTimeFrame.Started(now))
                 {
-                    schedule.nextTriggerTimeFrame = sv.Trigger(now);                     
-                    if (schedule.nextTriggerTimeFrame.IsInvalid) continue;
+                    schedule.scheduleStatus = sv.Trigger(now);                     
+                    if (schedule.scheduleStatus.IsTerminated) continue;
                 }
 
                 triggeredSchedules.Add(schedule);
-                triggerTimeFrame = new TimeFrame(triggerTimeFrame.utcStartTime.TheEarlierOne(schedule.nextTriggerTimeFrame.utcStartTime), 
-                                                 triggerTimeFrame.utcEndTime.TheEarlierOne(schedule.nextTriggerTimeFrame.utcEndTime));
+                triggerTimeFrame = new TimeFrame(triggerTimeFrame.utcStartTime.TheEarlierOne(schedule.scheduleStatus.ExecutionTimeFrame.utcStartTime), 
+                                                 triggerTimeFrame.utcEndTime.TheEarlierOne(schedule.scheduleStatus.ExecutionTimeFrame.utcEndTime));
             }
             triggerTimeFrame = new TimeFrame(triggerTimeFrame.utcStartTime.TheLaterOne(now + minimumDelay), triggerTimeFrame.utcEndTime);
             return triggerTimeFrame;
@@ -182,7 +182,7 @@ namespace FeatureLoom.Scheduling
         {
             WeakReference<ISchedule> scheduleRef;
             string name;
-            public TimeFrame nextTriggerTimeFrame;
+            public ScheduleStatus scheduleStatus;
             public string Name => name;
 
 
