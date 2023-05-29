@@ -70,6 +70,8 @@ namespace Playground
         private static async Task Main()
         {
 
+            JsonTest.Run();
+
             Log.INFO("InfoTest");
             Log.ERROR("ErrorTest");
             Console.ReadKey();
