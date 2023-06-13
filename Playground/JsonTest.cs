@@ -24,6 +24,13 @@ namespace Playground
         private double privBase = 0.77;
         protected int protBase = 1;
         public int pubBase = 2;
+
+        public virtual void Mutate()
+        {
+            privBase = privBase * 2;
+            protBase = protBase * 2;
+            pubBase = pubBase * 2;
+        }
     }
 
     public class TestDto : BaseDto
@@ -46,6 +53,17 @@ namespace Playground
             myEmbeddedDict["2"] = new MyEmbedded2();
         }
         public TestDto() { }
+
+        public override void Mutate()
+        {
+            base.Mutate();
+
+            privInt = privInt * 2;
+            myInt = myInt * 2;
+            myString += "*";
+            myEmbedded = new MyEmbedded1() { x = 42 };
+
+        }
     }
 
     public interface IMyInterface

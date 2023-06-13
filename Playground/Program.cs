@@ -69,6 +69,13 @@ namespace Playground
 
         private static async Task Main()
         {
+            TestDto orig = new TestDto();
+            orig.Mutate();
+            orig.TryClone(out var clone);
+
+
+
+
 
             JsonTest.Run();
 
