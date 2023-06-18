@@ -36,6 +36,7 @@ namespace FeatureLoom.Logging
 
         public void Post<M>(in M message)
         {
+            if (message == null) return;
             if (!hasConsole) return;
 
             config.TryUpdateFromStorage(true);
@@ -47,8 +48,8 @@ namespace FeatureLoom.Logging
                     string strMsg;
                     using (stringBuilderLock.Lock())
                     {
-                        strMsg = logMessage.PrintToStringBuilder(stringBuilder, config.format, config.timeStampFormat).ToString();
-                        stringBuilder.Clear();
+                        strMsg = logMessage.PrintToStringBuilder(stringBuilder, config?.format, config?.timeStampFormat).ToString();
+                        stringBuilder?.Clear();
                     }
 
                     ConsoleHelper.UseLocked(() =>

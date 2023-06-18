@@ -59,7 +59,7 @@ namespace FeatureLoom.Logging
                 shortText,
                 threadId.ToString(),
                 contextHandle.ToString(),
-                sourceFile.ToString(),
+                sourceFile,
                 sourceLine.ToString(),
                 caller,
                 detailText);

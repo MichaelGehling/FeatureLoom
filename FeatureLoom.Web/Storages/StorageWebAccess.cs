@@ -5,8 +5,10 @@ using FeatureLoom.Serialization;
 using FeatureLoom.Web;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace FeatureLoom.Storages
 {
@@ -17,11 +19,28 @@ namespace FeatureLoom.Storages
             public bool allowChange = false;
             public bool allowRead = true;
             public bool allowReadUrls = true;
-            public bool applyFilter = false;
-            public List<string> filterWildcards = new List<string>();
-            public string category = "wwwroot";            
+            public string category = "wwwroot";
+            public string defaultContentType = "application/octet-stream";
+            public Dictionary<string, string> fileEndingToContentType = new Dictionary<string, string>()
+            {
+                {"html", "text/html"},
+                {"htm", "text/html"},
+                {"json", "application/json"},
+                {"css", "text/css"},
+                {"js", "text/js"},
+                {"txt", "text/plain"},
+                {"xml", "application/xml"},
+                {"pdf", "application/pdf"},
+                {"jpg", "image/jpeg"},
+                {"jpeg", "image/jpeg"},
+                {"png", "image/png"},
+                {"gif", "image/gif"},
+                {"mp3", "audio/mpeg"},
+                {"wav", "audio/wav"},
+                {"mp4", "video/mp4"},
+                {"mpeg", "video/mpeg"}
+            };
         }
-
         private Config config;
 
         private IStorageReader reader;
@@ -30,7 +49,7 @@ namespace FeatureLoom.Storages
 
         public StorageWebAccess(string route, Config config = null)
         {
-            this.config = config ?? new Config();
+            this.config = config ?? new Config(){};            
             this.config.TryUpdateFromStorage(false);
 
             route = route.TrimEnd("/");
@@ -134,11 +153,28 @@ namespace FeatureLoom.Storages
 
         private async Task<HandlerResult> ReadAsync(IWebRequest request, IWebResponse response)
         {
+            string uri = request.RelativePath.Replace("%20", " ").TrimChar('/');
+
             if (typeof(T).IsAssignableFrom(typeof(string)) ||
                 typeof(T).IsAssignableFrom(typeof(byte[])))
             {
+                int endingStart = uri.LastIndexOf('.') + 1;
+                string ending = "";
+                if (endingStart > 0 && endingStart < uri.Length) ending = uri.Substring(endingStart);
+
+                if (config.fileEndingToContentType != null &&
+                    config.fileEndingToContentType.TryGetValue(ending, out string contentType))
+                {
+                    response.ContentType = contentType;
+                }
+                else if (config.defaultContentType != null)
+                {
+                    response.ContentType = config.defaultContentType;
+                }
+
                 response.StatusCode = HttpStatusCode.OK;
-                if (await reader.TryReadAsync(request.RelativePath.Replace("%20", " ").TrimChar('/'), s => s.CopyToAsync(response.Stream)))
+
+                if (await reader.TryReadAsync(uri, s => s.CopyToAsync(response.Stream)))
                 {
                     return HandlerResult.Handled_OK();
                 }
@@ -149,7 +185,9 @@ namespace FeatureLoom.Storages
             }
             else
             {
-                if ((await reader.TryReadAsync<T>(request.RelativePath.Replace("%20", " ").TrimChar('/'))).TryOut(out T obj))
+                response.ContentType = config.defaultContentType ?? "application/json";
+
+                if ((await reader.TryReadAsync<T>(uri)).TryOut(out T obj))
                 {
                     return HandlerResult.Handled_OK(obj);
                 }
