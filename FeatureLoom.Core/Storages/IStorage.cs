@@ -16,7 +16,7 @@ namespace FeatureLoom.Storages
 
         Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer);
 
-        Task<(bool, string[])> TryListUrisAsync(string pattern = null);
+        Task<(bool, string[])> TryListUrisAsync(string uriPattern = null);
 
         bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink);
 
@@ -38,5 +38,31 @@ namespace FeatureLoom.Storages
         Task<bool> TryDeleteAsync(string uri);
 
         bool Exists(string uri);
+    }
+
+    public interface IStorage
+    {
+        string Category { get; }
+
+        bool Exists(string uri);
+
+        Task<(bool, string[])> TryListUrisAsync(string uriPattern = null);
+    }
+
+    public interface IStorageObjectWriter<T> : IStorage
+    {
+        Task<bool> TryWriteAsync(string uri, T data);
+
+        Task<bool> TryDeleteAsync(string uri);
+    }
+
+    public interface IStorageObjectReader<T> : IStorage
+    {
+        Task<(bool, T)> TryReadAsync(string uri);
+    }
+
+    public interface IStorageObjectLogger<T, K> : IStorage where K : IComparable<K>
+    {
+        Task<(bool, K)> TryLogAsync(string uri, T data);
     }
 }

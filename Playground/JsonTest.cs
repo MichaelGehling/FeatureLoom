@@ -221,22 +221,26 @@ namespace Playground
                 IncludeFields = true
             };
 
+            int iterations = 1_000_000;
+
             object testDto = new TestDto(99, "World", new MyEmbedded1());
             string json;
             var tk = AppTime.TimeKeeper;
-            for (int i = 0; i < 2_000_000; i++)
+            for (int i = 0; i < iterations; i++)
             {
                 json = JsonSerializer.Serialize(testDto, opt);
             }
             Console.WriteLine(tk.Elapsed);
+            Thread.Sleep(1000);
             tk.Restart();
-            for (int i = 0; i < 2_000_000; i++)
+            for (int i = 0; i < iterations; i++)
             {
                 json = FeatureLoom.Serialization.Json.SerializeToJson(testDto);
             }
             Console.WriteLine(tk.Elapsed);
+            Thread.Sleep(1000);
             tk.Restart();
-            for (int i = 0; i < 2_000_000; i++)
+            for (int i = 0; i < iterations; i++)
             {
                 json = MyJsonSerializer.Serialize<object>(testDto);
             }

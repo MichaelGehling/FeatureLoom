@@ -6,11 +6,11 @@ namespace FeatureLoom.Extensions
 {
     public static class ByteArrayExtensions
     {
-        public static T[] Slice<T>(this T[] data, int offset, int count)
+        public static T[] CopySection<T>(this T[] data, int offset, int count)
         {
-            T[] slice = new T[count];
-            Buffer.BlockCopy(data, offset, slice, 0, count);
-            return slice;
+            T[] section = new T[count];
+            Buffer.BlockCopy(data, offset, section, 0, count);
+            return section;
         }
 
         public static int FindPatternPos(this byte[] buffer, byte[] pattern)
