@@ -651,7 +651,7 @@ namespace FeatureLoom.Storages
 
                 if (TrySerialize(data, out string fileContent))
                 {
-                    // TODO: Update Cache etc.
+                    cache?.Remove(uri);
 
                     using (var stream = fileInfo.AppendText())
                     {
@@ -678,7 +678,7 @@ namespace FeatureLoom.Storages
                 FileInfo fileInfo = new FileInfo(filePath);
                 fileInfo.Directory.Create();
 
-                // TODO: Update Cache etc.
+                cache?.Remove(uri);
 
                 using (var stream = fileInfo.OpenWrite())
                 {

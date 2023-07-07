@@ -59,7 +59,7 @@ namespace FeatureLoom.TCP
             
             if (reader == null)
             {
-                byte[] bytes = memoryStream.GetBuffer().Slice((int)memoryStream.Position, messageLength);
+                byte[] bytes = memoryStream.GetBuffer().CopySection((int)memoryStream.Position, messageLength);
                 memoryStream.Position = messageEndPos;
                 return bytes;
             }
