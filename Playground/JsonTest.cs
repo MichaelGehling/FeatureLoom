@@ -42,7 +42,7 @@ namespace Playground
     {
         private int privInt = 42;
         public int myInt = 123;
-        public string myString = "Hello";
+        public string myString = "Hello: \\, \", \\, \n";
         public IMyInterface myEmbedded;
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
         public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
@@ -205,7 +205,13 @@ namespace Playground
         }
 
         private static void SerializeValue(object obj, Type expectedType, StringBuilder sb, Settings settings)
-        {            
+        {
+            if (obj == null)
+            {
+                sb.Append("null");
+                return;
+            }
+
             Type objType = obj.GetType();
 
             bool deviatingType = expectedType != obj.GetType();
@@ -219,7 +225,7 @@ namespace Playground
             else if (obj is string str)
             {
                 PrepareUnexpectedValue();
-                sb.Append("\"").Append(str).Append("\"");
+                sb.Append('\"').WriteEscapedString(str).Append('\"');
                 FinishUnexpectedValue();
             }
             else if (obj is IEnumerable items && (obj is ICollection || objType.ImplementsGenericInterface(typeof(ICollection<>))))
@@ -234,7 +240,7 @@ namespace Playground
             {
                 if (settings.addAllTypeInfo || (settings.addDeviatingTypeInfo && deviatingType))
                 {
-                    sb.Append("{")
+                    sb.Append('{')
                     .Append("\"$Type\":\"").Append(objType.FullName).Append("\",")
                     .Append("\"$Value\":");
                 }
@@ -274,15 +280,15 @@ namespace Playground
                 Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>));
                 collectionType = collectionType ?? typeof(object);
 
-                sb.Append("[");
+                sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(",");
+                    else sb.Append(',');
                     SerializeValue(item, collectionType, sb, settings);
                 }
-                sb.Append("]");
+                sb.Append(']');
             }
         }
 
@@ -297,13 +303,13 @@ namespace Playground
             }
 
             bool isFirstField = true;
-            sb.Append("{");
+            sb.Append('{');
 
             bool deviatingType = expectedType != obj.GetType();
             if (settings.addAllTypeInfo || (settings.addDeviatingTypeInfo && deviatingType))
             {
                 if (isFirstField) isFirstField = false;
-                sb.Append($"\"$Type\":\"").Append(objType.FullName).Append("\"");
+                sb.Append($"\"$Type\":\"").Append(objType.FullName).Append('\"');
             }
 
             List<FieldInfo> fields;
@@ -334,7 +340,7 @@ namespace Playground
             foreach (var field in fields)
             {
                 if (isFirstField) isFirstField = false;
-                else sb.Append(",");
+                else sb.Append(',');
 
                 Action<object, FieldInfo, StringBuilder, Settings> writer;
                 using (var lockHandle = fieldInfosLock.LockReadOnly())
@@ -389,28 +395,28 @@ namespace Playground
 
         private static void SerializePrimitiveCollection<T>(IEnumerable<T> items, StringBuilder sb)
         {
-            sb.Append("[");
+            sb.Append('[');
             bool isFirstItem = true;
             foreach (var item in items)
             {
                 if (isFirstItem) isFirstItem = false;
-                else sb.Append(",");
+                else sb.Append(',');
                 sb.Append(item.ToString());
             }
-            sb.Append("]");
+            sb.Append(']');
         }
 
         private static void SerializeStringCollection(IEnumerable<string> items, StringBuilder sb)
         {
-            sb.Append("[");
+            sb.Append('[');
             bool isFirstItem = true;
             foreach (var item in items)
             {
                 if (isFirstItem) isFirstItem = false;
-                else sb.Append(",");
-                sb.Append("\"").Append(item).Append("\"");
+                else sb.Append(',');
+                sb.Append('\"').WriteEscapedString(item).Append('\"');
             }
-            sb.Append("]");
+            sb.Append(']');
         }
 
         private static Action<object, FieldInfo, StringBuilder, Settings> CreateFieldWriter<T>(Type objType, FieldInfo field)
@@ -439,9 +445,9 @@ namespace Playground
 
             Action<object, FieldInfo, StringBuilder, Settings> writer = (obj, field, sb, settings) =>
             {
-                sb.Append(fieldName).Append("\"");
+                sb.Append(fieldName).Append('\"');
                 var value = (string)field.GetValue(obj);
-                sb.Append(value).Append("\"");
+                sb.WriteEscapedString(value).Append('\"');
             };
 
             return writer;
@@ -455,15 +461,15 @@ namespace Playground
             {
                 IEnumerable<T> items = (IEnumerable<T>)field.GetValue(obj);
                 sb.Append(fieldName);
-                sb.Append("[");
+                sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(",");
+                    else sb.Append(',');
                     sb.Append(item.ToString());
                 }
-                sb.Append("]");
+                sb.Append(']');
             };
 
             return writer;
@@ -477,15 +483,15 @@ namespace Playground
             {
                 IEnumerable<string> items = (IEnumerable<string>)field.GetValue(obj);
                 sb.Append(fieldName);
-                sb.Append("[");
+                sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(",");
-                    sb.Append("\"").Append(item).Append("\"");
+                    else sb.Append(',');
+                    sb.Append('\"').WriteEscapedString(item).Append('\"');
                 }
-                sb.Append("]");
+                sb.Append(']');
             };
 
             return writer;
@@ -518,20 +524,41 @@ namespace Playground
             {
                 IEnumerable items = (IEnumerable)field.GetValue(obj);
                 sb.Append(fieldName);
-                sb.Append("[");
+                sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(",");
+                    else sb.Append(',');
                     SerializeValue(item, collectionType, sb, settings);
                 }
-                sb.Append("]");
+                sb.Append(']');
             };
 
             return writer;
         }
+
+        private static StringBuilder WriteEscapedString(this StringBuilder sb, string str)
+        {
+            foreach (char c in str)
+            {
+                switch (c)
+                {
+                    case '\"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\b': sb.Append("\\b"); break;
+                    case '\f': sb.Append("\\f"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default: sb.Append(c); break;
+                }
+            }
+            return sb;
+        }
     }
+
+
 
     
 
@@ -546,7 +573,8 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            object testDto = new TestDto(99, "World", new MyEmbedded1());
+            //object testDto = new TestDto(99, "World", new MyEmbedded1());
+            object testDto = new TestDto();
             string json;
             var tk = AppTime.TimeKeeper;
             for (int i = 0; i < iterations; i++)
