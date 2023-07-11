@@ -71,7 +71,7 @@ namespace Playground
         {
             TestDto orig = new TestDto();
             orig.Mutate();
-            orig.TryClone(out var clone);
+            //orig.TryClone(out var clone);
 
 
 

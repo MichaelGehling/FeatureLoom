@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Serialization;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -32,47 +33,75 @@ namespace FeatureLoom.Extensions
             return e.InnerException ?? e;
         }
 
-        public static bool TryClone<T>(this T obj, out T clone) where T : class
-        {
-            clone = obj;
-
+        public static bool TryClone<T>(this T obj, out T clone)
+        {            
+            clone = default;
             if (obj == null) return true;
 
             Type type = obj.GetType();
-            var constructors = type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            foreach(var c in constructors)
+
+            if (type.IsPrimitive)
             {
-                if (c.GetParameters().Length == 0)
+                clone = obj;
+                return true;
+            }
+
+            if (obj == null)
+            {
+                clone = default;
+                return true;
+            }
+
+            if (obj is ICollection)
+            {
+                throw new NotImplementedException();
+            }
+            else
+            {
+
+                bool constructorFound = false;
+                var constructors = type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (var c in constructors)
                 {
-                    clone = (T)c.Invoke(Array.Empty<object>());
-                    break;
+                    if (c.GetParameters().Length == 0)
+                    {
+                        clone = (T)c.Invoke(Array.Empty<object>());
+                        constructorFound = true;
+                        break;
+                    }
                 }
-            }
-            if (clone == obj) return false;
 
-            List<FieldInfo> fields;
-            fields = new List<FieldInfo>();
-            fields.AddRange(type.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
-            Type t = type.BaseType;
-            while (t != null)
-            {
-
-                fields.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !fields.Any(field => field.Name == baseField.Name)));
-                t = t.BaseType;
-            }
-
-            foreach(FieldInfo field in fields)
-            {
-                object value = field.GetValue(obj);
-                Type fieldType = field.FieldType;
-                if (!fieldType.IsPrimitive && fieldType != typeof(string))
+                if (!constructorFound)
                 {
-                    TryClone(value, out value);
+                    clone = default;
+                    return false;
                 }
-                field.SetValue(clone, value);
-            }
 
-            return true;
+
+                List<FieldInfo> fields;
+                fields = new List<FieldInfo>();
+                fields.AddRange(type.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
+                Type t = type.BaseType;
+                while (t != null)
+                {
+
+                    fields.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !fields.Any(field => field.Name == baseField.Name)));
+                    t = t.BaseType;
+                }
+
+                foreach (FieldInfo field in fields)
+                {
+                    object value = field.GetValue(obj);
+                    Type fieldType = field.FieldType;
+                    if (!fieldType.IsPrimitive && fieldType != typeof(string))
+                    {
+                        TryClone(value, out value);
+                    }
+                    field.SetValue(clone, value);
+                }
+
+                return true;
+            }
         }
 
         public static bool TrySetValueByName<T, V>(this T obj, string fieldOrPropertyName, V value) where T : class

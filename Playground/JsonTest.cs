@@ -364,27 +364,6 @@ namespace Playground
             return;
         }
 
-        static void PrepareUnexpectedValue(Crawler crawler, bool deviatingType, Type objType)
-        {
-            if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
-            {
-                crawler.sb.Append('{')
-                .Append("\"$type\":\"").Append(objType.FullName).Append("\",")
-                .Append("\"$value\":");
-            }
-        }
-
-        static void FinishUnexpectedValue(Crawler crawler, bool deviatingType)
-        {
-            if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
-            {
-                crawler.sb.Append("}");
-            }
-        }
-
-
-
-
         private static void SerializeCollection(Type objType, IEnumerable items, Crawler crawler)
         {
             var sb = crawler.sb;
@@ -427,6 +406,30 @@ namespace Playground
                 }
                 sb.Append(']');
             }
+        }
+        private static void SerializePrimitiveCollection<T>(IEnumerable<T> items, StringBuilder sb)
+        {
+            sb.Append('[');
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else sb.Append(',');
+                sb.Append(item.ToString());
+            }
+            sb.Append(']');
+        }
+        private static void SerializeStringCollection(IEnumerable<string> items, StringBuilder sb)
+        {
+            sb.Append('[');
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else sb.Append(',');
+                sb.Append('\"').WriteEscapedString(item).Append('\"');
+            }
+            sb.Append(']');
         }
 
         private static void SerializeComplexType(object obj, Type expectedType, Crawler crawler)
@@ -540,33 +543,6 @@ namespace Playground
 
             return writer;
         }
-
-        private static void SerializePrimitiveCollection<T>(IEnumerable<T> items, StringBuilder sb)
-        {
-            sb.Append('[');
-            bool isFirstItem = true;
-            foreach (var item in items)
-            {
-                if (isFirstItem) isFirstItem = false;
-                else sb.Append(',');
-                sb.Append(item.ToString());
-            }
-            sb.Append(']');
-        }
-
-        private static void SerializeStringCollection(IEnumerable<string> items, StringBuilder sb)
-        {
-            sb.Append('[');
-            bool isFirstItem = true;
-            foreach (var item in items)
-            {
-                if (isFirstItem) isFirstItem = false;
-                else sb.Append(',');
-                sb.Append('\"').WriteEscapedString(item).Append('\"');
-            }
-            sb.Append(']');
-        }
-
         private static Action<object, MemberInfo, Crawler> CreateFieldWriter<T>(Type objType, MemberInfo member, Settings settings)
         {
             string fieldName = PrepareFieldName(member, settings);
@@ -588,7 +564,6 @@ namespace Playground
 
             return writer;
         }
-
         private static Action<object, MemberInfo, Crawler> CreateStringFieldWriter(MemberInfo member, Settings settings)
         {
             string fieldName = PrepareFieldName(member, settings);
@@ -600,58 +575,6 @@ namespace Playground
                 if (value != null) PrepareUnexpectedValue(crawler, false, value.GetType());
                 crawler.sb.Append('\"');
                 crawler.sb.WriteEscapedString(value).Append('\"');
-                FinishUnexpectedValue(crawler, false);
-            };
-
-            return writer;
-        }
-
-        private static Action<object, MemberInfo, Crawler> CreateCollectionFieldWriter<T>(MemberInfo member, Settings settings)
-        {
-            string fieldName = PrepareFieldName(member, settings);
-
-            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
-            {                
-                IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
-                crawler.sb.Append(fieldName);
-                PrepareUnexpectedValue(crawler, false, items.GetType());
-                crawler.sb.Append('[');
-                bool isFirstItem = true;
-                foreach (var item in items)
-                {
-                    if (isFirstItem) isFirstItem = false;
-                    else crawler.sb.Append(',');
-                    PrepareUnexpectedValue(crawler, false, item.GetType());
-                    crawler.sb.Append(item.ToString());
-                    FinishUnexpectedValue(crawler, false);
-                }
-                crawler.sb.Append(']');
-                FinishUnexpectedValue(crawler, false);
-            };
-
-            return writer;
-        }
-
-        private static Action<object, MemberInfo, Crawler> CreateStringCollectionFieldWriter(MemberInfo member, Settings settings)
-        {
-            string fieldName = PrepareFieldName(member, settings);
-
-            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
-            {                
-                IEnumerable<string> items = (IEnumerable<string>)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
-                crawler.sb.Append(fieldName);
-                PrepareUnexpectedValue(crawler, false, items.GetType());
-                crawler.sb.Append('[');
-                bool isFirstItem = true;
-                foreach (var item in items)
-                {
-                    if (isFirstItem) isFirstItem = false;
-                    else crawler.sb.Append(',');
-                    PrepareUnexpectedValue(crawler, false, item.GetType());
-                    crawler.sb.Append('\"').WriteEscapedString(item).Append('\"');
-                    FinishUnexpectedValue(crawler, false);
-                }
-                crawler.sb.Append(']');
                 FinishUnexpectedValue(crawler, false);
             };
 
@@ -680,11 +603,20 @@ namespace Playground
             else if (collectionType == typeof(double)) return CreateCollectionFieldWriter<double>(member, settings);
             else if (collectionType == typeof(IntPtr)) return CreateCollectionFieldWriter<IntPtr>(member, settings);
             else if (collectionType == typeof(UIntPtr)) return CreateCollectionFieldWriter<UIntPtr>(member, settings);
-            
+
+            var parameter = Expression.Parameter(typeof(object));
+            Type declaringType = member is FieldInfo field2 ? field2.DeclaringType : member is PropertyInfo property2 ? property2.DeclaringType : default;
+            var castedParameter = Expression.Convert(parameter, declaringType);
+            var fieldAccess = member is FieldInfo field3 ? Expression.Field(castedParameter, field3) : member is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable));
+            var lambda = Expression.Lambda<Func<object, IEnumerable>>(castFieldAccess, parameter);
+            var compiledGetter = lambda.Compile();
+
             string fieldName = PrepareFieldName(member, settings);
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                IEnumerable items = (IEnumerable)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                //IEnumerable items = (IEnumerable)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                IEnumerable items = compiledGetter(obj);
                 crawler.sb.Append(fieldName);
                 PrepareUnexpectedValue(crawler, false, items.GetType());
                 crawler.sb.Append('[');
@@ -710,6 +642,75 @@ namespace Playground
 
             return writer;
         }
+        private static Action<object, MemberInfo, Crawler> CreateCollectionFieldWriter<T>(MemberInfo member, Settings settings)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            Type declaringType = member is FieldInfo field2 ? field2.DeclaringType : member is PropertyInfo property2 ? property2.DeclaringType : default;
+            var castedParameter = Expression.Convert(parameter, declaringType);
+            var fieldAccess = member is FieldInfo field3 ? Expression.Field(castedParameter, field3) : member is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable<T>));
+            var lambda = Expression.Lambda<Func<object, IEnumerable<T>>>(castFieldAccess, parameter);
+            var compiledGetter = lambda.Compile();
+
+            string fieldName = PrepareFieldName(member, settings);
+
+            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
+            {
+                //IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                IEnumerable<T> items = compiledGetter(obj);
+                crawler.sb.Append(fieldName);
+                PrepareUnexpectedValue(crawler, false, items.GetType());
+                crawler.sb.Append('[');
+                bool isFirstItem = true;
+                foreach (var item in items)
+                {
+                    if (isFirstItem) isFirstItem = false;
+                    else crawler.sb.Append(',');
+                    PrepareUnexpectedValue(crawler, false, item.GetType());
+                    crawler.sb.Append(item.ToString());
+                    FinishUnexpectedValue(crawler, false);
+                }
+                crawler.sb.Append(']');
+                FinishUnexpectedValue(crawler, false);
+            };
+
+            return writer;
+        }
+        private static Action<object, MemberInfo, Crawler> CreateStringCollectionFieldWriter(MemberInfo member, Settings settings)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            Type declaringType = member is FieldInfo field2 ? field2.DeclaringType : member is PropertyInfo property2 ? property2.DeclaringType : default;
+            var castedParameter = Expression.Convert(parameter, declaringType);
+            var fieldAccess = member is FieldInfo field3 ? Expression.Field(castedParameter, field3) : member is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable<string>));
+            var lambda = Expression.Lambda<Func<object, IEnumerable<string>>>(castFieldAccess, parameter);
+            var compiledGetter = lambda.Compile();
+
+            string fieldName = PrepareFieldName(member, settings);
+
+            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
+            {
+                //IEnumerable<string> items = (IEnumerable<string>)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                IEnumerable<string> items = compiledGetter(obj);
+                crawler.sb.Append(fieldName);
+                PrepareUnexpectedValue(crawler, false, items.GetType());
+                crawler.sb.Append('[');
+                bool isFirstItem = true;
+                foreach (var item in items)
+                {
+                    if (isFirstItem) isFirstItem = false;
+                    else crawler.sb.Append(',');
+                    PrepareUnexpectedValue(crawler, false, item.GetType());
+                    crawler.sb.Append('\"').WriteEscapedString(item).Append('\"');
+                    FinishUnexpectedValue(crawler, false);
+                }
+                crawler.sb.Append(']');
+                FinishUnexpectedValue(crawler, false);
+            };
+
+            return writer;
+        }
+
 
         private static string PrepareFieldName(MemberInfo member, Settings settings)
         {
@@ -718,6 +719,24 @@ namespace Playground
                 member.Name.EndsWith(">k__BackingField")) return $"\"{member.Name.Substring("<", ">")}\":";
 
             return $"\"{member.Name}\":";
+        }
+
+        static void PrepareUnexpectedValue(Crawler crawler, bool deviatingType, Type objType)
+        {
+            if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
+            {
+                crawler.sb.Append('{')
+                .Append("\"$type\":\"").Append(objType.FullName).Append("\",")
+                .Append("\"$value\":");
+            }
+        }
+
+        static void FinishUnexpectedValue(Crawler crawler, bool deviatingType)
+        {
+            if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
+            {
+                crawler.sb.Append("}");
+            }
         }
 
         private static StringBuilder WriteEscapedString(this StringBuilder sb, string str)
@@ -742,8 +761,6 @@ namespace Playground
 
 
 
-    
-
     internal class JsonTest
     {
         public static void Run()
@@ -754,10 +771,10 @@ namespace Playground
                 ReferenceHandler = ReferenceHandler.Preserve
             };
 
-            int iterations = 1_000_000;
+            int iterations = 5_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
-            //var testDto = new TestDto2();
+            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto2();
             string json;
 
             GC.Collect();
