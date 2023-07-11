@@ -59,7 +59,7 @@ namespace Playground
             this.myInt = myInt;
             this.myString = myString;
             this.myEmbedded = myEmbedded;
-            this.self = this;
+            //this.self = this;
 
             myEmbeddedDict["1"] = new MyEmbedded1();
             myEmbeddedDict["2"] = new MyEmbedded2();
@@ -139,8 +139,7 @@ namespace Playground
     {
         public class Settings
         {
-            public bool addDeviatingTypeInfo = true;
-            public bool addAllTypeInfo = false;
+            public TypeInfoHandling typeInfoHandling = TypeInfoHandling.AddDeviatingTypeInfo;
             public DataSelection dataSelection = DataSelection.PublicAndPrivateFields_CleanBackingFields;
             public ReferenceCheck referenceCheck = ReferenceCheck.AlwaysReplaceByRef;
             public int bufferSize = -1;
@@ -160,6 +159,13 @@ namespace Playground
             OnLoopReplaceByNull = 2,
             OnLoopReplaceByRef = 3,
             AlwaysReplaceByRef = 4
+        }
+
+        public enum TypeInfoHandling
+        {
+            AddNoTypeInfo = 0,
+            AddDeviatingTypeInfo = 1,
+            AddAllTypeInfo = 2,
         }
 
         private struct Crawler
@@ -307,16 +313,16 @@ namespace Playground
 
             if (objType.IsPrimitive)
             {
-                PrepareUnexpectedValue();
+                PrepareUnexpectedValue(crawler, deviatingType, objType);
                 crawler.sb.Append(obj.ToString());
-                FinishUnexpectedValue();
+                FinishUnexpectedValue(crawler, deviatingType);
                 return;
             }
             if (obj is string str)
             {
-                PrepareUnexpectedValue();
+                PrepareUnexpectedValue(crawler, deviatingType, objType);
                 crawler.sb.Append('\"').WriteEscapedString(str).Append('\"');
-                FinishUnexpectedValue();
+                FinishUnexpectedValue(crawler, deviatingType);
                 return;
             }
 
@@ -348,31 +354,31 @@ namespace Playground
 
             if (obj is IEnumerable items && (obj is ICollection || objType.ImplementsGenericInterface(typeof(ICollection<>))))
             {
-                PrepareUnexpectedValue();
+                PrepareUnexpectedValue(crawler, deviatingType, objType);
                 SerializeCollection(objType, items, crawler);
-                FinishUnexpectedValue();
+                FinishUnexpectedValue(crawler, deviatingType);
                 return;
             }
 
             SerializeComplexType(obj, expectedType, crawler);
             return;
+        }
 
-            void PrepareUnexpectedValue()
+        static void PrepareUnexpectedValue(Crawler crawler, bool deviatingType, Type objType)
+        {
+            if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
             {
-                if (crawler.settings.addAllTypeInfo || (crawler.settings.addDeviatingTypeInfo && deviatingType))
-                {
-                    crawler.sb.Append('{')
-                    .Append("\"$type\":\"").Append(objType.FullName).Append("\",")
-                    .Append("\"$value\":");
-                }
+                crawler.sb.Append('{')
+                .Append("\"$type\":\"").Append(objType.FullName).Append("\",")
+                .Append("\"$value\":");
             }
+        }
 
-            void FinishUnexpectedValue()
+        static void FinishUnexpectedValue(Crawler crawler, bool deviatingType)
+        {
+            if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
             {
-                if (crawler.settings.addAllTypeInfo || (crawler.settings.addDeviatingTypeInfo && deviatingType))
-                {
-                    crawler.sb.Append("}");
-                }
+                crawler.sb.Append("}");
             }
         }
 
@@ -440,7 +446,7 @@ namespace Playground
             sb.Append('{');
 
             bool deviatingType = expectedType != obj.GetType();
-            if (settings.addAllTypeInfo || (settings.addDeviatingTypeInfo && deviatingType))
+            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
             {
                 if (isFirstField) isFirstField = false;
                 sb.Append("\"$type\":\"").Append(objType.FullName).Append('\"');
@@ -573,9 +579,11 @@ namespace Playground
 
             Action<object, MemberInfo, Crawler>  writer = (obj, member, crawler) =>
             {
-                crawler.sb.Append(fieldName);
+                crawler.sb.Append(fieldName);          
                 var value = compiledGetter(obj);
+                if (value != null) PrepareUnexpectedValue(crawler, false, value.GetType());
                 crawler.sb.Append(value.ToString());
+                if (value != null) FinishUnexpectedValue(crawler, false);
             };
 
             return writer;
@@ -587,9 +595,12 @@ namespace Playground
 
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                crawler.sb.Append(fieldName).Append('\"');
+                crawler.sb.Append(fieldName);
                 var value = (string) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                if (value != null) PrepareUnexpectedValue(crawler, false, value.GetType());
+                crawler.sb.Append('\"');
                 crawler.sb.WriteEscapedString(value).Append('\"');
+                FinishUnexpectedValue(crawler, false);
             };
 
             return writer;
@@ -600,18 +611,22 @@ namespace Playground
             string fieldName = PrepareFieldName(member, settings);
 
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
-            {
+            {                
                 IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
                 crawler.sb.Append(fieldName);
+                PrepareUnexpectedValue(crawler, false, items.GetType());
                 crawler.sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
                     else crawler.sb.Append(',');
+                    PrepareUnexpectedValue(crawler, false, item.GetType());
                     crawler.sb.Append(item.ToString());
+                    FinishUnexpectedValue(crawler, false);
                 }
                 crawler.sb.Append(']');
+                FinishUnexpectedValue(crawler, false);
             };
 
             return writer;
@@ -622,18 +637,22 @@ namespace Playground
             string fieldName = PrepareFieldName(member, settings);
 
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
-            {
+            {                
                 IEnumerable<string> items = (IEnumerable<string>)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
                 crawler.sb.Append(fieldName);
+                PrepareUnexpectedValue(crawler, false, items.GetType());
                 crawler.sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
                     else crawler.sb.Append(',');
+                    PrepareUnexpectedValue(crawler, false, item.GetType());
                     crawler.sb.Append('\"').WriteEscapedString(item).Append('\"');
+                    FinishUnexpectedValue(crawler, false);
                 }
                 crawler.sb.Append(']');
+                FinishUnexpectedValue(crawler, false);
             };
 
             return writer;
@@ -667,6 +686,7 @@ namespace Playground
             {
                 IEnumerable items = (IEnumerable)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
                 crawler.sb.Append(fieldName);
+                PrepareUnexpectedValue(crawler, false, items.GetType());
                 crawler.sb.Append('[');
                 bool isFirstItem = true;
                 int index = 0;
@@ -685,6 +705,7 @@ namespace Playground
                     index++;
                 }
                 crawler.sb.Append(']');
+                FinishUnexpectedValue(crawler, false);
             };
 
             return writer;
@@ -733,7 +754,7 @@ namespace Playground
                 ReferenceHandler = ReferenceHandler.Preserve
             };
 
-            int iterations = 100_000;
+            int iterations = 1_000_000;
 
             var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
@@ -753,10 +774,8 @@ namespace Playground
             var settings = new MyJsonSerializer.Settings()
             {
                 referenceCheck = MyJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
-                addAllTypeInfo = true,
-                addDeviatingTypeInfo = false,
-                dataSelection = MyJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                bufferSize = -1
+                typeInfoHandling = MyJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
+                dataSelection = MyJsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields
             };
             tk.Restart();
             for (int i = 0; i < iterations; i++)
@@ -770,7 +789,7 @@ namespace Playground
             tk.Restart();
             for (int i = 0; i < iterations; i++)
             {
-                //json = FeatureLoom.Serialization.Json.SerializeToJson(testDto);
+                json = FeatureLoom.Serialization.Json.SerializeToJson(testDto);
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -779,10 +798,8 @@ namespace Playground
             settings = new MyJsonSerializer.Settings()
             {
                 referenceCheck = MyJsonSerializer.ReferenceCheck.NoRefCheck,
-                addAllTypeInfo = false,
-                addDeviatingTypeInfo = false,
-                dataSelection = MyJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                bufferSize = 0
+                typeInfoHandling = MyJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                dataSelection = MyJsonSerializer.DataSelection.PublicFieldsAndProperties
             };
             tk.Restart();
             for (int i = 0; i < iterations; i++)
