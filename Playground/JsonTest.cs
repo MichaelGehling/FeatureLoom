@@ -22,6 +22,7 @@ using System.IO;
 using System.Data;
 using FeatureLoom.TCP;
 using Microsoft.VisualBasic.FileIO;
+using System.Text.Json.Serialization;
 
 namespace Playground
 {
@@ -58,7 +59,7 @@ namespace Playground
             this.myInt = myInt;
             this.myString = myString;
             this.myEmbedded = myEmbedded;
-            //this.self = this;
+            this.self = this;
 
             myEmbeddedDict["1"] = new MyEmbedded1();
             myEmbeddedDict["2"] = new MyEmbedded2();
@@ -93,6 +94,16 @@ namespace Playground
     {
         public int y = 2;
     }
+
+    public class TestDto2
+    {
+        public string str1 = "Mystring";
+        public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+        public int int1 = 12345;
+        public double double1 = 12.1231;
+    }
+
+
 
     public interface IJsonWriter
     {
@@ -131,7 +142,8 @@ namespace Playground
             public bool addDeviatingTypeInfo = true;
             public bool addAllTypeInfo = false;
             public DataSelection dataSelection = DataSelection.PublicAndPrivateFields_CleanBackingFields;
-            public bool performKnownRefCheck = true;            
+            public ReferenceCheck referenceCheck = ReferenceCheck.AlwaysReplaceByRef;
+            public int bufferSize = -1;
         }
 
         public enum DataSelection
@@ -141,36 +153,45 @@ namespace Playground
             PublicFieldsAndProperties = 2,
         }
 
+        public enum ReferenceCheck
+        {
+            NoRefCheck = 0,
+            OnLoopThrowException = 1,
+            OnLoopReplaceByNull = 2,
+            OnLoopReplaceByRef = 3,
+            AlwaysReplaceByRef = 4
+        }
+
         private struct Crawler
         {
             public Settings settings;
             public string currentPath;
             public Dictionary<object, string> pathMap;
             public StringBuilder sb;
-            public string loopRef;
+            public string refPath;
 
-            public static Crawler Root(object rootObj, Settings settings, int bufferSize)
+            public static Crawler Root(object rootObj, Settings settings)
             {                
-                if (!settings.performKnownRefCheck) return new Crawler() { settings = settings, sb = new StringBuilder(bufferSize) };
+                if (settings.referenceCheck == ReferenceCheck.NoRefCheck) return new Crawler() { settings = settings, sb = new StringBuilder(settings.bufferSize) };
 
                 return new Crawler()
                 {
                     settings = settings,
-                    currentPath = "root",
-                    pathMap = new Dictionary<object, string>(){{rootObj, "root"}},
+                    currentPath = "$",
+                    pathMap = new Dictionary<object, string>(){{rootObj, "$"}},
                     sb = new StringBuilder()
                 };
             }
 
             public Crawler NewChild(object child, string name)
             {
-                if (!settings.performKnownRefCheck) return this;
+                if (settings.referenceCheck == ReferenceCheck.NoRefCheck) return this;
 
-                string childLoopRef = null;
+                string childRefPath = null;
                 string childPath = currentPath + "." + name;
                 if (child != null && child.GetType().IsClass && !(child is string))
                 {
-                    childLoopRef = FindLoopRef(child);
+                    childRefPath = FindObjRefPath(child);
                     pathMap[child] = childPath;
                 }
 
@@ -180,19 +201,19 @@ namespace Playground
                     currentPath = childPath,
                     pathMap = pathMap,
                     sb = sb,
-                    loopRef = childLoopRef
+                    refPath = childRefPath
                 };
             }
 
             public Crawler NewCollectionItem(object item, string fieldName, int index)
             {
-                if (!settings.performKnownRefCheck) return this;
+                if (settings.referenceCheck == ReferenceCheck.NoRefCheck) return this;
 
-                string childLoopRef = null;
+                string childRefPath = null;
                 string childPath = $"{currentPath}.{fieldName}[{index}]";
                 if (item != null && item.GetType().IsClass && !(item is string))
                 {
-                    childLoopRef = FindLoopRef(item);
+                    childRefPath = FindObjRefPath(item);
                     pathMap[item] = childPath;
                 }
 
@@ -202,13 +223,13 @@ namespace Playground
                     currentPath = childPath,
                     pathMap = pathMap,
                     sb = sb,
-                    loopRef = childLoopRef
+                    refPath = childRefPath
                 };
             }
 
-            private string FindLoopRef(object obj)
-            {                
-                if (!settings.performKnownRefCheck) return null;                
+            private string FindObjRefPath(object obj)
+            {
+                if (settings.referenceCheck == ReferenceCheck.NoRefCheck) return null;                
                 if (pathMap.TryGetValue(obj, out string path)) return path;
                 else return null;
             }
@@ -246,18 +267,24 @@ namespace Playground
 
             TypeCache typeCache = typeCaches[settings.dataSelection.ToInt()];
             Type objType = obj.GetType();
-            int buffer = 64;
-            using (typeCacheLock.LockReadOnly())
+
+            bool autoBufferSize = false;
+            if (settings.bufferSize < 0)
             {
-                if (typeCache.typeBufferInfo.TryGetValue(objType, out var b)) buffer = b;
+                autoBufferSize = true;
+                settings.bufferSize = 64;
+                using (typeCacheLock.LockReadOnly())
+                {
+                    if (typeCache.typeBufferInfo.TryGetValue(objType, out var b)) settings.bufferSize = b;
+                }
             }
             
-            Crawler crawler = Crawler.Root(obj, settings, buffer);
+            Crawler crawler = Crawler.Root(obj, settings);
             SerializeValue(obj, typeof(T), crawler);
 
             Thread.CurrentThread.CurrentCulture = oldCulture;
 
-            if (crawler.sb.Length > buffer)
+            if (autoBufferSize && crawler.sb.Length > settings.bufferSize)
             {
                 using (typeCacheLock.Lock())
                 {
@@ -293,10 +320,30 @@ namespace Playground
                 return;
             }
 
-            if (crawler.loopRef != null)
+            if (crawler.refPath != null)
             {
-                crawler.sb.Append("{\"$Ref\":\"").Append(crawler.loopRef).Append("\"}");
-                return;
+                if (crawler.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
+                {
+                    crawler.sb.Append("{\"$ref\":\"").Append(crawler.refPath).Append("\"}");
+                    return;
+                }
+                else if (crawler.currentPath.StartsWith(crawler.refPath))
+                {
+                    if (crawler.settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef)
+                    {
+                        crawler.sb.Append("{\"$ref\":\"").Append(crawler.refPath).Append("\"}");
+                        return;
+                    }
+                    if (crawler.settings.referenceCheck == ReferenceCheck.OnLoopReplaceByNull)
+                    {
+                        crawler.sb.Append("null");
+                        return;
+                    }
+                    if (crawler.settings.referenceCheck == ReferenceCheck.OnLoopThrowException)
+                    {
+                        throw new Exception("Circular referencing detected!");
+                    }
+                }
             }
 
             if (obj is IEnumerable items && (obj is ICollection || objType.ImplementsGenericInterface(typeof(ICollection<>))))
@@ -315,8 +362,8 @@ namespace Playground
                 if (crawler.settings.addAllTypeInfo || (crawler.settings.addDeviatingTypeInfo && deviatingType))
                 {
                     crawler.sb.Append('{')
-                    .Append("\"$Type\":\"").Append(objType.FullName).Append("\",")
-                    .Append("\"$Value\":");
+                    .Append("\"$type\":\"").Append(objType.FullName).Append("\",")
+                    .Append("\"$value\":");
                 }
             }
 
@@ -396,7 +443,7 @@ namespace Playground
             if (settings.addAllTypeInfo || (settings.addDeviatingTypeInfo && deviatingType))
             {
                 if (isFirstField) isFirstField = false;
-                sb.Append("\"$Type\":\"").Append(objType.FullName).Append('\"');
+                sb.Append("\"$type\":\"").Append(objType.FullName).Append('\"');
             }
 
             TypeCache typeCache = typeCaches[settings.dataSelection.ToInt()];
@@ -682,13 +729,18 @@ namespace Playground
         {
             var opt = new JsonSerializerOptions()
             {
-                IncludeFields = true
+                IncludeFields = true,
+                ReferenceHandler = ReferenceHandler.Preserve
             };
 
             int iterations = 100_000;
 
-            object testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto2();
             string json;
+
+            GC.Collect();
+            AppTime.Wait(1.Seconds());
             var tk = AppTime.TimeKeeper;
             for (int i = 0; i < iterations; i++)
             {
@@ -700,10 +752,11 @@ namespace Playground
 
             var settings = new MyJsonSerializer.Settings()
             {
-                performKnownRefCheck = true,
-                addAllTypeInfo = false,
-                addDeviatingTypeInfo = true,
-                dataSelection = MyJsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields
+                referenceCheck = MyJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
+                addAllTypeInfo = true,
+                addDeviatingTypeInfo = false,
+                dataSelection = MyJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                bufferSize = -1
             };
             tk.Restart();
             for (int i = 0; i < iterations; i++)
@@ -717,7 +770,7 @@ namespace Playground
             tk.Restart();
             for (int i = 0; i < iterations; i++)
             {
-                json = FeatureLoom.Serialization.Json.SerializeToJson(testDto);
+                //json = FeatureLoom.Serialization.Json.SerializeToJson(testDto);
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -725,10 +778,11 @@ namespace Playground
             
             settings = new MyJsonSerializer.Settings()
             {
-                performKnownRefCheck = false,
+                referenceCheck = MyJsonSerializer.ReferenceCheck.NoRefCheck,
                 addAllTypeInfo = false,
                 addDeviatingTypeInfo = false,
-                dataSelection = MyJsonSerializer.DataSelection.PublicFieldsAndProperties
+                dataSelection = MyJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                bufferSize = 0
             };
             tk.Restart();
             for (int i = 0; i < iterations; i++)
