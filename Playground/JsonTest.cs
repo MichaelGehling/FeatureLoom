@@ -21,6 +21,7 @@ using System.Reflection.Metadata;
 using System.IO;
 using System.Data;
 using FeatureLoom.TCP;
+using Microsoft.VisualBasic.FileIO;
 
 namespace Playground
 {
@@ -40,6 +41,7 @@ namespace Playground
 
     public class TestDto : BaseDto
     {
+        public object self;
         private int privInt = 42;
         public int myInt = 123;
         public string myString = "Hello: \\, \", \\, \n";
@@ -49,14 +51,19 @@ namespace Playground
         public IDictionary<string, IMyInterface> myEmbeddedDict = new Dictionary<string, IMyInterface>();
         public object someObj = "Something";
 
-        public TestDto(int myInt, string myString, IMyInterface myEmbedded)
+        public string MyProperty { get; set; } = "propValue";
+
+        public TestDto(int myInt, IMyInterface myEmbedded)
         {
             this.myInt = myInt;
             this.myString = myString;
             this.myEmbedded = myEmbedded;
+            //this.self = this;
 
             myEmbeddedDict["1"] = new MyEmbedded1();
             myEmbeddedDict["2"] = new MyEmbedded2();
+
+            myObjects.Add(myEmbedded);
         }
         public TestDto() { }
 
@@ -123,8 +130,15 @@ namespace Playground
         {
             public bool addDeviatingTypeInfo = true;
             public bool addAllTypeInfo = false;
-            public bool onlyPublicFields = false;
+            public DataSelection dataSelection = DataSelection.PublicAndPrivateFields_CleanBackingFields;
             public bool performKnownRefCheck = true;            
+        }
+
+        public enum DataSelection
+        {
+            PublicAndPrivateFields = 0,
+            PublicAndPrivateFields_CleanBackingFields = 1,
+            PublicFieldsAndProperties = 2,
         }
 
         private struct Crawler
@@ -132,16 +146,19 @@ namespace Playground
             public Settings settings;
             public string currentPath;
             public Dictionary<object, string> pathMap;
+            public StringBuilder sb;
+            public string loopRef;
 
-            public static Crawler Root(object rootObj, Settings settings)
+            public static Crawler Root(object rootObj, Settings settings, int bufferSize)
             {                
-                if (!settings.performKnownRefCheck) return new Crawler() { settings = settings };
+                if (!settings.performKnownRefCheck) return new Crawler() { settings = settings, sb = new StringBuilder(bufferSize) };
 
                 return new Crawler()
                 {
                     settings = settings,
-                    currentPath = "",
-                    pathMap = new Dictionary<object, string>(){{rootObj, ""}}
+                    currentPath = "root",
+                    pathMap = new Dictionary<object, string>(){{rootObj, "root"}},
+                    sb = new StringBuilder()
                 };
             }
 
@@ -149,32 +166,76 @@ namespace Playground
             {
                 if (!settings.performKnownRefCheck) return this;
 
+                string childLoopRef = null;
                 string childPath = currentPath + "." + name;
-                pathMap[child] = childPath;
+                if (child != null && child.GetType().IsClass && !(child is string))
+                {
+                    childLoopRef = FindLoopRef(child);
+                    pathMap[child] = childPath;
+                }
 
                 return new Crawler()
                 {
                     settings = settings,
                     currentPath = childPath,
-                    pathMap = pathMap
+                    pathMap = pathMap,
+                    sb = sb,
+                    loopRef = childLoopRef
                 };
             }
 
-            public bool Exists(object obj, out string path)
+            public Crawler NewCollectionItem(object item, string fieldName, int index)
             {
-                path = null;
-                if (!settings.performKnownRefCheck) return false;
-                return pathMap.TryGetValue(obj, out path);
+                if (!settings.performKnownRefCheck) return this;
+
+                string childLoopRef = null;
+                string childPath = $"{currentPath}.{fieldName}[{index}]";
+                if (item != null && item.GetType().IsClass && !(item is string))
+                {
+                    childLoopRef = FindLoopRef(item);
+                    pathMap[item] = childPath;
+                }
+
+                return new Crawler()
+                {
+                    settings = settings,
+                    currentPath = childPath,
+                    pathMap = pathMap,
+                    sb = sb,
+                    loopRef = childLoopRef
+                };
+            }
+
+            private string FindLoopRef(object obj)
+            {                
+                if (!settings.performKnownRefCheck) return null;                
+                if (pathMap.TryGetValue(obj, out string path)) return path;
+                else return null;
             }
         }
 
         static Settings defaultSettings = new Settings();
 
-        static Dictionary<Type, List<FieldInfo>> fieldInfos = new Dictionary<Type, List<FieldInfo>>();
-        static Dictionary<FieldInfo, Action<object, FieldInfo, StringBuilder, Settings>> fieldWriters = new Dictionary<FieldInfo, Action<object, FieldInfo, StringBuilder, Settings>>();
-        static Dictionary<Type, int> typeBufferInfo = new Dictionary<Type, int>();
-        static FeatureLock fieldInfosLock = new FeatureLock();
-        
+        private class TypeCache
+        {
+            public Dictionary<Type, List<MemberInfo>> memberInfos = new Dictionary<Type, List<MemberInfo>>();
+            public Dictionary<MemberInfo, Action<object, MemberInfo, Crawler>> fieldWriters = new Dictionary<MemberInfo, Action<object, MemberInfo, Crawler>>();
+            public Dictionary<Type, int> typeBufferInfo = new Dictionary<Type, int>();
+        }
+        static TypeCache[] typeCaches = InitTypeCaches();
+        static FeatureLock typeCacheLock = new FeatureLock();
+
+        private static TypeCache[] InitTypeCaches()
+        {
+            int numTypeCaches = Enum.GetValues(typeof(DataSelection)).Length;
+            TypeCache[] typeCaches = new TypeCache[numTypeCaches];
+            for (int i = 0; i < typeCaches.Length; i++)
+            {
+                typeCaches[i] = new TypeCache();
+            }
+            return typeCaches;
+        }
+
         public static string Serialize<T>(T obj, Settings settings = null)
         {
             if (settings == null) settings = defaultSettings;            
@@ -182,65 +243,78 @@ namespace Playground
             var oldCulture = Thread.CurrentThread.CurrentCulture;
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
 
+
+            TypeCache typeCache = typeCaches[settings.dataSelection.ToInt()];
             Type objType = obj.GetType();
             int buffer = 64;
-            using (fieldInfosLock.LockReadOnly())
+            using (typeCacheLock.LockReadOnly())
             {
-                if (typeBufferInfo.TryGetValue(objType, out var b)) buffer = b;
+                if (typeCache.typeBufferInfo.TryGetValue(objType, out var b)) buffer = b;
             }
-            var sb = new StringBuilder(buffer);
-
-            SerializeValue(obj, typeof(T), sb, settings);
+            
+            Crawler crawler = Crawler.Root(obj, settings, buffer);
+            SerializeValue(obj, typeof(T), crawler);
 
             Thread.CurrentThread.CurrentCulture = oldCulture;
 
-            if (sb.Length > buffer)
+            if (crawler.sb.Length > buffer)
             {
-                using (fieldInfosLock.Lock())
+                using (typeCacheLock.Lock())
                 {
-                    typeBufferInfo[objType] = sb.Length;
+                    typeCache.typeBufferInfo[objType] = crawler.sb.Length;
                 }
             }
-            return sb.ToString();
+            return crawler.sb.ToString();
         }
 
-        private static void SerializeValue(object obj, Type expectedType, StringBuilder sb, Settings settings)
+        private static void SerializeValue(object obj, Type expectedType, Crawler crawler)
         {
             if (obj == null)
             {
-                sb.Append("null");
+                crawler.sb.Append("null");
                 return;
-            }
-
+            }            
+            
             Type objType = obj.GetType();
-
             bool deviatingType = expectedType != obj.GetType();
 
             if (objType.IsPrimitive)
             {
                 PrepareUnexpectedValue();
-                sb.Append(obj.ToString());
+                crawler.sb.Append(obj.ToString());
                 FinishUnexpectedValue();
+                return;
             }
-            else if (obj is string str)
+            if (obj is string str)
             {
                 PrepareUnexpectedValue();
-                sb.Append('\"').WriteEscapedString(str).Append('\"');
+                crawler.sb.Append('\"').WriteEscapedString(str).Append('\"');
                 FinishUnexpectedValue();
+                return;
             }
-            else if (obj is IEnumerable items && (obj is ICollection || objType.ImplementsGenericInterface(typeof(ICollection<>))))
+
+            if (crawler.loopRef != null)
+            {
+                crawler.sb.Append("{\"$Ref\":\"").Append(crawler.loopRef).Append("\"}");
+                return;
+            }
+
+            if (obj is IEnumerable items && (obj is ICollection || objType.ImplementsGenericInterface(typeof(ICollection<>))))
             {
                 PrepareUnexpectedValue();
-                SerializeCollection(sb, objType, items, settings);
+                SerializeCollection(objType, items, crawler);
                 FinishUnexpectedValue();
+                return;
             }
-            else SerializeComplexType(obj, expectedType, sb, settings);
+
+            SerializeComplexType(obj, expectedType, crawler);
+            return;
 
             void PrepareUnexpectedValue()
             {
-                if (settings.addAllTypeInfo || (settings.addDeviatingTypeInfo && deviatingType))
+                if (crawler.settings.addAllTypeInfo || (crawler.settings.addDeviatingTypeInfo && deviatingType))
                 {
-                    sb.Append('{')
+                    crawler.sb.Append('{')
                     .Append("\"$Type\":\"").Append(objType.FullName).Append("\",")
                     .Append("\"$Value\":");
                 }
@@ -248,9 +322,9 @@ namespace Playground
 
             void FinishUnexpectedValue()
             {
-                if (settings.addAllTypeInfo || (settings.addDeviatingTypeInfo && deviatingType))
+                if (crawler.settings.addAllTypeInfo || (crawler.settings.addDeviatingTypeInfo && deviatingType))
                 {
-                    sb.Append("}");
+                    crawler.sb.Append("}");
                 }
             }
         }
@@ -258,8 +332,10 @@ namespace Playground
 
 
 
-        private static void SerializeCollection(StringBuilder sb, Type objType, IEnumerable items, Settings settings)
+        private static void SerializeCollection(Type objType, IEnumerable items, Crawler crawler)
         {
+            var sb = crawler.sb;
+
             if (items is IEnumerable<string> string_items) SerializeStringCollection(string_items, sb);
             else if (items is IEnumerable<int> int_items) SerializePrimitiveCollection(int_items, sb);
             else if (items is IEnumerable<uint> uint_items) SerializePrimitiveCollection(uint_items, sb);
@@ -276,27 +352,38 @@ namespace Playground
             else if (items is IEnumerable<IntPtr> intPtr_items) SerializePrimitiveCollection(intPtr_items, sb);
             else if (items is IEnumerable<UIntPtr> uIntPtr_items) SerializePrimitiveCollection(uIntPtr_items, sb);
             else 
-            {
+            {                
                 Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>));
                 collectionType = collectionType ?? typeof(object);
 
                 sb.Append('[');
                 bool isFirstItem = true;
+                int index = 0;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
                     else sb.Append(',');
-                    SerializeValue(item, collectionType, sb, settings);
+                    if (item != null && !item.GetType().IsValueType && !(item is string))
+                    {
+                        SerializeValue(item, collectionType, crawler.NewCollectionItem(item, "", index++));
+                    }
+                    else
+                    {
+                        SerializeValue(item, collectionType, crawler);
+                    }
                 }
                 sb.Append(']');
             }
         }
 
-        private static void SerializeComplexType(object obj, Type expectedType, StringBuilder sb, Settings settings)
+        private static void SerializeComplexType(object obj, Type expectedType, Crawler crawler)
         {
+            var sb = crawler.sb;
+            var settings = crawler.settings;
+
             Type objType = obj.GetType();
 
-            if (objType.IsNullable() && obj is object o && o == null)
+            if (objType.IsNullable() && obj == null)
             {
                 sb.Append("null");
                 return;
@@ -309,85 +396,93 @@ namespace Playground
             if (settings.addAllTypeInfo || (settings.addDeviatingTypeInfo && deviatingType))
             {
                 if (isFirstField) isFirstField = false;
-                sb.Append($"\"$Type\":\"").Append(objType.FullName).Append('\"');
+                sb.Append("\"$Type\":\"").Append(objType.FullName).Append('\"');
             }
 
-            List<FieldInfo> fields;
-
-            using (var lockHandle = fieldInfosLock.LockReadOnly())
+            TypeCache typeCache = typeCaches[settings.dataSelection.ToInt()];
+            List<MemberInfo> members;
+            using (var lockHandle = typeCacheLock.LockReadOnly())
             {
-                if (!fieldInfos.TryGetValue(objType, out fields))
+                if (!typeCache.memberInfos.TryGetValue(objType, out members))
                 {
                     lockHandle.UpgradeToWriteMode();
 
-                    fields = new List<FieldInfo>();
-                    if (settings.onlyPublicFields) fields.AddRange(objType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
-                    else fields.AddRange(objType.GetFields(BindingFlags.Public | BindingFlags.Instance));
-                    Type t = objType.BaseType;
-                    if (!settings.onlyPublicFields)
+                    members = new List<MemberInfo>();
+                    if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
                     {
+                        members.AddRange(objType.GetFields(BindingFlags.Public | BindingFlags.Instance));
+                        members.AddRange(objType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.GetMethod != null));
+                    }
+                    else
+                    {
+                        members.AddRange(objType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
+                        Type t = objType.BaseType;
                         while (t != null)
                         {
-
-                            fields.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !fields.Any(field => field.Name == baseField.Name)));
+                            members.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !members.Any(field => field.Name == baseField.Name)));
                             t = t.BaseType;
                         }
                     }
-                    fieldInfos[objType] = fields;
+                    typeCache.memberInfos[objType] = members;
                 }
             }
 
-            foreach (var field in fields)
+            foreach (var field in members)
             {
                 if (isFirstField) isFirstField = false;
                 else sb.Append(',');
 
-                Action<object, FieldInfo, StringBuilder, Settings> writer;
-                using (var lockHandle = fieldInfosLock.LockReadOnly())
+                Action<object, MemberInfo, Crawler> writer;
+                using (var lockHandle = typeCacheLock.LockReadOnly())
                 {
-                    if (!fieldWriters.TryGetValue(field, out writer))
+                    if (!typeCache.fieldWriters.TryGetValue(field, out writer))
                     {
                         lockHandle.UpgradeToWriteMode();
-                        writer = CreateFieldWriter(objType, field);
-                        fieldWriters[field] = writer;
+                        writer = CreateFieldWriter(objType, field, settings);
+                        typeCache.fieldWriters[field] = writer;
                     }
                 }
-                writer.Invoke(obj, field, sb, settings);
+                writer.Invoke(obj, field, crawler);
             }
             sb.Append("}");
         }
 
-        private static Action<object, FieldInfo, StringBuilder, Settings> CreateFieldWriter(Type objType, FieldInfo field)
+        private static Action<object, MemberInfo, Crawler> CreateFieldWriter(Type objType, MemberInfo member, Settings settings)
         {
-            if (field.FieldType == typeof(string)) return CreateStringFieldWriter(field);
-            else if (field.FieldType == typeof(int)) return CreateFieldWriter<int>(objType, field);
-            else if (field.FieldType == typeof(uint)) return CreateFieldWriter<uint>(objType, field);
-            else if (field.FieldType == typeof(byte)) return CreateFieldWriter<byte>(objType, field);
-            else if (field.FieldType == typeof(sbyte)) return CreateFieldWriter<sbyte>(objType, field);
-            else if (field.FieldType == typeof(short)) return CreateFieldWriter<short>(objType, field);
-            else if (field.FieldType == typeof(ushort)) return CreateFieldWriter<ushort>(objType, field);
-            else if (field.FieldType == typeof(long)) return CreateFieldWriter<long>(objType, field);
-            else if (field.FieldType == typeof(ulong)) return CreateFieldWriter<ulong>(objType, field);
-            else if (field.FieldType == typeof(bool)) return CreateFieldWriter<bool>(objType, field);
-            else if (field.FieldType == typeof(char)) return CreateFieldWriter<char>(objType, field);
-            else if (field.FieldType == typeof(float)) return CreateFieldWriter<float>(objType, field);
-            else if (field.FieldType == typeof(double)) return CreateFieldWriter<double>(objType, field);
-            else if (field.FieldType == typeof(IntPtr)) return CreateFieldWriter<IntPtr>(objType, field);
-            else if (field.FieldType == typeof(UIntPtr)) return CreateFieldWriter<UIntPtr>(objType, field);
-            else if (field.FieldType.IsAssignableTo(typeof(IEnumerable)) && 
-                        (field.FieldType.IsAssignableTo(typeof(ICollection)) || 
-                         field.FieldType.IsOfGenericType(typeof(ICollection<>))))
+            Type memberType = member is FieldInfo field ? field.FieldType : member is PropertyInfo property ? property.PropertyType : default;
+
+            if (memberType == typeof(string)) return CreateStringFieldWriter(member, settings);
+            else if (memberType == typeof(int)) return CreateFieldWriter<int>(objType, member, settings);
+            else if (memberType == typeof(uint)) return CreateFieldWriter<uint>(objType, member, settings);
+            else if (memberType == typeof(byte)) return CreateFieldWriter<byte>(objType, member, settings);
+            else if (memberType == typeof(sbyte)) return CreateFieldWriter<sbyte>(objType, member, settings);
+            else if (memberType == typeof(short)) return CreateFieldWriter<short>(objType, member, settings);
+            else if (memberType == typeof(ushort)) return CreateFieldWriter<ushort>(objType, member, settings);
+            else if (memberType == typeof(long)) return CreateFieldWriter<long>(objType, member, settings);
+            else if (memberType == typeof(ulong)) return CreateFieldWriter<ulong>(objType, member, settings);
+            else if (memberType == typeof(bool)) return CreateFieldWriter<bool>(objType, member, settings);
+            else if (memberType == typeof(char)) return CreateFieldWriter<char>(objType, member, settings);
+            else if (memberType == typeof(float)) return CreateFieldWriter<float>(objType, member, settings);
+            else if (memberType == typeof(double)) return CreateFieldWriter<double>(objType, member, settings);
+            else if (memberType == typeof(IntPtr)) return CreateFieldWriter<IntPtr>(objType, member, settings);
+            else if (memberType == typeof(UIntPtr)) return CreateFieldWriter<UIntPtr>(objType, member, settings);
+            else if (memberType.IsAssignableTo(typeof(IEnumerable)) && 
+                        (memberType.IsAssignableTo(typeof(ICollection)) || 
+                         memberType.IsOfGenericType(typeof(ICollection<>))))
             {
 
-                return CreateCollectionFieldWriter(field);
+                return CreateCollectionFieldWriter(member, settings);
             }
 
-            string fieldName = $"\"{field.Name}\":";
-            Action<object, FieldInfo, StringBuilder, Settings> writer = (obj, field, sb, settings) =>
+            string fieldName = PrepareFieldName(member, settings);
+
+            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                sb.Append(fieldName);
-                var value = field.GetValue(obj);
-                SerializeValue(value, field.FieldType, sb, settings);
+                crawler.sb.Append(fieldName);
+                var (memberType, value) = member is FieldInfo field ? (field.FieldType, field.GetValue(obj)) : 
+                                          member is PropertyInfo property ? (property.PropertyType, property.GetValue(obj)) : 
+                                          default;
+                SerializeValue(value, memberType, crawler.NewChild(value, member.Name));
             };
 
             return writer;
@@ -419,123 +514,142 @@ namespace Playground
             sb.Append(']');
         }
 
-        private static Action<object, FieldInfo, StringBuilder, Settings> CreateFieldWriter<T>(Type objType, FieldInfo field)
+        private static Action<object, MemberInfo, Crawler> CreateFieldWriter<T>(Type objType, MemberInfo member, Settings settings)
         {
-            string fieldName = $"\"{field.Name}\":";
+            string fieldName = PrepareFieldName(member, settings);
 
             var parameter = Expression.Parameter(typeof(object));
             var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = Expression.Field(castedParameter, field);
+            var fieldAccess = member is FieldInfo field ? Expression.Field(castedParameter, field) : member is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
             var lambda = Expression.Lambda<Func<object, T>>(fieldAccess, parameter);
             var compiledGetter = lambda.Compile();
 
-            Action<object, FieldInfo, StringBuilder, Settings>  writer = (obj, field, sb, settings) =>
+            Action<object, MemberInfo, Crawler>  writer = (obj, member, crawler) =>
             {
-                sb.Append(fieldName);
+                crawler.sb.Append(fieldName);
                 var value = compiledGetter(obj);
-                sb.Append(value.ToString());
+                crawler.sb.Append(value.ToString());
             };
 
             return writer;
         }
 
-        private static Action<object, FieldInfo, StringBuilder, Settings> CreateStringFieldWriter(FieldInfo field)
+        private static Action<object, MemberInfo, Crawler> CreateStringFieldWriter(MemberInfo member, Settings settings)
         {
-            string fieldName = $"\"{field.Name}\":";
+            string fieldName = PrepareFieldName(member, settings);
 
-            Action<object, FieldInfo, StringBuilder, Settings> writer = (obj, field, sb, settings) =>
+            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                sb.Append(fieldName).Append('\"');
-                var value = (string)field.GetValue(obj);
-                sb.WriteEscapedString(value).Append('\"');
+                crawler.sb.Append(fieldName).Append('\"');
+                var value = (string) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                crawler.sb.WriteEscapedString(value).Append('\"');
             };
 
             return writer;
         }
 
-        private static Action<object, FieldInfo, StringBuilder, Settings> CreateCollectionFieldWriter<T>(FieldInfo field)
+        private static Action<object, MemberInfo, Crawler> CreateCollectionFieldWriter<T>(MemberInfo member, Settings settings)
         {
-            string fieldName = $"\"{field.Name}\":";
+            string fieldName = PrepareFieldName(member, settings);
 
-            Action<object, FieldInfo, StringBuilder, Settings> writer = (obj, field, sb, settings) =>
+            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                IEnumerable<T> items = (IEnumerable<T>)field.GetValue(obj);
-                sb.Append(fieldName);
-                sb.Append('[');
+                IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                crawler.sb.Append(fieldName);
+                crawler.sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(',');
-                    sb.Append(item.ToString());
+                    else crawler.sb.Append(',');
+                    crawler.sb.Append(item.ToString());
                 }
-                sb.Append(']');
+                crawler.sb.Append(']');
             };
 
             return writer;
         }
 
-        private static Action<object, FieldInfo, StringBuilder, Settings> CreateStringCollectionFieldWriter(FieldInfo field)
+        private static Action<object, MemberInfo, Crawler> CreateStringCollectionFieldWriter(MemberInfo member, Settings settings)
         {
-            string fieldName = $"\"{field.Name}\":";
+            string fieldName = PrepareFieldName(member, settings);
 
-            Action<object, FieldInfo, StringBuilder, Settings> writer = (obj, field, sb, settings) =>
+            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                IEnumerable<string> items = (IEnumerable<string>)field.GetValue(obj);
-                sb.Append(fieldName);
-                sb.Append('[');
+                IEnumerable<string> items = (IEnumerable<string>)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                crawler.sb.Append(fieldName);
+                crawler.sb.Append('[');
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(',');
-                    sb.Append('\"').WriteEscapedString(item).Append('\"');
+                    else crawler.sb.Append(',');
+                    crawler.sb.Append('\"').WriteEscapedString(item).Append('\"');
                 }
-                sb.Append(']');
+                crawler.sb.Append(']');
             };
 
             return writer;
         }
 
-        private static Action<object, FieldInfo, StringBuilder, Settings> CreateCollectionFieldWriter(FieldInfo field)
+        private static Action<object, MemberInfo, Crawler> CreateCollectionFieldWriter(MemberInfo member, Settings settings)
         {
-            Type collectionType = field.FieldType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>));
+            Type collectionType = member is FieldInfo field ? field.FieldType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>)) :
+                                  member is PropertyInfo property ? property.PropertyType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>)) :
+                                  default;
             collectionType = collectionType ?? typeof(object);
 
-            if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(field);
-            else if (collectionType == typeof(int)) return CreateCollectionFieldWriter<int>(field);
-            else if (collectionType == typeof(uint)) return CreateCollectionFieldWriter<uint>(field);
-            else if (collectionType == typeof(byte)) return CreateCollectionFieldWriter<byte>(field);
-            else if (collectionType == typeof(sbyte)) return CreateCollectionFieldWriter<sbyte>(field);
-            else if (collectionType == typeof(short)) return CreateCollectionFieldWriter<short>(field);
-            else if (collectionType == typeof(ushort)) return CreateCollectionFieldWriter<ushort>(field);
-            else if (collectionType == typeof(long)) return CreateCollectionFieldWriter<long>(field);
-            else if (collectionType == typeof(ulong)) return CreateCollectionFieldWriter<ulong>(field);
-            else if (collectionType == typeof(bool)) return CreateCollectionFieldWriter<bool>(field);
-            else if (collectionType == typeof(char)) return CreateCollectionFieldWriter<char>(field);
-            else if (collectionType == typeof(float)) return CreateCollectionFieldWriter<float>(field);
-            else if (collectionType == typeof(double)) return CreateCollectionFieldWriter<double>(field);
-            else if (collectionType == typeof(IntPtr)) return CreateCollectionFieldWriter<IntPtr>(field);
-            else if (collectionType == typeof(UIntPtr)) return CreateCollectionFieldWriter<UIntPtr>(field);
-
-            string fieldName = $"\"{field.Name}\":";
-
-            Action<object, FieldInfo, StringBuilder, Settings> writer = (obj, field, sb, settings) =>
+            if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(member, settings);
+            else if (collectionType == typeof(int)) return CreateCollectionFieldWriter<int>(member, settings);
+            else if (collectionType == typeof(uint)) return CreateCollectionFieldWriter<uint>(member, settings);
+            else if (collectionType == typeof(byte)) return CreateCollectionFieldWriter<byte>(member, settings);
+            else if (collectionType == typeof(sbyte)) return CreateCollectionFieldWriter<sbyte>(member, settings);
+            else if (collectionType == typeof(short)) return CreateCollectionFieldWriter<short>(member, settings);
+            else if (collectionType == typeof(ushort)) return CreateCollectionFieldWriter<ushort>(member, settings);
+            else if (collectionType == typeof(long)) return CreateCollectionFieldWriter<long>(member, settings);
+            else if (collectionType == typeof(ulong)) return CreateCollectionFieldWriter<ulong>(member, settings);
+            else if (collectionType == typeof(bool)) return CreateCollectionFieldWriter<bool>(member, settings);
+            else if (collectionType == typeof(char)) return CreateCollectionFieldWriter<char>(member, settings);
+            else if (collectionType == typeof(float)) return CreateCollectionFieldWriter<float>(member, settings);
+            else if (collectionType == typeof(double)) return CreateCollectionFieldWriter<double>(member, settings);
+            else if (collectionType == typeof(IntPtr)) return CreateCollectionFieldWriter<IntPtr>(member, settings);
+            else if (collectionType == typeof(UIntPtr)) return CreateCollectionFieldWriter<UIntPtr>(member, settings);
+            
+            string fieldName = PrepareFieldName(member, settings);
+            Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                IEnumerable items = (IEnumerable)field.GetValue(obj);
-                sb.Append(fieldName);
-                sb.Append('[');
+                IEnumerable items = (IEnumerable)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                crawler.sb.Append(fieldName);
+                crawler.sb.Append('[');
                 bool isFirstItem = true;
+                int index = 0;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(',');
-                    SerializeValue(item, collectionType, sb, settings);
+                    else crawler.sb.Append(',');
+                    if (item != null && !item.GetType().IsPrimitive && !(item is string))
+                    {
+                        SerializeValue(item, collectionType, crawler.NewCollectionItem(item, member.Name, index));
+                    }
+                    else
+                    {
+                        SerializeValue(item, collectionType, crawler);
+                    }
+                    index++;
                 }
-                sb.Append(']');
+                crawler.sb.Append(']');
             };
 
             return writer;
+        }
+
+        private static string PrepareFieldName(MemberInfo member, Settings settings)
+        {
+            if (settings.dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields && 
+                member.Name.StartsWith('<') && 
+                member.Name.EndsWith(">k__BackingField")) return $"\"{member.Name.Substring("<", ">")}\":";
+
+            return $"\"{member.Name}\":";
         }
 
         private static StringBuilder WriteEscapedString(this StringBuilder sb, string str)
@@ -571,10 +685,9 @@ namespace Playground
                 IncludeFields = true
             };
 
-            int iterations = 1_000_000;
+            int iterations = 100_000;
 
-            //object testDto = new TestDto(99, "World", new MyEmbedded1());
-            object testDto = new TestDto();
+            object testDto = new TestDto(99, new MyEmbedded1());
             string json;
             var tk = AppTime.TimeKeeper;
             for (int i = 0; i < iterations; i++)
@@ -584,11 +697,18 @@ namespace Playground
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
             AppTime.Wait(1.Seconds());
-            
+
+            var settings = new MyJsonSerializer.Settings()
+            {
+                performKnownRefCheck = true,
+                addAllTypeInfo = false,
+                addDeviatingTypeInfo = true,
+                dataSelection = MyJsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields
+            };
             tk.Restart();
             for (int i = 0; i < iterations; i++)
             {
-                json = MyJsonSerializer.Serialize(testDto);
+                json = MyJsonSerializer.Serialize(testDto, settings);
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -602,14 +722,15 @@ namespace Playground
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
             AppTime.Wait(1.Seconds());
-
-            tk.Restart();
-            MyJsonSerializer.Settings settings = new MyJsonSerializer.Settings()
+            
+            settings = new MyJsonSerializer.Settings()
             {
-                addDeviatingTypeInfo = false,
+                performKnownRefCheck = false,
                 addAllTypeInfo = false,
-                onlyPublicFields = true,
+                addDeviatingTypeInfo = false,
+                dataSelection = MyJsonSerializer.DataSelection.PublicFieldsAndProperties
             };
+            tk.Restart();
             for (int i = 0; i < iterations; i++)
             {
                 json = MyJsonSerializer.Serialize<object>(testDto, settings);

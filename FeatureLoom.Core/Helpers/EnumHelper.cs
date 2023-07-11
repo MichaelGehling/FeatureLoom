@@ -34,6 +34,7 @@ namespace FeatureLoom.Helpers
                     intToName[intValue] = name;
                     intToEnum[intValue] = enumValue;
                 }
+                initialized = true;
             }
             finally
             {
@@ -74,6 +75,21 @@ namespace FeatureLoom.Helpers
             int intFlag = convertToInt(enumFlag);
             return (intValue & intFlag) != 0;
         }
+
+    }
+
+    public static class EnumHelper
+    {
+
+        public static string ToName<T>(T enumValue) where T : struct, Enum => EnumHelper<T>.ToName(enumValue);
+
+        public static int ToInt<T>(T enumValue) where T : struct, Enum => EnumHelper<T>.ToInt(enumValue);
+
+        public static bool TryFromString<T>(string enumString, out T enumValue) where T : struct, Enum => EnumHelper<T>.TryFromString(enumString, out enumValue);
+
+        public static bool TryFromInt<T>(int intValue, out T enumValue) where T : struct, Enum => EnumHelper<T>.TryFromInt(intValue, out enumValue);
+
+        public static bool IsFlagSet<T>(T enumValue, T enumFlag) where T : struct, Enum => EnumHelper<T>.IsFlagSet(enumValue, enumFlag);
 
     }
 
