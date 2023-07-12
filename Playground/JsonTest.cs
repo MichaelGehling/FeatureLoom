@@ -646,9 +646,17 @@ namespace Playground
         {
             string fieldName = PrepareFieldName(member, settings);
 
+            var parameter = Expression.Parameter(typeof(object));
+            Type declaringType = member is FieldInfo field2 ? field2.DeclaringType : member is PropertyInfo property2 ? property2.DeclaringType : default;
+            var castedParameter = Expression.Convert(parameter, declaringType);
+            var fieldAccess = member is FieldInfo field3 ? Expression.Field(castedParameter, field3) : member is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable<T>));
+            var lambda = Expression.Lambda<Func<object, IEnumerable<T>>>(castFieldAccess, parameter);
+            var compiledGetter = lambda.Compile();
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
-            {                
-                IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+            {
+                //IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                IEnumerable<T> items = compiledGetter(obj);
                 crawler.writer.WritePreparedString(fieldName);
                 PrepareUnexpectedValue(crawler, false, items.GetType());
                 crawler.writer.OpenCollection();
@@ -778,8 +786,6 @@ namespace Playground
 
 
 
-    
-
     internal class JsonTest
     {
         public static void Run()
@@ -792,8 +798,8 @@ namespace Playground
 
             int iterations = 5_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
-            //var testDto = new TestDto2();
+            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto2();
             string json;
 
             GC.Collect();
