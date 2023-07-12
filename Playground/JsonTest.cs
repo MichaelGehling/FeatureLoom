@@ -105,9 +105,30 @@ namespace Playground
 
 
 
-    public interface IJsonWriter
+    public class JsonStringWriter
     {
-        void OpenObject();
+        private StringBuilder sb = new StringBuilder();
+
+        public JsonStringWriter(StringBuilder sb)
+        {
+            this.sb = sb;
+        }
+
+        public void WriteNullValue() => sb.Append("null");
+        public void OpenObject() => sb.Append("{");
+        public void CloseObject() => sb.Append("}");
+        public void WriteTypeInfo(string typeName) => sb.Append("\"$type\":\"").Append(typeName).Append("\",");
+        public void WriteValueFieldName() => sb.Append("\"$value\":");
+        public void WritePrimitiveValue<T>(T value) => sb.Append(value.ToString());
+        public void WriteStringValue(string str) => sb.Append('\"').WriteEscapedString(str).Append('\"');
+        public void WriteRefObject(string refPath) => sb.Append("{\"$ref\":\"").Append(refPath).Append("\"}");
+        public void OpenCollection() => sb.Append("[");
+        public void CloseCollection() => sb.Append("]");
+        public void WriteComma() => sb.Append(",");
+        public void WritePreparedString(string str) => sb.Append(str);
+
+        /*
+        
         void CloseObject();
         void OpenCollection();
         void CloseCollection();
@@ -132,7 +153,8 @@ namespace Playground
         void WriteValue(DateTime value);
         void WriteValue(TimeSpan value);
         void WriteValue<T>(T value) where T : Enum;
-    }    
+        */
+    }
 
 
     public static class MyJsonSerializer
@@ -170,6 +192,7 @@ namespace Playground
 
         private struct Crawler
         {
+            public JsonStringWriter writer;
             public Settings settings;
             public string currentPath;
             public Dictionary<object, string> pathMap;
@@ -177,15 +200,27 @@ namespace Playground
             public string refPath;
 
             public static Crawler Root(object rootObj, Settings settings)
-            {                
-                if (settings.referenceCheck == ReferenceCheck.NoRefCheck) return new Crawler() { settings = settings, sb = new StringBuilder(settings.bufferSize) };
+            {
+                StringBuilder sb = new StringBuilder(settings.bufferSize);
+                var writer = new JsonStringWriter(sb);
+
+                if (settings.referenceCheck == ReferenceCheck.NoRefCheck)
+                {
+                    return new Crawler() 
+                    { 
+                        settings = settings, 
+                        sb = sb,
+                        writer = writer
+                    };
+                }
 
                 return new Crawler()
                 {
                     settings = settings,
                     currentPath = "$",
                     pathMap = new Dictionary<object, string>(){{rootObj, "$"}},
-                    sb = new StringBuilder()
+                    sb = sb,
+                    writer = writer
                 };
             }
 
@@ -207,7 +242,8 @@ namespace Playground
                     currentPath = childPath,
                     pathMap = pathMap,
                     sb = sb,
-                    refPath = childRefPath
+                    refPath = childRefPath,
+                    writer = writer
                 };
             }
 
@@ -229,7 +265,8 @@ namespace Playground
                     currentPath = childPath,
                     pathMap = pathMap,
                     sb = sb,
-                    refPath = childRefPath
+                    refPath = childRefPath,
+                    writer = writer
                 };
             }
 
@@ -304,7 +341,7 @@ namespace Playground
         {
             if (obj == null)
             {
-                crawler.sb.Append("null");
+                crawler.writer.WriteNullValue();
                 return;
             }            
             
@@ -314,14 +351,14 @@ namespace Playground
             if (objType.IsPrimitive)
             {
                 PrepareUnexpectedValue(crawler, deviatingType, objType);
-                crawler.sb.Append(obj.ToString());
+                crawler.writer.WritePrimitiveValue(obj);
                 FinishUnexpectedValue(crawler, deviatingType);
                 return;
             }
             if (obj is string str)
             {
                 PrepareUnexpectedValue(crawler, deviatingType, objType);
-                crawler.sb.Append('\"').WriteEscapedString(str).Append('\"');
+                crawler.writer.WriteStringValue(str);
                 FinishUnexpectedValue(crawler, deviatingType);
                 return;
             }
@@ -330,19 +367,19 @@ namespace Playground
             {
                 if (crawler.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
                 {
-                    crawler.sb.Append("{\"$ref\":\"").Append(crawler.refPath).Append("\"}");
+                    crawler.writer.WriteRefObject(crawler.refPath);
                     return;
                 }
                 else if (crawler.currentPath.StartsWith(crawler.refPath))
                 {
                     if (crawler.settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef)
                     {
-                        crawler.sb.Append("{\"$ref\":\"").Append(crawler.refPath).Append("\"}");
+                        crawler.writer.WriteRefObject(crawler.refPath);
                         return;
                     }
                     if (crawler.settings.referenceCheck == ReferenceCheck.OnLoopReplaceByNull)
                     {
-                        crawler.sb.Append("null");
+                        crawler.writer.WriteNullValue();
                         return;
                     }
                     if (crawler.settings.referenceCheck == ReferenceCheck.OnLoopThrowException)
@@ -368,9 +405,9 @@ namespace Playground
         {
             if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
             {
-                crawler.sb.Append('{')
-                .Append("\"$type\":\"").Append(objType.FullName).Append("\",")
-                .Append("\"$value\":");
+                crawler.writer.OpenObject();
+                crawler.writer.WriteTypeInfo(objType.FullName);
+                crawler.writer.WriteValueFieldName();
             }
         }
 
@@ -378,7 +415,7 @@ namespace Playground
         {
             if (crawler.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (crawler.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
             {
-                crawler.sb.Append("}");
+                crawler.writer.CloseObject();
             }
         }
 
@@ -389,33 +426,33 @@ namespace Playground
         {
             var sb = crawler.sb;
 
-            if (items is IEnumerable<string> string_items) SerializeStringCollection(string_items, sb);
-            else if (items is IEnumerable<int> int_items) SerializePrimitiveCollection(int_items, sb);
-            else if (items is IEnumerable<uint> uint_items) SerializePrimitiveCollection(uint_items, sb);
-            else if (items is IEnumerable<byte> byte_items) SerializePrimitiveCollection(byte_items, sb);
-            else if (items is IEnumerable<sbyte> sbyte_items) SerializePrimitiveCollection(sbyte_items, sb);
-            else if (items is IEnumerable<short> short_items) SerializePrimitiveCollection(short_items, sb);
-            else if (items is IEnumerable<ushort> ushort_items) SerializePrimitiveCollection(ushort_items, sb);
-            else if (items is IEnumerable<long> long_items) SerializePrimitiveCollection(long_items, sb);
-            else if (items is IEnumerable<ulong> ulong_items) SerializePrimitiveCollection(ulong_items, sb);
-            else if (items is IEnumerable<bool> bool_items) SerializePrimitiveCollection(bool_items, sb);
-            else if (items is IEnumerable<char> char_items) SerializePrimitiveCollection(char_items, sb);
-            else if (items is IEnumerable<float> float_items) SerializePrimitiveCollection(float_items, sb);
-            else if (items is IEnumerable<double> double_items) SerializePrimitiveCollection(double_items, sb);
-            else if (items is IEnumerable<IntPtr> intPtr_items) SerializePrimitiveCollection(intPtr_items, sb);
-            else if (items is IEnumerable<UIntPtr> uIntPtr_items) SerializePrimitiveCollection(uIntPtr_items, sb);
+            if (items is IEnumerable<string> string_items) SerializeStringCollection(string_items, crawler);
+            else if (items is IEnumerable<int> int_items) SerializePrimitiveCollection(int_items, crawler);
+            else if (items is IEnumerable<uint> uint_items) SerializePrimitiveCollection(uint_items, crawler);
+            else if (items is IEnumerable<byte> byte_items) SerializePrimitiveCollection(byte_items, crawler);
+            else if (items is IEnumerable<sbyte> sbyte_items) SerializePrimitiveCollection(sbyte_items, crawler);
+            else if (items is IEnumerable<short> short_items) SerializePrimitiveCollection(short_items, crawler);
+            else if (items is IEnumerable<ushort> ushort_items) SerializePrimitiveCollection(ushort_items, crawler);
+            else if (items is IEnumerable<long> long_items) SerializePrimitiveCollection(long_items, crawler);
+            else if (items is IEnumerable<ulong> ulong_items) SerializePrimitiveCollection(ulong_items, crawler);
+            else if (items is IEnumerable<bool> bool_items) SerializePrimitiveCollection(bool_items, crawler);
+            else if (items is IEnumerable<char> char_items) SerializePrimitiveCollection(char_items, crawler);
+            else if (items is IEnumerable<float> float_items) SerializePrimitiveCollection(float_items, crawler);
+            else if (items is IEnumerable<double> double_items) SerializePrimitiveCollection(double_items, crawler);
+            else if (items is IEnumerable<IntPtr> intPtr_items) SerializePrimitiveCollection(intPtr_items, crawler);
+            else if (items is IEnumerable<UIntPtr> uIntPtr_items) SerializePrimitiveCollection(uIntPtr_items, crawler);
             else 
             {                
                 Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>));
                 collectionType = collectionType ?? typeof(object);
 
-                sb.Append('[');
+                crawler.writer.OpenCollection();
                 bool isFirstItem = true;
                 int index = 0;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else sb.Append(',');
+                    else crawler.writer.WriteComma();
                     if (item != null && !item.GetType().IsValueType && !(item is string))
                     {
                         SerializeValue(item, collectionType, crawler.NewCollectionItem(item, "", index++));
@@ -425,7 +462,7 @@ namespace Playground
                         SerializeValue(item, collectionType, crawler);
                     }
                 }
-                sb.Append(']');
+                crawler.writer.CloseCollection();
             }
         }
 
@@ -438,18 +475,18 @@ namespace Playground
 
             if (objType.IsNullable() && obj == null)
             {
-                sb.Append("null");
+                crawler.writer.WriteNullValue();
                 return;
             }
 
             bool isFirstField = true;
-            sb.Append('{');
+            crawler.writer.OpenObject();
 
             bool deviatingType = expectedType != obj.GetType();
             if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
             {
                 if (isFirstField) isFirstField = false;
-                sb.Append("\"$type\":\"").Append(objType.FullName).Append('\"');
+                crawler.writer.WriteTypeInfo(objType.FullName);
             }
 
             TypeCache typeCache = typeCaches[settings.dataSelection.ToInt()];
@@ -483,7 +520,7 @@ namespace Playground
             foreach (var field in members)
             {
                 if (isFirstField) isFirstField = false;
-                else sb.Append(',');
+                else crawler.writer.WriteComma();
 
                 Action<object, MemberInfo, Crawler> writer;
                 using (var lockHandle = typeCacheLock.LockReadOnly())
@@ -497,7 +534,7 @@ namespace Playground
                 }
                 writer.Invoke(obj, field, crawler);
             }
-            sb.Append("}");
+            crawler.writer.CloseObject();
         }
 
         private static Action<object, MemberInfo, Crawler> CreateFieldWriter(Type objType, MemberInfo member, Settings settings)
@@ -505,20 +542,20 @@ namespace Playground
             Type memberType = member is FieldInfo field ? field.FieldType : member is PropertyInfo property ? property.PropertyType : default;
 
             if (memberType == typeof(string)) return CreateStringFieldWriter(member, settings);
-            else if (memberType == typeof(int)) return CreateFieldWriter<int>(objType, member, settings);
-            else if (memberType == typeof(uint)) return CreateFieldWriter<uint>(objType, member, settings);
-            else if (memberType == typeof(byte)) return CreateFieldWriter<byte>(objType, member, settings);
-            else if (memberType == typeof(sbyte)) return CreateFieldWriter<sbyte>(objType, member, settings);
-            else if (memberType == typeof(short)) return CreateFieldWriter<short>(objType, member, settings);
-            else if (memberType == typeof(ushort)) return CreateFieldWriter<ushort>(objType, member, settings);
-            else if (memberType == typeof(long)) return CreateFieldWriter<long>(objType, member, settings);
-            else if (memberType == typeof(ulong)) return CreateFieldWriter<ulong>(objType, member, settings);
-            else if (memberType == typeof(bool)) return CreateFieldWriter<bool>(objType, member, settings);
-            else if (memberType == typeof(char)) return CreateFieldWriter<char>(objType, member, settings);
-            else if (memberType == typeof(float)) return CreateFieldWriter<float>(objType, member, settings);
-            else if (memberType == typeof(double)) return CreateFieldWriter<double>(objType, member, settings);
-            else if (memberType == typeof(IntPtr)) return CreateFieldWriter<IntPtr>(objType, member, settings);
-            else if (memberType == typeof(UIntPtr)) return CreateFieldWriter<UIntPtr>(objType, member, settings);
+            else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, member, settings);
+            else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, member, settings);
+            else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, member, settings);
+            else if (memberType == typeof(sbyte)) return CreatePrimitiveFieldWriter<sbyte>(objType, member, settings);
+            else if (memberType == typeof(short)) return CreatePrimitiveFieldWriter<short>(objType, member, settings);
+            else if (memberType == typeof(ushort)) return CreatePrimitiveFieldWriter<ushort>(objType, member, settings);
+            else if (memberType == typeof(long)) return CreatePrimitiveFieldWriter<long>(objType, member, settings);
+            else if (memberType == typeof(ulong)) return CreatePrimitiveFieldWriter<ulong>(objType, member, settings);
+            else if (memberType == typeof(bool)) return CreatePrimitiveFieldWriter<bool>(objType, member, settings);
+            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, member, settings);
+            else if (memberType == typeof(float)) return CreatePrimitiveFieldWriter<float>(objType, member, settings);
+            else if (memberType == typeof(double)) return CreatePrimitiveFieldWriter<double>(objType, member, settings);
+            else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, member, settings);
+            else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, member, settings);
             else if (memberType.IsAssignableTo(typeof(IEnumerable)) && 
                         (memberType.IsAssignableTo(typeof(ICollection)) || 
                          memberType.IsOfGenericType(typeof(ICollection<>))))
@@ -541,33 +578,33 @@ namespace Playground
             return writer;
         }
 
-        private static void SerializePrimitiveCollection<T>(IEnumerable<T> items, StringBuilder sb)
+        private static void SerializePrimitiveCollection<T>(IEnumerable<T> items, Crawler crawler)
         {
-            sb.Append('[');
+            crawler.writer.OpenCollection();
             bool isFirstItem = true;
             foreach (var item in items)
             {
                 if (isFirstItem) isFirstItem = false;
-                else sb.Append(',');
-                sb.Append(item.ToString());
+                else crawler.writer.WriteComma();
+                crawler.writer.WritePrimitiveValue(item);
             }
-            sb.Append(']');
+            crawler.writer.CloseCollection();
         }
 
-        private static void SerializeStringCollection(IEnumerable<string> items, StringBuilder sb)
+        private static void SerializeStringCollection(IEnumerable<string> items, Crawler crawler)
         {
-            sb.Append('[');
+            crawler.writer.OpenCollection();
             bool isFirstItem = true;
             foreach (var item in items)
             {
                 if (isFirstItem) isFirstItem = false;
-                else sb.Append(',');
-                sb.Append('\"').WriteEscapedString(item).Append('\"');
+                else crawler.writer.WriteComma();
+                crawler.writer.WriteStringValue(item);
             }
-            sb.Append(']');
+            crawler.writer.CloseCollection();
         }
 
-        private static Action<object, MemberInfo, Crawler> CreateFieldWriter<T>(Type objType, MemberInfo member, Settings settings)
+        private static Action<object, MemberInfo, Crawler> CreatePrimitiveFieldWriter<T>(Type objType, MemberInfo member, Settings settings)
         {
             string fieldName = PrepareFieldName(member, settings);
 
@@ -579,10 +616,10 @@ namespace Playground
 
             Action<object, MemberInfo, Crawler>  writer = (obj, member, crawler) =>
             {
-                crawler.sb.Append(fieldName);          
+                crawler.writer.WritePreparedString(fieldName);
                 var value = compiledGetter(obj);
                 if (value != null) PrepareUnexpectedValue(crawler, false, value.GetType());
-                crawler.sb.Append(value.ToString());
+                crawler.writer.WritePrimitiveValue(value);
                 if (value != null) FinishUnexpectedValue(crawler, false);
             };
 
@@ -595,37 +632,36 @@ namespace Playground
 
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                crawler.sb.Append(fieldName);
+                crawler.writer.WritePreparedString(fieldName);
                 var value = (string) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
                 if (value != null) PrepareUnexpectedValue(crawler, false, value.GetType());
-                crawler.sb.Append('\"');
-                crawler.sb.WriteEscapedString(value).Append('\"');
+                crawler.writer.WriteStringValue(value);
                 FinishUnexpectedValue(crawler, false);
             };
 
             return writer;
         }
 
-        private static Action<object, MemberInfo, Crawler> CreateCollectionFieldWriter<T>(MemberInfo member, Settings settings)
+        private static Action<object, MemberInfo, Crawler> CreatePrimitiveCollectionFieldWriter<T>(MemberInfo member, Settings settings)
         {
             string fieldName = PrepareFieldName(member, settings);
 
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {                
                 IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
-                crawler.sb.Append(fieldName);
+                crawler.writer.WritePreparedString(fieldName);
                 PrepareUnexpectedValue(crawler, false, items.GetType());
-                crawler.sb.Append('[');
+                crawler.writer.OpenCollection();
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else crawler.sb.Append(',');
+                    else crawler.writer.WriteComma();
                     PrepareUnexpectedValue(crawler, false, item.GetType());
-                    crawler.sb.Append(item.ToString());
+                    crawler.writer.WritePrimitiveValue(item);
                     FinishUnexpectedValue(crawler, false);
                 }
-                crawler.sb.Append(']');
+                crawler.writer.CloseCollection();
                 FinishUnexpectedValue(crawler, false);
             };
 
@@ -639,19 +675,19 @@ namespace Playground
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {                
                 IEnumerable<string> items = (IEnumerable<string>)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
-                crawler.sb.Append(fieldName);
+                crawler.writer.WritePreparedString(fieldName);
                 PrepareUnexpectedValue(crawler, false, items.GetType());
-                crawler.sb.Append('[');
+                crawler.writer.OpenCollection();
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else crawler.sb.Append(',');
+                    else crawler.writer.WriteComma();
                     PrepareUnexpectedValue(crawler, false, item.GetType());
-                    crawler.sb.Append('\"').WriteEscapedString(item).Append('\"');
+                    crawler.writer.WriteStringValue(item);
                     FinishUnexpectedValue(crawler, false);
                 }
-                crawler.sb.Append(']');
+                crawler.writer.CloseCollection();
                 FinishUnexpectedValue(crawler, false);
             };
 
@@ -666,34 +702,34 @@ namespace Playground
             collectionType = collectionType ?? typeof(object);
 
             if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(member, settings);
-            else if (collectionType == typeof(int)) return CreateCollectionFieldWriter<int>(member, settings);
-            else if (collectionType == typeof(uint)) return CreateCollectionFieldWriter<uint>(member, settings);
-            else if (collectionType == typeof(byte)) return CreateCollectionFieldWriter<byte>(member, settings);
-            else if (collectionType == typeof(sbyte)) return CreateCollectionFieldWriter<sbyte>(member, settings);
-            else if (collectionType == typeof(short)) return CreateCollectionFieldWriter<short>(member, settings);
-            else if (collectionType == typeof(ushort)) return CreateCollectionFieldWriter<ushort>(member, settings);
-            else if (collectionType == typeof(long)) return CreateCollectionFieldWriter<long>(member, settings);
-            else if (collectionType == typeof(ulong)) return CreateCollectionFieldWriter<ulong>(member, settings);
-            else if (collectionType == typeof(bool)) return CreateCollectionFieldWriter<bool>(member, settings);
-            else if (collectionType == typeof(char)) return CreateCollectionFieldWriter<char>(member, settings);
-            else if (collectionType == typeof(float)) return CreateCollectionFieldWriter<float>(member, settings);
-            else if (collectionType == typeof(double)) return CreateCollectionFieldWriter<double>(member, settings);
-            else if (collectionType == typeof(IntPtr)) return CreateCollectionFieldWriter<IntPtr>(member, settings);
-            else if (collectionType == typeof(UIntPtr)) return CreateCollectionFieldWriter<UIntPtr>(member, settings);
+            else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(member, settings);
+            else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(member, settings);
+            else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(member, settings);
+            else if (collectionType == typeof(sbyte)) return CreatePrimitiveCollectionFieldWriter<sbyte>(member, settings);
+            else if (collectionType == typeof(short)) return CreatePrimitiveCollectionFieldWriter<short>(member, settings);
+            else if (collectionType == typeof(ushort)) return CreatePrimitiveCollectionFieldWriter<ushort>(member, settings);
+            else if (collectionType == typeof(long)) return CreatePrimitiveCollectionFieldWriter<long>(member, settings);
+            else if (collectionType == typeof(ulong)) return CreatePrimitiveCollectionFieldWriter<ulong>(member, settings);
+            else if (collectionType == typeof(bool)) return CreatePrimitiveCollectionFieldWriter<bool>(member, settings);
+            else if (collectionType == typeof(char)) return CreatePrimitiveCollectionFieldWriter<char>(member, settings);
+            else if (collectionType == typeof(float)) return CreatePrimitiveCollectionFieldWriter<float>(member, settings);
+            else if (collectionType == typeof(double)) return CreatePrimitiveCollectionFieldWriter<double>(member, settings);
+            else if (collectionType == typeof(IntPtr)) return CreatePrimitiveCollectionFieldWriter<IntPtr>(member, settings);
+            else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(member, settings);
             
             string fieldName = PrepareFieldName(member, settings);
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
                 IEnumerable items = (IEnumerable)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
-                crawler.sb.Append(fieldName);
+                crawler.writer.WritePreparedString(fieldName);
                 PrepareUnexpectedValue(crawler, false, items.GetType());
-                crawler.sb.Append('[');
+                crawler.writer.OpenCollection();
                 bool isFirstItem = true;
                 int index = 0;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
-                    else crawler.sb.Append(',');
+                    else crawler.writer.WriteComma();
                     if (item != null && !item.GetType().IsPrimitive && !(item is string))
                     {
                         SerializeValue(item, collectionType, crawler.NewCollectionItem(item, member.Name, index));
@@ -704,7 +740,7 @@ namespace Playground
                     }
                     index++;
                 }
-                crawler.sb.Append(']');
+                crawler.writer.CloseCollection();
                 FinishUnexpectedValue(crawler, false);
             };
 
@@ -720,7 +756,7 @@ namespace Playground
             return $"\"{member.Name}\":";
         }
 
-        private static StringBuilder WriteEscapedString(this StringBuilder sb, string str)
+        public static StringBuilder WriteEscapedString(this StringBuilder sb, string str)
         {
             foreach (char c in str)
             {
@@ -754,7 +790,7 @@ namespace Playground
                 ReferenceHandler = ReferenceHandler.Preserve
             };
 
-            int iterations = 1_000_000;
+            int iterations = 5_000_000;
 
             var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
