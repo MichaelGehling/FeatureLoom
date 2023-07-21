@@ -31,7 +31,7 @@ namespace FeatureLoom.Extensions
             if (encoding == default) encoding = Encoding.UTF8;
             return encoding.GetBytes(str);
         }
-        
+
 
         public static string AddToPath(this string pathBase, string pathExtension, char seperator = '\\')
         {

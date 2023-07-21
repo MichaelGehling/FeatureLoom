@@ -57,7 +57,6 @@ namespace Playground
         public TestDto(int myInt, IMyInterface myEmbedded)
         {
             this.myInt = myInt;
-            this.myString = myString;
             this.myEmbedded = myEmbedded;
             //this.self = this;
 
@@ -104,59 +103,6 @@ namespace Playground
     }
 
 
-
-    public class JsonStringWriter
-    {
-        private StringBuilder sb = new StringBuilder();
-
-        public JsonStringWriter(StringBuilder sb)
-        {
-            this.sb = sb;
-        }
-
-        public void WriteNullValue() => sb.Append("null");
-        public void OpenObject() => sb.Append("{");
-        public void CloseObject() => sb.Append("}");
-        public void WriteTypeInfo(string typeName) => sb.Append("\"$type\":\"").Append(typeName).Append("\",");
-        public void WriteValueFieldName() => sb.Append("\"$value\":");
-        public void WritePrimitiveValue<T>(T value) => sb.Append(value.ToString());
-        public void WriteStringValue(string str) => sb.Append('\"').WriteEscapedString(str).Append('\"');
-        public void WriteRefObject(string refPath) => sb.Append("{\"$ref\":\"").Append(refPath).Append("\"}");
-        public void OpenCollection() => sb.Append("[");
-        public void CloseCollection() => sb.Append("]");
-        public void WriteComma() => sb.Append(",");
-        public void WritePreparedString(string str) => sb.Append(str);
-
-        /*
-        
-        void CloseObject();
-        void OpenCollection();
-        void CloseCollection();
-        void WriteLabel(string label);
-        void WriteLabel(ArraySegment<byte> utf8Label);
-        void WriteEncodedValue(string value);
-        void WriteEncodedValue(ArraySegment<byte> utf8Value);
-        void WriteValue(string value);
-        void WriteValue(byte value);
-        void WriteValue(sbyte value);
-        void WriteValue(short value);
-        void WriteValue(ushort value);
-        void WriteValue(int value);
-        void WriteValue(uint value);
-        void WriteValue(long value);
-        void WriteValue(ulong value);
-        void WriteValue(float value);
-        void WriteValue(double value);
-        void WriteValue(decimal value);
-        void WriteValue(bool value);
-        void WriteValue(char value);
-        void WriteValue(DateTime value);
-        void WriteValue(TimeSpan value);
-        void WriteValue<T>(T value) where T : Enum;
-        */
-    }
-
-
     public static class MyJsonSerializer
     {
         public class Settings
@@ -190,26 +136,135 @@ namespace Playground
             AddAllTypeInfo = 2,
         }
 
+        public interface IJsonWriter
+        {
+            void CloseCollection();
+            void CloseObject();
+            void OpenCollection();
+            void OpenObject();
+            string ToString();
+            void WriteComma();
+            void WriteNullValue();
+            void WritePreparedString(string str);
+            void WritePrimitiveValue<T>(T value);
+            void WriteRefObject(string refPath);
+            void WriteStringValue(string str);
+            void WriteTypeInfo(string typeName);
+            void WriteValueFieldName();
+        }
+
+        public sealed class JsonStringWriter : IJsonWriter
+        {
+            private StringBuilder sb;
+
+            public JsonStringWriter(int bufferSize)
+            {
+                this.sb = new StringBuilder(bufferSize);
+            }
+
+            public int UsedBuffer => sb.Length;
+
+            public override string ToString() => sb.ToString();
+
+            public void WriteNullValue() => sb.Append("null");
+            public void OpenObject() => sb.Append("{");
+            public void CloseObject() => sb.Append("}");
+            public void WriteTypeInfo(string typeName) => sb.Append("\"$type\":\"").Append(typeName).Append("\",");
+            public void WriteValueFieldName() => sb.Append("\"$value\":");
+            public void WritePrimitiveValue<T>(T value) => sb.Append(value.ToString());
+            public void WriteStringValue(string str) => sb.Append('\"').WriteEscapedString(str).Append('\"');
+            public void WriteRefObject(string refPath) => sb.Append("{\"$ref\":\"").Append(refPath).Append("\"}");
+            public void OpenCollection() => sb.Append("[");
+            public void CloseCollection() => sb.Append("]");
+            public void WriteComma() => sb.Append(",");
+            public void WritePreparedString(string str) => sb.Append(str);
+        }
+
+        public sealed class JsonUTF8StreamWriter : IJsonWriter
+        {
+            private Stream stream;
+            private StreamWriter stringWriter;
+
+
+            public JsonUTF8StreamWriter(Stream stream)
+            {
+                this.stream = stream;
+                this.stringWriter = new StreamWriter(stream, Encoding.UTF8);
+            }
+
+            public override string ToString() => stream.ReadToString();
+
+
+            static readonly byte[] NULL = "null".ToByteArray();
+            public void WriteNullValue() => stream.Write(NULL, 0, NULL.Length);
+
+            static readonly byte[] OPEN_OBJECT = "{".ToByteArray();
+            public void OpenObject() => stream.Write(OPEN_OBJECT, 0, OPEN_OBJECT.Length);
+
+            static readonly byte[] CLOSE_OBJECT = "}".ToByteArray();
+            public void CloseObject() => stream.Write(CLOSE_OBJECT, 0, CLOSE_OBJECT.Length);
+
+            static readonly byte[] TYPEINFO_PRE = "\"$type\":\"".ToByteArray();
+            static readonly byte[] TYPEINFO_POST = "\",".ToByteArray();
+            public void WriteTypeInfo(string typeName)
+            {
+                stream.Write(TYPEINFO_PRE, 0, TYPEINFO_PRE.Length);
+                stringWriter.Write(typeName);
+                stream.Write(TYPEINFO_POST, 0, TYPEINFO_POST.Length);
+            }
+
+            static readonly byte[] VALUEFIELDNAME = "\"$value\":".ToByteArray();
+            public void WriteValueFieldName() => stream.Write(VALUEFIELDNAME, 0, VALUEFIELDNAME.Length);
+
+
+            public void WritePrimitiveValue<T>(T value) => stringWriter.Write(value.ToString());
+
+            static readonly byte[] STRINGVALUE_PRE = "\"".ToByteArray();
+            static readonly byte[] STRINGVALUE_POST = "\"".ToByteArray();
+            public void WriteStringValue(string str)
+            {
+                stream.Write(STRINGVALUE_PRE, 0,  STRINGVALUE_PRE.Length);
+                stringWriter.Write(str);
+                stream.Write(STRINGVALUE_POST, 0, STRINGVALUE_POST.Length);
+            }
+
+            static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();
+            static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();
+            public void WriteRefObject(string refPath)
+            {
+                stream.Write(REFOBJECT_PRE, 0, REFOBJECT_PRE.Length);
+                stringWriter.Write(refPath);
+                stream.Write(REFOBJECT_POST, 0, REFOBJECT_POST.Length);
+            }
+
+            static readonly byte[] OPENCOLLECTION = "[".ToByteArray();
+            public void OpenCollection() => stream.Write(OPENCOLLECTION, 0, OPENCOLLECTION.Length);
+
+            static readonly byte[] CLOSECOLLECTION = "]".ToByteArray();
+            public void CloseCollection() => stream.Write(CLOSECOLLECTION, 0, CLOSECOLLECTION.Length);
+
+            static readonly byte[] COMMA = ",".ToByteArray();
+            public void WriteComma() => stream.Write(COMMA, 0, COMMA.Length);
+
+            public void WritePreparedString(string str) => stringWriter.Write(str);
+        }
+
         private struct Crawler
         {
-            public JsonStringWriter writer;
+            public IJsonWriter writer;
             public Settings settings;
             public string currentPath;
             public Dictionary<object, string> pathMap;
-            public StringBuilder sb;
             public string refPath;
 
-            public static Crawler Root(object rootObj, Settings settings)
+            public static Crawler Root(object rootObj, Settings settings, IJsonWriter writer)
             {
-                StringBuilder sb = new StringBuilder(settings.bufferSize);
-                var writer = new JsonStringWriter(sb);
 
                 if (settings.referenceCheck == ReferenceCheck.NoRefCheck)
                 {
                     return new Crawler() 
                     { 
                         settings = settings, 
-                        sb = sb,
                         writer = writer
                     };
                 }
@@ -219,7 +274,6 @@ namespace Playground
                     settings = settings,
                     currentPath = "$",
                     pathMap = new Dictionary<object, string>(){{rootObj, "$"}},
-                    sb = sb,
                     writer = writer
                 };
             }
@@ -241,7 +295,6 @@ namespace Playground
                     settings = settings,
                     currentPath = childPath,
                     pathMap = pathMap,
-                    sb = sb,
                     refPath = childRefPath,
                     writer = writer
                 };
@@ -264,7 +317,6 @@ namespace Playground
                     settings = settings,
                     currentPath = childPath,
                     pathMap = pathMap,
-                    sb = sb,
                     refPath = childRefPath,
                     writer = writer
                 };
@@ -321,20 +373,75 @@ namespace Playground
                     if (typeCache.typeBufferInfo.TryGetValue(objType, out var b)) settings.bufferSize = b;
                 }
             }
-            
-            Crawler crawler = Crawler.Root(obj, settings);
+
+
+            var writer = new JsonStringWriter(settings.bufferSize);
+            Crawler crawler = Crawler.Root(obj, settings, writer);
             SerializeValue(obj, typeof(T), crawler);
 
             Thread.CurrentThread.CurrentCulture = oldCulture;
 
-            if (autoBufferSize && crawler.sb.Length > settings.bufferSize)
+            if (autoBufferSize && writer.UsedBuffer > settings.bufferSize)
             {
                 using (typeCacheLock.Lock())
                 {
-                    typeCache.typeBufferInfo[objType] = crawler.sb.Length;
+                    typeCache.typeBufferInfo[objType] = writer.UsedBuffer;
                 }
             }
-            return crawler.sb.ToString();
+            return crawler.ToString();
+        }
+
+        public static byte[] SerializeToUtf8Bytes<T>(T obj, Settings settings = null)
+        {
+            if (settings == null) settings = defaultSettings;
+
+            var oldCulture = Thread.CurrentThread.CurrentCulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
+
+            TypeCache typeCache = typeCaches[settings.dataSelection.ToInt()];
+            Type objType = obj.GetType();
+
+            bool autoBufferSize = false;
+            if (settings.bufferSize < 0)
+            {
+                autoBufferSize = true;
+                settings.bufferSize = 64;
+                using (typeCacheLock.LockReadOnly())
+                {
+                    if (typeCache.typeBufferInfo.TryGetValue(objType, out var b)) settings.bufferSize = b;
+                }
+            }
+
+            MemoryStream stream = new MemoryStream(settings.bufferSize);
+            var writer = new JsonUTF8StreamWriter(stream);
+            Crawler crawler = Crawler.Root(obj, settings, writer);
+            SerializeValue(obj, typeof(T), crawler);
+
+            Thread.CurrentThread.CurrentCulture = oldCulture;
+
+            if (autoBufferSize && stream.Length > settings.bufferSize)
+            {
+                using (typeCacheLock.Lock())
+                {
+                    typeCache.typeBufferInfo[objType] = (int)stream.Length;
+                }
+            }
+            return stream.GetBuffer();
+        }
+
+        public static void Serialize<T>(Stream stream, T obj, Settings settings = null)
+        {
+            if (settings == null) settings = defaultSettings;
+
+            var oldCulture = Thread.CurrentThread.CurrentCulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
+            var writer = new JsonUTF8StreamWriter(stream);
+            Crawler crawler = Crawler.Root(obj, settings, writer);
+            SerializeValue(obj, typeof(T), crawler);
+
+            Thread.CurrentThread.CurrentCulture = oldCulture;
         }
 
         private static void SerializeValue(object obj, Type expectedType, Crawler crawler)
@@ -424,7 +531,6 @@ namespace Playground
 
         private static void SerializeCollection(Type objType, IEnumerable items, Crawler crawler)
         {
-            var sb = crawler.sb;
 
             if (items is IEnumerable<string> string_items) SerializeStringCollection(string_items, crawler);
             else if (items is IEnumerable<int> int_items) SerializePrimitiveCollection(int_items, crawler);
@@ -453,7 +559,7 @@ namespace Playground
                 {
                     if (isFirstItem) isFirstItem = false;
                     else crawler.writer.WriteComma();
-                    if (item != null && !item.GetType().IsValueType && !(item is string))
+                    if (item != null && !item.GetType().IsPrimitive && !(item is string))
                     {
                         SerializeValue(item, collectionType, crawler.NewCollectionItem(item, "", index++));
                     }
@@ -468,7 +574,6 @@ namespace Playground
 
         private static void SerializeComplexType(object obj, Type expectedType, Crawler crawler)
         {
-            var sb = crawler.sb;
             var settings = crawler.settings;
 
             Type objType = obj.GetType();
@@ -541,7 +646,7 @@ namespace Playground
         {
             Type memberType = member is FieldInfo field ? field.FieldType : member is PropertyInfo property ? property.PropertyType : default;
 
-            if (memberType == typeof(string)) return CreateStringFieldWriter(member, settings);
+            if (memberType == typeof(string)) return CreateStringFieldWriter(objType, member, settings);
             else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, member, settings);
             else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, member, settings);
             else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, member, settings);
@@ -568,7 +673,7 @@ namespace Playground
 
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                crawler.sb.Append(fieldName);
+                crawler.writer.WritePreparedString(fieldName);
                 var (memberType, value) = member is FieldInfo field ? (field.FieldType, field.GetValue(obj)) : 
                                           member is PropertyInfo property ? (property.PropertyType, property.GetValue(obj)) : 
                                           default;
@@ -616,8 +721,9 @@ namespace Playground
 
             Action<object, MemberInfo, Crawler>  writer = (obj, member, crawler) =>
             {
-                crawler.writer.WritePreparedString(fieldName);
                 var value = compiledGetter(obj);
+                //var value = (T) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                crawler.writer.WritePreparedString(fieldName);                
                 if (value != null) PrepareUnexpectedValue(crawler, false, value.GetType());
                 crawler.writer.WritePrimitiveValue(value);
                 if (value != null) FinishUnexpectedValue(crawler, false);
@@ -626,14 +732,21 @@ namespace Playground
             return writer;
         }
 
-        private static Action<object, MemberInfo, Crawler> CreateStringFieldWriter(MemberInfo member, Settings settings)
+        private static Action<object, MemberInfo, Crawler> CreateStringFieldWriter(Type objType, MemberInfo member, Settings settings)
         {
             string fieldName = PrepareFieldName(member, settings);
 
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = member is FieldInfo field ? Expression.Field(castedParameter, field) : member is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, string>>(fieldAccess, parameter);
+            var compiledGetter = lambda.Compile();
+
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
+                var value = compiledGetter(obj);
+                //var value = (string) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
                 crawler.writer.WritePreparedString(fieldName);
-                var value = (string) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
                 if (value != null) PrepareUnexpectedValue(crawler, false, value.GetType());
                 crawler.writer.WriteStringValue(value);
                 FinishUnexpectedValue(crawler, false);
@@ -653,6 +766,7 @@ namespace Playground
             var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable<T>));
             var lambda = Expression.Lambda<Func<object, IEnumerable<T>>>(castFieldAccess, parameter);
             var compiledGetter = lambda.Compile();
+
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
                 //IEnumerable<T> items = (IEnumerable<T>) (member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
@@ -680,9 +794,18 @@ namespace Playground
         {
             string fieldName = PrepareFieldName(member, settings);
 
+            var parameter = Expression.Parameter(typeof(object));
+            Type declaringType = member is FieldInfo field2 ? field2.DeclaringType : member is PropertyInfo property2 ? property2.DeclaringType : default;
+            var castedParameter = Expression.Convert(parameter, declaringType);
+            var fieldAccess = member is FieldInfo field3 ? Expression.Field(castedParameter, field3) : member is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable<string>));
+            var lambda = Expression.Lambda<Func<object, IEnumerable<string>>>(castFieldAccess, parameter);
+            var compiledGetter = lambda.Compile();
+
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
-            {                
-                IEnumerable<string> items = (IEnumerable<string>)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+            {
+                //IEnumerable<string> items = (IEnumerable<string>)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                IEnumerable<string> items = compiledGetter(obj);
                 crawler.writer.WritePreparedString(fieldName);
                 PrepareUnexpectedValue(crawler, false, items.GetType());
                 crawler.writer.OpenCollection();
@@ -726,9 +849,19 @@ namespace Playground
             else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(member, settings);
             
             string fieldName = PrepareFieldName(member, settings);
+
+            var parameter = Expression.Parameter(typeof(object));
+            Type declaringType = member is FieldInfo field2 ? field2.DeclaringType : member is PropertyInfo property2 ? property2.DeclaringType : default;
+            var castedParameter = Expression.Convert(parameter, declaringType);
+            var fieldAccess = member is FieldInfo field3 ? Expression.Field(castedParameter, field3) : member is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable));
+            var lambda = Expression.Lambda<Func<object, IEnumerable>>(castFieldAccess, parameter);
+            var compiledGetter = lambda.Compile();
+
             Action<object, MemberInfo, Crawler> writer = (obj, member, crawler) =>
             {
-                IEnumerable items = (IEnumerable)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                //IEnumerable items = (IEnumerable)(member is FieldInfo field ? field.GetValue(obj) : member is PropertyInfo property ? property.GetValue(obj) : default);
+                IEnumerable items = compiledGetter(obj);
                 crawler.writer.WritePreparedString(fieldName);
                 PrepareUnexpectedValue(crawler, false, items.GetType());
                 crawler.writer.OpenCollection();
@@ -788,26 +921,51 @@ namespace Playground
 
     internal class JsonTest
     {
-        public static void Run()
+        public class NullStream : Stream
+        {
+            public override bool CanRead => false;
+            public override bool CanSeek => false;
+            public override bool CanWrite => true;
+            public override long Length => 0;
+            public override long Position { get; set; } = 0;
+
+            public override void Flush() { }
+
+            public override int Read(byte[] buffer, int offset, int count) => 0;
+
+            public override long Seek(long offset, SeekOrigin origin) => 0;
+
+            public override void SetLength(long value) { }
+
+            public override void Write(byte[] buffer, int offset, int count) { }
+        }
+
+        public static async Task Run()
         {
             var opt = new JsonSerializerOptions()
             {
                 IncludeFields = true,
-                ReferenceHandler = ReferenceHandler.Preserve
+                //ReferenceHandler = ReferenceHandler.Preserve
             };
 
-            int iterations = 5_000_000;
+            int iterations = 3_000_000;
 
             //var testDto = new TestDto(99, new MyEmbedded1());
             var testDto = new TestDto2();
-            string json;
+            Type testDtoType = testDto.GetType();
+            //string json;
+            byte[] json;
+
+            NullStream nullStream = new NullStream();
 
             GC.Collect();
             AppTime.Wait(1.Seconds());
             var tk = AppTime.TimeKeeper;
             for (int i = 0; i < iterations; i++)
             {
-                json = JsonSerializer.Serialize(testDto, opt);
+                //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
+                JsonSerializer.Serialize(nullStream, testDto, opt);
+                //json = JsonSerializer.Serialize(testDto, opt);
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -822,7 +980,9 @@ namespace Playground
             tk.Restart();
             for (int i = 0; i < iterations; i++)
             {
-                json = MyJsonSerializer.Serialize(testDto, settings);
+                //json = MyJsonSerializer.SerializeToUtf8Bytes(testDto, settings);
+                MyJsonSerializer.Serialize(nullStream, testDto, settings);
+                //json = MyJsonSerializer.Serialize(testDto, settings);
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -831,7 +991,7 @@ namespace Playground
             tk.Restart();
             for (int i = 0; i < iterations; i++)
             {
-                json = FeatureLoom.Serialization.Json.SerializeToJson(testDto);
+                //json = FeatureLoom.Serialization.Json.SerializeToJson(testDto).ToByteArray();                
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -845,8 +1005,10 @@ namespace Playground
             };
             tk.Restart();
             for (int i = 0; i < iterations; i++)
-            {
-                json = MyJsonSerializer.Serialize<object>(testDto, settings);
+            {                
+                //json = MyJsonSerializer.SerializeToUtf8Bytes(testDto, settings);
+                MyJsonSerializer.Serialize(nullStream, testDto, settings);
+                //json = MyJsonSerializer.Serialize(testDto, settings);
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();

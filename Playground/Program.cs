@@ -77,7 +77,7 @@ namespace Playground
 
 
 
-            JsonTest.Run();
+            await JsonTest.Run();
 
             Log.INFO("InfoTest");
             Log.ERROR("ErrorTest");

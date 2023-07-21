@@ -7,15 +7,15 @@ namespace FeatureLoom.Extensions
 {
     public static class StreamExtensions
     {
-        public static string ReadToString(this Stream stream)
+        public static string ReadToString(this Stream stream, Encoding encoding = null)
         {
-            StreamReader reader = new StreamReader(stream);
+            StreamReader reader = new StreamReader(stream, encoding ?? Encoding.UTF8);
             return reader.ReadToEnd();
         }
 
-        public static Task<string> ReadToStringAsync(this Stream stream)
+        public static Task<string> ReadToStringAsync(this Stream stream, Encoding encoding = null)
         {
-            StreamReader reader = new StreamReader(stream);
+            StreamReader reader = new StreamReader(stream, encoding ?? Encoding.UTF8);
             return reader.ReadToEndAsync();
         }
 
