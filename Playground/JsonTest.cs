@@ -125,11 +125,11 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
-            var testDto = new TestDto2();
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto2();
             Type testDtoType = testDto.GetType();
-            //string json;
-            byte[] json;
+            string json;
+            //byte[] json;
 
             NullStream nullStream = new NullStream();
 
@@ -161,6 +161,7 @@ namespace Playground
                 //json = loopSerializer.Serialize(testDto, settingsloop);
             }
             Console.WriteLine(tk.Elapsed);
+            AppTime.Wait(1.Seconds());
             GC.Collect();
             AppTime.Wait(1.Seconds());
 

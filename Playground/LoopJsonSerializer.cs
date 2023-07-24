@@ -49,8 +49,7 @@ namespace Playground
         JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
         MemoryStream memoryStream = new MemoryStream();
         Dictionary<object, string> pathMap = new();
-        Dictionary<Type, List<MemberInfo>> memberInfosCache = new();
-        Dictionary<MemberInfo, Action<object, string>> fieldWritersCache = new();
+        Dictionary<Type, List<Action<object, string>>> fieldWritersCache = new();
 
         struct CollectionInfo
         {
@@ -169,13 +168,7 @@ namespace Playground
                 if (job.index++ > 0) writer.WriteComma();
                 jobStack.Push(job);
 
-                var memberInfo = (MemberInfo)job.enumerator.Current;
-
-                if (!fieldWritersCache.TryGetValue(memberInfo, out var fieldWriter))
-                {
-                    fieldWriter = CreateFieldWriter(job.itemType, memberInfo);
-                    fieldWritersCache[memberInfo] = fieldWriter;
-                }
+                var fieldWriter = (Action<object, string>)job.enumerator.Current;
 
                 fieldWriter(job.item, job.currentPath);
             }
@@ -220,9 +213,9 @@ namespace Playground
             }
 
             {
-                if (!memberInfosCache.TryGetValue(objType, out var memberInfos))
+                if (!fieldWritersCache.TryGetValue(objType, out var fieldWriters))
                 {
-                    memberInfos = new List<MemberInfo>();
+                    var memberInfos = new List<MemberInfo>();
                     if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
                     {
                         memberInfos.AddRange(objType.GetFields(BindingFlags.Public | BindingFlags.Instance));
@@ -238,7 +231,14 @@ namespace Playground
                             t = t.BaseType;
                         }
                     }
-                    memberInfosCache[objType] = memberInfos;
+
+                    fieldWriters = new();
+                    foreach (var memberInfo in memberInfos)
+                    {
+                        var fieldWriter = CreateFieldWriter(objType, memberInfo);
+                        fieldWriters.Add(fieldWriter);                        
+                    }
+                    fieldWritersCache[objType] = fieldWriters;
                 }
 
                 Job job = new Job()
@@ -248,7 +248,7 @@ namespace Playground
                     index = 0,
                     item = obj,
                     itemType = objType,
-                    enumerator = memberInfos.GetEnumerator(),
+                    enumerator = fieldWriters.GetEnumerator(),
                     currentPath = currentPath,
                     deviatingType = deviatingType
                 };
