@@ -123,7 +123,7 @@ namespace Playground
                 //ReferenceHandler = ReferenceHandler.Preserve
             };
 
-            int iterations = 1_000_000;
+            int iterations = 100_000;
 
             var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
@@ -146,6 +146,20 @@ namespace Playground
             GC.Collect();
             AppTime.Wait(1.Seconds());
 
+            tk.Restart();
+            for (int i = 0; i < iterations; i++)
+            {
+                //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
+                JsonSerializer.Serialize(nullStream, testDto, opt);
+                //json = JsonSerializer.Serialize(testDto, opt);
+            }
+            Console.WriteLine(tk.Elapsed);
+            GC.Collect();
+            AppTime.Wait(1.Seconds());
+
+
+
+
             var settingsloop = new LoopJsonSerializer.Settings()
             {
                 referenceCheck = LoopJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
@@ -163,7 +177,21 @@ namespace Playground
             Console.WriteLine(tk.Elapsed);
             AppTime.Wait(1.Seconds());
             GC.Collect();
+
+            tk.Restart();
+            for (int i = 0; i < iterations; i++)
+            {
+                //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
+                loopSerializer.Serialize(nullStream, testDto, settingsloop);
+                //json = loopSerializer.Serialize(testDto, settingsloop);
+            }
+            Console.WriteLine(tk.Elapsed);
             AppTime.Wait(1.Seconds());
+            GC.Collect();
+
+
+
+            /*
 
             var settings = new MyJsonSerializer.Settings()
             {
@@ -181,6 +209,8 @@ namespace Playground
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
             AppTime.Wait(1.Seconds());
+            */
+
 
             settingsloop = new LoopJsonSerializer.Settings()
             {
@@ -200,6 +230,18 @@ namespace Playground
             GC.Collect();
             AppTime.Wait(1.Seconds());
 
+            tk.Restart();
+            for (int i = 0; i < iterations; i++)
+            {
+                //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
+                loopSerializer.Serialize(nullStream, testDto, settingsloop);
+                //json = loopSerializer.Serialize(testDto, settingsloop);
+            }
+            Console.WriteLine(tk.Elapsed);
+            GC.Collect();
+            AppTime.Wait(1.Seconds());
+
+            /*
             settings = new MyJsonSerializer.Settings()
             {
                 referenceCheck = MyJsonSerializer.ReferenceCheck.NoRefCheck,
@@ -216,7 +258,7 @@ namespace Playground
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
             AppTime.Wait(1.Seconds());
-
+            */
 
             //var result = JsonSerializer.Deserialize<TestDto>(json);
             Console.ReadKey();

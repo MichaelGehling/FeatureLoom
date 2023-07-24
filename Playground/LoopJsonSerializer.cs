@@ -18,6 +18,7 @@ using Newtonsoft.Json.Linq;
 using System.Diagnostics.Metrics;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
+using System.Collections.Specialized;
 
 namespace Playground
 {
@@ -49,21 +50,29 @@ namespace Playground
         JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
         MemoryStream memoryStream = new MemoryStream();
         Dictionary<object, string> pathMap = new();
-        Dictionary<Type, List<Action<object, string>>> fieldWritersCache = new();
+        Dictionary<Type, TypeCacheItem> typeCache = new();
 
-        struct CollectionInfo
+        class TypeCacheItem
         {
             public bool isCollection;
             public Type collectionType;
+            public List<Action<object, string>> fieldWriters;
+        }
+
+        class CollectionInfo
+        {
+            public bool isCollection;
+            public Type collectionType;
+
+            public readonly static CollectionInfo NoCollectionInfo = new CollectionInfo(false, null);
+            public readonly static CollectionInfo ObjectCollectionInfo = new CollectionInfo(false, typeof(object));
 
             public CollectionInfo(bool isCollection, Type collectionType)
             {
                 this.isCollection = isCollection;
                 this.collectionType = collectionType;
             }
-        }
-
-        LazyValue<Dictionary<Type, CollectionInfo>> collectionInfos;
+        }        
 
 
         public string Serialize<T>(T item, Settings settings = null)
@@ -207,53 +216,80 @@ namespace Playground
                 if (objType.IsClass) pathMap[obj] = currentPath;
             }
 
-            if (obj is IEnumerable items)
+            if (!typeCache.TryGetValue(objType, out var typeCacheItem))
             {
-                if (TryHandleCollection(currentPath, objType, deviatingType, items)) return;                
+                typeCacheItem = CreateTypeCacheItem(obj, objType);
             }
 
+            if (typeCacheItem.isCollection)
             {
-                if (!fieldWritersCache.TryGetValue(objType, out var fieldWriters))
-                {
-                    var memberInfos = new List<MemberInfo>();
-                    if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
-                    {
-                        memberInfos.AddRange(objType.GetFields(BindingFlags.Public | BindingFlags.Instance));
-                        memberInfos.AddRange(objType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.GetMethod != null));
-                    }
-                    else
-                    {
-                        memberInfos.AddRange(objType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
-                        Type t = objType.BaseType;
-                        while (t != null)
-                        {
-                            memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !memberInfos.Any(field => field.Name == baseField.Name)));
-                            t = t.BaseType;
-                        }
-                    }
+                HandleCollection(currentPath, objType, deviatingType, obj as IEnumerable, typeCacheItem);
+                return;
+            }
 
-                    fieldWriters = new();
-                    foreach (var memberInfo in memberInfos)
+            Job job = new Job()
+            {
+                jobType = JobType.ComplexObject,
+                collectionType = null,
+                index = 0,
+                item = obj,
+                itemType = objType,
+                enumerator = typeCacheItem.fieldWriters.GetEnumerator(),
+                currentPath = currentPath,
+                deviatingType = deviatingType
+            };
+            jobStack.Push(job);
+        }
+
+        private TypeCacheItem CreateTypeCacheItem(object obj, Type objType)
+        {
+            TypeCacheItem typeCacheItem = new TypeCacheItem();
+            if (obj is IEnumerable)
+            {
+                Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
+                if (collectionType != null)
+                {
+                    typeCacheItem.isCollection = true;
+                    typeCacheItem.collectionType = collectionType;
+                }
+                else if (objType is ICollection)
+                {
+                    typeCacheItem.isCollection = true;
+                    typeCacheItem.collectionType = typeof(object);
+                }
+                else typeCacheItem.isCollection = false;
+            }
+            else typeCacheItem.isCollection = false;
+
+            if (!typeCacheItem.isCollection)
+            {
+                var memberInfos = new List<MemberInfo>();
+                if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
+                {
+                    memberInfos.AddRange(objType.GetFields(BindingFlags.Public | BindingFlags.Instance));
+                    memberInfos.AddRange(objType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.GetMethod != null));
+                }
+                else
+                {
+                    memberInfos.AddRange(objType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
+                    Type t = objType.BaseType;
+                    while (t != null)
                     {
-                        var fieldWriter = CreateFieldWriter(objType, memberInfo);
-                        fieldWriters.Add(fieldWriter);                        
+                        memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !memberInfos.Any(field => field.Name == baseField.Name)));
+                        t = t.BaseType;
                     }
-                    fieldWritersCache[objType] = fieldWriters;
                 }
 
-                Job job = new Job()
+                typeCacheItem.fieldWriters = new();
+                foreach (var memberInfo in memberInfos)
                 {
-                    jobType = JobType.ComplexObject,
-                    collectionType = null,
-                    index = 0,
-                    item = obj,
-                    itemType = objType,
-                    enumerator = fieldWriters.GetEnumerator(),
-                    currentPath = currentPath,
-                    deviatingType = deviatingType
-                };
-                jobStack.Push(job);
+                    var fieldWriter = CreateFieldWriter(objType, memberInfo);
+                    typeCacheItem.fieldWriters.Add(fieldWriter);
+                }
             }
+
+            typeCache[objType] = typeCacheItem;
+            return typeCacheItem;
         }
 
         private bool TryHandleRef(object obj, string currentPath)
@@ -286,61 +322,48 @@ namespace Playground
             return done;
         }
 
-        private bool TryHandleCollection(string currentPath, Type objType, bool deviatingType, IEnumerable items)
+        private void HandleCollection(string currentPath, Type objType, bool deviatingType, IEnumerable items, TypeCacheItem typeCacheItem)
         {
-            bool done = false;
-            if (!collectionInfos.Exists || !collectionInfos.Obj.TryGetValue(objType, out CollectionInfo collectionInfo))
+            if (items is ICollection<string> string_items)
             {
-                Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
-                if (collectionType != null) collectionInfo = new CollectionInfo(true, collectionType);
-                else if (objType is ICollection) collectionInfo = new CollectionInfo(true, null);
-                else collectionInfo = new CollectionInfo(false, null);
-                collectionInfos.Obj[objType] = collectionInfo;
+                PrepareUnexpectedValue(deviatingType, objType);
+                SerializeStringCollection(string_items);
+                FinishUnexpectedValue(deviatingType);
             }
-
-            if (collectionInfo.isCollection)
+            else if (typeCacheItem.collectionType.IsPrimitive)
             {
-                if (collectionInfo.collectionType != null &&
-                    (collectionInfo.collectionType == typeof(string) || collectionInfo.collectionType.IsPrimitive))
-                {
-                    PrepareUnexpectedValue(deviatingType, objType);
-                    if (items is ICollection<string> string_items) SerializeStringCollection(string_items);
-                    else if (items is ICollection<int> int_items) SerializePrimitiveCollection(int_items);
-                    else if (items is ICollection<uint> uint_items) SerializePrimitiveCollection(uint_items);
-                    else if (items is ICollection<byte> byte_items) SerializePrimitiveCollection(byte_items);
-                    else if (items is ICollection<sbyte> sbyte_items) SerializePrimitiveCollection(sbyte_items);
-                    else if (items is ICollection<short> short_items) SerializePrimitiveCollection(short_items);
-                    else if (items is ICollection<ushort> ushort_items) SerializePrimitiveCollection(ushort_items);
-                    else if (items is ICollection<long> long_items) SerializePrimitiveCollection(long_items);
-                    else if (items is ICollection<ulong> ulong_items) SerializePrimitiveCollection(ulong_items);
-                    else if (items is ICollection<bool> bool_items) SerializePrimitiveCollection(bool_items);
-                    else if (items is ICollection<char> char_items) SerializePrimitiveCollection(char_items);
-                    else if (items is ICollection<float> float_items) SerializePrimitiveCollection(float_items);
-                    else if (items is ICollection<double> double_items) SerializePrimitiveCollection(double_items);
-                    else if (items is ICollection<IntPtr> intPtr_items) SerializePrimitiveCollection(intPtr_items);
-                    else if (items is ICollection<UIntPtr> uIntPtr_items) SerializePrimitiveCollection(uIntPtr_items);
-                    FinishUnexpectedValue(deviatingType);
-                    done = true;
-                }
-                else
-                {
-                    Job job = new Job()
-                    {
-                        jobType = JobType.Collection,
-                        collectionType = collectionInfo.collectionType,
-                        index = 0,
-                        item = items,
-                        itemType = objType,
-                        enumerator = items.GetEnumerator(),
-                        currentPath = currentPath,
-                        deviatingType = deviatingType
-                    };
-                    jobStack.Push(job);
-                    done = true;
-                }
+                PrepareUnexpectedValue(deviatingType, objType);
+                if (items is ICollection<int> int_items) SerializePrimitiveCollection(int_items);
+                else if (items is ICollection<uint> uint_items) SerializePrimitiveCollection(uint_items);
+                else if (items is ICollection<byte> byte_items) SerializePrimitiveCollection(byte_items);
+                else if (items is ICollection<sbyte> sbyte_items) SerializePrimitiveCollection(sbyte_items);
+                else if (items is ICollection<short> short_items) SerializePrimitiveCollection(short_items);
+                else if (items is ICollection<ushort> ushort_items) SerializePrimitiveCollection(ushort_items);
+                else if (items is ICollection<long> long_items) SerializePrimitiveCollection(long_items);
+                else if (items is ICollection<ulong> ulong_items) SerializePrimitiveCollection(ulong_items);
+                else if (items is ICollection<bool> bool_items) SerializePrimitiveCollection(bool_items);
+                else if (items is ICollection<char> char_items) SerializePrimitiveCollection(char_items);
+                else if (items is ICollection<float> float_items) SerializePrimitiveCollection(float_items);
+                else if (items is ICollection<double> double_items) SerializePrimitiveCollection(double_items);
+                else if (items is ICollection<IntPtr> intPtr_items) SerializePrimitiveCollection(intPtr_items);
+                else if (items is ICollection<UIntPtr> uIntPtr_items) SerializePrimitiveCollection(uIntPtr_items);
+                FinishUnexpectedValue(deviatingType);
             }
-
-            return done;
+            else
+            {
+                Job job = new Job()
+                {
+                    jobType = JobType.Collection,
+                    collectionType = typeCacheItem.collectionType,
+                    index = 0,
+                    item = items,
+                    itemType = objType,
+                    enumerator = items.GetEnumerator(),
+                    currentPath = currentPath,
+                    deviatingType = deviatingType
+                };
+                jobStack.Push(job);
+            }
         }
 
         private void SerializeStringCollection(ICollection<string> items)
