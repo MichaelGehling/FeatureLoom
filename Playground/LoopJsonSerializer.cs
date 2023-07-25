@@ -25,9 +25,13 @@ namespace Playground
     public sealed partial class LoopJsonSerializer
     {
         
-        class Job
+        interface IJob
         {
-            public JobType jobType;
+
+        }
+
+        class CollectionJob : IJob
+        {
             public object item;
             public Type itemType;
             public Type collectionType;
@@ -36,15 +40,18 @@ namespace Playground
             public string currentPath;
             public bool deviatingType;
         }
-        
-        enum JobType
-        {
-            ComplexObject,
-            Collection,
-            Unknown
-        }
 
-        Stack<Job> jobStack = new Stack<Job>();        
+        class ComplexJob : IJob
+        {
+            public object item;
+            public Type itemType;
+            public bool firstChild;
+            public IEnumerator enumerator;
+            public string currentPath;
+            public bool deviatingType;
+        }        
+
+        Stack<IJob> jobStack = new Stack<IJob>();        
         static Settings defaultSettings = new();
         Settings settings;
         JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
@@ -120,20 +127,20 @@ namespace Playground
 
         private void Loop()
         {
-            while (jobStack.TryPop(out Job job))
+            while (jobStack.TryPop(out IJob job))
             {
-                if (job.jobType == JobType.ComplexObject)
+                if (job is ComplexJob complexJob)
                 {
-                    HandleComplexObjectJob(job);
+                    HandleComplexObjectJob(complexJob);
                 }
-                else if (job.jobType == JobType.Collection)
+                else if (job is CollectionJob collectionJob)
                 {
-                    HandleCollectionJob(job);
+                    HandleCollectionJob(collectionJob);
                 }
             }
         }
 
-        private void HandleCollectionJob(Job job)
+        private void HandleCollectionJob(CollectionJob job)
         {
             if (job.index == 0)
             {
@@ -155,15 +162,15 @@ namespace Playground
             }
         }
 
-        private void HandleComplexObjectJob(Job job)
+        private void HandleComplexObjectJob(ComplexJob job)
         {
-            if (job.index == 0)
+            if (job.firstChild)
             {
                 writer.OpenObject();
                 if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && job.deviatingType))
                 {
                     writer.WriteTypeInfo(job.itemType.FullName);
-                    job.index++;
+                    job.firstChild = false;
                 }
             }
 
@@ -174,7 +181,9 @@ namespace Playground
             else
             {
 
-                if (job.index++ > 0) writer.WriteComma();
+                if (job.firstChild) job.firstChild = false;
+                else writer.WriteComma();
+
                 jobStack.Push(job);
 
                 var fieldWriter = (Action<object, string>)job.enumerator.Current;
@@ -227,11 +236,9 @@ namespace Playground
                 return;
             }
 
-            Job job = new Job()
-            {
-                jobType = JobType.ComplexObject,
-                collectionType = null,
-                index = 0,
+            ComplexJob job = new()
+            {                                
+                firstChild = true,
                 item = obj,
                 itemType = objType,
                 enumerator = typeCacheItem.fieldWriters.GetEnumerator(),
@@ -351,9 +358,8 @@ namespace Playground
             }
             else
             {
-                Job job = new Job()
+                CollectionJob job = new()
                 {
-                    jobType = JobType.Collection,
                     collectionType = typeCacheItem.collectionType,
                     index = 0,
                     item = items,
@@ -506,9 +512,8 @@ namespace Playground
             {                
                 IEnumerable items = getValue(obj);
                 writer.WriteFieldName(fieldName);
-                Job job = new Job()
+                CollectionJob job = new()
                 {
-                    jobType = JobType.Collection,
                     collectionType = collectionType,
                     index = 0,
                     item = items,

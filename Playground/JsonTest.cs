@@ -123,7 +123,7 @@ namespace Playground
                 //ReferenceHandler = ReferenceHandler.Preserve
             };
 
-            int iterations = 100_000;
+            int iterations = 1_000_000;
 
             var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
