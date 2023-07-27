@@ -411,38 +411,41 @@ namespace Playground
                 fieldName = fieldName.Substring("<", ">");
             }
 
-            if (memberType == typeof(string)) return CreateStringFieldWriter(objType, memberInfo, fieldName);
-            else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(sbyte)) return CreatePrimitiveFieldWriter<sbyte>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(short)) return CreatePrimitiveFieldWriter<short>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(ushort)) return CreatePrimitiveFieldWriter<ushort>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(long)) return CreatePrimitiveFieldWriter<long>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(ulong)) return CreatePrimitiveFieldWriter<ulong>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(bool)) return CreatePrimitiveFieldWriter<bool>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(float)) return CreatePrimitiveFieldWriter<float>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(double)) return CreatePrimitiveFieldWriter<double>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, memberInfo, fieldName);
-            else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, memberInfo, fieldName);
+            var fieldNameBytes = writer.PrepareFieldNameBytes(fieldName);
+
+            if (memberType == typeof(string)) return CreateStringFieldWriter(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(sbyte)) return CreatePrimitiveFieldWriter<sbyte>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(short)) return CreatePrimitiveFieldWriter<short>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(ushort)) return CreatePrimitiveFieldWriter<ushort>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(long)) return CreatePrimitiveFieldWriter<long>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(ulong)) return CreatePrimitiveFieldWriter<ulong>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(bool)) return CreatePrimitiveFieldWriter<bool>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(float)) return CreatePrimitiveFieldWriter<float>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(double)) return CreatePrimitiveFieldWriter<double>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, memberInfo, fieldNameBytes);
+            else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, memberInfo, fieldNameBytes);
             else if (memberType.IsAssignableTo(typeof(IEnumerable)) &&
                         (memberType.IsAssignableTo(typeof(ICollection)) ||
                          memberType.IsOfGenericType(typeof(ICollection<>))))
             {
 
-                return CreateCollectionFieldWriter(objType, memberInfo, fieldName);
+                return CreateCollectionFieldWriter(objType, memberInfo, fieldNameBytes);
             }
 
             return (obj, currentPath) =>
-            {                
-                writer.WriteFieldName(fieldName);
+            {
+                //writer.WriteFieldName(fieldName);
+                writer.WritePreparedByteString(fieldNameBytes);
                 var value = getValue(obj);
                 HandleItem(value, memberType, settings.referenceCheck != ReferenceCheck.NoRefCheck ? $"{currentPath}.{fieldName}" : null);
             };
         }
 
-        private Action<object, string> CreateStringFieldWriter(Type objType, MemberInfo memberInfo, string fieldName)
+        private Action<object, string> CreateStringFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             var parameter = Expression.Parameter(typeof(object));
             var castedParameter = Expression.Convert(parameter, objType);
@@ -452,14 +455,15 @@ namespace Playground
 
             return (obj, currentPath) =>
             {
-                var value = getValue(obj);                
-                writer.WriteFieldName(fieldName);
+                var value = getValue(obj);
+                //writer.WriteFieldName(fieldName);
+                writer.WritePreparedByteString(fieldNameBytes);
                 if (value == null) writer.WriteNullValue();
                 else writer.WriteStringValue(value);                
             };
         }
 
-        private Action<object, string> CreatePrimitiveFieldWriter<T>(Type objType, MemberInfo memberInfo, string fieldName)
+        private Action<object, string> CreatePrimitiveFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             var parameter = Expression.Parameter(typeof(object));
             var castedParameter = Expression.Convert(parameter, objType);
@@ -470,13 +474,14 @@ namespace Playground
             return (obj, currentPath) =>
             {
                 var value = getValue(obj);
-                writer.WriteFieldName(fieldName);
+                //writer.WriteFieldName(fieldName);
+                writer.WritePreparedByteString(fieldNameBytes);
                 if (value == null) writer.WriteNullValue();
                 else writer.WritePrimitiveValue(value);
             };
         }
 
-        private Action<object, string> CreateCollectionFieldWriter(Type objType, MemberInfo memberInfo, string fieldName)
+        private Action<object, string> CreateCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
             Type collectionType = memberInfo is FieldInfo field2 ? field2.FieldType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>)) :
@@ -484,21 +489,21 @@ namespace Playground
                                   default;
             collectionType = collectionType ?? typeof(object);
 
-            if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(sbyte)) return CreatePrimitiveCollectionFieldWriter<sbyte>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(short)) return CreatePrimitiveCollectionFieldWriter<short>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(ushort)) return CreatePrimitiveCollectionFieldWriter<ushort>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(long)) return CreatePrimitiveCollectionFieldWriter<long>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(ulong)) return CreatePrimitiveCollectionFieldWriter<ulong>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(bool)) return CreatePrimitiveCollectionFieldWriter<bool>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(char)) return CreatePrimitiveCollectionFieldWriter<char>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(float)) return CreatePrimitiveCollectionFieldWriter<float>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(double)) return CreatePrimitiveCollectionFieldWriter<double>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(IntPtr)) return CreatePrimitiveCollectionFieldWriter<IntPtr>(objType, memberInfo, fieldName);
-            else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(objType, memberInfo, fieldName);
+            if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(sbyte)) return CreatePrimitiveCollectionFieldWriter<sbyte>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(short)) return CreatePrimitiveCollectionFieldWriter<short>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(ushort)) return CreatePrimitiveCollectionFieldWriter<ushort>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(long)) return CreatePrimitiveCollectionFieldWriter<long>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(ulong)) return CreatePrimitiveCollectionFieldWriter<ulong>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(bool)) return CreatePrimitiveCollectionFieldWriter<bool>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(char)) return CreatePrimitiveCollectionFieldWriter<char>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(float)) return CreatePrimitiveCollectionFieldWriter<float>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(double)) return CreatePrimitiveCollectionFieldWriter<double>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(IntPtr)) return CreatePrimitiveCollectionFieldWriter<IntPtr>(objType, memberInfo, fieldNameBytes);
+            else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(objType, memberInfo, fieldNameBytes);
 
             var parameter = Expression.Parameter(typeof(object));
             Type declaringType = memberInfo is FieldInfo field3 ? field3.DeclaringType : memberInfo is PropertyInfo property3 ? property3.DeclaringType : default;
@@ -511,7 +516,8 @@ namespace Playground
             return (obj, currentPath) =>
             {                
                 IEnumerable items = getValue(obj);
-                writer.WriteFieldName(fieldName);
+                //writer.WriteFieldName(fieldName);
+                writer.WritePreparedByteString(fieldNameBytes);
                 CollectionJob job = new()
                 {
                     collectionType = collectionType,
@@ -526,7 +532,7 @@ namespace Playground
             };
         }
 
-        private Action<object, string> CreateStringCollectionFieldWriter(Type objType, MemberInfo memberInfo, string fieldName)
+        private Action<object, string> CreateStringCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
 
@@ -544,7 +550,8 @@ namespace Playground
                 bool deviating = memberType != objType;
 
                 IEnumerable<string> items = getValue(obj);
-                writer.WriteFieldName(fieldName);
+                //writer.WriteFieldName(fieldName);
+                writer.WritePreparedByteString(fieldNameBytes);
                 PrepareUnexpectedValue(deviating, objType);
                 writer.OpenCollection();
                 bool isFirstItem = true;
@@ -559,7 +566,7 @@ namespace Playground
             };
         }
 
-        private Action<object, string> CreatePrimitiveCollectionFieldWriter<T>(Type objType, MemberInfo memberInfo, string fieldName)
+        private Action<object, string> CreatePrimitiveCollectionFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
 
@@ -577,7 +584,8 @@ namespace Playground
                 bool deviating = memberType != objType;
 
                 IEnumerable<T> items = getValue(obj);
-                writer.WriteFieldName(fieldName);
+                //writer.WriteFieldName(fieldName);
+                writer.WritePreparedByteString(fieldNameBytes);
                 PrepareUnexpectedValue(deviating, objType);
                 writer.OpenCollection();
                 bool isFirstItem = true;

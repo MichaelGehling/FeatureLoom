@@ -65,13 +65,13 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue<T>(T value) => WriteString(value.ToString());
 
-            static readonly byte[] STRINGVALUE_PRE = "\"".ToByteArray();            
+            static readonly byte[] STRINGVALUE_PRE = "\"".ToByteArray();
             static readonly byte[] STRINGVALUE_POST = "\"".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteStringValue(string str)
             {
-                stream.Write(STRINGVALUE_PRE, 0,  STRINGVALUE_PRE.Length);
-                WriteString(str, true);
+                stream.Write(STRINGVALUE_PRE, 0, STRINGVALUE_PRE.Length);
+                WriteEscapedString(str);
                 stream.Write(STRINGVALUE_POST, 0, STRINGVALUE_POST.Length);
             }
 
@@ -102,51 +102,38 @@ namespace Playground
             public void WriteDot() => stream.Write(DOT, 0, DOT.Length);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePreparedString(string str) => WriteString(str);
+            public void WritePreparedByteString(byte[] bytes) => stream.Write(bytes);
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public byte[] PrepareFieldNameBytes(string fieldname)
+            {
+                return Encoding.UTF8.GetBytes($"\"{fieldname}\":");
+            }
 
-            static readonly byte[] ESCAPE_QUOTE = "\\\"".ToByteArray();
-            static readonly byte[] ESCAPE_BACKSLASH = "\\\\".ToByteArray();
-            static readonly byte[] ESCAPE_B = "\\b".ToByteArray();
-            static readonly byte[] ESCAPE_F = "\\f".ToByteArray();
-            static readonly byte[] ESCAPE_N = "\\n".ToByteArray();
-            static readonly byte[] ESCAPE_R = "\\r".ToByteArray();
-            static readonly byte[] ESCAPE_T = "\\t".ToByteArray();
-            private void WriteString(string str, bool escape = false)
+            static readonly byte[] ESCAPE_SEQUENCES = "\\\\\\\"\\b\\f\\n\\r\\t".ToByteArray();
+            private void WriteEscapedString(string str)
             {
                 int bufferIndex = 0;
 
-                for (var i = 0; i < str.Length; i++)
+                int charIndex = 0;
+                int minCharSpace = buffer.Length / 4;
+                while (charIndex < str.Length)
                 {
-                    var c = str[i];
+                    int charIndexLimit = Math.Min(str.Length, charIndex + minCharSpace);
 
-                    if (!char.IsSurrogate(c))
+                    for (; charIndex < charIndexLimit; charIndex++)
                     {
-                        // Ensure we have enough room in the buffer
-                        if (buffer.Length - bufferIndex < 20)
-                        {
-                            stream.Write(buffer, 0, bufferIndex);
-                            bufferIndex = 0;
-                        }
+                        var c = str[charIndex];
 
                         
-                        if (escape)
+                        int escapeIndex = "\\\"\b\f\n\r\t".IndexOf(c);
+                        if (escapeIndex != -1)
                         {
-                            bool next = true;
-                            switch (c)
-                            {
-                                case '\"': Buffer.BlockCopy(ESCAPE_QUOTE, 0, buffer, bufferIndex, ESCAPE_QUOTE.Length); bufferIndex += ESCAPE_QUOTE.Length; break;
-                                case '\\': Buffer.BlockCopy(ESCAPE_BACKSLASH, 0, buffer, bufferIndex, ESCAPE_BACKSLASH.Length); bufferIndex += ESCAPE_BACKSLASH.Length; break;
-                                case '\b': Buffer.BlockCopy(ESCAPE_B, 0, buffer, bufferIndex, ESCAPE_B.Length); bufferIndex += ESCAPE_B.Length; break;
-                                case '\f': Buffer.BlockCopy(ESCAPE_F, 0, buffer, bufferIndex, ESCAPE_F.Length); bufferIndex += ESCAPE_F.Length; break;
-                                case '\n': Buffer.BlockCopy(ESCAPE_N, 0, buffer, bufferIndex, ESCAPE_N.Length); bufferIndex += ESCAPE_N.Length; break;
-                                case '\r': Buffer.BlockCopy(ESCAPE_R, 0, buffer, bufferIndex, ESCAPE_R.Length); bufferIndex += ESCAPE_R.Length; break;
-                                case '\t': Buffer.BlockCopy(ESCAPE_T, 0, buffer, bufferIndex, ESCAPE_T.Length); bufferIndex += ESCAPE_T.Length; break;
-                                default: next = false; break;
-                            }
-                            if (next) continue;
+                            Buffer.BlockCopy(ESCAPE_SEQUENCES, escapeIndex * 2, buffer, bufferIndex, 2);
+                            bufferIndex += 2;
+                            continue;
                         }
-                        
+
 
                         int codepoint = c;
 
@@ -161,38 +148,98 @@ namespace Playground
                             buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x1F) | 0xC0);
                             buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
                         }
-                        else
+                        else if (!char.IsSurrogate(c))
                         {
                             // 3-byte sequence
                             buffer[bufferIndex++] = (byte)(((codepoint >> 12) & 0x0F) | 0xE0);
                             buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x3F) | 0x80);
                             buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
                         }
-                    }
-                    else
-                    {
-                        // Handle surrogate pairs
-                        if (char.IsHighSurrogate(c) && i + 1 < str.Length && char.IsLowSurrogate(str[i + 1]))
-                        {
-                            var bytesUsed = encoder.GetBytes(str.ToCharArray(i, 2), 0, 2, buffer, bufferIndex, false);
-                            i++; // Skip next character, it was part of the surrogate pair
-                            bufferIndex += bytesUsed;
-                        }
                         else
                         {
-                            throw new ArgumentException("Invalid surrogate pair in string.");
+                            // Handle surrogate pairs
+                            if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                            {
+                                var bytesUsed = encoder.GetBytes(str.ToCharArray(charIndex, 2), 0, 2, buffer, bufferIndex, false);
+                                charIndex++; // Skip next character, it was part of the surrogate pair
+                                bufferIndex += bytesUsed;
+                            }
+                            else
+                            {
+                                throw new ArgumentException("Invalid surrogate pair in string.");
+                            }
                         }
                     }
-                }
 
-                // Flush any remaining bytes in the buffer to the stream
-                if (bufferIndex > 0)
-                {
-                    stream.Write(buffer, 0, bufferIndex);
+                    // Flush any remaining bytes in the buffer to the stream
+                    if (bufferIndex > 0)
+                    {
+                        stream.Write(buffer, 0, bufferIndex);
+                        bufferIndex = 0;
+                    }
                 }
             }
 
-        }
+            private void WriteString(string str)
+            {
+                int bufferIndex = 0;
 
+                int charIndex = 0;
+                int minCharSpace = buffer.Length / 4;
+                while (charIndex < str.Length)
+                {                    
+                    int charIndexLimit = Math.Min(str.Length, charIndex + minCharSpace);
+
+                    for (; charIndex < charIndexLimit; charIndex++)
+                    {
+                        var c = str[charIndex];                        
+                        int codepoint = c;
+
+                        if (codepoint <= 0x7F)
+                        {
+                            // 1-byte sequence
+                            buffer[bufferIndex++] = (byte)codepoint;
+                        }
+                        else if (codepoint <= 0x7FF)
+                        {
+                            // 2-byte sequence
+                            buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x1F) | 0xC0);
+                            buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                        }
+                        else if (!char.IsSurrogate(c))
+                        {
+                            // 3-byte sequence
+                            buffer[bufferIndex++] = (byte)(((codepoint >> 12) & 0x0F) | 0xE0);
+                            buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x3F) | 0x80);
+                            buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                        }
+                        else
+                        {
+                            // Handle surrogate pairs
+                            if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                            {
+                                var bytesUsed = encoder.GetBytes(str.ToCharArray(charIndex, 2), 0, 2, buffer, bufferIndex, false);
+                                charIndex++; // Skip next character, it was part of the surrogate pair
+                                bufferIndex += bytesUsed;
+                            }
+                            else
+                            {
+                                throw new ArgumentException("Invalid surrogate pair in string.");
+                            }
+                        }
+                    }
+
+                    // Flush any remaining bytes in the buffer to the stream
+                    if (bufferIndex > 0)
+                    {
+                        stream.Write(buffer, 0, bufferIndex);
+                        bufferIndex = 0;
+                    }
+                }
+
+
+            }
+
+        }
     }
 }
