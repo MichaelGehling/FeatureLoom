@@ -19,115 +19,143 @@ using System.Diagnostics.Metrics;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using System.Collections.Specialized;
+using System.Net.Http.Headers;
+using FeatureLoom.Synchronization;
 
 namespace Playground
 {
     public sealed partial class LoopJsonSerializer
     {
-        
-        interface IJob
-        {
 
-        }
+        delegate void FieldWriter(ComplexJob parentJob);
+        delegate void ItemHandler(object obj, BaseJob parentJob, bool writeTypeInfo);
 
-        class CollectionJob : IJob
+        abstract class BaseJob
         {
             public object item;
             public Type itemType;
+            public IEnumerator enumerator;
+            public bool writeTypeInfo;
+            public BaseJob parentJob;
+            public byte[] itemName;
+        }
+
+        sealed class CollectionJob : BaseJob
+        {
             public Type collectionType;
             public int index;
-            public IEnumerator enumerator;
-            public string currentPath;
-            public bool deviatingType;
         }
 
-        class ComplexJob : IJob
+        sealed class ComplexJob : BaseJob
         {
-            public object item;
-            public Type itemType;
             public bool firstChild;
-            public IEnumerator enumerator;
-            public string currentPath;
-            public bool deviatingType;
-        }        
-
-        Stack<IJob> jobStack = new Stack<IJob>();        
-        static Settings defaultSettings = new();
-        Settings settings;
-        JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
-        MemoryStream memoryStream = new MemoryStream();
-        Dictionary<object, string> pathMap = new();
-        Dictionary<Type, TypeCacheItem> typeCache = new();
+            public byte[] currentFieldName;
+        }
 
         class TypeCacheItem
         {
-            public bool isCollection;
-            public Type collectionType;
-            public List<Action<object, string>> fieldWriters;
+            public ItemHandler itemHandler;
         }
 
-        class CollectionInfo
+        struct EnumKey
         {
-            public bool isCollection;
-            public Type collectionType;
+            public Type enumType;
+            public int value;
 
-            public readonly static CollectionInfo NoCollectionInfo = new CollectionInfo(false, null);
-            public readonly static CollectionInfo ObjectCollectionInfo = new CollectionInfo(false, typeof(object));
-
-            public CollectionInfo(bool isCollection, Type collectionType)
+            public EnumKey(object enumValue, Type enumType)
             {
-                this.isCollection = isCollection;
-                this.collectionType = collectionType;
+                this.enumType = enumType;
+                this.value = (int)enumValue;
             }
-        }        
 
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(enumType, value);
+            }
 
-        public string Serialize<T>(T item, Settings settings = null)
-        {
-            memoryStream.Position = 0;
-            pathMap.Clear();
-            if (settings == null) settings = defaultSettings;
-            this.settings = settings;
-            var oldCulture = Thread.CurrentThread.CurrentCulture;
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            writer.stream = memoryStream;
-            HandleItem(item, typeof(T), "$");
-            Loop();
-            Thread.CurrentThread.CurrentCulture = oldCulture;
-            return Encoding.UTF8.GetString(memoryStream.ToArray());
+            public static implicit operator EnumKey((object enumValue, Type enumType) pair) => new EnumKey(pair.enumValue, pair.enumType);
         }
 
-        public byte[] SerializeToUtf8Bytes<T>(T item, Settings settings = null)
+        FeatureLock serializerLock = new FeatureLock();
+        Stack<BaseJob> jobStack = new Stack<BaseJob>();
+        Settings settings;
+        JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
+        MemoryStream memoryStream = new MemoryStream();
+        Dictionary<object, BaseJob> objToJob = new();
+        Dictionary<Type, TypeCacheItem> typeCache = new();
+        Dictionary<EnumKey, byte[]> enumTextMap = new();
+
+        readonly Action<bool, byte[]> prepareTypeInfoObjectFromBytes;
+        readonly Action<bool, Type> prepareTypeInfoObjectFromType;
+        readonly Action<bool> finishTypeInfoObject;
+        readonly Func<object, BaseJob, Type, bool> tryHandleAsRef;
+            
+
+
+        public LoopJsonSerializer(Settings settings = null)
         {
-            memoryStream.Position = 0;
-            pathMap.Clear();
-            if (settings == null) settings = defaultSettings;
-            this.settings = settings;
-            var oldCulture = Thread.CurrentThread.CurrentCulture;
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            writer.stream = memoryStream;
-            HandleItem(item, typeof(T), "$");
-            Loop();
-            Thread.CurrentThread.CurrentCulture = oldCulture;
-            return memoryStream.ToArray();
+            this.settings = settings ?? new();
+
+            prepareTypeInfoObjectFromBytes = PrepareTypeInfoObject;
+            prepareTypeInfoObjectFromType = PrepareTypeInfoObject;
+            finishTypeInfoObject = FinishTypeInfoObject;
+            if (settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
+            {
+                prepareTypeInfoObjectFromBytes = (_, _) => { };
+                prepareTypeInfoObjectFromType = (_, _) => { };
+                finishTypeInfoObject = (_) => { };
+            }
+            tryHandleAsRef = TryHandleAsRef;
+            if (settings.referenceCheck == ReferenceCheck.NoRefCheck)
+            {
+                tryHandleAsRef = (_, _, _) => false;
+            }
         }
 
-        public void Serialize<T>(Stream stream, T item, Settings settings = null)
+
+        public string Serialize<T>(T item)
         {
-            pathMap.Clear();
-            if (settings == null) settings = defaultSettings;
-            this.settings = settings;
-            var oldCulture = Thread.CurrentThread.CurrentCulture;
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            writer.stream = stream;
-            HandleItem(item, typeof(T), "$");
-            Loop();
-            Thread.CurrentThread.CurrentCulture = oldCulture;
+            using (serializerLock.Lock())
+            {
+                memoryStream.Position = 0;
+                objToJob.Clear();
+
+                writer.stream = memoryStream;
+                HandleItem(item, typeof(T), null);
+                Loop();
+                return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
+            }
+        }
+
+        public byte[] SerializeToUtf8Bytes<T>(T item)
+        {
+            using (serializerLock.Lock())
+            {
+                memoryStream.Position = 0;
+                objToJob.Clear();
+
+                writer.stream = memoryStream;
+                HandleItem(item, typeof(T), null);
+                Loop();
+                return memoryStream.ToArray();
+            }
+        }
+
+        public void Serialize<T>(Stream stream, T item)
+        {
+            using (serializerLock.Lock())
+            {
+                objToJob.Clear();
+
+                writer.stream = stream;
+                HandleItem(item, typeof(T), null);
+                Loop();
+            }
         }
 
         private void Loop()
         {
-            while (jobStack.TryPop(out IJob job))
+            while (jobStack.TryPop(out BaseJob job))
             {
                 if (job is ComplexJob complexJob)
                 {
@@ -144,22 +172,26 @@ namespace Playground
         {
             if (job.index == 0)
             {
-                PrepareUnexpectedValue(job.deviatingType, job.itemType);
+                prepareTypeInfoObjectFromType(job.writeTypeInfo, job.itemType);
                 writer.OpenCollection();
             }
 
-            if (!job.enumerator.MoveNext())
+            jobStack.Push(job);
+            int beforeStackSize = jobStack.Count;
+            do
             {
-                writer.CloseCollection();
-                FinishUnexpectedValue(job.deviatingType);
-            }
-            else
-            {
-                if (job.index++ > 0) writer.WriteComma();
-                jobStack.Push(job);
-
-                HandleItem(job.enumerator.Current, job.collectionType, settings.referenceCheck != ReferenceCheck.NoRefCheck ? $"{job.currentPath}[{job.index}]" : default);
-            }
+                if (!job.enumerator.MoveNext())
+                {
+                    writer.CloseCollection();
+                    finishTypeInfoObject(job.writeTypeInfo);
+                    jobStack.Pop();
+                    return;
+                }
+            
+                if (job.index > 0) writer.WriteComma();
+                HandleItem(job.enumerator.Current, job.collectionType, job);
+                job.index++;            
+            } while (jobStack.Count == beforeStackSize);
         }
 
         private void HandleComplexObjectJob(ComplexJob job)
@@ -167,32 +199,34 @@ namespace Playground
             if (job.firstChild)
             {
                 writer.OpenObject();
-                if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && job.deviatingType))
+                if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && job.writeTypeInfo))
                 {
                     writer.WriteTypeInfo(job.itemType.FullName);
                     job.firstChild = false;
                 }
             }
 
-            if (!job.enumerator.MoveNext())
+            jobStack.Push(job);
+            int beforeStackSize = jobStack.Count;
+            do
             {
-                writer.CloseObject();
-            }
-            else
-            {
+                if (!job.enumerator.MoveNext())
+                {
+                    writer.CloseObject();
+                    jobStack.Pop();
+                    return;
+                }                
 
                 if (job.firstChild) job.firstChild = false;
                 else writer.WriteComma();
 
-                jobStack.Push(job);
+                var fieldWriter = (FieldWriter)job.enumerator.Current;                
+                fieldWriter(job);
+            } while (jobStack.Count == beforeStackSize);
 
-                var fieldWriter = (Action<object, string>)job.enumerator.Current;
-
-                fieldWriter(job.item, job.currentPath);
-            }
         }
 
-        private void HandleItem(object obj, Type expectedType, string currentPath)
+        private void HandleItem(object obj, Type expectedType, BaseJob parentJob)
         {
             if (obj == null)
             {
@@ -201,74 +235,362 @@ namespace Playground
             }
 
             Type objType = obj.GetType();
-            bool deviatingType = expectedType != obj.GetType();
-
-            if (objType.IsPrimitive)
-            {
-                PrepareUnexpectedValue(deviatingType, objType);
-                writer.WritePrimitiveValue(obj);
-                FinishUnexpectedValue(deviatingType);
-                return;
-            }
-
-            if (obj is string str)
-            {
-                PrepareUnexpectedValue(deviatingType, objType);
-                writer.WriteStringValue(str);
-                FinishUnexpectedValue(deviatingType);
-                return;
-            }
-
-            if (settings.referenceCheck != ReferenceCheck.NoRefCheck)
-            {
-                if (TryHandleRef(obj, currentPath)) return;                
-                if (objType.IsClass) pathMap[obj] = currentPath;
-            }
-
+            bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != objType);            
+            
             if (!typeCache.TryGetValue(objType, out var typeCacheItem))
             {
                 typeCacheItem = CreateTypeCacheItem(obj, objType);
-            }
+            }            
+            typeCacheItem.itemHandler(obj, parentJob, writeTypeInfo);                        
+        }
 
-            if (typeCacheItem.isCollection)
+        private bool TryHandleAsRef(object obj, BaseJob parentJob, Type objType)
+        {
+            if (parentJob == null || !objType.IsClass || settings.referenceCheck == ReferenceCheck.NoRefCheck) return false;
+
+            if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
             {
-                HandleCollection(currentPath, objType, deviatingType, obj as IEnumerable, typeCacheItem);
-                return;
+                if (objToJob.TryGetValue(obj, out BaseJob refJob))
+                {
+                    writer.WriteRefObject(refJob);
+                    return true;
+                }
             }
-
-            ComplexJob job = new()
-            {                                
-                firstChild = true,
-                item = obj,
-                itemType = objType,
-                enumerator = typeCacheItem.fieldWriters.GetEnumerator(),
-                currentPath = currentPath,
-                deviatingType = deviatingType
-            };
-            jobStack.Push(job);
+            else if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef)
+            {
+                foreach (var refJob in jobStack)
+                {
+                    if (refJob.item == obj)
+                    {
+                        writer.WriteRefObject(refJob);
+                        return true;
+                    }
+                }
+            }
+            else if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByNull)
+            {
+                foreach (var refJob in jobStack)
+                {
+                    if (refJob.item == obj)
+                    {
+                        writer.WriteNullValue();
+                        return true;
+                    }
+                }
+            }
+            else if (settings.referenceCheck == ReferenceCheck.OnLoopThrowException)
+            {
+                foreach (var refJob in jobStack)
+                {
+                    if (refJob.item == obj)
+                    {
+                        throw new Exception("Circular referencing detected!"); ;
+                    }
+                }
+            }
+            return false;
         }
 
         private TypeCacheItem CreateTypeCacheItem(object obj, Type objType)
         {
             TypeCacheItem typeCacheItem = new TypeCacheItem();
+            typeCache[objType] = typeCacheItem;
+            byte[] preparedTypeInfo = writer.PrepareTypeInfo(objType.FullName);            
+
+
+            if (objType == typeof(string))
+            {
+                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    writer.WriteStringValue((string)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                return typeCacheItem;
+            }
+
+            if (objType.IsPrimitive)
+            {
+                if (objType == typeof(int) || objType == typeof(short) || objType == typeof(sbyte))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteSignedIntValue((int)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (objType == typeof(long))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteSignedIntValue((long)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (objType == typeof(uint) || objType == typeof(ushort) || objType == typeof(byte))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteUnsignedIntValue((uint)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (objType == typeof(ulong))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteUnsignedIntValue((ulong)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (objType == typeof(bool))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteBoolValue((bool)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (objType == typeof(double))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteFloatValue((double)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (objType == typeof(float))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteFloatValue((float)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WritePrimitiveValue(obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                return typeCacheItem;
+            }
+
+            if (objType.IsEnum)
+            {
+                if (settings.enumAsString)
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WritePreparedByteString(GetEnumText(obj, objType));
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        writer.WriteSignedIntValue((int)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                return typeCacheItem;
+            }
+
             if (obj is IEnumerable)
             {
                 Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
-                if (collectionType != null)
-                {
-                    typeCacheItem.isCollection = true;
-                    typeCacheItem.collectionType = collectionType;
-                }
-                else if (objType is ICollection)
-                {
-                    typeCacheItem.isCollection = true;
-                    typeCacheItem.collectionType = typeof(object);
-                }
-                else typeCacheItem.isCollection = false;
-            }
-            else typeCacheItem.isCollection = false;
 
-            if (!typeCacheItem.isCollection)
+                if (collectionType == typeof(string))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<string>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(int))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<int>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(uint))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<uint>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(byte))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<byte>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(sbyte))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<sbyte>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(short))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<short>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(ushort))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<ushort>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(long))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<long>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(ulong))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<ulong>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(bool))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<bool>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(char))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<char>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(float))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<float>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(double))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<double>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(IntPtr))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<IntPtr>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (collectionType == typeof(UIntPtr))
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<UIntPtr>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                }
+                else if (obj is ICollection)
+                {
+                    if (collectionType == null) collectionType = typeof(object);
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        var items = (IEnumerable)obj;
+                        CollectionJob job = new()
+                        {
+                            collectionType = collectionType,
+                            index = 0,
+                            item = obj,
+                            itemType = objType,
+                            enumerator = items.GetEnumerator(),
+                            writeTypeInfo = writeTypeInfo,
+                            parentJob = parentJob,
+                            itemName = parentJob == null ? writer.PrepareRootName() :
+                                        parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                                        writer.PrepareCollectionIndexName((CollectionJob)parentJob)
+
+                        };
+                        jobStack.Push(job);
+                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
+                    };
+                }
+                if (typeCacheItem.itemHandler != null) return typeCacheItem;
+            }
+
             {
                 var memberInfos = new List<MemberInfo>();
                 if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
@@ -287,92 +609,51 @@ namespace Playground
                     }
                 }
 
-                typeCacheItem.fieldWriters = new();
+                List<FieldWriter> fieldWriters = new();
                 foreach (var memberInfo in memberInfos)
                 {
                     var fieldWriter = CreateFieldWriter(objType, memberInfo);
-                    typeCacheItem.fieldWriters.Add(fieldWriter);
+                    fieldWriters.Add(fieldWriter);
                 }
-            }
 
-            typeCache[objType] = typeCacheItem;
+                if (fieldWriters.Count > 0)
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+
+                        ComplexJob job = new()
+                        {
+                            firstChild = true,
+                            item = obj,
+                            itemType = objType,
+                            enumerator = fieldWriters.GetEnumerator(),
+                            writeTypeInfo = writeTypeInfo,
+                            parentJob = parentJob,
+                            itemName = parentJob == null ? writer.PrepareRootName() :
+                                       parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                                       writer.PrepareCollectionIndexName((CollectionJob)parentJob)
+                        };
+                        jobStack.Push(job);
+                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[obj] = job;
+                    };
+                }
+                else
+                {
+                    typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        writer.OpenObject();
+                        if (writeTypeInfo) writer.WritePreparedByteString(preparedTypeInfo);
+                        writer.CloseCollection();
+                    };
+                }
+
+            }
             return typeCacheItem;
         }
-
-        private bool TryHandleRef(object obj, string currentPath)
-        {
-            bool done = false;
-            if (pathMap.TryGetValue(obj, out string refPath))
-            {
-                if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
-                {
-                    writer.WriteRefObject(refPath);
-                }
-                else if (currentPath.StartsWith(refPath))
-                {
-                    if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef)
-                    {
-                        writer.WriteRefObject(refPath);
-                    }
-                    else if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByNull)
-                    {
-                        writer.WriteNullValue();
-                    }
-                    else if (settings.referenceCheck == ReferenceCheck.OnLoopThrowException)
-                    {
-                        throw new Exception("Circular referencing detected!");
-                    }
-                }
-                done = true;
-            }
-
-            return done;
-        }
-
-        private void HandleCollection(string currentPath, Type objType, bool deviatingType, IEnumerable items, TypeCacheItem typeCacheItem)
-        {
-            if (items is ICollection<string> string_items)
-            {
-                PrepareUnexpectedValue(deviatingType, objType);
-                SerializeStringCollection(string_items);
-                FinishUnexpectedValue(deviatingType);
-            }
-            else if (typeCacheItem.collectionType.IsPrimitive)
-            {
-                PrepareUnexpectedValue(deviatingType, objType);
-                if (items is ICollection<int> int_items) SerializePrimitiveCollection(int_items);
-                else if (items is ICollection<uint> uint_items) SerializePrimitiveCollection(uint_items);
-                else if (items is ICollection<byte> byte_items) SerializePrimitiveCollection(byte_items);
-                else if (items is ICollection<sbyte> sbyte_items) SerializePrimitiveCollection(sbyte_items);
-                else if (items is ICollection<short> short_items) SerializePrimitiveCollection(short_items);
-                else if (items is ICollection<ushort> ushort_items) SerializePrimitiveCollection(ushort_items);
-                else if (items is ICollection<long> long_items) SerializePrimitiveCollection(long_items);
-                else if (items is ICollection<ulong> ulong_items) SerializePrimitiveCollection(ulong_items);
-                else if (items is ICollection<bool> bool_items) SerializePrimitiveCollection(bool_items);
-                else if (items is ICollection<char> char_items) SerializePrimitiveCollection(char_items);
-                else if (items is ICollection<float> float_items) SerializePrimitiveCollection(float_items);
-                else if (items is ICollection<double> double_items) SerializePrimitiveCollection(double_items);
-                else if (items is ICollection<IntPtr> intPtr_items) SerializePrimitiveCollection(intPtr_items);
-                else if (items is ICollection<UIntPtr> uIntPtr_items) SerializePrimitiveCollection(uIntPtr_items);
-                FinishUnexpectedValue(deviatingType);
-            }
-            else
-            {
-                CollectionJob job = new()
-                {
-                    collectionType = typeCacheItem.collectionType,
-                    index = 0,
-                    item = items,
-                    itemType = objType,
-                    enumerator = items.GetEnumerator(),
-                    currentPath = currentPath,
-                    deviatingType = deviatingType
-                };
-                jobStack.Push(job);
-            }
-        }
-
-        private void SerializeStringCollection(ICollection<string> items)
+        
+        private void SerializePrimitiveCollection(ICollection<string> items)
         {
             writer.OpenCollection();
             bool isFirstItem = true;
@@ -381,6 +662,149 @@ namespace Playground
                 if (isFirstItem) isFirstItem = false;
                 else writer.WriteComma();
                 writer.WriteStringValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<int> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteSignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<sbyte> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteSignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<short> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteSignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<long> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteSignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<byte> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteUnsignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<uint> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteUnsignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<ushort> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteUnsignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<ulong> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteUnsignedIntValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<float> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteFloatValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<double> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteFloatValue(item);
+            }
+            writer.CloseCollection();
+        }
+
+        private void SerializePrimitiveCollection(ICollection<bool> items)
+        {
+            writer.OpenCollection();
+            bool isFirstItem = true;
+            foreach (var item in items)
+            {
+                if (isFirstItem) isFirstItem = false;
+                else writer.WriteComma();
+                writer.WriteBoolValue(item);
             }
             writer.CloseCollection();
         }
@@ -398,10 +822,10 @@ namespace Playground
             writer.CloseCollection();
         }
 
-        private Action<object, string> CreateFieldWriter(Type objType, MemberInfo memberInfo)
+        private FieldWriter CreateFieldWriter(Type objType, MemberInfo memberInfo)
         {
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
-            Func<object?, object?> getValue = memberInfo is FieldInfo field2 ? field2.GetValue : memberInfo is PropertyInfo property2 ? property2.GetValue : default;
+            Func<object, object> getValue = memberInfo is FieldInfo field2 ? field2.GetValue : memberInfo is PropertyInfo property2 ? property2.GetValue : default;
 
             string fieldName = memberInfo.Name;
             if (settings.dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields &&
@@ -411,41 +835,43 @@ namespace Playground
                 fieldName = fieldName.Substring("<", ">");
             }
 
-            var fieldNameBytes = writer.PrepareFieldNameBytes(fieldName);
+            var extendedFieldNameBytes = writer.PrepareFieldNameBytes(fieldName);
+            var fieldNameBytes = writer.PrepareStringToBytes(fieldName);
 
-            if (memberType == typeof(string)) return CreateStringFieldWriter(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(sbyte)) return CreatePrimitiveFieldWriter<sbyte>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(short)) return CreatePrimitiveFieldWriter<short>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(ushort)) return CreatePrimitiveFieldWriter<ushort>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(long)) return CreatePrimitiveFieldWriter<long>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(ulong)) return CreatePrimitiveFieldWriter<ulong>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(bool)) return CreatePrimitiveFieldWriter<bool>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(float)) return CreatePrimitiveFieldWriter<float>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(double)) return CreatePrimitiveFieldWriter<double>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, memberInfo, fieldNameBytes);
-            else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, memberInfo, fieldNameBytes);
+            if (memberType == typeof(string)) return CreateStringFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(int)) return CreateIntFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(uint)) return CreateUintFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(byte)) return CreateByteFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(sbyte)) return CreateSbyteFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(short)) return CreateShortFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(ushort)) return CreateUshortFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(long)) return CreateLongFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(ulong)) return CreateUlongFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(bool)) return CreateBoolFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(float)) return CreateFloatFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(double)) return CreateDoubleFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes);
+            else if (memberType.IsEnum) return CreateEnumFieldWriter(objType, memberInfo, extendedFieldNameBytes);
             else if (memberType.IsAssignableTo(typeof(IEnumerable)) &&
                         (memberType.IsAssignableTo(typeof(ICollection)) ||
                          memberType.IsOfGenericType(typeof(ICollection<>))))
             {
 
-                return CreateCollectionFieldWriter(objType, memberInfo, fieldNameBytes);
+                return CreateCollectionFieldWriter(objType, memberInfo, extendedFieldNameBytes, fieldNameBytes);
             }
 
-            return (obj, currentPath) =>
+            return (parentJob) =>
             {
-                //writer.WriteFieldName(fieldName);
-                writer.WritePreparedByteString(fieldNameBytes);
-                var value = getValue(obj);
-                HandleItem(value, memberType, settings.referenceCheck != ReferenceCheck.NoRefCheck ? $"{currentPath}.{fieldName}" : null);
+                parentJob.currentFieldName = fieldNameBytes;
+                writer.WritePreparedByteString(extendedFieldNameBytes);
+                var value = getValue(parentJob.item);
+                HandleItem(value, memberType, parentJob);
             };
         }
 
-        private Action<object, string> CreateStringFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        private FieldWriter CreateStringFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             var parameter = Expression.Parameter(typeof(object));
             var castedParameter = Expression.Convert(parameter, objType);
@@ -453,17 +879,16 @@ namespace Playground
             var lambda = Expression.Lambda<Func<object, string>>(fieldAccess, parameter);
             var getValue = lambda.Compile();
 
-            return (obj, currentPath) =>
-            {
-                var value = getValue(obj);
-                //writer.WriteFieldName(fieldName);
+            return (parentJob) =>
+            {                
                 writer.WritePreparedByteString(fieldNameBytes);
+                var value = getValue(parentJob.item);
                 if (value == null) writer.WriteNullValue();
-                else writer.WriteStringValue(value);                
+                else writer.WriteStringValue(value);
             };
         }
 
-        private Action<object, string> CreatePrimitiveFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        private FieldWriter CreatePrimitiveFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             var parameter = Expression.Parameter(typeof(object));
             var castedParameter = Expression.Convert(parameter, objType);
@@ -471,17 +896,204 @@ namespace Playground
             var lambda = Expression.Lambda<Func<object, T>>(fieldAccess, parameter);
             var getValue = lambda.Compile();
 
-            return (obj, currentPath) =>
+            return (parentJob) =>
             {
-                var value = getValue(obj);
-                //writer.WriteFieldName(fieldName);
+                var value = getValue(parentJob.item);
                 writer.WritePreparedByteString(fieldNameBytes);
-                if (value == null) writer.WriteNullValue();
-                else writer.WritePrimitiveValue(value);
+                writer.WritePrimitiveValue(value);
             };
         }
 
-        private Action<object, string> CreateCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        private FieldWriter CreateBoolFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, bool>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteBoolValue(value);
+            };
+        }
+
+        private FieldWriter CreateIntFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, int>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                writer.WritePreparedByteString(fieldNameBytes);
+                var value = getValue(parentJob.item);                
+                writer.WriteSignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateSbyteFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, sbyte>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteSignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateShortFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, short>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteSignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateLongFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, long>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteSignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateUintFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, uint>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteUnsignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateByteFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, byte>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteUnsignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateUshortFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, ushort>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteUnsignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateUlongFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, ulong>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteUnsignedIntValue(value);
+            };
+        }
+
+        private FieldWriter CreateFloatFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, float>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteFloatValue(value);
+            };
+        }
+
+        private FieldWriter CreateDoubleFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            var parameter = Expression.Parameter(typeof(object));
+            var castedParameter = Expression.Convert(parameter, objType);
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var lambda = Expression.Lambda<Func<object, double>>(fieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                writer.WriteFloatValue(value);
+            };
+        }
+
+        private FieldWriter CreateEnumFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            Func<object, object> getValue = memberInfo is FieldInfo fieldInfo ? fieldInfo.GetValue : memberInfo is PropertyInfo propertyInfo ? propertyInfo.GetValue : default;
+
+            return (parentJob) =>
+            {
+                var value = getValue(parentJob.item);
+                writer.WritePreparedByteString(fieldNameBytes);
+                if (settings.enumAsString) writer.WritePreparedByteString(GetEnumText(value, objType));
+                else writer.WriteSignedIntValue((int)value);
+            };
+        }
+
+        private FieldWriter CreateCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] extendedFieldNameBytes, byte[] fieldNameBytes)
         {
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
             Type collectionType = memberInfo is FieldInfo field2 ? field2.FieldType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>)) :
@@ -489,21 +1101,21 @@ namespace Playground
                                   default;
             collectionType = collectionType ?? typeof(object);
 
-            if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(sbyte)) return CreatePrimitiveCollectionFieldWriter<sbyte>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(short)) return CreatePrimitiveCollectionFieldWriter<short>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(ushort)) return CreatePrimitiveCollectionFieldWriter<ushort>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(long)) return CreatePrimitiveCollectionFieldWriter<long>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(ulong)) return CreatePrimitiveCollectionFieldWriter<ulong>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(bool)) return CreatePrimitiveCollectionFieldWriter<bool>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(char)) return CreatePrimitiveCollectionFieldWriter<char>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(float)) return CreatePrimitiveCollectionFieldWriter<float>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(double)) return CreatePrimitiveCollectionFieldWriter<double>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(IntPtr)) return CreatePrimitiveCollectionFieldWriter<IntPtr>(objType, memberInfo, fieldNameBytes);
-            else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(objType, memberInfo, fieldNameBytes);
+            if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(sbyte)) return CreatePrimitiveCollectionFieldWriter<sbyte>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(short)) return CreatePrimitiveCollectionFieldWriter<short>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(ushort)) return CreatePrimitiveCollectionFieldWriter<ushort>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(long)) return CreatePrimitiveCollectionFieldWriter<long>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(ulong)) return CreatePrimitiveCollectionFieldWriter<ulong>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(bool)) return CreatePrimitiveCollectionFieldWriter<bool>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(char)) return CreatePrimitiveCollectionFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(float)) return CreatePrimitiveCollectionFieldWriter<float>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(double)) return CreatePrimitiveCollectionFieldWriter<double>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(IntPtr)) return CreatePrimitiveCollectionFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes);
+            else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes);
 
             var parameter = Expression.Parameter(typeof(object));
             Type declaringType = memberInfo is FieldInfo field3 ? field3.DeclaringType : memberInfo is PropertyInfo property3 ? property3.DeclaringType : default;
@@ -513,11 +1125,12 @@ namespace Playground
             var lambda = Expression.Lambda<Func<object, IEnumerable>>(castFieldAccess, parameter);
             var getValue = lambda.Compile();
 
-            return (obj, currentPath) =>
-            {                
-                IEnumerable items = getValue(obj);
-                //writer.WriteFieldName(fieldName);
-                writer.WritePreparedByteString(fieldNameBytes);
+            return (parentJob) =>
+            {
+                IEnumerable items = getValue(parentJob.item);
+                Type objType = items.GetType();
+                bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
+                writer.WritePreparedByteString(extendedFieldNameBytes);
                 CollectionJob job = new()
                 {
                     collectionType = collectionType,
@@ -525,14 +1138,16 @@ namespace Playground
                     item = items,
                     itemType = objType,
                     enumerator = items.GetEnumerator(),
-                    currentPath = currentPath,
-                    deviatingType = objType != memberType
+                    writeTypeInfo = writeTypeInfo,
+                    parentJob = parentJob,
+                    itemName = fieldNameBytes
                 };
                 jobStack.Push(job);
+                if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
             };
         }
 
-        private Action<object, string> CreateStringCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        private FieldWriter CreateStringCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
 
@@ -544,15 +1159,13 @@ namespace Playground
             var lambda = Expression.Lambda<Func<object, IEnumerable<string>>>(castFieldAccess, parameter);
             var getValue = lambda.Compile();
 
-            return (obj, currentPath) =>
+            return (parentJob) =>
             {
-                Type objType = obj.GetType();
-                bool deviating = memberType != objType;
-
-                IEnumerable<string> items = getValue(obj);
-                //writer.WriteFieldName(fieldName);
+                IEnumerable<string> items = getValue(parentJob.item);
+                Type objType = items.GetType();
+                bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
                 writer.WritePreparedByteString(fieldNameBytes);
-                PrepareUnexpectedValue(deviating, objType);
+                prepareTypeInfoObjectFromType(writeTypeInfo, objType);
                 writer.OpenCollection();
                 bool isFirstItem = true;
                 foreach (var item in items)
@@ -562,11 +1175,11 @@ namespace Playground
                     writer.WriteStringValue(item);
                 }
                 writer.CloseCollection();
-                FinishUnexpectedValue(deviating);
+                finishTypeInfoObject(writeTypeInfo);
             };
         }
 
-        private Action<object, string> CreatePrimitiveCollectionFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        private FieldWriter CreatePrimitiveCollectionFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
 
@@ -578,49 +1191,76 @@ namespace Playground
             var lambda = Expression.Lambda<Func<object, IEnumerable<T>>>(castFieldAccess, parameter);
             var getValue = lambda.Compile();
 
-            return (obj, currentPath) =>
-            {
-                Type objType = obj.GetType();
-                bool deviating = memberType != objType;
+            Action<T> writeValue = writer.WritePrimitiveValue;
+            if (typeof(T).IsAssignableTo(typeof(int))) writeValue = value => { if (value is int v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(uint))) writeValue = value => { if (value is uint v) writer.WriteUnsignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(long))) writeValue = value => { if (value is long v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(ulong))) writeValue = value => { if (value is ulong v) writer.WriteUnsignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(float))) writeValue = value => { if (value is float v) writer.WriteFloatValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(double))) writeValue = value => { if (value is double v) writer.WriteFloatValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(bool))) writeValue = value => { if (value is bool v) writer.WriteBoolValue(v); };
 
-                IEnumerable<T> items = getValue(obj);
-                //writer.WriteFieldName(fieldName);
+            return (parentJob) =>
+            {
+                IEnumerable<T> items = getValue(parentJob.item);
+                Type objType = items.GetType();
+                bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
                 writer.WritePreparedByteString(fieldNameBytes);
-                PrepareUnexpectedValue(deviating, objType);
+                prepareTypeInfoObjectFromType(writeTypeInfo, objType);
                 writer.OpenCollection();
                 bool isFirstItem = true;
                 foreach (var item in items)
                 {
                     if (isFirstItem) isFirstItem = false;
                     else writer.WriteComma();
-                    writer.WritePrimitiveValue(item);
+                    writeValue(item);
                 }
                 writer.CloseCollection();
-                FinishUnexpectedValue(deviating);
+                finishTypeInfoObject(writeTypeInfo);
             };
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void PrepareUnexpectedValue(bool deviatingType, Type objType)
+        void PrepareTypeInfoObject(bool write, Type objType)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
-            {
-                writer.OpenObject();
-                writer.WriteTypeInfo(objType.FullName);
-                writer.WriteComma();
-                writer.WriteValueFieldName();
-            }
+            if (!write) return;
+
+            writer.OpenObject();
+            writer.WriteTypeInfo(objType.FullName);
+            writer.WriteComma();
+            writer.WriteValueFieldName();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void FinishUnexpectedValue(bool deviatingType)
+        void PrepareTypeInfoObject(bool write, byte[] preparedTypeInfo)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && deviatingType))
-            {
-                writer.CloseObject();
-            }
+            if (!write) return;
+
+            writer.OpenObject();
+            writer.WritePreparedByteString(preparedTypeInfo);
+            writer.WriteComma();
+            writer.WriteValueFieldName();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void FinishTypeInfoObject(bool write)
+        {
+            if (!write) return;
+
+            writer.CloseObject();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        byte[] GetEnumText(object enumValue, Type enumType)
+        {
+            EnumKey key = (enumValue, enumType);
+            if (!enumTextMap.TryGetValue(key, out byte[] text))
+            {
+                text = writer.PrepareEnumTextToBytes(enumValue.ToString());
+                enumTextMap[key] = text;
+            }
+            return text;
+        }
 
     }
 

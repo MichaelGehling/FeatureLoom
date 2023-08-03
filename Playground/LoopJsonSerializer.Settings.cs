@@ -1,4 +1,6 @@
-﻿namespace Playground
+﻿using System.Runtime.CompilerServices;
+
+namespace Playground
 {
 
     public partial class LoopJsonSerializer
@@ -9,6 +11,7 @@
             public DataSelection dataSelection = DataSelection.PublicAndPrivateFields_CleanBackingFields;
             public ReferenceCheck referenceCheck = ReferenceCheck.AlwaysReplaceByRef;
             public int bufferSize = -1;
+            public bool enumAsString = false;
         }
 
         public enum DataSelection

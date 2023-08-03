@@ -70,12 +70,48 @@ namespace Playground
         private static async Task Main()
         {
             TestDto orig = new TestDto();
-            orig.Mutate();
+            //orig.Mutate();
             //orig.TryClone(out var clone);
 
+            /*
+            object obj = 99;
+            Type objType = obj.GetType();
+            int iterations = 100_000_000;
+            bool dummy = true;
+
+            TimeKeeper tk = AppTime.TimeKeeper;
+            for(int i =0; i < iterations; i++)
+            {
+                dummy = objType.IsEnum;
+            }
+            Console.WriteLine($"IsEnum: {tk.Elapsed}");
+            var x = dummy;
 
 
+            tk.Restart();
+            for (int i = 0; i < iterations; i++)
+            {
+                dummy = objType.IsPrimitive;
+            }
+            Console.WriteLine($"IsPrimitive: {tk.Elapsed}");
+            x = dummy;
 
+            Dictionary<object, bool> dict = new Dictionary<object, bool>();
+            dict[obj] = true;
+            bool isPrimitive = false;
+            tk.Restart();
+            for (int i = 0; i < iterations; i++)
+            {
+                dummy = dict[obj];
+            }
+            Console.WriteLine($"dict: {tk.Elapsed}");
+            x = dummy;
+            
+            
+
+
+            Console.ReadKey();
+            */
 
             await JsonTest.Run();
 
