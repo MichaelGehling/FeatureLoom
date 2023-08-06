@@ -1,10 +1,13 @@
-﻿using System;
+﻿using FeatureLoom.Core.Helpers;
+using System;
 using System.Linq;
 
 namespace FeatureLoom.Extensions
 {
     public static class TypeExtensions
     {
+        public static string GetSimplifiedTypeName(this Type type) => TypeHelper.GetSimplifiedTypeName(type);
+
         public static bool IsNullable(this Type type) => Nullable.GetUnderlyingType(type) != null;
 
         public static bool ImplementsGenericInterface(this Type typeToCheck, Type genericInterfaceType)
@@ -26,7 +29,7 @@ namespace FeatureLoom.Extensions
 
         public static bool IsOfGenericType(this Type typeToCheck, Type genericType)
         {
-            return typeToCheck.IsOfGenericType(genericType, out Type concreteType);
+            return typeToCheck.IsOfGenericType(genericType, out Type _);
         }
 
         public static bool IsOfGenericType(this Type typeToCheck, Type genericType, out Type concreteGenericType)

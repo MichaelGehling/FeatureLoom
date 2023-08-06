@@ -134,6 +134,12 @@ namespace Playground
 
         public static async Task Run()
         {
+
+            LoopJsonDeserializer loopJsonDeserializer = new LoopJsonDeserializer();
+            //var result = loopJsonDeserializer.Deserialize<int>("5.123e4");
+
+
+
             var opt = new JsonSerializerOptions()
             {
                 IncludeFields = true,
@@ -160,6 +166,7 @@ namespace Playground
                 //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
                 JsonSerializer.Serialize(nullStream, testDto, opt);
                 //json = JsonSerializer.Serialize(testDto, opt);
+                //var result1 = JsonSerializer.Deserialize<double>("-1234.567899");
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -171,6 +178,7 @@ namespace Playground
                 //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
                 JsonSerializer.Serialize(nullStream, testDto, opt);
                 //json = JsonSerializer.Serialize(testDto, opt);
+                //var result2 = loopJsonDeserializer.Deserialize<double>("-1234.567899");
             }
             Console.WriteLine(tk.Elapsed);
             GC.Collect();
@@ -179,7 +187,8 @@ namespace Playground
 ;
             LoopJsonSerializer loopSerializer = new LoopJsonSerializer(new LoopJsonSerializer.Settings()
             {
-                enumAsString = false
+                enumAsString = false,
+                //typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddAllTypeInfo
             });
             tk.Restart();
             for (int i = 0; i < iterations; i++)

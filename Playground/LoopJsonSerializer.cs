@@ -201,7 +201,7 @@ namespace Playground
                 writer.OpenObject();
                 if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && job.writeTypeInfo))
                 {
-                    writer.WriteTypeInfo(job.itemType.FullName);
+                    writer.WriteTypeInfo(job.itemType.GetSimplifiedTypeName());
                     job.firstChild = false;
                 }
             }
@@ -295,7 +295,7 @@ namespace Playground
         {
             TypeCacheItem typeCacheItem = new TypeCacheItem();
             typeCache[objType] = typeCacheItem;
-            byte[] preparedTypeInfo = writer.PrepareTypeInfo(objType.FullName);            
+            byte[] preparedTypeInfo = writer.PrepareTypeInfo(objType.GetSimplifiedTypeName());            
 
 
             if (objType == typeof(string))
@@ -1226,7 +1226,7 @@ namespace Playground
             if (!write) return;
 
             writer.OpenObject();
-            writer.WriteTypeInfo(objType.FullName);
+            writer.WriteTypeInfo(objType.GetSimplifiedTypeName());
             writer.WriteComma();
             writer.WriteValueFieldName();
         }

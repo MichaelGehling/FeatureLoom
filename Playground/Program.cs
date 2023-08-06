@@ -26,6 +26,7 @@ using System.Runtime.CompilerServices;
 using System.Linq;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Statemachines;
+using FeatureLoom.Core.Helpers;
 
 namespace Playground
 {
@@ -65,11 +66,24 @@ namespace Playground
             public int bbb = 3;
         }
 
+        public class OuterClass
+        {
+            public class InnerClass
+            {
+
+            }
+        }
         
 
         private static async Task Main()
-        {
-            TestDto orig = new TestDto();
+        {           
+            //string typeName = typeof(Dictionary<string, List<List<TestDto>[]>>).GetSimplifiedTypeName();
+
+            //Type resolvedType = TypeHelper.GetTypeFromSimplifiedName(typeName);
+
+            //TestDto orig = new TestDto();
+
+
             //orig.Mutate();
             //orig.TryClone(out var clone);
 
@@ -112,6 +126,8 @@ namespace Playground
 
             Console.ReadKey();
             */
+
+
 
             await JsonTest.Run();
 
