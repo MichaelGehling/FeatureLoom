@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Core.Helpers;
+﻿using FeatureLoom.Helpers;
 using System;
 using System.Linq;
 

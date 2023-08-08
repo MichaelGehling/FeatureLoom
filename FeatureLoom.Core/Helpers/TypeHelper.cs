@@ -9,7 +9,7 @@ using FeatureLoom.Logging;
 using FeatureLoom.Helpers;
 using System.Runtime.CompilerServices;
 
-namespace FeatureLoom.Core.Helpers
+namespace FeatureLoom.Helpers
 {
     /// <summary>
     /// Not supported are 
