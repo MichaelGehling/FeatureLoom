@@ -10,7 +10,9 @@ namespace FeatureLoom.DependencyInversion
     public static class Factory
     {
         public static bool TryCreateFromType(Type type, out object instance)
-        {            
+        {
+            instance = default;
+            if (type == null) return false;
             return Service<TypeCreationCache>.Instance.TryCreate(type, out instance);
         }
 
