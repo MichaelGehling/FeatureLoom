@@ -1,280 +1,161 @@
-// <copyright file="WildcardMatch.cs" company="H.A. Sullivan">
-//     Copyright (c) 2016 All Rights Reserved
-// </copyright>
-// <author> H.A. Sullivan </author>
-// <date> 04/11/2016 </date>
-// <summary> Wildcard matching string extension method </summary>
-// MIT License
-//
-// Copyright(c) [2016] [H.A. Sullivan]
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-// associated documentation files (the "Software"), to deal in the Software without restriction,
-// including without limitation the rights to use, copy, modify, merge, publish, distribute,
-// sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all copies or
-// substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
-// NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-// NOTE: The namespace and class name were changed compared to the original source code!
-
 using System.Collections.Generic;
+using System;
+using System.Runtime.CompilerServices;
+using FeatureLoom.Workflows;
 
 namespace FeatureLoom.Extensions
 {
     public static class WildcardMatchExtension
     {
-        public static bool MatchesWildcard(this string text, string wildcardString)
+        public static bool MatchesWildcard(this string text, string pattern)
         {
-            bool isLike = true;
-            byte matchCase = 0;
-            char[] filter;
-            char[] reversedFilter;
-            char[] reversedWord;
-            char[] word;
-            int currentPatternStartIndex = 0;
-            int lastCheckedHeadIndex = 0;
-            int lastCheckedTailIndex = 0;
-            int reversedWordIndex = 0;
-            List<char[]> reversedPatterns = new List<char[]>();
+            if (pattern.Length == 0) return text.Length == 0 ? true : false;            
 
-            if (text == null || wildcardString == null)
+            TextSection remainingText = new TextSection(text);
+            TextSection remainingPattern = new TextSection(pattern);
+
+            while(remainingPattern.length > 0)
             {
-                return false;
-            }
-
-            word = text.ToCharArray();
-            filter = wildcardString.ToCharArray();
-
-            //Set which case will be used (0 = no wildcards, 1 = only ?, 2 = only *, 3 = both ? and *
-            for (int i = 0; i < filter.Length; i++)
-            {
-                if (filter[i] == '?')
+                TextSection sectionWithoutWildcard = remainingPattern.SectionUntilNextWildcard();
+                if (sectionWithoutWildcard.length > remainingText.length) return false;
+                for(int i = 0; i < sectionWithoutWildcard.length; i++)
                 {
-                    matchCase += 1;
-                    break;
+                    if (remainingText[i] != sectionWithoutWildcard[i]) return false;
+                }
+
+                remainingPattern.SkipChars(sectionWithoutWildcard.length);
+                remainingText.SkipChars(sectionWithoutWildcard.length);
+                if (remainingPattern.length == 0) return true;
+
+                char wildCard = remainingPattern[0];
+                remainingPattern.SkipChars(1);
+                if (wildCard == '?')
+                {
+                    if (remainingText.length == 0) return false;
+                    remainingText.SkipChars(1);
+                }
+                else if (wildCard == '*')
+                {
+                    sectionWithoutWildcard = remainingPattern.SectionUntilNextWildcard();
+                    int minRandomCharCount = 0;                    
+                    while (sectionWithoutWildcard.length == 0 && remainingPattern.length > 0)
+                    {
+                        wildCard = remainingPattern[0];
+                        remainingPattern.SkipChars(1);
+                        if (wildCard == '?') minRandomCharCount++;
+                        sectionWithoutWildcard = remainingPattern.SectionUntilNextWildcard();
+                    }
+                    if (sectionWithoutWildcard.length == 0)
+                    {
+                        if (remainingText.length < minRandomCharCount) return false;
+                        else return true;
+                    }
+                    else
+                    {
+                        if (!remainingText.TryFindIndex(sectionWithoutWildcard, out int index)) return false;
+                        if (index < minRandomCharCount) return false;
+                        remainingText.SkipChars(index + sectionWithoutWildcard.length);
+                        remainingPattern.SkipChars(sectionWithoutWildcard.length);
+                    }
+                }
+            }
+            return true;
+        }
+
+        private struct TextSection
+        {
+            public static readonly TextSection Empty = new TextSection("");
+
+            string text;
+            int startIndex;
+            public int length;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void SkipChars(int numChars)
+            {
+                startIndex += numChars;
+                length -= numChars;
+                if (length < 0)
+                {
+                    text = "";
+                    startIndex = 0;
+                    length = 0;
                 }
             }
 
-            for (int i = 0; i < filter.Length; i++)
+            public TextSection(string text) : this()
             {
-                if (filter[i] == '*')
-                {
-                    matchCase += 2;
-                    break;
-                }
+                this.text = text;
+                this.startIndex = 0;
+                this.length = text.Length;
             }
 
-            if ((matchCase == 0 || matchCase == 1) && word.Length != filter.Length)
+            public TextSection(string text, int startIndex) : this()
             {
+                if (startIndex >= text.Length)
+                {
+                    this.text = "";
+                    return;
+                }
+
+                this.text = text;
+                this.startIndex = startIndex;
+                this.length = text.Length - startIndex;                
+            }
+
+            public TextSection(string text, int startIndex, int length) : this()
+            {
+                if (startIndex + length > text.Length)
+                {
+                    this.text = "";
+                    return;
+                }
+
+                this.text = text;
+                this.startIndex = startIndex;
+                this.length = length;
+            }
+
+            public override string ToString() => length == 0 ? "" : text.Substring(startIndex, length);
+
+            public char this[int index] => text[startIndex + index];
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public TextSection SubSection(int startIndex) => new TextSection(text, this.startIndex + startIndex);
+            
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public TextSection SubSection(int startIndex, int length) => new TextSection(text, this.startIndex + startIndex, length);
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool TryFindIndex(TextSection other, out int index)
+            {                                
+                for (index = 0; index < length; index++)
+                {
+                    if (index + other.length > length) return false;
+                    bool found = true;
+                    for(int j = 0; j < other.length; j++)
+                    {
+                        if (this[index + j] != other[j])
+                        {
+                            found = false;
+                            break;
+                        }
+                    }
+                    if (found) return true;
+                }
                 return false;
             }
+        }
 
-            switch (matchCase)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static TextSection SectionUntilNextWildcard(this TextSection textSection)
+        {
+            for(int i = 0; i < textSection.length; i++)
             {
-                case 0:
-                    isLike = (text == wildcardString);
-                    break;
-
-                case 1:
-                    for (int i = 0; i < text.Length; i++)
-                    {
-                        if ((word[i] != filter[i]) && filter[i] != '?')
-                        {
-                            isLike = false;
-                        }
-                    }
-                    break;
-
-                case 2:
-                    //Search for matches until first *
-                    for (int i = 0; i < filter.Length; i++)
-                    {
-                        if (filter[i] != '*')
-                        {
-                            if (filter[i] != word[i])
-                            {
-                                return false;
-                            }
-                        }
-                        else
-                        {
-                            lastCheckedHeadIndex = i;
-                            break;
-                        }
-                    }
-                    //Search Tail for matches until first *
-                    for (int i = 0; i < filter.Length; i++)
-                    {
-                        if (filter[filter.Length - 1 - i] != '*')
-                        {
-                            if (filter[filter.Length - 1 - i] != word[word.Length - 1 - i])
-                            {
-                                return false;
-                            }
-                        }
-                        else
-                        {
-                            lastCheckedTailIndex = i;
-                            break;
-                        }
-                    }
-
-                    //Create a reverse word and filter for searching in reverse. The reversed word and filter do not include already checked chars
-                    reversedWord = new char[word.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
-                    reversedFilter = new char[filter.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
-
-                    for (int i = 0; i < reversedWord.Length; i++)
-                    {
-                        reversedWord[i] = word[word.Length - (i + 1) - lastCheckedTailIndex];
-                    }
-                    for (int i = 0; i < reversedFilter.Length; i++)
-                    {
-                        reversedFilter[i] = filter[filter.Length - (i + 1) - lastCheckedTailIndex];
-                    }
-
-                    //Cut up the filter into seperate patterns, exclude * as they are not longer needed
-                    for (int i = 0; i < reversedFilter.Length; i++)
-                    {
-                        if (reversedFilter[i] == '*')
-                        {
-                            if (i - currentPatternStartIndex > 0)
-                            {
-                                char[] pattern = new char[i - currentPatternStartIndex];
-                                for (int j = 0; j < pattern.Length; j++)
-                                {
-                                    pattern[j] = reversedFilter[currentPatternStartIndex + j];
-                                }
-                                reversedPatterns.Add(pattern);
-                            }
-                            currentPatternStartIndex = i + 1;
-                        }
-                    }
-
-                    //Search for the patterns
-                    for (int i = 0; i < reversedPatterns.Count; i++)
-                    {
-                        for (int j = 0; j < reversedPatterns[i].Length; j++)
-                        {
-                            if ((reversedPatterns[i].Length - 1 - j) > (reversedWord.Length - 1 - reversedWordIndex))
-                            {
-                                return false;
-                            }
-
-                            if (reversedPatterns[i][j] != reversedWord[reversedWordIndex + j])
-                            {
-                                reversedWordIndex += 1;
-                                j = -1;
-                            }
-                            else
-                            {
-                                if (j == reversedPatterns[i].Length - 1)
-                                {
-                                    reversedWordIndex = reversedWordIndex + reversedPatterns[i].Length;
-                                }
-                            }
-                        }
-                    }
-                    break;
-
-                case 3:
-                    //Same as Case 2 except ? is considered a match
-                    //Search Head for matches util first *
-                    for (int i = 0; i < filter.Length; i++)
-                    {
-                        if (filter[i] != '*')
-                        {
-                            if (filter[i] != word[i] && filter[i] != '?')
-                            {
-                                return false;
-                            }
-                        }
-                        else
-                        {
-                            lastCheckedHeadIndex = i;
-                            break;
-                        }
-                    }
-                    //Search Tail for matches until first *
-                    for (int i = 0; i < filter.Length; i++)
-                    {
-                        if (filter[filter.Length - 1 - i] != '*')
-                        {
-                            if (filter[filter.Length - 1 - i] != word[word.Length - 1 - i] && filter[filter.Length - 1 - i] != '?')
-                            {
-                                return false;
-                            }
-                        }
-                        else
-                        {
-                            lastCheckedTailIndex = i;
-                            break;
-                        }
-                    }
-                    // Reverse and trim word and filter
-                    reversedWord = new char[word.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
-                    reversedFilter = new char[filter.Length - lastCheckedHeadIndex - lastCheckedTailIndex];
-
-                    for (int i = 0; i < reversedWord.Length; i++)
-                    {
-                        reversedWord[i] = word[word.Length - (i + 1) - lastCheckedTailIndex];
-                    }
-                    for (int i = 0; i < reversedFilter.Length; i++)
-                    {
-                        reversedFilter[i] = filter[filter.Length - (i + 1) - lastCheckedTailIndex];
-                    }
-
-                    for (int i = 0; i < reversedFilter.Length; i++)
-                    {
-                        if (reversedFilter[i] == '*')
-                        {
-                            if (i - currentPatternStartIndex > 0)
-                            {
-                                char[] pattern = new char[i - currentPatternStartIndex];
-                                for (int j = 0; j < pattern.Length; j++)
-                                {
-                                    pattern[j] = reversedFilter[currentPatternStartIndex + j];
-                                }
-                                reversedPatterns.Add(pattern);
-                            }
-
-                            currentPatternStartIndex = i + 1;
-                        }
-                    }
-                    //Search for the patterns
-                    for (int i = 0; i < reversedPatterns.Count; i++)
-                    {
-                        for (int j = 0; j < reversedPatterns[i].Length; j++)
-                        {
-                            if ((reversedPatterns[i].Length - 1 - j) > (reversedWord.Length - 1 - reversedWordIndex))
-                            {
-                                return false;
-                            }
-
-                            if (reversedPatterns[i][j] != '?' && reversedPatterns[i][j] != reversedWord[reversedWordIndex + j])
-                            {
-                                reversedWordIndex += 1;
-                                j = -1;
-                            }
-                            else
-                            {
-                                if (j == reversedPatterns[i].Length - 1)
-                                {
-                                    reversedWordIndex = reversedWordIndex + reversedPatterns[i].Length;
-                                }
-                            }
-                        }
-                    }
-                    break;
+                char c = textSection[i];
+                if (c == '?' || c == '*') return textSection.SubSection(0, i);
             }
-            return isLike;
+            return textSection;
         }
 
         public static bool MatchesWildcard(this string text, string wildcardString, bool ignoreCase)

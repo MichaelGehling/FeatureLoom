@@ -147,7 +147,7 @@ namespace Playground
                 
             };
 
-            int iterations = 1_000_000;
+            int iterations = 2_000_000;
 
             var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
@@ -158,90 +158,78 @@ namespace Playground
 
             NullStream nullStream = new NullStream();
 
-            GC.Collect();
-            AppTime.Wait(1.Seconds());
-            var tk = AppTime.TimeKeeper;
-            for (int i = 0; i < iterations; i++)
+            LoopJsonSerializer loopSerializer1 = new LoopJsonSerializer(new LoopJsonSerializer.Settings()
             {
-                //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                JsonSerializer.Serialize(nullStream, testDto, opt);
-                //json = JsonSerializer.Serialize(testDto, opt);
-                //var result1 = JsonSerializer.Deserialize<double>("-1234.567899");
-            }
-            Console.WriteLine(tk.Elapsed);
-            GC.Collect();
-            AppTime.Wait(1.Seconds());
-
-            tk.Restart();
-            for (int i = 0; i < iterations; i++)
-            {
-                //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                JsonSerializer.Serialize(nullStream, testDto, opt);
-                //json = JsonSerializer.Serialize(testDto, opt);
-                //var result2 = loopJsonDeserializer.Deserialize<double>("-1234.567899");
-            }
-            Console.WriteLine(tk.Elapsed);
-            GC.Collect();
-            AppTime.Wait(1.Seconds());
-
-;
-            LoopJsonSerializer loopSerializer = new LoopJsonSerializer(new LoopJsonSerializer.Settings()
-            {
-                enumAsString = false,
-                //typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddAllTypeInfo
-            });
-            tk.Restart();
-            for (int i = 0; i < iterations; i++)
-            {
-                //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                loopSerializer.Serialize(nullStream, testDto);
-                //json = loopSerializer.Serialize(testDto);
-            }
-            Console.WriteLine(tk.Elapsed);
-            GC.Collect();
-            AppTime.Wait(1.Seconds());
-
-            tk.Restart();
-            for (int i = 0; i < iterations; i++)
-            {
-                //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                loopSerializer.Serialize(nullStream, testDto);
-                //json = loopSerializer.Serialize(testDto, settingsloop);
-            }
-            Console.WriteLine(tk.Elapsed);
-            GC.Collect();
-            AppTime.Wait(1.Seconds());            
-
-
-
-            loopSerializer = new(new LoopJsonSerializer.Settings()
-            {
-                typeInfoHandling= LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
                 referenceCheck = LoopJsonSerializer.ReferenceCheck.NoRefCheck,
+                enumAsString = false,
+            });
+
+            LoopJsonSerializer loopSerializer2 = new(new LoopJsonSerializer.Settings()
+            {
+                typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                referenceCheck = LoopJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
                 enumAsString = false
             });
-            tk.Restart();
-            for (int i = 0; i < iterations; i++)
-            {
-                //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                loopSerializer.Serialize(nullStream, testDto);
-                //json = loopSerializer.Serialize(testDto);
-            }
-            Console.WriteLine(tk.Elapsed);
-            GC.Collect();
-            AppTime.Wait(1.Seconds());
 
-            tk.Restart();
-            for (int i = 0; i < iterations; i++)
-            {
-                //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                loopSerializer.Serialize(nullStream, testDto);
-                //json = loopSerializer.Serialize(testDto, settingsloop);
-            }
-            Console.WriteLine(tk.Elapsed);
+            TimeSpan elapsed;
+            long beforeCollection;
+            long afterCollection;
             GC.Collect();
-            AppTime.Wait(1.Seconds());
+            GC.WaitForPendingFinalizers();
+            var tk = AppTime.TimeKeeper;
+            Console.WriteLine("SerializerTest");
+            while (true)
+            {
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
+                    JsonSerializer.Serialize(nullStream, testDto, opt);
+                    //json = JsonSerializer.Serialize(testDto, opt);
+                    //var result1 = JsonSerializer.Deserialize<double>("-1234.567899");
+                }
+                elapsed = tk.Elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"JsonSerializer:  {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(2.Seconds());
+
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
+                    loopSerializer1.Serialize(nullStream, testDto);
+                    //json = loopSerializer.Serialize(testDto);
+                }
+                elapsed = tk.Elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"LoopSerializer1: {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(2.Seconds());
+
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
+                    loopSerializer2.Serialize(nullStream, testDto);
+                    //json = loopSerializer.Serialize(testDto);
+                }
+                elapsed = tk.Elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"LoopSerializer2: {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(2.Seconds());
+
+            }
 
             //var result = JsonSerializer.Deserialize<TestDto>(json);
             Console.ReadKey();
