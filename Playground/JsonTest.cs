@@ -38,24 +38,29 @@ namespace Playground
         public int myInt = 123;
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public string myString = "Hello: \\, \", \\, \n";
-        public IMyInterface myEmbedded;
+        public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
+        public MyEmbedded2 myEmbedded2 = new MyEmbedded2();
+        public MyEmbedded1 myEmbedded1a = new MyEmbedded1();
+        public MyEmbedded2 myEmbedded2a = new MyEmbedded2();
+        public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
+        public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
-        public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
-        public IDictionary<string, IMyInterface> myEmbeddedDict = new Dictionary<string, IMyInterface>();
-        public object someObj = "Something";
+        //public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
+        //public object someObj = "Something";
 
         public string MyProperty { get; set; } = "propValue";
 
-        public TestDto(int myInt, IMyInterface myEmbedded)
+        public TestDto(int myInt, MyEmbedded1 myEmbedded)
         {
             this.myInt = myInt;
-            this.myEmbedded = myEmbedded;
+            //this.myEmbedded = myEmbedded;
             //this.self = this;
 
-            myEmbeddedDict["1"] = new MyEmbedded1();
-            myEmbeddedDict["2"] = new MyEmbedded2();
+            //myEmbeddedDict["1"] = new MyEmbedded1();
+            //myEmbeddedDict["2"] = new MyEmbedded1();
 
-            myObjects.Add(myEmbedded);
+            //myObjects.Add(myEmbedded);
         }
         public TestDto() { }
 
@@ -147,16 +152,19 @@ namespace Playground
                 
             };
 
-            int iterations = 2_000_000;
+            int iterations = 1_000_000;
 
             var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
             //var testDto = 1234.5678;
+            //var testDto = "Hallo";
+            
             Type testDtoType = testDto.GetType();
             string json;
             //byte[] json;
 
-            NullStream nullStream = new NullStream();
+            Stream stream = new NullStream();
+            //MemoryStream stream = new MemoryStream();
 
             LoopJsonSerializer loopSerializer1 = new LoopJsonSerializer(new LoopJsonSerializer.Settings()
             {
@@ -187,9 +195,10 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                    JsonSerializer.Serialize(nullStream, testDto, opt);
+                    JsonSerializer.Serialize(stream, testDto, opt);
                     //json = JsonSerializer.Serialize(testDto, opt);
                     //var result1 = JsonSerializer.Deserialize<double>("-1234.567899");
+                    stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 beforeCollection = GC.GetTotalMemory(false);
@@ -203,8 +212,9 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                    loopSerializer1.Serialize(nullStream, testDto);
+                    loopSerializer1.Serialize(stream, testDto);
                     //json = loopSerializer.Serialize(testDto);
+                    stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 beforeCollection = GC.GetTotalMemory(false);
@@ -218,8 +228,9 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                    loopSerializer2.Serialize(nullStream, testDto);
+                    loopSerializer2.Serialize(stream, testDto);
                     //json = loopSerializer.Serialize(testDto);
+                    stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 beforeCollection = GC.GetTotalMemory(false);

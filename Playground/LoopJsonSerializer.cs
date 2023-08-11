@@ -44,6 +44,7 @@ namespace Playground
         {
             public Type collectionType;
             public int index;
+            internal TypeCacheItem collectionTypeCacheItem;
         }
 
         sealed class ComplexJob : BaseJob
@@ -121,7 +122,7 @@ namespace Playground
                 objToJob.Clear();
 
                 writer.stream = memoryStream;
-                HandleItem(item, typeof(T), null);
+                HandleItem(item, item?.GetType(), typeof(T), null);
                 Loop();
                 return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
             }
@@ -135,7 +136,7 @@ namespace Playground
                 objToJob.Clear();
 
                 writer.stream = memoryStream;
-                HandleItem(item, typeof(T), null);
+                HandleItem(item, item?.GetType(), typeof(T), null);
                 Loop();
                 return memoryStream.ToArray();
             }
@@ -148,7 +149,7 @@ namespace Playground
                 objToJob.Clear();
 
                 writer.stream = stream;
-                HandleItem(item, typeof(T), null);
+                HandleItem(item, item?.GetType(), typeof(T), null);
                 Loop();
             }
         }
@@ -189,7 +190,12 @@ namespace Playground
                 }
             
                 if (job.index > 0) writer.WriteComma();
-                HandleItem(job.enumerator.Current, job.collectionType, job);
+                
+                var item = job.enumerator.Current;
+                var itemType = item?.GetType();
+                if (job.collectionType == itemType) job.collectionTypeCacheItem.itemHandler(item, job, settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo);
+                else HandleItem(item, itemType, job.collectionType, job);                
+
                 job.index++;            
             } while (jobStack.Count == beforeStackSize);
         }
@@ -226,20 +232,19 @@ namespace Playground
 
         }
 
-        private void HandleItem(object obj, Type expectedType, BaseJob parentJob)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void HandleItem(object obj, Type objType, Type expectedType, BaseJob parentJob)
         {
             if (obj == null)
             {
                 writer.WriteNullValue();
                 return;
             }
-
-            Type objType = obj.GetType();
-            bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != objType);            
+            bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != objType);
             
             if (!typeCache.TryGetValue(objType, out var typeCacheItem))
             {
-                typeCacheItem = CreateTypeCacheItem(obj, objType);
+                typeCacheItem = CreateTypeCacheItem(objType);
             }            
             typeCacheItem.itemHandler(obj, parentJob, writeTypeInfo);                        
         }
@@ -291,7 +296,7 @@ namespace Playground
             return false;
         }
 
-        private TypeCacheItem CreateTypeCacheItem(object obj, Type objType)
+        private TypeCacheItem CreateTypeCacheItem(Type objType)
         {
             TypeCacheItem typeCacheItem = new TypeCacheItem();
             typeCache[objType] = typeCacheItem;
@@ -409,7 +414,7 @@ namespace Playground
                 return typeCacheItem;
             }
 
-            if (obj is IEnumerable)
+            if (objType.IsAssignableTo(typeof(IEnumerable)))
             {
                 Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
 
@@ -563,9 +568,15 @@ namespace Playground
                         finishTypeInfoObject(writeTypeInfo);
                     };
                 }
-                else if (obj is ICollection)
+                else if (objType.IsAssignableTo(typeof(ICollection)))
                 {
                     if (collectionType == null) collectionType = typeof(object);
+
+                    if (!typeCache.TryGetValue(collectionType, out var collectionTypeCacheItem))
+                    {
+                        collectionTypeCacheItem = CreateTypeCacheItem(collectionType);
+                    }
+
                     typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                     {
                         if (tryHandleAsRef(obj, parentJob, objType)) return;
@@ -577,6 +588,7 @@ namespace Playground
                             item = obj,
                             itemType = objType,
                             enumerator = items.GetEnumerator(),
+                            collectionTypeCacheItem = collectionTypeCacheItem,
                             writeTypeInfo = writeTypeInfo,
                             parentJob = parentJob,
                             itemName = parentJob == null ? writer.PrepareRootName() :
@@ -652,7 +664,8 @@ namespace Playground
             }
             return typeCacheItem;
         }
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<string> items)
         {
             writer.OpenCollection();
@@ -666,6 +679,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<int> items)
         {
             writer.OpenCollection();
@@ -679,6 +693,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<sbyte> items)
         {
             writer.OpenCollection();
@@ -692,6 +707,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<short> items)
         {
             writer.OpenCollection();
@@ -705,6 +721,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<long> items)
         {
             writer.OpenCollection();
@@ -718,6 +735,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<byte> items)
         {
             writer.OpenCollection();
@@ -731,6 +749,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<uint> items)
         {
             writer.OpenCollection();
@@ -744,6 +763,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<ushort> items)
         {
             writer.OpenCollection();
@@ -757,6 +777,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<ulong> items)
         {
             writer.OpenCollection();
@@ -770,6 +791,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<float> items)
         {
             writer.OpenCollection();
@@ -783,6 +805,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<double> items)
         {
             writer.OpenCollection();
@@ -796,6 +819,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<bool> items)
         {
             writer.OpenCollection();
@@ -809,6 +833,7 @@ namespace Playground
             writer.CloseCollection();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection<T>(ICollection<T> items)
         {
             writer.OpenCollection();
@@ -862,12 +887,23 @@ namespace Playground
                 return CreateCollectionFieldWriter(objType, memberInfo, extendedFieldNameBytes, fieldNameBytes);
             }
 
+            if (!typeCache.TryGetValue(memberType, out var memberTypeCacheItem))
+            {
+                memberTypeCacheItem = CreateTypeCacheItem(memberType);
+            }            
+
             return (parentJob) =>
             {
                 parentJob.currentFieldName = fieldNameBytes;
                 writer.WritePreparedByteString(extendedFieldNameBytes);
                 var value = getValue(parentJob.item);
-                HandleItem(value, memberType, parentJob);
+                var valueType = value?.GetType();
+                if (valueType == memberType)
+                {
+                    bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo;
+                    memberTypeCacheItem.itemHandler(value, parentJob, writeTypeInfo);
+                }
+                else HandleItem(value, valueType, memberType, parentJob);
             };
         }
 
@@ -1125,6 +1161,11 @@ namespace Playground
             var lambda = Expression.Lambda<Func<object, IEnumerable>>(castFieldAccess, parameter);
             var getValue = lambda.Compile();
 
+            if (!typeCache.TryGetValue(collectionType, out var collectionTypeCacheItem))
+            {
+                collectionTypeCacheItem = CreateTypeCacheItem(collectionType);
+            }
+
             return (parentJob) =>
             {
                 IEnumerable items = getValue(parentJob.item);
@@ -1138,6 +1179,7 @@ namespace Playground
                     item = items,
                     itemType = objType,
                     enumerator = items.GetEnumerator(),
+                    collectionTypeCacheItem = collectionTypeCacheItem,
                     writeTypeInfo = writeTypeInfo,
                     parentJob = parentJob,
                     itemName = fieldNameBytes
