@@ -81,6 +81,24 @@ namespace FeatureLoom.DependencyInversion
             else HandleUninitializedSet(serviceInstance, serviceInstanceName);
         }
 
+        public static void Delete()
+        {
+            if (unnamedInstanceContainer != null)
+            {
+                unnamedInstanceContainer = null;
+                ServiceRegistry.DeleteServiceInstanceContainer<T>("");
+            }
+        }
+
+        public static void Delete(string serviceInstanceName)
+        {
+            if (unnamedInstanceContainer != null)
+            {
+                unnamedInstanceContainer = null;
+                ServiceRegistry.DeleteServiceInstanceContainer<T>(serviceInstanceName);
+            }
+        }
+
         public static T Instance
         {
             get => Get();

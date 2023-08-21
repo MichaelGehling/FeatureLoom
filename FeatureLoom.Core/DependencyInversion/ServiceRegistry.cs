@@ -188,6 +188,15 @@ namespace FeatureLoom.DependencyInversion
             }
         }
 
+        internal static void DeleteServiceInstanceContainer<T>(string serviceInstanceName) where T : class
+        {
+            var typeAndName = new TypeAndName(typeof(T), serviceInstanceName);
+            using (registryLock.Lock())
+            {
+                services.Remove(typeAndName);
+            }
+        }
+
         private static TypeAndName GetTypeAndName(this IServiceInstanceContainer service) => new TypeAndName(service.ServiceType, service.ServiceInstanceName);
 
         private readonly struct TypeAndName : IEquatable<TypeAndName>
