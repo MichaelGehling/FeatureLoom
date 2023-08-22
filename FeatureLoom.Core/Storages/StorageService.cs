@@ -47,6 +47,37 @@ namespace FeatureLoom.Storages
             }
         }
 
+        public void RemoveReader(string category)
+        {
+            using (categoryToReaderLock.Lock())
+            {
+                if (categoryToReader.TryGetValue(category, out IStorageReader reader))
+                {
+                    if (reader is IDisposable disposable) disposable.Dispose();
+                    categoryToReader.Remove(category);
+                }
+            }
+        }
+
+        public void RemoveWriter(string category)
+        {
+            using (categoryToWriterLock.Lock())
+            {
+                if (categoryToWriter.TryGetValue(category, out IStorageWriter writer))
+                {
+                    if (writer is IDisposable disposable) disposable.Dispose();
+                    categoryToWriter.Remove(category);
+                }
+            }
+        }
+        
+        public void RemoveReaderAndWriter(string category)
+        {
+            RemoveReader(category);
+            RemoveWriter(category);
+        }
+
+
         public IStorageReader GetReader(string category)
         {
             using (var acquiredLock = categoryToReaderLock.LockReadOnly())
