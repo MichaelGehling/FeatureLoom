@@ -733,7 +733,7 @@ namespace FeatureLoom.Storages
 
         public void Dispose()
         {
-            ((IDisposable)fileObserver).Dispose();
+            ((IDisposable)fileObserver)?.Dispose();
         }
 
         private class FileSubscriptionStatus

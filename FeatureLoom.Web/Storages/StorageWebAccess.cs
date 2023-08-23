@@ -38,7 +38,8 @@ namespace FeatureLoom.Storages
                 {"mp3", "audio/mpeg"},
                 {"wav", "audio/wav"},
                 {"mp4", "video/mp4"},
-                {"mpeg", "video/mpeg"}
+                {"mpeg", "video/mpeg"},
+                {"svg", "image/svg+xml"}
             };
         }
         private Config config;

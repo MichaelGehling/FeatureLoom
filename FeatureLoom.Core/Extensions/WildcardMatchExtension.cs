@@ -11,12 +11,12 @@ namespace FeatureLoom.Extensions
         {
             if (pattern.Length == 0) return text.Length == 0 ? true : false;            
 
-            TextSection remainingText = new TextSection(text);
-            TextSection remainingPattern = new TextSection(pattern);
+            VariableTextSection remainingText = new VariableTextSection(text);
+            VariableTextSection remainingPattern = new VariableTextSection(pattern);
 
             while(remainingPattern.length > 0)
             {
-                TextSection sectionWithoutWildcard = remainingPattern.SectionUntilNextWildcard();
+                VariableTextSection sectionWithoutWildcard = remainingPattern.SectionUntilNextWildcard();
                 if (sectionWithoutWildcard.length > remainingText.length) return false;
                 for(int i = 0; i < sectionWithoutWildcard.length; i++)
                 {
@@ -62,9 +62,9 @@ namespace FeatureLoom.Extensions
             return true;
         }
 
-        private struct TextSection
+        private struct VariableTextSection
         {
-            public static readonly TextSection Empty = new TextSection("");
+            public static readonly VariableTextSection Empty = new VariableTextSection("");
 
             string text;
             int startIndex;
@@ -83,14 +83,14 @@ namespace FeatureLoom.Extensions
                 }
             }
 
-            public TextSection(string text) : this()
+            public VariableTextSection(string text) : this()
             {
                 this.text = text;
                 this.startIndex = 0;
                 this.length = text.Length;
             }
 
-            public TextSection(string text, int startIndex) : this()
+            public VariableTextSection(string text, int startIndex) : this()
             {
                 if (startIndex >= text.Length)
                 {
@@ -103,7 +103,7 @@ namespace FeatureLoom.Extensions
                 this.length = text.Length - startIndex;                
             }
 
-            public TextSection(string text, int startIndex, int length) : this()
+            public VariableTextSection(string text, int startIndex, int length) : this()
             {
                 if (startIndex + length > text.Length)
                 {
@@ -121,13 +121,13 @@ namespace FeatureLoom.Extensions
             public char this[int index] => text[startIndex + index];
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public TextSection SubSection(int startIndex) => new TextSection(text, this.startIndex + startIndex);
+            public VariableTextSection SubSection(int startIndex) => new VariableTextSection(text, this.startIndex + startIndex);
             
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public TextSection SubSection(int startIndex, int length) => new TextSection(text, this.startIndex + startIndex, length);
+            public VariableTextSection SubSection(int startIndex, int length) => new VariableTextSection(text, this.startIndex + startIndex, length);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool TryFindIndex(TextSection other, out int index)
+            public bool TryFindIndex(VariableTextSection other, out int index)
             {                                
                 for (index = 0; index < length; index++)
                 {
@@ -148,7 +148,7 @@ namespace FeatureLoom.Extensions
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static TextSection SectionUntilNextWildcard(this TextSection textSection)
+        private static VariableTextSection SectionUntilNextWildcard(this VariableTextSection textSection)
         {
             for(int i = 0; i < textSection.length; i++)
             {
