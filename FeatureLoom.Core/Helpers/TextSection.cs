@@ -163,6 +163,6 @@ namespace FeatureLoom.Helpers
         }
 
         public static implicit operator TextSection(string text) => new TextSection(text);
-        public static implicit operator string(TextSection textSection) => textSection.text;
+        public static implicit operator string(TextSection textSection) => textSection.ToString();
     }
 }
