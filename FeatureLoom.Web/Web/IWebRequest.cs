@@ -25,6 +25,7 @@ namespace FeatureLoom.Web
         string BasePath { get; }
         string FullPath { get; }
         string HostAddress { get; }
+        string OriginalPath { get; }
 
         void ChangePath(string newPath);
 

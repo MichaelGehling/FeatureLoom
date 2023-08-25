@@ -44,7 +44,7 @@ namespace FeatureLoom.Web
         Settings settings;
         static string[] scopes = new[] { "openid", "profile", "email", "user.read" };
         static string scopesString = string.Join(" ", scopes);
-        ConcurrentDictionary<string, DateTime> authStates = new ConcurrentDictionary<string, DateTime>();
+        ConcurrentDictionary<string, (DateTime timeStamp, string originalPath)> authStates = new();
         public TimeSpan authStateTimeout = 15.Minutes();
         DateTime lastCleanup = AppTime.Now;
         ISchedule cleanupSchedule;
@@ -64,7 +64,7 @@ namespace FeatureLoom.Web
                 if (cleanupSchedule == null) return TimeFrame.Invalid;
                 foreach(var state in authStates)
                 {
-                    if (now > state.Value + authStateTimeout) authStates.TryRemove(state.Key, out _);
+                    if (now > state.Value.timeStamp + authStateTimeout) authStates.TryRemove(state.Key, out _);
                 }
                 return new TimeFrame(now + authStateTimeout, 1.Minutes());
             });
@@ -81,7 +81,7 @@ namespace FeatureLoom.Web
 
                 string authorizationEndpoint = $"https://login.microsoftonline.com/{settings.tenantId}/oauth2/v2.0/authorize";
                 string authState = RandomGenerator.Int64(true).ToString();
-                authStates[authState] = AppTime.Now;
+                authStates[authState] = (AppTime.Now, request.OriginalPath);
                 string authUrl = $"{authorizationEndpoint}?client_id={settings.applicationClientId}&response_type=code&redirect_uri={Uri.EscapeDataString(callBack)}&scope={Uri.EscapeDataString(scopesString)}&response_mode=query&state={Uri.EscapeDataString(authState)}";
 
                 return response.Redirect(authUrl);
@@ -100,13 +100,13 @@ namespace FeatureLoom.Web
                     return HandlerResult.Handled_BadRequest("State parameter missing");
                 }
 
-                if (!authStates.TryRemove(authState, out var authStateTime) || AppTime.Now - authStateTime > authStateTimeout)
+                if (!authStates.TryRemove(authState, out var state) || AppTime.Now - state.timeStamp > authStateTimeout)
                 {
                     return HandlerResult.Handled_Unauthorized("Invalid state parameter");
                 }
 
                 // Initialize the MSAL app object
-                var app = ConfidentialClientApplicationBuilder.Create(settings.applicationClientId)
+                var app = ConfidentialClientApplicationBuilder.Create(settings.applicationClientId)                      
                     .WithClientSecret(settings.applicationClientSecret)
                     .WithAuthority("https://login.microsoftonline.com/" + settings.tenantId)
                     .WithRedirectUri(callBack)
@@ -148,7 +148,7 @@ namespace FeatureLoom.Web
                     {
                         response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });
                         Log.INFO(this.GetHandle(), $"Login successful by user [{identityId}]");
-                        return HandlerResult.Handled_OK(session.SessionId);
+                        return response.Redirect(settings.baseUrl + state.originalPath);
                     }
                     else
                     {

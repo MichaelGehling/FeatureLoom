@@ -17,8 +17,15 @@ namespace FeatureLoom.Web
             private string relativePath = null;
             private string basePath = null;
             private string fullPath = null;
+            private string originalPath;
+
             private bool responseSent = false;
             private bool statusCodeSet = false;
+
+            public ContextWrapper(HttpContext context)
+            {
+                this.context = context;
+            }
 
             public void SetRoute(string route)
             {
@@ -50,17 +57,14 @@ namespace FeatureLoom.Web
 
             void IWebRequest.ChangePath(string newPath)
             {
+                originalPath = context.Request.Path;
                 context.Request.Path = newPath;
                 relativePath = null;
                 basePath = null;
                 fullPath = null;
             }
 
-            public ContextWrapper(HttpContext context)
-            {
-                this.context = context;
-            }
-
+            string IWebRequest.OriginalPath => originalPath ?? context.Request.Path;
             string IWebRequest.BasePath => basePath ?? UpdateBasePath();
 
             string IWebRequest.Path => context.Request.Path;
