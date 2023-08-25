@@ -19,5 +19,7 @@ namespace FeatureLoom.Web
 
         bool ResponseSent { get; }
         bool StatusCodeSet { get; }
+
+        HandlerResult Redirect(string url);
     }
 }

@@ -38,6 +38,11 @@ namespace FeatureLoom.Security
             this.storedCredentials.Add(credential);
         }
 
+        public Identity(string identityId)
+        {
+            this.identityId = identityId;
+        }
+
         public Identity()
         {
         }

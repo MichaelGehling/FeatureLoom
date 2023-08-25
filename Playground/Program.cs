@@ -78,14 +78,6 @@ namespace Playground
 
         private static async Task Main()
         {
-
-            TextSection section = ",Hello,,World,!,";
-            var skipped = section.Split(',', true).ToArray();
-            var notskipped = section.Split(',', false).ToArray();
-            foreach (var part in section.Split(','))
-            {
-                var x = part;
-            }
         
             //string typeName = typeof(Dictionary<string, List<List<TestDto>[]>>).GetSimplifiedTypeName();
 

@@ -164,5 +164,46 @@ namespace FeatureLoom.Helpers
 
         public static implicit operator TextSection(string text) => new TextSection(text);
         public static implicit operator string(TextSection textSection) => textSection.ToString();
+        public static bool operator ==(TextSection left, TextSection right)
+        {
+            if (left.length !=  right.length) return false;
+            for (int i = 0;i < left.length;i++)
+            {
+                if (left[i] != right[i]) return false;
+            }
+            return true;
+        }
+
+        public static bool operator !=(TextSection left, TextSection right) => !(left == right);
+
+        public override bool Equals(object obj)
+        {            
+            if (obj is TextSection textSection) return this == textSection;
+            if (obj is string str) return this == str;
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            // Initial hash values.
+            int hash1 = 5381;
+            int hash2 = 5381;
+
+            for (int i = 0; i < length; i++)
+            {
+                // Processing odd indexed characters with hash1 and even indexed characters with hash2.
+                if (i % 2 == 0)
+                {
+                    hash1 = ((hash1 << 5) + hash1) ^ this[i];
+                }
+                else
+                {
+                    hash2 = ((hash2 << 5) + hash2) ^ this[i];
+                }
+            }
+
+            // Combining the hash values.
+            return hash1 + (hash2 * 1566083941);
+        }
     }
 }

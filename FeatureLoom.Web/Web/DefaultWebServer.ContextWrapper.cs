@@ -159,6 +159,13 @@ namespace FeatureLoom.Web
                 responseSent = true;
                 return context.Response.WriteAsync(reply);
             }
+
+            HandlerResult IWebResponse.Redirect(string url)
+            {
+                context.Response.Redirect(url);
+                responseSent = true;
+                return new HandlerResult(true, null, HttpStatusCode.Redirect);
+            }
         }        
     }
 }
