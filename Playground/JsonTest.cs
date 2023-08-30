@@ -102,7 +102,7 @@ namespace Playground
     public class TestDto2
     {
         public string str1 = "Mystring1";
-        /*public string str2 = "Mystring2";
+        public string str2 = "Mystring2";
         public string str3 = "Mystring3";
         public string str4 = "Mystring4";
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
@@ -110,7 +110,7 @@ namespace Playground
         public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
         public int int1 = 123451;
         public int int2 = 123452;
-        public int int3 = 123453;*/
+        public int int3 = 123453;
         public int int4 = 123454;
         public double double1 = 12.1231;
     }
@@ -155,8 +155,8 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
-            //var testDto = new TestDto2();
+            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto2();
             //var testDto = 1234.5678;
             //var testDto = "Hallo";
             //var testDto = new object();
@@ -181,6 +181,14 @@ namespace Playground
                 typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
                 referenceCheck = LoopJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
+                enumAsString = false
+            });
+
+            LoopJsonSerializer loopSerializer3 = new(new LoopJsonSerializer.Settings()
+            {
+                typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                referenceCheck = LoopJsonSerializer.ReferenceCheck.OnLoopReplaceByRef,
                 enumAsString = false
             });
 
@@ -240,6 +248,22 @@ namespace Playground
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"LoopSerializer2: {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(2.Seconds());
+
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
+                    loopSerializer3.Serialize(stream, testDto);
+                    //json = loopSerializer.Serialize(testDto);
+                    stream.Position = 0;
+                }
+                elapsed = tk.Elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"LoopSerializer3: {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(2.Seconds());
 
             }
