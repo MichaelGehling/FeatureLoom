@@ -45,9 +45,10 @@ namespace Playground
         public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
         public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
-        //public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
         public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
-        //public object someObj = "Something";
+        public object someObj = "Something";
+        List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
         public string MyProperty { get; set; } = "propValue";
 
@@ -101,7 +102,7 @@ namespace Playground
     public class TestDto2
     {
         public string str1 = "Mystring1";
-        public string str2 = "Mystring2";
+        /*public string str2 = "Mystring2";
         public string str3 = "Mystring3";
         public string str4 = "Mystring4";
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
@@ -109,7 +110,7 @@ namespace Playground
         public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
         public int int1 = 123451;
         public int int2 = 123452;
-        public int int3 = 123453;
+        public int int3 = 123453;*/
         public int int4 = 123454;
         public double double1 = 12.1231;
     }
@@ -158,6 +159,7 @@ namespace Playground
             //var testDto = new TestDto2();
             //var testDto = 1234.5678;
             //var testDto = "Hallo";
+            //var testDto = new object();
             
             Type testDtoType = testDto.GetType();
             string json;

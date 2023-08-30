@@ -197,7 +197,7 @@ namespace Playground
             List<byte[]> indexNameList = new List<byte[]>();
             public byte[] PrepareCollectionIndexName(CollectionJob parentJob)
             {
-                int index = parentJob.index;
+                int index = parentJob.currentIndex;
                 for (int i = 0; i <= index; i++)
                 {
                     if (indexNameList.Count <= i) indexNameList.Add(null);

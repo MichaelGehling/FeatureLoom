@@ -33,22 +33,23 @@ namespace Playground
         abstract class BaseJob
         {
             public object item;
-            public Type itemType;
-            public IEnumerator enumerator;
+            public Type itemType;            
             public bool writeTypeInfo;
             public BaseJob parentJob;
             public byte[] itemName;
+            public int currentIndex;
         }
 
         sealed class CollectionJob : BaseJob
         {
-            public Type collectionType;
-            public int index;
+            public IEnumerator enumerator;
+            public Type collectionType;            
             internal TypeCacheItem collectionTypeCacheItem;
         }
 
         sealed class ComplexJob : BaseJob
         {
+            public List<FieldWriter> fieldWriters;
             public bool firstChild;
             public byte[] currentFieldName;
         }
@@ -171,65 +172,81 @@ namespace Playground
 
         private void HandleCollectionJob(CollectionJob job)
         {
-            if (job.index == 0)
+            jobStack.Push(job);
+            int beforeStackSize = jobStack.Count;
+
+            if (job.currentIndex == 0)
             {
                 prepareTypeInfoObjectFromType(job.writeTypeInfo, job.itemType);
                 writer.OpenCollection();
-            }
 
-            jobStack.Push(job);
-            int beforeStackSize = jobStack.Count;
-            do
-            {
-                if (!job.enumerator.MoveNext())
+                if (job.enumerator.MoveNext())
                 {
-                    writer.CloseCollection();
-                    finishTypeInfoObject(job.writeTypeInfo);
-                    jobStack.Pop();
-                    return;
+                    var item = job.enumerator.Current;
+                    var itemType = item?.GetType();
+                    if (job.collectionType == itemType) job.collectionTypeCacheItem.itemHandler(item, job, settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo);
+                    else HandleItem(item, itemType, job.collectionType, job);
+
+                    job.currentIndex++;
+
+                    if (jobStack.Count != beforeStackSize) return;
                 }
-            
-                if (job.index > 0) writer.WriteComma();
+            }            
+
+            while (job.enumerator.MoveNext())
+            {            
+                writer.WriteComma();
                 
                 var item = job.enumerator.Current;
                 var itemType = item?.GetType();
                 if (job.collectionType == itemType) job.collectionTypeCacheItem.itemHandler(item, job, settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo);
                 else HandleItem(item, itemType, job.collectionType, job);                
 
-                job.index++;            
-            } while (jobStack.Count == beforeStackSize);
+                job.currentIndex++;
+
+                if (jobStack.Count != beforeStackSize) return;
+            }
+
+            writer.CloseCollection();
+            finishTypeInfoObject(job.writeTypeInfo);
+            jobStack.Pop();
+
         }
 
         private void HandleComplexObjectJob(ComplexJob job)
         {
+            jobStack.Push(job);
+            int beforeStackSize = jobStack.Count;
+
             if (job.firstChild)
             {
+                job.firstChild = false;
                 writer.OpenObject();
+
                 if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && job.writeTypeInfo))
                 {
                     writer.WriteTypeInfo(job.itemType.GetSimplifiedTypeName());
-                    job.firstChild = false;
+                    writer.WriteComma();                    
+                }
+
+                if (job.currentIndex < job.fieldWriters.Count)
+                {
+                    var fieldWriter = job.fieldWriters[job.currentIndex++];
+                    fieldWriter(job);
+                    if (jobStack.Count != beforeStackSize) return;
                 }
             }
 
-            jobStack.Push(job);
-            int beforeStackSize = jobStack.Count;
-            do
+            while (job.currentIndex < job.fieldWriters.Count)
             {
-                if (!job.enumerator.MoveNext())
-                {
-                    writer.CloseObject();
-                    jobStack.Pop();
-                    return;
-                }                
-
-                if (job.firstChild) job.firstChild = false;
-                else writer.WriteComma();
-
-                var fieldWriter = (FieldWriter)job.enumerator.Current;                
+                writer.WriteComma();
+                var fieldWriter = job.fieldWriters[job.currentIndex++];
                 fieldWriter(job);
-            } while (jobStack.Count == beforeStackSize);
+                if (jobStack.Count != beforeStackSize) return;
+            }
 
+            writer.CloseObject();
+            jobStack.Pop();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -584,7 +601,7 @@ namespace Playground
                         CollectionJob job = new()
                         {
                             collectionType = collectionType,
-                            index = 0,
+                            currentIndex = 0,
                             item = obj,
                             itemType = objType,
                             enumerator = items.GetEnumerator(),
@@ -639,7 +656,8 @@ namespace Playground
                             firstChild = true,
                             item = obj,
                             itemType = objType,
-                            enumerator = fieldWriters.GetEnumerator(),
+                            fieldWriters = fieldWriters,
+                            currentIndex = 0,
                             writeTypeInfo = writeTypeInfo,
                             parentJob = parentJob,
                             itemName = parentJob == null ? writer.PrepareRootName() :
@@ -1175,7 +1193,7 @@ namespace Playground
                 CollectionJob job = new()
                 {
                     collectionType = collectionType,
-                    index = 0,
+                    currentIndex = 0,
                     item = items,
                     itemType = objType,
                     enumerator = items.GetEnumerator(),
