@@ -195,7 +195,7 @@ namespace Playground
             }
 
             List<byte[]> indexNameList = new List<byte[]>();
-            public byte[] PrepareCollectionIndexName(CollectionJob parentJob)
+            public byte[] PrepareCollectionIndexName(BaseJob parentJob)
             {
                 int index = parentJob.currentIndex;
                 for (int i = 0; i <= index; i++)

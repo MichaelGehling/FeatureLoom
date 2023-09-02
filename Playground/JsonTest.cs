@@ -18,8 +18,8 @@ namespace Playground
 {
     public class BaseDto
     {
-        private double privBase = 0.77;
-        protected int protBase = 1;
+        public double privBase = 0.77;
+        public int protBase = 1;
         public int pubBase = 2;
 
         public virtual void Mutate()
@@ -34,7 +34,7 @@ namespace Playground
     {
         public TestEnum testEnum = TestEnum.TestB;
         public object self;
-        private int privInt = 42;
+        //private int privInt = 42;
         public int myInt = 123;
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public string myString = "Hello: \\, \", \\, \n";
@@ -45,10 +45,10 @@ namespace Playground
         public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
         public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
-        public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        //public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
         public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
-        public object someObj = "Something";
-        List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
+        //public object someObj = "Something";
+        public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
         public string MyProperty { get; set; } = "propValue";
 
@@ -155,12 +155,13 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
-            var testDto = new TestDto2();
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto2();
+            //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = 1234.5678;
             //var testDto = "Hallo";
             //var testDto = new object();
-            
+
             Type testDtoType = testDto.GetType();
             string json;
             //byte[] json;

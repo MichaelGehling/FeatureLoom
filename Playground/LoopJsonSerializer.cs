@@ -40,10 +40,16 @@ namespace Playground
             public int currentIndex;
         }
 
-        sealed class CollectionJob : BaseJob
+        sealed class EnumarableJob : BaseJob
         {
             public IEnumerator enumerator;
             public Type collectionType;            
+            internal TypeCacheItem collectionTypeCacheItem;
+        }
+
+        sealed class ListJob : BaseJob
+        {
+            public Type collectionType;
             internal TypeCacheItem collectionTypeCacheItem;
         }
 
@@ -163,14 +169,18 @@ namespace Playground
                 {
                     HandleComplexObjectJob(complexJob);
                 }
-                else if (job is CollectionJob collectionJob)
+                else if (job is ListJob listJob)
                 {
-                    HandleCollectionJob(collectionJob);
+                    HandleListJob(listJob);
+                }
+                else if (job is EnumarableJob enumerableJob)
+                {                    
+                    HandleEnumerableJob(enumerableJob);
                 }
             }
         }
 
-        private void HandleCollectionJob(CollectionJob job)
+        private void HandleEnumerableJob(EnumarableJob job)
         {
             jobStack.Push(job);
             int beforeStackSize = jobStack.Count;
@@ -198,9 +208,54 @@ namespace Playground
             finishTypeInfoObject(job.writeTypeInfo);
             jobStack.Pop();
 
-            bool HandleNextCollectionItem(CollectionJob job, int beforeStackSize)
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            bool HandleNextCollectionItem(EnumarableJob job, int beforeStackSize)
             {
                 var item = job.enumerator.Current;
+                var itemType = item?.GetType();
+                if (job.collectionType == itemType) job.collectionTypeCacheItem.itemHandler(item, job, settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo);
+                else HandleItem(item, itemType, job.collectionType, job);
+
+                job.currentIndex++;
+
+                bool stackChanged = jobStack.Count != beforeStackSize;
+                return stackChanged;
+            }
+        }
+
+        private void HandleListJob(ListJob job)
+        {
+            jobStack.Push(job);
+            int beforeStackSize = jobStack.Count;
+            IList list = (IList)job.item;
+            if (job.currentIndex == 0)
+            {
+                prepareTypeInfoObjectFromType(job.writeTypeInfo, job.itemType);
+                writer.OpenCollection();
+
+                if (job.currentIndex < list.Count)
+                {
+                    bool stackChanged = HandleNextCollectionItem(job, beforeStackSize);
+                    if (stackChanged) return;
+                }
+            }
+
+            while (job.currentIndex < list.Count)
+            {
+                writer.WriteComma();
+                bool stackChanged = HandleNextCollectionItem(job, beforeStackSize);
+                if (stackChanged) return;
+            }
+
+            writer.CloseCollection();
+            finishTypeInfoObject(job.writeTypeInfo);
+            jobStack.Pop();
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            bool HandleNextCollectionItem(ListJob job, int beforeStackSize)
+            {
+                IList list = (IList)job.item;
+                var item = list[job.currentIndex];
                 var itemType = item?.GetType();
                 if (job.collectionType == itemType) job.collectionTypeCacheItem.itemHandler(item, job, settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo);
                 else HandleItem(item, itemType, job.collectionType, job);
@@ -386,7 +441,7 @@ namespace Playground
                         parentJob = parentJob,
                         itemName = parentJob == null ? writer.PrepareRootName() :
                                     parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((CollectionJob)parentJob)
+                                    writer.PrepareCollectionIndexName((BaseJob)parentJob)
                     };
                     jobStack.Push(job);
                     if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[obj] = job;
@@ -411,17 +466,31 @@ namespace Playground
 
             if (collectionType == typeof(string))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<string>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
+                if (objType.IsAssignableTo(typeof(IList<string>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveList((IList<string>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                    {
+                        if (tryHandleAsRef(obj, parentJob, objType)) return;
+                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                        SerializePrimitiveCollection((ICollection<string>)obj);
+                        finishTypeInfoObject(writeTypeInfo);
+                    };
             }
             else if (collectionType == typeof(int))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<int>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<int>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -431,7 +500,14 @@ namespace Playground
             }
             else if (collectionType == typeof(uint))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<uint>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<uint>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -441,7 +517,14 @@ namespace Playground
             }
             else if (collectionType == typeof(byte))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<byte>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<byte>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -451,7 +534,14 @@ namespace Playground
             }
             else if (collectionType == typeof(sbyte))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<sbyte>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<sbyte>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -461,7 +551,14 @@ namespace Playground
             }
             else if (collectionType == typeof(short))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<short>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<short>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -471,7 +568,14 @@ namespace Playground
             }
             else if (collectionType == typeof(ushort))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<ushort>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<ushort>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -481,7 +585,14 @@ namespace Playground
             }
             else if (collectionType == typeof(long))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<long>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<long>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -491,7 +602,14 @@ namespace Playground
             }
             else if (collectionType == typeof(ulong))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<ulong>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<ulong>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -501,7 +619,14 @@ namespace Playground
             }
             else if (collectionType == typeof(bool))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<bool>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<bool>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -511,7 +636,14 @@ namespace Playground
             }
             else if (collectionType == typeof(char))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<char>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<char>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -521,7 +653,14 @@ namespace Playground
             }
             else if (collectionType == typeof(float))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<float>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<float>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -531,7 +670,14 @@ namespace Playground
             }
             else if (collectionType == typeof(double))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<double>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<double>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -541,7 +687,14 @@ namespace Playground
             }
             else if (collectionType == typeof(IntPtr))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<IntPtr>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<IntPtr>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -551,7 +704,14 @@ namespace Playground
             }
             else if (collectionType == typeof(UIntPtr))
             {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (objType.IsAssignableTo(typeof(IList<UIntPtr>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    SerializePrimitiveList((IList<UIntPtr>)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
@@ -570,25 +730,53 @@ namespace Playground
 
                 typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    var items = (IEnumerable)obj;
-                    CollectionJob job = new()
+                    if (obj == null)
                     {
-                        collectionType = collectionType,
-                        currentIndex = 0,
-                        item = obj,
-                        itemType = objType,
-                        enumerator = items.GetEnumerator(),
-                        collectionTypeCacheItem = collectionTypeCacheItem,
-                        writeTypeInfo = writeTypeInfo,
-                        parentJob = parentJob,
-                        itemName = parentJob == null ? writer.PrepareRootName() :
-                                    parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((CollectionJob)parentJob)
+                        writer.WriteNullValue();
+                        return;
+                    }
 
-                    };
-                    jobStack.Push(job);
-                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+
+                    if (obj is IList list)
+                    {
+                        ListJob job = new()
+                        {
+                            collectionType = collectionType,
+                            currentIndex = 0,
+                            item = list,
+                            itemType = objType,                            
+                            collectionTypeCacheItem = collectionTypeCacheItem,
+                            writeTypeInfo = writeTypeInfo,
+                            parentJob = parentJob,
+                            itemName = parentJob == null ? writer.PrepareRootName() :
+                                    parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob)
+
+                        };
+                        jobStack.Push(job);
+                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[list] = job;
+                    }
+                    else if (obj is IEnumerable enumerable)
+                    {
+                        EnumarableJob job = new()
+                        {
+                            collectionType = collectionType,
+                            currentIndex = 0,
+                            item = enumerable,
+                            itemType = objType,
+                            enumerator = enumerable.GetEnumerator(),
+                            collectionTypeCacheItem = collectionTypeCacheItem,
+                            writeTypeInfo = writeTypeInfo,
+                            parentJob = parentJob,
+                            itemName = parentJob == null ? writer.PrepareRootName() :
+                                    parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob)
+
+                        };
+                        jobStack.Push(job);
+                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[enumerable] = job;
+                    }                    
                 };
             }
             bool collectionHandled = typeCacheItem.itemHandler != null;
@@ -726,6 +914,25 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<string> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteStringValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteStringValue(items[index++]);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<int> items)
         {
             writer.OpenCollection();
@@ -739,6 +946,25 @@ namespace Playground
             {
                 writer.WriteComma();
                 writer.WriteSignedIntValue(enumerator.Current);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<int> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteSignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteSignedIntValue(items[index++]);
             }
 
             writer.CloseCollection();
@@ -764,6 +990,25 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<sbyte> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteSignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteSignedIntValue(items[index++]);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<short> items)
         {
             writer.OpenCollection();
@@ -777,6 +1022,25 @@ namespace Playground
             {
                 writer.WriteComma();
                 writer.WriteSignedIntValue(enumerator.Current);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<short> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteSignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteSignedIntValue(items[index++]);
             }
 
             writer.CloseCollection();
@@ -802,6 +1066,25 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<long> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteSignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteSignedIntValue(items[index++]);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<byte> items)
         {
             writer.OpenCollection();
@@ -815,6 +1098,25 @@ namespace Playground
             {
                 writer.WriteComma();
                 writer.WriteUnsignedIntValue(enumerator.Current);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<byte> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteUnsignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteUnsignedIntValue(items[index++]);
             }
 
             writer.CloseCollection();
@@ -840,6 +1142,25 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<uint> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteUnsignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteUnsignedIntValue(items[index++]);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<ushort> items)
         {
             writer.OpenCollection();
@@ -853,6 +1174,25 @@ namespace Playground
             {
                 writer.WriteComma();
                 writer.WriteUnsignedIntValue(enumerator.Current);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<ushort> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteUnsignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteUnsignedIntValue(items[index++]);
             }
 
             writer.CloseCollection();
@@ -878,6 +1218,25 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<ulong> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteUnsignedIntValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteUnsignedIntValue(items[index++]);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<float> items)
         {
             writer.OpenCollection();
@@ -891,6 +1250,25 @@ namespace Playground
             {
                 writer.WriteComma();
                 writer.WriteFloatValue(enumerator.Current);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<float> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteFloatValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteFloatValue(items[index++]);
             }
 
             writer.CloseCollection();
@@ -916,6 +1294,25 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<double> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteFloatValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteFloatValue(items[index++]);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection(ICollection<bool> items)
         {
             writer.OpenCollection();
@@ -935,6 +1332,25 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList(IList<bool> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WriteBoolValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WriteBoolValue(items[index++]);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SerializePrimitiveCollection<T>(ICollection<T> items)
         {
             writer.OpenCollection();
@@ -948,6 +1364,25 @@ namespace Playground
             {
                 writer.WriteComma();
                 writer.WritePrimitiveValue(enumerator.Current);
+            }
+
+            writer.CloseCollection();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SerializePrimitiveList<T>(IList<T> items)
+        {
+            writer.OpenCollection();
+
+            int index = 0;
+            if (index < items.Count)
+            {
+                writer.WritePrimitiveValue(items[index++]);
+            }
+            while (index < items.Count)
+            {
+                writer.WriteComma();
+                writer.WritePrimitiveValue(items[index++]);
             }
 
             writer.CloseCollection();
@@ -1243,7 +1678,7 @@ namespace Playground
                                   default;
             collectionType = collectionType ?? typeof(object);
 
-            if (collectionType == typeof(string)) return CreateStringCollectionFieldWriter(objType, memberInfo, extendedFieldNameBytes);
+            if (collectionType == typeof(string)) return CreatePrimitiveCollectionFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes);
             else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes);
             else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes);
             else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes);
@@ -1275,67 +1710,57 @@ namespace Playground
             return (parentJob) =>
             {
                 IEnumerable items = getValue(parentJob.item);
+
+                if (items == null)
+                {
+                    writer.WriteNullValue();
+                    return;
+                }
+
                 Type objType = items.GetType();
                 bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
                 writer.WritePreparedByteString(extendedFieldNameBytes);
-                CollectionJob job = new()
+
+                if (items is IList list)
                 {
-                    collectionType = collectionType,
-                    currentIndex = 0,
-                    item = items,
-                    itemType = objType,
-                    enumerator = items.GetEnumerator(),
-                    collectionTypeCacheItem = collectionTypeCacheItem,
-                    writeTypeInfo = writeTypeInfo,
-                    parentJob = parentJob,
-                    itemName = fieldNameBytes
-                };
-                jobStack.Push(job);
-                if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
-            };
-        }
-
-        private FieldWriter CreateStringCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
-
-            var parameter = Expression.Parameter(typeof(object));
-            Type declaringType = memberInfo is FieldInfo field2 ? field2.DeclaringType : memberInfo is PropertyInfo property2 ? property2.DeclaringType : default;
-            var castedParameter = Expression.Convert(parameter, declaringType);
-            var fieldAccess = memberInfo is FieldInfo field3 ? Expression.Field(castedParameter, field3) : memberInfo is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
-            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable<string>));
-            var lambda = Expression.Lambda<Func<object, IEnumerable<string>>>(castFieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                IEnumerable<string> items = getValue(parentJob.item);
-                Type objType = items.GetType();
-                bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
-                writer.WritePreparedByteString(fieldNameBytes);
-                prepareTypeInfoObjectFromType(writeTypeInfo, objType);
-                writer.OpenCollection();
-
-                var enumerator = items.GetEnumerator();
-                if (enumerator.MoveNext())
-                {
-                    writer.WriteStringValue(enumerator.Current);
+                    ListJob job = new()
+                    {
+                        collectionType = collectionType,
+                        currentIndex = 0,
+                        item = list,
+                        itemType = objType,
+                        collectionTypeCacheItem = collectionTypeCacheItem,
+                        writeTypeInfo = writeTypeInfo,
+                        parentJob = parentJob,
+                        itemName = fieldNameBytes
+                    };
+                    jobStack.Push(job);
+                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
                 }
-
-                while (enumerator.MoveNext())
-                {
-                    writer.WriteComma();
-                    writer.WriteStringValue(enumerator.Current);
+                else
+                {                                                            
+                    EnumarableJob job = new()
+                    {
+                        collectionType = collectionType,
+                        currentIndex = 0,
+                        item = items,
+                        itemType = objType,
+                        enumerator = items.GetEnumerator(),
+                        collectionTypeCacheItem = collectionTypeCacheItem,
+                        writeTypeInfo = writeTypeInfo,
+                        parentJob = parentJob,
+                        itemName = fieldNameBytes
+                    };
+                    jobStack.Push(job);
+                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
                 }
-
-                writer.CloseCollection();
-                finishTypeInfoObject(writeTypeInfo);
             };
         }
 
         private FieldWriter CreatePrimitiveCollectionFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
+        {            
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
+            if (memberType.IsAssignableTo(typeof(IList<T>))) return CreatePrimitiveListFieldWriter<T>(objType, memberInfo, fieldNameBytes);
 
             var parameter = Expression.Parameter(typeof(object));
             Type declaringType = memberInfo is FieldInfo field2 ? field2.DeclaringType : memberInfo is PropertyInfo property2 ? property2.DeclaringType : default;
@@ -1353,6 +1778,7 @@ namespace Playground
             else if (typeof(T).IsAssignableTo(typeof(float))) writeValue = value => { if (value is float v) writer.WriteFloatValue(v); };
             else if (typeof(T).IsAssignableTo(typeof(double))) writeValue = value => { if (value is double v) writer.WriteFloatValue(v); };
             else if (typeof(T).IsAssignableTo(typeof(bool))) writeValue = value => { if (value is bool v) writer.WriteBoolValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(string))) writeValue = value => { if (value is string v) writer.WriteStringValue(v); };
 
             return (parentJob) =>
             {
@@ -1373,6 +1799,54 @@ namespace Playground
                 {
                     writer.WriteComma();
                     writeValue(enumerator.Current);
+                }
+
+                writer.CloseCollection();
+                finishTypeInfoObject(writeTypeInfo);
+            };
+        }
+
+        private FieldWriter CreatePrimitiveListFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        {
+            Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
+
+            var parameter = Expression.Parameter(typeof(object));
+            Type declaringType = memberInfo is FieldInfo field2 ? field2.DeclaringType : memberInfo is PropertyInfo property2 ? property2.DeclaringType : default;
+            var castedParameter = Expression.Convert(parameter, declaringType);
+            var fieldAccess = memberInfo is FieldInfo field3 ? Expression.Field(castedParameter, field3) : memberInfo is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IList<T>));
+            var lambda = Expression.Lambda<Func<object, IList<T>>>(castFieldAccess, parameter);
+            var getValue = lambda.Compile();
+
+            Action<T> writeValue = writer.WritePrimitiveValue;
+            if (typeof(T).IsAssignableTo(typeof(int))) writeValue = value => { if (value is int v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(uint))) writeValue = value => { if (value is uint v) writer.WriteUnsignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(long))) writeValue = value => { if (value is long v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(ulong))) writeValue = value => { if (value is ulong v) writer.WriteUnsignedIntValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(float))) writeValue = value => { if (value is float v) writer.WriteFloatValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(double))) writeValue = value => { if (value is double v) writer.WriteFloatValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(bool))) writeValue = value => { if (value is bool v) writer.WriteBoolValue(v); };
+            else if (typeof(T).IsAssignableTo(typeof(string))) writeValue = value => { if (value is string v) writer.WriteStringValue(v); };
+
+            return (parentJob) =>
+            {
+                IList<T> items = getValue(parentJob.item);
+                Type objType = items.GetType();
+                bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
+                writer.WritePreparedByteString(fieldNameBytes);
+                prepareTypeInfoObjectFromType(writeTypeInfo, objType);
+                writer.OpenCollection();
+
+                int index = 0;
+                if (index < items.Count)
+                {
+                    writeValue(items[index++]);
+                }
+
+                while (index < items.Count)
+                {
+                    writer.WriteComma();
+                    writeValue(items[index++]);
                 }
 
                 writer.CloseCollection();
