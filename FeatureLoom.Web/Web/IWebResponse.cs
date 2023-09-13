@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using System.IO;
 using System.Net;
+using System.Net.WebSockets;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
@@ -21,5 +22,7 @@ namespace FeatureLoom.Web
         bool StatusCodeSet { get; }
 
         HandlerResult Redirect(string url);
+
+        Task<(HandlerResult, WebSocket)> UpgradeToWebSocketAsync();
     }
 }

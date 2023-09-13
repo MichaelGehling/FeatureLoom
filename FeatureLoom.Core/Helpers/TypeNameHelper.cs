@@ -15,7 +15,7 @@ namespace FeatureLoom.Helpers
     /// Not supported are 
     /// - open constructed types (typeof(List<>)) 
     /// </summary>
-    public static class TypeHelper
+    public static class TypeNameHelper
     {
         public static List<string> SupplementaryAssemblies { get; } = new List<string>();
         private static Dictionary<Assembly, Box<int>> checkedAssemblies = new();
@@ -162,3 +162,4 @@ namespace FeatureLoom.Helpers
 
     }
 }
+

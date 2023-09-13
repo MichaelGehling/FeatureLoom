@@ -1,6 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.MessageFlow;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Net;
+using System.Net.WebSockets;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
@@ -18,6 +21,24 @@ namespace FeatureLoom.Web
         public static Task Run(this IWebServer webserver, IPAddress address, int port, string certificateName) => webserver.Run(new HttpEndpointConfig(address, port, certificateName));
 
         public static void MapStorage<T>(this IWebServer webServer, string route, string storageCategory, bool allowRead = true, bool allowChange = false, bool allowReadUrls = false) => webServer.AddRequestHandler(new Storages.StorageWebAccess<T>(route, new Storages.StorageWebAccess<T>.Config() { allowRead = allowRead, allowChange = allowChange, allowReadUrls = allowReadUrls }));
+        public static void AddWebSocketEndpoint(this IWebServer webServer, string route, IMessageSource messageSource, IMessageSink messageSink, Type deserializationType = null, bool useConnectionMetaDataForMessages = true, int readBufferSize = 4096)
+        {
+            webServer.HandleGET(route, async (IWebRequest req, IWebResponse resp) =>
+            {
+                if (!req.RequestsWebSocket) return HandlerResult.Handled_BadRequest("Websocket upgrade must be requested");
+                (await resp.UpgradeToWebSocketAsync()).AllOut(out var result, out var webSocket);
+                var wsEndpoint = new WebSocketEndpoint(webSocket, deserializationType, useConnectionMetaDataForMessages, readBufferSize);
+                messageSource?.ConnectTo(wsEndpoint, true);
+                wsEndpoint.ConnectTo(messageSink);
+                // We wait here until the WebSocketEndpoint was disposed/closed!
+                // That happens when the client disconnects or
+                // it can by done by sending the WebSocketControlMessage with a close command through
+                // the messageSource or by getting the WebSocketEndpoint via its object handle
+                // (which is published via the messageSink) and calling the dispose method.
+                await wsEndpoint.CloseEventWaitHandle.WaitingTask;
+                return result;
+            });
+        }
 
         #region InterceptRequestExtensions
         public static void InterceptRequest(this IWebServer webserver, Func<IWebRequest, IWebResponse, Task<HandlerResult>> interceptRequest) => webserver.AddRequestInterceptor(new SimpleWebRequestInterceptor(interceptRequest));

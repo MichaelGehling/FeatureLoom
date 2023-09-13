@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Net.WebSockets;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
@@ -31,5 +32,7 @@ namespace FeatureLoom.Web
 
         bool TryGetQueryItem(string key, out string item);
         IEnumerable<string> GetAllQueryKeys();
+
+        bool RequestsWebSocket { get; }
     }
 }

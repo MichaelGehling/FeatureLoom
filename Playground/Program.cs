@@ -79,6 +79,27 @@ namespace Playground
         private static async Task Main()
         {
         
+            DefaultWebServer webserver = new DefaultWebServer();
+
+            Sender sender = new Sender();
+            ProcessingEndpoint<object> printer = new ProcessingEndpoint<object>(msg =>
+            {
+                if (msg.TryGetMetaData(WebSocketEndpoint.META_DATA_CONNECTION_KEY, out ObjectHandle handle))
+                {
+                    Console.Write($"{handle}: ");
+                }
+                Console.WriteLine(msg);
+                if (msg is string str) sender.Send(str);
+            });
+
+            webserver.AddWebSocketEndpoint("/", sender, printer);
+
+            _ = webserver.Run(IPAddress.Loopback, 5001);
+
+
+
+            Console.ReadKey();
+
             //string typeName = typeof(Dictionary<string, List<List<TestDto>[]>>).GetSimplifiedTypeName();
 
             //Type resolvedType = TypeHelper.GetTypeFromSimplifiedName(typeName);
