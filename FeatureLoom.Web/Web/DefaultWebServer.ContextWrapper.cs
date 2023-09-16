@@ -4,6 +4,7 @@ using Microsoft.Extensions.Primitives;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.WebSockets;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
@@ -96,6 +97,39 @@ namespace FeatureLoom.Web
                 }
             }
 
+            Task<string> IWebRequest.ReadAsync()
+            {
+                return context.Request.Body.ReadToStringAsync();
+            }
+
+            bool IWebRequest.TryGetCookie(string key, out string content)
+            {
+                return context.Request.Cookies.TryGetValue(key, out content);
+            }
+
+            bool IWebRequest.TryGetQueryItem(string key, out string item)
+            {
+                if (context.Request.Query.TryGetValue(key, out StringValues values))
+                {
+                    item = values[0];
+                    return true;
+                }
+                else
+                {
+                    item = default;
+                    return false;
+                }
+            }
+
+            bool IWebRequest.RequestsWebSocket => context.Request.Headers.TryGetValue("Upgrade", out StringValues upgrade) && upgrade.Contains("websocket");
+            async Task<(HandlerResult, WebSocket)> IWebResponse.UpgradeToWebSocketAsync()
+            {
+                responseSent = true;
+                return (new HandlerResult(true, null, HttpStatusCode.SwitchingProtocols), await context.WebSockets.AcceptWebSocketAsync());
+            }
+
+            IEnumerable<string> IWebRequest.GetAllQueryKeys() => context.Request.Query.Keys;
+
             Stream IWebResponse.Stream
             {
                 get
@@ -131,32 +165,6 @@ namespace FeatureLoom.Web
             {
                 context.Response.Cookies.Delete(key);
             }
-
-            Task<string> IWebRequest.ReadAsync()
-            {
-                return context.Request.Body.ReadToStringAsync();
-            }
-
-            bool IWebRequest.TryGetCookie(string key, out string content)
-            {
-                return context.Request.Cookies.TryGetValue(key, out content);
-            }
-
-            bool IWebRequest.TryGetQueryItem(string key, out string item)
-            {
-                if (context.Request.Query.TryGetValue(key, out StringValues values))
-                {
-                    item = values[0];
-                    return true;
-                }
-                else
-                {
-                    item = default;
-                    return false;
-                }
-            }
-
-            IEnumerable<string> IWebRequest.GetAllQueryKeys() => context.Request.Query.Keys;
 
             Task IWebResponse.WriteAsync(string reply)
             {

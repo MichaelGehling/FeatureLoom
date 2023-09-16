@@ -261,6 +261,7 @@ namespace FeatureLoom.Web
                 .UseKestrel(ApplyEndpoints)
                 .Configure(applicationBuilder =>
                 {
+                    applicationBuilder.UseWebSockets();
                     applicationBuilder.Map("", _applicationBuilder =>
                     {
                         _applicationBuilder.Run(HandleWebRequest);

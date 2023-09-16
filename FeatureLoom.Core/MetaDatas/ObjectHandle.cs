@@ -6,6 +6,10 @@ namespace FeatureLoom.MetaDatas
     {
         public readonly long id;
 
+        public static ObjectHandle Invalid => new ObjectHandle(0);
+
+        public bool IsInvalid => id == 0;
+
         public ObjectHandle(long id)
         {
             this.id = id;
