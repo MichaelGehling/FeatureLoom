@@ -1404,21 +1404,21 @@ namespace Playground
             var extendedFieldNameBytes = writer.PrepareFieldNameBytes(fieldName);
             var fieldNameBytes = writer.PrepareStringToBytes(fieldName);
 
-            if (memberType == typeof(string)) return CreateStringFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(int)) return CreateIntFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(uint)) return CreateUintFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(byte)) return CreateByteFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(sbyte)) return CreateSbyteFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(short)) return CreateShortFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(ushort)) return CreateUshortFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(long)) return CreateLongFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(ulong)) return CreateUlongFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(bool)) return CreateBoolFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(float)) return CreateFloatFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(double)) return CreateDoubleFieldWriter(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes);
-            else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes);
+            if (memberType == typeof(string)) return CreatePrimitiveFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes, writer.WriteStringValue);            
+            else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
+            else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
+            else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
+            else if (memberType == typeof(sbyte)) return CreatePrimitiveFieldWriter<sbyte>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
+            else if (memberType == typeof(short)) return CreatePrimitiveFieldWriter<short>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
+            else if (memberType == typeof(ushort)) return CreatePrimitiveFieldWriter<ushort>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
+            else if (memberType == typeof(long)) return CreatePrimitiveFieldWriter<long>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
+            else if (memberType == typeof(ulong)) return CreatePrimitiveFieldWriter<ulong>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
+            else if (memberType == typeof(bool)) return CreatePrimitiveFieldWriter<bool>(objType, memberInfo, extendedFieldNameBytes, writer.WriteBoolValue);
+            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes, writer.WriteCharValue);
+            else if (memberType == typeof(float)) return CreatePrimitiveFieldWriter<float>(objType, memberInfo, extendedFieldNameBytes, writer.WriteFloatValue);
+            else if (memberType == typeof(double)) return CreatePrimitiveFieldWriter<double>(objType, memberInfo, extendedFieldNameBytes, writer.WriteFloatValue);
+            else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);            
             else if (memberType.IsEnum) return CreateEnumFieldWriter(objType, memberInfo, extendedFieldNameBytes);
             else if (memberType.IsAssignableTo(typeof(IEnumerable)) &&
                         (memberType.IsAssignableTo(typeof(ICollection)) ||
@@ -1448,24 +1448,7 @@ namespace Playground
             };
         }
 
-        private FieldWriter CreateStringFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, string>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {                
-                writer.WritePreparedByteString(fieldNameBytes);
-                var value = getValue(parentJob.item);
-                if (value == null) writer.WriteNullValue();
-                else writer.WriteStringValue(value);
-            };
-        }
-
-        private FieldWriter CreatePrimitiveFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
+        private FieldWriter CreatePrimitiveFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes, Action<T> write)
         {
             var parameter = Expression.Parameter(typeof(object));
             var castedParameter = Expression.Convert(parameter, objType);
@@ -1475,198 +1458,23 @@ namespace Playground
 
             return (parentJob) =>
             {
+                writer.WritePreparedByteString(fieldNameBytes);
                 var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WritePrimitiveValue(value);
-            };
-        }
-
-        private FieldWriter CreateBoolFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, bool>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteBoolValue(value);
-            };
-        }
-
-        private FieldWriter CreateIntFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, int>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                writer.WritePreparedByteString(fieldNameBytes);
-                var value = getValue(parentJob.item);                
-                writer.WriteSignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateSbyteFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, sbyte>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteSignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateShortFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, short>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteSignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateLongFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, long>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteSignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateUintFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, uint>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteUnsignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateByteFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, byte>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteUnsignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateUshortFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, ushort>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteUnsignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateUlongFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, ulong>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteUnsignedIntValue(value);
-            };
-        }
-
-        private FieldWriter CreateFloatFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, float>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteFloatValue(value);
-            };
-        }
-
-        private FieldWriter CreateDoubleFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
-        {
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, objType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
-            var lambda = Expression.Lambda<Func<object, double>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-
-            return (parentJob) =>
-            {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                writer.WriteFloatValue(value);
+                write(value);
             };
         }
 
         private FieldWriter CreateEnumFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
             Func<object, object> getValue = memberInfo is FieldInfo fieldInfo ? fieldInfo.GetValue : memberInfo is PropertyInfo propertyInfo ? propertyInfo.GetValue : default;
+            Action<object> write = settings.enumAsString ? enumValue => writer.WritePreparedByteString(GetEnumText(enumValue, objType)) :
+                                                           enumValue => writer.WriteSignedIntValue((int)enumValue);
 
             return (parentJob) =>
             {
                 var value = getValue(parentJob.item);
                 writer.WritePreparedByteString(fieldNameBytes);
-                if (settings.enumAsString) writer.WritePreparedByteString(GetEnumText(value, objType));
-                else writer.WriteSignedIntValue((int)value);
+                write(value);
             };
         }
 

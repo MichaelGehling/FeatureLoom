@@ -58,8 +58,8 @@ namespace Playground
             //this.myEmbedded = myEmbedded;
             //this.self = this;
 
-            //myEmbeddedDict["1"] = new MyEmbedded1();
-            //myEmbeddedDict["2"] = new MyEmbedded1();
+            myEmbeddedDict["1"] = new MyEmbedded1();
+            myEmbeddedDict["2"] = new MyEmbedded1();
 
             //myObjects.Add(myEmbedded);
         }
@@ -105,6 +105,8 @@ namespace Playground
         public string str2 = "Mystring2";
         public string str3 = "Mystring3";
         public string str4 = "Mystring4";
+        public string myString1 = "Hello: \\, \", \\, \n";
+        public string myString2 = "Hello: \\, \", \\, \n";
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
@@ -155,19 +157,26 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = 1234.5678;
-            //var testDto = "Hallo";
+            //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = new object();
+            var testDto = new Dictionary<string, string>()
+            {
+                ["1"] = "Hello",
+                ["2"] = "Hello",
+                ["3"] = "Hello",
+                ["4"] = "Hello",
+            };
 
             Type testDtoType = testDto.GetType();
             string json;
             //byte[] json;
 
-            Stream stream = new NullStream();
-            //MemoryStream stream = new MemoryStream();
+            //Stream stream = new NullStream();
+            MemoryStream stream = new MemoryStream();
 
             LoopJsonSerializer loopSerializer1 = new LoopJsonSerializer(new LoopJsonSerializer.Settings()
             {
@@ -224,7 +233,7 @@ namespace Playground
                 {
                     //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
                     loopSerializer1.Serialize(stream, testDto);
-                    //json = loopSerializer.Serialize(testDto);
+                    //json = loopSerializer1.Serialize(testDto);
                     stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
@@ -240,7 +249,7 @@ namespace Playground
                 {
                     //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
                     loopSerializer2.Serialize(stream, testDto);
-                    //json = loopSerializer.Serialize(testDto);
+                    //json = loopSerializer2.Serialize(testDto);
                     stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
@@ -256,7 +265,7 @@ namespace Playground
                 {
                     //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
                     loopSerializer3.Serialize(stream, testDto);
-                    //json = loopSerializer.Serialize(testDto);
+                    //json = loopSerializer3.Serialize(testDto);
                     stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;

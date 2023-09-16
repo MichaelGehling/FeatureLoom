@@ -101,6 +101,30 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteUnsignedIntValue(byte value)
+            {
+                WriteUnsignedInteger(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteSignedIntValue(sbyte value)
+            {
+                WriteSignedInteger(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteSignedIntValue(short value)
+            {
+                WriteSignedInteger(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteUnsignedIntValue(ushort value)
+            {
+                WriteUnsignedInteger(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteFloatValue(float value)
             {
                 WriteFloat(value);
@@ -121,12 +145,24 @@ namespace Playground
             }            
 
             static readonly byte[] STRINGVALUE_PRE = "\"".ToByteArray();
-            static readonly byte[] STRINGVALUE_POST = "\"".ToByteArray();
+            static readonly byte[] STRINGVALUE_POST = STRINGVALUE_PRE;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteStringValue(string str)
             {
+                if (str != null)
+                {
+                    stream.Write(STRINGVALUE_PRE, 0, STRINGVALUE_PRE.Length);
+                    WriteEscapedString(str);
+                    stream.Write(STRINGVALUE_POST, 0, STRINGVALUE_POST.Length);
+                }
+                else WriteNullValue();
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteCharValue(char value)
+            {
                 stream.Write(STRINGVALUE_PRE, 0, STRINGVALUE_PRE.Length);
-                WriteEscapedString(str);
+                WriteChar(value);
                 stream.Write(STRINGVALUE_POST, 0, STRINGVALUE_POST.Length);
             }
 
@@ -209,13 +245,80 @@ namespace Playground
                 return indexNameList[index];
             }
 
-            static readonly byte[] ESCAPE_SEQUENCES = "\\\\\\\"\\b\\f\\n\\r\\t".ToByteArray();
+            private static readonly byte[][] EscapeByteLookup = InitEscapeByteLookup();
+            private static byte[][] InitEscapeByteLookup()
+            {
+                byte[][] lookup = new byte[128][];
+                string escapeChars = "\\\"\b\f\n\r\t";
+                for (int i = 0; i < escapeChars.Length; i++)
+                {
+                    char c = escapeChars[i];
+                    lookup[c] = new byte[] { (byte)'\\', (byte)escapeChars[i] };
+                }
+
+                // Special handling for characters that don't map directly to their escape sequence
+                lookup['\b'] = new byte[] { (byte)'\\', (byte)'b' };
+                lookup['\f'] = new byte[] { (byte)'\\', (byte)'f' };
+                lookup['\n'] = new byte[] { (byte)'\\', (byte)'n' };
+                lookup['\r'] = new byte[] { (byte)'\\', (byte)'r' };
+                lookup['\t'] = new byte[] { (byte)'\\', (byte)'t' };
+
+                // Handling for control characters
+                for (int i = 0; i < 0x20; i++)
+                {
+                    if (lookup[i] == null) // If not already set by the escape sequences above
+                    {
+                        string unicodeEscape = "\\u" + i.ToString("X4");
+                        lookup[i] = Encoding.ASCII.GetBytes(unicodeEscape);
+                    }
+                }
+
+                return lookup;
+            }
+
+            private void WriteChar(char c)
+            {
+                // Check if the character is in the EscapeByteLookup table
+                if (c < EscapeByteLookup.Length && EscapeByteLookup[c] != null)
+                {
+                    byte[] escapeBytes = EscapeByteLookup[c];
+                    stream.Write(escapeBytes, 0, escapeBytes.Length);
+                    return;
+                }
+
+                int codepoint = c;
+
+                if (codepoint <= 0x7F)
+                {
+                    // 1-byte sequence
+                    stream.WriteByte((byte)codepoint);
+                }
+                else if (codepoint <= 0x7FF)
+                {
+                    // 2-byte sequence
+                    stream.WriteByte((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                    stream.WriteByte((byte)((codepoint & 0x3F) | 0x80));
+                }
+                else if (!char.IsSurrogate(c))
+                {
+                    // 3-byte sequence
+                    stream.WriteByte((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                    stream.WriteByte((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                    stream.WriteByte((byte)((codepoint & 0x3F) | 0x80));
+                }
+                else
+                {
+                    // Handle surrogate by writing it as a Unicode escape sequence
+                    WriteString("\\u" + ((int)c).ToString("X4"));
+                }
+            }
+
             private void WriteEscapedString(string str)
             {
                 int bufferIndex = 0;
 
                 int charIndex = 0;
-                int minCharSpace = buffer.Length / 4;
+                int minCharSpace = buffer.Length / 6;
                 while (charIndex < str.Length)
                 {
                     int charIndexLimit = Math.Min(str.Length, charIndex + minCharSpace);
@@ -224,15 +327,17 @@ namespace Playground
                     {
                         var c = str[charIndex];
 
-                        
-                        int escapeIndex = "\\\"\b\f\n\r\t".IndexOf(c);
-                        if (escapeIndex != -1)
+                        // Handle escaped chars and control chars
+                        if (c < EscapeByteLookup.Length)
                         {
-                            Buffer.BlockCopy(ESCAPE_SEQUENCES, escapeIndex * 2, buffer, bufferIndex, 2);
-                            bufferIndex += 2;
-                            continue;
+                            byte[] escapeBytes = EscapeByteLookup[c];
+                            if (escapeBytes != null)
+                            {
+                                Buffer.BlockCopy(escapeBytes, 0, buffer, bufferIndex, escapeBytes.Length);
+                                bufferIndex += escapeBytes.Length;
+                                continue;
+                            }
                         }
-
 
                         int codepoint = c;
 
@@ -259,9 +364,16 @@ namespace Playground
                             // Handle surrogate pairs
                             if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
                             {
-                                var bytesUsed = encoder.GetBytes(str.ToCharArray(charIndex, 2), 0, 2, buffer, bufferIndex, false);
+                                int highSurrogate = c;
+                                int lowSurrogate = str[charIndex + 1];
+                                int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
+
+                                buffer[bufferIndex++] = (byte)((surrogateCodePoint >> 18) | 0xF0);
+                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80);
+                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80);
+                                buffer[bufferIndex++] = (byte)((surrogateCodePoint & 0x3F) | 0x80);
+
                                 charIndex++; // Skip next character, it was part of the surrogate pair
-                                bufferIndex += bytesUsed;
                             }
                             else
                             {
@@ -317,9 +429,16 @@ namespace Playground
                             // Handle surrogate pairs
                             if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
                             {
-                                var bytesUsed = encoder.GetBytes(str.ToCharArray(charIndex, 2), 0, 2, buffer, bufferIndex, false);
+                                int highSurrogate = c;
+                                int lowSurrogate = str[charIndex + 1];
+                                int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
+
+                                buffer[bufferIndex++] = (byte)((surrogateCodePoint >> 18) | 0xF0);
+                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80);
+                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80);
+                                buffer[bufferIndex++] = (byte)((surrogateCodePoint & 0x3F) | 0x80);
+
                                 charIndex++; // Skip next character, it was part of the surrogate pair
-                                bufferIndex += bytesUsed;
                             }
                             else
                             {
@@ -335,8 +454,6 @@ namespace Playground
                         bufferIndex = 0;
                     }
                 }
-
-
             }
 
             private void WriteSignedInteger(long value)
@@ -520,84 +637,7 @@ namespace Playground
                 }
                 stream.Write(buffer, 0, index);
             }
-            /*private void WriteFloat(double value)
-            {
-                if (value == 0.0)
-                {
-                    stream.Write(ZERO_FLOAT);
-                    return;
-                }
-
-                int index = 0;
-                if (value < 0)
-                {
-                    value = -value;
-                    buffer[index++] = (byte)'-';
-                }
-
-                int integralDigits = 0;
-                while (value >= 1)
-                {
-                    integralDigits++;
-                    value /= 10;
-                }
-
-                byte digit;                
-                for (int i = 0; i < integralDigits; i++)
-                {
-                    value *= 10;
-                    digit = (byte)value;
-                    buffer[index++] = (byte)('0' + digit);
-                    value -= digit;
-                }
-
-                if (value == 0) return;
-
-                WriteDot();
-                               
-                while(value > 0)
-                {
-                    value *= 10;
-                    digit = (byte)value;
-                    buffer[index++] = (byte)('0' + digit);
-                    value -= digit;
-                }
-                stream.Write(buffer, 0, index);
-            }*/
-
-            /*
-            private void WriteFloat(float value)
-            {
-                if (value == 0.0)
-                {
-                    stream.Write(ZERO_FLOAT);
-                    return;
-                }
-
-                long fullValue = (long)value;
-                WriteSignedInteger(fullValue);
-
-                WriteDot();
-
-                float fracturedValue = value - fullValue;
-                if (fracturedValue == 0.0)
-                {
-                    stream.WriteByte((byte)'0');
-                    return;
-                }
-                if (fracturedValue < 0) fracturedValue = -fracturedValue;
-                byte digit;
-                int index = 0;
-                while (fracturedValue > 0)
-                {
-                    fracturedValue *= 10;
-                    digit = (byte)fracturedValue;
-                    buffer[index++] = (byte)('0' + digit);
-                    fracturedValue -= digit;
-                }
-                stream.Write(buffer, 0, index);
-            }
-            */
+      
         }
             
     }
