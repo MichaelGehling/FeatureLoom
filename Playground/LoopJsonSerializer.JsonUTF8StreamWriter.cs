@@ -77,93 +77,200 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteSignedIntValue(long value)
+            public void WritePrimitiveValueAsString<T>(T value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteString(value.ToString());
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+           
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(long value)
             {
                 WriteSignedInteger(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUnsignedIntValue(ulong value)
+            public void WritePrimitiveValueAsString(long value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteSignedInteger(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(ulong value)
             {
                 WriteUnsignedInteger((long)value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteSignedIntValue(int value)
+            public void WritePrimitiveValueAsString(ulong value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteUnsignedInteger((long)value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(int value)
             {
                 WriteSignedInteger(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUnsignedIntValue(uint value)
+            public void WritePrimitiveValueAsString(int value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteSignedInteger(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(uint value)
             {
                 WriteUnsignedInteger(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUnsignedIntValue(byte value)
+            public void WritePrimitiveValueAsString(uint value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteUnsignedInteger(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(byte value)
             {
                 WriteUnsignedInteger(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteSignedIntValue(sbyte value)
+            public void WritePrimitiveValueAsString(byte value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteUnsignedInteger(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(sbyte value)
             {
                 WriteSignedInteger(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteSignedIntValue(short value)
+            public void WritePrimitiveValueAsString(sbyte value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteSignedInteger(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(short value)
             {
                 WriteSignedInteger(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUnsignedIntValue(ushort value)
+            public void WritePrimitiveValueAsString(short value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteSignedInteger(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(ushort value)
             {
                 WriteUnsignedInteger(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteFloatValue(float value)
+            public void WritePrimitiveValueAsString(ushort value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteUnsignedInteger(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(float value)
             {
                 WriteFloat(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteFloatValue(double value)
+            public void WritePrimitiveValueAsString(float value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteFloat(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(double value)
             {
                 WriteFloat(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValueAsString(double value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteFloat(value);
+                stream.Write(QUOTES, 0, QUOTES.Length);
             }
 
             static readonly byte[] BOOLVALUE_TRUE = "true".ToByteArray();
             static readonly byte[] BOOLVALUE_FALSE = "false".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteBoolValue(bool value)
+            public void WritePrimitiveValue(bool value)
             {
                 stream.Write(value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE);
-            }            
+            }
 
-            static readonly byte[] STRINGVALUE_PRE = "\"".ToByteArray();
-            static readonly byte[] STRINGVALUE_POST = STRINGVALUE_PRE;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteStringValue(string str)
+            public void WritePrimitiveValueAsString(bool value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
+                stream.Write(value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            static readonly byte[] QUOTES = "\"".ToByteArray();
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(string str)
             {
                 if (str != null)
                 {
-                    stream.Write(STRINGVALUE_PRE, 0, STRINGVALUE_PRE.Length);
+                    stream.Write(QUOTES, 0, QUOTES.Length);
                     WriteEscapedString(str);
-                    stream.Write(STRINGVALUE_POST, 0, STRINGVALUE_POST.Length);
+                    stream.Write(QUOTES, 0, QUOTES.Length);
                 }
                 else WriteNullValue();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteCharValue(char value)
+            public void WritePrimitiveValueAsString(string str)
             {
-                stream.Write(STRINGVALUE_PRE, 0, STRINGVALUE_PRE.Length);
+                WritePrimitiveValue(str);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(char value)
+            {
+                stream.Write(QUOTES, 0, QUOTES.Length);
                 WriteChar(value);
-                stream.Write(STRINGVALUE_POST, 0, STRINGVALUE_POST.Length);
+                stream.Write(QUOTES, 0, QUOTES.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValueAsString(char value)
+            {
+                WritePrimitiveValue(value);
             }
 
             static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();

@@ -464,261 +464,21 @@ namespace Playground
         {
             Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
 
-            if (collectionType == typeof(string))
-            {
-                if (objType.IsAssignableTo(typeof(IList<string>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                    {
-                        if (tryHandleAsRef(obj, parentJob, objType)) return;
-                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                        SerializePrimitiveList((IList<string>)obj);
-                        finishTypeInfoObject(writeTypeInfo);
-                    };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                    {
-                        if (tryHandleAsRef(obj, parentJob, objType)) return;
-                        prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                        SerializePrimitiveCollection((ICollection<string>)obj);
-                        finishTypeInfoObject(writeTypeInfo);
-                    };
-            }
-            else if (collectionType == typeof(int))
-            {
-                if (objType.IsAssignableTo(typeof(IList<int>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<int>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<int>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(uint))
-            {
-                if (objType.IsAssignableTo(typeof(IList<uint>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<uint>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<uint>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(byte))
-            {
-                if (objType.IsAssignableTo(typeof(IList<byte>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<byte>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<byte>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(sbyte))
-            {
-                if (objType.IsAssignableTo(typeof(IList<sbyte>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<sbyte>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<sbyte>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(short))
-            {
-                if (objType.IsAssignableTo(typeof(IList<short>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<short>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<short>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(ushort))
-            {
-                if (objType.IsAssignableTo(typeof(IList<ushort>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<ushort>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<ushort>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(long))
-            {
-                if (objType.IsAssignableTo(typeof(IList<long>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<long>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<long>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(ulong))
-            {
-                if (objType.IsAssignableTo(typeof(IList<ulong>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<ulong>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<ulong>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(bool))
-            {
-                if (objType.IsAssignableTo(typeof(IList<bool>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<bool>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<bool>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(char))
-            {
-                if (objType.IsAssignableTo(typeof(IList<char>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<char>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<char>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(float))
-            {
-                if (objType.IsAssignableTo(typeof(IList<float>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<float>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<float>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(double))
-            {
-                if (objType.IsAssignableTo(typeof(IList<double>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<double>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<double>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(IntPtr))
-            {
-                if (objType.IsAssignableTo(typeof(IList<IntPtr>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<IntPtr>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<IntPtr>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (collectionType == typeof(UIntPtr))
-            {
-                if (objType.IsAssignableTo(typeof(IList<UIntPtr>))) typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveList((IList<UIntPtr>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-                else typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    if (tryHandleAsRef(obj, parentJob, objType)) return;
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    SerializePrimitiveCollection((ICollection<UIntPtr>)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
+            if (collectionType == typeof(string)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<string>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(int)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<int>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(uint)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<uint>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(byte)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<byte>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(sbyte)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<sbyte>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(short)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<short>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(ushort)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<ushort>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(long)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<long>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(ulong)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<ulong>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(bool)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<bool>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(char)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<char>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(float)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<float>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(double)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<double>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(IntPtr)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<IntPtr>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (collectionType == typeof(UIntPtr)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<UIntPtr>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
             else if (objType.IsAssignableTo(typeof(ICollection)))
             {
                 if (collectionType == null) collectionType = typeof(object);
@@ -781,6 +541,57 @@ namespace Playground
             }
             bool collectionHandled = typeCacheItem.itemHandler != null;
             return collectionHandled;
+
+            ItemHandler CreateCollectionCacheItemHandler<T>(Type objType, byte[] preparedTypeInfo, Action<T> write)
+            {
+                if (objType.IsAssignableTo(typeof(IList<T>))) return (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+
+                    var items = (IList<T>)obj;
+                    writer.OpenCollection();
+
+                    int index = 0;
+                    if (index < items.Count)
+                    {
+                        write(items[index++]);
+                    }
+                    while (index < items.Count)
+                    {
+                        writer.WriteComma();
+                        write(items[index++]);
+                    }
+
+                    writer.CloseCollection();
+
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+                else return (obj, parentJob, writeTypeInfo) =>
+                {
+                    if (tryHandleAsRef(obj, parentJob, objType)) return;
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+
+                    var items = (ICollection<T>)obj;
+                    writer.OpenCollection();
+
+                    var enumerator = items.GetEnumerator();
+                    if (enumerator.MoveNext())
+                    {
+                        write(enumerator.Current);
+                    }
+                    while (enumerator.MoveNext())
+                    {
+                        writer.WriteComma();
+                        write(enumerator.Current);
+                    }
+
+                    writer.CloseCollection();
+
+
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+            }
         }
 
         private TypeCacheItem CreateTypeCacheItem_Enum(Type objType, TypeCacheItem typeCacheItem, byte[] preparedTypeInfo)
@@ -799,7 +610,7 @@ namespace Playground
                 typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
                 {
                     prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteSignedIntValue((int)obj);
+                    writer.WritePrimitiveValue((int)obj);
                     finishTypeInfoObject(writeTypeInfo);
                 };
             }
@@ -807,80 +618,32 @@ namespace Playground
         }
 
         private TypeCacheItem CreateTypeCacheItem_Primitive(Type objType, TypeCacheItem typeCacheItem, byte[] preparedTypeInfo)
-        {
-            if (objType == typeof(int) || objType == typeof(short) || objType == typeof(sbyte))
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteSignedIntValue((int)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (objType == typeof(long))
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteSignedIntValue((long)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (objType == typeof(uint) || objType == typeof(ushort) || objType == typeof(byte))
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteUnsignedIntValue((uint)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (objType == typeof(ulong))
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteUnsignedIntValue((ulong)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (objType == typeof(bool))
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteBoolValue((bool)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (objType == typeof(double))
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteFloatValue((double)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else if (objType == typeof(float))
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WriteFloatValue((float)obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
-            else
-            {
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
-                {
-                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                    writer.WritePrimitiveValue(obj);
-                    finishTypeInfoObject(writeTypeInfo);
-                };
-            }
+        {            
+            if (objType == typeof(int)) CreatePrimitiveItemHandler<int>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(uint)) CreatePrimitiveItemHandler<uint>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(short)) CreatePrimitiveItemHandler<short>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(ushort)) CreatePrimitiveItemHandler<ushort>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(sbyte)) CreatePrimitiveItemHandler<sbyte>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(byte)) CreatePrimitiveItemHandler<byte>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(long)) CreatePrimitiveItemHandler<long>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(ulong)) CreatePrimitiveItemHandler<ulong>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(bool)) CreatePrimitiveItemHandler<bool>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(double)) CreatePrimitiveItemHandler<double>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(float)) CreatePrimitiveItemHandler<float>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else if (objType == typeof(char)) CreatePrimitiveItemHandler<char>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+            else CreatePrimitiveItemHandler<object>(typeCacheItem, preparedTypeInfo, writer.WritePrimitiveValue);
+
             return typeCacheItem;
+
+            void CreatePrimitiveItemHandler<T>(TypeCacheItem typeCacheItem, byte[] preparedTypeInfo, Action<T> write)
+            {
+                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                {
+                    prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
+                    write((T)obj);
+                    finishTypeInfoObject(writeTypeInfo);
+                };
+            }
         }
 
         private TypeCacheItem CreateTypeCacheItem_String(TypeCacheItem typeCacheItem, byte[] preparedTypeInfo)
@@ -888,505 +651,12 @@ namespace Playground
             typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
             {
                 prepareTypeInfoObjectFromBytes(writeTypeInfo, preparedTypeInfo);
-                writer.WriteStringValue((string)obj);
+                writer.WritePrimitiveValue((string)obj);
                 finishTypeInfoObject(writeTypeInfo);
             };
             return typeCacheItem;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<string> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteStringValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteStringValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<string> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteStringValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteStringValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<int> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<int> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteSignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<sbyte> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<sbyte> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteSignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<short> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<short> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteSignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<long> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<long> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteSignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteSignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<byte> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<byte> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<uint> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<uint> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<ushort> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<ushort> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<ulong> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<ulong> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteUnsignedIntValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<float> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteFloatValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteFloatValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<float> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteFloatValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteFloatValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<double> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteFloatValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteFloatValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<double> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteFloatValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteFloatValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection(ICollection<bool> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WriteBoolValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WriteBoolValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList(IList<bool> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WriteBoolValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WriteBoolValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveCollection<T>(ICollection<T> items)
-        {
-            writer.OpenCollection();
-
-            var enumerator = items.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                writer.WritePrimitiveValue(enumerator.Current);
-            }
-            while (enumerator.MoveNext())
-            {
-                writer.WriteComma();
-                writer.WritePrimitiveValue(enumerator.Current);
-            }
-
-            writer.CloseCollection();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SerializePrimitiveList<T>(IList<T> items)
-        {
-            writer.OpenCollection();
-
-            int index = 0;
-            if (index < items.Count)
-            {
-                writer.WritePrimitiveValue(items[index++]);
-            }
-            while (index < items.Count)
-            {
-                writer.WriteComma();
-                writer.WritePrimitiveValue(items[index++]);
-            }
-
-            writer.CloseCollection();
-        }
 
         private FieldWriter CreateFieldWriter(Type objType, MemberInfo memberInfo)
         {
@@ -1404,19 +674,19 @@ namespace Playground
             var extendedFieldNameBytes = writer.PrepareFieldNameBytes(fieldName);
             var fieldNameBytes = writer.PrepareStringToBytes(fieldName);
 
-            if (memberType == typeof(string)) return CreatePrimitiveFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes, writer.WriteStringValue);            
-            else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
-            else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
-            else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
-            else if (memberType == typeof(sbyte)) return CreatePrimitiveFieldWriter<sbyte>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
-            else if (memberType == typeof(short)) return CreatePrimitiveFieldWriter<short>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
-            else if (memberType == typeof(ushort)) return CreatePrimitiveFieldWriter<ushort>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
-            else if (memberType == typeof(long)) return CreatePrimitiveFieldWriter<long>(objType, memberInfo, extendedFieldNameBytes, writer.WriteSignedIntValue);
-            else if (memberType == typeof(ulong)) return CreatePrimitiveFieldWriter<ulong>(objType, memberInfo, extendedFieldNameBytes, writer.WriteUnsignedIntValue);
-            else if (memberType == typeof(bool)) return CreatePrimitiveFieldWriter<bool>(objType, memberInfo, extendedFieldNameBytes, writer.WriteBoolValue);
-            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes, writer.WriteCharValue);
-            else if (memberType == typeof(float)) return CreatePrimitiveFieldWriter<float>(objType, memberInfo, extendedFieldNameBytes, writer.WriteFloatValue);
-            else if (memberType == typeof(double)) return CreatePrimitiveFieldWriter<double>(objType, memberInfo, extendedFieldNameBytes, writer.WriteFloatValue);
+            if (memberType == typeof(string)) return CreatePrimitiveFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);            
+            else if (memberType == typeof(int)) return CreatePrimitiveFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(uint)) return CreatePrimitiveFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(byte)) return CreatePrimitiveFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(sbyte)) return CreatePrimitiveFieldWriter<sbyte>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(short)) return CreatePrimitiveFieldWriter<short>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(ushort)) return CreatePrimitiveFieldWriter<ushort>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(long)) return CreatePrimitiveFieldWriter<long>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(ulong)) return CreatePrimitiveFieldWriter<ulong>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(bool)) return CreatePrimitiveFieldWriter<bool>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(char)) return CreatePrimitiveFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(float)) return CreatePrimitiveFieldWriter<float>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
+            else if (memberType == typeof(double)) return CreatePrimitiveFieldWriter<double>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
             else if (memberType == typeof(IntPtr)) return CreatePrimitiveFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);
             else if (memberType == typeof(UIntPtr)) return CreatePrimitiveFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes, writer.WritePrimitiveValue);            
             else if (memberType.IsEnum) return CreateEnumFieldWriter(objType, memberInfo, extendedFieldNameBytes);
@@ -1424,7 +694,6 @@ namespace Playground
                         (memberType.IsAssignableTo(typeof(ICollection)) ||
                          memberType.IsOfGenericType(typeof(ICollection<>))))
             {
-
                 return CreateCollectionFieldWriter(objType, memberInfo, extendedFieldNameBytes, fieldNameBytes);
             }
 
@@ -1468,7 +737,7 @@ namespace Playground
         {
             Func<object, object> getValue = memberInfo is FieldInfo fieldInfo ? fieldInfo.GetValue : memberInfo is PropertyInfo propertyInfo ? propertyInfo.GetValue : default;
             Action<object> write = settings.enumAsString ? enumValue => writer.WritePreparedByteString(GetEnumText(enumValue, objType)) :
-                                                           enumValue => writer.WriteSignedIntValue((int)enumValue);
+                                                           enumValue => writer.WritePrimitiveValue((int)enumValue);
 
             return (parentJob) =>
             {
@@ -1479,92 +748,171 @@ namespace Playground
         }
 
         private FieldWriter CreateCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] extendedFieldNameBytes, byte[] fieldNameBytes)
-        {
+        {            
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
             Type collectionType = memberInfo is FieldInfo field2 ? field2.FieldType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>)) :
                                   memberInfo is PropertyInfo property2 ? property2.PropertyType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>)) :
                                   default;
             collectionType = collectionType ?? typeof(object);
 
-            if (collectionType == typeof(string)) return CreatePrimitiveCollectionFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(sbyte)) return CreatePrimitiveCollectionFieldWriter<sbyte>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(short)) return CreatePrimitiveCollectionFieldWriter<short>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(ushort)) return CreatePrimitiveCollectionFieldWriter<ushort>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(long)) return CreatePrimitiveCollectionFieldWriter<long>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(ulong)) return CreatePrimitiveCollectionFieldWriter<ulong>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(bool)) return CreatePrimitiveCollectionFieldWriter<bool>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(char)) return CreatePrimitiveCollectionFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(float)) return CreatePrimitiveCollectionFieldWriter<float>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(double)) return CreatePrimitiveCollectionFieldWriter<double>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(IntPtr)) return CreatePrimitiveCollectionFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes);
-            else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes);            
+            /*if (memberType.IsOfGenericType(typeof(IDictionary<,>), out Type concreteDictType) && dictionaryKeyAsPropertySerializer.TryGetValue(collectionType, out var propertyWriter))
+            {
+                collectionType = concreteDictType.GetGenericArguments()[1];
 
+                if (collectionType == typeof(string)) return CreatePrimitiveDictionaryFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(int)) return CreatePrimitiveDictionaryFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(uint)) return CreatePrimitiveDictionaryFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(byte)) return CreatePrimitiveDictionaryFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(sbyte)) return CreatePrimitiveDictionaryFieldWriter<sbyte>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(short)) return CreatePrimitiveDictionaryFieldWriter<short>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(ushort)) return CreatePrimitiveDictionaryFieldWriter<ushort>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(long)) return CreatePrimitiveDictionaryFieldWriter<long>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(ulong)) return CreatePrimitiveDictionaryFieldWriter<ulong>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(bool)) return CreatePrimitiveDictionaryFieldWriter<bool>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(char)) return CreatePrimitiveDictionaryFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(float)) return CreatePrimitiveDictionaryFieldWriter<float>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(double)) return CreatePrimitiveDictionaryFieldWriter<double>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(IntPtr)) return CreatePrimitiveDictionaryFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+                else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveDictionaryFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes, collectionType, propertyWriter);
+
+                Type genericDictType = typeof(IDictionary<,>).MakeGenericType(keyType, valueType);
+            }
+            else*/
+            {
+
+                if (collectionType == typeof(string)) return CreatePrimitiveCollectionFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(sbyte)) return CreatePrimitiveCollectionFieldWriter<sbyte>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(short)) return CreatePrimitiveCollectionFieldWriter<short>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(ushort)) return CreatePrimitiveCollectionFieldWriter<ushort>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(long)) return CreatePrimitiveCollectionFieldWriter<long>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(ulong)) return CreatePrimitiveCollectionFieldWriter<ulong>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(bool)) return CreatePrimitiveCollectionFieldWriter<bool>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(char)) return CreatePrimitiveCollectionFieldWriter<char>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(float)) return CreatePrimitiveCollectionFieldWriter<float>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(double)) return CreatePrimitiveCollectionFieldWriter<double>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(IntPtr)) return CreatePrimitiveCollectionFieldWriter<IntPtr>(objType, memberInfo, extendedFieldNameBytes);
+                else if (collectionType == typeof(UIntPtr)) return CreatePrimitiveCollectionFieldWriter<UIntPtr>(objType, memberInfo, extendedFieldNameBytes);
+
+                var parameter = Expression.Parameter(typeof(object));
+                Type declaringType = memberInfo is FieldInfo field3 ? field3.DeclaringType : memberInfo is PropertyInfo property3 ? property3.DeclaringType : default;
+                var castedParameter = Expression.Convert(parameter, declaringType);
+                var fieldAccess = memberInfo is FieldInfo field4 ? Expression.Field(castedParameter, field4) : memberInfo is PropertyInfo property4 ? Expression.Property(castedParameter, property4) : default;
+                var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable));
+                var lambda = Expression.Lambda<Func<object, IEnumerable>>(castFieldAccess, parameter);
+                var getValue = lambda.Compile();
+
+                if (!typeCache.TryGetValue(collectionType, out var collectionTypeCacheItem))
+                {
+                    collectionTypeCacheItem = CreateTypeCacheItem(collectionType);
+                }
+
+                return (parentJob) =>
+                {
+                    IEnumerable items = getValue(parentJob.item);
+
+                    if (items == null)
+                    {
+                        writer.WriteNullValue();
+                        return;
+                    }
+
+                    Type objType = items.GetType();
+                    bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
+                    writer.WritePreparedByteString(extendedFieldNameBytes);
+
+                    if (items is IList list)
+                    {
+                        ListJob job = new()
+                        {
+                            collectionType = collectionType,
+                            currentIndex = 0,
+                            item = list,
+                            itemType = objType,
+                            collectionTypeCacheItem = collectionTypeCacheItem,
+                            writeTypeInfo = writeTypeInfo,
+                            parentJob = parentJob,
+                            itemName = fieldNameBytes
+                        };
+                        jobStack.Push(job);
+                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
+                    }
+                    else
+                    {
+                        EnumarableJob job = new()
+                        {
+                            collectionType = collectionType,
+                            currentIndex = 0,
+                            item = items,
+                            itemType = objType,
+                            enumerator = items.GetEnumerator(),
+                            collectionTypeCacheItem = collectionTypeCacheItem,
+                            writeTypeInfo = writeTypeInfo,
+                            parentJob = parentJob,
+                            itemName = fieldNameBytes
+                        };
+                        jobStack.Push(job);
+                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
+                    }
+                };
+            }
+        }
+
+        /*
+        private FieldWriter CreatePrimitiveDictionaryFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes, Type collectionType, Action<object, JsonUTF8StreamWriter> propertyWriter)
+        {
             var parameter = Expression.Parameter(typeof(object));
-            Type declaringType = memberInfo is FieldInfo field3 ? field3.DeclaringType : memberInfo is PropertyInfo property3 ? property3.DeclaringType : default;
+            Type declaringType = memberInfo is FieldInfo field2 ? field2.DeclaringType : memberInfo is PropertyInfo property2 ? property2.DeclaringType : default;
             var castedParameter = Expression.Convert(parameter, declaringType);
-            var fieldAccess = memberInfo is FieldInfo field4 ? Expression.Field(castedParameter, field4) : memberInfo is PropertyInfo property4 ? Expression.Property(castedParameter, property4) : default;
-            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable));
-            var lambda = Expression.Lambda<Func<object, IEnumerable>>(castFieldAccess, parameter);
+            var fieldAccess = memberInfo is FieldInfo field3 ? Expression.Field(castedParameter, field3) : memberInfo is PropertyInfo property3 ? Expression.Property(castedParameter, property3) : default;
+            var castFieldAccess = Expression.Convert(fieldAccess, typeof(IEnumerable<T>));
+            var lambda = Expression.Lambda<Func<object, IEnumerable<T>>>(castFieldAccess, parameter);
             var getValue = lambda.Compile();
 
-            if (!typeCache.TryGetValue(collectionType, out var collectionTypeCacheItem))
-            {
-                collectionTypeCacheItem = CreateTypeCacheItem(collectionType);
-            }
+            Action<T> writeValue = writer.WritePrimitiveValue;
+            if (typeof(T) == typeof(int)) writeValue = value => { if (value is int v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T) == typeof(uint)) writeValue = value => { if (value is uint v) writer.WriteUnsignedIntValue(v); };
+            else if (typeof(T) == typeof(long)) writeValue = value => { if (value is long v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T) == typeof(ulong)) writeValue = value => { if (value is ulong v) writer.WriteUnsignedIntValue(v); };
+            else if (typeof(T) == typeof(float)) writeValue = value => { if (value is float v) writer.WriteFloatValue(v); };
+            else if (typeof(T) == typeof(double)) writeValue = value => { if (value is double v) writer.WriteFloatValue(v); };
+            else if (typeof(T) == typeof(bool)) writeValue = value => { if (value is bool v) writer.WriteBoolValue(v); };
+            else if (typeof(T) == typeof(string)) writeValue = value => { if (value is string v) writer.WriteStringValue(v); };
+            else if (typeof(T) == typeof(char)) writeValue = value => { if (value is char v) writer.WriteCharValue(v); };
+            else if (typeof(T) == typeof(sbyte)) writeValue = value => { if (value is sbyte v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T) == typeof(byte)) writeValue = value => { if (value is byte v) writer.WriteUnsignedIntValue(v); };
+            else if (typeof(T) == typeof(short)) writeValue = value => { if (value is short v) writer.WriteSignedIntValue(v); };
+            else if (typeof(T) == typeof(ushort)) writeValue = value => { if (value is ushort v) writer.WriteUnsignedIntValue(v); };
+            else writeValue = value => writer.WritePrimitiveValue(value);
 
             return (parentJob) =>
             {
-                IEnumerable items = getValue(parentJob.item);
-
-                if (items == null)
-                {
-                    writer.WriteNullValue();
-                    return;
-                }
-
+                IEnumerable<T> items = getValue(parentJob.item);
                 Type objType = items.GetType();
                 bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && memberType != objType);
-                writer.WritePreparedByteString(extendedFieldNameBytes);
+                writer.WritePreparedByteString(fieldNameBytes);
+                prepareTypeInfoObjectFromType(writeTypeInfo, objType);
+                writer.OpenCollection();
 
-                if (items is IList list)
+                var enumerator = items.GetEnumerator();
+                if (enumerator.MoveNext())
                 {
-                    ListJob job = new()
-                    {
-                        collectionType = collectionType,
-                        currentIndex = 0,
-                        item = list,
-                        itemType = objType,
-                        collectionTypeCacheItem = collectionTypeCacheItem,
-                        writeTypeInfo = writeTypeInfo,
-                        parentJob = parentJob,
-                        itemName = fieldNameBytes
-                    };
-                    jobStack.Push(job);
-                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
+                    writeValue(enumerator.Current);
                 }
-                else
-                {                                                            
-                    EnumarableJob job = new()
-                    {
-                        collectionType = collectionType,
-                        currentIndex = 0,
-                        item = items,
-                        itemType = objType,
-                        enumerator = items.GetEnumerator(),
-                        collectionTypeCacheItem = collectionTypeCacheItem,
-                        writeTypeInfo = writeTypeInfo,
-                        parentJob = parentJob,
-                        itemName = fieldNameBytes
-                    };
-                    jobStack.Push(job);
-                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
+
+                while (enumerator.MoveNext())
+                {
+                    writer.WriteComma();
+                    writeValue(enumerator.Current);
                 }
+
+                writer.CloseCollection();
+                finishTypeInfoObject(writeTypeInfo);
             };
         }
-
+        */
         private FieldWriter CreatePrimitiveCollectionFieldWriter<T>(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {            
             Type memberType = memberInfo is FieldInfo field ? field.FieldType : memberInfo is PropertyInfo property ? property.PropertyType : default;
@@ -1579,14 +927,19 @@ namespace Playground
             var getValue = lambda.Compile();
 
             Action<T> writeValue = writer.WritePrimitiveValue;
-            if (typeof(T).IsAssignableTo(typeof(int))) writeValue = value => { if (value is int v) writer.WriteSignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(uint))) writeValue = value => { if (value is uint v) writer.WriteUnsignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(long))) writeValue = value => { if (value is long v) writer.WriteSignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(ulong))) writeValue = value => { if (value is ulong v) writer.WriteUnsignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(float))) writeValue = value => { if (value is float v) writer.WriteFloatValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(double))) writeValue = value => { if (value is double v) writer.WriteFloatValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(bool))) writeValue = value => { if (value is bool v) writer.WriteBoolValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(string))) writeValue = value => { if (value is string v) writer.WriteStringValue(v); };
+            if (typeof(T) == typeof(int)) writeValue = value => { if (value is int v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(uint)) writeValue = value => { if (value is uint v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(long)) writeValue = value => { if (value is long v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(ulong)) writeValue = value => { if (value is ulong v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(float)) writeValue = value => { if (value is float v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(double)) writeValue = value => { if (value is double v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(bool)) writeValue = value => { if (value is bool v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(string)) writeValue = value => { if (value is string v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(char)) writeValue = value => { if (value is char v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(sbyte)) writeValue = value => { if (value is sbyte v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(byte)) writeValue = value => { if (value is byte v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(short)) writeValue = value => { if (value is short v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(ushort)) writeValue = value => { if (value is ushort v) writer.WritePrimitiveValue(v); };
 
             return (parentJob) =>
             {
@@ -1627,14 +980,19 @@ namespace Playground
             var getValue = lambda.Compile();
 
             Action<T> writeValue = writer.WritePrimitiveValue;
-            if (typeof(T).IsAssignableTo(typeof(int))) writeValue = value => { if (value is int v) writer.WriteSignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(uint))) writeValue = value => { if (value is uint v) writer.WriteUnsignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(long))) writeValue = value => { if (value is long v) writer.WriteSignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(ulong))) writeValue = value => { if (value is ulong v) writer.WriteUnsignedIntValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(float))) writeValue = value => { if (value is float v) writer.WriteFloatValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(double))) writeValue = value => { if (value is double v) writer.WriteFloatValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(bool))) writeValue = value => { if (value is bool v) writer.WriteBoolValue(v); };
-            else if (typeof(T).IsAssignableTo(typeof(string))) writeValue = value => { if (value is string v) writer.WriteStringValue(v); };
+            if (typeof(T) == typeof(int)) writeValue = value => { if (value is int v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(uint)) writeValue = value => { if (value is uint v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(long)) writeValue = value => { if (value is long v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(ulong)) writeValue = value => { if (value is ulong v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(float)) writeValue = value => { if (value is float v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(double)) writeValue = value => { if (value is double v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(bool)) writeValue = value => { if (value is bool v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(string)) writeValue = value => { if (value is string v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(char)) writeValue = value => { if (value is char v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(sbyte)) writeValue = value => { if (value is sbyte v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(byte)) writeValue = value => { if (value is byte v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(short)) writeValue = value => { if (value is short v) writer.WritePrimitiveValue(v); };
+            else if (typeof(T) == typeof(ushort)) writeValue = value => { if (value is ushort v) writer.WritePrimitiveValue(v); };
 
             return (parentJob) =>
             {

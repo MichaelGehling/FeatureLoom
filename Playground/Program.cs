@@ -79,6 +79,7 @@ namespace Playground
         private static async Task Main()
         {
         
+            /*
             DefaultWebServer webserver = new DefaultWebServer();
 
             Sender sender = new Sender();
@@ -99,7 +100,7 @@ namespace Playground
 
 
             Console.ReadKey();
-
+            */
             //string typeName = typeof(Dictionary<string, List<List<TestDto>[]>>).GetSimplifiedTypeName();
 
             //Type resolvedType = TypeHelper.GetTypeFromSimplifiedName(typeName);

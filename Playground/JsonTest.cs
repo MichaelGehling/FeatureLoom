@@ -46,7 +46,7 @@ namespace Playground
         public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
         //public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
-        public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
+        //public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
         //public object someObj = "Something";
         public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
@@ -58,8 +58,8 @@ namespace Playground
             //this.myEmbedded = myEmbedded;
             //this.self = this;
 
-            myEmbeddedDict["1"] = new MyEmbedded1();
-            myEmbeddedDict["2"] = new MyEmbedded1();
+            //myEmbeddedDict["1"] = new MyEmbedded1();
+            //myEmbeddedDict["2"] = new MyEmbedded1();
 
             //myObjects.Add(myEmbedded);
         }
@@ -96,7 +96,7 @@ namespace Playground
 
     public class MyEmbedded2 : IMyInterface
     {
-        public int y = 2;
+        public short y = 2;
     }
 
     public class TestDto2
@@ -111,9 +111,9 @@ namespace Playground
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
         public int int1 = 123451;
-        public int int2 = 123452;
-        public int int3 = 123453;
-        public int int4 = 123454;
+        public short int2 = 1234;
+        public long int3 = 123453;
+        public ulong int4 = 123454;
         public double double1 = 12.1231;
     }
 
@@ -158,18 +158,12 @@ namespace Playground
             int iterations = 1_000_000;
 
             //var testDto = new TestDto(99, new MyEmbedded1());
-            //var testDto = new TestDto2();
+            var testDto = new TestDto2();
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = 1234.5678;
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = new object();
-            var testDto = new Dictionary<string, string>()
-            {
-                ["1"] = "Hello",
-                ["2"] = "Hello",
-                ["3"] = "Hello",
-                ["4"] = "Hello",
-            };
+            //var testDto = new Dictionary<string, string>() { ["1"] = "Hello", ["2"] = "Hello" };
 
             Type testDtoType = testDto.GetType();
             string json;
