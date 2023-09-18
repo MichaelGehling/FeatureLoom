@@ -45,9 +45,10 @@ namespace Playground
         public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
         public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
-        //public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        
         //public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
-        //public object someObj = "Something";
+        public object someObj = "Something";
         public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
         public string MyProperty { get; set; } = "propValue";
@@ -157,8 +158,8 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
-            var testDto = new TestDto2();
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto2();
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = 1234.5678;
             //var testDto = "Hello: \\, \", \\, \n";

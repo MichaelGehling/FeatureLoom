@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using System.Collections.Specialized;
 using System.Net.Http.Headers;
 using FeatureLoom.Synchronization;
+using FeatureLoom.Collections;
 
 namespace Playground
 {
@@ -59,6 +60,28 @@ namespace Playground
             public bool firstChild;
             public byte[] currentFieldName;
         }
+
+        Pool<ComplexJob> complexJobPool = new Pool<ComplexJob>(() => new ComplexJob(), 
+        job =>
+        {
+            job.item = null;
+            job.parentJob = null;            
+        }, 1000, false);
+
+        Pool<ListJob> listJobPool = new Pool<ListJob>(() => new ListJob(),
+        job =>
+        {
+            job.item = null;
+            job.parentJob = null;
+        }, 1000, false);
+
+        Pool<EnumarableJob> enumerableJobPool = new Pool<EnumarableJob>(() => new EnumarableJob(),
+        job =>
+        {
+            job.item = null;
+            job.parentJob = null;
+            job.enumerator = null;
+        }, 1000, false);
 
         class TypeCacheItem
         {
@@ -126,6 +149,7 @@ namespace Playground
             using (serializerLock.Lock())
             {
                 memoryStream.Position = 0;
+                jobStack.Clear();
                 objToJob.Clear();
 
                 writer.stream = memoryStream;
@@ -140,6 +164,7 @@ namespace Playground
             using (serializerLock.Lock())
             {
                 memoryStream.Position = 0;
+                jobStack.Clear();
                 objToJob.Clear();
 
                 writer.stream = memoryStream;
@@ -153,6 +178,7 @@ namespace Playground
         {
             using (serializerLock.Lock())
             {
+                jobStack.Clear();
                 objToJob.Clear();
 
                 writer.stream = stream;
@@ -207,6 +233,7 @@ namespace Playground
             writer.CloseCollection();
             finishTypeInfoObject(job.writeTypeInfo);
             jobStack.Pop();
+            enumerableJobPool.Return(job);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool HandleNextCollectionItem(EnumarableJob job, int beforeStackSize)
@@ -250,6 +277,7 @@ namespace Playground
             writer.CloseCollection();
             finishTypeInfoObject(job.writeTypeInfo);
             jobStack.Pop();
+            listJobPool.Return(job);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool HandleNextCollectionItem(ListJob job, int beforeStackSize)
@@ -301,6 +329,7 @@ namespace Playground
 
             writer.CloseObject();
             jobStack.Pop();
+            complexJobPool.Return(job);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -430,21 +459,19 @@ namespace Playground
                 {
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
 
-                    ComplexJob job = new()
-                    {
-                        firstChild = true,
-                        item = obj,
-                        itemType = objType,
-                        fieldWriters = fieldWriters,
-                        currentIndex = 0,
-                        writeTypeInfo = writeTypeInfo,
-                        parentJob = parentJob,
-                        itemName = parentJob == null ? writer.PrepareRootName() :
+                    ComplexJob job = complexJobPool.Take();
+                    job.firstChild = true;
+                    job.item = obj;
+                    job.itemType = objType;
+                    job.fieldWriters = fieldWriters;
+                    job.currentIndex = 0;
+                    job.writeTypeInfo = writeTypeInfo;
+                    job.parentJob = parentJob;
+                    job.itemName = parentJob == null ? writer.PrepareRootName() :
                                     parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((BaseJob)parentJob)
-                    };
+                                    writer.PrepareCollectionIndexName((BaseJob)parentJob);                    
                     jobStack.Push(job);
-                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[obj] = job;
+                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[obj] = job;                    
                 };
             }
             else
@@ -500,40 +527,36 @@ namespace Playground
 
                     if (obj is IList list)
                     {
-                        ListJob job = new()
-                        {
-                            collectionType = collectionType,
-                            currentIndex = 0,
-                            item = list,
-                            itemType = objType,                            
-                            collectionTypeCacheItem = collectionTypeCacheItem,
-                            writeTypeInfo = writeTypeInfo,
-                            parentJob = parentJob,
-                            itemName = parentJob == null ? writer.PrepareRootName() :
+                        ListJob job = listJobPool.Take();
+                        job.collectionType = collectionType;
+                        job.currentIndex = 0;
+                        job.item = list;
+                        job.itemType = objType;
+                        job.collectionTypeCacheItem = collectionTypeCacheItem;
+                        job.writeTypeInfo = writeTypeInfo;
+                        job.parentJob = parentJob;
+                        job.itemName = parentJob == null ? writer.PrepareRootName() :
                                     parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob)
-
-                        };
+                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob);
+                        
                         jobStack.Push(job);
                         if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[list] = job;
                     }
                     else if (obj is IEnumerable enumerable)
                     {
-                        EnumarableJob job = new()
-                        {
-                            collectionType = collectionType,
-                            currentIndex = 0,
-                            item = enumerable,
-                            itemType = objType,
-                            enumerator = enumerable.GetEnumerator(),
-                            collectionTypeCacheItem = collectionTypeCacheItem,
-                            writeTypeInfo = writeTypeInfo,
-                            parentJob = parentJob,
-                            itemName = parentJob == null ? writer.PrepareRootName() :
+                        EnumarableJob job = enumerableJobPool.Take();
+                        job.collectionType = collectionType;
+                        job.currentIndex = 0;
+                        job.item = enumerable;
+                        job.itemType = objType;
+                        job.enumerator = enumerable.GetEnumerator();
+                        job.collectionTypeCacheItem = collectionTypeCacheItem;
+                        job.writeTypeInfo = writeTypeInfo;
+                        job.parentJob = parentJob;
+                        job.itemName = parentJob == null ? writer.PrepareRootName() :
                                     parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob)
+                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob);
 
-                        };
                         jobStack.Push(job);
                         if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[enumerable] = job;
                     }                    
@@ -728,23 +751,41 @@ namespace Playground
             return (parentJob) =>
             {
                 writer.WritePreparedByteString(fieldNameBytes);
-                var value = getValue(parentJob.item);
+                T value = getValue(parentJob.item);
                 write(value);
             };
         }
 
         private FieldWriter CreateEnumFieldWriter(Type objType, MemberInfo memberInfo, byte[] fieldNameBytes)
         {
-            Func<object, object> getValue = memberInfo is FieldInfo fieldInfo ? fieldInfo.GetValue : memberInfo is PropertyInfo propertyInfo ? propertyInfo.GetValue : default;
-            Action<object> write = settings.enumAsString ? enumValue => writer.WritePreparedByteString(GetEnumText(enumValue, objType)) :
-                                                           enumValue => writer.WritePrimitiveValue((int)enumValue);
-
-            return (parentJob) =>
+            if (settings.enumAsString)
             {
-                var value = getValue(parentJob.item);
-                writer.WritePreparedByteString(fieldNameBytes);
-                write(value);
-            };
+                Func<object, object> getValue = memberInfo is FieldInfo fieldInfo ? fieldInfo.GetValue : memberInfo is PropertyInfo propertyInfo ? propertyInfo.GetValue : default;
+                Action<object> write = enumValue => writer.WritePreparedByteString(GetEnumText(enumValue, objType));
+                return (parentJob) =>
+                {
+                    var value = getValue(parentJob.item);
+                    writer.WritePreparedByteString(fieldNameBytes);
+                    write(value);
+                };
+            }
+            else
+            {
+                var parameter = Expression.Parameter(typeof(object));
+                var castedParameter = Expression.Convert(parameter, objType);
+                var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+                var convertedFieldAccess = Expression.Convert(fieldAccess, typeof(int));
+                var lambda = Expression.Lambda<Func<object, int>>(convertedFieldAccess, parameter);
+                var getValue = lambda.Compile();
+                Action<int> write = enumValue => writer.WritePrimitiveValue(enumValue);
+
+                return (parentJob) =>
+                {
+                    var value = getValue(parentJob.item);
+                    writer.WritePreparedByteString(fieldNameBytes);
+                    write(value);
+                };
+            }
         }
 
         private FieldWriter CreateCollectionFieldWriter(Type objType, MemberInfo memberInfo, byte[] extendedFieldNameBytes, byte[] fieldNameBytes)
@@ -778,9 +819,9 @@ namespace Playground
                 Type genericDictType = typeof(IDictionary<,>).MakeGenericType(keyType, valueType);
             }
             else*/
-            {
+                {
 
-                if (collectionType == typeof(string)) return CreatePrimitiveCollectionFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes);
+                    if (collectionType == typeof(string)) return CreatePrimitiveCollectionFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes);
                 else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes);
                 else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes);
                 else if (collectionType == typeof(byte)) return CreatePrimitiveCollectionFieldWriter<byte>(objType, memberInfo, extendedFieldNameBytes);
@@ -825,34 +866,32 @@ namespace Playground
 
                     if (items is IList list)
                     {
-                        ListJob job = new()
-                        {
-                            collectionType = collectionType,
-                            currentIndex = 0,
-                            item = list,
-                            itemType = objType,
-                            collectionTypeCacheItem = collectionTypeCacheItem,
-                            writeTypeInfo = writeTypeInfo,
-                            parentJob = parentJob,
-                            itemName = fieldNameBytes
-                        };
+                        ListJob job = listJobPool.Take();
+                        job.collectionType = collectionType;
+                        job.currentIndex = 0;
+                        job.item = list;
+                        job.itemType = objType;
+                        job.collectionTypeCacheItem = collectionTypeCacheItem;
+                        job.writeTypeInfo = writeTypeInfo;
+                        job.parentJob = parentJob;
+                        job.itemName = fieldNameBytes;
+
                         jobStack.Push(job);
                         if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
                     }
                     else
                     {
-                        EnumarableJob job = new()
-                        {
-                            collectionType = collectionType,
-                            currentIndex = 0,
-                            item = items,
-                            itemType = objType,
-                            enumerator = items.GetEnumerator(),
-                            collectionTypeCacheItem = collectionTypeCacheItem,
-                            writeTypeInfo = writeTypeInfo,
-                            parentJob = parentJob,
-                            itemName = fieldNameBytes
-                        };
+                        EnumarableJob job = enumerableJobPool.Take();
+                        job.collectionType = collectionType;
+                        job.currentIndex = 0;
+                        job.item = items;
+                        job.itemType = objType;
+                        job.enumerator = items.GetEnumerator();
+                        job.collectionTypeCacheItem = collectionTypeCacheItem;
+                        job.writeTypeInfo = writeTypeInfo;
+                        job.parentJob = parentJob;
+                        job.itemName = fieldNameBytes;
+
                         jobStack.Push(job);
                         if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[items] = job;
                     }
