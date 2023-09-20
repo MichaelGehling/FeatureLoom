@@ -65,6 +65,13 @@ namespace Playground
         {
             public string aaa = "Hallo";
             public int bbb = 3;
+            public List<int> intList;
+            public DateTime dt = DateTime.Now;
+
+            public TestConfig()
+            {
+                Uri = "TestConfig";
+            }
         }
 
         public class OuterClass
@@ -76,8 +83,18 @@ namespace Playground
         }
         
 
+
         private static async Task Main()
         {
+
+            
+            string[] args = new string[] { "-aaa=World", "-intList", "\"1\"", "2", "3", "-bbb", "99", "-intList=4", "-dt=\"2022-09-20T11:56:38.6580724+02:00\"" };
+            TestConfig config = new TestConfig();
+            config.UpdateFromArgs(args,"");
+
+            Console.WriteLine(config.ToJson());
+            Console.ReadLine();
+
         
             /*
             DefaultWebServer webserver = new DefaultWebServer();

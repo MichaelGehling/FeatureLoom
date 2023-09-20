@@ -819,8 +819,7 @@ namespace Playground
                 Type genericDictType = typeof(IDictionary<,>).MakeGenericType(keyType, valueType);
             }
             else*/
-                {
-
+            {
                     if (collectionType == typeof(string)) return CreatePrimitiveCollectionFieldWriter<string>(objType, memberInfo, extendedFieldNameBytes);
                 else if (collectionType == typeof(int)) return CreatePrimitiveCollectionFieldWriter<int>(objType, memberInfo, extendedFieldNameBytes);
                 else if (collectionType == typeof(uint)) return CreatePrimitiveCollectionFieldWriter<uint>(objType, memberInfo, extendedFieldNameBytes);

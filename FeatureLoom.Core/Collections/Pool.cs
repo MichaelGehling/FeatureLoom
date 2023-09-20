@@ -13,7 +13,7 @@ namespace FeatureLoom.Collections
         Func<T> take;
         Action<T> ret;
 
-        public Pool(Func<T> create, Action<T> reset = null, int maxSize = 100, bool threadSafe = true)
+        public Pool(Func<T> create, Action<T> reset = null, int maxSize = 1000, bool threadSafe = true)
         {
             if (threadSafe)
             {

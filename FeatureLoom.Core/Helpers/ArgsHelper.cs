@@ -118,8 +118,8 @@ namespace FeatureLoom.Helpers
             {
                 index = namedArgs.FindIndex(index, p => p.Key == key);
                 if (index < 0) break;
-                if (namedArgs[index].Value != null) values.Add(namedArgs[index].Value);
-                while (namedArgs[++index].Key == null && namedArgs[index].Value != null) values.Add(namedArgs[index].Value);
+                if (namedArgs[index].Value != "") values.Add(namedArgs[index].Value);
+                while (++index < namedArgs.Count && namedArgs[index].Key == "" && namedArgs[index].Value != "") values.Add(namedArgs[index].Value);
             }
             return values;
         }

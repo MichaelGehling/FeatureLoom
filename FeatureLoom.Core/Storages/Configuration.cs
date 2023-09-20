@@ -9,6 +9,10 @@ using System.Threading.Tasks;
 using FeatureLoom.Extensions;
 using System;
 using System.Threading;
+using System.Reflection;
+using System.Linq;
+using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 namespace FeatureLoom.Storages
 {
@@ -202,6 +206,80 @@ namespace FeatureLoom.Storages
             {
                 if (cfg.TryUpdateFromStorage(true)) await action(cfg);
             }, config, true, cancellationToken);
+        }
+
+        public static void UpdateFromEnvironment<T>(this T config, string envVarPrefix = null) where T : Configuration
+        {
+            if (envVarPrefix == null) envVarPrefix = config.Uri + '.';
+
+            var envs = Environment.GetEnvironmentVariables();
+
+            Type configType = config.GetType();
+            var fields = configType.GetFields(BindingFlags.Public | BindingFlags.Instance);
+            foreach (var field in fields)
+            {
+                string varName = envVarPrefix + field.Name;
+                if (!envs.Contains(varName)) continue;
+
+                string jsonValue = envs[varName].ToString();
+                if (field.FieldType == typeof(string)) jsonValue = '"' + jsonValue.TrimChar('"') + '"';
+                field.SetValue(config, Json.DeserializeFromJson(jsonValue, field.FieldType));
+            }
+        }
+
+        public static void UpdateFromArgs<T>(this T config, string[] args, string argumentPrefix = null) where T : Configuration
+        {
+            config.UpdateFromArgs(new ArgsHelper(args), argumentPrefix);
+        }
+
+        public static void UpdateFromArgs<T>(this T config, ArgsHelper argsHelper, string argumentPrefix = null) where T : Configuration
+        {
+            if (argumentPrefix == null) argumentPrefix = config.Uri + '.';            
+
+            Type configType = config.GetType();
+            var fields = configType.GetFields(BindingFlags.Public | BindingFlags.Instance);
+            foreach (var field in fields)
+            {
+                string varName = argumentPrefix + field.Name;
+
+                var values = argsHelper.GetAllAfterKey(varName).ToArray();
+                if (values.Length == 0) continue;
+
+                string jsonValue;
+
+                if (field.FieldType.ImplementsGenericInterface(typeof(ICollection<>)))
+                {
+                    Type collectionType = field.FieldType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
+                    if (collectionType == typeof(string)) values = values.Select(v => '"' + v.TrimChar('"') + '"').ToArray();
+                    jsonValue = "[" + values.AllItemsToString(",") + "]";
+                }
+                else if(field.FieldType == typeof(string))
+                {
+                    if (values.Length > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
+                    jsonValue = '"' + values[0].TrimChar('"') + '"';
+                }
+                else
+                {
+                    if (values.Length > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
+                    jsonValue = values[0];
+                }
+
+                try
+                {
+                    field.SetValue(config, Json.DeserializeFromJson(jsonValue, field.FieldType));
+                }
+                catch(Exception ex)
+                {
+                    try
+                    {
+                        field.SetValue(config, Json.DeserializeFromJson('"' + jsonValue + '"', field.FieldType));
+                    }
+                    catch (Exception ex2)
+                    {
+                        Log.WARNING($"Failed to apply argument {varName}");
+                    }
+                }
+            }
         }
     }
 }
