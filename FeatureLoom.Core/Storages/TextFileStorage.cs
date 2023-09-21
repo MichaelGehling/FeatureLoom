@@ -473,8 +473,9 @@ namespace FeatureLoom.Storages
 
                 return (success, data);
             }
-            catch
+            catch(Exception e)
             {
+                Log.ERROR(this.GetHandle(), "Reading file failed!", e.ToString());
                 return (false, default);
             }
         }
@@ -521,8 +522,9 @@ namespace FeatureLoom.Storages
                 }
                 return false;
             }
-            catch
+            catch(Exception e)
             {
+                Log.ERROR(this.GetHandle(), "Reading file failed!", e.ToString());
                 return false;
             }
         }

@@ -241,26 +241,27 @@ namespace FeatureLoom.Storages
             foreach (var field in fields)
             {
                 string varName = argumentPrefix + field.Name;
+                if (!argsHelper.HasKey(varName)) continue;
 
-                var values = argsHelper.GetAllAfterKey(varName).ToArray();
-                if (values.Length == 0) continue;
+                var values = argsHelper.GetAllAfterKey(varName).ToList();
+                if (values.Count == 0 && field.FieldType == typeof(bool)) values.Add("True");
+                if (values.Count == 0) continue;
 
                 string jsonValue;
-
-                if (field.FieldType.ImplementsGenericInterface(typeof(ICollection<>)))
+                if (field.FieldType == typeof(string))
                 {
-                    Type collectionType = field.FieldType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
-                    if (collectionType == typeof(string)) values = values.Select(v => '"' + v.TrimChar('"') + '"').ToArray();
-                    jsonValue = "[" + values.AllItemsToString(",") + "]";
-                }
-                else if(field.FieldType == typeof(string))
-                {
-                    if (values.Length > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
+                    if (values.Count > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
                     jsonValue = '"' + values[0].TrimChar('"') + '"';
                 }
+                else if (field.FieldType.ImplementsGenericInterface(typeof(ICollection<>)))
+                {
+                    Type collectionType = field.FieldType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
+                    if (collectionType == typeof(string)) values = values.Select(v => '"' + v.TrimChar('"') + '"').ToList();
+                    jsonValue = "[" + values.AllItemsToString(",") + "]";
+                }                
                 else
                 {
-                    if (values.Length > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
+                    if (values.Count > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
                     jsonValue = values[0];
                 }
 

@@ -138,6 +138,12 @@ namespace FeatureLoom.Helpers
             }
             return -1;
         }
+        /// <summary>
+        /// True if the key exists.
+        /// </summary>
+        /// <param name="key">The key to be found</param>
+        /// <returns>True if the key exists, otherwise False</returns>
+        public bool HasKey(string key) => FindIndexByKey(key, 0) != -1;        
 
         /// <summary>
         /// Returns first argumnet value with the given key
