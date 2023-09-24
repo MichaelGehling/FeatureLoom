@@ -27,6 +27,60 @@ namespace FeatureLoom.Extensions
             return null;
         }
 
+        public static Type[] GetAllTypeParamsOfGenericInterface(this Type typeToCheck, Type genericInterfaceType)
+        {
+            foreach (var type in typeToCheck.GetInterfaces())
+            {
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
+                {
+                    return type.GetGenericArguments();
+                }
+            }
+            return null;
+        }
+
+        public static bool TryGetTypeParamsOfGenericInterface(this Type typeToCheck, Type genericInterfaceType, out Type param1)
+        {
+            param1 = null;
+            foreach (var type in typeToCheck.GetInterfaces())
+            {
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
+                {
+                    return type.GetGenericArguments().TryElementsOut(out param1);
+                }
+            }
+            return false;
+        }
+
+        public static bool TryGetTypeParamsOfGenericInterface(this Type typeToCheck, Type genericInterfaceType, out Type param1, out Type param2)
+        {
+            param1 = null; 
+            param2 = null;
+            foreach (var type in typeToCheck.GetInterfaces())
+            {
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
+                {
+                    return type.GetGenericArguments().TryElementsOut(out param1, out param2);
+                }
+            }
+            return false;
+        }
+
+        public static bool TryGetTypeParamsOfGenericInterface(this Type typeToCheck, Type genericInterfaceType, out Type param1, out Type param2, out Type param3)
+        {
+            param1 = null;
+            param2 = null;
+            param3 = null;
+            foreach (var type in typeToCheck.GetInterfaces())
+            {
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
+                {
+                    return type.GetGenericArguments().TryElementsOut(out param1, out param2, out param3);
+                }
+            }
+            return false;
+        }
+
         public static bool IsOfGenericType(this Type typeToCheck, Type genericType)
         {
             return typeToCheck.IsOfGenericType(genericType, out Type _);

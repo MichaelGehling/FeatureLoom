@@ -9,6 +9,7 @@ namespace Playground
 
     public partial class LoopJsonSerializer
     {
+        /*
         private Dictionary<Type, Action<object, JsonUTF8StreamWriter>> dictionaryKeyAsPropertySerializer = new Dictionary<Type, Action<object, JsonUTF8StreamWriter>>()
         {
             [typeof(string)] = (key, writer) => writer.WritePrimitiveValueAsString((string)key),
@@ -23,7 +24,7 @@ namespace Playground
             [typeof(uint)] = (key, writer) => writer.WritePrimitiveValueAsString((uint)key),
             [typeof(ulong)] = (key, writer) => writer.WritePrimitiveValueAsString((ulong)key),
         };
-
+        */
         public class Settings
         {
             public TypeInfoHandling typeInfoHandling = TypeInfoHandling.AddDeviatingTypeInfo;
@@ -31,7 +32,7 @@ namespace Playground
             public ReferenceCheck referenceCheck = ReferenceCheck.AlwaysReplaceByRef;
             public int bufferSize = -1;
             public bool enumAsString = false;
-            public List<string> dictionaryKeyTypesImplyingObjectNotation = new List<string>()
+          /*  public List<string> dictionaryKeyTypesImplyingObjectNotation = new List<string>()
             {
                 TypeNameHelper.GetSimplifiedTypeName(typeof(string)),
                 TypeNameHelper.GetSimplifiedTypeName(typeof(bool)),
@@ -59,6 +60,7 @@ namespace Playground
                     serializer.dictionaryKeyAsPropertySerializer.TryAdd(type, (key, writer) => writer.WritePrimitiveValueAsString(key.ToString()));
                 }
             }
+          */
         }
 
         public enum DataSelection

@@ -208,5 +208,50 @@ namespace FeatureLoom.Extensions
             }
             return convertedList.ToArray();            
         }
+
+
+        public static bool TryElementsOut<T>(this IList<T> list, out T item0)
+        {
+            item0 = default;
+            if (list.EmptyOrNull() || list.Count < 1) return false;
+            item0 = list[0];
+            return true;
+        }
+
+        public static bool TryElementsOut<T>(this IList<T> list, out T item0, out T item1)
+        {
+            item0 = default;
+            item1 = default;
+            if (list.EmptyOrNull() || list.Count < 2) return false;
+            item0 = list[0];
+            item1 = list[1];
+            return true;
+        }
+
+        public static bool TryElementsOut<T>(this IList<T> list, out T item0, out T item1, out T item2)
+        {
+            item0 = default;
+            item1 = default;
+            item2 = default;
+            if (list.EmptyOrNull() || list.Count < 3) return false;
+            item0 = list[0];
+            item1 = list[1];
+            item2 = list[2];
+            return true;
+        }
+
+        public static bool TryElementsOut<T>(this IList<T> list, out T item0, out T item1, out T item2, out T item3)
+        {
+            item0 = default;
+            item1 = default;
+            item2 = default;
+            item3 = default;
+            if (list.EmptyOrNull() || list.Count < 4) return false;
+            item0 = list[0];
+            item1 = list[1];
+            item2 = list[2];
+            item3 = list[3];
+            return true;
+        }
     }
 }

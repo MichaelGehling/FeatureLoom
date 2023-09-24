@@ -22,6 +22,7 @@ using System.Collections.Specialized;
 using System.Net.Http.Headers;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Collections;
+using System.Runtime.InteropServices.ObjectiveC;
 
 namespace Playground
 {
@@ -30,6 +31,8 @@ namespace Playground
 
         delegate void FieldWriter(ComplexJob parentJob);
         delegate void ItemHandler(object obj, BaseJob parentJob, bool writeTypeInfo);
+        delegate void KeyValuePairWriter(DictionaryJob parentJob);
+
 
         abstract class BaseJob
         {
@@ -52,6 +55,15 @@ namespace Playground
         {
             public Type collectionType;
             internal TypeCacheItem collectionTypeCacheItem;
+        }
+
+        sealed class DictionaryJob : BaseJob
+        {
+            public IEnumerator enumerator;
+            public Type keyType;
+            public Type valueType;
+            public KeyValuePairWriter keyValuePairWriter;
+            public byte[] currentFieldName;
         }
 
         sealed class ComplexJob : BaseJob
@@ -83,9 +95,17 @@ namespace Playground
             job.enumerator = null;
         }, 1000, false);
 
+        Pool<DictionaryJob> dictJobPool = new Pool<DictionaryJob>(() => new DictionaryJob(),
+        job =>
+        {
+            job.item = null;
+            job.parentJob = null;
+            job.enumerator = null;
+        }, 1000, false);        
+
         class TypeCacheItem
         {
-            public ItemHandler itemHandler;
+            public ItemHandler itemHandler;            
         }
 
         struct EnumKey
@@ -120,7 +140,6 @@ namespace Playground
         readonly Action<bool, Type> prepareTypeInfoObjectFromType;
         readonly Action<bool> finishTypeInfoObject;
         readonly Func<object, BaseJob, Type, bool> tryHandleAsRef;
-            
 
 
         public LoopJsonSerializer(Settings settings = null)
@@ -203,7 +222,45 @@ namespace Playground
                 {                    
                     HandleEnumerableJob(enumerableJob);
                 }
+                else if (job is DictionaryJob dictionaryJob)
+                {
+                    HandleDictionaryJob(dictionaryJob);
+                }
             }
+        }
+
+        private void HandleDictionaryJob(DictionaryJob job)
+        {
+            jobStack.Push(job);
+            int beforeStackSize = jobStack.Count;
+
+            if (job.currentIndex == 0)
+            {
+                writer.OpenObject();
+
+                if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && job.writeTypeInfo))
+                {
+                    writer.WriteTypeInfo(job.itemType.GetSimplifiedTypeName());
+                    writer.WriteComma();
+                }
+
+                if (job.enumerator.MoveNext())
+                {
+                    job.keyValuePairWriter(job);
+                    if (jobStack.Count != beforeStackSize) return;
+                }
+            }
+
+            while (job.enumerator.MoveNext())
+            {
+                writer.WriteComma();
+                job.keyValuePairWriter(job);
+                if (jobStack.Count != beforeStackSize) return;
+            }
+
+            writer.CloseObject();
+            jobStack.Pop();
+            dictJobPool.Return(job);
         }
 
         private void HandleEnumerableJob(EnumarableJob job)
@@ -341,11 +398,8 @@ namespace Playground
                 return;
             }
             bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo || (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != objType);
-            
-            if (!typeCache.TryGetValue(objType, out var typeCacheItem))
-            {
-                typeCacheItem = CreateTypeCacheItem(objType);
-            }            
+
+            var typeCacheItem = GetTypeCacheItem(objType);
             typeCacheItem.itemHandler(obj, parentJob, writeTypeInfo);                        
         }
 
@@ -397,6 +451,9 @@ namespace Playground
             return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private TypeCacheItem GetTypeCacheItem(Type objType) => typeCache.TryGetValue(objType, out var typeCacheItem) ? typeCacheItem : CreateTypeCacheItem(objType);
+
         private TypeCacheItem CreateTypeCacheItem(Type objType)
         {
             TypeCacheItem typeCacheItem = new TypeCacheItem();
@@ -421,6 +478,7 @@ namespace Playground
 
             if (objType.IsAssignableTo(typeof(IEnumerable)))
             {
+                if (TryCreateTypeCacheItem_Dictionary(objType, typeCacheItem, preparedTypeInfo)) return typeCacheItem;
                 if (TryCreateTypeCacheItem_Collection(objType, typeCacheItem, preparedTypeInfo)) return typeCacheItem;
             }
 
@@ -469,7 +527,8 @@ namespace Playground
                     job.parentJob = parentJob;
                     job.itemName = parentJob == null ? writer.PrepareRootName() :
                                     parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((BaseJob)parentJob);                    
+                                    parentJob is DictionaryJob dictionaryJob ? dictionaryJob.currentFieldName :
+                                    writer.PrepareCollectionIndexName(parentJob);                    
                     jobStack.Push(job);
                     if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[obj] = job;                    
                 };
@@ -487,35 +546,103 @@ namespace Playground
             return typeCacheItem;
         }
 
-        private bool TryCreateTypeCacheItem_Collection(Type objType, TypeCacheItem typeCacheItem, byte[] preparedTypeInfo)
+        private ItemHandler CreateDictionaryCacheItemHandler_KeyValue<K, V>(Type objType, Type keyType, Type expectedValueType)
         {
-            Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
+            var valueTypeCacheItem = GetTypeCacheItem(expectedValueType);
 
-            if (collectionType == typeof(string)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<string>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(int)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<int>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(uint)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<uint>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(byte)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<byte>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(sbyte)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<sbyte>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(short)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<short>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(ushort)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<ushort>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(long)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<long>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(ulong)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<ulong>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(bool)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<bool>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(char)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<char>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(float)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<float>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(double)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<double>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(IntPtr)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<IntPtr>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (collectionType == typeof(UIntPtr)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<UIntPtr>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
-            else if (objType.IsAssignableTo(typeof(ICollection)))
+            KeyValuePairWriter keyValuePairWriter = (job) =>
             {
-                if (collectionType == null) collectionType = typeof(object);
+                KeyValuePair<K,V> keyValuePair = ((IEnumerator<KeyValuePair<K,V>>)job.enumerator).Current;
+                K key = keyValuePair.Key;
+                writer.WritePrimitiveValueAsString(key); // writer method for primitives to avoid generic version of the method. BETTER: PreparePrimitveToBytes() for each primitive type
+                writer.WriteColon();
 
-                if (!typeCache.TryGetValue(collectionType, out var collectionTypeCacheItem))
+                job.currentFieldName = writer.PrepareStringToBytes(key.ToString());
+
+                V value = keyValuePair.Value;
+                Type valueType = value?.GetType();
+                if (valueType == expectedValueType) valueTypeCacheItem.itemHandler(value, job, settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo);
+                else HandleItem(value, valueType, expectedValueType, job);
+
+                job.currentIndex++;
+            };
+
+            return (obj, parentJob, writeTypeInfo) =>
+            {
+                if (obj == null)
                 {
-                    collectionTypeCacheItem = CreateTypeCacheItem(collectionType);
+                    writer.WriteNullValue();
+                    return;
                 }
 
-                typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+                if (tryHandleAsRef(obj, parentJob, objType)) return;
+
+                DictionaryJob job = dictJobPool.Take();
+                job.valueType = expectedValueType;
+                job.keyType = keyType;
+                job.keyValuePairWriter = keyValuePairWriter;
+                job.enumerator = ((IDictionary<K,V>)obj).GetEnumerator();
+                job.currentIndex = 0;
+                job.item = obj;
+                job.itemType = objType;
+                job.writeTypeInfo = writeTypeInfo;
+                job.parentJob = parentJob;
+                job.itemName = parentJob == null ? writer.PrepareRootName() :
+                            parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                            parentJob is DictionaryJob dictionaryJob ? dictionaryJob.currentFieldName :
+                            writer.PrepareCollectionIndexName(parentJob);
+                jobStack.Push(job);
+                if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[obj] = job;
+            };
+        }
+
+        private bool TryCreateTypeCacheItem_Dictionary(Type objType, TypeCacheItem typeCacheItem, byte[] preparedTypeInfo)
+        {
+            if (!objType.GetAllTypeParamsOfGenericInterface(typeof(IDictionary<,>)).TryElementsOut(out Type keyType, out Type expectedValueType)) return false;
+
+            
+            
+            MethodInfo createItemHandlerMethodInfo = this.GetType().GetMethod(nameof(CreateDictionaryCacheItemHandler_KeyValue), BindingFlags.NonPublic | BindingFlags.Instance).MakeGenericMethod(keyType, expectedValueType);
+            typeCacheItem.itemHandler = (ItemHandler)createItemHandlerMethodInfo.Invoke(this, new object[] { objType, keyType, expectedValueType });
+
+            //if (keyType == typeof(string)) typeCacheItem.itemHandler = CreateDictionaryCacheItemHandler_Key<string>(writer.WritePrimitiveValueAsString);
+
+            bool collectionHandled = typeCacheItem.itemHandler != null;
+            return collectionHandled;
+
+
+            ItemHandler CreateDictionaryCacheItemHandler_Key<T>(Action<T> writeKey)
+            {
+                /*
+                 * TODO: PRIMITIVE VALUES
+                 */
+                Type keyValueType = objType.GetFirstTypeParamOfGenericInterface(typeof(IEnumerable<>));
+                PropertyInfo keyProperty = keyValueType.GetProperty("Key");
+                PropertyInfo valueProperty = keyValueType.GetProperty("Value");
+                var keyParameter = Expression.Parameter(typeof(object));
+                var castedKeyParameter = Expression.Convert(keyParameter, keyValueType);
+                var keyFieldAccess = Expression.Property(castedKeyParameter, keyProperty);
+                var lambda = Expression.Lambda<Func<object, T>>(keyFieldAccess, keyParameter);
+                var getKey = lambda.Compile();
+
+                var valueTypeCacheItem = GetTypeCacheItem(expectedValueType);
+
+                KeyValuePairWriter keyValuePairWriter = (job) =>
+                {
+                    object keyValuePair = job.enumerator.Current;
+                    T key = getKey(keyValuePair);
+                    writeKey(key);
+                    writer.WriteColon();
+
+                    object value = valueProperty.GetValue(keyValuePair);
+                    Type valueType = value?.GetType();
+                    if (valueType == expectedValueType) valueTypeCacheItem.itemHandler(value, job, settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo);
+                    else HandleItem(value, valueType, expectedValueType, job);
+
+                    job.currentIndex++;
+                };
+
+                return (obj, parentJob, writeTypeInfo) =>
                 {
                     if (obj == null)
                     {
@@ -525,43 +652,102 @@ namespace Playground
 
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
 
-                    if (obj is IList list)
-                    {
-                        ListJob job = listJobPool.Take();
-                        job.collectionType = collectionType;
-                        job.currentIndex = 0;
-                        job.item = list;
-                        job.itemType = objType;
-                        job.collectionTypeCacheItem = collectionTypeCacheItem;
-                        job.writeTypeInfo = writeTypeInfo;
-                        job.parentJob = parentJob;
-                        job.itemName = parentJob == null ? writer.PrepareRootName() :
-                                    parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob);
-                        
-                        jobStack.Push(job);
-                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[list] = job;
-                    }
-                    else if (obj is IEnumerable enumerable)
-                    {
-                        EnumarableJob job = enumerableJobPool.Take();
-                        job.collectionType = collectionType;
-                        job.currentIndex = 0;
-                        job.item = enumerable;
-                        job.itemType = objType;
-                        job.enumerator = enumerable.GetEnumerator();
-                        job.collectionTypeCacheItem = collectionTypeCacheItem;
-                        job.writeTypeInfo = writeTypeInfo;
-                        job.parentJob = parentJob;
-                        job.itemName = parentJob == null ? writer.PrepareRootName() :
-                                    parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
-                                    writer.PrepareCollectionIndexName((EnumarableJob)parentJob);
-
-                        jobStack.Push(job);
-                        if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[enumerable] = job;
-                    }                    
+                    DictionaryJob job = dictJobPool.Take();
+                    job.valueType = expectedValueType;
+                    job.keyType = keyType;
+                    job.keyValuePairWriter = keyValuePairWriter;
+                    job.enumerator = ((IDictionary<T, object>)obj).GetEnumerator();
+                    job.currentIndex = 0;
+                    job.item = obj;
+                    job.itemType = objType;
+                    job.writeTypeInfo = writeTypeInfo;
+                    job.parentJob = parentJob;
+                    job.itemName = parentJob == null ? writer.PrepareRootName() :
+                                parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                                parentJob is DictionaryJob dictionaryJob ? dictionaryJob.currentFieldName :
+                                writer.PrepareCollectionIndexName(parentJob);
+                    jobStack.Push(job);
+                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[obj] = job;
                 };
             }
+        }
+
+        private bool TryCreateTypeCacheItem_Collection(Type objType, TypeCacheItem typeCacheItem, byte[] preparedTypeInfo)
+        {
+            Type collectionType = objType.GetFirstTypeParamOfGenericInterface(typeof(ICollection<>));
+            if (collectionType == null && !objType.IsAssignableTo(typeof(ICollection))) return false;
+
+            if (collectionType != null)
+            {
+                if (collectionType == typeof(string)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<string>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(int)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<int>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(uint)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<uint>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(byte)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<byte>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(sbyte)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<sbyte>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(short)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<short>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(ushort)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<ushort>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(long)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<long>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(ulong)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<ulong>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(bool)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<bool>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(char)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<char>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(float)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<float>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(double)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<double>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(IntPtr)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<IntPtr>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+                else if (collectionType == typeof(UIntPtr)) typeCacheItem.itemHandler = CreateCollectionCacheItemHandler<UIntPtr>(objType, preparedTypeInfo, writer.WritePrimitiveValue);
+            }
+            else collectionType = typeof(object);
+
+            var collectionTypeCacheItem = GetTypeCacheItem(collectionType);
+
+            typeCacheItem.itemHandler = (obj, parentJob, writeTypeInfo) =>
+            {
+                if (obj == null)
+                {
+                    writer.WriteNullValue();
+                    return;
+                }
+
+                if (tryHandleAsRef(obj, parentJob, objType)) return;
+
+                if (obj is IList list)
+                {
+                    ListJob job = listJobPool.Take();
+                    job.collectionType = collectionType;
+                    job.currentIndex = 0;
+                    job.item = list;
+                    job.itemType = objType;
+                    job.collectionTypeCacheItem = collectionTypeCacheItem;
+                    job.writeTypeInfo = writeTypeInfo;
+                    job.parentJob = parentJob;
+                    job.itemName = parentJob == null ? writer.PrepareRootName() :
+                                parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                                parentJob is DictionaryJob dictionaryJob ? dictionaryJob.currentFieldName :
+                                writer.PrepareCollectionIndexName(parentJob);
+
+                    jobStack.Push(job);
+                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[list] = job;
+                }
+                else if (obj is IEnumerable enumerable)
+                {
+                    EnumarableJob job = enumerableJobPool.Take();
+                    job.collectionType = collectionType;
+                    job.currentIndex = 0;
+                    job.item = enumerable;
+                    job.itemType = objType;
+                    job.enumerator = enumerable.GetEnumerator();
+                    job.collectionTypeCacheItem = collectionTypeCacheItem;
+                    job.writeTypeInfo = writeTypeInfo;
+                    job.parentJob = parentJob;
+                    job.itemName = parentJob == null ? writer.PrepareRootName() :
+                                parentJob is ComplexJob complexParentJob ? complexParentJob.currentFieldName :
+                                parentJob is DictionaryJob dictionaryJob ? dictionaryJob.currentFieldName :
+                                writer.PrepareCollectionIndexName(parentJob);
+
+                    jobStack.Push(job);
+                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && objType.IsClass) objToJob[enumerable] = job;
+                }
+            };
+            
             bool collectionHandled = typeCacheItem.itemHandler != null;
             return collectionHandled;
 
@@ -720,10 +906,7 @@ namespace Playground
                 return CreateCollectionFieldWriter(objType, memberInfo, extendedFieldNameBytes, fieldNameBytes);
             }
 
-            if (!typeCache.TryGetValue(memberType, out var memberTypeCacheItem))
-            {
-                memberTypeCacheItem = CreateTypeCacheItem(memberType);
-            }            
+            var memberTypeCacheItem = GetTypeCacheItem(memberType);            
 
             return (parentJob) =>
             {
@@ -844,10 +1027,7 @@ namespace Playground
                 var lambda = Expression.Lambda<Func<object, IEnumerable>>(castFieldAccess, parameter);
                 var getValue = lambda.Compile();
 
-                if (!typeCache.TryGetValue(collectionType, out var collectionTypeCacheItem))
-                {
-                    collectionTypeCacheItem = CreateTypeCacheItem(collectionType);
-                }
+                var collectionTypeCacheItem = GetTypeCacheItem(collectionType);
 
                 return (parentJob) =>
                 {

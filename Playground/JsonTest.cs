@@ -13,6 +13,8 @@ using System.IO;
 using FeatureLoom.TCP;
 using Microsoft.VisualBasic.FileIO;
 using System.Text.Json.Serialization;
+using System.Collections;
+using System.Linq;
 
 namespace Playground
 {
@@ -47,7 +49,7 @@ namespace Playground
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
         public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
         
-        //public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
+        public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
         public object someObj = "Something";
         public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
@@ -59,8 +61,8 @@ namespace Playground
             //this.myEmbedded = myEmbedded;
             //this.self = this;
 
-            //myEmbeddedDict["1"] = new MyEmbedded1();
-            //myEmbeddedDict["2"] = new MyEmbedded1();
+            myEmbeddedDict["1"] = new MyEmbedded1();
+            myEmbeddedDict["2"] = new MyEmbedded1();
 
             //myObjects.Add(myEmbedded);
         }
@@ -118,6 +120,11 @@ namespace Playground
         public double double1 = 12.1231;
     }
 
+    public class TestDto3
+    {
+        public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+    }
+
 
 
     internal class JsonTest
@@ -158,13 +165,18 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+            var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = 1234.5678;
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = new object();
-            //var testDto = new Dictionary<string, string>() { ["1"] = "Hello", ["2"] = "Hello" };
+            //var testDto = new Dictionary<string, string>() { ["a"] = "Hello1", ["b"] = "Hello2" };
+            //var testDto = new Dictionary<int, MyEmbedded1>() { [1] = new MyEmbedded1(), [2] = null };
+            //var testDto = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+            //object testDto = 123;
+            //var testDto = new TestDto3();
 
             Type testDtoType = testDto.GetType();
             string json;
@@ -212,7 +224,6 @@ namespace Playground
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
                     JsonSerializer.Serialize(stream, testDto, opt);
                     //json = JsonSerializer.Serialize(testDto, opt);
-                    //var result1 = JsonSerializer.Deserialize<double>("-1234.567899");
                     stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;

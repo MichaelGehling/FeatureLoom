@@ -83,7 +83,13 @@ namespace Playground
                 WriteString(value.ToString());
                 stream.Write(QUOTES, 0, QUOTES.Length);
             }
-           
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public byte[] PreparePrimitiveToBytes<T>(T value)
+            {
+                return Encoding.UTF8.GetBytes(value.ToString());
+            }
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue(long value)
             {
@@ -97,6 +103,13 @@ namespace Playground
                 WriteSignedInteger(value);
                 stream.Write(QUOTES, 0, QUOTES.Length);
             }
+
+            /*
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public byte[] PreparePrimitiveToBytes(long value)
+            {
+                return SignedIntegerToBytes(value);
+            }*/
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue(ulong value)
@@ -311,6 +324,10 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteDot() => stream.Write(DOT, 0, DOT.Length);
 
+            static readonly byte[] COLON = ":".ToByteArray();
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteColon() => stream.Write(COLON, 0, COLON.Length);
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePreparedByteString(byte[] bytes) => stream.Write(bytes);
 
@@ -352,6 +369,21 @@ namespace Playground
                 return indexNameList[index];
             }
 
+            private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
+            private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
+            private static byte[][] InitNumberBytesLookup(bool negative, int size)
+            {
+                byte[][] lookup = new byte[size][];
+                int factor = negative ? -1 : 1;
+
+                for (int i = 0; i < size; i++)
+                {
+                    lookup[i] = Encoding.ASCII.GetBytes((i*factor).ToString());
+                }
+
+                return lookup;
+            }
+
             private static readonly byte[][] EscapeByteLookup = InitEscapeByteLookup();
             private static byte[][] InitEscapeByteLookup()
             {
@@ -385,6 +417,8 @@ namespace Playground
 
             private void WriteChar(char c)
             {
+                int bufferIndex = 0;
+
                 // Check if the character is in the EscapeByteLookup table
                 if (c < EscapeByteLookup.Length && EscapeByteLookup[c] != null)
                 {
@@ -398,20 +432,23 @@ namespace Playground
                 if (codepoint <= 0x7F)
                 {
                     // 1-byte sequence
-                    stream.WriteByte((byte)codepoint);
+                    buffer[bufferIndex++] = (byte)codepoint;
+                    stream.Write(buffer, 0, bufferIndex);
                 }
                 else if (codepoint <= 0x7FF)
                 {
                     // 2-byte sequence
-                    stream.WriteByte((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                    stream.WriteByte((byte)((codepoint & 0x3F) | 0x80));
+                    buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x1F) | 0xC0);
+                    buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                    stream.Write(buffer, 0, bufferIndex);
                 }
                 else if (!char.IsSurrogate(c))
                 {
                     // 3-byte sequence
-                    stream.WriteByte((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                    stream.WriteByte((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                    stream.WriteByte((byte)((codepoint & 0x3F) | 0x80));
+                    buffer[bufferIndex++] = (byte)(((codepoint >> 12) & 0x0F) | 0xE0);
+                    buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x3F) | 0x80);
+                    buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                    stream.Write(buffer, 0, bufferIndex);
                 }
                 else
                 {
@@ -563,16 +600,26 @@ namespace Playground
                 }
             }
 
+            byte[] ZERO = new byte[] { (byte)'0' };
             private void WriteSignedInteger(long value)
-            {
-                if (value == 0)
+            {                
+                bool isNegative = value < 0;
+                if (isNegative)
                 {
-                    stream.WriteByte((byte)'0');
+                    value = -value;
+                    if (value < NegativeNumberBytesLookup.Length)
+                    {
+                        var bytes = NegativeNumberBytesLookup[value];
+                        stream.Write(bytes, 0, bytes.Length);
+                        return;
+                    }
+                }
+                if (value < PositiveNumberBytesLookup.Length)
+                {
+                    var bytes = PositiveNumberBytesLookup[value];
+                    stream.Write(bytes, 0, bytes.Length);
                     return;
                 }
-
-                bool isNegative = value < 0;
-                if (isNegative) value = -value;                
 
                 const int maxDigits = 20;
                 int index = maxDigits;
@@ -587,16 +634,30 @@ namespace Playground
                 stream.Write(buffer, index+1, maxDigits - index);
             }
 
+           /* private byte[] SignedIntegerToBytes(long value)
+            {
+                if (value == 0) return ZERO;
+            }*/
+
             private void WriteSignedInteger(int value)
             {
-                if (value == 0)
+                bool isNegative = value < 0;
+                if (isNegative)
                 {
-                    stream.WriteByte((byte)'0');
+                    value = -value;
+                    if (value < NegativeNumberBytesLookup.Length)
+                    {
+                        var bytes = NegativeNumberBytesLookup[value];
+                        stream.Write(bytes, 0, bytes.Length);
+                        return;
+                    }
+                }
+                if (value < PositiveNumberBytesLookup.Length)
+                {
+                    var bytes = PositiveNumberBytesLookup[value];
+                    stream.Write(bytes, 0, bytes.Length);
                     return;
                 }
-
-                bool isNegative = value < 0;
-                if (isNegative) value = -value;
 
                 const int maxDigits = 20;
                 int index = maxDigits;
@@ -613,9 +674,10 @@ namespace Playground
 
             private void WriteUnsignedInteger(long value)
             {
-                if (value == 0)
+                if (value < PositiveNumberBytesLookup.Length)
                 {
-                    stream.WriteByte((byte)'0');
+                    var bytes = PositiveNumberBytesLookup[value];
+                    stream.Write(bytes, 0, bytes.Length);
                     return;
                 }
 
