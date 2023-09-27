@@ -31,6 +31,7 @@ namespace Playground
         delegate void ItemHandler<T>(T item, Type expectedType, StackJob parentJob);
 
         StackJobRecycler<DictionaryStackJob> dictionaryStackJobRecycler;
+        StackJobRecycler<ListStackJob> listStackJobRecycler;
         StackJobRecycler<RefJob> refJobRecycler;
 
         public FeatureJsonSerializer(Settings settings = null)
@@ -60,6 +61,7 @@ namespace Playground
         void InitStackJobRecyclers()
         {
             dictionaryStackJobRecycler = new(this);
+            listStackJobRecycler = new(this);
             refJobRecycler = new(this);
         }
 
@@ -72,6 +74,7 @@ namespace Playground
 
             dictionaryStackJobRecycler.RecyclePostponedJobs();    
             refJobRecycler.RecyclePostponedJobs();
+            listStackJobRecycler.RecyclePostponedJobs();
         }
 
         public string Serialize<T>(T item)
@@ -201,6 +204,7 @@ namespace Playground
             else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<DateTime>(writer.WritePrimitiveValue, preparedTypeInfo), true); //Make specialized
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(GetEnumItemHandler), preparedTypeInfo, true);
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
+            else if (TryCreateListItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
 
             //else throw new Exception($"No handler available for {itemType}");
             else typeHandler.SetItemHandler<object>((_, _, _) => writer.WritePrimitiveValue($"Unsupported Type {itemType.GetSimplifiedTypeName()}"), false);

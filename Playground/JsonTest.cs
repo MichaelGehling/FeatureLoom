@@ -169,7 +169,7 @@ namespace Playground
             //var testDto = new TestDto2();
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
-            var testDto = 1234.5678;
+            //var testDto = 1234.5678;
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = new object();
             //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
@@ -185,9 +185,10 @@ namespace Playground
                 [42] = new Dictionary<int, string>() { [3] = "Hello3", [4] = "Hello4" },
                 [99] = 99,
                 [111] = 123.123
-            };*/
-
-            //testDto[112] = testDto;
+            };
+            testDto[112] = testDto[42];
+            */
+            object testDto = new List<IDictionary<string, int>> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>() };
 
             Type testDtoType = testDto.GetType();
             string json; 
@@ -271,9 +272,9 @@ namespace Playground
                 Console.WriteLine($"JsonSerializer:  {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(1.Seconds());
 
-                Console.WriteLine($"JsonSerializerF/Text.Json:  {100 * elapsed_A/elapsed_B}%");
+                Console.WriteLine($"JsonSerializerF/Text.Json:  {(100.0/(elapsed_A/elapsed_B) - 100).ToString("F")}% faster");
 
-                /*
+               /*  
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
@@ -288,9 +289,9 @@ namespace Playground
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"LoopSerializer1: {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(2.Seconds());
+                AppTime.Wait(1.Seconds());
 
-                tk.Restart();
+               tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);

@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
-    {        
+    {
         class DictionaryStackJob : StackJob
         {
             internal Type itemType;
@@ -72,7 +72,7 @@ namespace Playground
             var itemHandler = genericCreateMethod.Invoke(this, new object[] { valueHandler, keyWriter, preparedTypeInfo });
 
             MethodInfo genericSetMethod = CachedTypeHandler.setItemHandlerMethodInfo.MakeGenericMethod(itemType);
-            genericSetMethod.Invoke(typeHandler, new object[] { itemHandler, valueHandler.IsPrimitive });
+            genericSetMethod.Invoke(typeHandler, new object[] { itemHandler, false });
 
             return true;
         }

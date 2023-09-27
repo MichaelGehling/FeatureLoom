@@ -358,9 +358,8 @@ namespace Playground
             }
 
             List<byte[]> indexNameList = new List<byte[]>();
-      /*      public byte[] PrepareCollectionIndexName(BaseJob parentJob)
-            {
-                int index = parentJob.currentIndex;
+            public byte[] PrepareCollectionIndexName(int index)
+            {                
                 for (int i = 0; i <= index; i++)
                 {
                     if (indexNameList.Count <= i) indexNameList.Add(null);
@@ -371,7 +370,7 @@ namespace Playground
                 }
                 return indexNameList[index];
             }
-      */
+
             private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
             private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
             private static byte[][] InitNumberBytesLookup(bool negative, int size)
