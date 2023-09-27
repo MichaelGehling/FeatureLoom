@@ -179,6 +179,8 @@ namespace FeatureLoom.Extensions
             }
 
         }
+
+        public static bool IsAsciiDigit(this char c) => c >= '0' && c <= '9';
  
     }
 }

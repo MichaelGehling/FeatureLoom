@@ -243,14 +243,16 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue(bool value)
             {
-                stream.Write(value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE);
+                var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
+                stream.Write(bytes, 0, bytes.Length);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(bool value)
             {
                 stream.Write(QUOTES, 0, QUOTES.Length);
-                stream.Write(value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE);
+                var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
+                stream.Write(bytes, 0, bytes.Length);
                 stream.Write(QUOTES, 0, QUOTES.Length);
             }
 
@@ -304,7 +306,7 @@ namespace Playground
                 {
                     if (first) first = false;
                     else if (job.itemName[0] != OPENCOLLECTION[0]) WriteDot();
-                    stream.Write(job.itemName);                    
+                    stream.Write(job.itemName, 0, job.itemName.Length);                    
                 }
                 stream.Write(REFOBJECT_POST, 0, REFOBJECT_POST.Length);
             }
@@ -330,7 +332,7 @@ namespace Playground
             public void WriteColon() => stream.Write(COLON, 0, COLON.Length);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePreparedByteString(byte[] bytes) => stream.Write(bytes);
+            public void WritePreparedByteString(byte[] bytes) => stream.Write(bytes, 0, bytes.Length);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public byte[] PrepareFieldNameBytes(string fieldname)
@@ -699,7 +701,7 @@ namespace Playground
             {
                 if (value == 0.0)
                 {
-                    stream.Write(ZERO_FLOAT);
+                    stream.Write(ZERO_FLOAT, 0, ZERO_FLOAT.Length);
                     return;
                 }
 

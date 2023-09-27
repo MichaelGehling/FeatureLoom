@@ -15,14 +15,12 @@ using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using System.Data;
 using Newtonsoft.Json.Linq;
-using System.Diagnostics.Metrics;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using System.Collections.Specialized;
 using System.Net.Http.Headers;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Collections;
-using System.Runtime.InteropServices.ObjectiveC;
 
 namespace Playground
 {
@@ -121,7 +119,7 @@ namespace Playground
 
             public override int GetHashCode()
             {
-                return HashCode.Combine(enumType, value);
+                return enumType.GetHashCode() * value;
             }
 
             public static implicit operator EnumKey((object enumValue, Type enumType) pair) => new EnumKey(pair.enumValue, pair.enumType);

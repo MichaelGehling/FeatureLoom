@@ -11,8 +11,8 @@ using FeatureLoom.Time;
 using System.Reflection.Metadata;
 using System.IO;
 using FeatureLoom.TCP;
-using Microsoft.VisualBasic.FileIO;
-using System.Text.Json.Serialization;
+//using Microsoft.VisualBasic.FileIO;
+//using System.Text.Json.Serialization;
 using System.Collections;
 using System.Linq;
 
@@ -188,7 +188,7 @@ namespace Playground
             };
             testDto[112] = testDto[42];
             */
-            object testDto = new List<IDictionary<string, int>> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>() };
+            object testDto = new List<Dictionary<string, int>> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>() };
 
             Type testDtoType = testDto.GetType();
             string json; 
@@ -273,7 +273,7 @@ namespace Playground
                 AppTime.Wait(1.Seconds());
 
                 Console.WriteLine($"JsonSerializerF/Text.Json:  {(100.0/(elapsed_A/elapsed_B) - 100).ToString("F")}% faster");
-
+     
                /*  
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)

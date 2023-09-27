@@ -189,7 +189,7 @@ namespace Playground
             bool isNegative = json[peekIndex] == '-';
             if (isNegative) peekIndex++;
 
-            if (!char.IsAsciiDigit(json[peekIndex])) return false;
+            if (!json[peekIndex].IsAsciiDigit()) return false;
 
             bool hasExponent = false;
             bool hasFractionalPart = false;
@@ -198,7 +198,7 @@ namespace Playground
             while (peekIndex < json.Length)
             {
                 char c = json[peekIndex++];
-                if (!char.IsAsciiDigit(c))
+                if (!c.IsAsciiDigit())
                 {
                     if (c == '.') hasFractionalPart = true;
                     else if (c == 'e' || c == 'E') hasExponent = true;
@@ -213,7 +213,7 @@ namespace Playground
                 while (peekIndex < json.Length)
                 {
                     char c = json[peekIndex++];
-                    if (!char.IsAsciiDigit(c))
+                    if (!c.IsAsciiDigit())
                     {
                         if (c == 'e' || c == 'E') hasExponent = true;
                         break;
@@ -227,13 +227,13 @@ namespace Playground
                 bool negativeExponent = json[peekIndex] == '-';
                 if (negativeExponent) peekIndex++;
 
-                if (!char.IsAsciiDigit(json[peekIndex])) return false;
+                if (!json[peekIndex].IsAsciiDigit()) return false;
 
                 int exponent = 0;
                 while (peekIndex < json.Length)
                 {
                     char c = json[peekIndex++];
-                    if (!char.IsAsciiDigit(c)) break;
+                    if (!c.IsAsciiDigit()) break;
                     exponent *= 10;
                     exponent += c - '0';
                 }
@@ -270,7 +270,7 @@ namespace Playground
             bool isNegative = json[peekIndex] == '-';
             if (isNegative) peekIndex++;
 
-            if (!char.IsAsciiDigit(json[peekIndex])) return false;
+            if (!json[peekIndex].IsAsciiDigit()) return false;
 
             bool hasExponent = false;
             bool hasFractionalPart = false;
@@ -278,7 +278,7 @@ namespace Playground
             while (peekIndex < json.Length)
             {
                 char c = json[peekIndex++];
-                if (!char.IsAsciiDigit(c))
+                if (!c.IsAsciiDigit())
                 {
                     if (c == '.') hasFractionalPart = true;
                     else if (c == 'e' || c == 'E') hasExponent = true;
@@ -295,7 +295,7 @@ namespace Playground
                 while (peekIndex < json.Length)
                 {
                     char c = json[peekIndex++];
-                    if (!char.IsAsciiDigit(c))
+                    if (!c.IsAsciiDigit())
                     {
                         if (c == 'e' || c == 'E') hasExponent = true;
                         break;
@@ -313,13 +313,13 @@ namespace Playground
                 bool negativeExponent = json[peekIndex] == '-';
                 if (negativeExponent) peekIndex++;
 
-                if (!char.IsAsciiDigit(json[peekIndex])) return false;
+                if (!json[peekIndex].IsAsciiDigit()) return false;
 
                 int exponent = 0;
                 while (peekIndex < json.Length)
                 {
                     char c = json[peekIndex++];
-                    if (!char.IsAsciiDigit(c)) break;
+                    if (!c.IsAsciiDigit()) break;
                     exponent *= 10;
                     exponent += c - '0';
                 }

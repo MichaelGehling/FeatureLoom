@@ -42,7 +42,7 @@ namespace Playground
 
                         char guessedChar = Char.ToLower(Console.ReadKey().KeyChar);
                         guessedChars.Add(guessedChar);
-                        if (!c.theWord.ToLower().Contains(guessedChar)) c.counter++;
+                        if (!c.theWord.ToLower().Contains(guessedChar.ToString())) c.counter++;
 
                         bool done = true;
                         for (int i = 0; i < c.theWord.Length; i++)
