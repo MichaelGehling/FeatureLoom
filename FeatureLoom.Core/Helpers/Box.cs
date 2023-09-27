@@ -1,6 +1,18 @@
-﻿namespace FeatureLoom.Helpers
+﻿using System;
+using System.Data;
+
+namespace FeatureLoom.Helpers
 {
-    public class Box<T> where T : struct
+
+    public interface IBox
+    {
+        void Clear();
+
+        T GetValue<T>();
+        void SetValue<T>(T value);
+    }
+
+    public class Box<T> : IBox
     {
         public T value;
 
@@ -11,7 +23,9 @@
         public Box(T value)
         {
             this.value = value;
-        }
+        }        
+
+        public void Clear() => value = default;
         
         public static implicit operator Box<T>(T value) => new Box<T>(value);
 
@@ -33,6 +47,18 @@
         public override string ToString()
         {
             return value.ToString();
+        }
+
+        public T1 GetValue<T1>()
+        {
+            if (value is T1 castedValue) return castedValue;
+            throw new Exception($"Wrong type! Box has a value of type {typeof(T)}, while requested was a {typeof(T1)}");
+        }
+
+        public void SetValue<T1>(T1 value)
+        {
+            if (value is T castedValue) this.value = castedValue;
+            throw new Exception($"Wrong type! Box has a value of type {typeof(T)}, while set was a {typeof(T1)}");
         }
     }
 }

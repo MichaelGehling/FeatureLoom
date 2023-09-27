@@ -35,7 +35,7 @@ namespace FeatureLoom.Helpers
 
                 lockHandle.UpgradeToWriteMode();
 
-                return LockedGetSimplifieedTypeName(type);
+                return LockedGetSimplifiedTypeName(type);
             }
         }
 
@@ -51,17 +51,17 @@ namespace FeatureLoom.Helpers
             }
         }
 
-        private static string LockedGetSimplifieedTypeName(Type type)
+        private static string LockedGetSimplifiedTypeName(Type type)
         {
             string typeName;
             if (type.IsArray)
             {
-                typeName = LockedGetSimplifieedTypeName(type.GetElementType()) + "[]";
+                typeName = LockedGetSimplifiedTypeName(type.GetElementType()) + "[]";
             }
             else if (type.IsGenericType)
             {
                 var name = type.FullName.Substring(0, type.FullName.IndexOf('`'));
-                var args = type.GetGenericArguments().Select(LockedGetSimplifieedTypeName);
+                var args = type.GetGenericArguments().Select(LockedGetSimplifiedTypeName);
 
                 typeName = name + "<" + string.Join(", ", args) + ">";
             }

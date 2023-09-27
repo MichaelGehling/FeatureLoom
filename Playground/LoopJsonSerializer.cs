@@ -540,7 +540,7 @@ namespace Playground
                     if (tryHandleAsRef(obj, parentJob, objType)) return;
                     writer.OpenObject();
                     if (writeTypeInfo) writer.WritePreparedByteString(preparedTypeInfo);
-                    writer.CloseCollection();
+                    writer.CloseObject();
                 };
             }
             return typeCacheItem;

@@ -168,18 +168,29 @@ namespace Playground
             //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
-            var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
-            //var testDto = 1234.5678;
+            //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+            var testDto = 1234.5678;
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = new object();
-            //var testDto = new Dictionary<string, string>() { ["a"] = "Hello1", ["b"] = "Hello2" };
+            //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
             //var testDto = new Dictionary<int, MyEmbedded1>() { [1] = new MyEmbedded1(), [2] = null };
             //var testDto = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
             //object testDto = 123;
             //var testDto = new TestDto3();
+            //var testDto = AppTime.Now;
+            //var testDto = TestEnum.TestB;
+            /*var testDto = new Dictionary<int, object>() 
+            { 
+                [12] = new Dictionary<string, int>() { ["a"] = 123, ["b"] = 42 },
+                [42] = new Dictionary<int, string>() { [3] = "Hello3", [4] = "Hello4" },
+                [99] = 99,
+                [111] = 123.123
+            };*/
+
+            //testDto[112] = testDto;
 
             Type testDtoType = testDto.GetType();
-            string json;
+            string json; 
             //byte[] json;
 
             //Stream stream = new NullStream();
@@ -190,7 +201,7 @@ namespace Playground
                 typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
                 referenceCheck = LoopJsonSerializer.ReferenceCheck.NoRefCheck,
-                enumAsString = false,
+                enumAsString = true,
             });
 
             LoopJsonSerializer loopSerializer2 = new(new LoopJsonSerializer.Settings()
@@ -209,6 +220,14 @@ namespace Playground
                 enumAsString = false
             });
 
+            FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+            {
+                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+                enumAsString = false,
+            });            
+
             TimeSpan elapsed;
             long beforeCollection;
             long afterCollection;
@@ -222,18 +241,39 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
+                    featureJsonSerializer.Serialize(stream, testDto);
+                    //json = featureJsonSerializer.Serialize(testDto);
+                    stream.Position = 0;
+                }
+                elapsed = tk.Elapsed;
+                var elapsed_A = elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"FJsonSerializer: {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(1.Seconds());
+
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
                     JsonSerializer.Serialize(stream, testDto, opt);
                     //json = JsonSerializer.Serialize(testDto, opt);
                     stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
+                var elapsed_B = elapsed;
                 beforeCollection = GC.GetTotalMemory(false);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"JsonSerializer:  {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(2.Seconds());
+                AppTime.Wait(1.Seconds());
 
+                Console.WriteLine($"JsonSerializerF/Text.Json:  {100 * elapsed_A/elapsed_B}%");
+
+                /*
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
@@ -281,7 +321,7 @@ namespace Playground
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"LoopSerializer3: {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(2.Seconds());
-
+                */
             }
 
             //var result = JsonSerializer.Deserialize<TestDto>(json);

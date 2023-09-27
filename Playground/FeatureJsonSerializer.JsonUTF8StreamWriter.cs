@@ -11,17 +11,15 @@ using System.Reflection;
 
 namespace Playground
 {
-    public sealed partial class LoopJsonSerializer
+    public sealed partial class FeatureJsonSerializer
     {
         private sealed class JsonUTF8StreamWriter
         {
             public Stream stream;
-            private Encoder encoder;
             private static byte[] buffer;
 
             public JsonUTF8StreamWriter()
             {
-                this.encoder = Encoding.UTF8.GetEncoder();
                 buffer = new byte[1024];
             }
 
@@ -289,8 +287,8 @@ namespace Playground
 
             static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();
             static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();            
-            Stack<BaseJob> reverseJobStack = new Stack<BaseJob>();
-            public void WriteRefObject(BaseJob job)
+            Stack<StackJob> reverseJobStack = new Stack<StackJob>();
+            public void WriteRefObject(StackJob job)
             {
                 while (job != null)
                 {
@@ -299,16 +297,20 @@ namespace Playground
                 }
 
                 stream.Write(REFOBJECT_PRE, 0, REFOBJECT_PRE.Length);
-                bool first = true;
-                while(reverseJobStack.TryPop(out job))
+
+                if (reverseJobStack.TryPop(out job))
                 {
-                    if (first) first = false;
-                    else if (job.itemName[0] != OPENCOLLECTION[0]) WriteDot();
+                    stream.Write(job.itemName);
+                }
+
+                while (reverseJobStack.TryPop(out job))
+                {
+                    if (job.itemName[0] != OPENCOLLECTION[0]) WriteDot();
                     stream.Write(job.itemName);                    
                 }
                 stream.Write(REFOBJECT_POST, 0, REFOBJECT_POST.Length);
             }
-
+        
             static readonly byte[] OPENCOLLECTION = "[".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void OpenCollection() => stream.Write(OPENCOLLECTION, 0, OPENCOLLECTION.Length);
@@ -356,7 +358,7 @@ namespace Playground
             }
 
             List<byte[]> indexNameList = new List<byte[]>();
-            public byte[] PrepareCollectionIndexName(BaseJob parentJob)
+      /*      public byte[] PrepareCollectionIndexName(BaseJob parentJob)
             {
                 int index = parentJob.currentIndex;
                 for (int i = 0; i <= index; i++)
@@ -369,7 +371,7 @@ namespace Playground
                 }
                 return indexNameList[index];
             }
-
+      */
             private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
             private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
             private static byte[][] InitNumberBytesLookup(bool negative, int size)

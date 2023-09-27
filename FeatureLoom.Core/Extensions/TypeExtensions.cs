@@ -128,5 +128,10 @@ namespace FeatureLoom.Extensions
             }
         }
 
+        public static bool IsAssignableTo(this Type fromType, Type toType)
+        {
+            return toType.IsAssignableFrom(fromType);
+        }
+
     }
 }
