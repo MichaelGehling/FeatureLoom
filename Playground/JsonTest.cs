@@ -188,7 +188,7 @@ namespace Playground
             };
             testDto[112] = testDto[42];
             */
-            var testDto = new List<object> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>() };
+            var testDto = new List<object> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
             testDto.Add(testDto[0]);
 
             Type testDtoType = testDto.GetType();
@@ -226,7 +226,7 @@ namespace Playground
             {
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
                 enumAsString = false,
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
