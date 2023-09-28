@@ -60,7 +60,7 @@ namespace Playground
             }
         }
 
-        private bool TryCreateDictionaryItemHandler(CachedTypeHandler typeHandler, Type itemType, byte[] preparedTypeInfo)
+        private bool TryCreateDictionaryItemHandler(CachedTypeHandler typeHandler, Type itemType)
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type keyType, out Type valueType)) return false;
             if (!TryGetCachedStringValueWriter(keyType, out CachedStringValueWriter keyWriter)) return false;
@@ -69,17 +69,14 @@ namespace Playground
             string methodName = itemType.IsOfGenericType(typeof(Dictionary<,>)) ? nameof(CreateDictionaryItemHandler) : nameof(CreateIDictionaryItemHandler);
             MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
             MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, keyType, valueType);
-            var itemHandler = genericCreateMethod.Invoke(this, new object[] { valueHandler, keyWriter, preparedTypeInfo });
-
-            MethodInfo genericSetMethod = CachedTypeHandler.setItemHandlerMethodInfo.MakeGenericMethod(itemType);
-            genericSetMethod.Invoke(typeHandler, new object[] { itemHandler, false });
+            genericCreateMethod.Invoke(this, new object[] { typeHandler, valueHandler, keyWriter });
 
             return true;
         }
 
 
         /// The code of this method must be the same as for CreateIDictionaryItemHandler. It was duplicated to avoid boxing of the Dictionary enumerator.
-        private ItemHandler<T> CreateDictionaryItemHandler<T, K, V>(CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter, byte[] preparedTypeInfo) where T : Dictionary<K, V>
+        private void CreateDictionaryItemHandler<T, K, V>(CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter) where T : Dictionary<K, V>
         {
             bool requiresItemNames = settings.RequiresItemNames;
 
@@ -96,7 +93,7 @@ namespace Playground
                     if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                     {
-                        writer.WritePreparedByteString(preparedTypeInfo);
+                        writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                         writer.WriteComma();
                     }
 
@@ -119,7 +116,7 @@ namespace Playground
 
                     writer.CloseObject();
                 };
-                return itemHandler;
+                typeHandler.SetItemHandler(itemHandler, false);
             }
             else
             {
@@ -136,7 +133,7 @@ namespace Playground
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                             (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != job.dictType))
                         {
-                            writer.WritePreparedByteString(preparedTypeInfo);
+                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                             writer.WriteComma();
                         }
 
@@ -176,7 +173,7 @@ namespace Playground
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                             (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                         {
-                            writer.WritePreparedByteString(preparedTypeInfo);
+                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                         }
                         writer.CloseObject();
                         return;
@@ -186,7 +183,7 @@ namespace Playground
                     job.SetEnumerator(dict.GetEnumerator());                    
                     AddJobToStack(job);
                 };
-                return itemHandler;
+                typeHandler.SetItemHandler(itemHandler, false);
             }
 
             void WriteKeyAndValue(CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter, DictionaryStackJob job, KeyValuePair<K, V> pair)
@@ -210,7 +207,7 @@ namespace Playground
             }
         }
 
-        private ItemHandler<T> CreateIDictionaryItemHandler<T, K, V>(CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter, byte[] preparedTypeInfo) where T : IDictionary<K, V>
+        private void CreateIDictionaryItemHandler<T, K, V>(CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter) where T : IDictionary<K, V>
         {
             bool requiresItemNames = settings.RequiresItemNames;
 
@@ -227,7 +224,7 @@ namespace Playground
                     if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                     {
-                        writer.WritePreparedByteString(preparedTypeInfo);
+                        writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                         writer.WriteComma();
                     }
 
@@ -250,7 +247,7 @@ namespace Playground
 
                     writer.CloseObject();
                 };
-                return itemHandler;
+                typeHandler.SetItemHandler(itemHandler, false);
             }
             else
             {
@@ -267,7 +264,7 @@ namespace Playground
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                             (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != job.dictType))
                         {
-                            writer.WritePreparedByteString(preparedTypeInfo);
+                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                             writer.WriteComma();
                         }
 
@@ -307,7 +304,7 @@ namespace Playground
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                             (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                         {
-                            writer.WritePreparedByteString(preparedTypeInfo);
+                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                         }
                         writer.CloseObject();
                         return;
@@ -317,7 +314,7 @@ namespace Playground
                     job.SetEnumerator(dict.GetEnumerator());
                     AddJobToStack(job);
                 };
-                return itemHandler;
+                typeHandler.SetItemHandler(itemHandler, false);
             }
 
             void WriteKeyAndValue(CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter, DictionaryStackJob job, KeyValuePair<K, V> pair)

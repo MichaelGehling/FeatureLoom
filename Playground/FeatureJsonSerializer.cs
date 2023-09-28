@@ -184,27 +184,27 @@ namespace Playground
             CachedTypeHandler typeHandler = new CachedTypeHandler();
             typeHandlerCache[itemType] = typeHandler;
 
-            byte[] preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
+            typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
 
-            if (itemType == typeof(int)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<int>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(uint)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<uint>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(long)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<long>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(ulong)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<ulong>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(short)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<short>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(ushort)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<ushort>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(sbyte)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<sbyte>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(byte)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<byte>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(string)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<string>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(float)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<float>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(double)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<double>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(char)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<char>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(IntPtr)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<IntPtr>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<UIntPtr>(writer.WritePrimitiveValue, preparedTypeInfo), true);
-            else if (itemType == typeof(Guid)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<Guid>(writer.WritePrimitiveValue, preparedTypeInfo), true); //Make specialized
-            else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler(GetPrimitiveItemHandler<DateTime>(writer.WritePrimitiveValue, preparedTypeInfo), true); //Make specialized
-            else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(GetEnumItemHandler), preparedTypeInfo, true);
-            else if (TryCreateDictionaryItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
-            else if (TryCreateListItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
+            if (itemType == typeof(int)) CreatePrimitiveItemHandler<int>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(uint)) CreatePrimitiveItemHandler<uint>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(long)) CreatePrimitiveItemHandler<long>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(ulong)) CreatePrimitiveItemHandler<ulong>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(short)) CreatePrimitiveItemHandler<short>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(ushort)) CreatePrimitiveItemHandler<ushort>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(sbyte)) CreatePrimitiveItemHandler<sbyte>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(byte)) CreatePrimitiveItemHandler<byte>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(string)) CreatePrimitiveItemHandler<string>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(float)) CreatePrimitiveItemHandler<float>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(double)) CreatePrimitiveItemHandler<double>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(char)) CreatePrimitiveItemHandler<char>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(IntPtr)) CreatePrimitiveItemHandler<IntPtr>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(UIntPtr)) CreatePrimitiveItemHandler<UIntPtr>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(Guid)) CreatePrimitiveItemHandler<Guid>(typeHandler, writer.WritePrimitiveValue); //Make specialized
+            else if (itemType == typeof(DateTime)) CreatePrimitiveItemHandler<DateTime>(typeHandler, writer.WritePrimitiveValue); //Make specialized
+            else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
+            else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
+            else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
             //else if (TryCreateEnumerableItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
 
             //else throw new Exception($"No handler available for {itemType}");
@@ -212,35 +212,32 @@ namespace Playground
             
             return typeHandler;
 
-            void CreateAndSetItemHandlerViaReflection(CachedTypeHandler typeHandler, Type itemType, string getItemHandlerMethodName, byte[] preparedTypeInfo, bool isPrimitive)
+            void CreateAndSetItemHandlerViaReflection(CachedTypeHandler typeHandler, Type itemType, string getItemHandlerMethodName, bool isPrimitive)
             {
                 MethodInfo method = typeof(FeatureJsonSerializer).GetMethod(getItemHandlerMethodName, BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo generic = method.MakeGenericMethod(itemType);
-                var itemHandler = generic.Invoke(this, new object[] { preparedTypeInfo });
-
-                MethodInfo genericSetMethod = CachedTypeHandler.setItemHandlerMethodInfo.MakeGenericMethod(itemType);
-                genericSetMethod.Invoke(typeHandler, new object[] { itemHandler, isPrimitive });
+                generic.Invoke(this, new object[] { typeHandler });
             }
         }
 
-        private ItemHandler<T> GetPrimitiveItemHandler<T>(Action<T> write, byte[] preparedTypeInfo)
+        private void CreatePrimitiveItemHandler<T>(CachedTypeHandler typeHandler, Action<T> write)
         {
             if (settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
             {
-                return (item, _, _) => write(item);
+                typeHandler.SetItemHandler<T>((item, _, _) => write(item), true);
             }
             else if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
-                return (item, _, _) =>
+                typeHandler.SetItemHandler<T>((item, _, _) =>
                 {
-                    PrepareTypeInfoObject(preparedTypeInfo);
+                    PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
                     write(item);
                     FinishTypeInfoObject();
-                };
+                }, true);
             }
             else
             {
-                return (item, expectedType, _) =>
+                typeHandler.SetItemHandler<T>((item, expectedType, _) =>
                 {
                     if (expectedType == item.GetType())
                     {                        
@@ -248,23 +245,23 @@ namespace Playground
                     }
                     else
                     {
-                        PrepareTypeInfoObject(preparedTypeInfo);
+                        PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
                         write(item);
                         FinishTypeInfoObject();
                     }
-                };
+                }, true);
             }
         }
 
-        private ItemHandler<T> GetEnumItemHandler<T>(byte[] preparedTypeInfo) where T : struct, Enum
+        private void CreateEnumItemHandler<T>(CachedTypeHandler typeHandler) where T : struct, Enum
         {
             if (settings.enumAsString)
             {                
-                return GetPrimitiveItemHandler<T>(item => writer.WritePrimitiveValue(item.ToName()), preparedTypeInfo);
+                CreatePrimitiveItemHandler<T>(typeHandler, item => writer.WritePrimitiveValue(item.ToName()));
             }
             else
             {
-                return GetPrimitiveItemHandler<T>(item => writer.WritePrimitiveValue(item.ToInt()), preparedTypeInfo);
+                CreatePrimitiveItemHandler<T>(typeHandler, item => writer.WritePrimitiveValue(item.ToInt()));
             }
         }
 

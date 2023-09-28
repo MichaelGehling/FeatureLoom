@@ -13,6 +13,7 @@ namespace Playground
             private ItemHandler<object> objectItemHandler;
             private Type handlerType;
             private bool isPrimitive;
+            public byte[] preparedTypeInfo;
             public bool IsPrimitive => isPrimitive;
 
             public Type HandlerType => handlerType;

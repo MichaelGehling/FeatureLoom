@@ -51,7 +51,7 @@ namespace Playground
             }
         }
 
-        private bool TryCreateListItemHandler(CachedTypeHandler typeHandler, Type itemType, byte[] preparedTypeInfo)
+        private bool TryCreateListItemHandler(CachedTypeHandler typeHandler, Type itemType)
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IList<>), out Type elementType)) return false;
             CachedTypeHandler elementHandler = GetCachedTypeHandler(elementType);
@@ -59,15 +59,12 @@ namespace Playground
             string methodName = nameof(CreateIListItemHandler);
             MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
             MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, elementType);
-            var itemHandler = genericCreateMethod.Invoke(this, new object[] { elementHandler, preparedTypeInfo });
-
-            MethodInfo genericSetMethod = CachedTypeHandler.setItemHandlerMethodInfo.MakeGenericMethod(itemType);
-            genericSetMethod.Invoke(typeHandler, new object[] { itemHandler, false });
+            genericCreateMethod.Invoke(this, new object[] { typeHandler, elementHandler });
 
             return true;
         }
 
-        private ItemHandler<T> CreateIListItemHandler<T, E>(CachedTypeHandler elementHandler, byte[] preparedTypeInfo) where T : IList<E>
+        private void CreateIListItemHandler<T, E>(CachedTypeHandler typeHandler, CachedTypeHandler elementHandler) where T : IList<E>
         {
             bool requiresItemNames = settings.RequiresItemNames;
             if (elementHandler.IsPrimitive)
@@ -79,7 +76,7 @@ namespace Playground
 
                     bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && listType != expectedType);
-                    if (writeTypeInfo) PrepareTypeInfoObject(preparedTypeInfo);
+                    if (writeTypeInfo) PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
                     writer.OpenCollection();
                     int currentIndex = 0;
                     if (currentIndex < list.Count)
@@ -96,7 +93,7 @@ namespace Playground
                     writer.CloseCollection();
                     if (writeTypeInfo) FinishTypeInfoObject();
                 };
-                return itemHandler;
+                typeHandler.SetItemHandler(itemHandler, false);
             }
             else
             {
@@ -108,7 +105,7 @@ namespace Playground
                     
                     if (job.currentIndex == 0)
                     {
-                        if (job.writeTypeInfo) PrepareTypeInfoObject(preparedTypeInfo);
+                        if (job.writeTypeInfo) PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
 
                         writer.OpenCollection();
 
@@ -152,7 +149,7 @@ namespace Playground
 
                     if (list.Count == 0)
                     {                        
-                        if (writeTypeInfo) PrepareTypeInfoObject(preparedTypeInfo);
+                        if (writeTypeInfo) PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
                         writer.OpenCollection();
                         writer.CloseCollection();
                         if (writeTypeInfo) FinishTypeInfoObject();
@@ -162,7 +159,7 @@ namespace Playground
                     job.Init(this, processor, list, writeTypeInfo);
                     AddJobToStack(job);
                 };
-                return itemHandler;
+                typeHandler.SetItemHandler(itemHandler, false);
             }
         }
     }
