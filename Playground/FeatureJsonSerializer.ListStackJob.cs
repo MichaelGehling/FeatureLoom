@@ -38,6 +38,7 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public override void Reset()
             {
+                processor = null;
                 currentIndex = 0;
                 listType = null;
                 base.Reset();
@@ -49,6 +50,7 @@ namespace Playground
                 return serializer.writer.PrepareCollectionIndexName(currentIndex);
             }
         }
+
         private bool TryCreateListItemHandler(CachedTypeHandler typeHandler, Type itemType, byte[] preparedTypeInfo)
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IList<>), out Type elementType)) return false;
@@ -68,7 +70,7 @@ namespace Playground
         private ItemHandler<T> CreateIListItemHandler<T, E>(CachedTypeHandler elementHandler, byte[] preparedTypeInfo) where T : IList<E>
         {
             bool requiresItemNames = settings.RequiresItemNames;
-            if (elementHandler.IsPrimitive && settings.AllowSkipStack)
+            if (elementHandler.IsPrimitive)
             {
                 ItemHandler<T> itemHandler = (list, expectedType, parentJob) =>
                 {
@@ -112,18 +114,20 @@ namespace Playground
 
                         E element = list[job.currentIndex];                        
                         if (element == null) writer.WriteNullValue();
-                        else if (element.GetType() == typeof(E)) elementHandler.HandleItem(element, typeof(E), job.parentJob);
-                        else GetCachedTypeHandler(element.GetType()).HandleItem(element, typeof(E), job.parentJob);                        
+                        else if (element.GetType() == typeof(E)) elementHandler.HandleItem(element, typeof(E), job);
+                        else GetCachedTypeHandler(element.GetType()).HandleItem(element, typeof(E), job);
+                        job.currentIndex++;
                         if (jobStack.Count != beforeStackSize) return false;
                     }
 
-                    while (++job.currentIndex < list.Count)
+                    while (job.currentIndex < list.Count)
                     {
                         writer.WriteComma();
                         E element = list[job.currentIndex];
                         if (element == null) writer.WriteNullValue();
-                        else if (element.GetType() == typeof(E)) elementHandler.HandleItem(element, typeof(E), job.parentJob);
-                        else GetCachedTypeHandler(element.GetType()).HandleItem(element, typeof(E), job.parentJob);
+                        else if (element.GetType() == typeof(E)) elementHandler.HandleItem(element, typeof(E), job);
+                        else GetCachedTypeHandler(element.GetType()).HandleItem(element, typeof(E), job);
+                        job.currentIndex++;
                         if (jobStack.Count != beforeStackSize) return false;
                     }
 
@@ -156,8 +160,7 @@ namespace Playground
                     }
                     var job = listStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, list);
                     job.Init(this, processor, list, writeTypeInfo);
-                    if (settings.AllowSkipStack && job.Process()) job.Recycle();
-                    else AddJobToStack(job);
+                    AddJobToStack(job);
                 };
                 return itemHandler;
             }

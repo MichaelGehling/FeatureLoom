@@ -205,6 +205,7 @@ namespace Playground
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(GetEnumItemHandler), preparedTypeInfo, true);
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
+            //else if (TryCreateEnumerableItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
 
             //else throw new Exception($"No handler available for {itemType}");
             else typeHandler.SetItemHandler<object>((_, _, _) => writer.WritePrimitiveValue($"Unsupported Type {itemType.GetSimplifiedTypeName()}"), false);
@@ -295,7 +296,7 @@ namespace Playground
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryHandleItemAsRef<T>(T item, StackJob parentJob, Type itemType)
         {
-            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || item == null || !itemType.IsClass || parentJob == null) return false;
+            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || item == null || !itemType.IsClass) return false;
             return TryHandleObjAsRef(item, parentJob, itemType);
         }
 
@@ -304,50 +305,29 @@ namespace Playground
         {
             if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
             {
-                if (objToJob.TryGetValue(obj, out RefJob refJob))
+                RefJob newRefJob = refJobRecycler.GetJob(parentJob, parentJob?.GetCurrentChildItemName() ?? writer.PrepareRootName(), obj);
+                newRefJob.Recycle(); // Actual recycling will be postponed based on ReferenceCheck.AlwaysReplaceByRef setting.
+                if (!objToJob.TryAdd(obj, newRefJob))
                 {
-                    writer.WriteRefObject(refJob);
+                    writer.WriteRefObject(objToJob[obj]);
                     return true;
                 }
-                else
-                {
-                    RefJob newRefJob = refJobRecycler.GetJob(parentJob, parentJob.GetCurrentChildItemName(), obj);
-                    newRefJob.Recycle(); // Actual recycling will be postponed based on ReferenceCheck.AlwaysReplaceByRef setting.
-                    objToJob[obj] = newRefJob;
-                }
             }
-            else if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef)
+            else
             {
-                foreach (var refJob in jobStack)
+                while(parentJob != null)
                 {
-                    if (refJob.objItem == obj)
+                    if (parentJob.objItem == obj)
                     {
-                        writer.WriteRefObject(refJob);
+                        if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef) writer.WriteRefObject(parentJob);
+                        else if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByNull) writer.WriteNullValue();
+                        else if (settings.referenceCheck == ReferenceCheck.OnLoopThrowException) throw new Exception("Circular referencing detected!");
                         return true;
                     }
+                    parentJob = parentJob.parentJob;
                 }
             }
-            else if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByNull)
-            {
-                foreach (var refJob in jobStack)
-                {
-                    if (refJob.objItem == obj)
-                    {
-                        writer.WriteNullValue();
-                        return true;
-                    }
-                }
-            }
-            else if (settings.referenceCheck == ReferenceCheck.OnLoopThrowException)
-            {
-                foreach (var refJob in jobStack)
-                {
-                    if (refJob.objItem == obj)
-                    {
-                        throw new Exception("Circular referencing detected!"); ;
-                    }
-                }
-            }
+
             return false;
         }
 

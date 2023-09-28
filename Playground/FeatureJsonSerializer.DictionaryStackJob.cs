@@ -11,7 +11,7 @@ namespace Playground
     {
         class DictionaryStackJob : StackJob
         {
-            internal Type itemType;
+            internal Type dictType;
             internal bool firstElement = true;
             internal byte[] currentFieldName;
             Func<DictionaryStackJob, bool> processor;
@@ -31,10 +31,10 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Init(Func<DictionaryStackJob, bool> processor, Type itemType)
+            public void Init(Func<DictionaryStackJob, bool> processor, Type dictType)
             {
                 this.processor = processor;
-                this.itemType = itemType;
+                this.dictType = dictType;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -49,7 +49,7 @@ namespace Playground
                 firstElement = true;
                 enumeratorBox.Clear();
                 processor = null;
-                itemType = null;
+                dictType = null;
                 base.Reset();
             }
 
@@ -83,18 +83,18 @@ namespace Playground
         {
             bool requiresItemNames = settings.RequiresItemNames;
 
-            if (valueHandler.IsPrimitive && settings.AllowSkipStack)
+            if (valueHandler.IsPrimitive)
             {
-                ItemHandler<T> itemHandler = (item, expectedType, parentJob) =>
+                ItemHandler<T> itemHandler = (dict, expectedType, parentJob) =>
                 {
-                    Type itemType = item.GetType();
-                    if (TryHandleItemAsRef(item, parentJob, itemType)) return;
+                    Type dictType = dict.GetType();
+                    if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
 
                     writer.OpenObject();
-                    var enumerator = item.GetEnumerator();
+                    var enumerator = dict.GetEnumerator();
 
                     if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != itemType))
+                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                     {
                         writer.WritePreparedByteString(preparedTypeInfo);
                         writer.WriteComma();
@@ -134,7 +134,7 @@ namespace Playground
                         writer.OpenObject();
 
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != job.itemType))
+                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != job.dictType))
                         {
                             writer.WritePreparedByteString(preparedTypeInfo);
                             writer.WriteComma();
@@ -159,33 +159,32 @@ namespace Playground
                     return true;
                 };
 
-                ItemHandler<T> itemHandler = (item, expectedType, parentJob) =>
+                ItemHandler<T> itemHandler = (dict, expectedType, parentJob) =>
                 {
-                    if (item == null)
+                    if (dict == null)
                     {
                         writer.WriteNullValue();
                         return;
                     }
 
-                    Type itemType = item.GetType();
-                    if (TryHandleItemAsRef(item, parentJob, itemType)) return;
+                    Type dictType = dict.GetType();
+                    if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
 
-                    if (item.Count == 0)
+                    if (dict.Count == 0)
                     {                        
                         writer.OpenObject();
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != itemType))
+                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                         {
                             writer.WritePreparedByteString(preparedTypeInfo);
                         }
                         writer.CloseObject();
                         return;
                     }
-                    var job = dictionaryStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, item);
-                    job.Init(processor, item.GetType());
-                    job.SetEnumerator(item.GetEnumerator());                    
-                    if (settings.AllowSkipStack && job.Process()) job.Recycle();
-                    else AddJobToStack(job);
+                    var job = dictionaryStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, dict);
+                    job.Init(processor, dict.GetType());
+                    job.SetEnumerator(dict.GetEnumerator());                    
+                    AddJobToStack(job);
                 };
                 return itemHandler;
             }
@@ -205,7 +204,7 @@ namespace Playground
                     Type valueType = value.GetType();
                     CachedTypeHandler actualHandler = valueHandler;
                     if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                    if (requiresItemNames) job.currentFieldName = writer.PrepareStringToBytes(pair.Key.ToString()); //TODO: Optimize
+                    if (requiresItemNames) job.currentFieldName = writer.PrepareStringToBytes(pair.Key.ToString()); //TODO: Optimize with caching ?
                     actualHandler.HandleItem(pair.Value, typeof(V), job);
                 }
             }
@@ -215,18 +214,18 @@ namespace Playground
         {
             bool requiresItemNames = settings.RequiresItemNames;
 
-            if (valueHandler.IsPrimitive && settings.AllowSkipStack)
+            if (valueHandler.IsPrimitive)
             {
-                ItemHandler<T> itemHandler = (item, expectedType, parentJob) =>
+                ItemHandler<T> itemHandler = (dict, expectedType, parentJob) =>
                 {
-                    Type itemType = item.GetType();
-                    if (TryHandleItemAsRef(item, parentJob, itemType)) return;
+                    Type dictType = dict.GetType();
+                    if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
 
                     writer.OpenObject();
-                    var enumerator = item.GetEnumerator();
+                    var enumerator = dict.GetEnumerator();
 
                     if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != itemType))
+                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                     {
                         writer.WritePreparedByteString(preparedTypeInfo);
                         writer.WriteComma();
@@ -266,7 +265,7 @@ namespace Playground
                         writer.OpenObject();
 
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != job.itemType))
+                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != job.dictType))
                         {
                             writer.WritePreparedByteString(preparedTypeInfo);
                             writer.WriteComma();
@@ -291,33 +290,32 @@ namespace Playground
                     return true;
                 };
 
-                ItemHandler<T> itemHandler = (item, expectedType, parentJob) =>
+                ItemHandler<T> itemHandler = (dict, expectedType, parentJob) =>
                 {
-                    if (item == null)
+                    if (dict == null)
                     {
                         writer.WriteNullValue();
                         return;
                     }
                     
-                    Type itemType = item.GetType();
-                    if (TryHandleItemAsRef(item, parentJob, itemType)) return;
+                    Type dictType = dict.GetType();
+                    if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
 
-                    if (item.Count == 0)
+                    if (dict.Count == 0)
                     {
                         writer.OpenObject();
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != itemType))
+                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
                         {
                             writer.WritePreparedByteString(preparedTypeInfo);
                         }
                         writer.CloseObject();
                         return;
                     }
-                    var job = dictionaryStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, item);
-                    job.Init(processor, item.GetType());
-                    job.SetEnumerator(item.GetEnumerator());
-                    if (settings.AllowSkipStack && job.Process()) job.Recycle();
-                    else AddJobToStack(job);
+                    var job = dictionaryStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, dict);
+                    job.Init(processor, dict.GetType());
+                    job.SetEnumerator(dict.GetEnumerator());
+                    AddJobToStack(job);
                 };
                 return itemHandler;
             }

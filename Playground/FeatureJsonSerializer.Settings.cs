@@ -16,9 +16,9 @@ namespace Playground
             public ReferenceCheck referenceCheck = ReferenceCheck.AlwaysReplaceByRef;
             public int bufferSize = -1;
             public bool enumAsString = false;
+            public bool treatEnumerablesAsCollections = true;
 
             public bool RequiresItemNames => referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef;
-            public bool AllowSkipStack => referenceCheck == ReferenceCheck.NoRefCheck;
         }
 
         public enum DataSelection

@@ -188,7 +188,8 @@ namespace Playground
             };
             testDto[112] = testDto[42];
             */
-            object testDto = new List<Dictionary<string, int>> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>() };
+            var testDto = new List<object> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>() };
+            testDto.Add(testDto[0]);
 
             Type testDtoType = testDto.GetType();
             string json; 
@@ -221,13 +222,18 @@ namespace Playground
                 enumAsString = false
             });
 
-            FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+            var settings = new FeatureJsonSerializer.Settings()
             {
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
                 enumAsString = false,
-            });            
+            };
+            FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
+
+            Console.WriteLine(featureJsonSerializer.Serialize(testDto));
+
+            featureJsonSerializer = new FeatureJsonSerializer(settings);
 
             TimeSpan elapsed;
             long beforeCollection;
