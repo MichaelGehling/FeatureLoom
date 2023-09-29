@@ -15,6 +15,11 @@ namespace FeatureLoom.Extensions
             return typeToCheck.GetInterfaces().Any(x => x.IsGenericType && x.GetGenericTypeDefinition() == genericInterfaceType);
         }
 
+        public static bool ImplementsInterface(this Type typeToCheck, Type interfaceType)
+        {
+            return typeToCheck.GetInterfaces().Any(x => x == interfaceType);
+        }
+
         public static Type GetFirstTypeParamOfGenericInterface(this Type typeToCheck, Type genericInterfaceType)
         {
             foreach (var type in typeToCheck.GetInterfaces())

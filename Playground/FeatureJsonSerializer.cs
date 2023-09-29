@@ -32,6 +32,7 @@ namespace Playground
 
         StackJobRecycler<DictionaryStackJob> dictionaryStackJobRecycler;
         StackJobRecycler<ListStackJob> listStackJobRecycler;
+        StackJobRecycler<EnumerableStackJob> enumerableStackJobRecycler;
         StackJobRecycler<RefJob> refJobRecycler;
 
         public FeatureJsonSerializer(Settings settings = null)
@@ -62,6 +63,7 @@ namespace Playground
         {
             dictionaryStackJobRecycler = new(this);
             listStackJobRecycler = new(this);
+            enumerableStackJobRecycler = new(this);
             refJobRecycler = new(this);
         }
 
@@ -75,7 +77,11 @@ namespace Playground
             dictionaryStackJobRecycler.RecyclePostponedJobs();    
             refJobRecycler.RecyclePostponedJobs();
             listStackJobRecycler.RecyclePostponedJobs();
+            enumerableStackJobRecycler.RecyclePostponedJobs();
         }
+
+        CachedTypeHandler lastTypeHandler = null;
+        Type lastTypeHandlerType = null;
 
         public string Serialize<T>(T item)
         {
@@ -89,10 +95,22 @@ namespace Playground
                     {
                         return "null";
                     }
+
                     Type expectedType = typeof(T);
                     Type itemType = item.GetType();
-                    var typeHandler = GetCachedTypeHandler(itemType);
-                    typeHandler.HandleItem(item, expectedType, null);
+
+                    if (lastTypeHandlerType == itemType)
+                    {
+                        lastTypeHandler.HandleItem(item, expectedType, null);
+                    }
+                    else
+                    {
+                        var typeHandler = GetCachedTypeHandler(itemType);
+                        typeHandler.HandleItem(item, expectedType, null);
+
+                        lastTypeHandler = typeHandler;
+                        lastTypeHandlerType = typeHandler.HandlerType;
+                    }
 
                     LoopJobStack();
 
@@ -118,10 +136,22 @@ namespace Playground
                         writer.WriteNullValue();
                         return;
                     }
+
                     Type expectedType = typeof(T);
                     Type itemType = item.GetType();
-                    var typeHandler = GetCachedTypeHandler(itemType);
-                    typeHandler.HandleItem(item, expectedType, null);
+
+                    if (lastTypeHandlerType == itemType)
+                    {
+                        lastTypeHandler.HandleItem(item, expectedType, null);
+                    }
+                    else
+                    {
+                        var typeHandler = GetCachedTypeHandler(itemType);
+                        typeHandler.HandleItem(item, expectedType, null);
+
+                        lastTypeHandler = typeHandler;
+                        lastTypeHandlerType = typeHandler.HandlerType;
+                    }
 
                     LoopJobStack();
                 }
@@ -205,7 +235,7 @@ namespace Playground
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
-            //else if (TryCreateEnumerableItemHandler(typeHandler, itemType, preparedTypeInfo)) /* do nothing */;
+            else if (TryCreateEnumerableItemHandler(typeHandler, itemType)) /* do nothing */;
 
             //else throw new Exception($"No handler available for {itemType}");
             else typeHandler.SetItemHandler<object>((_, _, _) => writer.WritePrimitiveValue($"Unsupported Type {itemType.GetSimplifiedTypeName()}"), false);
@@ -230,7 +260,7 @@ namespace Playground
             {
                 typeHandler.SetItemHandler<T>((item, _, _) =>
                 {
-                    PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
+                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
                     write(item);
                     FinishTypeInfoObject();
                 }, true);
@@ -245,7 +275,7 @@ namespace Playground
                     }
                     else
                     {
-                        PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
+                        StartTypeInfoObject(typeHandler.preparedTypeInfo);
                         write(item);
                         FinishTypeInfoObject();
                     }
@@ -268,7 +298,7 @@ namespace Playground
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void PrepareTypeInfoObject(byte[] preparedTypeInfo)
+        void StartTypeInfoObject(byte[] preparedTypeInfo)
         {
             writer.OpenObject();
             writer.WritePreparedByteString(preparedTypeInfo);
@@ -302,7 +332,7 @@ namespace Playground
         {
             if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
             {
-                RefJob newRefJob = refJobRecycler.GetJob(parentJob, parentJob?.GetCurrentChildItemName() ?? writer.PrepareRootName(), obj);
+                RefJob newRefJob = refJobRecycler.GetJob(parentJob, CreateItemName(parentJob), obj);
                 newRefJob.Recycle(); // Actual recycling will be postponed based on ReferenceCheck.AlwaysReplaceByRef setting.
                 if (!objToJob.TryAdd(obj, newRefJob))
                 {

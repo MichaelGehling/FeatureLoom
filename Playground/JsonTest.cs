@@ -167,12 +167,14 @@ namespace Playground
 
             //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
-            //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+            //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+            //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = 1234.5678;
+            //var testDto = 12345678;
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = new object();
-            //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
+            var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
             //var testDto = new Dictionary<int, MyEmbedded1>() { [1] = new MyEmbedded1(), [2] = null };
             //var testDto = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
             //object testDto = 123;
@@ -188,8 +190,11 @@ namespace Playground
             };
             testDto[112] = testDto[42];
             */
-            var testDto = new List<object> { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
-            testDto.Add(testDto[0]);
+            //var testDto = new HashSet<object>() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
+            //testDto.Add(testDto[0]);
+
+            //var testDto = new ArrayList() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
+
 
             Type testDtoType = testDto.GetType();
             string json; 

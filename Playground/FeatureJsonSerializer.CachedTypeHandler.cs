@@ -38,7 +38,14 @@ namespace Playground
                 {
                     objectItemHandler(item, expectedType, parentJob);
                 }
-            }            
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void HandlePrimitiveItem<T>(T item)
+            {
+                ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
+                typedItemHandler.Invoke(item, typeof(T), null);
+            }
         }
     }
 

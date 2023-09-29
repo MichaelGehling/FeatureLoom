@@ -76,21 +76,23 @@ namespace Playground
 
                     bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && listType != expectedType);
-                    if (writeTypeInfo) PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
+                    if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+
                     writer.OpenCollection();
                     int currentIndex = 0;
                     if (currentIndex < list.Count)
                     {
                         E element = list[currentIndex++];
-                        elementHandler.HandleItem(element, elementHandler.HandlerType, parentJob);
+                        elementHandler.HandlePrimitiveItem(element);
                     }
                     while (currentIndex < list.Count)
                     {
                         writer.WriteComma();
                         E element = list[currentIndex++];
-                        elementHandler.HandleItem(element, elementHandler.HandlerType, parentJob);
+                        elementHandler.HandlePrimitiveItem(element);
                     }
                     writer.CloseCollection();
+
                     if (writeTypeInfo) FinishTypeInfoObject();
                 };
                 typeHandler.SetItemHandler(itemHandler, false);
@@ -105,7 +107,7 @@ namespace Playground
                     
                     if (job.currentIndex == 0)
                     {
-                        if (job.writeTypeInfo) PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
+                        if (job.writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
                         writer.OpenCollection();
 
@@ -148,11 +150,19 @@ namespace Playground
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && listType != expectedType);
 
                     if (list.Count == 0)
-                    {                        
-                        if (writeTypeInfo) PrepareTypeInfoObject(typeHandler.preparedTypeInfo);
-                        writer.OpenCollection();
-                        writer.CloseCollection();
-                        if (writeTypeInfo) FinishTypeInfoObject();
+                    {
+                        if (writeTypeInfo)
+                        {
+                            StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                            writer.OpenCollection();
+                            writer.CloseCollection();
+                            FinishTypeInfoObject();
+                        }
+                        else
+                        {
+                            writer.OpenCollection();
+                            writer.CloseCollection();
+                        }
                         return;
                     }
                     var job = listStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, list);

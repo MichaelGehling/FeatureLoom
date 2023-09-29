@@ -388,11 +388,12 @@ namespace Playground
                 return lookup;
             }
 
+            private static readonly byte[] BackSlashEscapeBytes = "\\\\".ToByteArray();
             private static readonly byte[][] EscapeByteLookup = InitEscapeByteLookup();
             private static byte[][] InitEscapeByteLookup()
             {
-                byte[][] lookup = new byte[128][];
-                string escapeChars = "\\\"\b\f\n\r\t";
+                byte[][] lookup = new byte[35][]; // '\\' is the highest escape char
+                string escapeChars = "\"\b\f\n\r\t"; ; //  '\\' Is checked extra
                 for (int i = 0; i < escapeChars.Length; i++)
                 {
                     char c = escapeChars[i];
@@ -419,14 +420,22 @@ namespace Playground
                 return lookup;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static byte[] GetEscapeBytes(char c)
+            {
+                if (c == '\\') return BackSlashEscapeBytes;
+                if (c < EscapeByteLookup.Length) return EscapeByteLookup[c];
+                return null;
+            }
+
             private void WriteChar(char c)
             {
                 int bufferIndex = 0;
 
                 // Check if the character is in the EscapeByteLookup table
-                if (c < EscapeByteLookup.Length && EscapeByteLookup[c] != null)
+                byte[] escapeBytes = GetEscapeBytes(c);                
+                if (escapeBytes != null)
                 {
-                    byte[] escapeBytes = EscapeByteLookup[c];
                     stream.Write(escapeBytes, 0, escapeBytes.Length);
                     return;
                 }
@@ -476,15 +485,12 @@ namespace Playground
                         var c = str[charIndex];
 
                         // Handle escaped chars and control chars
-                        if (c < EscapeByteLookup.Length)
-                        {
-                            byte[] escapeBytes = EscapeByteLookup[c];
-                            if (escapeBytes != null)
-                            {
-                                Buffer.BlockCopy(escapeBytes, 0, buffer, bufferIndex, escapeBytes.Length);
-                                bufferIndex += escapeBytes.Length;
-                                continue;
-                            }
+                        byte[] escapeBytes = GetEscapeBytes(c);
+                        if (escapeBytes != null)
+                        { 
+                            Buffer.BlockCopy(escapeBytes, 0, buffer, bufferIndex, escapeBytes.Length);
+                            bufferIndex += escapeBytes.Length;
+                            continue;
                         }
 
                         int codepoint = c;

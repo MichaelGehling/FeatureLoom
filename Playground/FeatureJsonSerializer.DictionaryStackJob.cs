@@ -66,18 +66,23 @@ namespace Playground
             if (!TryGetCachedStringValueWriter(keyType, out CachedStringValueWriter keyWriter)) return false;
             CachedTypeHandler valueHandler = GetCachedTypeHandler(valueType);
 
-            string methodName = itemType.IsOfGenericType(typeof(Dictionary<,>)) ? nameof(CreateDictionaryItemHandler) : nameof(CreateIDictionaryItemHandler);
-            MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
-            MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, keyType, valueType);
+            MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
+
+            MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateDictionaryItemHandler), BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, keyType, valueType, getEnumeratorMethod.ReturnType);
             genericCreateMethod.Invoke(this, new object[] { typeHandler, valueHandler, keyWriter });
 
             return true;
         }
 
-
-        /// The code of this method must be the same as for CreateIDictionaryItemHandler. It was duplicated to avoid boxing of the Dictionary enumerator.
-        private void CreateDictionaryItemHandler<T, K, V>(CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter) where T : Dictionary<K, V>
+        private void CreateDictionaryItemHandler<T, K, V, ENUM>(CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter) 
+            where T : IDictionary<K, V> 
+            where ENUM : IEnumerator<KeyValuePair<K,V>>
         {
+            Type itemType = typeof(T);
+            MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
+            var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
+
             bool requiresItemNames = settings.RequiresItemNames;
 
             if (valueHandler.IsPrimitive)
@@ -88,138 +93,7 @@ namespace Playground
                     if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
 
                     writer.OpenObject();
-                    var enumerator = dict.GetEnumerator();
-
-                    if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
-                    {
-                        writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                        writer.WriteComma();
-                    }
-
-                    if (enumerator.MoveNext())
-                    {
-                        KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteValueAsString(pair.Key);
-                        writer.WriteColon();
-                        valueHandler.HandleItem(pair.Value, valueHandler.HandlerType, parentJob);
-                    }
-
-                    while (enumerator.MoveNext())
-                    {
-                        writer.WriteComma();
-                        KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteValueAsString(pair.Key);
-                        writer.WriteColon();
-                        valueHandler.HandleItem(pair.Value, valueHandler.HandlerType, parentJob);
-                    }
-
-                    writer.CloseObject();
-                };
-                typeHandler.SetItemHandler(itemHandler, false);
-            }
-            else
-            {
-                Func<DictionaryStackJob, bool> processor = job =>
-                {
-                    int beforeStackSize = jobStack.Count;
-                    var enumeratorBox = job.GetEnumeratorBox<Dictionary<K, V>.Enumerator>();
-
-                    if (job.firstElement)
-                    {
-                        job.firstElement = false;
-                        writer.OpenObject();
-
-                        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != job.dictType))
-                        {
-                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                            writer.WriteComma();
-                        }
-
-                        if (enumeratorBox.value.MoveNext())
-                        {
-                            WriteKeyAndValue(valueHandler, keyWriter, job, enumeratorBox.value.Current);
-                            if (jobStack.Count != beforeStackSize) return false;
-                        }
-                    }
-
-                    while (enumeratorBox.value.MoveNext())
-                    {
-                        writer.WriteComma();
-                        WriteKeyAndValue(valueHandler, keyWriter, job, enumeratorBox.value.Current);
-                        if (jobStack.Count != beforeStackSize) return false;
-                    }
-
-                    writer.CloseObject();
-
-                    return true;
-                };
-
-                ItemHandler<T> itemHandler = (dict, expectedType, parentJob) =>
-                {
-                    if (dict == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
-                    Type dictType = dict.GetType();
-                    if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
-
-                    if (dict.Count == 0)
-                    {                        
-                        writer.OpenObject();
-                        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
-                        {
-                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                        }
-                        writer.CloseObject();
-                        return;
-                    }
-                    var job = dictionaryStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, dict);
-                    job.Init(processor, dict.GetType());
-                    job.SetEnumerator(dict.GetEnumerator());                    
-                    AddJobToStack(job);
-                };
-                typeHandler.SetItemHandler(itemHandler, false);
-            }
-
-            void WriteKeyAndValue(CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter, DictionaryStackJob job, KeyValuePair<K, V> pair)
-            {
-                keyWriter.WriteValueAsString(pair.Key);
-                writer.WriteColon();
-
-                V value = pair.Value;
-                if (value == null)
-                {
-                    writer.WriteNullValue();
-                }
-                else
-                {
-                    Type valueType = value.GetType();
-                    CachedTypeHandler actualHandler = valueHandler;
-                    if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                    if (requiresItemNames) job.currentFieldName = writer.PrepareStringToBytes(pair.Key.ToString()); //TODO: Optimize with caching ?
-                    actualHandler.HandleItem(pair.Value, typeof(V), job);
-                }
-            }
-        }
-
-        private void CreateIDictionaryItemHandler<T, K, V>(CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter) where T : IDictionary<K, V>
-        {
-            bool requiresItemNames = settings.RequiresItemNames;
-
-            if (valueHandler.IsPrimitive)
-            {
-                ItemHandler<T> itemHandler = (dict, expectedType, parentJob) =>
-                {
-                    Type dictType = dict.GetType();
-                    if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
-
-                    writer.OpenObject();
-                    var enumerator = dict.GetEnumerator();
+                    var enumerator = getEnumerator(dict);
 
                     if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
@@ -311,7 +185,7 @@ namespace Playground
                     }
                     var job = dictionaryStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, dict);
                     job.Init(processor, dict.GetType());
-                    job.SetEnumerator(dict.GetEnumerator());
+                    job.SetEnumerator(getEnumerator(dict));
                     AddJobToStack(job);
                 };
                 typeHandler.SetItemHandler(itemHandler, false);

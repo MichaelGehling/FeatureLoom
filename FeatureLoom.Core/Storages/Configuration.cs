@@ -269,13 +269,13 @@ namespace FeatureLoom.Storages
                 {
                     field.SetValue(config, Json.DeserializeFromJson(jsonValue, field.FieldType));
                 }
-                catch(Exception ex)
+                catch
                 {
                     try
                     {
                         field.SetValue(config, Json.DeserializeFromJson('"' + jsonValue + '"', field.FieldType));
                     }
-                    catch (Exception ex2)
+                    catch
                     {
                         Log.WARNING($"Failed to apply argument {varName}");
                     }
