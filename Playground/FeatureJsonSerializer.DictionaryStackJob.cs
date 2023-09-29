@@ -93,7 +93,7 @@ namespace Playground
                     if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
 
                     writer.OpenObject();
-                    var enumerator = getEnumerator(dict);
+                    ENUM enumerator = getEnumerator(dict);
 
                     if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
@@ -128,7 +128,7 @@ namespace Playground
                 Func<DictionaryStackJob, bool> processor = job =>
                 {
                     int beforeStackSize = jobStack.Count;
-                    var enumeratorBox = job.GetEnumeratorBox<IEnumerator<KeyValuePair<K, V>>>();
+                    var enumeratorBox = job.GetEnumeratorBox<ENUM>();
 
                     if (job.firstElement)
                     {
