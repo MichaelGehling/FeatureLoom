@@ -74,7 +74,7 @@ namespace Playground
                 }
             }
 
-            List<Action<T, StackJob>> fieldValueWriters = new();
+            List<Action<T, ComplexStackJob>> fieldValueWriters = new();
             bool allFieldsPrimitive = true;
             foreach (var memberInfo in memberInfos)
             {
@@ -83,7 +83,7 @@ namespace Playground
                 allFieldsPrimitive &= fieldTypeHandler.IsPrimitive;
                 MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
-                Action<T, StackJob> writer = (Action<T, StackJob>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
+                Action<T, ComplexStackJob> writer = (Action<T, ComplexStackJob>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
                 fieldValueWriters.Add(writer);
             }
 
@@ -140,7 +140,7 @@ namespace Playground
 
                     writer.CloseObject();
                 };
-                bool isPrimitive = !itemType.IsClass || itemType.IsSealed;
+                bool isPrimitive = !itemType.IsClass;
                 typeHandler.SetItemHandler(itemHandler, isPrimitive);
             }
             else
@@ -211,7 +211,7 @@ namespace Playground
             throw new Exception("Not a FieldType or PropertyType");
         }
 
-        private Action<T, StackJob> CreateFieldValueWriter<T, V>(CachedTypeHandler fieldTypeHandler, MemberInfo memberInfo)
+        private Action<T, ComplexStackJob> CreateFieldValueWriter<T, V>(CachedTypeHandler fieldTypeHandler, MemberInfo memberInfo)
         {
             string fieldName = memberInfo.Name;
             if (settings.dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields &&
@@ -221,6 +221,7 @@ namespace Playground
                 fieldName = fieldName.Substring("<", ">");
             }
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
+            var fieldNameBytes = writer.PreparePrimitiveToBytes(fieldName);
 
             Type itemType = typeof(T);
             var parameter = Expression.Parameter(typeof(object));
@@ -244,7 +245,18 @@ namespace Playground
                 {
                     writer.WritePreparedByteString(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
-                    fieldTypeHandler.HandleItem(value, typeof(V), parentJob);
+                    if (value == null)
+                    {
+                        writer.WriteNullValue();
+                    }
+                    else
+                    {
+                        Type valueType = value.GetType();
+                        CachedTypeHandler actualHandler = fieldTypeHandler;
+                        if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
+                        parentJob.currentFieldName = fieldNameBytes;
+                        fieldTypeHandler.HandleItem(value, typeof(V), parentJob);
+                    }
                 };
             }
         }

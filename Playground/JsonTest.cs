@@ -63,6 +63,7 @@ namespace Playground
 
             myEmbeddedDict["1"] = new MyEmbedded1();
             myEmbeddedDict["2"] = new MyEmbedded1();
+            myEmbeddedDict["1_"] = myEmbeddedDict["1"];
 
             //myObjects.Add(myEmbedded);
         }
@@ -116,9 +117,11 @@ namespace Playground
         public long int3 = 123453;
         public ulong int4 = 123454;
         public double double1 = 12.1231;
+     
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
+
     }
 
     public class TestDto3
@@ -166,8 +169,9 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
-            var testDto = new TestDto2();
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto2();
+            //var testDto = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
@@ -237,7 +241,7 @@ namespace Playground
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
                 referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
-                enumAsString = false,
+                enumAsString = false
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
 
@@ -290,8 +294,8 @@ namespace Playground
 
                 Console.WriteLine($"JsonSerializerF/Text.Json:  {(100.0/(elapsed_A/elapsed_B) - 100).ToString("F")}% faster");
      
-               
-                tk.Restart();
+                
+        /*        tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
@@ -306,7 +310,7 @@ namespace Playground
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"LoopSerializer1: {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(1.Seconds());
-                /*
+               
                tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {

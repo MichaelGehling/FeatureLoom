@@ -140,7 +140,7 @@ namespace Playground
 
                     if (writeTypeInfo) FinishTypeInfoObject();
                 };
-                bool isPrimitive = !itemType.IsClass || itemType.IsSealed;
+                bool isPrimitive = !itemType.IsClass;
                 typeHandler.SetItemHandler(itemHandler, isPrimitive);
             }
             else
