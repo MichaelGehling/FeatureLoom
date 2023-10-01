@@ -66,11 +66,18 @@ namespace Playground
 
         private void CreateIListItemHandler<T, E>(CachedTypeHandler typeHandler, CachedTypeHandler elementHandler) where T : IList<E>
         {
+            Type itemType = typeof(T);
             bool requiresItemNames = settings.RequiresItemNames;
             if (elementHandler.IsPrimitive)
             {
                 ItemHandler<T> itemHandler = (list, expectedType, parentJob) =>
                 {
+                    if (list == null)
+                    {
+                        writer.WriteNullValue();
+                        return;
+                    }
+
                     Type listType = list.GetType();
                     if (TryHandleItemAsRef(list, parentJob, listType)) return;
 
@@ -95,7 +102,8 @@ namespace Playground
 
                     if (writeTypeInfo) FinishTypeInfoObject();
                 };
-                typeHandler.SetItemHandler(itemHandler, false);
+                bool isPrimitive = !itemType.IsClass || itemType.IsSealed;
+                typeHandler.SetItemHandler(itemHandler, isPrimitive);
             }
             else
             {

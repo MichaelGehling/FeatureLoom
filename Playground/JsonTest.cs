@@ -104,20 +104,21 @@ namespace Playground
 
     public class TestDto2
     {
+        
         public string str1 = "Mystring1";
         public string str2 = "Mystring2";
         public string str3 = "Mystring3";
         public string str4 = "Mystring4";
         public string myString1 = "Hello: \\, \", \\, \n";
-        public string myString2 = "Hello: \\, \", \\, \n";
-        public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
-        public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
-        public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
+        public string myString2 = "Hello: \\, \", \\, \n";        
         public int int1 = 123451;
         public short int2 = 1234;
         public long int3 = 123453;
         public ulong int4 = 123454;
         public double double1 = 12.1231;
+        public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+        public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+        public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
     }
 
     public class TestDto3
@@ -166,13 +167,15 @@ namespace Playground
             int iterations = 1_000_000;
 
             //var testDto = new TestDto(99, new MyEmbedded1());
-            //var testDto = new TestDto2();
+            var testDto = new TestDto2();
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+            //var testDto = new object();
             //var testDto = 1234.5678;
             //var testDto = 12345678;
             //var testDto = "Hello: \\, \", \\, \n";
+            //var testDto = "Mystring1";
             //var testDto = new object();
             //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
             //var testDto = new Dictionary<int, MyEmbedded1>() { [1] = new MyEmbedded1(), [2] = null };
@@ -181,7 +184,7 @@ namespace Playground
             //var testDto = new TestDto3();
             //var testDto = AppTime.Now;
             //var testDto = TestEnum.TestB;
-            var testDto = new Dictionary<int, object>() 
+           /* var testDto = new Dictionary<int, object>() 
             { 
                 [12] = new Dictionary<string, int>() { ["a"] = 123, ["b"] = 42 },
                 [42] = new Dictionary<int, string>() { [3] = "Hello3", [4] = "Hello4" },
@@ -191,7 +194,7 @@ namespace Playground
                 [32] = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 }
             };
             testDto[112] = testDto[42];
-            
+            */
             //var testDto = new HashSet<object>() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
             //testDto.Add(testDto[0]);
 
@@ -287,7 +290,7 @@ namespace Playground
 
                 Console.WriteLine($"JsonSerializerF/Text.Json:  {(100.0/(elapsed_A/elapsed_B) - 100).ToString("F")}% faster");
      
-               /*  
+               
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
@@ -303,7 +306,7 @@ namespace Playground
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"LoopSerializer1: {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(1.Seconds());
-
+                /*
                tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {

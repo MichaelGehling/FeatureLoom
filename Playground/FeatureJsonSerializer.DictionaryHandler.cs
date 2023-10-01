@@ -9,6 +9,7 @@ namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
+
         class DictionaryStackJob : StackJob
         {
             internal Type dictType;
@@ -89,6 +90,12 @@ namespace Playground
             {
                 ItemHandler<T> itemHandler = (dict, expectedType, parentJob) =>
                 {
+                    if (dict == null)
+                    {
+                        writer.WriteNullValue();
+                        return;
+                    }
+
                     Type dictType = dict.GetType();
                     if (TryHandleItemAsRef(dict, parentJob, dictType)) return;
 
@@ -121,7 +128,8 @@ namespace Playground
 
                     writer.CloseObject();
                 };
-                typeHandler.SetItemHandler(itemHandler, false);
+                bool isPrimitive = !itemType.IsClass || itemType.IsSealed;
+                typeHandler.SetItemHandler(itemHandler, isPrimitive);
             }
             else
             {

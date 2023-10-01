@@ -33,6 +33,7 @@ namespace Playground
         StackJobRecycler<DictionaryStackJob> dictionaryStackJobRecycler;
         StackJobRecycler<ListStackJob> listStackJobRecycler;
         StackJobRecycler<EnumerableStackJob> enumerableStackJobRecycler;
+        StackJobRecycler<ComplexStackJob> complexStackJobRecycler;
         StackJobRecycler<RefJob> refJobRecycler;
 
         public FeatureJsonSerializer(Settings settings = null)
@@ -64,6 +65,7 @@ namespace Playground
             dictionaryStackJobRecycler = new(this);
             listStackJobRecycler = new(this);
             enumerableStackJobRecycler = new(this);
+            complexStackJobRecycler = new(this);
             refJobRecycler = new(this);
         }
 
@@ -78,6 +80,7 @@ namespace Playground
             refJobRecycler.RecyclePostponedJobs();
             listStackJobRecycler.RecyclePostponedJobs();
             enumerableStackJobRecycler.RecyclePostponedJobs();
+            complexStackJobRecycler.RecyclePostponedJobs();
         }
 
         CachedTypeHandler lastTypeHandler = null;
@@ -236,9 +239,8 @@ namespace Playground
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateEnumerableItemHandler(typeHandler, itemType)) /* do nothing */;
-
-            //else throw new Exception($"No handler available for {itemType}");
-            else typeHandler.SetItemHandler<object>((_, _, _) => writer.WritePrimitiveValue($"Unsupported Type {itemType.GetSimplifiedTypeName()}"), false);
+            else CreateComplexItemHandler(typeHandler, itemType);
+            
             
             return typeHandler;
 

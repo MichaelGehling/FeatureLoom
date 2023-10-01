@@ -110,6 +110,12 @@ namespace Playground
             {
                 ItemHandler<T> itemHandler = (collection, expectedType, parentJob) =>
                 {
+                    if (collection == null)
+                    {
+                        writer.WriteNullValue();
+                        return;
+                    }
+
                     Type collectionType = collection.GetType();
                     if (TryHandleItemAsRef(collection, parentJob, collectionType)) return;
 
@@ -134,7 +140,8 @@ namespace Playground
 
                     if (writeTypeInfo) FinishTypeInfoObject();
                 };
-                typeHandler.SetItemHandler(itemHandler, false);
+                bool isPrimitive = !itemType.IsClass || itemType.IsSealed;
+                typeHandler.SetItemHandler(itemHandler, isPrimitive);
             }
             else
             {
