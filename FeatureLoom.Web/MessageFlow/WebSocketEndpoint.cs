@@ -141,8 +141,8 @@ namespace FeatureLoom.MessageFlow
                     {
                         ms.Position = 0;
                         object message;
-                        if (deserializationType == null) message = streamReader.ReadToEnd();
-                        else message = Json.Default_Serializer.Deserialize(jsonTextReader, deserializationType);
+                        message = streamReader.ReadToEnd();
+                        if (deserializationType != null) message = Json.DeserializeFromJson(message.ToString(), deserializationType); //TODO Optimize, serializer should directly work on stream, but last try failed and the smae message was read again and again.
 
                         if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, this.endpointHandle);
                         _ = sourceHelper.ForwardAsync(message);

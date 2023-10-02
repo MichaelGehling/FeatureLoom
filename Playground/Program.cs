@@ -28,6 +28,7 @@ using FeatureLoom.MetaDatas;
 using FeatureLoom.Statemachines;
 using FeatureLoom.Core.Helpers;
 using System.Data;
+using System.Net.WebSockets;
 
 namespace Playground
 {
@@ -85,6 +86,49 @@ namespace Playground
 
         private static async Task Main()
         {
+
+            IWebServer webserver = new DefaultWebServer();
+
+            Sender serverSender = new Sender();
+            Forwarder serverReceiver = new Forwarder();
+            webserver.AddWebSocketEndpoint("/websocket", serverSender, serverReceiver, typeof(int));
+            _ = webserver.Run(IPAddress.Loopback, 5001);
+
+            ClientWebSocket clientWebSocket = new ClientWebSocket();
+            Uri serverUri = new Uri("ws://localhost:5001/websocket");
+            bool connected = false;
+            while (!connected)
+            {
+                try
+                {
+                    Console.WriteLine("Trying to connect...");
+                    await clientWebSocket.ConnectAsync(serverUri, CancellationToken.None);
+                    connected = true;
+                }
+                catch
+                {
+                    Console.WriteLine("Connection attempt faild! Retry...");
+                    AppTime.Wait(1.Seconds());
+                }
+            }
+
+            Console.WriteLine("Connected to server");
+            WebSocketEndpoint clientEndpoint = new WebSocketEndpoint(clientWebSocket, typeof(int));
+
+            serverReceiver.ProcessMessage<int>(async msg =>
+            {
+                Console.WriteLine("S:" + msg.ToString());
+                serverSender.Send(msg + 1);
+            });
+            clientEndpoint.ProcessMessage<int>(async msg =>
+            {
+                Console.WriteLine("C:" + msg.ToString());
+                clientEndpoint.Send(msg + 1);
+            });
+            
+            clientEndpoint.Send(1);
+
+            Console.ReadKey();
 
             /*
             DefaultWebServer webserver = new DefaultWebServer();
