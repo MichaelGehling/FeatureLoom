@@ -126,7 +126,7 @@ namespace Playground
 
     public class TestDto3
     {
-        public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+        public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
     }
 
 
@@ -169,8 +169,8 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
-            //var testDto = new TestDto2();
+            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto2();
             //var testDto = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 };
@@ -179,8 +179,7 @@ namespace Playground
             //var testDto = 1234.5678;
             //var testDto = 12345678;
             //var testDto = "Hello: \\, \", \\, \n";
-            //var testDto = "Mystring1";
-            //var testDto = new object();
+            //var testDto = "Mystring1";            
             //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
             //var testDto = new Dictionary<int, MyEmbedded1>() { [1] = new MyEmbedded1(), [2] = null };
             //var testDto = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
@@ -188,7 +187,7 @@ namespace Playground
             //var testDto = new TestDto3();
             //var testDto = AppTime.Now;
             //var testDto = TestEnum.TestB;
-           /* var testDto = new Dictionary<int, object>() 
+            /*var testDto = new Dictionary<int, object>() 
             { 
                 [12] = new Dictionary<string, int>() { ["a"] = 123, ["b"] = 42 },
                 [42] = new Dictionary<int, string>() { [3] = "Hello3", [4] = "Hello4" },
@@ -240,7 +239,7 @@ namespace Playground
             {
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
                 enumAsString = false
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);

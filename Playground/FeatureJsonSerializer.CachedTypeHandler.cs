@@ -9,11 +9,18 @@ namespace Playground
         sealed class CachedTypeHandler
         {
             public readonly static MethodInfo setItemHandlerMethodInfo = typeof(CachedTypeHandler).GetMethod("SetItemHandler");
+            private FeatureJsonSerializer serializer;
             private Delegate itemHandler;
             private ItemHandler<object> objectItemHandler;
             private Type handlerType;
             private bool isPrimitive;
             public byte[] preparedTypeInfo;
+
+            public CachedTypeHandler(FeatureJsonSerializer serializer)
+            {
+                this.serializer = serializer;
+            }
+
             public bool IsPrimitive => isPrimitive;
 
             public Type HandlerType => handlerType;
@@ -27,16 +34,16 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void HandleItem<T>(T item, Type expectedType, StackJob parentJob)
+            public void HandleItem<T>(T item, ItemInfo itemInfo)
             {
                 if (typeof(T) == handlerType)
                 {
                     ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
-                    typedItemHandler.Invoke(item, expectedType, parentJob);
+                    typedItemHandler.Invoke(item, typeof(T), itemInfo);
                 }
                 else
                 {
-                    objectItemHandler(item, expectedType, parentJob);
+                    objectItemHandler(item, typeof(T), itemInfo);
                 }
             }
 

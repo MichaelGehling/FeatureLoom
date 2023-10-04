@@ -12,41 +12,6 @@ namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
-        class ComplexStackJob : StackJob
-        {
-            internal object complexItem;
-            internal int currentIndex = 0;
-            internal byte[] currentFieldName;
-            internal Func<ComplexStackJob, bool> processor;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Init(Func<ComplexStackJob, bool> processor, object complexItem)
-            {
-                this.processor = processor;
-                this.complexItem = complexItem;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override byte[] GetCurrentChildItemName()
-            {
-                return currentFieldName;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override bool Process()
-            {
-                return processor.Invoke(this);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override void Reset()
-            {
-                complexItem = null;
-                currentIndex = 0;
-                processor = null;
-                base.Reset();
-            }
-        }
 
         private void CreateComplexItemHandler(CachedTypeHandler typeHandler, Type itemType)
         {
@@ -74,7 +39,7 @@ namespace Playground
                 }
             }
 
-            List<Action<T, ComplexStackJob>> fieldValueWriters = new();
+            List<Action<T, ItemInfo>> fieldValueWriters = new();
             bool allFieldsPrimitive = true;
             foreach (var memberInfo in memberInfos)
             {
@@ -83,7 +48,7 @@ namespace Playground
                 allFieldsPrimitive &= fieldTypeHandler.IsPrimitive;
                 MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
-                Action<T, ComplexStackJob> writer = (Action<T, ComplexStackJob>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
+                Action<T, ItemInfo> writer = (Action<T, ItemInfo>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
                 fieldValueWriters.Add(writer);
             }
 
@@ -110,9 +75,9 @@ namespace Playground
                 bool isPrimitive = !itemType.IsClass || itemType.IsSealed;
                 typeHandler.SetItemHandler(itemHandler, isPrimitive);
             }
-            else if (allFieldsPrimitive)
+            else
             {
-                ItemHandler<T> itemHandler = (complexItem, expectedType, parentJob) =>
+                ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
                 {
                     if (complexItem == null)
                     {
@@ -121,7 +86,7 @@ namespace Playground
                     }
 
                     Type complexType = complexItem.GetType();
-                    if (TryHandleItemAsRef(complexItem, parentJob, complexType)) return;
+                    if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
 
                     writer.OpenObject();
 
@@ -131,76 +96,17 @@ namespace Playground
                         writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                         writer.WriteComma();
                     }                    
-                    fieldValueWriters[0].Invoke(complexItem, null);
+                    fieldValueWriters[0].Invoke(complexItem, itemInfo);
                     for (int i = 1; i < fieldValueWriters.Count; i++)
                     {
                         writer.WriteComma();
-                        fieldValueWriters[i].Invoke(complexItem, null);
+                        fieldValueWriters[i].Invoke(complexItem, itemInfo);
                     }
 
                     writer.CloseObject();
                 };
-                bool isPrimitive = !itemType.IsClass;
+                bool isPrimitive = allFieldsPrimitive && !itemType.IsClass;
                 typeHandler.SetItemHandler(itemHandler, isPrimitive);
-            }
-            else
-            {
-                Func<ComplexStackJob, bool> processor = job =>
-                {
-                    int beforeStackSize = jobStack.Count;
-
-                    T complexItem = (T)job.complexItem;
-                    Type complexItemType = complexItem.GetType();
-
-                    if (job.currentIndex == 0)
-                    {
-                        writer.OpenObject();
-
-                        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                            (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeof(T) != complexItemType))
-                        {
-                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                            writer.WriteComma();
-                        }
-
-                        fieldValueWriters[job.currentIndex].Invoke(complexItem, job);
-
-                        job.currentIndex++;
-                        if (jobStack.Count != beforeStackSize) return false;
-                    }
-
-                    while (job.currentIndex < fieldValueWriters.Count)
-                    {
-                        writer.WriteComma();
-                        fieldValueWriters[job.currentIndex].Invoke(complexItem, job);
-
-                        job.currentIndex++;
-                        if (jobStack.Count != beforeStackSize) return false;
-                    }
-
-                    writer.CloseObject();
-
-                    return true;
-                };
-
-                bool requiresItemNames = settings.RequiresItemNames;
-
-                ItemHandler <T> itemHandler = (complexItem, expectedType, parentJob) =>
-                {
-                    if (complexItem == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
-                    Type complexItemType = complexItem.GetType();
-                    if (TryHandleItemAsRef(complexItem, parentJob, complexItemType)) return;
-
-                    var job = complexStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, complexItem);
-                    job.Init(processor, complexItem);
-                    AddJobToStack(job);
-                };
-                typeHandler.SetItemHandler(itemHandler, false);
             }
         }
 
@@ -211,7 +117,7 @@ namespace Playground
             throw new Exception("Not a FieldType or PropertyType");
         }
 
-        private Action<T, ComplexStackJob> CreateFieldValueWriter<T, V>(CachedTypeHandler fieldTypeHandler, MemberInfo memberInfo)
+        private Action<T, ItemInfo> CreateFieldValueWriter<T, V>(CachedTypeHandler fieldTypeHandler, MemberInfo memberInfo)
         {
             string fieldName = memberInfo.Name;
             if (settings.dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields &&
@@ -221,7 +127,7 @@ namespace Playground
                 fieldName = fieldName.Substring("<", ">");
             }
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
-            var fieldNameBytes = writer.PreparePrimitiveToBytes(fieldName);
+            var fieldNameBytes = JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName);
 
             Type itemType = typeof(T);
             var parameter = Expression.Parameter(typeof(object));
@@ -236,26 +142,25 @@ namespace Playground
                 {
                     writer.WritePreparedByteString(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
-                    fieldTypeHandler.HandlePrimitiveItem(value);    
+                    fieldTypeHandler.HandlePrimitiveItem(value);
                 };
             }
             else
             {
-                return (parentItem, parentJob) =>
+                return (parentItem, parentInfo) =>
                 {
                     writer.WritePreparedByteString(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
-                    if (value == null)
-                    {
-                        writer.WriteNullValue();
-                    }
+                    if (value == null)writer.WriteNullValue();
                     else
                     {
                         Type valueType = value.GetType();
                         CachedTypeHandler actualHandler = fieldTypeHandler;
                         if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                        parentJob.currentFieldName = fieldNameBytes;
-                        fieldTypeHandler.HandleItem(value, typeof(V), parentJob);
+
+                        ItemInfo itemInfo = CreateItemInfo(value, parentInfo, fieldNameBytes);
+                        fieldTypeHandler.HandleItem(value, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                 };
             }

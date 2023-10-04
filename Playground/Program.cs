@@ -88,7 +88,7 @@ namespace Playground
         private static async Task Main()
         {
 
-
+            /*
             IWebServer webserver = new DefaultWebServer();
 
             Sender serverSender = new Sender();
@@ -131,7 +131,7 @@ namespace Playground
             clientEndpoint.Send(1);
 
             Console.ReadKey();
-
+            */
             /*
             DefaultWebServer webserver = new DefaultWebServer();
 

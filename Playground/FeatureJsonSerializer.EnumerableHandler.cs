@@ -9,65 +9,12 @@ using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
 using System.Linq;
 using Microsoft.VisualBasic;
 using System.Linq.Expressions;
+using Newtonsoft.Json.Linq;
 
 namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
-        class EnumerableStackJob : StackJob
-        {
-            IBox enumeratorBox;
-            internal Type collectionType;
-            internal int currentIndex;
-            internal FeatureJsonSerializer serializer;
-            Func<EnumerableStackJob, bool> processor;
-            internal bool writeTypeInfo;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal void SetEnumerator<T>(T enumerator)
-            {
-                if (!(enumeratorBox is Box<T> castedBox)) enumeratorBox = new Box<T>(enumerator);
-                else castedBox.value = enumerator;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal Box<T> GetEnumeratorBox<T>()
-            {
-                return enumeratorBox as Box<T>;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Init(FeatureJsonSerializer serializer, Func<EnumerableStackJob, bool> processor, object collection, bool writeTypeInfo)
-            {
-                this.processor = processor;
-                this.serializer = serializer;
-                this.collectionType = collection.GetType();
-                this.writeTypeInfo = writeTypeInfo;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override bool Process()
-            {
-                return processor.Invoke(this);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override void Reset()
-            {
-                enumeratorBox.Clear();
-                processor = null;
-                currentIndex = 0;
-                collectionType = null;
-                base.Reset();
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public override byte[] GetCurrentChildItemName()
-            {
-                return serializer.writer.PrepareCollectionIndexName(currentIndex);
-            }
-        }
-
         private bool TryCreateEnumerableItemHandler(CachedTypeHandler typeHandler, Type itemType)
         {
             if (!itemType.ImplementsInterface(typeof(IEnumerable))) return false;
@@ -108,7 +55,7 @@ namespace Playground
             Type expectedElementType = typeof(E);
             if (elementHandler.IsPrimitive)
             {
-                ItemHandler<T> itemHandler = (collection, expectedType, parentJob) =>
+                ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
                 {
                     if (collection == null)
                     {
@@ -117,7 +64,7 @@ namespace Playground
                     }
 
                     Type collectionType = collection.GetType();
-                    if (TryHandleItemAsRef(collection, parentJob, collectionType)) return;
+                    if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
                     bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && collectionType != expectedType);
@@ -145,43 +92,7 @@ namespace Playground
             }
             else
             {
-                Func<EnumerableStackJob, bool> processor = job =>
-                {
-                    int beforeStackSize = jobStack.Count;
-                    var enumeratorBox = job.GetEnumeratorBox<IEnumerator<E>>();
-
-                    if (job.currentIndex == 0)
-                    {
-                        if (job.writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
-
-                        writer.OpenCollection();
-
-                        // We did the first MoveNext already to check if the collection is empty, so we can directly get the current element.
-                        E element = enumeratorBox.value.Current;
-                        if (element == null) writer.WriteNullValue();
-                        else if (element.GetType() == expectedElementType) elementHandler.HandleItem(element, expectedElementType, job);
-                        else GetCachedTypeHandler(element.GetType()).HandleItem(element, typeof(E), job);
-                        job.currentIndex++;
-                        if (jobStack.Count != beforeStackSize) return false;
-                    }
-
-                    while(enumeratorBox.value.MoveNext())
-                    {
-                        writer.WriteComma();
-                        E element = enumeratorBox.value.Current;
-                        if (element == null) writer.WriteNullValue();
-                        else if (element.GetType() == expectedElementType) elementHandler.HandleItem(element, expectedElementType, job);
-                        else GetCachedTypeHandler(element.GetType()).HandleItem(element, typeof(E), job);
-                        job.currentIndex++;
-                        if (jobStack.Count != beforeStackSize) return false;
-                    }
-
-                    writer.CloseCollection();
-                    if (job.writeTypeInfo) FinishTypeInfoObject();
-                    return true;
-                };
-
-                ItemHandler<T> itemHandler = (collection, expectedType, parentJob) =>
+                ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
                 {
                     if (collection == null)
                     {
@@ -190,77 +101,65 @@ namespace Playground
                     }
 
                     Type collectionType = collection.GetType();
-                    if (TryHandleItemAsRef(collection, parentJob, collectionType)) return;
+                    if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
                     bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                         (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && collectionType != expectedType);
+                    if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
-                    var enumerator = getEnumerator(collection);
-                    if (!enumerator.MoveNext()) // We do the first MoveNet already here, so we don't do it later in processing
+                    writer.OpenCollection();
+                    ENUM enumerator = getEnumerator(collection);
+                    int index = 0;
+                    if (enumerator.MoveNext())
                     {
-                        if (writeTypeInfo)
-                        {
-                            StartTypeInfoObject(typeHandler.preparedTypeInfo);
-                            writer.OpenCollection();
-                            writer.CloseCollection();
-                            FinishTypeInfoObject();
-                        }
+                        E element = enumerator.Current;
+                        if (element == null) writer.WriteNullValue();
                         else
                         {
-                            writer.OpenCollection();
-                            writer.CloseCollection();
+                            Type elementType = element.GetType();
+                            CachedTypeHandler actualHandler = elementHandler;
+                            if (elementType != expectedType) actualHandler = GetCachedTypeHandler(elementType);
+                            byte[] elementName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                            ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
+                            actualHandler.HandleItem(element, elementInfo);
+                            itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
-                        return;
+                        index++;
                     }
-                    var job = enumerableStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, collection);
-                    job.Init(this, processor, collection, writeTypeInfo);
-                    job.SetEnumerator(enumerator);
-                    AddJobToStack(job);
+                    while (enumerator.MoveNext())
+                    {
+                        writer.WriteComma();
+
+                        E element = enumerator.Current;
+                        if (element == null) writer.WriteNullValue();
+                        else
+                        {
+                            Type elementType = element.GetType();
+                            CachedTypeHandler actualHandler = elementHandler;
+                            if (elementType != expectedType) actualHandler = GetCachedTypeHandler(elementType);
+                            byte[] elementName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                            ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
+                            actualHandler.HandleItem(element, elementInfo);
+                            itemInfoRecycler.ReturnItemInfo(elementInfo);
+                        }
+                        index++;
+                    }
+                    writer.CloseCollection();
+
+                    if (writeTypeInfo) FinishTypeInfoObject();
                 };
                 typeHandler.SetItemHandler(itemHandler, false);
             }
         }
+
+
 
         private void CreateEnumerableItemHandler<T>(CachedTypeHandler typeHandler) where T : IEnumerable
         {
             bool requiresItemNames = settings.RequiresItemNames;
             Type expectedElementType = typeof(object);
 
-            Func<EnumerableStackJob, bool> processor = job =>
-            {
-                int beforeStackSize = jobStack.Count;
-                var enumeratorBox = job.GetEnumeratorBox<IEnumerator>();
-
-                if (job.currentIndex == 0)
-                {
-                    if (job.writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
-
-                    writer.OpenCollection();
-
-                    // We did the first MoveNext already to check if the collection is empty, so we can directly get the current element.
-                    object element = enumeratorBox.value.Current;
-                    if (element == null) writer.WriteNullValue();
-                    else GetCachedTypeHandler(element.GetType()).HandleItem(element, expectedElementType, job);
-                    job.currentIndex++;
-                    if (jobStack.Count != beforeStackSize) return false;
-                }
-
-                while (enumeratorBox.value.MoveNext())
-                {
-                    writer.WriteComma();
-                    object element = enumeratorBox.value.Current;
-                    if (element == null) writer.WriteNullValue();
-                    else GetCachedTypeHandler(element.GetType()).HandleItem(element, expectedElementType, job);
-                    job.currentIndex++;
-                    if (jobStack.Count != beforeStackSize) return false;
-                }
-
-                writer.CloseCollection();
-                if (job.writeTypeInfo) FinishTypeInfoObject();
-                return true;
-            };
-
-            ItemHandler<T> itemHandler = (collection, expectedType, parentJob) =>
+            ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
             {
                 if (collection == null)
                 {
@@ -269,34 +168,51 @@ namespace Playground
                 }
 
                 Type collectionType = collection.GetType();
-                if (TryHandleItemAsRef(collection, parentJob, collectionType)) return;
+                if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
                 bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
                     (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && collectionType != expectedType);
+                if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
+                writer.OpenCollection();
                 var enumerator = collection.GetEnumerator();
-                if (!enumerator.MoveNext()) // We do the first MoveNet already here, so we don't do it later in processing
+                int index = 0;
+                if (enumerator.MoveNext())
                 {
-                    if (writeTypeInfo)
-                    {
-                        StartTypeInfoObject(typeHandler.preparedTypeInfo);
-                        writer.OpenCollection();
-                        writer.CloseCollection();
-                        FinishTypeInfoObject();
-                    }
+                    object element = enumerator.Current;
+                    if (element == null) writer.WriteNullValue();
                     else
                     {
-                        writer.OpenCollection();
-                        writer.CloseCollection();
+                        Type elementType = element.GetType();
+                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
+                        byte[] itemName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                        ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
+                        actualHandler.HandleItem(element, elementInfo);
                     }
-                    return;
+                    index++;
                 }
-                var job = enumerableStackJobRecycler.GetJob(parentJob, requiresItemNames ? CreateItemName(parentJob) : null, collection);
-                job.Init(this, processor, collection, writeTypeInfo);
-                job.SetEnumerator(enumerator);
-                AddJobToStack(job);
+                while (enumerator.MoveNext())
+                {
+                    writer.WriteComma();
+
+                    object element = enumerator.Current;
+                    if (element == null) writer.WriteNullValue();
+                    else
+                    {
+                        Type elementType = element.GetType();
+                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
+                        byte[] itemName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                        ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
+                        actualHandler.HandleItem(element, elementInfo);
+                    }
+                    index++;
+                }
+                writer.CloseCollection();
+
+                if (writeTypeInfo) FinishTypeInfoObject();
             };
             typeHandler.SetItemHandler(itemHandler, false);
+
         }
     }
 

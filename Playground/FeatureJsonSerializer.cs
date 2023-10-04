@@ -14,73 +14,37 @@ using System.Reflection.Metadata;
 using System.Reflection;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using FeatureLoom.Helpers;
+using FeatureLoom.Collections;
 
 namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
         FeatureLock serializerLock = new FeatureLock();
-        Stack<StackJob> jobStack = new Stack<StackJob>();
-        Dictionary<object, RefJob> objToJob = new();
+        Dictionary<object, ItemInfo> objToItemInfo = new();
         MemoryStream memoryStream = new MemoryStream();
         JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
         Settings settings;
         Dictionary<Type, CachedTypeHandler> typeHandlerCache = new();
         Dictionary<Type, CachedStringValueWriter> stringValueWriterCache = new();
 
-        delegate void ItemHandler<T>(T item, Type expectedType, StackJob parentJob);
+        delegate void ItemHandler<T>(T item, Type expectedType, ItemInfo itemInfo);
 
-        StackJobRecycler<DictionaryStackJob> dictionaryStackJobRecycler;
-        StackJobRecycler<ListStackJob> listStackJobRecycler;
-        StackJobRecycler<EnumerableStackJob> enumerableStackJobRecycler;
-        StackJobRecycler<ComplexStackJob> complexStackJobRecycler;
-        StackJobRecycler<RefJob> refJobRecycler;
+        ItemInfoRecycler itemInfoRecycler;
 
         public FeatureJsonSerializer(Settings settings = null)
         {
             this.settings = settings ?? new();
 
-            InitStackJobRecyclers();
-
-            /*
-            prepareTypeInfoObjectFromBytes = PrepareTypeInfoObject;
-            prepareTypeInfoObjectFromType = PrepareTypeInfoObject;
-            finishTypeInfoObject = FinishTypeInfoObject;
-            if (settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
-            {
-                prepareTypeInfoObjectFromBytes = (_, _) => { };
-                prepareTypeInfoObjectFromType = (_, _) => { };
-                finishTypeInfoObject = (_) => { };
-            }
-            tryHandleAsRef = TryHandleAsRef;
-            if (settings.referenceCheck == ReferenceCheck.NoRefCheck)
-            {
-                tryHandleAsRef = (_, _, _) => false;
-            }
-            */
+            itemInfoRecycler = new ItemInfoRecycler(this);
         }
-
-        void InitStackJobRecyclers()
-        {
-            dictionaryStackJobRecycler = new(this);
-            listStackJobRecycler = new(this);
-            enumerableStackJobRecycler = new(this);
-            complexStackJobRecycler = new(this);
-            refJobRecycler = new(this);
-        }
-
         void FinishSerialization()
         {
             memoryStream.Position = 0;
             writer.stream = null;
-            if (objToJob.Count > 0) objToJob.Clear();
-            if (jobStack.Count > 0) jobStack.Clear();
+            if (objToItemInfo.Count > 0) objToItemInfo.Clear();
 
-            dictionaryStackJobRecycler.RecyclePostponedJobs();    
-            refJobRecycler.RecyclePostponedJobs();
-            listStackJobRecycler.RecyclePostponedJobs();
-            enumerableStackJobRecycler.RecyclePostponedJobs();
-            complexStackJobRecycler.RecyclePostponedJobs();
+            itemInfoRecycler.ResetPooledItemInfos();
         }
 
         CachedTypeHandler lastTypeHandler = null;
@@ -98,24 +62,32 @@ namespace Playground
                     {
                         return "null";
                     }
-
-                    Type expectedType = typeof(T);
                     Type itemType = item.GetType();
 
                     if (lastTypeHandlerType == itemType)
                     {
-                        lastTypeHandler.HandleItem(item, expectedType, null);
+                        if (lastTypeHandler.IsPrimitive && !typeof(T).IsClass) lastTypeHandler.HandlePrimitiveItem(item);
+                        else
+                        {
+                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                            lastTypeHandler.HandleItem(item, itemInfo);
+                            itemInfoRecycler.ReturnItemInfo(itemInfo);
+                        }
                     }
                     else
                     {
                         var typeHandler = GetCachedTypeHandler(itemType);
-                        typeHandler.HandleItem(item, expectedType, null);
+                        if (typeHandler.IsPrimitive && !typeof(T).IsClass) typeHandler.HandlePrimitiveItem(item);
+                        else
+                        {
+                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                            typeHandler.HandleItem(item, itemInfo);
+                            itemInfoRecycler.ReturnItemInfo(itemInfo);
+                        }
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;
                     }
-
-                    LoopJobStack();
 
                     return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
                 }
@@ -124,6 +96,20 @@ namespace Playground
                     FinishSerialization();
                 }
             }
+        }
+
+        ItemInfo CreateItemInfo<T>(T item, ItemInfo parentinfo, byte[] itemName)
+        {
+            if (!settings.RequiresItemInfos) return null;
+            if (typeof(T).IsClass) return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
+            else return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
+        }
+
+        ItemInfo CreateItemInfo<T>(T item, ItemInfo parentinfo, string itemName)
+        {
+            if (!settings.RequiresItemInfos) return null;
+            if (typeof(T).IsClass) return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
+            else return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
         }
 
         public void Serialize<T>(Stream stream, T item)
@@ -140,47 +126,36 @@ namespace Playground
                         return;
                     }
 
-                    Type expectedType = typeof(T);
                     Type itemType = item.GetType();
 
                     if (lastTypeHandlerType == itemType)
                     {
-                        lastTypeHandler.HandleItem(item, expectedType, null);
+                        if (lastTypeHandler.IsPrimitive && !typeof(T).IsClass) lastTypeHandler.HandlePrimitiveItem(item);
+                        else
+                        {
+                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                            lastTypeHandler.HandleItem(item, itemInfo);
+                            itemInfoRecycler.ReturnItemInfo(itemInfo);
+                        }
                     }
                     else
                     {
                         var typeHandler = GetCachedTypeHandler(itemType);
-                        typeHandler.HandleItem(item, expectedType, null);
+                        if (typeHandler.IsPrimitive && !typeof(T).IsClass) typeHandler.HandlePrimitiveItem(item);
+                        else
+                        {
+                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                            typeHandler.HandleItem(item, itemInfo);
+                            itemInfoRecycler.ReturnItemInfo(itemInfo);
+                        }
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;
                     }
-
-                    LoopJobStack();
                 }
                 finally
                 {
                     FinishSerialization();
-                }
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void AddJobToStack(StackJob job)
-        {
-            jobStack.Push(job);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void LoopJobStack()
-        {
-            while (jobStack.TryPeek(out StackJob job))
-            {
-                bool finished = job.Process();
-                if (finished)
-                {
-                    jobStack.Pop();
-                    job.Recycle();
                 }
             }
         }
@@ -214,7 +189,7 @@ namespace Playground
 
         private CachedTypeHandler CreateCachedTypeHandler(Type itemType)
         {
-            CachedTypeHandler typeHandler = new CachedTypeHandler();
+            CachedTypeHandler typeHandler = new CachedTypeHandler(this);
             typeHandlerCache[itemType] = typeHandler;
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
@@ -228,6 +203,7 @@ namespace Playground
             else if (itemType == typeof(sbyte)) CreatePrimitiveItemHandler<sbyte>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(byte)) CreatePrimitiveItemHandler<byte>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(string)) CreatePrimitiveItemHandler<string>(typeHandler, writer.WritePrimitiveValue);
+            //else if (itemType == typeof(string)) CreatePrimitiveItemHandler_string(typeHandler);
             else if (itemType == typeof(float)) CreatePrimitiveItemHandler<float>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(double)) CreatePrimitiveItemHandler<double>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(char)) CreatePrimitiveItemHandler<char>(typeHandler, writer.WritePrimitiveValue);
@@ -251,6 +227,32 @@ namespace Playground
                 generic.Invoke(this, new object[] { typeHandler });
             }
         }
+
+        private void CreatePrimitiveItemHandler_string(CachedTypeHandler typeHandler)
+        {
+            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                typeHandler.SetItemHandler<string>(HandleWithTypeInfo, true);
+            }
+            else
+            {
+                typeHandler.SetItemHandler<string>(HandleWithoutTypeInfo, true);
+            }
+
+            void HandleWithTypeInfo(string item, Type expectedType, ItemInfo parentInfo)
+            {
+                StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                writer.WritePrimitiveValue(item);
+                FinishTypeInfoObject();
+            }
+
+            void HandleWithoutTypeInfo(string item, Type expectedType, ItemInfo parentInfo)
+            {
+                writer.WritePrimitiveValue(item);
+            }
+        }
+
+
 
         private void CreatePrimitiveItemHandler<T>(CachedTypeHandler typeHandler, Action<T> write)
         {
@@ -283,7 +285,7 @@ namespace Playground
                     }
                 }, true);
             }
-        }
+        }        
 
         private void CreateEnumItemHandler<T>(CachedTypeHandler typeHandler) where T : struct, Enum
         {
@@ -315,45 +317,36 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        byte[] CreateItemName(StackJob parentJob)
+        private bool TryHandleItemAsRef<T>(T item, ItemInfo itemInfo, Type itemType)
         {
-            if (parentJob == null) return writer.PrepareRootName();
-            return parentJob.GetCurrentChildItemName();
-        }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryHandleItemAsRef<T>(T item, StackJob parentJob, Type itemType)
-        {
-            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || item == null || !itemType.IsClass) return false;
-            return TryHandleObjAsRef(item, parentJob, itemType);
+            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || itemInfo == null || item == null || !itemType.IsClass) return false;
+            return TryHandleObjAsRef(item, itemInfo, itemType);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryHandleObjAsRef(object obj, StackJob parentJob, Type itemType)
+        private bool TryHandleObjAsRef(object obj, ItemInfo itemInfo, Type itemType)
         {
             if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
             {
-                RefJob newRefJob = refJobRecycler.GetJob(parentJob, CreateItemName(parentJob), obj);
-                newRefJob.Recycle(); // Actual recycling will be postponed based on ReferenceCheck.AlwaysReplaceByRef setting.
-                if (!objToJob.TryAdd(obj, newRefJob))
+                if (!objToItemInfo.TryAdd(obj, itemInfo))
                 {
-                    writer.WriteRefObject(objToJob[obj]);
+                    writer.WriteRefObject(objToItemInfo[obj]);
                     return true;
                 }
             }
             else
             {
-                while(parentJob != null)
+                itemInfo = itemInfo.parentInfo;
+                while (itemInfo != null)
                 {
-                    if (parentJob.objItem == obj)
+                    if (itemInfo.objItem == obj)
                     {
-                        if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef) writer.WriteRefObject(parentJob);
+                        if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByRef) writer.WriteRefObject(itemInfo);
                         else if (settings.referenceCheck == ReferenceCheck.OnLoopReplaceByNull) writer.WriteNullValue();
                         else if (settings.referenceCheck == ReferenceCheck.OnLoopThrowException) throw new Exception("Circular referencing detected!");
                         return true;
                     }
-                    parentJob = parentJob.parentJob;
+                    itemInfo = itemInfo.parentInfo;
                 }
             }
 

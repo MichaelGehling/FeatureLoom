@@ -84,9 +84,9 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte[] PreparePrimitiveToBytes<T>(T value)
+            public static byte[] PreparePrimitiveToBytes<T>(T value)
             {
-                return Encoding.UTF8.GetBytes(value.ToString());
+                return Encoding.UTF8.GetBytes(value.ToString()); // TODO optimize
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -289,26 +289,28 @@ namespace Playground
 
             static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();
             static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();            
-            Stack<StackJob> reverseJobStack = new Stack<StackJob>();
-            public void WriteRefObject(StackJob job)
+            Stack<ItemInfo> reverseItemInfoStack = new Stack<ItemInfo>();
+            public void WriteRefObject(ItemInfo itemInfo)
             {
-                while (job != null)
+                while (itemInfo != null)
                 {
-                    reverseJobStack.Push(job);
-                    job = job.parentJob;
+                    reverseItemInfoStack.Push(itemInfo);
+                    itemInfo = itemInfo.parentInfo;
                 }
 
                 stream.Write(REFOBJECT_PRE, 0, REFOBJECT_PRE.Length);
 
-                if (reverseJobStack.TryPop(out job))
+                if (reverseItemInfoStack.TryPop(out itemInfo))
                 {
-                    stream.Write(job.itemName, 0, job.itemName.Length);
+                    var name = itemInfo.ItemName;
+                    stream.Write(itemInfo.ItemName, 0, name.Length);
                 }
 
-                while (reverseJobStack.TryPop(out job))
+                while (reverseItemInfoStack.TryPop(out itemInfo))
                 {
-                    if (job.itemName[0] != OPENCOLLECTION[0]) WriteDot();
-                    stream.Write(job.itemName, 0, job.itemName.Length);                    
+                    var name = itemInfo.ItemName;
+                    if (name[0] != OPENCOLLECTION[0]) WriteDot();
+                    stream.Write(name, 0, name.Length);                    
                 }
                 stream.Write(REFOBJECT_POST, 0, REFOBJECT_POST.Length);
             }
@@ -348,7 +350,7 @@ namespace Playground
                 return Encoding.UTF8.GetBytes(str);
             }
 
-            static readonly byte[] ROOT = "$".ToByteArray();
+            public static readonly byte[] ROOT = "$".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public byte[] PrepareRootName() => ROOT;
 
