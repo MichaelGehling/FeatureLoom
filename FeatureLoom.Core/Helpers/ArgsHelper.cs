@@ -45,7 +45,7 @@ namespace FeatureLoom.Helpers
                     var value = arg.Substring(assignment);
                     Add(key, value);
                 }
-                if (arg.StartsWith(bullet))
+                else if (arg.StartsWith(bullet))
                 {
                     var key = arg.Substring(bullet);
                     Add(key, "");

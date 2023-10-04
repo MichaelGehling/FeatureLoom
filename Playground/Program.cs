@@ -68,6 +68,7 @@ namespace Playground
             public int bbb = 3;
             public List<int> intList;
             public DateTime dt = DateTime.Now;
+            public TestEnum testEnum;
 
             public TestConfig()
             {
@@ -86,6 +87,7 @@ namespace Playground
 
         private static async Task Main()
         {
+
 
             IWebServer webserver = new DefaultWebServer();
 
