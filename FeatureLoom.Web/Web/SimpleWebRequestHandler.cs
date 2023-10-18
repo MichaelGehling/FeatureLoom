@@ -17,9 +17,23 @@ namespace FeatureLoom.Web
         protected string method = null;
         protected bool matchRouteExactly = false;
 
+        string[] supportedMethods;
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => matchRouteExactly;
+
         protected SimpleWebRequestHandler()
         {
 
+        }
+
+        // Use SimpleWebRequestHandler as a wrapper for any IWebRequestHandler to make it an IExtensibleWebRequestHandler
+        public SimpleWebRequestHandler(IWebRequestHandler handler)
+        {
+            this.matchRouteExactly = handler.RouteMustMatchExactly;
+            this.route = handler.Route;
+            this.handleActionAsync = handler.HandleRequestAsync;
+            this.supportedMethods = handler.SupportedMethods;
         }
 
         public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, Task<HandlerResult>> handleActionAsync, string method, bool matchRouteExactly = true)
@@ -28,6 +42,7 @@ namespace FeatureLoom.Web
             this.route = route ?? "";
             this.handleActionAsync = handleActionAsync;            
             this.method = method;
+            this.supportedMethods = method != null ? new string[] { method } : new string[] { };
         }
 
         public SimpleWebRequestHandler(string route, Func<IWebRequest, HandlerResult> handleAction, string method, bool matchRouteExactly = true)
@@ -39,6 +54,7 @@ namespace FeatureLoom.Web
             {
                 return Task.FromResult(handleAction(request)); 
             };
+            this.supportedMethods = method != null ? new string[] { method } : new string[] { };
         }
 
         public SimpleWebRequestHandler(string route, Func<HandlerResult> handleAction, string method, bool matchRouteExactly = true)
@@ -50,6 +66,7 @@ namespace FeatureLoom.Web
             {
                 return Task.FromResult(handleAction());
             };
+            this.supportedMethods = method != null ? new string[] { method } : new string[] { };
         }
 
         public SimpleWebRequestHandler(string route, Func<IWebRequest, IWebResponse, HandlerResult> handleAction, string method, bool matchRouteExactly = true)
@@ -61,6 +78,7 @@ namespace FeatureLoom.Web
             {
                 return Task.FromResult(handleAction(request, response));                
             };
+            this.supportedMethods = method != null ? new string[] { method } : new string[] { };
         }
 
         public SimpleWebRequestHandler(string route, Func<Task<HandlerResult>> handleActionAsync, string method, bool matchRouteExactly = true)
@@ -72,6 +90,7 @@ namespace FeatureLoom.Web
             {
                 return handleActionAsync();
             };
+            this.supportedMethods = method != null ? new string[] { method } : new string[] { };
         }
 
         public SimpleWebRequestHandler(string route, Func<IWebRequest, Task<HandlerResult>> handleActionAsync, string method, bool matchRouteExactly = true)
@@ -83,6 +102,7 @@ namespace FeatureLoom.Web
             {
                 return handleActionAsync(request);
             };
+            this.supportedMethods = method != null ? new string[] { method } : new string[] { };
         }
 
         public string Route => route;

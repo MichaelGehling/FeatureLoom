@@ -12,6 +12,7 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace FeatureLoom.Storages
 {
@@ -131,11 +132,12 @@ namespace FeatureLoom.Storages
             }
         }
 
+
         private void ProcessChangeNotification_Directory(FileSystemObserver.ChangeNotification notification, DirectoryInfo directoryInfo)
         {
             if (notification.changeType.IsFlagSet(WatcherChangeTypes.Created))
             {
-                var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
+                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix.Replace('/', '\\')));
                 foreach (var fileInfo in addedFileInfos)
                 {
                     lock (fileSet)
@@ -150,7 +152,7 @@ namespace FeatureLoom.Storages
             {
                 UpdateOnRemovedDir();
 
-                var addedFileInfos = directoryInfo.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
+                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix.Replace('/', '\\')));
                 foreach (var fileInfo in addedFileInfos)
                 {
                     lock (fileSet)
@@ -276,7 +278,7 @@ namespace FeatureLoom.Storages
         {
             if (!rootDir.RefreshAnd().Exists) return new HashSet<string>();
 
-            var fileInfos = rootDir.GetFiles("*" + config.fileSuffix, SearchOption.AllDirectories);
+            var fileInfos = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix.Replace('/', '\\')));
             var newFileSet = new HashSet<string>();
             foreach (var info in fileInfos)
             {
@@ -314,10 +316,10 @@ namespace FeatureLoom.Storages
 
         protected virtual string FilePathToUri(string filePath)
         {
-            if (!filePath.StartsWith(rootDir.FullName) || !filePath.EndsWith(config.fileSuffix)) return null;
-
-            int basePathLength = rootDir.FullName.Length + 1;
-            var rawUri = filePath.Substring(basePathLength, filePath.Length - basePathLength - config.fileSuffix.Length);
+            if (!filePath.StartsWith(rootDir.FullName) || !filePath.EndsWith(config.fileSuffix.Replace('/', '\\'))) return null;
+            string basePath = rootDir.FullName;
+            if (!basePath.EndsWith("\\")) basePath += "\\";
+            filePath.TryExtract($"{basePath}{{rawUri}}{config.fileSuffix.Replace('/', '\\')}", out string rawUri);            
             return rawUri.Replace('\\', '/');
         }
 
@@ -407,7 +409,7 @@ namespace FeatureLoom.Storages
                     if (!rootDir.RefreshAnd().Exists) return (true, Array.Empty<string>());
 
                     var uris = new List<string>();
-                    var files = await rootDir.GetFilesAsync($"*{config.fileSuffix}", SearchOption.AllDirectories);
+                    var files = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*"+ config.fileSuffix.Replace('/','\\')));
                     foreach (var file in files)
                     {
                         string uri = FilePathToUri(file.FullName);

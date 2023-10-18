@@ -12,7 +12,7 @@ namespace FeatureLoom.Web
 
         bool Running { get; }
 
-        void AddRequestHandler(IWebRequestHandler handler);
+        IExtensibleWebRequestHandler AddRequestHandler(IWebRequestHandler handler);
 
         void RemoveRequestHandler(IWebRequestHandler handler);
 

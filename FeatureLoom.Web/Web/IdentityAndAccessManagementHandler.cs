@@ -18,12 +18,20 @@ namespace FeatureLoom.Web
         public string route = "/IdentityAndAccess";
         public string Route => route;
 
+        string[] supportedMethods = { "DELETE" };
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => false;
+
         public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             Session session = Session.Current;
             if (session?.Identity == null) HandlerResult.Handled_Forbidden();            
 
             var splits = request.RelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);            
+
+            //TODO: Currently only supports deleting identities, should be extended to also allow creating identities
 
             if (splits.Length == 2 && splits[0] == "Identity")
             {

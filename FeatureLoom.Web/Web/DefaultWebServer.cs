@@ -147,16 +147,18 @@ namespace FeatureLoom.Web
             }
         }
 
-        public void AddRequestHandler(IWebRequestHandler handler)
+        public IExtensibleWebRequestHandler AddRequestHandler(IWebRequestHandler handler)
         {
+            IExtensibleWebRequestHandler extensibleHandler = handler.ToExtensibleHandler();
             using (myLock.Lock())
             {
                 var requestHandlers = this.requestHandlers;
                 if (running) requestHandlers = new List<IWebRequestHandler>(requestHandlers);
-                requestHandlers.Add(handler);
+                requestHandlers.Add(extensibleHandler);
                 requestHandlers.Sort(routeComparer);
                 this.requestHandlers = requestHandlers;
             }
+            return extensibleHandler;
         }
 
         public void RemoveRequestHandler(IWebRequestHandler handler)
@@ -165,8 +167,8 @@ namespace FeatureLoom.Web
             {
                 var requestHandlers = this.requestHandlers;
                 if (running) requestHandlers = new List<IWebRequestHandler>(requestHandlers);
-                requestHandlers.Remove(handler);
-                requestHandlers.Sort(routeComparer);
+                requestHandlers.RemoveWhere(h => h.Route == handler.Route);
+                //requestHandlers.Sort(routeComparer);
                 this.requestHandlers = requestHandlers;
             }
         }
@@ -304,17 +306,18 @@ namespace FeatureLoom.Web
 
                 var currentRequestHandlers = this.requestHandlers; // take current reference to avoid change while execution.                
                 foreach (var handler in currentRequestHandlers)
-                {
-                    if (request.Path.StartsWith(handler.Route))
+                {                    
+                    if (!request.Path.StartsWith(handler.Route)) continue;
+                    if (handler.RouteMustMatchExactly && request.Path != handler.Route) continue;
+                    if (!handler.SupportedMethods.EmptyOrNull() && !handler.SupportedMethods.Contains(request.Method)) continue;
+
+                    contextWrapper.SetRoute(handler.Route);
+                    HandlerResult result = await handler.HandleRequestAsync(request, response);
+                    if (await ProcessHandlerResult(request, response, result))
                     {
-                        contextWrapper.SetRoute(handler.Route);
-                        HandlerResult result = await handler.HandleRequestAsync(request, response);
-                        if (await ProcessHandlerResult(request, response, result))
-                        {
-                            await ReactOnResult(request, response, result);
-                            return;
-                        }
-                    }
+                        await ReactOnResult(request, response, result);
+                        return;
+                    }                    
                 }
 
                 // Request was not handled so NotFound StatusCode is set, but it has to be ensured that the response stream was not already written.

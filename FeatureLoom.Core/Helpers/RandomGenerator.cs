@@ -250,5 +250,47 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        private const string DefaultCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        /// <summary>
+        /// Generates a random string of a specified length using an optional set of allowed characters.
+        /// </summary>
+        /// <param name="length">The desired length of the resulting string.</param>
+        /// <param name="crypto">If true, the bytes are created by a cryptographic number generator, ensuring the randomness is suitable for security tasks.</param>
+        /// <param name="allowedChars">An optional set of characters that the resulting string can be composed of. If not provided, a default set of alphanumeric characters will be used.</param>
+        /// <returns>A random string of the specified length composed of characters from the provided or default character set.</returns>
+        public static string String(int length, bool crypto = false, string allowedChars = null)
+        {
+            if (length <= 0) return string.Empty;
+
+            string characterSet = allowedChars ?? DefaultCharacters;
+            int maxValidByteValue = 256 - (256 % characterSet.Length);  // Highest byte value that doesn't introduce bias
+
+            char[] chars = new char[length];
+            int charsFilled = 0;
+
+            // Allocate a byte buffer with twice the required length as initial size to allow skipping invalid values
+            byte[] randomBytes = new byte[2 * length];
+            int numGeneratedBytes;
+
+            while (charsFilled < length)
+            {
+                numGeneratedBytes = 2 * (length - charsFilled);
+                Bytes(randomBytes, 0, numGeneratedBytes, crypto);  // Fill the buffer with random bytes
+
+                for (int i = 0; i < numGeneratedBytes && charsFilled < length; i++)
+                {
+                    // Ensure the value is in the calculated limit to avoid a bias, otherwise skip this byte
+                    if (randomBytes[i] < maxValidByteValue)
+                    {
+                        chars[charsFilled] = characterSet[randomBytes[i] % characterSet.Length]; 
+                        charsFilled++;
+                    }
+                }
+            }
+
+            return new string(chars);
+        }
+
+
     }
 }

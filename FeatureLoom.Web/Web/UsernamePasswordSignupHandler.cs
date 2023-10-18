@@ -14,13 +14,20 @@ namespace FeatureLoom.Web
     {
         public string route = "/Signup/UsernamePassword";
         public IdentityRole defaultRole = null;
+        public bool createSessionAfterSignup = true;
         public string Route => route;
+
+        string[] supportedMethods = { "POST" };
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => true;
 
         public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             if (request.RelativePath != "") return HandlerResult.NotHandled();
 
-            if (!request.IsPost) return HandlerResult.Handled_MethodNotAllowed();
+            if (!request.IsPost) return HandlerResult.NotHandled_MethodNotAllowed();
 
             
             try
@@ -45,16 +52,21 @@ namespace FeatureLoom.Web
                     }
                     else
                     {
-                        Log.INFO(this.GetHandle(), $"Signup successful for user [{usernamePassword.username}]");                        
+                        Log.INFO(this.GetHandle(), $"Signup successful for user [{usernamePassword.username}]");
 
-                        Session session = new Session(identity);
-                        if (await session.TryStoreAsync())
+                        if (createSessionAfterSignup)
                         {
-                            response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });                            
-                        }
-                        else
-                        {
-                            Log.ERROR(this.GetHandle(), "Failed to store session!");
+                            Log.INFO(this.GetHandle(), $"Creating session for new identity [{usernamePassword.username}]");
+
+                            Session session = new Session(identity);
+                            if (await session.TryStoreAsync())
+                            {
+                                response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });
+                            }
+                            else
+                            {
+                                Log.ERROR(this.GetHandle(), "Failed to store session!");
+                            }
                         }
 
                         return HandlerResult.Handled_Created();

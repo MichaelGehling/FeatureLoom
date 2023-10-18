@@ -19,6 +19,12 @@ namespace FeatureLoom.Web
         private IWebMessageTranslator translator;
         public string Route => route;
 
+        string[] supportedMethods = { "GET" };
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => true;
+
         public HttpServerFetchProvider(string route, IWebMessageTranslator translator, int bufferSize = 100)
         {
             if (!route.StartsWith("/")) route = "/" + route;

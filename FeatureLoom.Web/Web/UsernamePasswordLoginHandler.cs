@@ -21,6 +21,12 @@ namespace FeatureLoom.Web
 
         ICredentialHandler<UsernamePassword> credentialHandler = new UserNamePasswordPBKDF2Handler();
 
+        string[] supportedMethods = { "POST" };
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => true;
+
         public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             if (request.RelativePath != "") return HandlerResult.NotHandled_NotFound();

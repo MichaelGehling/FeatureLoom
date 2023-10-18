@@ -43,6 +43,7 @@ namespace FeatureLoom.Storages
             };
         }
         private Config config;
+        private string[] supportedMethods;
 
         private IStorageReader reader;
         private IStorageWriter writer;
@@ -50,18 +51,31 @@ namespace FeatureLoom.Storages
 
         public StorageWebAccess(string route, Config config = null)
         {
-            this.config = config ?? new Config(){};            
+            this.config = config ?? new Config() { };
             this.config.TryUpdateFromStorage(false);
 
             route = route.TrimEnd("/");
-            if (!route.StartsWith("/")) route = "/" + route;            
+            if (!route.StartsWith("/")) route = "/" + route;
             this.route = route;
 
             reader = Storage.GetReader(this.config.category);
             writer = Storage.GetWriter(this.config.category);
+
+            List<string> methods = new List<string>();
+            if (config.allowRead) methods.Add("GET");
+            if (config.allowChange)
+            {
+                methods.Add("PUT");
+                methods.Add("DELETE");
+            }
+            supportedMethods = methods.ToArray();
         }
 
         public string Route => route;
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => false;
 
         public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {

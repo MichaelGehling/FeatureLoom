@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Security;
 using System;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Web
@@ -28,6 +29,8 @@ namespace FeatureLoom.Web
         public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<E, HandlerResult> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction(e)));
         public static IExtensibleWebRequestHandler HandleException<E>(this IExtensibleWebRequestHandler handler, Func<HandlerResult> reaction) where E : Exception => handler.HandleException((E e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction()));
         public static IExtensibleWebRequestHandler HandleException(this IExtensibleWebRequestHandler handler, Func<HandlerResult> reaction) => handler.HandleException((Exception e, IWebRequest req, IWebResponse resp) => Task.FromResult(reaction()));
+
+        public static IExtensibleWebRequestHandler ToExtensibleHandler(this IWebRequestHandler handler) => handler is IExtensibleWebRequestHandler extensible ? extensible : new SimpleWebRequestHandler(handler);
     }
 
 }

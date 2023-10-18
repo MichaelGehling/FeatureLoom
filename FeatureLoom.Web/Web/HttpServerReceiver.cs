@@ -30,6 +30,12 @@ namespace FeatureLoom.Web
 
         public string Route => route;
 
+        string[] supportedMethods = { "POST" };
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => true;
+
         public void DisconnectAll()
         {
             sourceHelper.DisconnectAll();

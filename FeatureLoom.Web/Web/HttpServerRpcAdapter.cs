@@ -29,6 +29,12 @@ namespace FeatureLoom.Web
 
         public int CountConnectedSinks => ((IRequester)rpcCaller).CountConnectedSinks;
 
+        string[] supportedMethods = { "POST" };
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => true;
+
         public async Task<HandlerResult> HandleRequestAsync(IWebRequest request, IWebResponse response)
         {
             if (!request.IsPost) return HandlerResult.Handled_MethodNotAllowed();            

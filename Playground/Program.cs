@@ -29,6 +29,7 @@ using FeatureLoom.Statemachines;
 using FeatureLoom.Core.Helpers;
 using System.Data;
 using System.Net.WebSockets;
+using Microsoft.Identity.Client;
 
 namespace Playground
 {
@@ -88,12 +89,11 @@ namespace Playground
         private static async Task Main()
         {
 
-            /*
             IWebServer webserver = new DefaultWebServer();
 
             Sender serverSender = new Sender();
             Forwarder serverReceiver = new Forwarder();
-            webserver.AddWebSocketEndpoint("/websocket", serverSender, serverReceiver, typeof(int));
+            webserver.AddWebSocketEndpoint("/websocket", serverSender, serverReceiver, typeof(DateTime));
             _ = webserver.Run(IPAddress.Loopback, 5001);
 
             ClientWebSocket clientWebSocket = new ClientWebSocket();
@@ -115,23 +115,25 @@ namespace Playground
             }
 
             Console.WriteLine("Connected to server");
-            WebSocketEndpoint clientEndpoint = new WebSocketEndpoint(clientWebSocket, typeof(int));
+            WebSocketEndpoint clientEndpoint = new WebSocketEndpoint(clientWebSocket, typeof(DateTime));
 
-            serverReceiver.ProcessMessage<int>(async msg =>
+            serverReceiver.ProcessMessage<DateTime>(async msg =>
             {
-                Console.WriteLine("S:" + msg.ToString());
-                serverSender.Send(msg + 1);
+                Log.FORCE("S:" + msg.ToString());      
+                await AppTime.WaitAsync(1.Seconds());
+                serverSender.Send(AppTime.Now);
             });
-            clientEndpoint.ProcessMessage<int>(async msg =>
+            clientEndpoint.ProcessMessage<DateTime>(async msg =>
             {
-                Console.WriteLine("C:" + msg.ToString());
-                clientEndpoint.Send(msg + 1);
+                Log.FORCE("C:" + msg.ToString());
+                await AppTime.WaitAsync(1.Seconds());
+                clientEndpoint.Send(AppTime.Now);
             });
             
-            clientEndpoint.Send(1);
+            clientEndpoint.Send(AppTime.Now);
 
             Console.ReadKey();
-            */
+            
             /*
             DefaultWebServer webserver = new DefaultWebServer();
 

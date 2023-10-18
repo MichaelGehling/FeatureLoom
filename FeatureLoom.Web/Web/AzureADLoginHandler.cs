@@ -38,8 +38,13 @@ namespace FeatureLoom.Web
         }
 
         public IdentityRole defaultRole = null;
+        string[] supportedMethods = new string[] {"GET"};
 
         public string Route => settings.route;
+
+        public string[] SupportedMethods => supportedMethods;
+
+        public bool RouteMustMatchExactly => false;
 
         Settings settings;
         static string[] scopes = new[] { "openid", "profile", "email", "user.read" };

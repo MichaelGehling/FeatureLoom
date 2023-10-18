@@ -25,7 +25,7 @@ namespace FeatureLoom.Security
         static TimeSpan refreshThreshold = 10.Seconds();
         public static TimeSpan RefreshThreshold { get => refreshThreshold; set => refreshThreshold = value; }
 
-        static TimeSpan cleanupInterval = 10.Minutes();
+        static TimeSpan cleanupInterval = 5.Minutes();
         static DateTime lastCleanup = AppTime.Now;
         static FeatureLock cleanupLock = new FeatureLock();
         static ISchedule cleanupSchedule = StartCleanupSchedule();
@@ -38,10 +38,10 @@ namespace FeatureLoom.Security
             {
                 if (cleanupSchedule == null) return TimeFrame.Invalid;
 
-                TimeFrame timer = new TimeFrame(lastCleanup, cleanupInterval);                
+                TimeFrame timer = new TimeFrame(lastCleanup + cleanupInterval, 1.Seconds());
                 if (!cleanupLock.IsLocked && timer.Elapsed(now))
                 {
-                    timer = new TimeFrame(now, cleanupInterval);
+                    timer = new TimeFrame(now + cleanupInterval, 1.Seconds());
                     _ = CleanUpAsync();                    
                 }                
                 return timer;
