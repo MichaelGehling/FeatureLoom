@@ -32,7 +32,7 @@ namespace FeatureLoom.Web
                 {
                     if (session.SessionId == sessionId && !session.LifeTime.Elapsed())
                     {
-                        if (Identity.Exists(session.IdentityId))
+                        if (await Identity.Exists(session.IdentityId))
                         {
                             if (session.Refresh())
                             {
@@ -59,10 +59,10 @@ namespace FeatureLoom.Web
 
             if (!anonymousIdentity.EmptyOrNull())
             {
-                if (!(await Identity.TryLoadIdentityAsync(anonymousIdentity)).TryOut(out Identity identity))
+                if (!(await Identity.TryGetIdentityAsync(anonymousIdentity)).TryOut(out Identity identity))
                 {
                     identity = new Identity(anonymousIdentity, null);
-                    _ = identity.TryStoreAsync();
+                    _ = identity.StoreAsync();
                 }
                 Session session = new Session(identity);
                 Session.Current = session;

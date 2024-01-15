@@ -265,13 +265,12 @@ namespace FeatureLoom.Synchronization
             {
                 mre.PulseAll();
             }
-       
+
             stop = true;            
             mre.PulseAll();            
-            Thread.Sleep(100);
-            Assert.Equal(numThreads, asyncEnded);
+            Thread.Sleep(100);            
             Assert.Equal(numThreads, syncEnded);
-            
+            Assert.Equal(numThreads, asyncEnded);
         }
 
     }

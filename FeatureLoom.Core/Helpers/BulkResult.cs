@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Core.Collections;
+﻿using FeatureLoom.Collections;
 using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using Newtonsoft.Json.Linq;
@@ -10,7 +10,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace FeatureLoom.Core.Helpers
+namespace FeatureLoom.Helpers
 {
     public interface IBulkResult
     {

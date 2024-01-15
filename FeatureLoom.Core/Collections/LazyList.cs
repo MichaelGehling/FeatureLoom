@@ -2,8 +2,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
-namespace FeatureLoom.Core.Collections
+namespace FeatureLoom.Collections
 {
     public struct LazyList<T> : IList<T>
     {
@@ -53,7 +54,7 @@ namespace FeatureLoom.Core.Collections
 
         public IEnumerator<T> GetEnumerator()
         {
-            if (!list.Exists) return (IEnumerator<T>)Array.Empty<T>().GetEnumerator();
+            if (!list.Exists) return Enumerable.Empty<T>().GetEnumerator();
             return list.Obj.GetEnumerator();
         }
 
@@ -82,7 +83,7 @@ namespace FeatureLoom.Core.Collections
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            if (!list.Exists) return Array.Empty<T>().GetEnumerator();
+            if (!list.Exists) return Enumerable.Empty<T>().GetEnumerator();
             return list.Obj.GetEnumerator();
         }
 

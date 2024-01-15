@@ -38,7 +38,7 @@ namespace FeatureLoom.Web
                 string data = await request.ReadAsync();
                 var usernamePassword = data.FromJson<UsernamePassword>();
 
-                if ((await Identity.TryLoadIdentityAsync(usernamePassword.username)).TryOut(out Identity identity))
+                if ((await Identity.TryGetIdentityAsync(usernamePassword.username)).TryOut(out Identity identity))
                 {
                     if (identity.TryGetCredential(credentialHandler.CredentialType, out var storedCredential) && 
                         credentialHandler.VerifyCredential(usernamePassword, storedCredential))

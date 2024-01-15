@@ -43,11 +43,12 @@ namespace FeatureLoom.Web
                     {
                         bool failed = false;
                         // Delete own identity (also possible without extra access right)
-                        if (await session.Identity.TryRemoveFromStorageAsync())
+                        try 
                         {
+                            await session.Identity.RemoveFromStorageAsync();
                             Log.INFO(this.GetHandle(), $"Successfully deleted identity [{identityId}]");                            
                         }
-                        else
+                        catch
                         {
                             Log.ERROR(this.GetHandle(), $"Failed deleting identity [{identityId}]");
                             failed = true;

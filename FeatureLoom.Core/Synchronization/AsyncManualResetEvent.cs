@@ -379,7 +379,7 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
-        /// Everyone thread waiting for this event is woken up, by setting and resetting the event in one step.
+        /// Every thread waiting for this event is woken up, by setting and resetting the event in one step.
         /// If the event is already set, it will only be reset.
         /// </summary>        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -397,14 +397,16 @@ namespace FeatureLoom.Synchronization
             isSet = true;
             setCounter++;
 
+            bool yield = false;
             if (anyAsyncWaiter)
             {
                 anyAsyncWaiter = false;
                 tcs.SetResult(true);
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                yield = true;
             }
 
-            bool yield = false;
+            
             if (anySyncWaiter)
             {
                 anySyncWaiter = false;
@@ -426,7 +428,7 @@ namespace FeatureLoom.Synchronization
 
             myLock.Exit();
 
-            // If threads are waiting synchronously and PulseAll is called rapidly in a row it might happen that not all waiters will wake up.
+            // If threads are waiting and PulseAll is called rapidly in a row it might happen that not all waiters will wake up.
             // Calling yield at the end will avoid this problem.
             if (yield) Thread.Yield();
         }

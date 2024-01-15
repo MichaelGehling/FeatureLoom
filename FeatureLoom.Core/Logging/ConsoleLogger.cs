@@ -29,7 +29,7 @@ namespace FeatureLoom.Logging
                 [Loglevel.DEBUG] = ConsoleColor.Gray,
                 [Loglevel.TRACE] = ConsoleColor.DarkGray,
             };
-            public ConsoleColor backgroundColor = ConsoleColor.Black;
+            public ConsoleColor backgroundColor = ConsoleColor.Black;            
         }
 
         public Config config = new Config();
@@ -58,8 +58,9 @@ namespace FeatureLoom.Logging
                         var oldColor = Console.ForegroundColor;
                         Console.BackgroundColor = config.backgroundColor;
                         if (config.loglevelColors != null && config.loglevelColors.TryGetValue(logMessage.level, out var color)) Console.ForegroundColor = color;
-
-                        Console.WriteLine(strMsg);
+                        
+                        if (logMessage.level == Loglevel.ERROR) Console.Error.WriteLine(strMsg);
+                        else Console.WriteLine(strMsg);
 
                         Console.ForegroundColor = oldColor;
                         Console.BackgroundColor = oldBgColor;

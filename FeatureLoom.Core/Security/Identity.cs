@@ -3,6 +3,7 @@ using FeatureLoom.Helpers;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,14 +16,88 @@ namespace FeatureLoom.Security
         static string storageCategory = "Security/Identities";
         public static string StorageCategory { get => storageCategory; set => storageCategory = value; }        
 
-        public static Task<(bool, Identity)> TryLoadIdentityAsync(string identityId)
+        static Dictionary<string, Identity> cache = null;
+        static FeatureLock cacheLock = new();
+
+        public static async Task UpdateCache()
         {
-            return Storage.GetReader(storageCategory).TryReadAsync<Identity>(identityId);
+            using (cacheLock.Lock())
+            {
+                var reader = Storage.GetReader(StorageCategory);
+                if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+            }
         }
 
-        public static bool Exists(string identityId)
+        public static async Task<string[]> GetAllIdentityIdsAsync(bool forceUpdateCache = false)
+        {            
+            using (var lockHandle = cacheLock.LockReadOnly())
+            {
+                if (cache == null) forceUpdateCache = true;
+                if (forceUpdateCache)
+                {
+                    lockHandle.UpgradeToWriteMode();
+                    var reader = Storage.GetReader(StorageCategory);
+                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                }
+                return cache.Keys.ToArray();
+            }
+        }
+
+        public static async Task<Identity[]> GetAllIdentitiesAsync(bool forceUpdateCache = false)
         {
-            return Storage.GetReader(storageCategory).Exists(identityId);
+            using (var lockHandle = cacheLock.LockReadOnly())
+            {
+                if (cache == null) forceUpdateCache = true;
+                if (forceUpdateCache)
+                {
+                    lockHandle.UpgradeToWriteMode();
+                    var reader = Storage.GetReader(StorageCategory);
+                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                }
+                return cache.Values.ToArray();
+            }
+        }
+
+
+        public static async Task<(bool, Identity)> TryGetIdentityAsync(string identityId, bool forceUpdateCache = false)
+        {
+            using (var lockHandle = cacheLock.LockReadOnly())
+            {
+                if (cache == null)
+                {
+                    lockHandle.UpgradeToWriteMode();
+                    var reader = Storage.GetReader(StorageCategory);
+                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                    forceUpdateCache = false;
+                }
+
+                if (forceUpdateCache)
+                {
+                    var reader = Storage.GetReader(StorageCategory);
+                    if (!(await reader.TryReadAsync<Identity>(identityId)).TryOut(out var identity)) return (false, null);
+                    cache[identityId] = identity;
+                    return (true, identity);
+                }
+                else
+                {
+                    return (cache.TryGetValue(identityId, out var identity), identity);
+                }
+            }
+        }
+
+        public static async Task<bool> Exists(string identityId, bool forceUpdateCache = false)
+        {
+            using (var lockHandle = cacheLock.LockReadOnly())
+            {
+                if (cache == null) forceUpdateCache = true;
+                if (forceUpdateCache)
+                {
+                    lockHandle.UpgradeToWriteMode();
+                    var reader = Storage.GetReader(StorageCategory);
+                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                }
+                return cache.ContainsKey(identityId);
+            }
         }
         #endregion
 
@@ -50,25 +125,32 @@ namespace FeatureLoom.Security
         [JsonIgnore]
         public IEnumerable<StoredCredential> StoredCredentials => storedCredentials;
 
-        public void SetOrReplaceCredential(StoredCredential credential)
+        public void SetOrReplaceCredential(StoredCredential credential, bool storeChanges)
         {
             if (!storedCredentials.Replace(credential, item => item.credentialType == credential.credentialType))
             {
                 storedCredentials.Add(credential);
             }
+            if (storeChanges) _ = StoreAsync();
         }
 
         public bool TryGetCredential(string credentialType, out StoredCredential storedCredential)
         {
-            return storedCredentials.TryFindFirst(credential => credential.credentialType == credentialType, out storedCredential);
+            return storedCredentials.TryFindFirst(credential => credential.credentialType == credentialType, out storedCredential);            
         }
 
-        public bool RemoveCredential(string credentialType)
+        public bool RemoveCredential(string credentialType, bool storeChanges)
         {
-            return storedCredentials.RemoveWhere(credential => credential.credentialType == credentialType) > 0;
+            var result =  storedCredentials.RemoveWhere(credential => credential.credentialType == credentialType) > 0;
+            if (storeChanges) _ = StoreAsync();
+            return result;
         }
 
-        public void ClearCredentials() => storedCredentials.Clear();
+        public void ClearCredentials(bool storeChanges)
+        {
+            storedCredentials.Clear();
+            if (storeChanges) _ = StoreAsync();
+        }
 
         [JsonIgnore]
         public string IdentityId => identityId;
@@ -105,32 +187,56 @@ namespace FeatureLoom.Security
         public bool MatchesAnyPermission(string permissionWildcard) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcard));
         public bool MatchesAnyPermission(IEnumerable<string> permissionWildcards) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcards));
 
-        public Task<bool> TryStoreAsync()
+        public async Task StoreAsync()
         {
-            return Storage.GetWriter(storageCategory).TryWriteAsync(identityId, this);
+            using (cacheLock.Lock())
+            {
+                if (cache == null)
+                {                    
+                    var reader = Storage.GetReader(StorageCategory);
+                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                }
+                
+                cache[identityId] = this;                
+            }
+            if (!await Storage.GetWriter(storageCategory).TryWriteAsync(identityId, this)) throw new Exception($"Failed writing identity {identityId} to storage");
         }
 
-        public Task<bool> TryRemoveFromStorageAsync()
+        public async Task RemoveFromStorageAsync()
         {
-            return Storage.GetWriter(storageCategory).TryDeleteAsync(identityId);
+            using (cacheLock.Lock())
+            {
+                if (cache == null)
+                {
+                    var reader = Storage.GetReader(StorageCategory);
+                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                }
+
+                cache.Remove(identityId);
+            }
+            if (!await Storage.GetWriter(storageCategory).TryDeleteAsync(identityId)) throw new Exception($"Failed removing identity {identityId} from storage");
         }
 
-        public void AddRole(IdentityRole role)
+        public void AddRole(IdentityRole role, bool storeChanges)
         {
             if (!roleNames.Contains(role.RoleName))
             {
                 roleNames.Add(role.RoleName);
                 if (_roles != null) _roles.Add(role);
             }
+
+            if (storeChanges) _ = StoreAsync();
         }
 
-        public void RemoveRole(IdentityRole role)
+        public void RemoveRole(IdentityRole role, bool storeChanges)
         {
             if (roleNames.Contains(role.RoleName))
             {
                 roleNames.Remove(role.RoleName);
                 if (_roles != null) _roles.RemoveAll(r => role.RoleName == r.RoleName);
             }
+
+            if (storeChanges) _ = StoreAsync();
         }
         
     }

@@ -132,20 +132,21 @@ namespace FeatureLoom.Web
                     string userName = jwtToken.Claims.First(claim => claim.Type == "name").Value;
 
                     string identityId = userEmail;
-                    if (!(await Identity.TryLoadIdentityAsync(identityId)).TryOut(out Identity identity))
+                    if (!(await Identity.TryGetIdentityAsync(identityId)).TryOut(out Identity identity))
                     {
                         identity = new Identity(identityId);
-                        if (defaultRole != null) identity.AddRole(defaultRole);
+                        if (defaultRole != null) identity.AddRole(defaultRole, false);
 
-                        if (!await identity.TryStoreAsync())
+                        try
+                        {
+                            await identity.StoreAsync();
+                            Log.INFO(this.GetHandle(), $"Signup successful for user [{identityId}]");
+                        }
+                        catch
                         {
                             Log.ERROR(this.GetHandle(), $"Failed storing new identity {identityId}");
                             return HandlerResult.Handled_InternalServerError();
-                        }
-                        else
-                        {
-                            Log.INFO(this.GetHandle(), $"Signup successful for user [{identityId}]");                            
-                        }
+                        }                        
                     }
 
                     Session session = new Session(identity);

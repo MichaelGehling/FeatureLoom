@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Core.Collections;
+﻿using FeatureLoom.Collections;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.MessageFlow;

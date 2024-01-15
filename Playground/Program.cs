@@ -26,7 +26,6 @@ using System.Runtime.CompilerServices;
 using System.Linq;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Statemachines;
-using FeatureLoom.Core.Helpers;
 using System.Data;
 using System.Net.WebSockets;
 using Microsoft.Identity.Client;
@@ -85,9 +84,56 @@ namespace Playground
             }
         }
 
+        class TestClass
+        {
+            public int a = 1;
+            private int p = 42;
+            public int P { get => this.p; set => p = value; }
+        }
+
+        class TestClass2 : TestClass
+        {
+            public int b = 2;            
+        }
+
+        struct TestStruct
+        {
+            public string str;
+            public int i;
+            public TestClass obj;
+        }
+
 
         private static async Task Main()
         {
+
+
+            TestStruct testStruct1 = new TestStruct()
+            {
+                str = "abc",
+                i = 123,
+                obj = new TestClass2() { a = 1, b = 99 }
+            };
+
+            TestStruct testStruct2 = new TestStruct()
+            {
+                str = "abc",
+                i = 123,
+                obj = new TestClass2() { a = 1, b= 100 }
+            };
+
+
+
+            bool a = testStruct1.EqualsDeep(testStruct1);
+            bool b = testStruct1.EqualsDeep(testStruct2);
+            bool c1 = testStruct2.EqualsDeep(testStruct2);
+            bool d = 1.EqualsDeep(1);
+            bool e = 1.EqualsDeep(2);
+            TestClass2 t1 = new TestClass2();
+            TestClass2 t2 = new TestClass2();
+            bool r1 = t1.EqualsDeep(t2);
+            t1.P = 43;
+            bool r3 = t1.EqualsDeep(t2);
 
             IWebServer webserver = new DefaultWebServer();
 

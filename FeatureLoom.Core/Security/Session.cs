@@ -120,7 +120,7 @@ namespace FeatureLoom.Security
             {
                 if (this.identity == null)
                 {
-                    if (Identity.TryLoadIdentityAsync(identityId).WaitFor().TryOut(out Identity identity))
+                    if (Identity.TryGetIdentityAsync(identityId).WaitFor().TryOut(out Identity identity))
                     {
                         this.identity = identity;
                     }
