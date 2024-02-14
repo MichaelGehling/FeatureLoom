@@ -238,5 +238,12 @@ namespace FeatureLoom.Synchronization
             else return true;
             */
         }
+
+        public static Task AsTask(this CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            cancellationToken.Register(() => tcs.TrySetResult(true));
+            return tcs.Task;
+        }
     }
 }

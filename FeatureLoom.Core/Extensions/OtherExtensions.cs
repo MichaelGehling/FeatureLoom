@@ -1,10 +1,12 @@
 ﻿using FeatureLoom.Serialization;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Extensions
 {
@@ -181,6 +183,16 @@ namespace FeatureLoom.Extensions
         }
 
         public static bool IsAsciiDigit(this char c) => c >= '0' && c <= '9';
+
+        public static async Task WaitForExited(this FeatureLock featureLock)
+        {
+            if (!featureLock.IsLocked) return;
+
+            using (await featureLock.LockAsync(true)) 
+            {
+                // Just lock with priority so we know when the lock was exited by previous owner 
+            };
+        }
  
     }
 }

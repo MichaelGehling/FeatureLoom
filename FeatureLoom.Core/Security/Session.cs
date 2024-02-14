@@ -36,8 +36,6 @@ namespace FeatureLoom.Security
         {
             cleanupSchedule = Service<SchedulerService>.Instance.ScheduleAction("SessionCleanup", now =>
             {
-                if (cleanupSchedule == null) return TimeFrame.Invalid;
-
                 TimeFrame timer = new TimeFrame(lastCleanup + cleanupInterval, 1.Seconds());
                 if (!cleanupLock.IsLocked && timer.Elapsed(now))
                 {
