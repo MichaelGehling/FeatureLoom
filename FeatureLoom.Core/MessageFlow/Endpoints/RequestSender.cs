@@ -17,7 +17,7 @@ namespace FeatureLoom.MessageFlow
         MicroValueLock responseHandlerLock = new MicroValueLock();
         TimeSpan timeout = 1.Seconds();
         short senderId = RandomGenerator.Int16();
-        ActionSchedule schedule;
+        ActionSchedule schedule = null;
 
 
         /// <summary>
@@ -37,11 +37,7 @@ namespace FeatureLoom.MessageFlow
 
         private void StartTimeoutCheck()
         {
-            schedule = Service<SchedulerService>.Instance.ScheduleAction("RequestSenderTimeout", now =>
-            {
-                CleanupTimeouts(now);
-                return new TimeFrame(now, timeout.Multiply(0.5));
-            });
+            schedule = Service<SchedulerService>.Instance.ScheduleAction("RequestSenderTimeout", now => CleanupTimeouts(now), timeout.Multiply(0.5));
         }
 
         public Task<RESP> SendRequestAsync(REQ message)

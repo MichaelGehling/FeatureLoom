@@ -18,7 +18,6 @@ namespace FeatureLoom.MessageFlow
         private readonly TimeSpan suppressionTime;
         private readonly TimeSpan cleanupPeriode = 10.Seconds();
         private readonly Func<object, object, bool> isDuplicate;
-        private DateTime nextCleanUp;
         private TimeSpan cleanupTolerance = 1.Seconds();
         private ISchedule scheduledAction;
 
@@ -27,30 +26,20 @@ namespace FeatureLoom.MessageFlow
             this.suppressionTime = suppressionTime;
             if (isDuplicate == null) isDuplicate = (a, b) => a.Equals(b);
             this.isDuplicate = isDuplicate;
+
             if (cleanupPeriode == default) cleanupPeriode = this.cleanupPeriode;
             cleanupPeriode = cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
             this.cleanupPeriode = cleanupPeriode;
-            this.nextCleanUp = AppTime.Now + this.cleanupPeriode;        
+            
             if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
             this.scheduledAction = Service<SchedulerService>.Instance.ScheduleAction("DuplicateMessageSuppressor", now => 
             {
-                TimeFrame nextTriggerTimeFrame;
-                if (now > nextCleanUp - this.cleanupTolerance)
+                using (suppressorsLock.Lock())
                 {
-                    using (suppressorsLock.Lock())
-                    {
-                        CleanUpSuppressors(now);
-                    }
-                    nextTriggerTimeFrame = new TimeFrame(now, this.cleanupPeriode);
+                    CleanUpSuppressors(now);
                 }
-                else
-                {
-                    nextTriggerTimeFrame = new TimeFrame (now, nextCleanUp);
-                }
-
-                return nextTriggerTimeFrame;
-            });
+            }, cleanupPeriode, cleanupPeriode + cleanupTolerance);
         }
 
         public void AddSuppressor<M>(M suppressorMessage)
@@ -82,7 +71,6 @@ namespace FeatureLoom.MessageFlow
 
         private void CleanUpSuppressors(DateTime now)
         {
-            nextCleanUp = now + cleanupPeriode;
             while (suppressors.Count > 0)
             {
                 if (now > suppressors.Peek().suppressionEnd) suppressors.Dequeue();

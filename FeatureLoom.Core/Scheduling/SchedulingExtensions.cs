@@ -71,5 +71,35 @@ namespace FeatureLoom.Scheduling
             scheduler.AddSchedule(schedule);
             return schedule;
         }
+
+        /// <summary>
+        /// Creates a new schedule based on a lamda function, adds it to the scheduler and returns it.
+        /// NOTE: The scheduler only keeps a weak reference to the schedule. If the schedule is not kept in another reference, it will be garbage collected.
+        /// </summary>
+        /// <param name="name">The name of the new schedule</param>
+        /// <param name="triggerAction">The action takes the current time as input parameter</param>
+        /// <param name="triggerTime">The time between the trigger action is called (with a tolerance of +1%)</param>
+        /// <returns>The created schedule.</returns>
+        public static ActionSchedule ScheduleAction(this SchedulerService scheduler, string name, Action<DateTime> triggerAction, TimeSpan triggerTime)
+        {
+            return ScheduleAction(scheduler, name, triggerAction, triggerTime, triggerTime.Multiply(1.01));
+        }
+
+        /// <summary>
+        /// Creates a new schedule based on a lamda function, adds it to the scheduler and returns it.
+        /// NOTE: The scheduler only keeps a weak reference to the schedule. If the schedule is not kept in another reference, it will be garbage collected.
+        /// </summary>
+        /// <param name="name">The name of the new schedule</param>
+        /// <param name="triggerAction">The action takes the current time as input parameter</param>
+        /// <param name="triggerTime">The time between the trigger action is called (with a variation of +1%</param>
+        /// <returns>The created schedule.</returns>
+        public static ActionSchedule ScheduleAction(this SchedulerService scheduler, string name, Action<DateTime> triggerAction, TimeSpan minTriggerTime, TimeSpan maxTriggerTime)
+        {
+            return ScheduleAction(scheduler, name, now =>
+                {
+                    triggerAction(now);
+                    return new ScheduleStatus(minTriggerTime, maxTriggerTime);
+                });            
+        }
     }
 }

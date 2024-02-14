@@ -66,13 +66,11 @@ namespace FeatureLoom.Web
         {
             cleanupSchedule = Service<SchedulerService>.Instance.ScheduleAction("AzureADLoginHandler_Cleanup", now =>
             {
-                if (cleanupSchedule == null) return TimeFrame.Invalid;
                 foreach(var state in authStates)
                 {
                     if (now > state.Value.timeStamp + authStateTimeout) authStates.TryRemove(state.Key, out _);
                 }
-                return new TimeFrame(now + authStateTimeout, 1.Minutes());
-            });
+            }, authStateTimeout.Multiply(0.5));
         }
 
         public void StopCleanupSchedule() => cleanupSchedule = null;

@@ -20,18 +20,11 @@ namespace FeatureLoom.RPC
         private FeatureLock responseHandlersLock = new FeatureLock();
         private readonly TimeSpan timeout;
         private readonly ISchedule timeoutSchedule;
-        private TimeFrame timeoutCheckTimer;
 
         public RpcCaller(TimeSpan timeout)
         {
             this.timeout = timeout;
-            this.timeoutSchedule = Service<SchedulerService>.Instance.ScheduleAction("StringRpcCaller_Timeout", now =>
-            {
-                if (!this.timeoutCheckTimer.Elapsed(now)) return this.timeoutCheckTimer;
-                CheckForTimeouts(now);
-                this.timeoutCheckTimer = new TimeFrame(now, this.timeout.Multiply(0.5));
-                return this.timeoutCheckTimer;
-            });
+            this.timeoutSchedule = Service<SchedulerService>.Instance.ScheduleAction("StringRpcCaller_Timeout", now => CheckForTimeouts(now), this.timeout.Multiply(0.5));
         }
 
         public void CheckForTimeouts(DateTime now)
