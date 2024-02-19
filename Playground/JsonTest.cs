@@ -156,11 +156,6 @@ namespace Playground
         public static async Task Run()
         {
 
-            LoopJsonDeserializer loopJsonDeserializer = new LoopJsonDeserializer();
-            //var result = loopJsonDeserializer.Deserialize<int>("5.123e4");
-
-
-
             var opt = new JsonSerializerOptions()
             {
                 IncludeFields = true,
@@ -170,14 +165,14 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
-            //var testDto = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
+            var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new object();
-            //var testDto = 1234.123999999;
+            //var testDto = 123456.1f;
             //var testDto = 12345678;
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = "Mystring1";            
@@ -211,30 +206,6 @@ namespace Playground
 
             //Stream stream = new NullStream();
             MemoryStream stream = new MemoryStream();
-
-            LoopJsonSerializer loopSerializer1 = new LoopJsonSerializer(new LoopJsonSerializer.Settings()
-            {
-                typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
-                dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = LoopJsonSerializer.ReferenceCheck.NoRefCheck,
-                enumAsString = true,
-            });
-
-            LoopJsonSerializer loopSerializer2 = new(new LoopJsonSerializer.Settings()
-            {
-                typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
-                dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = LoopJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
-                enumAsString = false
-            });
-
-            LoopJsonSerializer loopSerializer3 = new(new LoopJsonSerializer.Settings()
-            {
-                typeInfoHandling = LoopJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
-                dataSelection = LoopJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = LoopJsonSerializer.ReferenceCheck.OnLoopReplaceByRef,
-                enumAsString = false
-            });
 
             var settings = new FeatureJsonSerializer.Settings()
             {
