@@ -16,36 +16,129 @@ namespace Playground
         private sealed class JsonUTF8StreamWriter
         {
             public Stream stream;
-            private static byte[] buffer;
+            private byte[] localBuffer;                 
+            private byte[] mainBuffer;
+            private int mainBufferSize;
+            private int mainBufferCount;            
 
             public JsonUTF8StreamWriter()
             {
-                buffer = new byte[1024];
+                localBuffer = new byte[50];
+                mainBufferSize = 16 * 1024;
+                // We give some extra bytes in order to not always check remaining space
+                mainBuffer = new byte[mainBufferSize + 20]; 
             }
 
-            public override string ToString() => stream.ReadToString();
+            public override string ToString()
+            {
+                if (stream.Length > 0)
+                {
+                    WriteBufferToStream();
+                    return stream.ReadToString();
+                }
+                else
+                {
+                    return Encoding.UTF8.GetString(mainBuffer, 0, mainBufferCount);
+                }
+            }
+
+            public byte[] Buffer => mainBuffer;
+            public int BufferCount => mainBufferCount;
+
+            public void WriteBufferToStream()
+            {
+                if (mainBufferCount == 0) return;
+                
+                stream.Write(mainBuffer, 0, mainBufferCount);
+                mainBufferCount = 0;                
+            }
+
+            public void ResetBuffer()
+            {
+                mainBufferCount = 0;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBuffer(byte[] data, int offset, int count)
+            {
+                if (mainBufferCount + count > mainBuffer.Length) WriteBufferToStream();
+                System.Buffer.BlockCopy(data, offset, mainBuffer, mainBufferCount, count);
+                mainBufferCount += count;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBuffer(byte[] data, int count)
+            {
+                WriteToBuffer(data, 0, count);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBuffer(byte[] data)
+            {
+                WriteToBuffer(data, 0, data.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBuffer(byte data)
+            {
+                if (mainBufferCount >= mainBuffer.Length) WriteBufferToStream();
+                mainBuffer[mainBufferCount++] = data;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
+            {
+                System.Buffer.BlockCopy(data, offset, mainBuffer, mainBufferCount, count);
+                mainBufferCount += count;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBufferWithoutCheck(byte[] data, int count)
+            {
+                WriteToBufferWithoutCheck(data, 0, count);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBufferWithoutCheck(byte[] data)
+            {
+                WriteToBufferWithoutCheck(data, 0, data.Length);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteToBufferWithoutCheck(byte data)
+            {
+                mainBuffer[mainBufferCount++] = data;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void EnsureFreeBufferSpace(int freeBytes)
+            {
+                if (mainBufferCount + freeBytes >= mainBuffer.Length) WriteBufferToStream();
+            }
+
+
 
 
             static readonly byte[] NULL = "null".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteNullValue() => stream.Write(NULL, 0, NULL.Length);
+            public void WriteNullValue() => WriteToBuffer(NULL);
 
-            static readonly byte[] OPEN_OBJECT = "{".ToByteArray();
+            static readonly byte OPEN_OBJECT = (byte)'{';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void OpenObject() => stream.Write(OPEN_OBJECT, 0, OPEN_OBJECT.Length);
+            public void OpenObject() => WriteToBufferWithoutCheck(OPEN_OBJECT);
 
-            static readonly byte[] CLOSE_OBJECT = "}".ToByteArray();
+            static readonly byte CLOSE_OBJECT = (byte)'}';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void CloseObject() => stream.Write(CLOSE_OBJECT, 0, CLOSE_OBJECT.Length);
+            public void CloseObject() => WriteToBufferWithoutCheck(CLOSE_OBJECT);
 
             static readonly byte[] TYPEINFO_PRE = "\"$type\":\"".ToByteArray();
-            static readonly byte[] TYPEINFO_POST = "\"".ToByteArray();
+            static readonly byte TYPEINFO_POST = (byte)'\"';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteTypeInfo(string typeName)
             {
-                stream.Write(TYPEINFO_PRE, 0, TYPEINFO_PRE.Length);
+                WriteToBuffer(TYPEINFO_PRE);
                 WriteString(typeName);
-                stream.Write(TYPEINFO_POST, 0, TYPEINFO_POST.Length);
+                WriteToBufferWithoutCheck(TYPEINFO_POST);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -56,31 +149,33 @@ namespace Playground
 
             static readonly byte[] VALUEFIELDNAME = "\"$value\":".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteValueFieldName() => stream.Write(VALUEFIELDNAME, 0, VALUEFIELDNAME.Length);
+            public void WriteValueFieldName() => WriteToBuffer(VALUEFIELDNAME);
 
-            static readonly byte[] FIELDNAME_PRE = "\"".ToByteArray();
+            static readonly byte FIELDNAME_PRE = (byte)'\"';
             static readonly byte[] FIELDNAME_POST = "\":".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteFieldName(string fieldName)
             {
-                stream.Write(FIELDNAME_PRE, 0, FIELDNAME_PRE.Length);
+                WriteToBufferWithoutCheck(FIELDNAME_PRE);
                 WriteString(fieldName);
-                stream.Write(FIELDNAME_POST, 0, FIELDNAME_POST.Length);
+                WriteToBufferWithoutCheck(FIELDNAME_POST);
             }
 
 
+            // Fallback for non specialized methods
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue<T>(T value)
             {                
                 WriteString(value.ToString());
             }
 
+            // Fallback for non specialized methods
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString<T>(T value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteString(value.ToString());
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -98,9 +193,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(long value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             /*
@@ -119,9 +214,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(ulong value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger((long)value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -133,9 +228,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(int value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -147,9 +242,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(uint value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -161,9 +256,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(byte value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -175,9 +270,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(sbyte value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -189,9 +284,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(short value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -203,9 +298,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(ushort value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -217,9 +312,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(float value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteFloat(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -231,9 +326,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(double value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteFloat(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             static readonly byte[] BOOLVALUE_TRUE = "true".ToByteArray();
@@ -242,27 +337,27 @@ namespace Playground
             public void WritePrimitiveValue(bool value)
             {
                 var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
-                stream.Write(bytes, 0, bytes.Length);
+                WriteToBuffer(bytes);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(bool value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
-                stream.Write(bytes, 0, bytes.Length);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBuffer(bytes);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
-            static readonly byte[] QUOTES = "\"".ToByteArray();
+            static readonly byte QUOTES = (byte)'\"';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue(string str)
             {
                 if (str != null)
                 {
-                    stream.Write(QUOTES, 0, QUOTES.Length);
+                    WriteToBufferWithoutCheck(QUOTES);
                     WriteEscapedString(str);
-                    stream.Write(QUOTES, 0, QUOTES.Length);
+                    WriteToBufferWithoutCheck(QUOTES);
                 }
                 else WriteNullValue();
             }
@@ -276,9 +371,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue(char value)
             {
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
                 WriteChar(value);
-                stream.Write(QUOTES, 0, QUOTES.Length);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -298,45 +393,45 @@ namespace Playground
                     itemInfo = itemInfo.parentInfo;
                 }
 
-                stream.Write(REFOBJECT_PRE, 0, REFOBJECT_PRE.Length);
+                WriteToBuffer(REFOBJECT_PRE);
 
                 if (reverseItemInfoStack.TryPop(out itemInfo))
                 {
                     var name = itemInfo.ItemName;
-                    stream.Write(itemInfo.ItemName, 0, name.Length);
+                    WriteToBuffer(itemInfo.ItemName);
                 }
 
                 while (reverseItemInfoStack.TryPop(out itemInfo))
                 {
                     var name = itemInfo.ItemName;
-                    if (name[0] != OPENCOLLECTION[0]) WriteDot();
-                    stream.Write(name, 0, name.Length);                    
+                    if (name[0] != OPENCOLLECTION) WriteDot();
+                    WriteToBuffer(name);                    
                 }
-                stream.Write(REFOBJECT_POST, 0, REFOBJECT_POST.Length);
+                WriteToBuffer(REFOBJECT_POST);
             }
         
-            static readonly byte[] OPENCOLLECTION = "[".ToByteArray();
+            static readonly byte OPENCOLLECTION = (byte)'[';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void OpenCollection() => stream.Write(OPENCOLLECTION, 0, OPENCOLLECTION.Length);
+            public void OpenCollection() => WriteToBufferWithoutCheck(OPENCOLLECTION);
 
-            static readonly byte[] CLOSECOLLECTION = "]".ToByteArray();
+            static readonly byte CLOSECOLLECTION = (byte)']';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void CloseCollection() => stream.Write(CLOSECOLLECTION, 0, CLOSECOLLECTION.Length);
+            public void CloseCollection() => WriteToBufferWithoutCheck(CLOSECOLLECTION);
 
-            static readonly byte[] COMMA = ",".ToByteArray();
+            static readonly byte COMMA = (byte)',';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteComma() => stream.Write(COMMA, 0, COMMA.Length);
+            public void WriteComma() => WriteToBufferWithoutCheck(COMMA);
 
-            static readonly byte[] DOT = ".".ToByteArray();
+            static readonly byte DOT = (byte)'.';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteDot() => stream.Write(DOT, 0, DOT.Length);
+            public void WriteDot() => WriteToBufferWithoutCheck(DOT);
 
-            static readonly byte[] COLON = ":".ToByteArray();
+            static readonly byte COLON = (byte)':';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteColon() => stream.Write(COLON, 0, COLON.Length);
+            public void WriteColon() => WriteToBufferWithoutCheck(COLON);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePreparedByteString(byte[] bytes) => stream.Write(bytes, 0, bytes.Length);
+            public void WritePreparedByteString(byte[] bytes) => WriteToBuffer(bytes);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public byte[] PrepareFieldNameBytes(string fieldname)
@@ -432,13 +527,11 @@ namespace Playground
 
             private void WriteChar(char c)
             {
-                int bufferIndex = 0;
-
                 // Check if the character is in the EscapeByteLookup table
                 byte[] escapeBytes = GetEscapeBytes(c);                
                 if (escapeBytes != null)
                 {
-                    stream.Write(escapeBytes, 0, escapeBytes.Length);
+                    WriteToBuffer(escapeBytes, 0, escapeBytes.Length);
                     return;
                 }
 
@@ -447,23 +540,22 @@ namespace Playground
                 if (codepoint <= 0x7F)
                 {
                     // 1-byte sequence
-                    buffer[bufferIndex++] = (byte)codepoint;
-                    stream.Write(buffer, 0, bufferIndex);
+                    WriteToBuffer((byte)codepoint);
                 }
                 else if (codepoint <= 0x7FF)
                 {
                     // 2-byte sequence
-                    buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x1F) | 0xC0);
-                    buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
-                    stream.Write(buffer, 0, bufferIndex);
+                    EnsureFreeBufferSpace(2);
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));                    
                 }
                 else if (!char.IsSurrogate(c))
                 {
                     // 3-byte sequence
-                    buffer[bufferIndex++] = (byte)(((codepoint >> 12) & 0x0F) | 0xE0);
-                    buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x3F) | 0x80);
-                    buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
-                    stream.Write(buffer, 0, bufferIndex);
+                    EnsureFreeBufferSpace(3);
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                 }
                 else
                 {
@@ -473,14 +565,15 @@ namespace Playground
             }
 
             private void WriteEscapedString(string str)
-            {
-                int bufferIndex = 0;
-
+            {                
                 int charIndex = 0;
-                int minCharSpace = buffer.Length / 6;
+                const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
+               
                 while (charIndex < str.Length)
                 {
-                    int charIndexLimit = Math.Min(str.Length, charIndex + minCharSpace);
+                    EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
+                    int guaranteedCharSpace = (mainBuffer.Length - mainBufferCount) / MAX_CHAR_LENGTH;
+                    int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
 
                     for (; charIndex < charIndexLimit; charIndex++)
                     {
@@ -490,8 +583,7 @@ namespace Playground
                         byte[] escapeBytes = GetEscapeBytes(c);
                         if (escapeBytes != null)
                         { 
-                            Buffer.BlockCopy(escapeBytes, 0, buffer, bufferIndex, escapeBytes.Length);
-                            bufferIndex += escapeBytes.Length;
+                            WriteToBufferWithoutCheck(escapeBytes);                            
                             continue;
                         }
 
@@ -500,20 +592,20 @@ namespace Playground
                         if (codepoint <= 0x7F)
                         {
                             // 1-byte sequence
-                            buffer[bufferIndex++] = (byte)codepoint;
+                            WriteToBufferWithoutCheck((byte)codepoint);
                         }
                         else if (codepoint <= 0x7FF)
                         {
                             // 2-byte sequence
-                            buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x1F) | 0xC0);
-                            buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                         }
                         else if (!char.IsSurrogate(c))
                         {
                             // 3-byte sequence
-                            buffer[bufferIndex++] = (byte)(((codepoint >> 12) & 0x0F) | 0xE0);
-                            buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x3F) | 0x80);
-                            buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                            WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                         }
                         else
                         {
@@ -524,10 +616,10 @@ namespace Playground
                                 int lowSurrogate = str[charIndex + 1];
                                 int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
-                                buffer[bufferIndex++] = (byte)((surrogateCodePoint >> 18) | 0xF0);
-                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80);
-                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80);
-                                buffer[bufferIndex++] = (byte)((surrogateCodePoint & 0x3F) | 0x80);
+                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
 
                                 charIndex++; // Skip next character, it was part of the surrogate pair
                             }
@@ -536,49 +628,42 @@ namespace Playground
                                 throw new ArgumentException("Invalid surrogate pair in string.");
                             }
                         }
-                    }
-
-                    // Flush any remaining bytes in the buffer to the stream
-                    if (bufferIndex > 0)
-                    {
-                        stream.Write(buffer, 0, bufferIndex);
-                        bufferIndex = 0;
                     }
                 }
             }
 
             private void WriteString(string str)
             {
-                int bufferIndex = 0;
-
                 int charIndex = 0;
-                int minCharSpace = buffer.Length / 4;
+                const int MAX_CHAR_LENGTH = 4;                
                 while (charIndex < str.Length)
-                {                    
-                    int charIndexLimit = Math.Min(str.Length, charIndex + minCharSpace);
+                {
+                    EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
+                    int guaranteedCharSpace = (mainBuffer.Length - mainBufferCount) / MAX_CHAR_LENGTH;
+                    int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
 
                     for (; charIndex < charIndexLimit; charIndex++)
                     {
-                        var c = str[charIndex];                        
+                        var c = str[charIndex];
                         int codepoint = c;
 
                         if (codepoint <= 0x7F)
                         {
                             // 1-byte sequence
-                            buffer[bufferIndex++] = (byte)codepoint;
+                            WriteToBufferWithoutCheck((byte)codepoint);
                         }
                         else if (codepoint <= 0x7FF)
                         {
                             // 2-byte sequence
-                            buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x1F) | 0xC0);
-                            buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                         }
                         else if (!char.IsSurrogate(c))
                         {
                             // 3-byte sequence
-                            buffer[bufferIndex++] = (byte)(((codepoint >> 12) & 0x0F) | 0xE0);
-                            buffer[bufferIndex++] = (byte)(((codepoint >> 6) & 0x3F) | 0x80);
-                            buffer[bufferIndex++] = (byte)((codepoint & 0x3F) | 0x80);
+                            WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                         }
                         else
                         {
@@ -589,10 +674,10 @@ namespace Playground
                                 int lowSurrogate = str[charIndex + 1];
                                 int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
-                                buffer[bufferIndex++] = (byte)((surrogateCodePoint >> 18) | 0xF0);
-                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80);
-                                buffer[bufferIndex++] = (byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80);
-                                buffer[bufferIndex++] = (byte)((surrogateCodePoint & 0x3F) | 0x80);
+                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
 
                                 charIndex++; // Skip next character, it was part of the surrogate pair
                             }
@@ -602,17 +687,9 @@ namespace Playground
                             }
                         }
                     }
-
-                    // Flush any remaining bytes in the buffer to the stream
-                    if (bufferIndex > 0)
-                    {
-                        stream.Write(buffer, 0, bufferIndex);
-                        bufferIndex = 0;
-                    }
                 }
             }
 
-            byte[] ZERO = new byte[] { (byte)'0' };
             private void WriteSignedInteger(long value)
             {                
                 bool isNegative = value < 0;
@@ -622,14 +699,14 @@ namespace Playground
                     if (value < NegativeNumberBytesLookup.Length)
                     {
                         var bytes = NegativeNumberBytesLookup[value];
-                        stream.Write(bytes, 0, bytes.Length);
+                        WriteToBuffer(bytes);
                         return;
                     }
                 }
                 if (value < PositiveNumberBytesLookup.Length)
                 {
                     var bytes = PositiveNumberBytesLookup[value];
-                    stream.Write(bytes, 0, bytes.Length);
+                    WriteToBuffer(bytes);
                     return;
                 }
 
@@ -638,12 +715,12 @@ namespace Playground
                 while(value >= 10)
                 {
                     value = Math.DivRem(value, 10, out long digit);
-                    buffer[index--] = (byte)('0' + digit);
+                    localBuffer[index--] = (byte)('0' + digit);
                 }
-                if (value > 0) buffer[index--] = (byte)('0' + value);
-                if (isNegative) buffer[index--] = (byte)'-';
+                if (value > 0) localBuffer[index--] = (byte)('0' + value);
+                if (isNegative) localBuffer[index--] = (byte)'-';
 
-                stream.Write(buffer, index+1, maxDigits - index);
+                WriteToBuffer(localBuffer, index+1, maxDigits - index);
             }
 
            /* private byte[] SignedIntegerToBytes(long value)
@@ -660,14 +737,14 @@ namespace Playground
                     if (value < NegativeNumberBytesLookup.Length)
                     {
                         var bytes = NegativeNumberBytesLookup[value];
-                        stream.Write(bytes, 0, bytes.Length);
+                        WriteToBuffer(bytes);
                         return;
                     }
                 }
                 if (value < PositiveNumberBytesLookup.Length)
                 {
                     var bytes = PositiveNumberBytesLookup[value];
-                    stream.Write(bytes, 0, bytes.Length);
+                    WriteToBuffer(bytes);
                     return;
                 }
 
@@ -676,12 +753,12 @@ namespace Playground
                 while (value >= 10)
                 {
                     value = Math.DivRem(value, 10, out int digit);
-                    buffer[index--] = (byte)('0' + digit);
+                    localBuffer[index--] = (byte)('0' + digit);
                 }
-                if (value > 0) buffer[index--] = (byte)('0' + value);
-                if (isNegative) buffer[index--] = (byte)'-';
+                if (value > 0) localBuffer[index--] = (byte)('0' + value);
+                if (isNegative) localBuffer[index--] = (byte)'-';
 
-                stream.Write(buffer, index + 1, maxDigits - index);
+                WriteToBuffer(localBuffer, index + 1, maxDigits - index);
             }
 
             private void WriteUnsignedInteger(long value)
@@ -689,7 +766,7 @@ namespace Playground
                 if (value < PositiveNumberBytesLookup.Length)
                 {
                     var bytes = PositiveNumberBytesLookup[value];
-                    stream.Write(bytes, 0, bytes.Length);
+                    WriteToBuffer(bytes, 0, bytes.Length);
                     return;
                 }
 
@@ -698,11 +775,11 @@ namespace Playground
                 while (value >= 10)
                 {
                     value = Math.DivRem(value, 10, out long digit);
-                    buffer[index--] = (byte)('0' + digit);
+                    localBuffer[index--] = (byte)('0' + digit);
                 }
-                if (value > 0) buffer[index--] = (byte)('0' + value);
+                if (value > 0) localBuffer[index--] = (byte)('0' + value);
 
-                stream.Write(buffer, index + 1, maxDigits - index);
+                WriteToBuffer(localBuffer, index + 1, maxDigits - index);
             }
 
             static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
@@ -710,24 +787,26 @@ namespace Playground
             {
                 if (value == 0.0)
                 {
-                    stream.Write(ZERO_FLOAT, 0, ZERO_FLOAT.Length);
+                    WriteToBuffer(ZERO_FLOAT);
                     return;
                 }
 
-                int index = 0;
+                EnsureFreeBufferSpace(100);
+
                 if (value < 0)
                 {
                     value = -value;
-                    buffer[index++] = (byte)'-';
+                    WriteToBufferWithoutCheck((byte)'-');
                 }
 
 
                 double integralPart = Math.Floor(value);
-                double fractionalPart = value - integralPart;
+                double fractionalPart = value - integralPart;                
+                
                 byte digit;
                 if (integralPart == 0)
                 {
-                    buffer[index++] = (byte)'0';
+                    WriteToBufferWithoutCheck((byte)'0');
                 }
                 else
                 {
@@ -745,7 +824,7 @@ namespace Playground
                         digit = (byte)integralPart;
                         if (digit != 0)
                         {
-                            buffer[index++] = (byte)('0' + digit);
+                            WriteToBufferWithoutCheck((byte)('0' + digit));
                             integralPart -= digit;
                             i++;
                             break;
@@ -756,70 +835,66 @@ namespace Playground
                     {
                         integralPart *= 10;
                         digit = (byte)integralPart;
-                        buffer[index++] = (byte)('0' + digit);
+                        WriteToBufferWithoutCheck((byte)('0' + digit));
                         integralPart -= digit;                        
                     }
                     if (integralPart > 0.5)
                     {
-                        int correctionIndex = index - 1;
-                        while (buffer[correctionIndex] == (byte)'9')
+                        int correctionIndex = mainBufferCount - 1;
+                        while (mainBuffer[correctionIndex] == (byte)'9')
                         {
-                            buffer[correctionIndex] = (byte)'0';
+                            mainBuffer[correctionIndex] = (byte)'0';
                             correctionIndex--;
                         }
-                        buffer[correctionIndex] += 1;
+                        mainBuffer[correctionIndex] += 1;
                     }
                 }
 
-                buffer[index++] = (byte)'.';
+                WriteToBufferWithoutCheck((byte)'.');
 
                 if (fractionalPart == 0)
                 {
-                    buffer[index++] = (byte)'0';
+                    WriteToBufferWithoutCheck((byte)'0');
                 }
                 else
-                {                    
-                    int trailingNines = 0;
-                    int trailingZeros = 0;
-                    const int trailingLimit = 4;
-                    while (fractionalPart > 0)
+                {
+                    long fractionalInt = (long)(fractionalPart * 1_000_000_000_000);
+
+                    const int numDigits = 12; // More than 12 fractional digits may lead to rounding issues.
+                    int index = numDigits;
+
+                    const int FIRST = 0;
+                    const int TRAILING_ZEROS = 1;
+                    const int TRAILING_NINES = 2;
+                    const int DEFAULT = 3;
+                    int state = FIRST;
+                    for (int i= 0; i < numDigits; i++)
                     {
-                        fractionalPart *= 10;
-                        digit = (byte)fractionalPart;
-                        buffer[index++] = (byte)('0' + digit);
-                        fractionalPart -= digit;
-                        if (digit == 0)
+                        fractionalInt = Math.DivRem(fractionalInt, 10, out long digitLong);
+                        if (digitLong == 0 && (state == FIRST || state == TRAILING_ZEROS))
                         {
-                            trailingZeros++;
-                            if (trailingZeros >= trailingLimit)
-                            {
-                                index -= trailingZeros;
-                                break;
-                            }
-                            trailingNines = 0;
+                            state = TRAILING_ZEROS;
                         }
-                        else if (digit == 9)
+                        else if (digitLong == 9 && (state == FIRST || state == TRAILING_NINES))
                         {
-                            trailingNines++;
-                            if (trailingNines >= trailingLimit)
-                            {
-                                index -= trailingNines;
-                                buffer[index - 1] += 1;
-                                break;
-                            }
-                            trailingZeros = 0;
+                            state = TRAILING_NINES;
                         }
                         else
                         {
-                            trailingZeros = 0;
-                            trailingNines = 0;
+                            if (state == TRAILING_NINES) digitLong += 1;
+                            localBuffer[index--] = (byte)('0' + digitLong);
+                            state = DEFAULT;
                         }
                     }
+                    if (state == TRAILING_ZEROS) WriteToBufferWithoutCheck((byte)'1');
+                    else if (state == TRAILING_ZEROS || state == FIRST) WriteToBufferWithoutCheck((byte)'0');
+                    else WriteToBufferWithoutCheck(localBuffer, index + 1, numDigits - index);
                 }
-                stream.Write(buffer, 0, index);
+
             }
       
         }
             
     }
 }
+

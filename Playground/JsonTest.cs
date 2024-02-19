@@ -15,6 +15,7 @@ using FeatureLoom.TCP;
 //using System.Text.Json.Serialization;
 using System.Collections;
 using System.Linq;
+using System.Text;
 
 namespace Playground
 {
@@ -169,14 +170,14 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
-            var testDto = new TestDto2();
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto2();
             //var testDto = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new object();
-            //var testDto = 1234.5678;
+            //var testDto = 1234.123999999;
             //var testDto = 12345678;
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = "Mystring1";            
@@ -239,7 +240,7 @@ namespace Playground
             {
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
                 enumAsString = false
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
@@ -259,8 +260,7 @@ namespace Playground
             {
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
-                {
-                    //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
+                {                    
                     featureJsonSerializer.Serialize(stream, testDto);
                     //json = featureJsonSerializer.Serialize(testDto);
                     stream.Position = 0;
@@ -288,10 +288,10 @@ namespace Playground
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
-                Console.WriteLine($"JsonSerializer:  {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                Console.WriteLine($"Text.Json:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(1.Seconds());
 
-                Console.WriteLine($"JsonSerializerF/Text.Json:  {(100.0/(elapsed_A/elapsed_B) - 100).ToString("F")}% faster");
+                Console.WriteLine($"JsonSerializerF/Text.Json:  {(elapsed_A/elapsed_B).ToString("F")}% of time");
      
                 
         /*        tk.Restart();

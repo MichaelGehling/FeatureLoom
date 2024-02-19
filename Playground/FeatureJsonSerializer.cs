@@ -40,6 +40,7 @@ namespace Playground
         }
         void FinishSerialization()
         {
+            writer.ResetBuffer();
             memoryStream.Position = 0;
             writer.stream = null;
             if (objToItemInfo.Count > 0) objToItemInfo.Clear();
@@ -89,7 +90,15 @@ namespace Playground
                         lastTypeHandlerType = typeHandler.HandlerType;
                     }
 
-                    return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
+                    if (memoryStream.Length == 0)
+                    {
+                        return Encoding.UTF8.GetString(writer.Buffer, 0, writer.BufferCount);
+                    }
+                    else
+                    {
+                        writer.WriteBufferToStream();
+                        return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
+                    }                                        
                 }
                 finally
                 {
@@ -152,6 +161,8 @@ namespace Playground
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;
                     }
+
+                    writer.WriteBufferToStream();
                 }
                 finally
                 {
@@ -207,8 +218,8 @@ namespace Playground
             else if (itemType == typeof(float)) CreatePrimitiveItemHandler<float>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(double)) CreatePrimitiveItemHandler<double>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(char)) CreatePrimitiveItemHandler<char>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(IntPtr)) CreatePrimitiveItemHandler<IntPtr>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(UIntPtr)) CreatePrimitiveItemHandler<UIntPtr>(typeHandler, writer.WritePrimitiveValue);
+            else if (itemType == typeof(IntPtr)) CreatePrimitiveItemHandler<IntPtr>(typeHandler, writer.WritePrimitiveValue); //Make specialized
+            else if (itemType == typeof(UIntPtr)) CreatePrimitiveItemHandler<UIntPtr>(typeHandler, writer.WritePrimitiveValue); //Make specialized
             else if (itemType == typeof(Guid)) CreatePrimitiveItemHandler<Guid>(typeHandler, writer.WritePrimitiveValue); //Make specialized
             else if (itemType == typeof(DateTime)) CreatePrimitiveItemHandler<DateTime>(typeHandler, writer.WritePrimitiveValue); //Make specialized
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);

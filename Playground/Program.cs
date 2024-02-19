@@ -107,7 +107,7 @@ namespace Playground
         private static async Task Main()
         {
 
-
+            /*
             TestStruct testStruct1 = new TestStruct()
             {
                 str = "abc",
@@ -134,7 +134,9 @@ namespace Playground
             bool r1 = t1.EqualsDeep(t2);
             t1.P = 43;
             bool r3 = t1.EqualsDeep(t2);
+            */
 
+            /*
             IWebServer webserver = new DefaultWebServer();
 
             Sender serverSender = new Sender();
@@ -179,7 +181,8 @@ namespace Playground
             clientEndpoint.Send(AppTime.Now);
 
             Console.ReadKey();
-            
+            */
+
             /*
             DefaultWebServer webserver = new DefaultWebServer();
 
