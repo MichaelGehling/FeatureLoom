@@ -320,14 +320,14 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue(double value)
             {
-                WriteFloat(value);
+                WriteDouble(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValueAsString(double value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
-                WriteFloat(value);
+                WriteDouble(value);
                 WriteToBufferWithoutCheck(QUOTES);
             }
 
@@ -783,13 +783,198 @@ namespace Playground
             }
 
             static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
-            private void WriteFloat(double value)
+            static readonly byte[] NAN = "\"NaN\"".ToByteArray();
+            static readonly byte[] POS_INFINITY = "\"Infinity\"".ToByteArray();
+            static readonly byte[] NEG_INFINITY = "\"-Infinity\"".ToByteArray();
+
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private bool IsSpecial(double value)
             {
-                if (value == 0.0)
+                if (Double.IsNaN(value)) return true;   // NaN
+                long bits = BitConverter.DoubleToInt64Bits(value);
+                const long mask = 0x7FF0000000000000L;  // Mask to isolate the exponent bits for double
+                long maskedBits = bits & mask;
+                if (maskedBits == 0) return true;       // Subnormal
+                if (maskedBits == mask) return true;    // Infinity
+                return false;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private bool IsSpecial(float value)
+            {
+                if (Single.IsNaN(value)) return true;   // NaN
+                int bits = BitConverter.SingleToInt32Bits(value);
+                const int mask = 0x7F800000;            // Mask to isolate the exponent bits for float
+                int maskedBits = bits & mask;
+                if (maskedBits == 0) return true;       // Subnormal
+                if (maskedBits == mask) return true;    // Infinity
+                return false;
+            }
+
+            private void WriteFloat(float value)
+            {
+                if (HandleSpecialCases(value)) return;
+
+                EnsureFreeBufferSpace(100);
+
+                if (value < 0)
                 {
-                    WriteToBuffer(ZERO_FLOAT);
-                    return;
+                    value = -value;
+                    WriteToBufferWithoutCheck((byte)'-');
                 }
+                
+                value = CalculateNumDigits(value, out int  exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent);
+
+                float integralPart = (float)Math.Floor(value);
+                float fractionalPart = value - integralPart;
+
+                WriteIntegralPart(numIntegralDigits, integralPart);
+
+                WriteToBufferWithoutCheck((byte)'.');
+
+                WriteFractionalPart(numFractionalDigits, fractionalPart);
+
+                if (printExponent)
+                {
+                    WriteToBuffer((byte)'E');
+                    WriteSignedInteger(exponent);
+                }
+
+                // Local Functions
+
+                bool HandleSpecialCases(float value)
+                {
+                    if (value == 0)
+                    {
+                        WriteToBuffer(ZERO_FLOAT);
+                        return true;
+                    }
+                    if (IsSpecial(value))
+                    {
+                        if (Single.IsNaN(value)) WriteToBuffer(NAN);
+                        if (Single.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
+                        if (Single.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
+                        if (Single.IsSubnormal(value)) WriteString(value.ToString());
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                static float CalculateNumDigits(float value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
+                {
+                    const int MAX_SIGNIFICANT_DIGITS = 7;
+                    const int POS_EXPONENT_LIMIT = 7;
+                    const int NEG_EXPONENT_LIMIT = -5;
+
+                    int bits = BitConverter.SingleToInt32Bits(value);
+                    int binaryExponent = ((bits >> 23) & 0xFF) - 127;
+                    exponent = (int)(binaryExponent * 0.34f);
+                    numIntegralDigits = Math.Max(0, exponent + 1);
+                    numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+                    printExponent = false;
+
+
+                    if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                    {
+                        printExponent = true;
+                        value = (float)(value * Math.Pow(10, -exponent));
+                        while (value < 1)
+                        {
+                            value *= 10;
+                            exponent -= 1;
+                        }
+                        while (value >= 10)
+                        {
+                            value /= 10;
+                            exponent += 1;
+                        }
+                        numIntegralDigits = 1;
+                        numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 2;
+                    }
+
+                    return value;
+                }
+
+                void WriteIntegralPart(int numIntegralDigits, float integralPart)
+                {
+                    if (integralPart == 0)
+                    {
+                        WriteToBufferWithoutCheck((byte)'0');
+                    }
+                    else
+                    {
+
+                        int integralInt = (int)integralPart;
+                        int index = numIntegralDigits;
+                        int numLeadingZeros = 0;
+
+                        for (int i = 0; i < numIntegralDigits; i++)
+                        {
+                            integralInt = (int)Math.DivRem(integralInt, 10, out long digitLong);
+                            localBuffer[index--] = (byte)('0' + (byte)digitLong);
+                            if (digitLong == 0) numLeadingZeros++;
+                            else numLeadingZeros = 0;
+                        }
+                        index += numLeadingZeros;
+                        WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
+                    }
+                }
+
+                void WriteFractionalPart(int numFractionalDigits, float fractionalPart)
+                {
+                    if (fractionalPart == 0)
+                    {
+                        WriteToBufferWithoutCheck((byte)'0');
+                        return;
+                    }
+                    if (numFractionalDigits == 0)
+                    {
+                        if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
+                        else WriteToBufferWithoutCheck((byte)'0');
+                        return;
+                    }
+
+                    int firstFractionalDigitIndex = mainBufferCount;
+                    for (int i = 0; i <= numFractionalDigits; i++)
+                    {
+                        fractionalPart *= 10;
+                        byte digit = (byte)fractionalPart;
+                        fractionalPart -= digit;
+                        WriteToBufferWithoutCheck((byte)('0' + digit));
+                    }
+
+                    int correctionIndex = mainBufferCount - 1;
+                    while (mainBuffer[correctionIndex] == '0' && correctionIndex > firstFractionalDigitIndex)
+                    {
+                        correctionIndex--;
+                    }
+                    int oldMainBufferCount = mainBufferCount;
+                    mainBufferCount = correctionIndex + 1;
+                    if (oldMainBufferCount != mainBufferCount)
+                    {
+                        return;
+                    }
+
+                    while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
+                    {
+                        correctionIndex--;
+                    }
+
+                    if (mainBuffer[correctionIndex] < '9')
+                    {
+                        mainBuffer[correctionIndex] += 1;
+                        mainBufferCount = correctionIndex + 1;
+                        return;
+                    }
+                }
+
+            }
+
+            private void WriteDouble(double value)
+            {
+                if (HandleSpecialCases(value)) return;
 
                 EnsureFreeBufferSpace(100);
 
@@ -799,99 +984,152 @@ namespace Playground
                     WriteToBufferWithoutCheck((byte)'-');
                 }
 
+                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent);
 
                 double integralPart = Math.Floor(value);
-                double fractionalPart = value - integralPart;                
-                
-                byte digit;
-                if (integralPart == 0)
-                {
-                    WriteToBufferWithoutCheck((byte)'0');
-                }
-                else
-                {
-                    int integralDigits = 0;
-                    while (integralPart >= 1)
-                    {
-                        integralDigits += 4;
-                        integralPart /= 10000;
-                    }
+                double fractionalPart = value - integralPart;
 
-                    int i = 0;
-                    for (; i < integralDigits; i++)
-                    {
-                        integralPart *= 10;
-                        digit = (byte)integralPart;
-                        if (digit != 0)
-                        {
-                            WriteToBufferWithoutCheck((byte)('0' + digit));
-                            integralPart -= digit;
-                            i++;
-                            break;
-                        }                        
-                    }
-
-                    for (; i < integralDigits; i++)
-                    {
-                        integralPart *= 10;
-                        digit = (byte)integralPart;
-                        WriteToBufferWithoutCheck((byte)('0' + digit));
-                        integralPart -= digit;                        
-                    }
-                    if (integralPart > 0.5)
-                    {
-                        int correctionIndex = mainBufferCount - 1;
-                        while (mainBuffer[correctionIndex] == (byte)'9')
-                        {
-                            mainBuffer[correctionIndex] = (byte)'0';
-                            correctionIndex--;
-                        }
-                        mainBuffer[correctionIndex] += 1;
-                    }
-                }
+                WriteIntegralPart(numIntegralDigits, integralPart);
 
                 WriteToBufferWithoutCheck((byte)'.');
 
-                if (fractionalPart == 0)
+                WriteFractionalPart(numFractionalDigits, fractionalPart);
+
+                if (printExponent)
                 {
-                    WriteToBufferWithoutCheck((byte)'0');
+                    WriteToBuffer((byte)'E');
+                    WriteSignedInteger(exponent);
                 }
-                else
+
+                // Local Functions
+
+                bool HandleSpecialCases(double value)
                 {
-                    long fractionalInt = (long)(fractionalPart * 1_000_000_000_000);
-
-                    const int numDigits = 12; // More than 12 fractional digits may lead to rounding issues.
-                    int index = numDigits;
-
-                    const int FIRST = 0;
-                    const int TRAILING_ZEROS = 1;
-                    const int TRAILING_NINES = 2;
-                    const int DEFAULT = 3;
-                    int state = FIRST;
-                    for (int i= 0; i < numDigits; i++)
+                    if (value == 0)
                     {
-                        fractionalInt = Math.DivRem(fractionalInt, 10, out long digitLong);
-                        if (digitLong == 0 && (state == FIRST || state == TRAILING_ZEROS))
-                        {
-                            state = TRAILING_ZEROS;
-                        }
-                        else if (digitLong == 9 && (state == FIRST || state == TRAILING_NINES))
-                        {
-                            state = TRAILING_NINES;
-                        }
-                        else
-                        {
-                            if (state == TRAILING_NINES) digitLong += 1;
-                            localBuffer[index--] = (byte)('0' + digitLong);
-                            state = DEFAULT;
-                        }
+                        WriteToBuffer(ZERO_FLOAT);
+                        return true;
                     }
-                    if (state == TRAILING_ZEROS) WriteToBufferWithoutCheck((byte)'1');
-                    else if (state == TRAILING_ZEROS || state == FIRST) WriteToBufferWithoutCheck((byte)'0');
-                    else WriteToBufferWithoutCheck(localBuffer, index + 1, numDigits - index);
+                    if (IsSpecial(value))
+                    {
+                        if (Double.IsNaN(value)) WriteToBuffer(NAN);
+                        if (Double.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
+                        if (Double.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
+                        if (Double.IsSubnormal(value)) WriteString(value.ToString());
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                static double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
+                {
+                    const int MAX_SIGNIFICANT_DIGITS = 16;
+                    const int POS_EXPONENT_LIMIT = 7;
+                    const int NEG_EXPONENT_LIMIT = -5;
+
+                    long bits = BitConverter.DoubleToInt64Bits(value);
+                    int binaryExponent = (int)((bits >> 52) & 0x7FF) - 1023;
+                    exponent = (int)(binaryExponent * 0.34f);
+                    numIntegralDigits = Math.Max(0, exponent + 1);
+                    numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+                    printExponent = false;
+
+                    if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                    {
+                        printExponent = true;
+                        value = (value * Math.Pow(10, -exponent));
+                        while (value < 1)
+                        {
+                            value *= 10;
+                            exponent -= 1;
+                        }
+                        while (value >= 10)
+                        {
+                            value /= 10;
+                            exponent += 1;
+                        }
+                        numIntegralDigits = 1;
+                        numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 3;
+                    }
+
+                    return value;
+                }
+
+                void WriteIntegralPart(int numIntegralDigits, double integralPart)
+                {
+                    if (integralPart == 0)
+                    {
+                        WriteToBufferWithoutCheck((byte)'0');
+                    }
+                    else
+                    {
+                        long integralInt = (long)integralPart;
+                        int index = numIntegralDigits;
+                        int numLeadingZeros = 0;
+
+                        for (int i = 0; i < numIntegralDigits; i++)
+                        {
+                            integralInt = Math.DivRem(integralInt, 10, out long digitLong);
+                            localBuffer[index--] = (byte)('0' + (byte)digitLong);
+                            if (digitLong == 0) numLeadingZeros++;
+                            else numLeadingZeros = 0;
+                        }
+                        index += numLeadingZeros;
+                        WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
+                    }
+                }
+
+                void WriteFractionalPart(int numFractionalDigits, double fractionalPart)
+                {
+                    if (fractionalPart == 0)
+                    {
+                        WriteToBufferWithoutCheck((byte)'0');
+                        return;
+                    }
+                    if (numFractionalDigits == 0)
+                    {
+                        if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
+                        else WriteToBufferWithoutCheck((byte)'0');
+                        return;
+                    }
+
+                    int firstFractionalDigitIndex = mainBufferCount;
+                    for (int i = 0; i <= numFractionalDigits; i++)
+                    {
+                        fractionalPart *= 10;
+                        byte digit = (byte)fractionalPart;
+                        fractionalPart -= digit;
+                        WriteToBufferWithoutCheck((byte)('0' + digit));
+                    }
+
+                    int correctionIndex = mainBufferCount - 1;
+                    while (mainBuffer[correctionIndex] == '0' && correctionIndex > firstFractionalDigitIndex)
+                    {
+                        correctionIndex--;
+                    }
+                    int oldMainBufferCount = mainBufferCount;
+                    mainBufferCount = correctionIndex + 1;
+                    if (oldMainBufferCount != mainBufferCount)
+                    {
+                        return;
+                    }
+
+                    while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
+                    {
+                        correctionIndex--;
+                    }
+
+                    if (mainBuffer[correctionIndex] < '9')
+                    {
+                        mainBuffer[correctionIndex] += 1;
+                        mainBufferCount = correctionIndex + 1;
+                        return;
+                    }
                 }
 
             }
+
 
         }
             

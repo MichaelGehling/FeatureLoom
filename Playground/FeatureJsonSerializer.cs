@@ -66,24 +66,17 @@ namespace Playground
 
                     if (lastTypeHandlerType == itemType)
                     {
-                        if (lastTypeHandler.IsPrimitive && !typeof(T).IsClass) lastTypeHandler.HandlePrimitiveItem(item);
-                        else
-                        {
-                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
-                            lastTypeHandler.HandleItem(item, itemInfo);
-                            itemInfoRecycler.ReturnItemInfo(itemInfo);
-                        }
+                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        lastTypeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
                     {
                         var typeHandler = GetCachedTypeHandler(itemType);
-                        if (typeHandler.IsPrimitive && !typeof(T).IsClass) typeHandler.HandlePrimitiveItem(item);
-                        else
-                        {
-                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
-                            typeHandler.HandleItem(item, itemInfo);
-                            itemInfoRecycler.ReturnItemInfo(itemInfo);
-                        }
+
+                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        typeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;
@@ -138,24 +131,17 @@ namespace Playground
 
                     if (lastTypeHandlerType == itemType)
                     {
-                        if (lastTypeHandler.IsPrimitive && !typeof(T).IsClass) lastTypeHandler.HandlePrimitiveItem(item);
-                        else
-                        {
-                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
-                            lastTypeHandler.HandleItem(item, itemInfo);
-                            itemInfoRecycler.ReturnItemInfo(itemInfo);
-                        }
+                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        lastTypeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
                     {
                         var typeHandler = GetCachedTypeHandler(itemType);
-                        if (typeHandler.IsPrimitive && !typeof(T).IsClass) typeHandler.HandlePrimitiveItem(item);
-                        else
-                        {
-                            ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
-                            typeHandler.HandleItem(item, itemInfo);
-                            itemInfoRecycler.ReturnItemInfo(itemInfo);
-                        }
+
+                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        typeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;

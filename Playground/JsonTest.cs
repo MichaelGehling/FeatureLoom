@@ -16,6 +16,7 @@ using FeatureLoom.TCP;
 using System.Collections;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace Playground
 {
@@ -41,18 +42,18 @@ namespace Playground
         public int myInt = 123;
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public string myString = "Hello: \\, \", \\, \n";
-        public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
-        public MyEmbedded2 myEmbedded2 = new MyEmbedded2();
-        public MyEmbedded1 myEmbedded1a = new MyEmbedded1();
-        public MyEmbedded2 myEmbedded2a = new MyEmbedded2();
-        public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
-        public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
+        //public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
+        //public MyEmbedded2 myEmbedded2 = new MyEmbedded2();
+        //public MyEmbedded1 myEmbedded1a = new MyEmbedded1();
+        //public MyEmbedded2 myEmbedded2a = new MyEmbedded2();
+        //public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
+        //public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
         public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
         
-        public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
+        //public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
         public object someObj = "Something";
-        public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
+        //public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
         public string MyProperty { get; set; } = "propValue";
 
@@ -62,9 +63,9 @@ namespace Playground
             //this.myEmbedded = myEmbedded;
             //this.self = this;
 
-            myEmbeddedDict["1"] = new MyEmbedded1();
-            myEmbeddedDict["2"] = new MyEmbedded1();
-            myEmbeddedDict["1_"] = myEmbeddedDict["1"];
+            //myEmbeddedDict["1"] = new MyEmbedded1();
+            //myEmbeddedDict["2"] = new MyEmbedded1();
+            //myEmbeddedDict["1_"] = myEmbeddedDict["1"];
 
             //myObjects.Add(myEmbedded);
         }
@@ -101,7 +102,22 @@ namespace Playground
 
     public class MyEmbedded2 : IMyInterface
     {
-        public short y = 2;
+        public string str1 = "Mystring1";
+        public string str2 = "Mystring2";
+        public string str3 = "Mystring3";
+        public string str4 = "Mystring4";
+        public string myString1 = "Hello: \\, \", \\, \n";
+        public string myString2 = "Hello: \\, \", \\, \n";
+        public int int1 = 123451;
+        public short int2 = 1234;
+        public long int3 = 123453;
+        public ulong int4 = 123454;
+        public double double1 = 12.1231;
+    }
+
+    public class MyEmbedded3 : IMyInterface
+    {
+        //public short y = 2;
     }
 
     public class TestDto2
@@ -167,13 +183,15 @@ namespace Playground
 
             //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
-            var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
+            var testDto = new MyEmbedded2();
+            //var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
-            //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 };
+            //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.00000987654321, 0.0, 12.0213 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new object();
-            //var testDto = 123456.1f;
-            //var testDto = 12345678;
+            //var testDto = 1234567.7f; 
+            //var testDto = 12345678.0;
+            //var testDto = 123456789012345678901234567890.0;            
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = "Mystring1";            
             //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
@@ -197,7 +215,7 @@ namespace Playground
             //var testDto = new HashSet<object>() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
             //testDto.Add(testDto[0]);
 
-            //var testDto = new ArrayList() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
+            //var testDto = new ArrayList() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };            
 
 
             Type testDtoType = testDto.GetType();
@@ -211,8 +229,8 @@ namespace Playground
             {
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
-                enumAsString = false
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,                                
+                enumAsString = true
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
 
@@ -229,6 +247,21 @@ namespace Playground
             Console.WriteLine("SerializerTest");
             while (true)
             {
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    // Do nothing
+                    stream.Position = 0;
+                }
+                elapsed = tk.Elapsed;
+                var elapsed_DUMMY = elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"EmptyLoop:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(1.Seconds());
+
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {                    
@@ -262,57 +295,27 @@ namespace Playground
                 Console.WriteLine($"Text.Json:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(1.Seconds());
 
-                Console.WriteLine($"JsonSerializerF/Text.Json:  {(elapsed_A/elapsed_B).ToString("F")}% of time");
-     
-                
-        /*        tk.Restart();
-                for (int i = 0; i < iterations; i++)
-                {
-                    //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                    loopSerializer1.Serialize(stream, testDto);
-                    //json = loopSerializer1.Serialize(testDto);
-                    stream.Position = 0;
-                }
-                elapsed = tk.Elapsed;
-                beforeCollection = GC.GetTotalMemory(false);
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                afterCollection = GC.GetTotalMemory(false);
-                Console.WriteLine($"LoopSerializer1: {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(1.Seconds());
-               
-               tk.Restart();
-                for (int i = 0; i < iterations; i++)
-                {
-                    //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                    loopSerializer2.Serialize(stream, testDto);
-                    //json = loopSerializer2.Serialize(testDto);
-                    stream.Position = 0;
-                }
-                elapsed = tk.Elapsed;
-                beforeCollection = GC.GetTotalMemory(false);
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                afterCollection = GC.GetTotalMemory(false);
-                Console.WriteLine($"LoopSerializer2: {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(2.Seconds());
-
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
-                    //json = loopSerializer.SerializeToUtf8Bytes(testDto, settingsloop);
-                    loopSerializer3.Serialize(stream, testDto);
-                    //json = loopSerializer3.Serialize(testDto);
+                    //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
+                    Utf8Json.JsonSerializer.Serialize(stream, testDto);
+                    //json = UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto));
+                    //json = JsonSerializer.Serialize(testDto, opt);
                     stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
+                var elapsed_C = elapsed;
                 beforeCollection = GC.GetTotalMemory(false);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
-                Console.WriteLine($"LoopSerializer3: {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(2.Seconds());
-                */
+                Console.WriteLine($"Utf8Json:        {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(1.Seconds());
+
+                Console.WriteLine($"JsonSerializerF/Text.Json:  {(elapsed_A/elapsed_B).ToString("F")}% of time");
+     
+                
             }
 
             //var result = JsonSerializer.Deserialize<TestDto>(json);

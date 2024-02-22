@@ -36,14 +36,15 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void HandleItem<T>(T item, ItemInfo itemInfo)
             {
-                if (typeof(T) == handlerType)
+                Type type = typeof(T);
+                if (type == handlerType)
                 {
                     ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
-                    typedItemHandler.Invoke(item, typeof(T), itemInfo);
+                    typedItemHandler.Invoke(item, type, itemInfo);
                 }
                 else
                 {
-                    objectItemHandler(item, typeof(T), itemInfo);
+                    objectItemHandler(item, type, itemInfo);
                 }
             }
 
