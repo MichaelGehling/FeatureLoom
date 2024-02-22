@@ -23,17 +23,18 @@ namespace Playground
         Dictionary<object, ItemInfo> objToItemInfo = new();
         MemoryStream memoryStream = new MemoryStream();
         JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
-        Settings settings;
+        readonly CompiledSettings settings;
         Dictionary<Type, CachedTypeHandler> typeHandlerCache = new();
         Dictionary<Type, CachedStringValueWriter> stringValueWriterCache = new();
 
         delegate void ItemHandler<T>(T item, Type expectedType, ItemInfo itemInfo);
+        delegate void PrimitiveItemHandler<T>(T item);
 
         ItemInfoRecycler itemInfoRecycler;
 
         public FeatureJsonSerializer(Settings settings = null)
         {
-            this.settings = settings ?? new();
+            this.settings = new CompiledSettings(settings ?? new Settings());
 
             itemInfoRecycler = new ItemInfoRecycler(this);
         }
@@ -44,7 +45,7 @@ namespace Playground
             writer.stream = null;
             if (objToItemInfo.Count > 0) objToItemInfo.Clear();
 
-            itemInfoRecycler.ResetPooledItemInfos();
+            if (settings.typeInfoHandling != TypeInfoHandling.AddNoTypeInfo) itemInfoRecycler.ResetPooledItemInfos();
         }
 
         CachedTypeHandler lastTypeHandler = null;
@@ -99,16 +100,18 @@ namespace Playground
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         ItemInfo CreateItemInfo<T>(T item, ItemInfo parentinfo, byte[] itemName)
         {
-            if (!settings.RequiresItemInfos) return null;
+            if (!settings.requiresItemInfos) return null;
             if (typeof(T).IsClass) return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
             else return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         ItemInfo CreateItemInfo<T>(T item, ItemInfo parentinfo, string itemName)
         {
-            if (!settings.RequiresItemInfos) return null;
+            if (!settings.requiresItemInfos) return null;
             if (typeof(T).IsClass) return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
             else return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
         }
@@ -199,7 +202,6 @@ namespace Playground
             else if (itemType == typeof(sbyte)) CreatePrimitiveItemHandler<sbyte>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(byte)) CreatePrimitiveItemHandler<byte>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(string)) CreatePrimitiveItemHandler<string>(typeHandler, writer.WritePrimitiveValue);
-            //else if (itemType == typeof(string)) CreatePrimitiveItemHandler_string(typeHandler);
             else if (itemType == typeof(float)) CreatePrimitiveItemHandler<float>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(double)) CreatePrimitiveItemHandler<double>(typeHandler, writer.WritePrimitiveValue);
             else if (itemType == typeof(char)) CreatePrimitiveItemHandler<char>(typeHandler, writer.WritePrimitiveValue);
@@ -224,62 +226,20 @@ namespace Playground
             }
         }
 
-        private void CreatePrimitiveItemHandler_string(CachedTypeHandler typeHandler)
+        private void CreatePrimitiveItemHandler<T>(CachedTypeHandler typeHandler, PrimitiveItemHandler<T> write)
         {
             if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
-                typeHandler.SetItemHandler<string>(HandleWithTypeInfo, true);
-            }
-            else
-            {
-                typeHandler.SetItemHandler<string>(HandleWithoutTypeInfo, true);
-            }
-
-            void HandleWithTypeInfo(string item, Type expectedType, ItemInfo parentInfo)
-            {
-                StartTypeInfoObject(typeHandler.preparedTypeInfo);
-                writer.WritePrimitiveValue(item);
-                FinishTypeInfoObject();
-            }
-
-            void HandleWithoutTypeInfo(string item, Type expectedType, ItemInfo parentInfo)
-            {
-                writer.WritePrimitiveValue(item);
-            }
-        }
-
-
-
-        private void CreatePrimitiveItemHandler<T>(CachedTypeHandler typeHandler, Action<T> write)
-        {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
-            {
-                typeHandler.SetItemHandler<T>((item, _, _) => write(item), true);
-            }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
-            {
-                typeHandler.SetItemHandler<T>((item, _, _) =>
+                typeHandler.SetItemHandler<T>((item) =>
                 {
                     StartTypeInfoObject(typeHandler.preparedTypeInfo);
                     write(item);
                     FinishTypeInfoObject();
-                }, true);
+                });
             }
             else
             {
-                typeHandler.SetItemHandler<T>((item, expectedType, _) =>
-                {
-                    if (expectedType == item.GetType())
-                    {                        
-                        write(item);                        
-                    }
-                    else
-                    {
-                        StartTypeInfoObject(typeHandler.preparedTypeInfo);
-                        write(item);
-                        FinishTypeInfoObject();
-                    }
-                }, true);
+                typeHandler.SetItemHandler(write);
             }
         }        
 
@@ -346,6 +306,14 @@ namespace Playground
                 }
             }
 
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TypeInfoRequired(Type actualType, Type expectedType)
+        {
+            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo) return true;
+            if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && actualType != expectedType) return true;
             return false;
         }
 

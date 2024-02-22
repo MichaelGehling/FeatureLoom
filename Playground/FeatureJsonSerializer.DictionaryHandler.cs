@@ -33,7 +33,7 @@ namespace Playground
             MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
-            bool requiresItemNames = settings.RequiresItemNames;
+            bool requiresItemNames = settings.requiresItemNames;
 
             if (valueHandler.IsPrimitive)
             {
@@ -51,8 +51,7 @@ namespace Playground
                     writer.OpenObject();
                     ENUM enumerator = getEnumerator(dict);
 
-                    if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
+                    if (TypeInfoRequired(dictType, expectedType))
                     {
                         writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                         writer.WriteComma();
@@ -77,8 +76,7 @@ namespace Playground
 
                     writer.CloseObject();
                 };
-                bool isPrimitive = !itemType.IsClass;
-                typeHandler.SetItemHandler(itemHandler, isPrimitive);
+                typeHandler.SetItemHandler(itemHandler);
             }
             else
             {
@@ -96,8 +94,7 @@ namespace Playground
                     writer.OpenObject();
                     ENUM enumerator = getEnumerator(dict);
 
-                    if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != dictType))
+                    if (TypeInfoRequired(dictType, expectedType))
                     {
                         writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
                         writer.WriteComma();
@@ -116,7 +113,7 @@ namespace Playground
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
                             if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                            byte[] itemName = settings.RequiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
+                            byte[] itemName = settings.requiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
                             ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
                             itemInfoRecycler.ReturnItemInfo(valueInfo);
@@ -137,7 +134,7 @@ namespace Playground
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
                             if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                            byte[] itemName = settings.RequiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
+                            byte[] itemName = settings.requiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
                             ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
                             itemInfoRecycler.ReturnItemInfo(valueInfo);
@@ -146,7 +143,7 @@ namespace Playground
 
                     writer.CloseObject();
                 };
-                typeHandler.SetItemHandler(itemHandler, false);
+                typeHandler.SetItemHandler(itemHandler);
             }
         }
 

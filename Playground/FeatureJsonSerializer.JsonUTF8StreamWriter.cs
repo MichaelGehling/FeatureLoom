@@ -23,10 +23,10 @@ namespace Playground
 
             public JsonUTF8StreamWriter()
             {
-                localBuffer = new byte[50];
-                mainBufferSize = 16 * 1024;
+                localBuffer = new byte[64];
+                mainBufferSize = 64 * 1024;
                 // We give some extra bytes in order to not always check remaining space
-                mainBuffer = new byte[mainBufferSize + 20]; 
+                mainBuffer = new byte[mainBufferSize + 64]; 
             }
 
             public override string ToString()
@@ -45,6 +45,7 @@ namespace Playground
             public byte[] Buffer => mainBuffer;
             public int BufferCount => mainBufferCount;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteBufferToStream()
             {
                 if (mainBufferCount == 0) return;
@@ -53,6 +54,7 @@ namespace Playground
                 mainBufferCount = 0;                
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void ResetBuffer()
             {
                 mainBufferCount = 0;

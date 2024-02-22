@@ -25,22 +25,37 @@ namespace Playground
 
             public Type HandlerType => handlerType;
 
-            public void SetItemHandler<T>(ItemHandler<T> itemHandler, bool isPrimitive)
+            public void SetItemHandler<T>(ItemHandler<T> itemHandler)
             {
-                this.isPrimitive = isPrimitive;
+                this.isPrimitive = false;
                 this.handlerType = typeof(T);
                 this.itemHandler = itemHandler;
                 this.objectItemHandler = (item, expectedType, baseJob) => itemHandler.Invoke((T)item, expectedType, baseJob);
             }
 
+            public void SetItemHandler<T>(PrimitiveItemHandler<T> itemHandler)
+            {
+                this.isPrimitive = true;
+                this.handlerType = typeof(T);
+                this.itemHandler = itemHandler;
+                this.objectItemHandler = (item, _, _) => itemHandler.Invoke((T)item);
+            }
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void HandleItem<T>(T item, ItemInfo itemInfo)
-            {
+            {                
                 Type type = typeof(T);
                 if (type == handlerType)
                 {
-                    ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
-                    typedItemHandler.Invoke(item, type, itemInfo);
+                    if (IsPrimitive)
+                    {
+                        HandlePrimitiveItem(item);
+                    }
+                    else
+                    {
+                        ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
+                        typedItemHandler.Invoke(item, type, itemInfo);
+                    }
                 }
                 else
                 {
@@ -51,8 +66,8 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void HandlePrimitiveItem<T>(T item)
             {
-                ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
-                typedItemHandler.Invoke(item, typeof(T), null);
+                PrimitiveItemHandler<T> typedItemHandler = (PrimitiveItemHandler<T>)itemHandler;
+                typedItemHandler.Invoke(item);
             }
         }
     }

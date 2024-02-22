@@ -22,13 +22,13 @@ namespace Playground
 {
     public class BaseDto
     {
-        public double privBase = 0.77;
+        //private double privBase = 0.77;
         public int protBase = 1;
         public int pubBase = 2;
 
         public virtual void Mutate()
         {
-            privBase = privBase * 2;
+          //  privBase = privBase * 2;
             protBase = protBase * 2;
             pubBase = pubBase * 2;
         }
@@ -42,18 +42,18 @@ namespace Playground
         public int myInt = 123;
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public string myString = "Hello: \\, \", \\, \n";
-        //public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
-        //public MyEmbedded2 myEmbedded2 = new MyEmbedded2();
-        //public MyEmbedded1 myEmbedded1a = new MyEmbedded1();
-        //public MyEmbedded2 myEmbedded2a = new MyEmbedded2();
-        //public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
-        //public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
+        public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
+        public MyEmbedded2 myEmbedded2 = new MyEmbedded2();
+        public MyEmbedded1 myEmbedded1a = new MyEmbedded1();
+        public MyEmbedded2 myEmbedded2a = new MyEmbedded2();
+        public MyEmbedded1 myEmbedded1b = new MyEmbedded1();
+        public MyEmbedded2 myEmbedded2b = new MyEmbedded2();
         public List<float> myFloats = new List<float>(){ 123.1f, 23.4f};
         public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
         
-        //public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
+        public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
         public object someObj = "Something";
-        //public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
+        public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
         public string MyProperty { get; set; } = "propValue";
 
@@ -63,9 +63,9 @@ namespace Playground
             //this.myEmbedded = myEmbedded;
             //this.self = this;
 
-            //myEmbeddedDict["1"] = new MyEmbedded1();
-            //myEmbeddedDict["2"] = new MyEmbedded1();
-            //myEmbeddedDict["1_"] = myEmbeddedDict["1"];
+            myEmbeddedDict["1"] = new MyEmbedded1();
+            myEmbeddedDict["2"] = new MyEmbedded1();
+            myEmbeddedDict["1_"] = myEmbeddedDict["1"];
 
             //myObjects.Add(myEmbedded);
         }
@@ -97,27 +97,22 @@ namespace Playground
 
     public class MyEmbedded1 : IMyInterface
     {
-        public int x = 1;
+        //public int x = 1;
     }
 
     public class MyEmbedded2 : IMyInterface
     {
-        public string str1 = "Mystring1";
-        public string str2 = "Mystring2";
-        public string str3 = "Mystring3";
-        public string str4 = "Mystring4";
-        public string myString1 = "Hello: \\, \", \\, \n";
-        public string myString2 = "Hello: \\, \", \\, \n";
-        public int int1 = 123451;
-        public short int2 = 1234;
-        public long int3 = 123453;
-        public ulong int4 = 123454;
-        public double double1 = 12.1231;
+        public short y = 2;
     }
 
     public class MyEmbedded3 : IMyInterface
     {
-        //public short y = 2;
+
+    }
+
+    public struct MyStruct
+    {
+
     }
 
     public class TestDto2
@@ -181,16 +176,20 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
-            var testDto = new MyEmbedded2();
+            //var testDto = new MyEmbedded3();
+            //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
+            //var testDto = new List<MyStruct>() { new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct() };
             //var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.00000987654321, 0.0, 12.0213 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new object();
+            //var testDto = new MyStruct();
             //var testDto = 1234567.7f; 
             //var testDto = 12345678.0;
+            //var testDto = 0;
             //var testDto = 123456789012345678901234567890.0;            
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = "Mystring1";            

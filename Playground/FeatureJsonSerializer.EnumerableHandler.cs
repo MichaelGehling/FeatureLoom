@@ -51,44 +51,81 @@ namespace Playground
             MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
-            bool requiresItemNames = settings.RequiresItemNames;
+            bool requiresItemNames = settings.requiresItemNames;
             Type expectedElementType = typeof(E);
+
+            bool isPrimitive = !itemType.IsClass;
             if (elementHandler.IsPrimitive)
             {
-                ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
+                if (isPrimitive)
                 {
-                    if (collection == null)
+                    PrimitiveItemHandler<T> itemHandler = (collection) =>
                     {
-                        writer.WriteNullValue();
-                        return;
-                    }
+                        if (collection == null)
+                        {
+                            writer.WriteNullValue();
+                            return;
+                        }
 
-                    Type collectionType = collection.GetType();
-                    if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
+                        bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo;
+                        if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
-                    bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && collectionType != expectedType);
-                    if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                        writer.OpenCollection();
+                        ENUM enumerator = getEnumerator(collection);
+                        if (enumerator.MoveNext())
+                        {
+                            E element = enumerator.Current;
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        while (enumerator.MoveNext())
+                        {
+                            writer.WriteComma();
+                            E element = enumerator.Current;
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        writer.CloseCollection();
 
-                    writer.OpenCollection();
-                    ENUM enumerator = getEnumerator(collection);
-                    if (enumerator.MoveNext())
+                        if (writeTypeInfo) FinishTypeInfoObject();
+                    };
+
+                    typeHandler.SetItemHandler(itemHandler);
+                }
+                else
+                {
+                    ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
                     {
-                        E element = enumerator.Current;
-                        elementHandler.HandlePrimitiveItem(element);
-                    }
-                    while (enumerator.MoveNext())
-                    {
-                        writer.WriteComma();
-                        E element = enumerator.Current;
-                        elementHandler.HandlePrimitiveItem(element);
-                    }
-                    writer.CloseCollection();
+                        if (collection == null)
+                        {
+                            writer.WriteNullValue();
+                            return;
+                        }
 
-                    if (writeTypeInfo) FinishTypeInfoObject();
-                };
-                bool isPrimitive = !itemType.IsClass;
-                typeHandler.SetItemHandler(itemHandler, isPrimitive);
+                        Type collectionType = collection.GetType();
+                        if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
+
+                        bool writeTypeInfo = TypeInfoRequired(collectionType, expectedType);
+                        if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+
+                        writer.OpenCollection();
+                        ENUM enumerator = getEnumerator(collection);
+                        if (enumerator.MoveNext())
+                        {
+                            E element = enumerator.Current;
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        while (enumerator.MoveNext())
+                        {
+                            writer.WriteComma();
+                            E element = enumerator.Current;
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        writer.CloseCollection();
+
+                        if (writeTypeInfo) FinishTypeInfoObject();
+                    };
+
+                    typeHandler.SetItemHandler(itemHandler);
+                }
             }
             else
             {
@@ -103,8 +140,7 @@ namespace Playground
                     Type collectionType = collection.GetType();
                     if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
-                    bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && collectionType != expectedType);
+                    bool writeTypeInfo = TypeInfoRequired(collectionType, expectedType);
                     if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
                     writer.OpenCollection();
@@ -119,7 +155,7 @@ namespace Playground
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
                             if (elementType != expectedType) actualHandler = GetCachedTypeHandler(elementType);
-                            byte[] elementName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                            byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
@@ -137,7 +173,7 @@ namespace Playground
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
                             if (elementType != expectedType) actualHandler = GetCachedTypeHandler(elementType);
-                            byte[] elementName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                            byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
@@ -148,7 +184,7 @@ namespace Playground
 
                     if (writeTypeInfo) FinishTypeInfoObject();
                 };
-                typeHandler.SetItemHandler(itemHandler, false);
+                typeHandler.SetItemHandler(itemHandler);
             }
         }
 
@@ -156,7 +192,7 @@ namespace Playground
 
         private void CreateEnumerableItemHandler<T>(CachedTypeHandler typeHandler) where T : IEnumerable
         {
-            bool requiresItemNames = settings.RequiresItemNames;
+            bool requiresItemNames = settings.requiresItemNames;
             Type expectedElementType = typeof(object);
 
             ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
@@ -170,8 +206,7 @@ namespace Playground
                 Type collectionType = collection.GetType();
                 if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
-                bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                    (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && collectionType != expectedType);
+                bool writeTypeInfo = TypeInfoRequired(collectionType, expectedType);
                 if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
                 writer.OpenCollection();
@@ -185,7 +220,7 @@ namespace Playground
                     {
                         Type elementType = element.GetType();
                         CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
-                        byte[] itemName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                        byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                         ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
                         actualHandler.HandleItem(element, elementInfo);
                     }
@@ -201,7 +236,7 @@ namespace Playground
                     {
                         Type elementType = element.GetType();
                         CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
-                        byte[] itemName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                        byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                         ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
                         actualHandler.HandleItem(element, elementInfo);
                     }
@@ -211,7 +246,7 @@ namespace Playground
 
                 if (writeTypeInfo) FinishTypeInfoObject();
             };
-            typeHandler.SetItemHandler(itemHandler, false);
+            typeHandler.SetItemHandler(itemHandler);
 
         }
     }

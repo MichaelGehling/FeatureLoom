@@ -52,61 +52,99 @@ namespace Playground
                 fieldValueWriters.Add(writer);
             }
 
+            bool isPrimitive = allFieldsPrimitive && !itemType.IsClass;
             if (fieldValueWriters.Count == 0)
             {
-                ItemHandler<T> itemHandler = (complexItem, expectedType, parentJob) =>
+                if (isPrimitive)
                 {
-                    if (complexItem == null)
+                    PrimitiveItemHandler<T> itemHandler = (complexItem) =>
                     {
-                        writer.WriteNullValue();
-                        return;
-                    }
+                        writer.OpenObject();
+                        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo) writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
+                        writer.CloseObject();
+                    };
+                    typeHandler.SetItemHandler(itemHandler);
+                }
+                else
+                {
+                    ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
+                    {
+                        if (complexItem == null)
+                        {
+                            writer.WriteNullValue();
+                            return;
+                        }
 
-                    Type complexType = complexItem.GetType();
-                    if (TryHandleItemAsRef(complexItem, parentJob, complexType)) return;
-                    writer.OpenObject();
-                    if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != complexType))
-                    {
-                        writer.WritePreparedByteString(typeHandler.preparedTypeInfo);                        
-                    }
-                    writer.CloseObject();
-                };
-                bool isPrimitive = !itemType.IsClass || itemType.IsSealed;
-                typeHandler.SetItemHandler(itemHandler, isPrimitive);
+                        Type complexType = complexItem.GetType();
+                        if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
+                        writer.OpenObject();
+                        if (TypeInfoRequired(complexType, expectedType)) writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
+                        writer.CloseObject();
+                    };
+                    typeHandler.SetItemHandler(itemHandler);
+                }
             }
             else
             {
-                ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
+                if (isPrimitive)
                 {
-                    if (complexItem == null)
+                    PrimitiveItemHandler<T> itemHandler = (complexItem) =>
                     {
-                        writer.WriteNullValue();
-                        return;
-                    }
+                        if (complexItem == null)
+                        {
+                            writer.WriteNullValue();
+                            return;
+                        }
 
-                    Type complexType = complexItem.GetType();
-                    if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
+                        writer.OpenObject();
 
-                    writer.OpenObject();
+                        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+                        {
+                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
+                            writer.WriteComma();
+                        }
+                        fieldValueWriters[0].Invoke(complexItem, null);
+                        for (int i = 1; i < fieldValueWriters.Count; i++)
+                        {
+                            writer.WriteComma();
+                            fieldValueWriters[i].Invoke(complexItem, null);
+                        }
 
-                    if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && expectedType != complexType))
+                        writer.CloseObject();
+                    };
+                    typeHandler.SetItemHandler(itemHandler);
+                }
+                else
+                {
+                    ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
                     {
-                        writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                        writer.WriteComma();
-                    }                    
-                    fieldValueWriters[0].Invoke(complexItem, itemInfo);
-                    for (int i = 1; i < fieldValueWriters.Count; i++)
-                    {
-                        writer.WriteComma();
-                        fieldValueWriters[i].Invoke(complexItem, itemInfo);
-                    }
+                        if (complexItem == null)
+                        {
+                            writer.WriteNullValue();
+                            return;
+                        }
 
-                    writer.CloseObject();
-                };
-                bool isPrimitive = allFieldsPrimitive && !itemType.IsClass;
-                typeHandler.SetItemHandler(itemHandler, isPrimitive);
+                        Type complexType = complexItem.GetType();
+                        if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
+
+                        writer.OpenObject();
+
+                        if (TypeInfoRequired(complexType, expectedType))
+                        {
+                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
+                            writer.WriteComma();
+                        }
+                        fieldValueWriters[0].Invoke(complexItem, itemInfo);
+                        for (int i = 1; i < fieldValueWriters.Count; i++)
+                        {
+                            writer.WriteComma();
+                            fieldValueWriters[i].Invoke(complexItem, itemInfo);
+                        }
+
+                        writer.CloseObject();
+                    };
+                    typeHandler.SetItemHandler(itemHandler);
+                }
             }
         }
 
@@ -151,7 +189,10 @@ namespace Playground
                 {
                     writer.WritePreparedByteString(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
-                    if (value == null)writer.WriteNullValue();
+                    if (value == null)
+                    {
+                        writer.WriteNullValue();
+                    }
                     else
                     {
                         Type valueType = value.GetType();
@@ -159,7 +200,7 @@ namespace Playground
                         if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
 
                         ItemInfo itemInfo = CreateItemInfo(value, parentInfo, fieldNameBytes);
-                        fieldTypeHandler.HandleItem(value, itemInfo);
+                        actualHandler.HandleItem(value, itemInfo);
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                 };

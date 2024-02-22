@@ -28,43 +28,73 @@ namespace Playground
         private void CreateIListItemHandler<T, E>(CachedTypeHandler typeHandler, CachedTypeHandler elementHandler) where T : IList<E>
         {
             Type itemType = typeof(T);
-            bool requiresItemNames = settings.RequiresItemNames;
+            bool requiresItemNames = settings.requiresItemNames;
             if (elementHandler.IsPrimitive)
             {
-                ItemHandler<T> itemHandler = (list, expectedType, parentJob) =>
-                {
-                    if (list == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
-                    Type listType = list.GetType();
-                    if (TryHandleItemAsRef(list, parentJob, listType)) return;
-
-                    bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && listType != expectedType);
-                    if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
-
-                    writer.OpenCollection();
-                    int currentIndex = 0;
-                    if (currentIndex < list.Count)
-                    {
-                        E element = list[currentIndex++];
-                        elementHandler.HandlePrimitiveItem(element);
-                    }
-                    while (currentIndex < list.Count)
-                    {
-                        writer.WriteComma();
-                        E element = list[currentIndex++];
-                        elementHandler.HandlePrimitiveItem(element);
-                    }
-                    writer.CloseCollection();
-
-                    if (writeTypeInfo) FinishTypeInfoObject();
-                };
                 bool isPrimitive = !itemType.IsClass;
-                typeHandler.SetItemHandler(itemHandler, isPrimitive);
+                if (isPrimitive)
+                {
+                    PrimitiveItemHandler<T> itemHandler = (list) =>
+                    {
+                        bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo;
+                        if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+
+                        writer.OpenCollection();
+                        int currentIndex = 0;
+                        if (currentIndex < list.Count)
+                        {
+                            E element = list[currentIndex++];
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        while (currentIndex < list.Count)
+                        {
+                            writer.WriteComma();
+                            E element = list[currentIndex++];
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        writer.CloseCollection();
+
+                        if (writeTypeInfo) FinishTypeInfoObject();
+                    };
+
+                    typeHandler.SetItemHandler(itemHandler);
+                }
+                else
+                {
+                    ItemHandler<T> itemHandler = (list, expectedType, parentJob) =>
+                    {
+                        if (list == null)
+                        {
+                            writer.WriteNullValue();
+                            return;
+                        }
+
+                        Type listType = list.GetType();
+                        if (TryHandleItemAsRef(list, parentJob, listType)) return;
+
+                        bool writeTypeInfo = TypeInfoRequired(listType, expectedType);
+                        if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+
+                        writer.OpenCollection();
+                        int currentIndex = 0;
+                        if (currentIndex < list.Count)
+                        {
+                            E element = list[currentIndex++];
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        while (currentIndex < list.Count)
+                        {
+                            writer.WriteComma();
+                            E element = list[currentIndex++];
+                            elementHandler.HandlePrimitiveItem(element);
+                        }
+                        writer.CloseCollection();
+
+                        if (writeTypeInfo) FinishTypeInfoObject();
+                    };
+
+                    typeHandler.SetItemHandler(itemHandler);
+                }
             }
             else
             {
@@ -79,8 +109,7 @@ namespace Playground
                     Type listType = list.GetType();
                     if (TryHandleItemAsRef(list, itemInfo, listType)) return;
 
-                    bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo ||
-                        (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && listType != expectedType);
+                    bool writeTypeInfo = TypeInfoRequired(listType, expectedType);
                     if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
                     writer.OpenCollection();
@@ -93,8 +122,8 @@ namespace Playground
                         {
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != expectedType) actualHandler = GetCachedTypeHandler(elementType);
-                            byte[] elementName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
+                            byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
@@ -110,8 +139,8 @@ namespace Playground
                         {
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != expectedType) actualHandler = GetCachedTypeHandler(elementType);
-                            byte[] elementName = settings.RequiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
+                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
+                            byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
@@ -121,7 +150,7 @@ namespace Playground
 
                     if (writeTypeInfo) FinishTypeInfoObject();
                 };
-                typeHandler.SetItemHandler(itemHandler, false);
+                typeHandler.SetItemHandler(itemHandler);
 
             }
         }
