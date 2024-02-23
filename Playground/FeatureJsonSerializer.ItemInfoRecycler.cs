@@ -18,11 +18,17 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void ReturnItemInfo(ItemInfo info)
+            {                
+                if (info == null) return;
+                returnStack.Push(info);                
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public ItemInfo TakeItemInfo(ItemInfo parent, object objItem, byte[] itemName)
             {
                 if (!pool.TryPop(out ItemInfo info)) info = new ItemInfo();
                 info.Init(parent, objItem, itemName);
-                returnStack.Push(info);
                 return info;
             }
 
@@ -31,7 +37,6 @@ namespace Playground
             {
                 if (!pool.TryPop(out ItemInfo info)) info = new ItemInfo();
                 info.Init(parent, objItem, itemName);
-                returnStack.Push(info);
                 return info;
             }
 

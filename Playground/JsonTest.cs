@@ -75,7 +75,7 @@ namespace Playground
 
             myEmbeddedDict["1"] = new MyEmbedded1();
             myEmbeddedDict["2"] = new MyEmbedded1();
-            myEmbeddedDict["1_"] = myEmbeddedDict["1"];
+            //myEmbeddedDict["1_"] = myEmbeddedDict["1"];
 
             //myObjects.Add(myEmbedded);
         }
@@ -107,17 +107,20 @@ namespace Playground
 
     public class MyEmbedded1 : IMyInterface
     {
-        //public int x = 1;
+        public int x = 1;
     }
 
     public class MyEmbedded2 : IMyInterface
     {
-        public short y = 2;
+        public short y = 2;        
     }
 
     public class MyEmbedded3 : IMyInterface
     {
-
+        public short y = 2;
+        public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+        public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+        public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
     }
 
     public struct MyStruct
@@ -238,7 +241,7 @@ namespace Playground
             {
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,                                
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
                 enumAsString = true
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);

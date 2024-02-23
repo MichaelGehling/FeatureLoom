@@ -116,7 +116,7 @@ namespace Playground
                     int index = 0;
                     if (index < list.Count)
                     {
-                        E element = list[index++];
+                        E element = list[index];
                         if (element == null) writer.WriteNullValue();
                         else
                         {
@@ -126,13 +126,15 @@ namespace Playground
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
+                            itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
+                        index++;
                     }
                     while (index < list.Count)
                     {
                         writer.WriteComma();
 
-                        E element = list[index++];
+                        E element = list[index];
                         if (element == null) writer.WriteNullValue();
                         else
                         {
@@ -142,7 +144,9 @@ namespace Playground
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
+                            itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
+                        index++;
                     }
                     writer.CloseCollection();
 

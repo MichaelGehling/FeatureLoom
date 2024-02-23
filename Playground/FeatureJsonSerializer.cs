@@ -44,8 +44,7 @@ namespace Playground
             memoryStream.Position = 0;
             writer.stream = null;
             if (objToItemInfo.Count > 0) objToItemInfo.Clear();
-
-            if (settings.typeInfoHandling != TypeInfoHandling.AddNoTypeInfo) itemInfoRecycler.ResetPooledItemInfos();
+            itemInfoRecycler.ResetPooledItemInfos();
         }
 
         CachedTypeHandler lastTypeHandler = null;
@@ -69,6 +68,7 @@ namespace Playground
                     {
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         lastTypeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
                     {
@@ -76,6 +76,7 @@ namespace Playground
 
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         typeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;
@@ -134,6 +135,7 @@ namespace Playground
                     {
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         lastTypeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
                     {
@@ -141,6 +143,7 @@ namespace Playground
 
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         typeHandler.HandleItem(item, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;

@@ -201,6 +201,7 @@ namespace Playground
 
                         ItemInfo itemInfo = CreateItemInfo(value, parentInfo, fieldNameBytes);
                         actualHandler.HandleItem(value, itemInfo);
+                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                 };
             }

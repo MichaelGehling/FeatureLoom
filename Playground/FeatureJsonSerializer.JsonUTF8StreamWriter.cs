@@ -461,7 +461,7 @@ namespace Playground
             List<byte[]> indexNameList = new List<byte[]>();            
             public byte[] PrepareCollectionIndexName(int index)
             {
-                if (index > indexNameList.Count)
+                if (index >= indexNameList.Count)
                 {                    
                     for(int i = indexNameList.Count; i <= index; i++)
                     {

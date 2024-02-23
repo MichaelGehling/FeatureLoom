@@ -113,9 +113,10 @@ namespace Playground
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
                             if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                            byte[] itemName = settings.requiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
+                            string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
                             ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
+                            itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }
                     }
 
@@ -133,9 +134,10 @@ namespace Playground
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
                             if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                            byte[] itemName = settings.requiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
+                            string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
                             ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
+                            itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }
                     }
 

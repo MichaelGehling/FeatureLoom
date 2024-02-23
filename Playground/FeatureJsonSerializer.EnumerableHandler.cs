@@ -184,6 +184,7 @@ namespace Playground
                 byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                 ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                 currentHandler.HandleItem(element, elementInfo);
+                itemInfoRecycler.ReturnItemInfo(elementInfo);
             }
 
             return currentHandler;
@@ -224,6 +225,7 @@ namespace Playground
                         byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                         ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
                         actualHandler.HandleItem(element, elementInfo);
+                        itemInfoRecycler.ReturnItemInfo(elementInfo);
                     }
                     index++;
                 }
@@ -240,6 +242,7 @@ namespace Playground
                         byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                         ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
                         actualHandler.HandleItem(element, elementInfo);
+                        itemInfoRecycler.ReturnItemInfo(elementInfo);
                     }
                     index++;
                 }
