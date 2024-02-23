@@ -126,7 +126,6 @@ namespace Playground
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
-                            itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
                     }
                     while (index < list.Count)
@@ -143,7 +142,6 @@ namespace Playground
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
-                            itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
                     }
                     writer.CloseCollection();

@@ -69,7 +69,6 @@ namespace Playground
                     {
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         lastTypeHandler.HandleItem(item, itemInfo);
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
                     {
@@ -77,7 +76,6 @@ namespace Playground
 
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         typeHandler.HandleItem(item, itemInfo);
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;
@@ -136,7 +134,6 @@ namespace Playground
                     {
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         lastTypeHandler.HandleItem(item, itemInfo);
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
                     {
@@ -144,7 +141,6 @@ namespace Playground
 
                         ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
                         typeHandler.HandleItem(item, itemInfo);
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
                         lastTypeHandlerType = typeHandler.HandlerType;
@@ -160,7 +156,11 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryGetCachedStringValueWriter(Type itemType, out CachedStringValueWriter stringValueWriter) => stringValueWriterCache.TryGetValue(itemType, out stringValueWriter) || TryCreateStringValueWriter(itemType, out stringValueWriter);
+        private bool TryGetCachedStringValueWriter(Type itemType, out CachedStringValueWriter stringValueWriter)
+        {
+            return stringValueWriterCache.TryGetValue(itemType, out stringValueWriter) || 
+                   TryCreateStringValueWriter(itemType, out stringValueWriter);
+        }
 
         private bool TryCreateStringValueWriter(Type itemType, out CachedStringValueWriter stringValueWriter)
         {
@@ -184,7 +184,10 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private CachedTypeHandler GetCachedTypeHandler(Type itemType) => typeHandlerCache.TryGetValue(itemType, out var typeCacheItem) ? typeCacheItem : CreateCachedTypeHandler(itemType);
+        private CachedTypeHandler GetCachedTypeHandler(Type itemType)
+        {
+            return typeHandlerCache.TryGetValue(itemType, out var typeCacheItem) ? typeCacheItem : CreateCachedTypeHandler(itemType);
+        }
 
         private CachedTypeHandler CreateCachedTypeHandler(Type itemType)
         {

@@ -458,17 +458,17 @@ namespace Playground
                 return Encoding.UTF8.GetBytes($"\"{enumText}\"");
             }
 
-            List<byte[]> indexNameList = new List<byte[]>();
+            List<byte[]> indexNameList = new List<byte[]>();            
             public byte[] PrepareCollectionIndexName(int index)
-            {                
-                for (int i = 0; i <= index; i++)
-                {
-                    if (indexNameList.Count <= i) indexNameList.Add(null);
-                    if (index == i)
+            {
+                if (index > indexNameList.Count)
+                {                    
+                    for(int i = indexNameList.Count; i <= index; i++)
                     {
-                        if (indexNameList[i] == null) indexNameList[i] = $"[{index}]".ToByteArray();                        
+                        indexNameList.Add(null);
                     }
                 }
+                if (indexNameList[index] == null) indexNameList[index] = $"[{index}]".ToByteArray();                
                 return indexNameList[index];
             }
 

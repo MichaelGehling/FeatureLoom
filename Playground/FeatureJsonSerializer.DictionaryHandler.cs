@@ -116,7 +116,6 @@ namespace Playground
                             byte[] itemName = settings.requiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
                             ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
-                            itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }
                     }
 
@@ -137,7 +136,6 @@ namespace Playground
                             byte[] itemName = settings.requiresItemNames ? JsonUTF8StreamWriter.PreparePrimitiveToBytes(pair.Key) : null;
                             ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
-                            itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }
                     }
 
