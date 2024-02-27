@@ -13,7 +13,7 @@ namespace FeatureLoom.Helpers
     {
         T[] buffer;
         List<Slice> freeSlices = new List<Slice>();
-        int parentId;
+        int parentId = 0;
 
         FeatureLock myLock = new FeatureLock();
 
@@ -28,7 +28,7 @@ namespace FeatureLoom.Helpers
         {
             using (myLock.Lock())
             {
-                parentId = RandomGenerator.Int32(1, Int32.MaxValue - 1);
+                parentId++;
                 freeSlices.Clear();
                 freeSlices.Add(new Slice(this, 0, buffer.Length));
             }
@@ -158,13 +158,13 @@ namespace FeatureLoom.Helpers
             {
                 if (count > targetBuffer.Length + targetOffset) throw new OutOfMemoryException();
 
-                Buffer.BlockCopy(parent.buffer, firstIndex, targetBuffer, targetOffset, count);
+                Array.Copy(parent.buffer, firstIndex, targetBuffer, targetOffset, count);
             }
             public void CopyTo(Slice targetBuffer, int targetOffset)
             {
                 if (count > targetBuffer.count + targetOffset) throw new OutOfMemoryException();
 
-                Buffer.BlockCopy(parent.buffer, firstIndex, targetBuffer.parent.buffer, targetBuffer.firstIndex + targetOffset, count);
+                Array.Copy(parent.buffer, firstIndex, targetBuffer.parent.buffer, targetBuffer.firstIndex + targetOffset, count);
             }
 
             public void CopyTo(T[] targetBuffer, int targetOffset, int count)
@@ -172,7 +172,7 @@ namespace FeatureLoom.Helpers
                 if (count > this.count) throw new ArgumentOutOfRangeException("count");
                 if (count > targetBuffer.Length + targetOffset) throw new ArgumentOutOfRangeException("count");
 
-                Buffer.BlockCopy(parent.buffer, firstIndex, targetBuffer, targetOffset, count);
+                Array.Copy(parent.buffer, firstIndex, targetBuffer, targetOffset, count);
             }
 
             public void CopyTo(Slice targetBuffer, int targetOffset, int count)
@@ -180,7 +180,7 @@ namespace FeatureLoom.Helpers
                 if (count > this.count) throw new ArgumentOutOfRangeException("count");
                 if (count > targetBuffer.count + targetOffset) throw new ArgumentOutOfRangeException("count");
 
-                Buffer.BlockCopy(parent.buffer, firstIndex, targetBuffer.parent.buffer, targetBuffer.firstIndex + targetOffset, count);
+                Array.Copy(parent.buffer, firstIndex, targetBuffer.parent.buffer, targetBuffer.firstIndex + targetOffset, count);
             }
 
             public void CopyTo(T[] targetBuffer, int targetOffset, int offset, int count)
@@ -188,7 +188,7 @@ namespace FeatureLoom.Helpers
                 if (offset + count > this.count) throw new ArgumentOutOfRangeException("offset+count");
                 if (count > targetBuffer.Length + targetOffset) throw new ArgumentOutOfRangeException("count");
 
-                Buffer.BlockCopy(parent.buffer, firstIndex + offset, targetBuffer, targetOffset, count);
+                Array.Copy(parent.buffer, firstIndex + offset, targetBuffer, targetOffset, count);
             }
 
             public void CopyTo(Slice targetBuffer, int targetOffset, int offset, int count)
@@ -196,21 +196,21 @@ namespace FeatureLoom.Helpers
                 if (offset + count > this.count) throw new ArgumentOutOfRangeException("offset+count");
                 if (count > targetBuffer.count + targetOffset) throw new ArgumentOutOfRangeException("count");
 
-                Buffer.BlockCopy(parent.buffer, firstIndex + offset, targetBuffer.parent.buffer, targetBuffer.firstIndex + targetOffset, count);
+                Array.Copy(parent.buffer, firstIndex + offset, targetBuffer.parent.buffer, targetBuffer.firstIndex + targetOffset, count);
             }
 
             public void CopyFrom(T[] sourceBuffer, int sourceOffset, int offset, int count)
             {
                 if (offset + count > this.count) throw new ArgumentOutOfRangeException("offset+count");
 
-                Buffer.BlockCopy(sourceBuffer, sourceOffset, parent.buffer, firstIndex + offset, count);
+                Array.Copy(sourceBuffer, sourceOffset, parent.buffer, firstIndex + offset, count);
             }
 
             public void CopyFrom(T[] sourceBuffer, int sourceOffset, int count)
             {
                 if (count > this.count) throw new ArgumentOutOfRangeException("count");
 
-                Buffer.BlockCopy(sourceBuffer, sourceOffset, parent.buffer, firstIndex, count);
+                Array.Copy(sourceBuffer, sourceOffset, parent.buffer, firstIndex, count);
             }
 
             /// <summary>
@@ -244,7 +244,7 @@ namespace FeatureLoom.Helpers
 
             public void Dispose()
             {
-                parent.ReturnSlice(this);
+                parent?.ReturnSlice(this);
                 parent = null;
             }
         }

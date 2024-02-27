@@ -30,11 +30,13 @@ namespace Playground
             where ENUM : IEnumerator<KeyValuePair<K,V>>
         {
             Type itemType = typeof(T);
+            Type expectedValueType = typeof(V);
+            Type expectedKeyType = typeof(K);
             MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
             bool requiresItemNames = settings.requiresItemNames;
-
+            
             if (valueHandler.IsPrimitive)
             {
                 ItemHandler<T> itemHandler = (dict, expectedType, itemInfo) =>
@@ -60,7 +62,7 @@ namespace Playground
                     if (enumerator.MoveNext())
                     {
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
+                        keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
                         valueHandler.HandlePrimitiveItem(pair.Value);
                     }
@@ -69,7 +71,7 @@ namespace Playground
                     {
                         writer.WriteComma();
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
+                        keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
                         valueHandler.HandlePrimitiveItem(pair.Value);
                     }
@@ -103,7 +105,7 @@ namespace Playground
                     if (enumerator.MoveNext())
                     {
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
+                        var itemName = keyWriter.WriteKeyAsStringWithCopy(pair.Key);
                         writer.WriteColon();
 
                         var value = pair.Value;
@@ -112,9 +114,9 @@ namespace Playground
                         {
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                            string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
-                            ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
+                            //string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
+                            ItemInfo valueInfo = valueType.IsClass ? CreateItemInfoForClass(value, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
                             itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }
@@ -124,7 +126,7 @@ namespace Playground
                     {
                         writer.WriteComma();
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
+                        var itemName = keyWriter.WriteKeyAsStringWithCopy(pair.Key);
                         writer.WriteColon();
 
                         var value = pair.Value;
@@ -133,9 +135,9 @@ namespace Playground
                         {
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
-                            string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
-                            ItemInfo valueInfo = CreateItemInfo(value, itemInfo, itemName);
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
+                            //string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
+                            ItemInfo valueInfo = valueType.IsClass ? CreateItemInfoForClass(value, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
                             actualHandler.HandleItem(value, valueInfo);
                             itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }

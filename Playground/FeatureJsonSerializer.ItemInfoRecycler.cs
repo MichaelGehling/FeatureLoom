@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using FeatureLoom.Helpers;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
@@ -10,10 +11,11 @@ namespace Playground
         {
             Stack<ItemInfo> pool = new Stack<ItemInfo>();
             Stack<ItemInfo> returnStack;
+            bool postponeRecycling;
 
             public ItemInfoRecycler(FeatureJsonSerializer serializer)
             {                
-                bool postponeRecycling = serializer.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef;
+                postponeRecycling = serializer.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef;
                 returnStack = postponeRecycling ? new Stack<ItemInfo>() : pool;
             }
 
@@ -21,6 +23,7 @@ namespace Playground
             public void ReturnItemInfo(ItemInfo info)
             {                
                 if (info == null) return;
+                info.Reset(!postponeRecycling);
                 returnStack.Push(info);                
             }
 
@@ -33,7 +36,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ItemInfo TakeItemInfo(ItemInfo parent, object objItem, string itemName)
+            public ItemInfo TakeItemInfo(ItemInfo parent, object objItem, SlicedBuffer<byte>.Slice itemName)
             {
                 if (!pool.TryPop(out ItemInfo info)) info = new ItemInfo();
                 info.Init(parent, objItem, itemName);
@@ -43,13 +46,15 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void ResetPooledItemInfos()
             {
-                foreach (var info in pool) info.Reset();
-                if (pool == returnStack) return;
-                while(returnStack.TryPop(out var info))
+                if (!postponeRecycling) return;
+                foreach (var info in pool) info.Reset(false);
+                foreach(var info in returnStack)
+                //while(returnStack.TryPop(out var info))
                 {
-                    info.Reset();
+                    info.Reset(false);
                     pool.Push(info);
                 }
+                returnStack.Clear();
             }
         }
 

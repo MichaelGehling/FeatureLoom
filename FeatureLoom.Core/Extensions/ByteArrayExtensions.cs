@@ -9,7 +9,7 @@ namespace FeatureLoom.Extensions
         public static T[] CopySection<T>(this T[] data, int offset, int count)
         {
             T[] section = new T[count];
-            Buffer.BlockCopy(data, offset, section, 0, count);
+            Array.Copy(data, offset, section, 0, count);
             return section;
         }
 
@@ -38,16 +38,16 @@ namespace FeatureLoom.Extensions
         public static byte[] Combine(this byte[] array1, byte[] array2)
         {
             byte[] result = new byte[array1.Length + array2.Length];
-            System.Buffer.BlockCopy(array1, 0, result, 0, array1.Length);
-            System.Buffer.BlockCopy(array2, 0, result, array1.Length, array2.Length);
+            Array.Copy(array1, 0, result, 0, array1.Length);
+            Array.Copy(array2, 0, result, array1.Length, array2.Length);
             return result;
         }
 
         public static byte[] Combine(this byte[] array1, byte[] array2, int length)
         {
             byte[] result = new byte[array1.Length + length];
-            System.Buffer.BlockCopy(array1, 0, result, 0, array1.Length);
-            System.Buffer.BlockCopy(array2, 0, result, array1.Length, length);
+            Array.Copy(array1, 0, result, 0, array1.Length);
+            Array.Copy(array2, 0, result, array1.Length, length);
             return result;
         }
 

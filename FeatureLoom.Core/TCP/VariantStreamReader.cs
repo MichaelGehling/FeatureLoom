@@ -154,7 +154,7 @@ namespace FeatureLoom.TCP
             if (memoryStream.Position > missingCapacity)
             {
                 var buffer = memoryStream.GetBuffer();
-                Buffer.BlockCopy(buffer, (int)memoryStream.Position, buffer, 0, memoryStream.GetSizeOfLeftData());
+                Array.Copy(buffer, (int)memoryStream.Position, buffer, 0, memoryStream.GetSizeOfLeftData());
             }
             else
             {

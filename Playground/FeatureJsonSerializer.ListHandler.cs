@@ -124,7 +124,7 @@ namespace Playground
                             CachedTypeHandler actualHandler = elementHandler;
                             if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
-                            ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
+                            ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
@@ -142,7 +142,7 @@ namespace Playground
                             CachedTypeHandler actualHandler = elementHandler;
                             if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
-                            ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
+                            ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
                             actualHandler.HandleItem(element, elementInfo);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }

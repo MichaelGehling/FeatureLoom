@@ -315,10 +315,11 @@ namespace Playground
                 Console.WriteLine($"slice:  {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(1.Seconds());
 
-            }
-            */
-
+            }           
             Console.ReadKey();
+            */
+            
+
             await JsonTest.Run();
 
             Log.INFO("InfoTest");

@@ -182,7 +182,7 @@ namespace Playground
                     else currentHandler = GetCachedTypeHandler(elementType);
                 }
                 byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
-                ItemInfo elementInfo = CreateItemInfo(element, itemInfo, elementName);
+                ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
                 currentHandler.HandleItem(element, elementInfo);
                 itemInfoRecycler.ReturnItemInfo(elementInfo);
             }
@@ -223,7 +223,7 @@ namespace Playground
                         Type elementType = element.GetType();
                         CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
                         byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
-                        ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
+                        ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
                         actualHandler.HandleItem(element, elementInfo);
                         itemInfoRecycler.ReturnItemInfo(elementInfo);
                     }
@@ -240,7 +240,7 @@ namespace Playground
                         Type elementType = element.GetType();
                         CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
                         byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
-                        ItemInfo elementInfo = CreateItemInfo(element, itemInfo, itemName);
+                        ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
                         actualHandler.HandleItem(element, elementInfo);
                         itemInfoRecycler.ReturnItemInfo(elementInfo);
                     }

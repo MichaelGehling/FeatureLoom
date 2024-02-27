@@ -58,16 +58,16 @@ namespace FeatureLoom.TCP
 
                     int writePos = 0;
                     byte[] buffer = new byte[totalLength];
-                    Buffer.BlockCopy(headerStartMarkerBytes, 0, buffer, writePos, headerStartMarkerBytes.Length);
+                    Array.Copy(headerStartMarkerBytes, 0, buffer, writePos, headerStartMarkerBytes.Length);
                     writePos += headerStartMarkerBytes.Length;
 
-                    Buffer.BlockCopy(lengthInfo, 0, buffer, writePos, lengthInfo.Length);
+                    Array.Copy(lengthInfo, 0, buffer, writePos, lengthInfo.Length);
                     writePos += lengthInfo.Length;
 
                     buffer[writePos] = type;
                     writePos += sizeof(byte);
 
-                    Buffer.BlockCopy(byteObj, 0, buffer, writePos, byteObj.Length);
+                    Array.Copy(byteObj, 0, buffer, writePos, byteObj.Length);
                     writePos += byteObj.Length;
 
                     return buffer;
@@ -128,7 +128,7 @@ namespace FeatureLoom.TCP
                 {
                     case 3:
                         byte[] byteResult = new byte[payloadLength];
-                        Buffer.BlockCopy(buffer, bufferReadPosition, byteResult, 0, payloadLength);
+                        Array.Copy(buffer, bufferReadPosition, byteResult, 0, payloadLength);
                         decodedMessage = byteResult;
                         return DecodingResult.Complete;
 

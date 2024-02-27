@@ -174,6 +174,8 @@ namespace Playground
             var lambda = Expression.Lambda<Func<T, V>>(fieldAccess, parameter);
             var getValue = lambda.Compile();
 
+            Type expectedValueType = typeof(V);
+
             if (fieldTypeHandler.IsPrimitive)
             {
                 return (parentItem, _) =>
@@ -197,9 +199,9 @@ namespace Playground
                     {
                         Type valueType = value.GetType();
                         CachedTypeHandler actualHandler = fieldTypeHandler;
-                        if (valueType != typeof(V)) actualHandler = GetCachedTypeHandler(valueType);
+                        if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
 
-                        ItemInfo itemInfo = CreateItemInfo(value, parentInfo, fieldNameBytes);
+                        ItemInfo itemInfo = actualHandler.HandlerType.IsClass ? CreateItemInfoForClass(value, parentInfo, fieldNameBytes) : CreateItemInfoForStruct(parentInfo, fieldNameBytes);
                         actualHandler.HandleItem(value, itemInfo);
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }

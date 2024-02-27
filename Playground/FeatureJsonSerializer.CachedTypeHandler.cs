@@ -76,17 +76,41 @@ namespace Playground
 
     sealed class CachedKeyWriter
     {
+        private Delegate writerDelegateWithCopy;
         private Delegate writerDelegate;
+        private bool skipCopy;
+
+        public CachedKeyWriter(bool skipCopy)
+        {
+            this.skipCopy = skipCopy;
+        }
 
         public bool HasMethod => writerDelegate != null;
 
-        public void SetWriterMethod<T>(Func<T, SlicedBuffer<byte>.Slice> writerDelegate) => this.writerDelegate = writerDelegate;
+        public void SetWriterMethod<T>(Func<T, SlicedBuffer<byte>.Slice> writerDelegate) => this.writerDelegateWithCopy = writerDelegate;
+        public void SetWriterMethod<T>(Action<T> writerDelegate) => this.writerDelegate = writerDelegate;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SlicedBuffer<byte>.Slice WriteKeyAsStringWithCopy<T>(T item)
         {
-            var write = (Func<T, SlicedBuffer<byte>.Slice>)writerDelegate;
-            return write(item);
+            if (skipCopy)
+            {
+                var write = (Action<T>)writerDelegate;
+                write(item);
+                return default;
+            }
+            else
+            {
+                var write = (Func<T, SlicedBuffer<byte>.Slice>)writerDelegateWithCopy;
+                return write(item);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteKeyAsString<T>(T item)
+        {
+            var write = (Action<T>)writerDelegate;
+            write(item);
         }
     }
 }

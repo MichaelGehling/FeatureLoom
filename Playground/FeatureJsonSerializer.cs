@@ -44,7 +44,7 @@ namespace Playground
             memoryStream.Position = 0;
             writer.stream = null;
             if (objToItemInfo.Count > 0) objToItemInfo.Clear();
-            itemInfoRecycler.ResetPooledItemInfos();
+            itemInfoRecycler.ResetPooledItemInfos();            
         }
 
         CachedTypeHandler lastTypeHandler = null;
@@ -66,7 +66,7 @@ namespace Playground
 
                     if (lastTypeHandlerType == itemType)
                     {
-                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
                         lastTypeHandler.HandleItem(item, itemInfo);
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
@@ -74,7 +74,7 @@ namespace Playground
                     {
                         var typeHandler = GetCachedTypeHandler(itemType);
 
-                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
                         typeHandler.HandleItem(item, itemInfo);
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
 
@@ -100,19 +100,31 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ItemInfo CreateItemInfo<T>(T item, ItemInfo parentinfo, byte[] itemName)
+        ItemInfo CreateItemInfoForClass<T>(T item, ItemInfo parentinfo, byte[] itemName)
         {
             if (!settings.requiresItemInfos) return null;
-            if (typeof(T).IsClass) return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
-            else return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
+            return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ItemInfo CreateItemInfo<T>(T item, ItemInfo parentinfo, string itemName)
+        ItemInfo CreateItemInfoForStruct(ItemInfo parentinfo, byte[] itemName)
         {
             if (!settings.requiresItemInfos) return null;
-            if (typeof(T).IsClass) return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
-            else return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
+            return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        ItemInfo CreateItemInfoForClass<T>(T item, ItemInfo parentinfo, SlicedBuffer<byte>.Slice itemName)
+        {
+            if (!settings.requiresItemInfos) return null;
+            return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        ItemInfo CreateItemInfoForStruct(ItemInfo parentinfo, SlicedBuffer<byte>.Slice itemName)
+        {
+            if (!settings.requiresItemInfos) return null;
+            return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
         }
 
         public void Serialize<T>(Stream stream, T item)
@@ -133,7 +145,7 @@ namespace Playground
 
                     if (lastTypeHandlerType == itemType)
                     {
-                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
                         lastTypeHandler.HandleItem(item, itemInfo);
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
@@ -141,7 +153,7 @@ namespace Playground
                     {
                         var typeHandler = GetCachedTypeHandler(itemType);
 
-                        ItemInfo itemInfo = CreateItemInfo(item, null, JsonUTF8StreamWriter.ROOT);
+                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
                         typeHandler.HandleItem(item, itemInfo);
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
 
@@ -167,7 +179,21 @@ namespace Playground
 
         private bool TryCreateKeyWriter(Type itemType, out CachedKeyWriter stringValueWriter)
         {
-            stringValueWriter = new();
+            stringValueWriter = new(!settings.requiresItemNames);
+
+            if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(char)) stringValueWriter.SetWriterMethod<char>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(sbyte)) stringValueWriter.SetWriterMethod<sbyte>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(short)) stringValueWriter.SetWriterMethod<short>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(int)) stringValueWriter.SetWriterMethod<int>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(long)) stringValueWriter.SetWriterMethod<long>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(byte)) stringValueWriter.SetWriterMethod<byte>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(ushort)) stringValueWriter.SetWriterMethod<ushort>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(uint)) stringValueWriter.SetWriterMethod<uint>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(writer.WritePrimitiveValueAsString);
 
             if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WritePrimitiveValueAsStringWithCopy);
             else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WritePrimitiveValueAsStringWithCopy);
