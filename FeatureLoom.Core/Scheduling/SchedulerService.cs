@@ -63,7 +63,7 @@ namespace FeatureLoom.Scheduling
         private void RunScheduling()
         {
             while (!stop)
-            {                
+            {                                
                 DateTime triggerStart = AppTime.Now;
 
                 CheckForNewSchedules();

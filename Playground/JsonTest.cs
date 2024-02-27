@@ -75,7 +75,7 @@ namespace Playground
 
             myEmbeddedDict["1"] = new MyEmbedded1();
             myEmbeddedDict["2"] = new MyEmbedded1();
-            //myEmbeddedDict["1_"] = myEmbeddedDict["1"];
+            myEmbeddedDict["1_"] = myEmbeddedDict["1"];
 
             //myObjects.Add(myEmbedded);
         }

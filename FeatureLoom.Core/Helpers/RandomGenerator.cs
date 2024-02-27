@@ -41,6 +41,11 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        public static void Reset(int seed)
+        {
+            _rng = new Random(seed);
+        }
+
         /// <summary>
         /// Returns a random bool value.
         /// </summary>

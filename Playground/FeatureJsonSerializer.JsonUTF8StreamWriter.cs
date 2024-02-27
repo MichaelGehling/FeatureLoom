@@ -118,9 +118,6 @@ namespace Playground
                 if (mainBufferCount + freeBytes >= mainBuffer.Length) WriteBufferToStream();
             }
 
-
-
-
             static readonly byte[] NULL = "null".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteNullValue() => WriteToBuffer(NULL);
@@ -173,9 +170,9 @@ namespace Playground
 
             // Fallback for non specialized methods
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString<T>(T value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy<T>(T value)
             {
-                WriteToBufferWithoutCheck(QUOTES);
+                WriteToBufferWithoutCheck(QUOTES);                
                 WriteString(value.ToString());
                 WriteToBufferWithoutCheck(QUOTES);
             }
@@ -193,7 +190,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(long value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(long value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -214,7 +211,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(ulong value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(ulong value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger((long)value);
@@ -228,7 +225,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(int value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(int value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -242,7 +239,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(uint value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(uint value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
@@ -256,7 +253,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(byte value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(byte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
@@ -270,7 +267,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(sbyte value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(sbyte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -284,7 +281,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(short value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(short value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -298,7 +295,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(ushort value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(ushort value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
@@ -312,7 +309,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(float value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(float value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteFloat(value);
@@ -326,7 +323,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(double value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(double value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteDouble(value);
@@ -343,7 +340,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(bool value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(bool value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
@@ -365,9 +362,11 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(string str)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(string str)
             {
-                WritePrimitiveValue(str);
+                WriteToBufferWithoutCheck(QUOTES);
+                WriteEscapedString(str);
+                WriteToBufferWithoutCheck(QUOTES);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -379,7 +378,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(char value)
+            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(char value)
             {
                 WritePrimitiveValue(value);
             }

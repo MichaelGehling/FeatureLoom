@@ -1,4 +1,6 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -72,19 +74,19 @@ namespace Playground
         }
     }
 
-    sealed class CachedStringValueWriter
+    sealed class CachedKeyWriter
     {
         private Delegate writerDelegate;
 
         public bool HasMethod => writerDelegate != null;
 
-        public void SetWriterMethod<T>(Action<T> writerDelegate) => this.writerDelegate = writerDelegate;
+        public void SetWriterMethod<T>(Func<T, SlicedBuffer<byte>.Slice> writerDelegate) => this.writerDelegate = writerDelegate;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteValueAsString<T>(T item)
+        public SlicedBuffer<byte>.Slice WriteKeyAsStringWithCopy<T>(T item)
         {
-            var write = (Action<T>)writerDelegate;
-            write(item);
+            var write = (Func<T, SlicedBuffer<byte>.Slice>)writerDelegate;
+            return write(item);
         }
     }
 }

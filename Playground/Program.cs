@@ -29,6 +29,7 @@ using FeatureLoom.Statemachines;
 using System.Data;
 using System.Net.WebSockets;
 using Microsoft.Identity.Client;
+using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 
 namespace Playground
 {
@@ -255,8 +256,69 @@ namespace Playground
             Console.ReadKey();
             */
 
+            /*
+            SlicedBuffer<byte> slicedBuffer = new SlicedBuffer<byte>(1000*1000);
 
+            int iterations = 10_000;            
+            RandomGenerator.Reset(123);
+            int[] sizes = Enumerable.Range(0, 1000).Select(i => RandomGenerator.Int32(1, 10)).ToArray(); 
+            bool[] keep = Enumerable.Range(0, 1000).Select(i => RandomGenerator.Bool(0.5)).ToArray();
 
+            TimeSpan elapsed;
+            long beforeCollection;
+            long afterCollection;
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            var tk = AppTime.TimeKeeper;
+            while (true)
+            {
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    byte[] buffer;
+                    for (int j = 0; j < sizes.Length; j++)
+                    {
+                        buffer = new byte[sizes[j]];
+                        buffer[0] = 1;
+                        if (keep[j]) continue;
+                        buffer = null;
+                    }
+                }
+                elapsed = tk.Elapsed;
+                var elapsed_DUMMY = elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"byte[]: {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(1.Seconds());
+
+                tk.Restart();
+                for (int i = 0; i < iterations; i++)
+                {
+                    slicedBuffer.Reset();
+                    SlicedBuffer<byte>.Slice buffer;                    
+                    for (int j = 0; j < sizes.Length; j++)
+                    {
+                        slicedBuffer.TryGetSlice(sizes[j], out buffer);
+                        buffer[0] = 1;
+                        if (keep[j]) continue;
+                        buffer.Dispose();
+                    }                    
+                }
+                elapsed = tk.Elapsed;
+                var elapsed_A = elapsed;
+                beforeCollection = GC.GetTotalMemory(false);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                afterCollection = GC.GetTotalMemory(false);
+                Console.WriteLine($"slice:  {elapsed} / {(beforeCollection - afterCollection)} bytes");
+                AppTime.Wait(1.Seconds());
+
+            }
+            */
+
+            Console.ReadKey();
             await JsonTest.Run();
 
             Log.INFO("InfoTest");

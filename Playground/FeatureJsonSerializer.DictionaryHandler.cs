@@ -13,7 +13,7 @@ namespace Playground
         private bool TryCreateDictionaryItemHandler(CachedTypeHandler typeHandler, Type itemType)
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type keyType, out Type valueType)) return false;
-            if (!TryGetCachedStringValueWriter(keyType, out CachedStringValueWriter keyWriter)) return false;
+            if (!TryGetCachedKeyWriter(keyType, out CachedKeyWriter keyWriter)) return false;
             CachedTypeHandler valueHandler = GetCachedTypeHandler(valueType);
 
             MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
@@ -25,7 +25,7 @@ namespace Playground
             return true;
         }
 
-        private void CreateDictionaryItemHandler<T, K, V, ENUM>(CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedStringValueWriter keyWriter) 
+        private void CreateDictionaryItemHandler<T, K, V, ENUM>(CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedKeyWriter keyWriter) 
             where T : IDictionary<K, V> 
             where ENUM : IEnumerator<KeyValuePair<K,V>>
         {
@@ -60,7 +60,7 @@ namespace Playground
                     if (enumerator.MoveNext())
                     {
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteValueAsString(pair.Key);
+                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
                         writer.WriteColon();
                         valueHandler.HandlePrimitiveItem(pair.Value);
                     }
@@ -69,7 +69,7 @@ namespace Playground
                     {
                         writer.WriteComma();
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteValueAsString(pair.Key);
+                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
                         writer.WriteColon();
                         valueHandler.HandlePrimitiveItem(pair.Value);
                     }
@@ -103,7 +103,7 @@ namespace Playground
                     if (enumerator.MoveNext())
                     {
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteValueAsString(pair.Key);
+                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
                         writer.WriteColon();
 
                         var value = pair.Value;
@@ -124,7 +124,7 @@ namespace Playground
                     {
                         writer.WriteComma();
                         KeyValuePair<K, V> pair = enumerator.Current;
-                        keyWriter.WriteValueAsString(pair.Key);
+                        keyWriter.WriteKeyAsStringWithCopy(pair.Key, null);
                         writer.WriteColon();
 
                         var value = pair.Value;

@@ -31,7 +31,7 @@ namespace FeatureLoom.Logging
             public Loglevel skipDelayLogLevel = Loglevel.ERROR;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
-            public int maxQueueSize = 10000;
+            public int maxQueueSize = 10000;            
         }
 
         public Config config;
@@ -66,7 +66,7 @@ namespace FeatureLoom.Logging
         {
             this.config = config ?? new Config();
             this.config.TryUpdateFromStorage(false);
-            _ = Run();
+            Task.Run(Run);
         }
 
         async Task Run()
