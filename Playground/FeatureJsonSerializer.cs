@@ -67,7 +67,7 @@ namespace Playground
                     if (lastTypeHandlerType == itemType)
                     {
                         ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        lastTypeHandler.HandleItem(item, itemInfo);
+                        lastTypeHandler.HandleItem(item, itemInfo, typeof(T));
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
@@ -75,7 +75,7 @@ namespace Playground
                         var typeHandler = GetCachedTypeHandler(itemType);
 
                         ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        typeHandler.HandleItem(item, itemInfo);
+                        typeHandler.HandleItem(item, itemInfo, typeof(T));
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
@@ -146,7 +146,7 @@ namespace Playground
                     if (lastTypeHandlerType == itemType)
                     {
                         ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        lastTypeHandler.HandleItem(item, itemInfo);
+                        lastTypeHandler.HandleItem(item, itemInfo, typeof(T));
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                     else
@@ -154,7 +154,7 @@ namespace Playground
                         var typeHandler = GetCachedTypeHandler(itemType);
 
                         ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        typeHandler.HandleItem(item, itemInfo);
+                        typeHandler.HandleItem(item, itemInfo, typeof(T));
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
 
                         lastTypeHandler = typeHandler;
@@ -259,10 +259,10 @@ namespace Playground
         }
 
         private void CreatePrimitiveItemHandler<T>(CachedTypeHandler typeHandler, PrimitiveItemHandler<T> write)
-        {
+        {               
             if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
-                typeHandler.SetItemHandler<T>((item) =>
+                typeHandler.SetItemHandler<T>((item, _, _) =>
                 {
                     StartTypeInfoObject(typeHandler.preparedTypeInfo);
                     write(item);

@@ -61,12 +61,6 @@ namespace Playground
                 {
                     PrimitiveItemHandler<T> itemHandler = (collection) =>
                     {
-                        if (collection == null)
-                        {
-                            writer.WriteNullValue();
-                            return;
-                        }
-
                         bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo;
                         if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
 
@@ -94,12 +88,6 @@ namespace Playground
                 {
                     ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
                     {
-                        if (collection == null)
-                        {
-                            writer.WriteNullValue();
-                            return;
-                        }
-
                         Type collectionType = collection.GetType();
                         if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
@@ -131,12 +119,6 @@ namespace Playground
             {
                 ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
                 {
-                    if (collection == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
                     Type collectionType = collection.GetType();
                     if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
@@ -150,7 +132,7 @@ namespace Playground
                     if (enumerator.MoveNext())
                     {
                         E element = enumerator.Current;
-                        currentHandler = HandleElement(defaultElementHandler, itemInfo, currentHandler, index, element);
+                        currentHandler = HandleElement(defaultElementHandler, itemInfo, currentHandler, index, element, expectedElementType);
                         index++;
                     }
                     while (enumerator.MoveNext())
@@ -158,7 +140,7 @@ namespace Playground
                         writer.WriteComma();
 
                         E element = enumerator.Current;
-                        currentHandler = HandleElement(defaultElementHandler, itemInfo, currentHandler, index, element);
+                        currentHandler = HandleElement(defaultElementHandler, itemInfo, currentHandler, index, element, expectedElementType);
                         index++;
                     }
                     writer.CloseCollection();
@@ -170,7 +152,7 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private CachedTypeHandler HandleElement<E>(CachedTypeHandler defaultElementHandler, ItemInfo itemInfo, CachedTypeHandler currentHandler, int index, E element)
+        private CachedTypeHandler HandleElement<E>(CachedTypeHandler defaultElementHandler, ItemInfo itemInfo, CachedTypeHandler currentHandler, int index, E element, Type expectedElementType)
         {
             if (element == null) writer.WriteNullValue();
             else
@@ -183,7 +165,7 @@ namespace Playground
                 }
                 byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                 ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
-                currentHandler.HandleItem(element, elementInfo);
+                currentHandler.HandleItem(element, elementInfo, expectedElementType);
                 itemInfoRecycler.ReturnItemInfo(elementInfo);
             }
 
@@ -199,12 +181,6 @@ namespace Playground
 
             ItemHandler<T> itemHandler = (collection, expectedType, itemInfo) =>
             {
-                if (collection == null)
-                {
-                    writer.WriteNullValue();
-                    return;
-                }
-
                 Type collectionType = collection.GetType();
                 if (TryHandleItemAsRef(collection, itemInfo, collectionType)) return;
 
@@ -224,7 +200,7 @@ namespace Playground
                         CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
                         byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                         ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
-                        actualHandler.HandleItem(element, elementInfo);
+                        actualHandler.HandleItem(element, elementInfo, expectedElementType);
                         itemInfoRecycler.ReturnItemInfo(elementInfo);
                     }
                     index++;
@@ -241,7 +217,7 @@ namespace Playground
                         CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
                         byte[] itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                         ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
-                        actualHandler.HandleItem(element, elementInfo);
+                        actualHandler.HandleItem(element, elementInfo, expectedElementType);
                         itemInfoRecycler.ReturnItemInfo(elementInfo);
                     }
                     index++;

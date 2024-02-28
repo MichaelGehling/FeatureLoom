@@ -69,12 +69,6 @@ namespace Playground
                 {
                     ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
                     {
-                        if (complexItem == null)
-                        {
-                            writer.WriteNullValue();
-                            return;
-                        }
-
                         Type complexType = complexItem.GetType();
                         if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
                         writer.OpenObject();
@@ -90,12 +84,6 @@ namespace Playground
                 {
                     PrimitiveItemHandler<T> itemHandler = (complexItem) =>
                     {
-                        if (complexItem == null)
-                        {
-                            writer.WriteNullValue();
-                            return;
-                        }
-
                         writer.OpenObject();
 
                         if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
@@ -118,12 +106,6 @@ namespace Playground
                 {
                     ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
                     {
-                        if (complexItem == null)
-                        {
-                            writer.WriteNullValue();
-                            return;
-                        }
-
                         Type complexType = complexItem.GetType();
                         if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
 
@@ -202,7 +184,7 @@ namespace Playground
                         if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
 
                         ItemInfo itemInfo = actualHandler.HandlerType.IsClass ? CreateItemInfoForClass(value, parentInfo, fieldNameBytes) : CreateItemInfoForStruct(parentInfo, fieldNameBytes);
-                        actualHandler.HandleItem(value, itemInfo);
+                        actualHandler.HandleItem(value, itemInfo, expectedValueType);
                         itemInfoRecycler.ReturnItemInfo(itemInfo);
                     }
                 };

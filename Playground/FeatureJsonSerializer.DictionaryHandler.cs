@@ -41,12 +41,6 @@ namespace Playground
             {
                 ItemHandler<T> itemHandler = (dict, expectedType, itemInfo) =>
                 {
-                    if (dict == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
                     Type dictType = dict.GetType();
                     if (TryHandleItemAsRef(dict, itemInfo, dictType)) return;
 
@@ -84,12 +78,6 @@ namespace Playground
             {
                 ItemHandler<T> itemHandler = (dict, expectedType, itemInfo) =>
                 {
-                    if (dict == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
                     Type dictType = dict.GetType();
                     if (TryHandleItemAsRef(dict, itemInfo, dictType)) return;
 
@@ -117,7 +105,7 @@ namespace Playground
                             if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
                             //string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
                             ItemInfo valueInfo = valueType.IsClass ? CreateItemInfoForClass(value, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
-                            actualHandler.HandleItem(value, valueInfo);
+                            actualHandler.HandleItem(value, valueInfo, expectedValueType);
                             itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }
                     }
@@ -138,7 +126,7 @@ namespace Playground
                             if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
                             //string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
                             ItemInfo valueInfo = valueType.IsClass ? CreateItemInfoForClass(value, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
-                            actualHandler.HandleItem(value, valueInfo);
+                            actualHandler.HandleItem(value, valueInfo, expectedValueType);
                             itemInfoRecycler.ReturnItemInfo(valueInfo);
                         }
                     }

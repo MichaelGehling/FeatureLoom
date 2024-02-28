@@ -8,6 +8,7 @@ namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
+
         sealed class CachedTypeHandler
         {
             public readonly static MethodInfo setItemHandlerMethodInfo = typeof(CachedTypeHandler).GetMethod("SetItemHandler");
@@ -44,10 +45,9 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void HandleItem<T>(T item, ItemInfo itemInfo)
+            public void HandleItem<T>(T item, ItemInfo itemInfo, Type expectedType)
             {                
-                Type type = typeof(T);
-                if (type == handlerType)
+                if (expectedType == handlerType)
                 {
                     if (IsPrimitive)
                     {
@@ -56,12 +56,12 @@ namespace Playground
                     else
                     {
                         ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
-                        typedItemHandler.Invoke(item, type, itemInfo);
+                        typedItemHandler.Invoke(item, expectedType, itemInfo);
                     }
                 }
                 else
                 {
-                    objectItemHandler(item, type, itemInfo);
+                    objectItemHandler(item, expectedType, itemInfo);
                 }
             }
 

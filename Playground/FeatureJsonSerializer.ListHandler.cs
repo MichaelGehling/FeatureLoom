@@ -28,6 +28,7 @@ namespace Playground
         private void CreateIListItemHandler<T, E>(CachedTypeHandler typeHandler, CachedTypeHandler elementHandler) where T : IList<E>
         {
             Type itemType = typeof(T);
+            Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
             if (elementHandler.IsPrimitive)
             {
@@ -63,12 +64,6 @@ namespace Playground
                 {
                     ItemHandler<T> itemHandler = (list, expectedType, parentJob) =>
                     {
-                        if (list == null)
-                        {
-                            writer.WriteNullValue();
-                            return;
-                        }
-
                         Type listType = list.GetType();
                         if (TryHandleItemAsRef(list, parentJob, listType)) return;
 
@@ -100,12 +95,6 @@ namespace Playground
             {
                 ItemHandler<T> itemHandler = (list, expectedType, itemInfo) =>
                 {
-                    if (list == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
                     Type listType = list.GetType();
                     if (TryHandleItemAsRef(list, itemInfo, listType)) return;
 
@@ -125,7 +114,7 @@ namespace Playground
                             if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
-                            actualHandler.HandleItem(element, elementInfo);
+                            actualHandler.HandleItem(element, elementInfo, expectedElementType);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
                         index++;
@@ -143,7 +132,7 @@ namespace Playground
                             if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
                             byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
                             ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
-                            actualHandler.HandleItem(element, elementInfo);
+                            actualHandler.HandleItem(element, elementInfo, expectedElementType);
                             itemInfoRecycler.ReturnItemInfo(elementInfo);
                         }
                         index++;

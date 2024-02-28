@@ -145,8 +145,7 @@ namespace Playground
      
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
-        public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
-
+        public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };     
     }
 
     public class TestDto3
@@ -189,9 +188,9 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
-            //var testDto = new TestDto2();
-            //var testDto = new MyEmbedded3();
+            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto2();
+            //var testDto = new MyEmbedded1();
             //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
             //var testDto = new List<MyStruct>() { new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct() };
             //var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
@@ -241,7 +240,7 @@ namespace Playground
             {
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                //referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
                 enumAsString = true
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
