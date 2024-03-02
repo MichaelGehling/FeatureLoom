@@ -94,5 +94,11 @@ namespace FeatureLoom.Extensions
             return true;
         }
 
+        public static void CopyFrom<T>(this ArraySegment<T> slice, T[] source, int sourceOffset, int count)
+        {
+            if (slice.Count < count) throw new ArgumentOutOfRangeException("count");
+            Array.Copy(source, sourceOffset, slice.Array, 0, count);
+        }
+
     }
 }

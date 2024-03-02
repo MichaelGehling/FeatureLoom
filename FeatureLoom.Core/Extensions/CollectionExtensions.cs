@@ -253,5 +253,13 @@ namespace FeatureLoom.Extensions
             item3 = list[3];
             return true;
         }
+
+        public static bool TryPop<T>(this Stack<T> stack, out T value)
+        {
+            value = default;
+            if (stack.Count == 0) return false;
+            value = stack.Pop();
+            return true;
+        }
     }
 }

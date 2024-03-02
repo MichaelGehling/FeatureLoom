@@ -262,7 +262,6 @@ namespace Playground
             int iterations = 10_000;            
             RandomGenerator.Reset(123);
             int[] sizes = Enumerable.Range(0, 1000).Select(i => RandomGenerator.Int32(1, 10)).ToArray(); 
-            bool[] keep = Enumerable.Range(0, 1000).Select(i => RandomGenerator.Bool(0.5)).ToArray();
 
             TimeSpan elapsed;
             long beforeCollection;
@@ -280,7 +279,6 @@ namespace Playground
                     {
                         buffer = new byte[sizes[j]];
                         buffer[0] = 1;
-                        if (keep[j]) continue;
                         buffer = null;
                     }
                 }
@@ -296,15 +294,13 @@ namespace Playground
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
-                    slicedBuffer.Reset();
                     SlicedBuffer<byte>.Slice buffer;                    
                     for (int j = 0; j < sizes.Length; j++)
                     {
-                        slicedBuffer.TryGetSlice(sizes[j], out buffer);
+                        buffer = slicedBuffer.GetSlice(sizes[j]);
                         buffer[0] = 1;
-                        if (keep[j]) continue;
                         buffer.Dispose();
-                    }                    
+                    }   
                 }
                 elapsed = tk.Elapsed;
                 var elapsed_A = elapsed;
@@ -316,7 +312,6 @@ namespace Playground
                 AppTime.Wait(1.Seconds());
 
             }           
-            Console.ReadKey();
             */
             
 

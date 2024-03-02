@@ -20,7 +20,7 @@ namespace Playground
             private byte[] mainBuffer;
             private int mainBufferSize;
             private int mainBufferCount;
-            private SlicedBuffer<byte> slicedBuffer;
+            private SlicedBuffer<byte> tempSliceBuffer;
 
             public JsonUTF8StreamWriter()
             {
@@ -28,7 +28,8 @@ namespace Playground
                 mainBufferSize = 64 * 1024;
                 // We give some extra bytes in order to not always check remaining space
                 mainBuffer = new byte[mainBufferSize + 64];
-                slicedBuffer = new SlicedBuffer<byte>(64 * 1024);
+                // Used for temporarily needed names e.g. Dictionary
+                tempSliceBuffer = new SlicedBuffer<byte>(64 * 1024, 1024);
             }
 
             public override string ToString()
@@ -60,7 +61,7 @@ namespace Playground
             public void ResetBuffer()
             {
                 mainBufferCount = 0;
-                slicedBuffer.Reset();
+                tempSliceBuffer.Reset(true);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -181,7 +182,7 @@ namespace Playground
 
             // Fallback for non specialized methods
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy<T>(T value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy<T>(T value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(1024);
@@ -190,7 +191,7 @@ namespace Playground
                 WriteString(value.ToString());
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);                
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
                 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -219,7 +220,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(long value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(long value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -228,7 +229,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -251,7 +252,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(ulong value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ulong value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -260,7 +261,7 @@ namespace Playground
                 WriteUnsignedInteger((long)value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -282,7 +283,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(int value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(int value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -291,7 +292,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -313,7 +314,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(uint value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(uint value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -322,7 +323,7 @@ namespace Playground
                 WriteUnsignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -344,7 +345,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(byte value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(byte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -353,7 +354,7 @@ namespace Playground
                 WriteUnsignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -375,7 +376,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(sbyte value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(sbyte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -384,7 +385,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -406,7 +407,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(short value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(short value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -415,7 +416,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -437,7 +438,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(ushort value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ushort value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -446,7 +447,7 @@ namespace Playground
                 WriteUnsignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -468,7 +469,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(float value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(float value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -477,7 +478,7 @@ namespace Playground
                 WriteFloat(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -499,7 +500,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(double value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(double value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -508,7 +509,7 @@ namespace Playground
                 WriteDouble(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -533,7 +534,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(bool value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(bool value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -543,7 +544,7 @@ namespace Playground
                 WriteToBuffer(bytes);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -573,7 +574,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(string str)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(string str)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -582,7 +583,7 @@ namespace Playground
                 WriteEscapedString(str);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -606,7 +607,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public SlicedBuffer<byte>.Slice WritePrimitiveValueAsStringWithCopy(char value)
+            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(char value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -615,7 +616,7 @@ namespace Playground
                 WritePrimitiveValue(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                slicedBuffer.TryGetSlice(writtenBytes, out var slice);
+                var slice = tempSliceBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -704,17 +705,17 @@ namespace Playground
                 return Encoding.UTF8.GetBytes($"\"{enumText}\"");
             }
 
-            List<byte[]> indexNameList = new List<byte[]>();            
-            public byte[] PrepareCollectionIndexName(int index)
+            List<ArraySegment<byte>> indexNameList = new List<ArraySegment<byte>>();            
+            public ArraySegment<byte> PrepareCollectionIndexName(int index)
             {
                 if (index >= indexNameList.Count)
                 {                    
                     for(int i = indexNameList.Count; i <= index; i++)
                     {
-                        indexNameList.Add(null);
+                        indexNameList.Add(default);
                     }
                 }
-                if (indexNameList[index] == null) indexNameList[index] = $"[{index}]".ToByteArray();                
+                if (indexNameList[index].Array == null) indexNameList[index] = new ArraySegment<byte>($"[{index}]".ToByteArray());
                 return indexNameList[index];
             }
 

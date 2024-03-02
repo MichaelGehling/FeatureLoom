@@ -43,7 +43,7 @@ namespace Playground
         public string myString = "Hello: \\, \", \\, \n";
         public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
         public MyEmbedded2 myEmbedded2 = new MyEmbedded2();
-        public List<object> myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        public IEnumerable myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
 
         public string str1 = "Mystring1";
         public string str2 = "Mystring2";
@@ -188,8 +188,8 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
-            var testDto = new TestDto2();
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto2();
             //var testDto = new MyEmbedded1();
             //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
             //var testDto = new List<MyStruct>() { new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct() };
@@ -212,16 +212,16 @@ namespace Playground
             //var testDto = new TestDto3();
             //var testDto = AppTime.Now;
             //var testDto = TestEnum.TestB;
-            /*var testDto = new Dictionary<int, object>() 
+            /*var testDto = new Dictionary<string, object>() 
             { 
-                [12] = new Dictionary<string, int>() { ["a"] = 123, ["b"] = 42 },
-                [42] = new Dictionary<int, string>() { [3] = "Hello3", [4] = "Hello4" },
-                [99] = 99,
-                [111] = 123.123,
-                [31] = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" },
-                [32] = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 }
+                ["Hallo"] = new Dictionary<string, int>() { ["a"] = 123, ["b"] = 42 },
+                ["Welt"] = new Dictionary<int, string>() { [3] = "Hello3", [4] = "Hello4" },
+                ["Wie"] = 99,
+                ["Gehts"] = 123.123,
+                ["Denn"] = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" },
+                ["So"] = new List<double>() { 354476.143, 0983427.1234, 0.0, 0.0, 12.0213 }
             };
-            testDto[112] = testDto[42];
+            testDto["?"] = testDto["Hallo"];
             */
             //var testDto = new HashSet<object>() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };
             //testDto.Add(testDto[0]);
@@ -238,9 +238,9 @@ namespace Playground
 
             var settings = new FeatureJsonSerializer.Settings()
             {
-                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
                 enumAsString = true
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);

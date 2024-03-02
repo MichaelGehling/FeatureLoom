@@ -19,7 +19,7 @@ namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
-        FeatureLock serializerLock = new FeatureLock();
+        MicroValueLock serializerLock = new MicroValueLock();
         Dictionary<object, ItemInfo> objToItemInfo = new();
         MemoryStream memoryStream = new MemoryStream();
         JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
@@ -27,7 +27,10 @@ namespace Playground
         Dictionary<Type, CachedTypeHandler> typeHandlerCache = new();
         Dictionary<Type, CachedKeyWriter> keyWriterCache = new();
 
-        delegate void ItemHandler<T>(T item, Type expectedType, ItemInfo itemInfo);
+        private ArraySegment<byte> rootName;
+
+        ItemInfo currentItemInfo;
+        delegate void ItemHandler<T>(T item);
         delegate void PrimitiveItemHandler<T>(T item);
 
         ItemInfoRecycler itemInfoRecycler;
@@ -37,6 +40,8 @@ namespace Playground
             this.settings = new CompiledSettings(settings ?? new Settings());
 
             itemInfoRecycler = new ItemInfoRecycler(this);
+
+            rootName = new ArraySegment<byte>(JsonUTF8StreamWriter.ROOT);
         }
         void FinishSerialization()
         {
@@ -52,122 +57,109 @@ namespace Playground
 
         public string Serialize<T>(T item)
         {
-            using (serializerLock.Lock())
+            serializerLock.Enter();
+            try
             {
-                try
+                writer.stream = memoryStream;
+
+                if (item == null)
                 {
-                    writer.stream = memoryStream;
-
-                    if (item == null)
-                    {
-                        return "null";
-                    }
-                    Type itemType = item.GetType();
-
-                    if (lastTypeHandlerType == itemType)
-                    {
-                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        lastTypeHandler.HandleItem(item, itemInfo, typeof(T));
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
-                    }
-                    else
-                    {
-                        var typeHandler = GetCachedTypeHandler(itemType);
-
-                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        typeHandler.HandleItem(item, itemInfo, typeof(T));
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
-
-                        lastTypeHandler = typeHandler;
-                        lastTypeHandlerType = typeHandler.HandlerType;
-                    }
-
-                    if (memoryStream.Length == 0)
-                    {
-                        return Encoding.UTF8.GetString(writer.Buffer, 0, writer.BufferCount);
-                    }
-                    else
-                    {
-                        writer.WriteBufferToStream();
-                        return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
-                    }                                        
+                    return "null";
                 }
-                finally
+                Type itemType = item.GetType();
+
+                if (lastTypeHandlerType == itemType)
+                {                    
+                    lastTypeHandler.HandleItem(item, rootName);                    
+                }
+                else
                 {
-                    FinishSerialization();
+                    var typeHandler = GetCachedTypeHandler(itemType);
+                    
+                    typeHandler.HandleItem(item, rootName);                    
+
+                    lastTypeHandler = typeHandler;
+                    lastTypeHandlerType = typeHandler.HandlerType;
                 }
+
+                if (memoryStream.Length == 0)
+                {
+                    return Encoding.UTF8.GetString(writer.Buffer, 0, writer.BufferCount);
+                }
+                else
+                {
+                    writer.WriteBufferToStream();
+                    return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
+                }                                        
             }
+            finally
+            {
+                FinishSerialization();
+                serializerLock.Exit();
+            }
+            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ItemInfo CreateItemInfoForClass<T>(T item, ItemInfo parentinfo, byte[] itemName)
-        {
-            if (!settings.requiresItemInfos) return null;
-            return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
+        void CreateItemInfoForClass<T>(T item, ArraySegment<byte> itemName)
+        {            
+            if (!settings.requiresItemInfos) return;
+            currentItemInfo = itemInfoRecycler.TakeItemInfo(currentItemInfo, item, itemName);            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ItemInfo CreateItemInfoForStruct(ItemInfo parentinfo, byte[] itemName)
+        void CreateItemInfoForStruct(ArraySegment<byte> itemName)
         {
-            if (!settings.requiresItemInfos) return null;
-            return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
+            if (!settings.requiresItemInfos) return;
+            currentItemInfo = itemInfoRecycler.TakeItemInfo(currentItemInfo, null, itemName);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ItemInfo CreateItemInfoForClass<T>(T item, ItemInfo parentinfo, SlicedBuffer<byte>.Slice itemName)
+        void UseParentItemInfo()
         {
-            if (!settings.requiresItemInfos) return null;
-            return itemInfoRecycler.TakeItemInfo(parentinfo, item, itemName);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ItemInfo CreateItemInfoForStruct(ItemInfo parentinfo, SlicedBuffer<byte>.Slice itemName)
-        {
-            if (!settings.requiresItemInfos) return null;
-            return itemInfoRecycler.TakeItemInfo(parentinfo, null, itemName);
+            if (currentItemInfo == null) return;
+            var parentItemInfo = currentItemInfo.parentInfo;
+            itemInfoRecycler.ReturnItemInfo(currentItemInfo);
+            currentItemInfo = parentItemInfo;
         }
 
         public void Serialize<T>(Stream stream, T item)
         {
-            using (serializerLock.Lock())
+            serializerLock.Enter();
+            try
             {
-                try
+                writer.stream = stream;
+
+                if (item == null)
                 {
-                    writer.stream = stream;
-
-                    if (item == null)
-                    {
-                        writer.WriteNullValue();
-                        return;
-                    }
-
-                    Type itemType = item.GetType();
-
-                    if (lastTypeHandlerType == itemType)
-                    {
-                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        lastTypeHandler.HandleItem(item, itemInfo, typeof(T));
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
-                    }
-                    else
-                    {
-                        var typeHandler = GetCachedTypeHandler(itemType);
-
-                        ItemInfo itemInfo = itemType.IsClass ? CreateItemInfoForClass(item, null, JsonUTF8StreamWriter.ROOT) : CreateItemInfoForStruct(null, JsonUTF8StreamWriter.ROOT);
-                        typeHandler.HandleItem(item, itemInfo, typeof(T));
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
-
-                        lastTypeHandler = typeHandler;
-                        lastTypeHandlerType = typeHandler.HandlerType;
-                    }
-
-                    writer.WriteBufferToStream();
+                    writer.WriteNullValue();
+                    return;
                 }
-                finally
+
+                Type itemType = item.GetType();
+
+                if (lastTypeHandlerType == itemType)
+                {                    
+                    lastTypeHandler.HandleItem(item, rootName);                    
+                }
+                else
                 {
-                    FinishSerialization();
+                    var typeHandler = GetCachedTypeHandler(itemType);
+                    
+                    typeHandler.HandleItem(item, rootName);                    
+
+                    lastTypeHandler = typeHandler;
+                    lastTypeHandlerType = typeHandler.HandlerType;
                 }
+
+                writer.WriteBufferToStream();
             }
+            finally
+            {
+                FinishSerialization();
+                serializerLock.Exit();
+            }
+        
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -225,22 +217,22 @@ namespace Playground
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
 
-            if (itemType == typeof(int)) CreatePrimitiveItemHandler<int>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(uint)) CreatePrimitiveItemHandler<uint>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(long)) CreatePrimitiveItemHandler<long>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(ulong)) CreatePrimitiveItemHandler<ulong>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(short)) CreatePrimitiveItemHandler<short>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(ushort)) CreatePrimitiveItemHandler<ushort>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(sbyte)) CreatePrimitiveItemHandler<sbyte>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(byte)) CreatePrimitiveItemHandler<byte>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(string)) CreatePrimitiveItemHandler<string>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(float)) CreatePrimitiveItemHandler<float>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(double)) CreatePrimitiveItemHandler<double>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(char)) CreatePrimitiveItemHandler<char>(typeHandler, writer.WritePrimitiveValue);
-            else if (itemType == typeof(IntPtr)) CreatePrimitiveItemHandler<IntPtr>(typeHandler, writer.WritePrimitiveValue); //Make specialized
-            else if (itemType == typeof(UIntPtr)) CreatePrimitiveItemHandler<UIntPtr>(typeHandler, writer.WritePrimitiveValue); //Make specialized
-            else if (itemType == typeof(Guid)) CreatePrimitiveItemHandler<Guid>(typeHandler, writer.WritePrimitiveValue); //Make specialized
-            else if (itemType == typeof(DateTime)) CreatePrimitiveItemHandler<DateTime>(typeHandler, writer.WritePrimitiveValue); //Make specialized
+            if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(uint)) typeHandler.SetItemHandler_Primitive<uint>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(long)) typeHandler.SetItemHandler_Primitive<long>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(ulong)) typeHandler.SetItemHandler_Primitive<ulong>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(short)) typeHandler.SetItemHandler_Primitive<short>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(ushort)) typeHandler.SetItemHandler_Primitive<ushort>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(sbyte)) typeHandler.SetItemHandler_Primitive<sbyte>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(byte)) typeHandler.SetItemHandler_Primitive<byte>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(string)) typeHandler.SetItemHandler_Primitive<string>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(float)) typeHandler.SetItemHandler_Primitive<float>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(double)) typeHandler.SetItemHandler_Primitive<double>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(char)) typeHandler.SetItemHandler_Primitive<char>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(IntPtr)) typeHandler.SetItemHandler_Primitive<IntPtr>(writer.WritePrimitiveValue); //Make specialized
+            else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler_Primitive<UIntPtr>(writer.WritePrimitiveValue); //Make specialized
+            else if (itemType == typeof(Guid)) typeHandler.SetItemHandler_Primitive<Guid>(writer.WritePrimitiveValue); //Make specialized
+            else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler_Primitive<DateTime>(writer.WritePrimitiveValue); //Make specialized
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
@@ -257,33 +249,17 @@ namespace Playground
                 generic.Invoke(this, new object[] { typeHandler });
             }
         }
-
-        private void CreatePrimitiveItemHandler<T>(CachedTypeHandler typeHandler, PrimitiveItemHandler<T> write)
-        {               
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
-            {
-                typeHandler.SetItemHandler<T>((item, _, _) =>
-                {
-                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
-                    write(item);
-                    FinishTypeInfoObject();
-                });
-            }
-            else
-            {
-                typeHandler.SetItemHandler(write);
-            }
-        }        
+   
 
         private void CreateEnumItemHandler<T>(CachedTypeHandler typeHandler) where T : struct, Enum
         {
             if (settings.enumAsString)
-            {                
-                CreatePrimitiveItemHandler<T>(typeHandler, item => writer.WritePrimitiveValue(item.ToName()));
+            {
+                typeHandler.SetItemHandler_Primitive<T>(item => writer.WritePrimitiveValue(item.ToName()));
             }
             else
             {
-                CreatePrimitiveItemHandler<T>(typeHandler, item => writer.WritePrimitiveValue(item.ToInt()));
+                typeHandler.SetItemHandler_Primitive<T>(item => writer.WritePrimitiveValue(item.ToInt()));
             }
         }
 

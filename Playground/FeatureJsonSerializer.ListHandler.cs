@@ -5,6 +5,7 @@ using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
 
 namespace Playground
@@ -32,76 +33,28 @@ namespace Playground
             bool requiresItemNames = settings.requiresItemNames;
             if (elementHandler.IsPrimitive)
             {
-                bool isPrimitive = !itemType.IsClass;
-                if (isPrimitive)
+                ItemHandler<T> itemHandler = (list) =>
                 {
-                    PrimitiveItemHandler<T> itemHandler = (list) =>
+                    int currentIndex = 0;
+                    if (currentIndex < list.Count)
                     {
-                        bool writeTypeInfo = settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo;
-                        if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
-
-                        writer.OpenCollection();
-                        int currentIndex = 0;
-                        if (currentIndex < list.Count)
-                        {
-                            E element = list[currentIndex++];
-                            elementHandler.HandlePrimitiveItem(element);
-                        }
-                        while (currentIndex < list.Count)
-                        {
-                            writer.WriteComma();
-                            E element = list[currentIndex++];
-                            elementHandler.HandlePrimitiveItem(element);
-                        }
-                        writer.CloseCollection();
-
-                        if (writeTypeInfo) FinishTypeInfoObject();
-                    };
-
-                    typeHandler.SetItemHandler(itemHandler);
-                }
-                else
-                {
-                    ItemHandler<T> itemHandler = (list, expectedType, parentJob) =>
+                        E element = list[currentIndex++];
+                        elementHandler.HandleItem(element, default);
+                    }
+                    while (currentIndex < list.Count)
                     {
-                        Type listType = list.GetType();
-                        if (TryHandleItemAsRef(list, parentJob, listType)) return;
+                        writer.WriteComma();
+                        E element = list[currentIndex++];
+                        elementHandler.HandleItem(element, default);
+                    }
+                };
 
-                        bool writeTypeInfo = TypeInfoRequired(listType, expectedType);
-                        if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
-
-                        writer.OpenCollection();
-                        int currentIndex = 0;
-                        if (currentIndex < list.Count)
-                        {
-                            E element = list[currentIndex++];
-                            elementHandler.HandlePrimitiveItem(element);
-                        }
-                        while (currentIndex < list.Count)
-                        {
-                            writer.WriteComma();
-                            E element = list[currentIndex++];
-                            elementHandler.HandlePrimitiveItem(element);
-                        }
-                        writer.CloseCollection();
-
-                        if (writeTypeInfo) FinishTypeInfoObject();
-                    };
-
-                    typeHandler.SetItemHandler(itemHandler);
-                }
+                typeHandler.SetItemHandler_Array(itemHandler, true);
             }
             else
             {
-                ItemHandler<T> itemHandler = (list, expectedType, itemInfo) =>
+                ItemHandler<T> itemHandler = (list) =>
                 {
-                    Type listType = list.GetType();
-                    if (TryHandleItemAsRef(list, itemInfo, listType)) return;
-
-                    bool writeTypeInfo = TypeInfoRequired(listType, expectedType);
-                    if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
-
-                    writer.OpenCollection();
                     int index = 0;
                     if (index < list.Count)
                     {
@@ -112,10 +65,8 @@ namespace Playground
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
                             if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
-                            byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
-                            ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
-                            actualHandler.HandleItem(element, elementInfo, expectedElementType);
-                            itemInfoRecycler.ReturnItemInfo(elementInfo);
+                            ArraySegment<byte> elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : default;                            
+                            actualHandler.HandleItem(element, elementName);                            
                         }
                         index++;
                     }
@@ -130,18 +81,13 @@ namespace Playground
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
                             if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
-                            byte[] elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : null;
-                            ItemInfo elementInfo = elementType.IsClass ? CreateItemInfoForClass(element, itemInfo, elementName) : CreateItemInfoForStruct(itemInfo, elementName);
-                            actualHandler.HandleItem(element, elementInfo, expectedElementType);
-                            itemInfoRecycler.ReturnItemInfo(elementInfo);
+                            ArraySegment<byte> elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : default;                            
+                            actualHandler.HandleItem(element, elementName);                            
                         }
                         index++;
                     }
-                    writer.CloseCollection();
-
-                    if (writeTypeInfo) FinishTypeInfoObject();
                 };
-                typeHandler.SetItemHandler(itemHandler);
+                typeHandler.SetItemHandler_Array(itemHandler, false);
 
             }
         }

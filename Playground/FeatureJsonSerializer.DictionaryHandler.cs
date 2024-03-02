@@ -39,26 +39,15 @@ namespace Playground
             
             if (valueHandler.IsPrimitive)
             {
-                ItemHandler<T> itemHandler = (dict, expectedType, itemInfo) =>
+                ItemHandler<T> itemHandler = (dict) =>
                 {
-                    Type dictType = dict.GetType();
-                    if (TryHandleItemAsRef(dict, itemInfo, dictType)) return;
-
-                    writer.OpenObject();
                     ENUM enumerator = getEnumerator(dict);
-
-                    if (TypeInfoRequired(dictType, expectedType))
-                    {
-                        writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                        writer.WriteComma();
-                    }
-
                     if (enumerator.MoveNext())
                     {
                         KeyValuePair<K, V> pair = enumerator.Current;
                         keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
-                        valueHandler.HandlePrimitiveItem(pair.Value);
+                        valueHandler.HandleItem(pair.Value, default);
                     }
 
                     while (enumerator.MoveNext())
@@ -67,29 +56,16 @@ namespace Playground
                         KeyValuePair<K, V> pair = enumerator.Current;
                         keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
-                        valueHandler.HandlePrimitiveItem(pair.Value);
+                        valueHandler.HandleItem(pair.Value, default);
                     }
-
-                    writer.CloseObject();
                 };
-                typeHandler.SetItemHandler(itemHandler);
+                typeHandler.SetItemHandler_Object(itemHandler, true, false);
             }
             else
             {
-                ItemHandler<T> itemHandler = (dict, expectedType, itemInfo) =>
+                ItemHandler<T> itemHandler = (dict) =>
                 {
-                    Type dictType = dict.GetType();
-                    if (TryHandleItemAsRef(dict, itemInfo, dictType)) return;
-
-                    writer.OpenObject();
                     ENUM enumerator = getEnumerator(dict);
-
-                    if (TypeInfoRequired(dictType, expectedType))
-                    {
-                        writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                        writer.WriteComma();
-                    }
-
                     if (enumerator.MoveNext())
                     {
                         KeyValuePair<K, V> pair = enumerator.Current;
@@ -102,11 +78,8 @@ namespace Playground
                         {
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
-                            //string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
-                            ItemInfo valueInfo = valueType.IsClass ? CreateItemInfoForClass(value, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
-                            actualHandler.HandleItem(value, valueInfo, expectedValueType);
-                            itemInfoRecycler.ReturnItemInfo(valueInfo);
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);                                                        
+                            actualHandler.HandleItem(value, itemName);                            
                         }
                     }
 
@@ -123,17 +96,12 @@ namespace Playground
                         {
                             Type valueType = value.GetType();
                             CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
-                            //string itemName = settings.requiresItemNames ? pair.Key.ToString() : null;
-                            ItemInfo valueInfo = valueType.IsClass ? CreateItemInfoForClass(value, itemInfo, itemName) : CreateItemInfoForStruct(itemInfo, itemName);
-                            actualHandler.HandleItem(value, valueInfo, expectedValueType);
-                            itemInfoRecycler.ReturnItemInfo(valueInfo);
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);                                                        
+                            actualHandler.HandleItem(value, itemName);                            
                         }
                     }
-
-                    writer.CloseObject();
                 };
-                typeHandler.SetItemHandler(itemHandler);
+                typeHandler.SetItemHandler_Object(itemHandler, false, false);
             }
         }
 

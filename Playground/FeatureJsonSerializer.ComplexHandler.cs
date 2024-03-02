@@ -6,6 +6,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
 
 namespace Playground
@@ -39,94 +40,57 @@ namespace Playground
                 }
             }
 
-            List<Action<T, ItemInfo>> fieldValueWriters = new();
-            bool allFieldsPrimitive = true;
+            List<Action<T>> fieldValueWriters = new();
+            bool allFieldsNoRefs = true;
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
                 var fieldTypeHandler = GetCachedTypeHandler(fieldType);
-                allFieldsPrimitive &= fieldTypeHandler.IsPrimitive;
+                allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
                 MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
-                Action<T, ItemInfo> writer = (Action<T, ItemInfo>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
+                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
                 fieldValueWriters.Add(writer);
             }
 
-            bool isPrimitive = allFieldsPrimitive && !itemType.IsClass;
+            bool isPrimitive = allFieldsNoRefs && !itemType.IsClass;
             if (fieldValueWriters.Count == 0)
             {
-                if (isPrimitive)
+                ItemHandler<T> itemHandler = (complexItem) =>
                 {
-                    PrimitiveItemHandler<T> itemHandler = (complexItem) =>
-                    {
-                        writer.OpenObject();
-                        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo) writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                        writer.CloseObject();
-                    };
-                    typeHandler.SetItemHandler(itemHandler);
-                }
-                else
-                {
-                    ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
-                    {
-                        Type complexType = complexItem.GetType();
-                        if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
-                        writer.OpenObject();
-                        if (TypeInfoRequired(complexType, expectedType)) writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                        writer.CloseObject();
-                    };
-                    typeHandler.SetItemHandler(itemHandler);
-                }
+                    // do nothing
+                };
+
+                typeHandler.SetItemHandler_Object(itemHandler, true, true);               
             }
             else
             {
-                if (isPrimitive)
+                ItemHandler<T> itemHandler;
+                if (allFieldsNoRefs)
                 {
-                    PrimitiveItemHandler<T> itemHandler = (complexItem) =>
+                    itemHandler = (complexItem) =>
                     {
-                        writer.OpenObject();
-
-                        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
-                        {
-                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                            writer.WriteComma();
-                        }
-                        fieldValueWriters[0].Invoke(complexItem, null);
+                        fieldValueWriters[0].Invoke(complexItem);
                         for (int i = 1; i < fieldValueWriters.Count; i++)
                         {
                             writer.WriteComma();
-                            fieldValueWriters[i].Invoke(complexItem, null);
+                            fieldValueWriters[i].Invoke(complexItem);
                         }
-
-                        writer.CloseObject();
                     };
-                    typeHandler.SetItemHandler(itemHandler);
                 }
                 else
                 {
-                    ItemHandler<T> itemHandler = (complexItem, expectedType, itemInfo) =>
+                    itemHandler = (complexItem) =>
                     {
-                        Type complexType = complexItem.GetType();
-                        if (TryHandleItemAsRef(complexItem, itemInfo, complexType)) return;
-
-                        writer.OpenObject();
-
-                        if (TypeInfoRequired(complexType, expectedType))
-                        {
-                            writer.WritePreparedByteString(typeHandler.preparedTypeInfo);
-                            writer.WriteComma();
-                        }
-                        fieldValueWriters[0].Invoke(complexItem, itemInfo);
+                        fieldValueWriters[0].Invoke(complexItem);
                         for (int i = 1; i < fieldValueWriters.Count; i++)
                         {
                             writer.WriteComma();
-                            fieldValueWriters[i].Invoke(complexItem, itemInfo);
+                            fieldValueWriters[i].Invoke(complexItem);
                         }
-
-                        writer.CloseObject();
                     };
-                    typeHandler.SetItemHandler(itemHandler);
                 }
+                typeHandler.SetItemHandler_Object(itemHandler, allFieldsNoRefs, false);
             }
         }
 
@@ -137,7 +101,7 @@ namespace Playground
             throw new Exception("Not a FieldType or PropertyType");
         }
 
-        private Action<T, ItemInfo> CreateFieldValueWriter<T, V>(CachedTypeHandler fieldTypeHandler, MemberInfo memberInfo)
+        private Action<T> CreateFieldValueWriter<T, V>(CachedTypeHandler fieldTypeHandler, MemberInfo memberInfo)
         {
             string fieldName = memberInfo.Name;
             if (settings.dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields &&
@@ -147,7 +111,7 @@ namespace Playground
                 fieldName = fieldName.Substring("<", ">");
             }
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
-            var fieldNameBytes = JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName);
+            var fieldNameBytes = new ArraySegment<byte>(JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName));
 
             Type itemType = typeof(T);
             var parameter = Expression.Parameter(typeof(object));
@@ -160,16 +124,16 @@ namespace Playground
 
             if (fieldTypeHandler.IsPrimitive)
             {
-                return (parentItem, _) =>
+                return (parentItem) =>
                 {
                     writer.WritePreparedByteString(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
-                    fieldTypeHandler.HandlePrimitiveItem(value);
+                    fieldTypeHandler.HandleItem(value, default);
                 };
             }
             else
             {
-                return (parentItem, parentInfo) =>
+                return (parentItem) =>
                 {
                     writer.WritePreparedByteString(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
@@ -182,10 +146,8 @@ namespace Playground
                         Type valueType = value.GetType();
                         CachedTypeHandler actualHandler = fieldTypeHandler;
                         if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
-
-                        ItemInfo itemInfo = actualHandler.HandlerType.IsClass ? CreateItemInfoForClass(value, parentInfo, fieldNameBytes) : CreateItemInfoForStruct(parentInfo, fieldNameBytes);
-                        actualHandler.HandleItem(value, itemInfo, expectedValueType);
-                        itemInfoRecycler.ReturnItemInfo(itemInfo);
+                        
+                        actualHandler.HandleItem(value, fieldNameBytes);                        
                     }
                 };
             }

@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Helpers;
+using Microsoft.VisualBasic;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -14,9 +15,10 @@ namespace Playground
             public readonly static MethodInfo setItemHandlerMethodInfo = typeof(CachedTypeHandler).GetMethod("SetItemHandler");
             private FeatureJsonSerializer serializer;
             private Delegate itemHandler;
-            private ItemHandler<object> objectItemHandler;
+            private Action<object, Type, ArraySegment<byte>> objectItemHandler;
             private Type handlerType;
             private bool isPrimitive;
+            private bool noRefTypes;
             public byte[] preparedTypeInfo;
 
             public CachedTypeHandler(FeatureJsonSerializer serializer)
@@ -25,51 +27,186 @@ namespace Playground
             }
 
             public bool IsPrimitive => isPrimitive;
+            public bool NoRefTypes => noRefTypes;
 
             public Type HandlerType => handlerType;
 
-            public void SetItemHandler<T>(ItemHandler<T> itemHandler)
+            public void SetItemHandler_Primitive<T>(PrimitiveItemHandler<T> itemHandler)
             {
-                this.isPrimitive = false;
                 this.handlerType = typeof(T);
-                this.itemHandler = itemHandler;
-                this.objectItemHandler = (item, expectedType, baseJob) => itemHandler.Invoke((T)item, expectedType, baseJob);
-            }
-
-            public void SetItemHandler<T>(PrimitiveItemHandler<T> itemHandler)
-            {
                 this.isPrimitive = true;
-                this.handlerType = typeof(T);
-                this.itemHandler = itemHandler;
-                this.objectItemHandler = (item, _, _) => itemHandler.Invoke((T)item);
+                this.noRefTypes = true;
+                Action<T, Type, ArraySegment<byte>> temp;
+                if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+                {
+                    temp = (item, _, _) =>
+                    {
+                        serializer.StartTypeInfoObject(preparedTypeInfo);
+                        itemHandler.Invoke(item);
+                        serializer.FinishTypeInfoObject();
+                    };
+                }
+                else if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+                {
+                    temp = (item, callType, _) =>
+                    {
+                        if (handlerType == callType)
+                        {
+                            itemHandler.Invoke(item);
+                        }
+                        else
+                        {
+                            serializer.StartTypeInfoObject(preparedTypeInfo);
+                            itemHandler.Invoke(item);
+                            serializer.FinishTypeInfoObject();
+                        }
+                    };
+                }
+                else
+                {
+                    temp = (item, expectedType, itemInfo) =>
+                    {
+                        itemHandler.Invoke(item);
+                    };
+                }
+                this.itemHandler = temp;
+                this.objectItemHandler = (item, expectedType, baseJob) => temp.Invoke((T)item, expectedType, baseJob);
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void HandleItem<T>(T item, ItemInfo itemInfo, Type expectedType)
-            {                
-                if (expectedType == handlerType)
-                {
-                    if (IsPrimitive)
+            public void SetItemHandler_Array<T>(ItemHandler<T> itemHandler, bool noRefChildren)
+            {
+                this.handlerType = typeof(T);
+                this.isPrimitive = false;
+                this.noRefTypes = noRefChildren && !this.handlerType.IsClass;
+                Action<T, Type, ArraySegment<byte>> temp;
+                if (this.handlerType.IsClass)
+                {                    
+                    temp = (item, callType, itemName) =>
                     {
-                        HandlePrimitiveItem(item);
+                        serializer.CreateItemInfoForClass(item, itemName);
+                        if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                        {
+                            Type itemType = item.GetType();
+                            bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                            if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
+                            serializer.writer.OpenCollection();
+                            itemHandler.Invoke(item);
+                            serializer.writer.CloseCollection();
+                            if (writeTypeInfo) serializer.FinishTypeInfoObject();
+                        }
+                        serializer.UseParentItemInfo();
+                    };
+                }
+                else
+                {
+                    temp = (item, callType, itemName) =>
+                    {
+                        serializer.CreateItemInfoForStruct(itemName);
+                        Type itemType = item.GetType();
+                        bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                        if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
+                        serializer.writer.OpenCollection();
+                        itemHandler.Invoke(item);
+                        serializer.writer.CloseCollection();
+                        if (writeTypeInfo) serializer.FinishTypeInfoObject();
+                        serializer.UseParentItemInfo();
+                    };
+                }
+                this.itemHandler = temp;
+                this.objectItemHandler = (item, callType, baseJob) => temp.Invoke((T)item, callType, baseJob);
+            }
+
+            public void SetItemHandler_Object<T>(ItemHandler<T> itemHandler, bool noRefChildren, bool noFields)
+            {
+                this.handlerType = typeof(T);
+                this.isPrimitive = false;                
+                this.noRefTypes = noRefChildren && !this.handlerType.IsClass;
+                Action<T, Type, ArraySegment<byte>> temp;
+                if (this.handlerType.IsClass)
+                {
+                    if (noFields)
+                    {
+                        temp = (item, callType, itemName) =>
+                        {
+                            serializer.CreateItemInfoForClass(item, itemName);
+                            if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                            {
+                                Type itemType = item.GetType();
+                                serializer.writer.OpenObject();
+                                if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                serializer.writer.CloseObject();
+                            }
+                            serializer.UseParentItemInfo();
+                        };
                     }
                     else
                     {
-                        ItemHandler<T> typedItemHandler = (ItemHandler<T>)itemHandler;
-                        typedItemHandler.Invoke(item, expectedType, itemInfo);
+                        temp = (item, callType, itemName) =>
+                        {
+                            serializer.CreateItemInfoForClass(item, itemName);
+                            if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                            {
+                                Type itemType = item.GetType();
+                                serializer.writer.OpenObject();
+                                if (serializer.TypeInfoRequired(itemType, callType))
+                                {
+                                    serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                    serializer.writer.WriteComma();
+                                }
+                                itemHandler.Invoke(item);
+                                serializer.writer.CloseObject();
+                            }
+                            serializer.UseParentItemInfo();
+                        };
                     }
                 }
                 else
                 {
-                    objectItemHandler(item, expectedType, itemInfo);
+                    if (noFields)
+                    {
+                        temp = (item, callType, _) =>
+                        {
+                            Type itemType = item.GetType();
+                            serializer.writer.OpenObject();
+                            if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                            serializer.writer.CloseObject();
+                        };
+                    }
+                    else
+                    {
+                        temp = (item, callType, itemName) =>
+                        {
+                            serializer.CreateItemInfoForStruct(itemName);
+                            Type itemType = item.GetType();
+                            serializer.writer.OpenObject();
+                            if (serializer.TypeInfoRequired(itemType, callType))
+                            {
+                                serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                serializer.writer.WriteComma();
+                            }
+                            itemHandler.Invoke(item);
+                            serializer.writer.CloseObject();
+                            serializer.UseParentItemInfo();
+                        };
+                    }
                 }
+                this.itemHandler = temp;
+                this.objectItemHandler = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void HandlePrimitiveItem<T>(T item)
+            public void HandleItem<T>(T item, ArraySegment<byte> fieldName)
             {
-                PrimitiveItemHandler<T> typedItemHandler = (PrimitiveItemHandler<T>)itemHandler;
-                typedItemHandler.Invoke(item);
+                Type callType = typeof(T);
+                if (callType == handlerType)
+                {
+                    Action<T, Type, ArraySegment<byte>> typedItemHandler = (Action<T, Type, ArraySegment<byte> >)itemHandler;
+                    typedItemHandler.Invoke(item, callType, fieldName);
+                }
+                else
+                {
+                    objectItemHandler(item, callType, fieldName);
+                }
             }
         }
     }
@@ -87,11 +224,11 @@ namespace Playground
 
         public bool HasMethod => writerDelegate != null;
 
-        public void SetWriterMethod<T>(Func<T, SlicedBuffer<byte>.Slice> writerDelegate) => this.writerDelegateWithCopy = writerDelegate;
+        public void SetWriterMethod<T>(Func<T, ArraySegment<byte>> writerDelegate) => this.writerDelegateWithCopy = writerDelegate;
         public void SetWriterMethod<T>(Action<T> writerDelegate) => this.writerDelegate = writerDelegate;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public SlicedBuffer<byte>.Slice WriteKeyAsStringWithCopy<T>(T item)
+        public ArraySegment<byte> WriteKeyAsStringWithCopy<T>(T item)
         {
             if (skipCopy)
             {
@@ -101,7 +238,7 @@ namespace Playground
             }
             else
             {
-                var write = (Func<T, SlicedBuffer<byte>.Slice>)writerDelegateWithCopy;
+                var write = (Func<T, ArraySegment<byte>>)writerDelegateWithCopy;
                 return write(item);
             }
         }
