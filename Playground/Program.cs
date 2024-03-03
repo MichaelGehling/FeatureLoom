@@ -257,11 +257,11 @@ namespace Playground
             */
 
             /*
-            SlicedBuffer<byte> slicedBuffer = new SlicedBuffer<byte>(1000*1000);
+            SlicedBuffer<byte> slicedBuffer = new SlicedBuffer<byte>(1000*1000, 100);
 
             int iterations = 10_000;            
             RandomGenerator.Reset(123);
-            int[] sizes = Enumerable.Range(0, 1000).Select(i => RandomGenerator.Int32(1, 10)).ToArray(); 
+            int[] sizes = Enumerable.Range(0, 1000).Select(i => RandomGenerator.Int32(1, 100)).ToArray();
 
             TimeSpan elapsed;
             long beforeCollection;
@@ -278,8 +278,6 @@ namespace Playground
                     for (int j = 0; j < sizes.Length; j++)
                     {
                         buffer = new byte[sizes[j]];
-                        buffer[0] = 1;
-                        buffer = null;
                     }
                 }
                 elapsed = tk.Elapsed;
@@ -294,12 +292,11 @@ namespace Playground
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
-                    SlicedBuffer<byte>.Slice buffer;                    
+                    slicedBuffer.Reset(true);
+                    ArraySegment<byte> buffer;                    
                     for (int j = 0; j < sizes.Length; j++)
                     {
-                        buffer = slicedBuffer.GetSlice(sizes[j]);
-                        buffer[0] = 1;
-                        buffer.Dispose();
+                        buffer = slicedBuffer.GetSlice(sizes[j]);                    
                     }   
                 }
                 elapsed = tk.Elapsed;

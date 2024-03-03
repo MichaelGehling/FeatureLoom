@@ -79,12 +79,47 @@ namespace Playground
                 this.isPrimitive = false;
                 this.noRefTypes = noRefChildren && !this.handlerType.IsClass;
                 Action<T, Type, ArraySegment<byte>> temp;
-                if (this.handlerType.IsClass)
-                {                    
-                    temp = (item, callType, itemName) =>
+                if (serializer.settings.requiresItemInfos)
+                {
+                    if (this.handlerType.IsClass)
                     {
-                        serializer.CreateItemInfoForClass(item, itemName);
-                        if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                        temp = (item, callType, itemName) =>
+                        {
+                            serializer.CreateItemInfoForClass(item, itemName);
+                            if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                            {
+                                Type itemType = item.GetType();
+                                bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                                if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
+                                serializer.writer.OpenCollection();
+                                itemHandler.Invoke(item);
+                                serializer.writer.CloseCollection();
+                                if (writeTypeInfo) serializer.FinishTypeInfoObject();
+                            }
+                            serializer.UseParentItemInfo();
+                        };
+                    }
+                    else
+                    {
+                        temp = (item, callType, itemName) =>
+                        {
+                            serializer.CreateItemInfoForStruct(itemName);
+                            Type itemType = item.GetType();
+                            bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                            if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
+                            serializer.writer.OpenCollection();
+                            itemHandler.Invoke(item);
+                            serializer.writer.CloseCollection();
+                            if (writeTypeInfo) serializer.FinishTypeInfoObject();
+                            serializer.UseParentItemInfo();
+                        };
+                    }
+                }
+                else
+                {
+                    if (this.handlerType.IsClass)
+                    {
+                        temp = (item, callType, itemName) =>
                         {
                             Type itemType = item.GetType();
                             bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
@@ -93,24 +128,21 @@ namespace Playground
                             itemHandler.Invoke(item);
                             serializer.writer.CloseCollection();
                             if (writeTypeInfo) serializer.FinishTypeInfoObject();
-                        }
-                        serializer.UseParentItemInfo();
-                    };
-                }
-                else
-                {
-                    temp = (item, callType, itemName) =>
+                        };
+                    }
+                    else
                     {
-                        serializer.CreateItemInfoForStruct(itemName);
-                        Type itemType = item.GetType();
-                        bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
-                        if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
-                        serializer.writer.OpenCollection();
-                        itemHandler.Invoke(item);
-                        serializer.writer.CloseCollection();
-                        if (writeTypeInfo) serializer.FinishTypeInfoObject();
-                        serializer.UseParentItemInfo();
-                    };
+                        temp = (item, callType, itemName) =>
+                        {
+                            Type itemType = item.GetType();
+                            bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                            if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
+                            serializer.writer.OpenCollection();
+                            itemHandler.Invoke(item);
+                            serializer.writer.CloseCollection();
+                            if (writeTypeInfo) serializer.FinishTypeInfoObject();
+                        };
+                    }
                 }
                 this.itemHandler = temp;
                 this.objectItemHandler = (item, callType, baseJob) => temp.Invoke((T)item, callType, baseJob);
@@ -122,29 +154,173 @@ namespace Playground
                 this.isPrimitive = false;                
                 this.noRefTypes = noRefChildren && !this.handlerType.IsClass;
                 Action<T, Type, ArraySegment<byte>> temp;
-                if (this.handlerType.IsClass)
+                if (serializer.settings.requiresItemInfos)
                 {
-                    if (noFields)
+                    if (this.handlerType.IsClass)
                     {
-                        temp = (item, callType, itemName) =>
+                        if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                         {
-                            serializer.CreateItemInfoForClass(item, itemName);
-                            if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                            if (noFields)
+                            {
+                                temp = (item, callType, itemName) =>
+                                {
+                                    serializer.CreateItemInfoForClass(item, itemName);
+                                    if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                    {
+                                        serializer.writer.OpenObject();
+                                        serializer.writer.CloseObject();
+                                    }
+                                    serializer.UseParentItemInfo();
+                                };
+                            }
+                            else
+                            {
+                                temp = (item, callType, itemName) =>
+                                {
+                                    serializer.CreateItemInfoForClass(item, itemName);
+                                    if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                    {
+                                        serializer.writer.OpenObject();
+                                        itemHandler.Invoke(item);
+                                        serializer.writer.CloseObject();
+                                    }
+                                    serializer.UseParentItemInfo();
+                                };
+                            }
+                        }
+                        else
+                        {
+                            if (noFields)
+                            {
+                                temp = (item, callType, itemName) =>
+                                {
+                                    serializer.CreateItemInfoForClass(item, itemName);
+                                    if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                    {
+                                        Type itemType = item.GetType();
+                                        serializer.writer.OpenObject();
+                                        if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                        serializer.writer.CloseObject();
+                                    }
+                                    serializer.UseParentItemInfo();
+                                };
+                            }
+                            else
+                            {
+                                temp = (item, callType, itemName) =>
+                                {
+                                    serializer.CreateItemInfoForClass(item, itemName);
+                                    if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                    {
+                                        Type itemType = item.GetType();
+                                        serializer.writer.OpenObject();
+                                        if (serializer.TypeInfoRequired(itemType, callType))
+                                        {
+                                            serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                            serializer.writer.WriteComma();
+                                        }
+                                        itemHandler.Invoke(item);
+                                        serializer.writer.RemoveTrailingComma();
+                                        serializer.writer.CloseObject();
+                                    }
+                                    serializer.UseParentItemInfo();
+                                };
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
+                        {
+                            if (noFields)
+                            {
+                                temp = (item, callType, _) =>
+                                {
+                                    serializer.writer.OpenObject();
+                                    serializer.writer.CloseObject();
+                                };
+                            }
+                            else
+                            {
+                                temp = (item, callType, itemName) =>
+                                {
+                                    serializer.CreateItemInfoForStruct(itemName);
+                                    serializer.writer.OpenObject();
+                                    itemHandler.Invoke(item);
+                                    serializer.writer.CloseObject();
+                                    serializer.UseParentItemInfo();
+                                };
+                            }
+                        }
+                        else
+                        {
+                            if (noFields)
+                            {
+                                temp = (item, callType, _) =>
+                                {
+                                    Type itemType = item.GetType();
+                                    serializer.writer.OpenObject();
+                                    if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                    serializer.writer.CloseObject();
+                                };
+                            }
+                            else
+                            {
+                                temp = (item, callType, itemName) =>
+                                {
+                                    serializer.CreateItemInfoForStruct(itemName);
+                                    Type itemType = item.GetType();
+                                    serializer.writer.OpenObject();
+                                    if (serializer.TypeInfoRequired(itemType, callType))
+                                    {
+                                        serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                        serializer.writer.WriteComma();
+                                    }
+                                    itemHandler.Invoke(item);
+                                    serializer.writer.CloseObject();
+                                    serializer.UseParentItemInfo();
+                                };
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
+                    {
+                        if (noFields)
+                        {
+                            temp = (item, callType, itemName) =>
+                            {
+                                serializer.writer.OpenObject();
+                                serializer.writer.CloseObject();
+                            };
+                        }
+                        else
+                        {
+                            temp = (item, callType, itemName) =>
+                            {
+                                serializer.writer.OpenObject();
+                                itemHandler.Invoke(item);
+                                serializer.writer.CloseObject();
+                            };
+                        }
+                    }
+                    else
+                    {
+                        if (noFields)
+                        {
+                            temp = (item, callType, itemName) =>
                             {
                                 Type itemType = item.GetType();
                                 serializer.writer.OpenObject();
                                 if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
                                 serializer.writer.CloseObject();
-                            }
-                            serializer.UseParentItemInfo();
-                        };
-                    }
-                    else
-                    {
-                        temp = (item, callType, itemName) =>
+                            };
+                        }
+                        else
                         {
-                            serializer.CreateItemInfoForClass(item, itemName);
-                            if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                            temp = (item, callType, itemName) =>
                             {
                                 Type itemType = item.GetType();
                                 serializer.writer.OpenObject();
@@ -154,42 +330,13 @@ namespace Playground
                                     serializer.writer.WriteComma();
                                 }
                                 itemHandler.Invoke(item);
+                                serializer.writer.RemoveTrailingComma();
                                 serializer.writer.CloseObject();
-                            }
-                            serializer.UseParentItemInfo();
-                        };
-                    }
+                            };
+                        }
+                    } 
                 }
-                else
-                {
-                    if (noFields)
-                    {
-                        temp = (item, callType, _) =>
-                        {
-                            Type itemType = item.GetType();
-                            serializer.writer.OpenObject();
-                            if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
-                            serializer.writer.CloseObject();
-                        };
-                    }
-                    else
-                    {
-                        temp = (item, callType, itemName) =>
-                        {
-                            serializer.CreateItemInfoForStruct(itemName);
-                            Type itemType = item.GetType();
-                            serializer.writer.OpenObject();
-                            if (serializer.TypeInfoRequired(itemType, callType))
-                            {
-                                serializer.writer.WritePreparedByteString(preparedTypeInfo);
-                                serializer.writer.WriteComma();
-                            }
-                            itemHandler.Invoke(item);
-                            serializer.writer.CloseObject();
-                            serializer.UseParentItemInfo();
-                        };
-                    }
-                }
+
                 this.itemHandler = temp;
                 this.objectItemHandler = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
             }

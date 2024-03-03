@@ -671,6 +671,12 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteComma() => WriteToBufferWithoutCheck(COMMA);
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void RemoveTrailingComma()
+            {
+                if (mainBuffer[mainBufferCount - 1] == COMMA) mainBufferCount--;
+            }
+
             static readonly byte DOT = (byte)'.';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteDot() => WriteToBufferWithoutCheck(DOT);

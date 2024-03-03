@@ -66,6 +66,7 @@ namespace Playground
                 {
                     return "null";
                 }
+
                 Type itemType = item.GetType();
 
                 if (lastTypeHandlerType == itemType)

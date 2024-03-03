@@ -238,9 +238,9 @@ namespace Playground
 
             var settings = new FeatureJsonSerializer.Settings()
             {
-                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
+                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
                 enumAsString = true
             };
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);

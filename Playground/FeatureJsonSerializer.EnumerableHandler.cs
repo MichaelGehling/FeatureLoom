@@ -51,7 +51,6 @@ namespace Playground
             MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
-            bool requiresItemNames = settings.requiresItemNames;
             Type expectedElementType = typeof(E);
             
             if (defaultElementHandler.IsPrimitive)
