@@ -20,7 +20,7 @@ namespace Playground
             private byte[] mainBuffer;
             private int mainBufferSize;
             private int mainBufferCount;
-            private SlicedBuffer<byte> tempSliceBuffer;
+            private SlicedBuffer<byte> tempSlicedBuffer;
 
             public JsonUTF8StreamWriter()
             {
@@ -29,7 +29,7 @@ namespace Playground
                 // We give some extra bytes in order to not always check remaining space
                 mainBuffer = new byte[mainBufferSize + 64];
                 // Used for temporarily needed names e.g. Dictionary
-                tempSliceBuffer = new SlicedBuffer<byte>(64 * 1024, 1024);
+                tempSlicedBuffer = new SlicedBuffer<byte>(8 * 1024, 128);
             }
 
             public override string ToString()
@@ -51,8 +51,6 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteBufferToStream()
             {
-                if (mainBufferCount == 0) return;
-                
                 stream.Write(mainBuffer, 0, mainBufferCount);
                 mainBufferCount = 0;                
             }
@@ -61,7 +59,7 @@ namespace Playground
             public void ResetBuffer()
             {
                 mainBufferCount = 0;
-                tempSliceBuffer.Reset(true);
+                tempSlicedBuffer.Reset(true);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -191,7 +189,7 @@ namespace Playground
                 WriteString(value.ToString());
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);                
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);                
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
                 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -229,7 +227,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -261,7 +259,7 @@ namespace Playground
                 WriteUnsignedInteger((long)value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -292,7 +290,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -323,7 +321,7 @@ namespace Playground
                 WriteUnsignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -354,7 +352,7 @@ namespace Playground
                 WriteUnsignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -385,7 +383,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -416,7 +414,7 @@ namespace Playground
                 WriteSignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -447,7 +445,7 @@ namespace Playground
                 WriteUnsignedInteger(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -478,7 +476,7 @@ namespace Playground
                 WriteFloat(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -509,7 +507,7 @@ namespace Playground
                 WriteDouble(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -544,7 +542,7 @@ namespace Playground
                 WriteToBuffer(bytes);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -583,7 +581,7 @@ namespace Playground
                 WriteEscapedString(str);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);
@@ -616,7 +614,7 @@ namespace Playground
                 WritePrimitiveValue(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSliceBuffer.GetSlice(writtenBytes);
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
                 WriteToBufferWithoutCheck(QUOTES);

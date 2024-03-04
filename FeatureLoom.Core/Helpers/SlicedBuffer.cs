@@ -41,7 +41,7 @@ namespace FeatureLoom.Helpers
                 position += size;
                 return slice;
             }
-            else if (leftCapacity > wasteLimit)
+            else if (leftCapacity > wasteLimit || size > capacity)
             {
                 return new ArraySegment<T>(new T[size]);
             }
