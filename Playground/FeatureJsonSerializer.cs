@@ -39,7 +39,8 @@ namespace Playground
             Array,
             Object,
             Array_WithoutRefChildren,
-            Object_WithoutRefChildren
+            Object_WithoutRefChildren,
+            Object_Empty
         }
 
         public interface ItemHandlerCreator

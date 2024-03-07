@@ -39,7 +39,8 @@ namespace Playground
                     case JsonDataTypeCategory.Array: SetItemHandler_Array(itemHandler, false); break;
                     case JsonDataTypeCategory.Array_WithoutRefChildren: SetItemHandler_Array(itemHandler, true); break;
                     case JsonDataTypeCategory.Object: SetItemHandler_Object(itemHandler, false, false); break;
-                    case JsonDataTypeCategory.Object_WithoutRefChildren: SetItemHandler_Object(itemHandler, true, false); break;                    
+                    case JsonDataTypeCategory.Object_WithoutRefChildren: SetItemHandler_Object(itemHandler, true, false); break;
+                    case JsonDataTypeCategory.Object_Empty: SetItemHandler_Object(itemHandler, true, true); break;
                 }
             }
 
