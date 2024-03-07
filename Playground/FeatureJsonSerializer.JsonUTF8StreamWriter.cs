@@ -22,7 +22,7 @@ namespace Playground
             private int mainBufferCount;
             private SlicedBuffer<byte> tempSlicedBuffer;
 
-            public JsonUTF8StreamWriter()
+            public JsonUTF8StreamWriter(int mainBufferSize, int tempBufferSize)
             {
                 localBuffer = new byte[64];
                 mainBufferSize = 64 * 1024;
