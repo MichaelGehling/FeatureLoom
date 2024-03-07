@@ -25,11 +25,11 @@ namespace Playground
             public JsonUTF8StreamWriter(int mainBufferSize, int tempBufferSize)
             {
                 localBuffer = new byte[64];
-                mainBufferSize = 64 * 1024;
+                this.mainBufferSize = mainBufferSize;
                 // We give some extra bytes in order to not always check remaining space
                 mainBuffer = new byte[mainBufferSize + 64];
                 // Used for temporarily needed names e.g. Dictionary
-                tempSlicedBuffer = new SlicedBuffer<byte>(8 * 1024, 128);
+                tempSlicedBuffer = new SlicedBuffer<byte>(tempBufferSize, 128);
             }
 
             public override string ToString()
@@ -495,6 +495,12 @@ namespace Playground
             public void WritePrimitiveValue(double value)
             {
                 WriteDouble(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WritePrimitiveValue(decimal value)
+            {
+                WriteDouble((double)value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

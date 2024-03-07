@@ -31,7 +31,7 @@ namespace Playground
 
             public Type HandlerType => handlerType;
 
-            public void SetItemHandler_Primitive<T>(PrimitiveItemHandler<T> itemHandler)
+            public void SetItemHandler_Primitive<T>(ItemHandler<T> itemHandler)
             {
                 this.handlerType = typeof(T);
                 this.isPrimitive = true;

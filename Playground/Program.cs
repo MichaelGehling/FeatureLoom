@@ -90,6 +90,11 @@ namespace Playground
             public int a = 1;
             private int p = 42;
             public int P { get => this.p; set => p = value; }
+
+            public void Inc()
+            {
+                a++;
+            }
         }
 
         class TestClass2 : TestClass
@@ -102,6 +107,11 @@ namespace Playground
             public string str;
             public int i;
             public TestClass obj;
+
+            public void Inc()
+            {
+                i++;
+            }
         }
 
 
@@ -310,7 +320,7 @@ namespace Playground
 
             }           
             */
-            
+
 
             await JsonTest.Run();
 

@@ -188,7 +188,7 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = new TestDto2();
             //var testDto = new MyEmbedded1();
             //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
@@ -228,6 +228,14 @@ namespace Playground
 
             //var testDto = new ArrayList() { new Dictionary<string, int>() { ["Hallo"] = 12, ["World"] = 34 }, null, new Dictionary<string, int>(), 99, 42, "Hello", "World", 123.999 };            
 
+            /*var testDto = new Dictionary<object, int>()
+            {
+                [new MyEmbedded1()] = 1,
+                [new MyEmbedded2()] = 2,
+                [new MyEmbedded3()] = 3,
+            };*/
+            //var testDto = new KeyValuePair<object, int>(new MyEmbedded1(), 1);
+            var testDto = new decimal(123.123);
 
             Type testDtoType = testDto.GetType();
             string json; 

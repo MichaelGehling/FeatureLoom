@@ -19,34 +19,55 @@ namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
-        MicroValueLock serializerLock = new MicroValueLock();
-        Dictionary<object, ItemInfo> objToItemInfo = new();
-        MemoryStream memoryStream = new MemoryStream();
-        JsonUTF8StreamWriter writer = new JsonUTF8StreamWriter();
+        MicroValueLock serializerLock = new MicroValueLock();        
+        LazyValue<MemoryStream> memoryStream = new();
+        JsonUTF8StreamWriter writer;
         readonly CompiledSettings settings;
         Dictionary<Type, CachedTypeHandler> typeHandlerCache = new();
         Dictionary<Type, CachedKeyWriter> keyWriterCache = new();
-
-        private ArraySegment<byte> rootName;
-
-        ItemInfo currentItemInfo;
-        delegate void ItemHandler<T>(T item);
-        delegate void PrimitiveItemHandler<T>(T item);
-
+        Dictionary<object, ItemInfo> objToItemInfo = new();
         ItemInfoRecycler itemInfoRecycler;
+        private ArraySegment<byte> rootName;
+        ItemInfo currentItemInfo;
+        public delegate void ItemHandler<T>(T item);
+        public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
+
+        public enum JsonDataTypeCategory
+        {
+            Primitive,
+            Array,
+            Object
+        }
+
+        public interface ItemHandlerCreator
+        {
+            bool TryCreateItemHandler<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
+        }
+
+        public sealed class ExtensionApi
+        {
+            FeatureJsonSerializer s;
+
+            public ExtensionApi(FeatureJsonSerializer serializer)
+            {
+                this.s = serializer;
+            }
+
+
+        }
+        
 
         public FeatureJsonSerializer(Settings settings = null)
         {
             this.settings = new CompiledSettings(settings ?? new Settings());
-
+            writer = new JsonUTF8StreamWriter(this.settings.writeBufferChunkSize, this.settings.tempBufferSize);
             itemInfoRecycler = new ItemInfoRecycler(this);
-
-            rootName = new ArraySegment<byte>(JsonUTF8StreamWriter.ROOT);
+            rootName = new ArraySegment<byte>(JsonUTF8StreamWriter.ROOT);            
         }
         void FinishSerialization()
         {
             writer.ResetBuffer();
-            memoryStream.Position = 0;
+            if (memoryStream.Exists) memoryStream.Obj.Position = 0;
             writer.stream = null;
             if (objToItemInfo.Count > 0) objToItemInfo.Clear();
             itemInfoRecycler.ResetPooledItemInfos();            
@@ -60,7 +81,7 @@ namespace Playground
             serializerLock.Enter();
             try
             {
-                writer.stream = memoryStream;
+                writer.stream = memoryStream.Obj;
 
                 if (item == null)
                 {
@@ -83,14 +104,14 @@ namespace Playground
                     lastTypeHandlerType = typeHandler.HandlerType;
                 }
 
-                if (memoryStream.Length == 0)
+                if (memoryStream.Obj.Length == 0)
                 {
                     return Encoding.UTF8.GetString(writer.Buffer, 0, writer.BufferCount);
                 }
                 else
                 {
                     writer.WriteBufferToStream();
-                    return Encoding.UTF8.GetString(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
+                    return Encoding.UTF8.GetString(memoryStream.Obj.GetBuffer(), 0, (int)memoryStream.Obj.Length);
                 }                                        
             }
             finally
@@ -218,6 +239,23 @@ namespace Playground
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
 
+            foreach(var creator in settings.itemHandlerCreators)
+            {
+                MethodInfo createMethod = creator.GetType().GetMethod(nameof(ItemHandlerCreator.TryCreateItemHandler), BindingFlags.Public | BindingFlags.Instance);
+                MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
+                Type delegateType = typeof(TryCreateItemHandlerDelegate<>).MakeGenericType(itemType);
+                Delegate delegateInstance = Delegate.CreateDelegate(delegateType, creator, genericCreateMethod);
+                object[] parameters = new object[] { this.extensionApi, null, null };
+                bool result = (bool)delegateInstance.DynamicInvoke(parameters);
+                ItemHandler<dynamic> itemHandler = (ItemHandler<dynamic>)parameters[1];
+                JsonDataTypeCategory category = (JsonDataTypeCategory)parameters[2];
+
+                bool result = genericCreateMethod.Invoke(this, new object[] { /* What to put here? */ });
+
+                if (creator.TryCreateItemHandler<>)
+            }
+
+
             if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WritePrimitiveValue);
             else if (itemType == typeof(uint)) typeHandler.SetItemHandler_Primitive<uint>(writer.WritePrimitiveValue);
             else if (itemType == typeof(long)) typeHandler.SetItemHandler_Primitive<long>(writer.WritePrimitiveValue);
@@ -229,6 +267,7 @@ namespace Playground
             else if (itemType == typeof(string)) typeHandler.SetItemHandler_Primitive<string>(writer.WritePrimitiveValue);
             else if (itemType == typeof(float)) typeHandler.SetItemHandler_Primitive<float>(writer.WritePrimitiveValue);
             else if (itemType == typeof(double)) typeHandler.SetItemHandler_Primitive<double>(writer.WritePrimitiveValue);
+            else if (itemType == typeof(decimal)) typeHandler.SetItemHandler_Primitive<decimal>(writer.WritePrimitiveValue);
             else if (itemType == typeof(char)) typeHandler.SetItemHandler_Primitive<char>(writer.WritePrimitiveValue);
             else if (itemType == typeof(IntPtr)) typeHandler.SetItemHandler_Primitive<IntPtr>(writer.WritePrimitiveValue); //Make specialized
             else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler_Primitive<UIntPtr>(writer.WritePrimitiveValue); //Make specialized

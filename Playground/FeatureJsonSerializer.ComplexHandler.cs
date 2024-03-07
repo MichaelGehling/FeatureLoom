@@ -4,7 +4,6 @@ using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
@@ -113,13 +112,15 @@ namespace Playground
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
             var fieldNameBytes = new ArraySegment<byte>(JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName));
 
+            
             Type itemType = typeof(T);
-            var parameter = Expression.Parameter(typeof(object));
-            var castedParameter = Expression.Convert(parameter, itemType);
-            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(castedParameter, field) : memberInfo is PropertyInfo property ? Expression.Property(castedParameter, property) : default;
+            var parameter = Expression.Parameter(itemType, "param");
+
+            var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(parameter, field) :
+                              memberInfo is PropertyInfo property ? Expression.Property(parameter, property) : null;
             var lambda = Expression.Lambda<Func<T, V>>(fieldAccess, parameter);
             var getValue = lambda.Compile();
-
+            
             Type expectedValueType = typeof(V);
 
             if (fieldTypeHandler.IsPrimitive)

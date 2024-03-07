@@ -2,6 +2,7 @@
 using FeatureLoom.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using static Playground.FeatureJsonSerializer;
 
@@ -18,6 +19,9 @@ namespace Playground
             public int bufferSize = -1;
             public bool enumAsString = false;
             public bool treatEnumerablesAsCollections = true;
+            public int writeBufferChunkSize = 64 * 1024;
+            public int tempBufferSize = 8 * 1024;
+            public List<ItemHandlerCreator> itemHandlerCreators = new List<ItemHandlerCreator>();
         }
 
         public enum DataSelection
@@ -51,6 +55,9 @@ namespace Playground
             public readonly int bufferSize;
             public readonly bool enumAsString;
             public readonly bool treatEnumerablesAsCollections;
+            public readonly int writeBufferChunkSize;
+            public readonly int tempBufferSize;
+            public readonly ItemHandlerCreator[] itemHandlerCreators;
 
             public readonly bool requiresItemNames;
             public readonly bool requiresItemInfos;
@@ -63,6 +70,9 @@ namespace Playground
                 bufferSize = settings.bufferSize;
                 enumAsString = settings.enumAsString;
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
+                writeBufferChunkSize = settings.writeBufferChunkSize;
+                tempBufferSize = settings.tempBufferSize;
+                itemHandlerCreators = settings.itemHandlerCreators.Where(creator => creator != null).ToArray();
 
                 requiresItemNames = referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef;
                 requiresItemInfos = referenceCheck != ReferenceCheck.NoRefCheck;
