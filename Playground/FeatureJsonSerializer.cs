@@ -228,7 +228,7 @@ namespace Playground
 
         private void CallItemHandlerCreator<T>(ItemHandlerCreator creator, CachedTypeHandler typeHandler)
         {
-            creator.CreateItemHandler(this.extensionApi, out var itemHandler, out JsonDataTypeCategory category);
+            creator.CreateItemHandler<T>(this.extensionApi, out var itemHandler, out JsonDataTypeCategory category);
             typeHandler.SetItemHandler<T>(itemHandler, category);
         }
 
