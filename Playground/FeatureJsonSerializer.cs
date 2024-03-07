@@ -29,6 +29,7 @@ namespace Playground
         ItemInfoRecycler itemInfoRecycler;
         private ArraySegment<byte> rootName;
         ItemInfo currentItemInfo;
+        ExtensionApi extensionApi;
         public delegate void ItemHandler<T>(T item);
         public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
 
@@ -36,33 +37,25 @@ namespace Playground
         {
             Primitive,
             Array,
-            Object
+            Object,
+            Array_WithoutRefChildren,
+            Object_WithoutRefChildren
         }
 
         public interface ItemHandlerCreator
         {
-            bool TryCreateItemHandler<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
-        }
-
-        public sealed class ExtensionApi
-        {
-            FeatureJsonSerializer s;
-
-            public ExtensionApi(FeatureJsonSerializer serializer)
-            {
-                this.s = serializer;
-            }
-
-
+            bool SupportsType(Type type);
+            void CreateItemHandler<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
         }
         
 
         public FeatureJsonSerializer(Settings settings = null)
-        {
+        {           
             this.settings = new CompiledSettings(settings ?? new Settings());
             writer = new JsonUTF8StreamWriter(this.settings.writeBufferChunkSize, this.settings.tempBufferSize);
             itemInfoRecycler = new ItemInfoRecycler(this);
-            rootName = new ArraySegment<byte>(JsonUTF8StreamWriter.ROOT);            
+            rootName = new ArraySegment<byte>(JsonUTF8StreamWriter.ROOT);
+            this.extensionApi = new ExtensionApi(this);
         }
         void FinishSerialization()
         {
@@ -232,6 +225,15 @@ namespace Playground
             return typeHandlerCache.TryGetValue(itemType, out var typeCacheItem) ? typeCacheItem : CreateCachedTypeHandler(itemType);
         }
 
+
+        private void CallItemHandlerCreator<T>(ItemHandlerCreator creator, CachedTypeHandler typeHandler)
+        {
+            creator.CreateItemHandler(this.extensionApi, out var itemHandler, out JsonDataTypeCategory category);
+            typeHandler.SetItemHandler<T>(itemHandler, category);
+        }
+
+
+
         private CachedTypeHandler CreateCachedTypeHandler(Type itemType)
         {
             CachedTypeHandler typeHandler = new CachedTypeHandler(this);
@@ -241,18 +243,11 @@ namespace Playground
 
             foreach(var creator in settings.itemHandlerCreators)
             {
-                MethodInfo createMethod = creator.GetType().GetMethod(nameof(ItemHandlerCreator.TryCreateItemHandler), BindingFlags.Public | BindingFlags.Instance);
+                if (!creator.SupportsType(itemType)) continue;
+
+                MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CallItemHandlerCreator), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
-                Type delegateType = typeof(TryCreateItemHandlerDelegate<>).MakeGenericType(itemType);
-                Delegate delegateInstance = Delegate.CreateDelegate(delegateType, creator, genericCreateMethod);
-                object[] parameters = new object[] { this.extensionApi, null, null };
-                bool result = (bool)delegateInstance.DynamicInvoke(parameters);
-                ItemHandler<dynamic> itemHandler = (ItemHandler<dynamic>)parameters[1];
-                JsonDataTypeCategory category = (JsonDataTypeCategory)parameters[2];
-
-                bool result = genericCreateMethod.Invoke(this, new object[] { /* What to put here? */ });
-
-                if (creator.TryCreateItemHandler<>)
+                genericCreateMethod.Invoke(this, new object[] { creator, typeHandler });
             }
 
 

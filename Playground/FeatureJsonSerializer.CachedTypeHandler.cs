@@ -31,6 +31,18 @@ namespace Playground
 
             public Type HandlerType => handlerType;
 
+            public void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category)
+            {
+                switch (category)
+                {
+                    case JsonDataTypeCategory.Primitive: SetItemHandler_Primitive(itemHandler); break;
+                    case JsonDataTypeCategory.Array: SetItemHandler_Array(itemHandler, false); break;
+                    case JsonDataTypeCategory.Array_WithoutRefChildren: SetItemHandler_Array(itemHandler, true); break;
+                    case JsonDataTypeCategory.Object: SetItemHandler_Object(itemHandler, false, false); break;
+                    case JsonDataTypeCategory.Object_WithoutRefChildren: SetItemHandler_Object(itemHandler, true, false); break;                    
+                }
+            }
+
             public void SetItemHandler_Primitive<T>(ItemHandler<T> itemHandler)
             {
                 this.handlerType = typeof(T);
