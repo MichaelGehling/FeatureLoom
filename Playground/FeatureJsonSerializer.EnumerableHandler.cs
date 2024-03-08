@@ -53,7 +53,7 @@ namespace Playground
 
             Type expectedElementType = typeof(E);
             
-            if (defaultElementHandler.IsPrimitive)
+            if (defaultElementHandler.NoRefTypes)
             {
                 ItemHandler<T> itemHandler = (collection) =>
                 {

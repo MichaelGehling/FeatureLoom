@@ -10,7 +10,12 @@ namespace Playground
     public sealed partial class FeatureJsonSerializer
     {
 
-        sealed class CachedTypeHandler
+        public interface ICachedTypeHandler
+        {
+            void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category);
+        }
+
+        public sealed class CachedTypeHandler : ICachedTypeHandler
         {
             public readonly static MethodInfo setItemHandlerMethodInfo = typeof(CachedTypeHandler).GetMethod("SetItemHandler");
             private FeatureJsonSerializer serializer;
@@ -239,7 +244,7 @@ namespace Playground
                                     {
                                         Type itemType = item.GetType();
                                         serializer.writer.OpenObject();
-                                        if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                        if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WriteToBuffer(preparedTypeInfo);
                                         serializer.writer.CloseObject();
                                     }
                                     serializer.UseParentItemInfo();
@@ -256,7 +261,7 @@ namespace Playground
                                         serializer.writer.OpenObject();
                                         if (serializer.TypeInfoRequired(itemType, callType))
                                         {
-                                            serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                            serializer.writer.WriteToBuffer(preparedTypeInfo);
                                             serializer.writer.WriteComma();
                                         }
                                         itemHandler.Invoke(item);
@@ -300,7 +305,7 @@ namespace Playground
                                 {
                                     Type itemType = item.GetType();
                                     serializer.writer.OpenObject();
-                                    if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                    if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WriteToBuffer(preparedTypeInfo);
                                     serializer.writer.CloseObject();
                                 };
                             }
@@ -313,7 +318,7 @@ namespace Playground
                                     serializer.writer.OpenObject();
                                     if (serializer.TypeInfoRequired(itemType, callType))
                                     {
-                                        serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                        serializer.writer.WriteToBuffer(preparedTypeInfo);
                                         serializer.writer.WriteComma();
                                     }
                                     itemHandler.Invoke(item);
@@ -354,7 +359,7 @@ namespace Playground
                             {
                                 Type itemType = item.GetType();
                                 serializer.writer.OpenObject();
-                                if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WriteToBuffer(preparedTypeInfo);
                                 serializer.writer.CloseObject();
                             };
                         }
@@ -366,7 +371,7 @@ namespace Playground
                                 serializer.writer.OpenObject();
                                 if (serializer.TypeInfoRequired(itemType, callType))
                                 {
-                                    serializer.writer.WritePreparedByteString(preparedTypeInfo);
+                                    serializer.writer.WriteToBuffer(preparedTypeInfo);
                                     serializer.writer.WriteComma();
                                 }
                                 itemHandler.Invoke(item);

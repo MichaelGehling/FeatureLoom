@@ -123,11 +123,11 @@ namespace Playground
             
             Type expectedValueType = typeof(V);
 
-            if (fieldTypeHandler.IsPrimitive)
+            if (fieldTypeHandler.NoRefTypes)
             {
                 return (parentItem) =>
                 {
-                    writer.WritePreparedByteString(fieldNameAndColonBytes);
+                    writer.WriteToBuffer(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
                     fieldTypeHandler.HandleItem(value, default);
                 };
@@ -136,7 +136,7 @@ namespace Playground
             {
                 return (parentItem) =>
                 {
-                    writer.WritePreparedByteString(fieldNameAndColonBytes);
+                    writer.WriteToBuffer(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
                     if (value == null)
                     {

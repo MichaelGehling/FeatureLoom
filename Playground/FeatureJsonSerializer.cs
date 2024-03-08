@@ -43,10 +43,10 @@ namespace Playground
             Object_Empty
         }
 
-        public interface ItemHandlerCreator
+        public interface ITypeHandlerCreator
         {
             bool SupportsType(Type type);
-            void CreateItemHandler<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
+            void CreateTypeHandler<T>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler);
         }
         
 
@@ -55,7 +55,7 @@ namespace Playground
             this.settings = new CompiledSettings(settings ?? new Settings());
             writer = new JsonUTF8StreamWriter(this.settings.writeBufferChunkSize, this.settings.tempBufferSize);
             itemInfoRecycler = new ItemInfoRecycler(this);
-            rootName = new ArraySegment<byte>(JsonUTF8StreamWriter.ROOT);
+            rootName = new ArraySegment<byte>(writer.PrepareRootName());
             this.extensionApi = new ExtensionApi(this);
         }
         void FinishSerialization()
@@ -227,10 +227,9 @@ namespace Playground
         }
 
 
-        private void CallItemHandlerCreator<T>(ItemHandlerCreator creator, CachedTypeHandler typeHandler)
+        private void CallItemHandlerCreator<T>(ITypeHandlerCreator creator, CachedTypeHandler typeHandler)
         {
-            creator.CreateItemHandler<T>(this.extensionApi, out var itemHandler, out JsonDataTypeCategory category);
-            typeHandler.SetItemHandler<T>(itemHandler, category);
+            creator.CreateTypeHandler<T>(extensionApi, typeHandler);
         }
 
 
@@ -246,9 +245,10 @@ namespace Playground
             {
                 if (!creator.SupportsType(itemType)) continue;
 
-                MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CallItemHandlerCreator), BindingFlags.NonPublic | BindingFlags.Instance);
+                MethodInfo createMethod = typeof(ITypeHandlerCreator).GetMethod(nameof(ITypeHandlerCreator.CreateTypeHandler), BindingFlags.Public | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
-                genericCreateMethod.Invoke(this, new object[] { creator, typeHandler });
+                genericCreateMethod.Invoke(creator, new object[] { extensionApi, typeHandler });
+                return typeHandler;
             }
 
 
@@ -305,7 +305,7 @@ namespace Playground
         void StartTypeInfoObject(byte[] preparedTypeInfo)
         {
             writer.OpenObject();
-            writer.WritePreparedByteString(preparedTypeInfo);
+            writer.WriteToBuffer(preparedTypeInfo);
             writer.WriteComma();
             writer.WriteValueFieldName();
         }

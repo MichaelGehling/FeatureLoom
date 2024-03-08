@@ -63,7 +63,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBuffer(byte[] data, int offset, int count)
+            public void WriteToBuffer(byte[] data, int offset, int count)
             {
                 if (mainBufferCount + count > mainBuffer.Length) WriteBufferToStream();
                 Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
@@ -71,19 +71,19 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBuffer(byte[] data, int count)
+            public void WriteToBuffer(byte[] data, int count)
             {
                 WriteToBuffer(data, 0, count);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBuffer(byte[] data)
+            public void WriteToBuffer(byte[] data)
             {
                 WriteToBuffer(data, 0, data.Length);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBuffer(ArraySegment<byte> data)
+            public void WriteToBuffer(ArraySegment<byte> data)
             {
                 if (mainBufferCount + data.Count > mainBuffer.Length) WriteBufferToStream();
                 data.CopyTo(mainBuffer, mainBufferCount);
@@ -91,39 +91,39 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBuffer(byte data)
+            public void WriteToBuffer(byte data)
             {
                 if (mainBufferCount >= mainBuffer.Length) WriteBufferToStream();
                 mainBuffer[mainBufferCount++] = data;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
+            public void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
             {
                 Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
                 mainBufferCount += count;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBufferWithoutCheck(byte[] data, int count)
+            public void WriteToBufferWithoutCheck(byte[] data, int count)
             {
                 WriteToBufferWithoutCheck(data, 0, count);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBufferWithoutCheck(byte[] data)
+            public void WriteToBufferWithoutCheck(byte[] data)
             {
                 WriteToBufferWithoutCheck(data, 0, data.Length);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteToBufferWithoutCheck(byte data)
+            public void WriteToBufferWithoutCheck(byte data)
             {
                 mainBuffer[mainBufferCount++] = data;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void EnsureFreeBufferSpace(int freeBytes)
+            public void EnsureFreeBufferSpace(int freeBytes)
             {
                 if (mainBufferCount + freeBytes >= mainBuffer.Length) WriteBufferToStream();
             }
@@ -690,9 +690,6 @@ namespace Playground
             public void WriteColon() => WriteToBufferWithoutCheck(COLON);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePreparedByteString(byte[] bytes) => WriteToBuffer(bytes);
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public byte[] PrepareFieldNameBytes(string fieldname)
             {
                 return Encoding.UTF8.GetBytes($"\"{fieldname}\":");
@@ -710,7 +707,7 @@ namespace Playground
 
             
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte[] PrepareEnumTextToBytes(string enumText)
+            public byte[] PrepareTextToBytes(string enumText)
             {
                 return Encoding.UTF8.GetBytes($"\"{enumText}\"");
             }

@@ -21,7 +21,7 @@ namespace Playground
             public bool treatEnumerablesAsCollections = true;
             public int writeBufferChunkSize = 64 * 1024;
             public int tempBufferSize = 8 * 1024;
-            public List<ItemHandlerCreator> itemHandlerCreators = new List<ItemHandlerCreator>();
+            public List<ITypeHandlerCreator> itemHandlerCreators = new List<ITypeHandlerCreator>();
         }
 
         public enum DataSelection
@@ -57,7 +57,7 @@ namespace Playground
             public readonly bool treatEnumerablesAsCollections;
             public readonly int writeBufferChunkSize;
             public readonly int tempBufferSize;
-            public readonly ItemHandlerCreator[] itemHandlerCreators;
+            public readonly ITypeHandlerCreator[] itemHandlerCreators;
 
             public readonly bool requiresItemNames;
             public readonly bool requiresItemInfos;

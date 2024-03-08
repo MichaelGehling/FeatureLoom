@@ -17,6 +17,7 @@ using System.Collections;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
+using FeatureLoom.Security;
 
 namespace Playground
 {
@@ -176,6 +177,50 @@ namespace Playground
             public override void Write(byte[] buffer, int offset, int count) { }
         }
 
+        public class CustomExtension : FeatureJsonSerializer.ITypeHandlerCreator
+        {
+            public void CreateTypeHandler<T>(FeatureJsonSerializer.ExtensionApi api, FeatureJsonSerializer.ICachedTypeHandler cachedTypeHandler)
+            {
+                if (typeof(T) == typeof(MyEmbedded1))
+                {
+                    var x = api.PrepareFieldNameBytes(nameof(MyEmbedded1.x));
+                    var xName = new ArraySegment<byte>(api.PrepareStringToBytes(nameof(MyEmbedded1.x)));
+                    var xHandler = api.GetCachedTypeHandler(typeof(int));
+                    cachedTypeHandler.SetItemHandler<MyEmbedded1>((item) =>
+                    {
+                        api.WriteToBuffer(x);
+                        //xHandler.HandleItem(item.x, xName);
+                        api.WritePrimitiveValue(item.x);
+                    }, FeatureJsonSerializer.JsonDataTypeCategory.Object_WithoutRefChildren);
+                }
+                if (typeof(T) == typeof(List<MyEmbedded1>))
+                {
+                    var xFieldName = api.PrepareFieldNameBytes(nameof(MyEmbedded1.x));
+                    var xName = new ArraySegment<byte>(api.PrepareStringToBytes(nameof(MyEmbedded1.x)));
+                    var xHandler = api.GetCachedTypeHandler(typeof(int));
+                    cachedTypeHandler.SetItemHandler<List<MyEmbedded1>>((list) =>
+                    {
+                        for (int i= 0; i < list.Count; i++)
+                        {
+                            if (i > 0) api.WriteComma();
+                            api.OpenObject();
+                            api.WriteToBuffer(xFieldName);
+                            api.WritePrimitiveValue(list[i].x);
+                            api.CloseObject();                            
+                        }
+                    }, FeatureJsonSerializer.JsonDataTypeCategory.Array);
+                }
+            }
+
+            public bool SupportsType(Type type)
+            {
+                if (type == typeof(MyEmbedded1)) return true;
+                if (type == typeof(List<MyEmbedded1>)) return true;
+
+                return false;
+            }
+        }
+
         public static async Task Run()
         {
 
@@ -235,7 +280,7 @@ namespace Playground
                 [new MyEmbedded3()] = 3,
             };*/
             //var testDto = new KeyValuePair<object, int>(new MyEmbedded1(), 1);
-            var testDto = new decimal(123.123);
+            //var testDto = new decimal(123.123);
 
             Type testDtoType = testDto.GetType();
             string json; 
@@ -249,8 +294,11 @@ namespace Playground
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
                 referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
-                enumAsString = true
+                enumAsString = true,
             };
+            //settings.itemHandlerCreators.Add(new CustomExtension());
+
+
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
 
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));
@@ -279,7 +327,7 @@ namespace Playground
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"EmptyLoop:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(1.Seconds());
+                AppTime.Wait(0.5.Seconds());
 
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
@@ -295,7 +343,7 @@ namespace Playground
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"FJsonSerializer: {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(1.Seconds());
+                AppTime.Wait(0.5.Seconds());
 
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
@@ -312,7 +360,7 @@ namespace Playground
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"Text.Json:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(1.Seconds());
+                AppTime.Wait(0.5.Seconds());
 
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
@@ -330,7 +378,7 @@ namespace Playground
                 GC.WaitForPendingFinalizers();
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"Utf8Json:        {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(1.Seconds());
+                AppTime.Wait(0.5.Seconds());
 
                 Console.WriteLine($"JsonSerializerF/Text.Json:  {(elapsed_A/elapsed_B).ToString("F")}% of time");
      

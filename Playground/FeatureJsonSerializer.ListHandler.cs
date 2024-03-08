@@ -31,7 +31,7 @@ namespace Playground
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
-            if (elementHandler.IsPrimitive)
+            if (elementHandler.NoRefTypes)
             {
                 ItemHandler<T> itemHandler = (list) =>
                 {
