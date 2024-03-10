@@ -19,6 +19,7 @@ namespace Playground
         {
             public readonly static MethodInfo setItemHandlerMethodInfo = typeof(CachedTypeHandler).GetMethod("SetItemHandler");
             private FeatureJsonSerializer serializer;
+            private JsonUTF8StreamWriter writer;
             private Delegate itemHandler;
             private Action<object, Type, ArraySegment<byte>> objectItemHandler;
             private Type handlerType;
@@ -29,6 +30,7 @@ namespace Playground
             public CachedTypeHandler(FeatureJsonSerializer serializer)
             {
                 this.serializer = serializer;
+                this.writer = serializer.writer;
             }
 
             public bool IsPrimitive => isPrimitive;
@@ -108,9 +110,9 @@ namespace Playground
                                 serializer.CreateItemInfoForClass(item, itemName);
                                 if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
                                 {
-                                    serializer.writer.OpenCollection();
+                                    writer.OpenCollection();
                                     itemHandler.Invoke(item);
-                                    serializer.writer.CloseCollection();
+                                    writer.CloseCollection();
                                 }
                                 serializer.UseParentItemInfo();
                             };
@@ -120,9 +122,9 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
-                                serializer.writer.OpenCollection();
+                                writer.OpenCollection();
                                 itemHandler.Invoke(item);
-                                serializer.writer.CloseCollection();
+                                writer.CloseCollection();
                                 serializer.UseParentItemInfo();
                             };
                         }
@@ -139,9 +141,9 @@ namespace Playground
                                     Type itemType = item.GetType();
                                     bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
                                     if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
-                                    serializer.writer.OpenCollection();
+                                    writer.OpenCollection();
                                     itemHandler.Invoke(item);
-                                    serializer.writer.CloseCollection();
+                                    writer.CloseCollection();
                                     if (writeTypeInfo) serializer.FinishTypeInfoObject();
                                 }
                                 serializer.UseParentItemInfo();
@@ -155,9 +157,9 @@ namespace Playground
                                 Type itemType = item.GetType();
                                 bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
                                 if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
-                                serializer.writer.OpenCollection();
+                                writer.OpenCollection();
                                 itemHandler.Invoke(item);
-                                serializer.writer.CloseCollection();
+                                writer.CloseCollection();
                                 if (writeTypeInfo) serializer.FinishTypeInfoObject();
                                 serializer.UseParentItemInfo();
                             };
@@ -170,9 +172,9 @@ namespace Playground
                     {
                         temp = (item, callType, itemName) =>
                         {
-                            serializer.writer.OpenCollection();
+                            writer.OpenCollection();
                             itemHandler.Invoke(item);
-                            serializer.writer.CloseCollection();
+                            writer.CloseCollection();
                         };
                     }
                     else
@@ -182,9 +184,9 @@ namespace Playground
                             Type itemType = item.GetType();
                             bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
                             if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
-                            serializer.writer.OpenCollection();
+                            writer.OpenCollection();
                             itemHandler.Invoke(item);
-                            serializer.writer.CloseCollection();
+                            writer.CloseCollection();
                             if (writeTypeInfo) serializer.FinishTypeInfoObject();
                         };
                     }
@@ -212,8 +214,8 @@ namespace Playground
                                     serializer.CreateItemInfoForClass(item, itemName);
                                     if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
                                     {
-                                        serializer.writer.OpenObject();
-                                        serializer.writer.CloseObject();
+                                        writer.OpenObject();
+                                        writer.CloseObject();
                                     }
                                     serializer.UseParentItemInfo();
                                 };
@@ -225,9 +227,9 @@ namespace Playground
                                     serializer.CreateItemInfoForClass(item, itemName);
                                     if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
                                     {
-                                        serializer.writer.OpenObject();
+                                        writer.OpenObject();
                                         itemHandler.Invoke(item);
-                                        serializer.writer.CloseObject();
+                                        writer.CloseObject();
                                     }
                                     serializer.UseParentItemInfo();
                                 };
@@ -243,9 +245,9 @@ namespace Playground
                                     if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
                                     {
                                         Type itemType = item.GetType();
-                                        serializer.writer.OpenObject();
-                                        if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WriteToBuffer(preparedTypeInfo);
-                                        serializer.writer.CloseObject();
+                                        writer.OpenObject();
+                                        if (serializer.TypeInfoRequired(itemType, callType)) writer.WriteToBuffer(preparedTypeInfo);
+                                        writer.CloseObject();
                                     }
                                     serializer.UseParentItemInfo();
                                 };
@@ -258,15 +260,15 @@ namespace Playground
                                     if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
                                     {
                                         Type itemType = item.GetType();
-                                        serializer.writer.OpenObject();
+                                        writer.OpenObject();
                                         if (serializer.TypeInfoRequired(itemType, callType))
                                         {
-                                            serializer.writer.WriteToBuffer(preparedTypeInfo);
-                                            serializer.writer.WriteComma();
+                                            writer.WriteToBuffer(preparedTypeInfo);
+                                            writer.WriteComma();
                                         }
                                         itemHandler.Invoke(item);
-                                        serializer.writer.RemoveTrailingComma();
-                                        serializer.writer.CloseObject();
+                                        writer.RemoveTrailingComma();
+                                        writer.CloseObject();
                                     }
                                     serializer.UseParentItemInfo();
                                 };
@@ -281,8 +283,8 @@ namespace Playground
                             {
                                 temp = (item, callType, _) =>
                                 {
-                                    serializer.writer.OpenObject();
-                                    serializer.writer.CloseObject();
+                                    writer.OpenObject();
+                                    writer.CloseObject();
                                 };
                             }
                             else
@@ -290,9 +292,9 @@ namespace Playground
                                 temp = (item, callType, itemName) =>
                                 {
                                     serializer.CreateItemInfoForStruct(itemName);
-                                    serializer.writer.OpenObject();
+                                    writer.OpenObject();
                                     itemHandler.Invoke(item);
-                                    serializer.writer.CloseObject();
+                                    writer.CloseObject();
                                     serializer.UseParentItemInfo();
                                 };
                             }
@@ -304,9 +306,9 @@ namespace Playground
                                 temp = (item, callType, _) =>
                                 {
                                     Type itemType = item.GetType();
-                                    serializer.writer.OpenObject();
-                                    if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WriteToBuffer(preparedTypeInfo);
-                                    serializer.writer.CloseObject();
+                                    writer.OpenObject();
+                                    if (serializer.TypeInfoRequired(itemType, callType)) writer.WriteToBuffer(preparedTypeInfo);
+                                    writer.CloseObject();
                                 };
                             }
                             else
@@ -315,14 +317,14 @@ namespace Playground
                                 {
                                     serializer.CreateItemInfoForStruct(itemName);
                                     Type itemType = item.GetType();
-                                    serializer.writer.OpenObject();
+                                    writer.OpenObject();
                                     if (serializer.TypeInfoRequired(itemType, callType))
                                     {
-                                        serializer.writer.WriteToBuffer(preparedTypeInfo);
-                                        serializer.writer.WriteComma();
+                                        writer.WriteToBuffer(preparedTypeInfo);
+                                        writer.WriteComma();
                                     }
                                     itemHandler.Invoke(item);
-                                    serializer.writer.CloseObject();
+                                    writer.CloseObject();
                                     serializer.UseParentItemInfo();
                                 };
                             }
@@ -337,17 +339,17 @@ namespace Playground
                         {
                             temp = (item, callType, itemName) =>
                             {
-                                serializer.writer.OpenObject();
-                                serializer.writer.CloseObject();
+                                writer.OpenObject();
+                                writer.CloseObject();
                             };
                         }
                         else
                         {
                             temp = (item, callType, itemName) =>
                             {
-                                serializer.writer.OpenObject();
+                                writer.OpenObject();
                                 itemHandler.Invoke(item);
-                                serializer.writer.CloseObject();
+                                writer.CloseObject();
                             };
                         }
                     }
@@ -358,9 +360,9 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 Type itemType = item.GetType();
-                                serializer.writer.OpenObject();
-                                if (serializer.TypeInfoRequired(itemType, callType)) serializer.writer.WriteToBuffer(preparedTypeInfo);
-                                serializer.writer.CloseObject();
+                                writer.OpenObject();
+                                if (serializer.TypeInfoRequired(itemType, callType)) writer.WriteToBuffer(preparedTypeInfo);
+                                writer.CloseObject();
                             };
                         }
                         else
@@ -368,15 +370,15 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 Type itemType = item.GetType();
-                                serializer.writer.OpenObject();
+                                writer.OpenObject();
                                 if (serializer.TypeInfoRequired(itemType, callType))
                                 {
-                                    serializer.writer.WriteToBuffer(preparedTypeInfo);
-                                    serializer.writer.WriteComma();
+                                    writer.WriteToBuffer(preparedTypeInfo);
+                                    writer.WriteComma();
                                 }
                                 itemHandler.Invoke(item);
-                                serializer.writer.RemoveTrailingComma();
-                                serializer.writer.CloseObject();
+                                writer.RemoveTrailingComma();
+                                writer.CloseObject();
                             };
                         }
                     } 

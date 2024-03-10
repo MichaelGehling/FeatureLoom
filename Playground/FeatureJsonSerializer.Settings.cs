@@ -22,6 +22,11 @@ namespace Playground
             public int writeBufferChunkSize = 64 * 1024;
             public int tempBufferSize = 8 * 1024;
             public List<ITypeHandlerCreator> itemHandlerCreators = new List<ITypeHandlerCreator>();
+
+            public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator)
+            {
+                itemHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator));
+            }
         }
 
         public enum DataSelection

@@ -997,7 +997,7 @@ namespace Playground
                         return;
                     }
                 }
-                if (value < PositiveNumberBytesLookup.Length)
+                else if (value < PositiveNumberBytesLookup.Length)
                 {
                     var bytes = PositiveNumberBytesLookup[value];
                     WriteToBuffer(bytes);
@@ -1038,7 +1038,8 @@ namespace Playground
                 WriteToBuffer(localBuffer, index + 1, maxDigits - index);
             }
 
-            static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
+            //static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
+            static readonly byte ZERO_FLOAT = (byte)'0';
             static readonly byte[] NAN = "\"NaN\"".ToByteArray();
             static readonly byte[] POS_INFINITY = "\"Infinity\"".ToByteArray();
             static readonly byte[] NEG_INFINITY = "\"-Infinity\"".ToByteArray();
@@ -1087,9 +1088,11 @@ namespace Playground
 
                 WriteIntegralPart(numIntegralDigits, integralPart);
 
-                WriteToBufferWithoutCheck((byte)'.');
-
-                WriteFractionalPart(numFractionalDigits, fractionalPart);
+                if (fractionalPart > 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'.');
+                    WriteFractionalPart(numFractionalDigits, fractionalPart);
+                }
 
                 if (printExponent)
                 {
@@ -1180,11 +1183,6 @@ namespace Playground
 
                 void WriteFractionalPart(int numFractionalDigits, float fractionalPart)
                 {
-                    if (fractionalPart == 0)
-                    {
-                        WriteToBufferWithoutCheck((byte)'0');
-                        return;
-                    }
                     if (numFractionalDigits == 0)
                     {
                         if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
@@ -1247,9 +1245,11 @@ namespace Playground
 
                 WriteIntegralPart(numIntegralDigits, integralPart);
 
-                WriteToBufferWithoutCheck((byte)'.');
-
-                WriteFractionalPart(numFractionalDigits, fractionalPart);
+                if (fractionalPart > 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'.');
+                    WriteFractionalPart(numFractionalDigits, fractionalPart);
+                }
 
                 if (printExponent)
                 {
@@ -1281,7 +1281,7 @@ namespace Playground
                 static double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
                 {
                     const int MAX_SIGNIFICANT_DIGITS = 16;
-                    const int POS_EXPONENT_LIMIT = 7;
+                    const int POS_EXPONENT_LIMIT = 13;
                     const int NEG_EXPONENT_LIMIT = -5;
 
                     long bits = BitConverter.DoubleToInt64Bits(value);
@@ -1338,11 +1338,6 @@ namespace Playground
 
                 void WriteFractionalPart(int numFractionalDigits, double fractionalPart)
                 {
-                    if (fractionalPart == 0)
-                    {
-                        WriteToBufferWithoutCheck((byte)'0');
-                        return;
-                    }
                     if (numFractionalDigits == 0)
                     {
                         if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');

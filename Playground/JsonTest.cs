@@ -113,7 +113,8 @@ namespace Playground
 
     public class MyEmbedded2 : IMyInterface
     {
-        public short y = 2;        
+        public IEnumerable myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        public short y = 2;
     }
 
     public class MyEmbedded3 : IMyInterface
@@ -177,50 +178,6 @@ namespace Playground
             public override void Write(byte[] buffer, int offset, int count) { }
         }
 
-        public class CustomExtension : FeatureJsonSerializer.ITypeHandlerCreator
-        {
-            public void CreateTypeHandler<T>(FeatureJsonSerializer.ExtensionApi api, FeatureJsonSerializer.ICachedTypeHandler cachedTypeHandler)
-            {
-                if (typeof(T) == typeof(MyEmbedded1))
-                {
-                    var x = api.PrepareFieldNameBytes(nameof(MyEmbedded1.x));
-                    var xName = new ArraySegment<byte>(api.PrepareStringToBytes(nameof(MyEmbedded1.x)));
-                    var xHandler = api.GetCachedTypeHandler(typeof(int));
-                    cachedTypeHandler.SetItemHandler<MyEmbedded1>((item) =>
-                    {
-                        api.WriteToBuffer(x);
-                        //xHandler.HandleItem(item.x, xName);
-                        api.WritePrimitiveValue(item.x);
-                    }, FeatureJsonSerializer.JsonDataTypeCategory.Object_WithoutRefChildren);
-                }
-                if (typeof(T) == typeof(List<MyEmbedded1>))
-                {
-                    var xFieldName = api.PrepareFieldNameBytes(nameof(MyEmbedded1.x));
-                    var xName = new ArraySegment<byte>(api.PrepareStringToBytes(nameof(MyEmbedded1.x)));
-                    var xHandler = api.GetCachedTypeHandler(typeof(int));
-                    cachedTypeHandler.SetItemHandler<List<MyEmbedded1>>((list) =>
-                    {
-                        for (int i= 0; i < list.Count; i++)
-                        {
-                            if (i > 0) api.WriteComma();
-                            api.OpenObject();
-                            api.WriteToBuffer(xFieldName);
-                            api.WritePrimitiveValue(list[i].x);
-                            api.CloseObject();                            
-                        }
-                    }, FeatureJsonSerializer.JsonDataTypeCategory.Array);
-                }
-            }
-
-            public bool SupportsType(Type type)
-            {
-                if (type == typeof(MyEmbedded1)) return true;
-                if (type == typeof(List<MyEmbedded1>)) return true;
-
-                return false;
-            }
-        }
-
         public static async Task Run()
         {
 
@@ -233,14 +190,16 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = -128;
+            //IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
             //var testDto = new TestDto2();
-            //var testDto = new MyEmbedded1();
+            //var testDto = new MyEmbedded2();
             //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
             //var testDto = new List<MyStruct>() { new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct() };
             //var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
-            //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.00000987654321, 0.0, 12.0213 };
+            //var testDto = new List<double>() { 354476.143, 0983427.1234, 0.000005987654321, 0.0, 12.0213, 123454678901234.1 };
             //var testDto = new HashSet<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
             //var testDto = new object();
             //var testDto = new MyStruct();
@@ -295,13 +254,50 @@ namespace Playground
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
                 referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
                 enumAsString = true,
+                treatEnumerablesAsCollections = true,
             };
-            //settings.itemHandlerCreators.Add(new CustomExtension());
 
+            /*
+            settings.AddCustomTypeHandlerCreator<List<MyEmbedded1>>(
+                FeatureJsonSerializer.JsonDataTypeCategory.Array,
+                (api) =>
+                {
+                    var xFieldName = api.PrepareFieldNameBytes(nameof(MyEmbedded1.x));
+
+                    return (list) =>
+                    {
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            if (i > 0) api.WriteComma();
+                            api.OpenObject();
+                            api.WriteToBuffer(xFieldName);
+                            api.WritePrimitiveValue(list[i].x);
+                            api.CloseObject();
+                        }
+                    };
+                });
+
+            settings.AddCustomTypeHandlerCreator<MyEmbedded1>(
+                FeatureJsonSerializer.JsonDataTypeCategory.Object_WithoutRefChildren,
+                (api) =>
+                {
+                    var xFieldName = api.PrepareFieldNameBytes(nameof(MyEmbedded1.x));
+                    return (item) =>
+                    {
+                        api.WriteToBuffer(xFieldName);
+                        api.WritePrimitiveValue(item.x);
+                    };
+                });
+            */
 
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
 
+            Console.WriteLine("FeatureJsonSerializer:");
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));
+            Console.WriteLine("\nSystem.Text.Json:");
+            Console.WriteLine(JsonSerializer.Serialize(testDto, opt));
+            Console.WriteLine("\nUtf8Json:");
+            Console.WriteLine(UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto)));
 
             featureJsonSerializer = new FeatureJsonSerializer(settings);
 
@@ -314,7 +310,7 @@ namespace Playground
             Console.WriteLine("SerializerTest");
             while (true)
             {
-                tk.Restart();
+               /* tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {
                     // Do nothing
@@ -328,7 +324,7 @@ namespace Playground
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"EmptyLoop:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(0.5.Seconds());
-
+               */
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {                    

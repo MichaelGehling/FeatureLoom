@@ -25,8 +25,8 @@ namespace Playground
             var memberInfos = new List<MemberInfo>();
             if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
             {
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance));
                 memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.GetMethod != null));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance));                
             }
             else
             {
