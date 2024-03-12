@@ -185,12 +185,12 @@ namespace Playground
             {
                 IncludeFields = true,
                 //ReferenceHandler = ReferenceHandler.Preserve
-                
+
             };
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = -128;
             //IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
             //var testDto = new TestDto2();
@@ -211,7 +211,7 @@ namespace Playground
             //var testDto = "Mystring1";            
             //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
             //var testDto = new Dictionary<int, MyEmbedded1>() { [1] = new MyEmbedded1(), [2] = null };
-            //var testDto = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+            var testDto = new List<int> { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
             //object testDto = 123;
             //var testDto = new TestDto3();
             //var testDto = AppTime.Now;
@@ -242,7 +242,7 @@ namespace Playground
             //var testDto = new decimal(123.123);
 
             Type testDtoType = testDto.GetType();
-            string json; 
+            string json;
             //byte[] json;
 
             //Stream stream = new NullStream();
@@ -257,6 +257,49 @@ namespace Playground
                 treatEnumerablesAsCollections = true,
             };
 
+            
+            
+            settings.AddCustomTypeHandlerCreator<int>(
+                FeatureJsonSerializer.JsonDataTypeCategory.Primitive,
+                api =>
+                {
+                    var w = api.Writer;
+                    return value => w.WritePrimitiveValue(value);
+                });
+
+            settings.AddCustomTypeHandlerCreator<int[]>(
+                FeatureJsonSerializer.JsonDataTypeCategory.Array_WithoutRefChildren,
+                api =>
+                {
+                    var w = api.Writer;
+                    return value =>
+                    {
+                        for (var i = 0; i < value.Length; i++)
+                        {
+                            w.WritePrimitiveValue(value[i]);
+                            w.WriteComma();
+                        }
+                        w.RemoveTrailingComma();
+                    };
+                });
+            
+            settings.AddCustomTypeHandlerCreator<List<int>>(
+                FeatureJsonSerializer.JsonDataTypeCategory.Array_WithoutRefChildren,
+                api =>
+                {
+                    var w = api.Writer;
+                    return value =>
+                    {
+                        var count = value.Count;
+                        for (var i = 0; i < count; i++)
+                        {
+                            w.WritePrimitiveValue(value[i]);
+                            w.WriteComma();
+                        }
+                        w.RemoveTrailingComma();
+                    };
+                });
+            
             /*
             settings.AddCustomTypeHandlerCreator<List<MyEmbedded1>>(
                 FeatureJsonSerializer.JsonDataTypeCategory.Array,

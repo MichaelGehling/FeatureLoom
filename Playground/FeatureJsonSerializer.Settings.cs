@@ -23,9 +23,14 @@ namespace Playground
             public int tempBufferSize = 8 * 1024;
             public List<ITypeHandlerCreator> itemHandlerCreators = new List<ITypeHandlerCreator>();
 
-            public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator)
+            public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, bool onlyExactType = true)
             {
-                itemHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator));
+                itemHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, onlyExactType));
+            }
+
+            public void AddCustomTypeHandlerCreator<T>(Func<Type, bool> supportsType, JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator)
+            {
+                itemHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, supportsType));
             }
         }
 

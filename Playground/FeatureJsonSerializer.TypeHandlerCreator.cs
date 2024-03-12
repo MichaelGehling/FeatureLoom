@@ -8,14 +8,26 @@ namespace Playground
         {
             JsonDataTypeCategory category;
             Func<ExtensionApi, ItemHandler<T>> creator;
+            bool onlyExactType;
+            Func<Type, bool> supports;
 
-            public TypeHandlerCreator(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator)
+
+            public TypeHandlerCreator(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, bool onlyExactType = true)
             {
                 this.category = category;
                 this.creator = creator;
+                this.onlyExactType = onlyExactType;
             }
 
-            public void CreateTypeHandler<T>(FeatureJsonSerializer.ExtensionApi api, FeatureJsonSerializer.ICachedTypeHandler cachedTypeHandler)
+            public TypeHandlerCreator(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, Func<Type, bool> supportsType)
+            {
+                this.category = category;
+                this.creator = creator;
+                this.onlyExactType = false;
+                this.supports = supportsType;
+            }
+
+            public void CreateTypeHandler(FeatureJsonSerializer.ExtensionApi api, FeatureJsonSerializer.ICachedTypeHandler cachedTypeHandler)
             {
                 var itemHandler = creator.Invoke(api);
                 cachedTypeHandler.SetItemHandler(itemHandler, category);
@@ -23,7 +35,9 @@ namespace Playground
 
             public bool SupportsType(Type type)
             {
-                return typeof(T) == type;
+                if (supports != null) return supports.Invoke(type);
+                if (onlyExactType) return typeof(T) == type;
+                return type.IsAssignableTo(typeof(T));
             }
         }
 

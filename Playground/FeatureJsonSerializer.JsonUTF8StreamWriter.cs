@@ -13,10 +13,92 @@ namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
-        private sealed class JsonUTF8StreamWriter
+        public interface IWriter
+        {
+            byte[] Buffer { get; }
+            int BufferCount { get; }
+
+            void CloseCollection();
+            void CloseObject();
+            void EnsureFreeBufferSpace(int freeBytes);
+            void OpenCollection();
+            void OpenObject();
+            ArraySegment<byte> PrepareCollectionIndexName(int index);
+            byte[] PrepareFieldNameBytes(string fieldname);
+            byte[] PrepareRootName();
+            byte[] PrepareStringToBytes(string str);
+            byte[] PrepareTextToBytes(string enumText);
+            byte[] PrepareTypeInfo(string typeName);
+            void RemoveTrailingComma();
+            void ResetBuffer();
+            string ToString();
+            void WriteBufferToStream();
+            void WriteColon();
+            void WriteComma();
+            void WriteDot();
+            void WriteFieldName(string fieldName);
+            void WriteNullValue();
+            void WritePrimitiveValue(bool value);
+            void WritePrimitiveValue(byte value);
+            void WritePrimitiveValue(char value);
+            void WritePrimitiveValue(decimal value);
+            void WritePrimitiveValue(double value);
+            void WritePrimitiveValue(float value);
+            void WritePrimitiveValue(int value);
+            void WritePrimitiveValue(long value);
+            void WritePrimitiveValue(sbyte value);
+            void WritePrimitiveValue(short value);
+            void WritePrimitiveValue(string str);
+            void WritePrimitiveValue(uint value);
+            void WritePrimitiveValue(ulong value);
+            void WritePrimitiveValue(ushort value);
+            void WritePrimitiveValue<T>(T value);
+            void WritePrimitiveValueAsString(bool value);
+            void WritePrimitiveValueAsString(byte value);
+            void WritePrimitiveValueAsString(char value);
+            void WritePrimitiveValueAsString(double value);
+            void WritePrimitiveValueAsString(float value);
+            void WritePrimitiveValueAsString(int value);
+            void WritePrimitiveValueAsString(long value);
+            void WritePrimitiveValueAsString(sbyte value);
+            void WritePrimitiveValueAsString(short value);
+            void WritePrimitiveValueAsString(string str);
+            void WritePrimitiveValueAsString(uint value);
+            void WritePrimitiveValueAsString(ulong value);
+            void WritePrimitiveValueAsString(ushort value);
+            void WritePrimitiveValueAsString<T>(T value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(bool value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(byte value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(char value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(double value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(float value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(int value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(long value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(sbyte value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(short value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(string str);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(uint value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ulong value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ushort value);
+            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy<T>(T value);
+            //void WriteRefObject(ItemInfo itemInfo);
+            void WriteToBuffer(ArraySegment<byte> data);
+            void WriteToBuffer(byte data);
+            void WriteToBuffer(byte[] data);
+            void WriteToBuffer(byte[] data, int count);
+            void WriteToBuffer(byte[] data, int offset, int count);
+            void WriteToBufferWithoutCheck(byte data);
+            void WriteToBufferWithoutCheck(byte[] data);
+            void WriteToBufferWithoutCheck(byte[] data, int count);
+            void WriteToBufferWithoutCheck(byte[] data, int offset, int count);
+            void WriteTypeInfo(string typeName);
+            void WriteValueFieldName();
+        }
+
+        public sealed class JsonUTF8StreamWriter : IWriter
         {
             public Stream stream;
-            private byte[] localBuffer;                 
+            private byte[] localBuffer;
             private byte[] mainBuffer;
             private int mainBufferSize;
             private int mainBufferCount;
@@ -52,7 +134,7 @@ namespace Playground
             public void WriteBufferToStream()
             {
                 stream.Write(mainBuffer, 0, mainBufferCount);
-                mainBufferCount = 0;                
+                mainBufferCount = 0;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -174,7 +256,7 @@ namespace Playground
             // Fallback for non specialized methods
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WritePrimitiveValue<T>(T value)
-            {                
+            {
                 WriteString(value.ToString());
             }
 
@@ -185,13 +267,13 @@ namespace Playground
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(1024);
                 var countBefore = mainBufferCount;
-                
+
                 WriteString(value.ToString());
 
                 var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);                
+                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
                 slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-                
+
                 WriteToBufferWithoutCheck(QUOTES);
                 return slice;
             }
@@ -636,7 +718,7 @@ namespace Playground
             }
 
             static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();
-            static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();            
+            static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();
             Stack<ItemInfo> reverseItemInfoStack = new Stack<ItemInfo>();
             public void WriteRefObject(ItemInfo itemInfo)
             {
@@ -658,11 +740,11 @@ namespace Playground
                 {
                     var name = itemInfo.ItemName;
                     if (name[0] != OPENCOLLECTION) WriteDot();
-                    WriteToBuffer(name);                    
+                    WriteToBuffer(name);
                 }
                 WriteToBuffer(REFOBJECT_POST);
             }
-        
+
             static readonly byte OPENCOLLECTION = (byte)'[';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void OpenCollection() => WriteToBufferWithoutCheck(OPENCOLLECTION);
@@ -705,19 +787,19 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public byte[] PrepareRootName() => ROOT;
 
-            
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public byte[] PrepareTextToBytes(string enumText)
             {
                 return Encoding.UTF8.GetBytes($"\"{enumText}\"");
             }
 
-            List<ArraySegment<byte>> indexNameList = new List<ArraySegment<byte>>();            
+            List<ArraySegment<byte>> indexNameList = new List<ArraySegment<byte>>();
             public ArraySegment<byte> PrepareCollectionIndexName(int index)
             {
                 if (index >= indexNameList.Count)
-                {                    
-                    for(int i = indexNameList.Count; i <= index; i++)
+                {
+                    for (int i = indexNameList.Count; i <= index; i++)
                     {
                         indexNameList.Add(default);
                     }
@@ -735,7 +817,7 @@ namespace Playground
 
                 for (int i = 0; i < size; i++)
                 {
-                    lookup[i] = Encoding.ASCII.GetBytes((i*factor).ToString());
+                    lookup[i] = Encoding.ASCII.GetBytes((i * factor).ToString());
                 }
 
                 return lookup;
@@ -784,7 +866,7 @@ namespace Playground
             private void WriteChar(char c)
             {
                 // Check if the character is in the EscapeByteLookup table
-                byte[] escapeBytes = GetEscapeBytes(c);                
+                byte[] escapeBytes = GetEscapeBytes(c);
                 if (escapeBytes != null)
                 {
                     WriteToBuffer(escapeBytes, 0, escapeBytes.Length);
@@ -803,7 +885,7 @@ namespace Playground
                     // 2-byte sequence
                     EnsureFreeBufferSpace(2);
                     WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));                    
+                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                 }
                 else if (!char.IsSurrogate(c))
                 {
@@ -821,10 +903,10 @@ namespace Playground
             }
 
             private void WriteEscapedString(string str)
-            {                
+            {
                 int charIndex = 0;
                 const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
-               
+
                 while (charIndex < str.Length)
                 {
                     EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
@@ -838,8 +920,8 @@ namespace Playground
                         // Handle escaped chars and control chars
                         byte[] escapeBytes = GetEscapeBytes(c);
                         if (escapeBytes != null)
-                        { 
-                            WriteToBufferWithoutCheck(escapeBytes);                            
+                        {
+                            WriteToBufferWithoutCheck(escapeBytes);
                             continue;
                         }
 
@@ -891,7 +973,7 @@ namespace Playground
             private void WriteString(string str)
             {
                 int charIndex = 0;
-                const int MAX_CHAR_LENGTH = 4;                
+                const int MAX_CHAR_LENGTH = 4;
                 while (charIndex < str.Length)
                 {
                     EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
@@ -947,7 +1029,7 @@ namespace Playground
             }
 
             private void WriteSignedInteger(long value)
-            {                
+            {
                 bool isNegative = value < 0;
                 if (isNegative)
                 {
@@ -968,7 +1050,7 @@ namespace Playground
 
                 const int maxDigits = 20;
                 int index = maxDigits;
-                while(value >= 10)
+                while (value >= 10)
                 {
                     value = Math.DivRem(value, 10, out long digit);
                     localBuffer[index--] = (byte)('0' + digit);
@@ -976,13 +1058,13 @@ namespace Playground
                 if (value > 0) localBuffer[index--] = (byte)('0' + value);
                 if (isNegative) localBuffer[index--] = (byte)'-';
 
-                WriteToBuffer(localBuffer, index+1, maxDigits - index);
+                WriteToBuffer(localBuffer, index + 1, maxDigits - index);
             }
 
-           /* private byte[] SignedIntegerToBytes(long value)
-            {
-                if (value == 0) return ZERO;
-            }*/
+            /* private byte[] SignedIntegerToBytes(long value)
+             {
+                 if (value == 0) return ZERO;
+             }*/
 
             private void WriteSignedInteger(int value)
             {
@@ -1080,8 +1162,8 @@ namespace Playground
                     value = -value;
                     WriteToBufferWithoutCheck((byte)'-');
                 }
-                
-                value = CalculateNumDigits(value, out int  exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent);
+
+                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent);
 
                 float integralPart = (float)Math.Floor(value);
                 float fractionalPart = value - integralPart;
@@ -1383,7 +1465,7 @@ namespace Playground
 
 
         }
-            
+
     }
 }
 

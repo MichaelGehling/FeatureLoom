@@ -8,8 +8,8 @@ namespace Playground
     {
         public sealed class ExtensionApi
         {
-            FeatureJsonSerializer s;
-            JsonUTF8StreamWriter w;
+            readonly FeatureJsonSerializer s;
+            readonly JsonUTF8StreamWriter w;
 
             public ExtensionApi(FeatureJsonSerializer serializer)
             {
@@ -20,6 +20,7 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public CachedTypeHandler GetCachedTypeHandler(Type type) => s.GetCachedTypeHandler(type);
 
+            public IWriter Writer => w;
 
             public byte[] Buffer => w.Buffer;
             public int BufferCount => w.BufferCount;

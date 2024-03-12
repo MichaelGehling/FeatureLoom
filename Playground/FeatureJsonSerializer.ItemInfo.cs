@@ -6,7 +6,7 @@ namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
-        class ItemInfo
+        public class ItemInfo
         {
             public ItemInfo parentInfo;
             public object objItem;

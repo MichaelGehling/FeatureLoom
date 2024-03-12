@@ -46,7 +46,7 @@ namespace Playground
         public interface ITypeHandlerCreator
         {
             bool SupportsType(Type type);
-            void CreateTypeHandler<T>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler);
+            void CreateTypeHandler(ExtensionApi api, ICachedTypeHandler cachedTypeHandler);
         }
         
 
@@ -227,17 +227,10 @@ namespace Playground
         }
 
 
-        private void CallItemHandlerCreator<T>(ITypeHandlerCreator creator, CachedTypeHandler typeHandler)
-        {
-            creator.CreateTypeHandler<T>(extensionApi, typeHandler);
-        }
-
-
-
         private CachedTypeHandler CreateCachedTypeHandler(Type itemType)
         {
             CachedTypeHandler typeHandler = new CachedTypeHandler(this);
-            typeHandlerCache[itemType] = typeHandler;
+            typeHandlerCache[itemType] = typeHandler; // Typehandler must be added first for the case of recursion (type contains same type)
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
 
@@ -245,9 +238,7 @@ namespace Playground
             {
                 if (!creator.SupportsType(itemType)) continue;
 
-                MethodInfo createMethod = typeof(ITypeHandlerCreator).GetMethod(nameof(ITypeHandlerCreator.CreateTypeHandler), BindingFlags.Public | BindingFlags.Instance);
-                MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
-                genericCreateMethod.Invoke(creator, new object[] { extensionApi, typeHandler });
+                creator.CreateTypeHandler(extensionApi, typeHandler);
                 return typeHandler;
             }
 
