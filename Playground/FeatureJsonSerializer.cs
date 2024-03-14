@@ -191,15 +191,15 @@ namespace Playground
 
             if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WritePrimitiveValueAsString);
             else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WriteBoolAsStringValue);
-            else if (itemType == typeof(char)) stringValueWriter.SetWriterMethod<char>(writer.WritePrimitiveValueAsString);
-            else if (itemType == typeof(sbyte)) stringValueWriter.SetWriterMethod<sbyte>(writer.WritePrimitiveValueAsString);
-            else if (itemType == typeof(short)) stringValueWriter.SetWriterMethod<short>(writer.WritePrimitiveValueAsString);
-            else if (itemType == typeof(int)) stringValueWriter.SetWriterMethod<int>(writer.WritePrimitiveValueAsString);
-            else if (itemType == typeof(long)) stringValueWriter.SetWriterMethod<long>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(char)) stringValueWriter.SetWriterMethod<char>(writer.WriteCharValueAsString);
+            else if (itemType == typeof(sbyte)) stringValueWriter.SetWriterMethod<sbyte>(writer.WriteSbyteValueAsString);
+            else if (itemType == typeof(short)) stringValueWriter.SetWriterMethod<short>(writer.WriteShortValueAsString);
+            else if (itemType == typeof(int)) stringValueWriter.SetWriterMethod<int>(writer.WriteIntValueAsString);
+            else if (itemType == typeof(long)) stringValueWriter.SetWriterMethod<long>(writer.WriteLongValueAsString);
             else if (itemType == typeof(byte)) stringValueWriter.SetWriterMethod<byte>(writer.WriteByteAsStringValue);
-            else if (itemType == typeof(ushort)) stringValueWriter.SetWriterMethod<ushort>(writer.WritePrimitiveValueAsString);
-            else if (itemType == typeof(uint)) stringValueWriter.SetWriterMethod<uint>(writer.WritePrimitiveValueAsString);
-            else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WritePrimitiveValueAsString);
+            else if (itemType == typeof(ushort)) stringValueWriter.SetWriterMethod<ushort>(writer.WriteUshortValueAsString);
+            else if (itemType == typeof(uint)) stringValueWriter.SetWriterMethod<uint>(writer.WriteUintValueAsString);
+            else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsString);
             else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WritePrimitiveValueAsString(value.ToString()));
             else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WritePrimitiveValueAsString(value.ToString()));
 

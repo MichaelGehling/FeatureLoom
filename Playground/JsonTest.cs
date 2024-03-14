@@ -271,7 +271,9 @@ namespace Playground
                             var count = list.Count;
                             for (int i = 0; i < count; i++)
                             {
-                                elementTypeHandler.HandleItem(list[i], default);
+                                if (list[i] == null) api.Writer.WriteNullValue();
+                                else if (list[i].GetType() == elementTypeHandler.HandlerType) elementTypeHandler.HandleItem(list[i], default);
+                                else api.GetCachedTypeHandler(list[i].GetType()).HandleItem(list[i], default);
                                 api.Writer.WriteComma();
                             }
                             api.Writer.RemoveTrailingComma();
@@ -310,9 +312,9 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = -128;
-            //IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+            IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
             //var testDto = new TestDto2();
             //var testDto = new MyEmbedded2();
             //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };

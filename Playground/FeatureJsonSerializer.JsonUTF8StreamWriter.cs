@@ -54,17 +54,16 @@ namespace Playground
             void WriteUshortValue(ushort value);
             void WriteBoolAsStringValue(bool value);
             void WriteByteAsStringValue(byte value);
-            void WritePrimitiveValueAsString(char value);
-            void WritePrimitiveValueAsString(double value);
-            void WritePrimitiveValueAsString(float value);
-            void WritePrimitiveValueAsString(int value);
-            void WritePrimitiveValueAsString(long value);
-            void WritePrimitiveValueAsString(sbyte value);
-            void WritePrimitiveValueAsString(short value);
-            void WritePrimitiveValueAsString(string str);
-            void WritePrimitiveValueAsString(uint value);
-            void WritePrimitiveValueAsString(ulong value);
-            void WritePrimitiveValueAsString(ushort value);
+            void WriteCharValueAsString(char value);
+            void WriteDoubleValueAsString(double value);
+            void WriteFloatValueAsString(float value);
+            void WriteIntValueAsString(int value);
+            void WriteLongValueAsString(long value);
+            void WriteSbyteValueAsString(sbyte value);
+            void WriteShortValueAsString(short value);
+            void WriteUintValueAsString(uint value);
+            void WriteUlongValueAsString(ulong value);
+            void WriteUshortValueAsString(ushort value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(bool value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(byte value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(char value);
@@ -327,7 +326,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(long value)
+            public void WriteLongValueAsString(long value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -359,7 +358,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(ulong value)
+            public void WriteUlongValueAsString(ulong value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger((long)value);
@@ -390,7 +389,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(int value)
+            public void WriteIntValueAsString(int value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -421,7 +420,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(uint value)
+            public void WriteUintValueAsString(uint value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
@@ -483,7 +482,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(sbyte value)
+            public void WriteSbyteValueAsString(sbyte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -514,7 +513,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(short value)
+            public void WriteShortValueAsString(short value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteSignedInteger(value);
@@ -545,7 +544,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(ushort value)
+            public void WriteUshortValueAsString(ushort value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
@@ -576,7 +575,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(float value)
+            public void WriteFloatValueAsString(float value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteFloat(value);
@@ -613,7 +612,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(double value)
+            public void WriteDoubleValueAsString(double value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteDouble(value);
@@ -720,7 +719,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(char value)
+            public void WriteCharValueAsString(char value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteChar(value);
