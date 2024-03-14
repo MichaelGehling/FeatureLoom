@@ -38,23 +38,22 @@ namespace Playground
             void WriteDot();
             void WriteFieldName(string fieldName);
             void WriteNullValue();
-            void WritePrimitiveValue(bool value);
-            void WritePrimitiveValue(byte value);
-            void WritePrimitiveValue(char value);
-            void WritePrimitiveValue(decimal value);
-            void WritePrimitiveValue(double value);
-            void WritePrimitiveValue(float value);
-            void WritePrimitiveValue(int value);
-            void WritePrimitiveValue(long value);
-            void WritePrimitiveValue(sbyte value);
-            void WritePrimitiveValue(short value);
-            void WritePrimitiveValue(string str);
-            void WritePrimitiveValue(uint value);
-            void WritePrimitiveValue(ulong value);
-            void WritePrimitiveValue(ushort value);
-            void WritePrimitiveValue<T>(T value);
-            void WritePrimitiveValueAsString(bool value);
-            void WritePrimitiveValueAsString(byte value);
+            void WriteBoolValue(bool value);
+            void WriteByteValue(byte value);
+            void WriteCharValue(char value);
+            void WriteDecimalValue(decimal value);
+            void WriteDoubleValue(double value);
+            void WriteFloatValue(float value);
+            void WriteIntValue(int value);
+            void WriteLongValue(long value);
+            void WriteSbyteValue(sbyte value);
+            void WriteShortValue(short value);
+            void WriteStringValue(string str);
+            void WriteUintValue(uint value);
+            void WriteUlongValue(ulong value);
+            void WriteUshortValue(ushort value);
+            void WriteBoolAsStringValue(bool value);
+            void WriteByteAsStringValue(byte value);
             void WritePrimitiveValueAsString(char value);
             void WritePrimitiveValueAsString(double value);
             void WritePrimitiveValueAsString(float value);
@@ -66,7 +65,6 @@ namespace Playground
             void WritePrimitiveValueAsString(uint value);
             void WritePrimitiveValueAsString(ulong value);
             void WritePrimitiveValueAsString(ushort value);
-            void WritePrimitiveValueAsString<T>(T value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(bool value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(byte value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(char value);
@@ -80,7 +78,6 @@ namespace Playground
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(uint value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ulong value);
             ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ushort value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy<T>(T value);
             //void WriteRefObject(ItemInfo itemInfo);
             void WriteToBuffer(ArraySegment<byte> data);
             void WriteToBuffer(byte data);
@@ -93,25 +90,26 @@ namespace Playground
             void WriteToBufferWithoutCheck(byte[] data, int offset, int count);
             void WriteTypeInfo(string typeName);
             void WriteValueFieldName();
+            bool TryPreparePrimitiveWriteDelegate<T>(out Action<T> primitiveWriteDelegate);
         }
 
-        public sealed class JsonUTF8StreamWriter : IWriter
+        private sealed class JsonUTF8StreamWriter : IWriter
         {
             public Stream stream;
             private byte[] localBuffer;
             private byte[] mainBuffer;
-            private int mainBufferSize;
             private int mainBufferCount;
             private SlicedBuffer<byte> tempSlicedBuffer;
+            private CompiledSettings settings;
 
-            public JsonUTF8StreamWriter(int mainBufferSize, int tempBufferSize)
+            public JsonUTF8StreamWriter(CompiledSettings settings)
             {
                 localBuffer = new byte[64];
-                this.mainBufferSize = mainBufferSize;
                 // We give some extra bytes in order to not always check remaining space
-                mainBuffer = new byte[mainBufferSize + 64];
+                mainBuffer = new byte[settings.writeBufferChunkSize + 64];
                 // Used for temporarily needed names e.g. Dictionary
-                tempSlicedBuffer = new SlicedBuffer<byte>(tempBufferSize, 128);
+                tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, 128);
+                this.settings = settings;                
             }
 
             public override string ToString()
@@ -210,6 +208,52 @@ namespace Playground
                 if (mainBufferCount + freeBytes >= mainBuffer.Length) WriteBufferToStream();
             }
 
+            static Dictionary<Type, string> typeMap = new Dictionary<Type, string>
+            {
+                { typeof(sbyte), "WriteSbyteValue" },
+                { typeof(byte), "WriteByteValue" },
+                { typeof(short), "WriteShortValue" },
+                { typeof(ushort), "WriteUshortValue" },
+                { typeof(int), "WriteIntValue" },
+                { typeof(uint), "WriteUintValue" },
+                { typeof(long), "WriteLongValue" },
+                { typeof(ulong), "WriteUlongValue" },
+                { typeof(float), "WriteFloatValue" },
+                { typeof(double), "WriteDoubleValue" },
+                { typeof(decimal), "WriteDecimalValue" },
+                { typeof(char), "WriteCharValue" },
+                { typeof(bool), "WriteBoolValue" },
+                { typeof(string), "WriteStringValue" }
+            };
+
+            public bool TryPreparePrimitiveWriteDelegate<T>(out Action<T> primitiveWriteDelegate)
+            {
+                primitiveWriteDelegate = null;
+                Type type = typeof(T);                
+
+                if (typeMap.TryGetValue(type, out string methodName))
+                {
+                    MethodInfo methodInfo = GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+
+                    if (methodInfo != null)
+                    {
+                        try
+                        {
+                            primitiveWriteDelegate = (Action<T>)Delegate.CreateDelegate(typeof(Action<T>), this, methodInfo);
+                            return true;
+                        }
+                        catch (ArgumentException)
+                        {
+                            // This catch block is here in case the delegate creation fails due to a mismatch,
+                            // which should not happen if the methods are correctly defined and matched.
+                            throw new Exception($"Method {methodName} not found!");
+                        }
+                    }
+                }
+
+                return false;
+            }
+
             static readonly byte[] NULL = "null".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteNullValue() => WriteToBuffer(NULL);
@@ -253,40 +297,6 @@ namespace Playground
             }
 
 
-            // Fallback for non specialized methods
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue<T>(T value)
-            {
-                WriteString(value.ToString());
-            }
-
-            // Fallback for non specialized methods
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy<T>(T value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(1024);
-                var countBefore = mainBufferCount;
-
-                WriteString(value.ToString());
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            // Fallback for non specialized methods
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString<T>(T value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteString(value.ToString());
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static byte[] PreparePrimitiveToBytes<T>(T value)
             {
@@ -294,7 +304,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(long value)
+            public void WriteLongValue(long value)
             {
                 WriteSignedInteger(value);
             }
@@ -326,7 +336,7 @@ namespace Playground
 
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(ulong value)
+            public void WriteUlongValue(ulong value)
             {
                 WriteUnsignedInteger((long)value);
             }
@@ -357,7 +367,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(int value)
+            public void WriteIntValue(int value)
             {
                 WriteSignedInteger(value);
             }
@@ -388,7 +398,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(uint value)
+            public void WriteUintValue(uint value)
             {
                 WriteUnsignedInteger(value);
             }
@@ -419,7 +429,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(byte value)
+            public void WriteByteValue(byte value)
             {
                 WriteUnsignedInteger(value);
             }
@@ -442,7 +452,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(byte value)
+            public void WriteByteAsStringValue(byte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteUnsignedInteger(value);
@@ -450,7 +460,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(sbyte value)
+            public void WriteSbyteValue(sbyte value)
             {
                 WriteSignedInteger(value);
             }
@@ -481,7 +491,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(short value)
+            public void WriteShortValue(short value)
             {
                 WriteSignedInteger(value);
             }
@@ -512,7 +522,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(ushort value)
+            public void WriteUshortValue(ushort value)
             {
                 WriteUnsignedInteger(value);
             }
@@ -543,7 +553,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(float value)
+            public void WriteFloatValue(float value)
             {
                 WriteFloat(value);
             }
@@ -574,13 +584,13 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(double value)
+            public void WriteDoubleValue(double value)
             {
                 WriteDouble(value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(decimal value)
+            public void WriteDecimalValue(decimal value)
             {
                 WriteDouble((double)value);
             }
@@ -613,7 +623,7 @@ namespace Playground
             static readonly byte[] BOOLVALUE_TRUE = "true".ToByteArray();
             static readonly byte[] BOOLVALUE_FALSE = "false".ToByteArray();
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(bool value)
+            public void WriteBoolValue(bool value)
             {
                 var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
                 WriteToBuffer(bytes);
@@ -638,7 +648,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(bool value)
+            public void WriteBoolAsStringValue(bool value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
@@ -648,7 +658,7 @@ namespace Playground
 
             static readonly byte QUOTES = (byte)'\"';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(string str)
+            public void WriteStringValue(string str)
             {
                 if (str != null)
                 {
@@ -685,7 +695,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValue(char value)
+            public void WriteCharValue(char value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 WriteChar(value);
@@ -699,7 +709,7 @@ namespace Playground
                 EnsureFreeBufferSpace(64);
                 var countBefore = mainBufferCount;
 
-                WritePrimitiveValue(value);
+                WriteChar(value);
 
                 var writtenBytes = mainBufferCount - countBefore;
                 var slice = tempSlicedBuffer.GetSlice(writtenBytes);
@@ -713,7 +723,7 @@ namespace Playground
             public void WritePrimitiveValueAsString(char value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
-                WritePrimitiveValue(value);
+                WriteChar(value);
                 WriteToBufferWithoutCheck(QUOTES);
             }
 

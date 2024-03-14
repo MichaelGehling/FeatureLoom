@@ -18,6 +18,9 @@ using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
 using FeatureLoom.Security;
+using FeatureLoom.Extensions;
+using static Playground.FeatureJsonSerializer;
+using System.Reflection.Metadata.Ecma335;
 
 namespace Playground
 {
@@ -178,6 +181,123 @@ namespace Playground
             public override void Write(byte[] buffer, int offset, int count) { }
         }
 
+        class MyGenericTypeHandlerCreator : GenericTypeHandlerCreator
+        {
+            public override bool SupportsType(Type type) => type.IsOfGenericType(typeof(IList<>));
+
+            protected override Type CastType(Type type)
+            {
+                Type concreteType;
+                if (type.IsOfGenericType(typeof(List<>), out concreteType)) return concreteType;
+                else if (type.IsOfGenericType(typeof(IList<>), out concreteType)) return concreteType;                
+                return type;
+            }
+
+            protected override void CreateAndSetGenericTypeHandler<T, ARG1>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
+            {
+                Type type = typeof(T);
+                Type elementType = typeof(ARG1);
+                var elementTypeHandler = api.GetCachedTypeHandler(elementType);
+                JsonDataTypeCategory typeCategory = elementTypeHandler.NoRefTypes ? JsonDataTypeCategory.Array_WithoutRefChildren : JsonDataTypeCategory.Array;                
+
+                if (api.Writer.TryPreparePrimitiveWriteDelegate<ARG1>(out var primitiveWrite))
+                {
+                    if (type.IsOfGenericType(typeof(List<>)))
+                    {
+                        ItemHandler<List<ARG1>> itemHandler = list =>
+                        {
+                            var count = list.Count;
+                            for (int i = 0; i < count; i++)
+                            {
+                                primitiveWrite(list[i]);
+                                api.Writer.WriteComma();
+                            }
+                            api.Writer.RemoveTrailingComma();
+                        };
+                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
+                    }
+                    else
+                    {
+                        ItemHandler<IList<ARG1>> itemHandler = list =>
+                        {
+                            var count = list.Count;
+                            for (int i = 0; i < count; i++)
+                            {
+                                primitiveWrite(list[i]);
+                                api.Writer.WriteComma();
+                            }
+                            api.Writer.RemoveTrailingComma();
+                        };
+                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
+                    }
+                }
+                else if (elementTypeHandler.NoRefTypes)
+                {
+                    if (type.IsOfGenericType(typeof(List<>)))
+                    {
+                        ItemHandler<List<ARG1>> itemHandler = list =>
+                        {
+                            var count = list.Count;
+                            for (int i = 0; i < count; i++)
+                            {
+                                elementTypeHandler.HandleItem(list[i], default);
+                                api.Writer.WriteComma();
+                            }
+                            api.Writer.RemoveTrailingComma();
+                        };
+                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
+                    }
+                    else
+                    {
+                        ItemHandler<IList<ARG1>> itemHandler = list =>
+                        {
+                            var count = list.Count;
+                            for (int i = 0; i < count; i++)
+                            {
+                                elementTypeHandler.HandleItem(list[i], default);
+                                api.Writer.WriteComma();
+                            }
+                            api.Writer.RemoveTrailingComma();
+                        };
+                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
+                    }
+                }
+                else
+                {
+                    if (type.IsOfGenericType(typeof(List<>)))
+                    {
+                        ItemHandler<List<ARG1>> itemHandler = list =>
+                        {
+                            var count = list.Count;
+                            for (int i = 0; i < count; i++)
+                            {
+                                elementTypeHandler.HandleItem(list[i], default);
+                                api.Writer.WriteComma();
+                            }
+                            api.Writer.RemoveTrailingComma();
+                        };
+                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
+                    }
+                    else
+                    {
+                        ItemHandler<IList<ARG1>> itemHandler = list =>
+                        {
+                            var count = list.Count;
+                            for (int i = 0; i < count; i++)
+                            {
+                                elementTypeHandler.HandleItem(list[i], default);
+                                api.Writer.WriteComma();
+                            }
+                            api.Writer.RemoveTrailingComma();
+                        };
+                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
+                    }
+                }
+
+                
+            }
+        }
+
         public static async Task Run()
         {
 
@@ -190,7 +310,7 @@ namespace Playground
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
+            var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = -128;
             //IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
             //var testDto = new TestDto2();
@@ -211,7 +331,7 @@ namespace Playground
             //var testDto = "Mystring1";            
             //var testDto = new Dictionary<int, string>() { [12] = "Hello1", [79] = "Hello2" };
             //var testDto = new Dictionary<int, MyEmbedded1>() { [1] = new MyEmbedded1(), [2] = null };
-            var testDto = new List<int> { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+            //var testDto = new List<int> { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
             //object testDto = 123;
             //var testDto = new TestDto3();
             //var testDto = AppTime.Now;
@@ -257,8 +377,9 @@ namespace Playground
                 treatEnumerablesAsCollections = true,
             };
 
+            settings.AddCustomTypeHandlerCreator(new MyGenericTypeHandlerCreator());
             
-            
+            /*
             settings.AddCustomTypeHandlerCreator<int>(
                 FeatureJsonSerializer.JsonDataTypeCategory.Primitive,
                 api =>
@@ -300,7 +421,7 @@ namespace Playground
                     };
                 });
             
-            /*
+            
             settings.AddCustomTypeHandlerCreator<List<MyEmbedded1>>(
                 FeatureJsonSerializer.JsonDataTypeCategory.Array,
                 (api) =>

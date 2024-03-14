@@ -21,16 +21,21 @@ namespace Playground
             public bool treatEnumerablesAsCollections = true;
             public int writeBufferChunkSize = 64 * 1024;
             public int tempBufferSize = 8 * 1024;
-            public List<ITypeHandlerCreator> itemHandlerCreators = new List<ITypeHandlerCreator>();
+            public List<ITypeHandlerCreator> customTypeHandlerCreators = new List<ITypeHandlerCreator>();
 
             public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, bool onlyExactType = true)
             {
-                itemHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, onlyExactType));
+                customTypeHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, onlyExactType));
             }
 
             public void AddCustomTypeHandlerCreator<T>(Func<Type, bool> supportsType, JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator)
             {
-                itemHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, supportsType));
+                customTypeHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, supportsType));
+            }
+
+            public void AddCustomTypeHandlerCreator(ITypeHandlerCreator creator)
+            {
+                customTypeHandlerCreators.Add(creator);
             }
         }
 
@@ -82,7 +87,7 @@ namespace Playground
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
                 writeBufferChunkSize = settings.writeBufferChunkSize;
                 tempBufferSize = settings.tempBufferSize;
-                itemHandlerCreators = settings.itemHandlerCreators.Where(creator => creator != null).ToArray();
+                itemHandlerCreators = settings.customTypeHandlerCreators.Where(creator => creator != null).ToArray();
 
                 requiresItemNames = referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef;
                 requiresItemInfos = referenceCheck != ReferenceCheck.NoRefCheck;
