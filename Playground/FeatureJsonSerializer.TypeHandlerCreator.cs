@@ -1,7 +1,9 @@
-﻿using System;
+﻿using FeatureLoom.Extensions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using static Playground.FeatureJsonSerializer;
 
 namespace Playground
@@ -39,11 +41,8 @@ namespace Playground
                 type = CastType(type);
                 List<Type> genericArguments = new List<Type> { type };
                 genericArguments.AddRange(type.GenericTypeArguments);
-                var createMethod = this.GetType().GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
-                        .FirstOrDefault(method => method.Name == nameof(CreateAndSetGenericTypeHandler) && method.GetGenericArguments().Length == genericArguments.Count);
-                if (createMethod == null) throw new NotSupportedException();
-                var genericCreateMethod = createMethod.MakeGenericMethod(genericArguments.ToArray());
-                genericCreateMethod.Invoke(this, new object[] { api, cachedTypeHandler });
+
+                this.InvokeGenericMethod(nameof(CreateAndSetGenericTypeHandler), genericArguments.ToArray(), api, cachedTypeHandler);
             }            
         }
 

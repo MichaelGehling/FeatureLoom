@@ -193,6 +193,15 @@ namespace FeatureLoom.Extensions
                 // Just lock with priority so we know when the lock was exited by previous owner 
             };
         }
- 
+        
+        public static void InvokeGenericMethod(this object obj, string methodName, Type[] typeArguments, params object[] argumentValues)
+        {
+            var createMethod = obj.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .FirstOrDefault(method => method.Name == methodName && method.GetGenericArguments().Length == typeArguments.Length);
+            if (createMethod == null) throw new NotSupportedException();
+            var genericCreateMethod = createMethod.MakeGenericMethod(typeArguments);
+            genericCreateMethod.Invoke(obj, argumentValues);
+        }
+
     }
 }

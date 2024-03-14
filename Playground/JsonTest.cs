@@ -191,10 +191,11 @@ namespace Playground
                 if (type.IsOfGenericType(typeof(List<>), out concreteType)) return concreteType;
                 else if (type.IsOfGenericType(typeof(IList<>), out concreteType)) return concreteType;                
                 return type;
-            }
+            }           
 
             protected override void CreateAndSetGenericTypeHandler<T, ARG1>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
             {
+
                 Type type = typeof(T);
                 Type elementType = typeof(ARG1);
                 var elementTypeHandler = api.GetCachedTypeHandler(elementType);
