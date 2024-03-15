@@ -402,6 +402,21 @@ namespace Playground
                     objectItemHandler(item, callType, fieldName);
                 }
             }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void HandleItem<T>(T item)
+            {
+                Type callType = typeof(T);
+                if (callType == handlerType)
+                {
+                    Action<T, Type, ArraySegment<byte>> typedItemHandler = (Action<T, Type, ArraySegment<byte>>)itemHandler;
+                    typedItemHandler.Invoke(item, callType, default);
+                }
+                else
+                {
+                    objectItemHandler(item, callType, default);
+                }
+            }
         }
     }
 

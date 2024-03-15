@@ -43,13 +43,6 @@ namespace Playground
             Object_Empty
         }
 
-        public interface ITypeHandlerCreator
-        {
-            bool SupportsType(Type type);
-            void CreateTypeHandler(ExtensionApi api, ICachedTypeHandler cachedTypeHandler, Type type);
-        }
-        
-
         public FeatureJsonSerializer(Settings settings = null)
         {           
             this.settings = new CompiledSettings(settings ?? new Settings());

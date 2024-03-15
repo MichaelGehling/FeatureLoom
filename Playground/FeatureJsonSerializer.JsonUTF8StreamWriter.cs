@@ -23,7 +23,7 @@ namespace Playground
             void EnsureFreeBufferSpace(int freeBytes);
             void OpenCollection();
             void OpenObject();
-            ArraySegment<byte> PrepareCollectionIndexName(int index);
+            ArraySegment<byte> GetCollectionIndexName(int index);
             byte[] PrepareFieldNameBytes(string fieldname);
             byte[] PrepareRootName();
             byte[] PrepareStringToBytes(string str);
@@ -804,8 +804,10 @@ namespace Playground
             }
 
             List<ArraySegment<byte>> indexNameList = new List<ArraySegment<byte>>();
-            public ArraySegment<byte> PrepareCollectionIndexName(int index)
+            public ArraySegment<byte> GetCollectionIndexName(int index)
             {
+                if (!settings.requiresItemNames) return default;
+
                 if (index >= indexNameList.Count)
                 {
                     for (int i = indexNameList.Count; i <= index; i++)

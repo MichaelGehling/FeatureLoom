@@ -4,45 +4,49 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using static Playground.FeatureJsonSerializer;
 
 namespace Playground
 {
     public sealed partial class FeatureJsonSerializer
     {
+        public interface ITypeHandlerCreator
+        {
+            bool SupportsType(Type type);
+            void CreateTypeHandler(ExtensionApi api, ICachedTypeHandler cachedTypeHandler, Type type);
+        }
+
         public abstract class GenericTypeHandlerCreator : ITypeHandlerCreator
         {
-            public abstract bool SupportsType(Type type);
+            protected Type genericType;
+            public GenericTypeHandlerCreator(Type genericType)
+            {
+                this.genericType = genericType;
+            }
 
-            protected virtual Type CastType(Type type) => type;
+            public virtual bool SupportsType(Type type)
+            {
+                return type.IsOfGenericType(genericType);
+            }
 
-            protected virtual void CreateAndSetGenericTypeHandler<T>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
+            protected virtual void CreateAndSetGenericTypeHandler<ARG1>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
             {
                 throw new NotImplementedException();
             }
 
-            protected virtual void CreateAndSetGenericTypeHandler<T, ARG1>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
+            protected virtual void CreateAndSetGenericTypeHandler<ARG1, ARG2>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
             {
                 throw new NotImplementedException();
             }
 
-            protected virtual void CreateAndSetGenericTypeHandler<T, ARG1, ARG2>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
+            protected virtual void CreateAndSetGenericTypeHandler<ARG1, ARG2, ARG3>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
             {
                 throw new NotImplementedException();
             }
-
-            protected virtual void CreateAndSetGenericTypeHandler<T, ARG1, ARG2, ARG3>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
-            {
-                throw new NotImplementedException();
-            }            
 
             public void CreateTypeHandler(ExtensionApi api, ICachedTypeHandler cachedTypeHandler, Type type)
             {
-                type = CastType(type);
-                List<Type> genericArguments = new List<Type> { type };
-                genericArguments.AddRange(type.GenericTypeArguments);
-
-                this.InvokeGenericMethod(nameof(CreateAndSetGenericTypeHandler), genericArguments.ToArray(), api, cachedTypeHandler);
+                if (!type.IsOfGenericType(genericType, out Type concreteGenericType)) throw new NotSupportedException();
+                this.InvokeGenericMethod(nameof(CreateAndSetGenericTypeHandler), concreteGenericType.GetGenericArguments(), api, cachedTypeHandler);
             }            
         }
 

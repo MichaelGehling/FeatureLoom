@@ -8,19 +8,21 @@ namespace Playground
     {
         public sealed class ExtensionApi
         {
-            readonly FeatureJsonSerializer s;
-            readonly JsonUTF8StreamWriter w;
+            readonly FeatureJsonSerializer serializer;
+            readonly JsonUTF8StreamWriter writer;            
 
             public ExtensionApi(FeatureJsonSerializer serializer)
             {
-                this.s = serializer;
-                this.w = serializer.writer;
+                this.serializer = serializer;
+                this.writer = serializer.writer;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public CachedTypeHandler GetCachedTypeHandler(Type type) => s.GetCachedTypeHandler(type);
+            public CachedTypeHandler GetCachedTypeHandler(Type type) => serializer.GetCachedTypeHandler(type);
 
-            public IWriter Writer => w;       
+            public IWriter Writer => writer;
+            public bool RequiresItemNames => serializer.settings.requiresItemNames;
+            public bool RequiresHandler => serializer.settings.requiresItemInfos;
         }
 
     }

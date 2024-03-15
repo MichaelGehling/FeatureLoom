@@ -21,6 +21,7 @@ using FeatureLoom.Security;
 using FeatureLoom.Extensions;
 using static Playground.FeatureJsonSerializer;
 using System.Reflection.Metadata.Ecma335;
+using System.Reflection;
 
 namespace Playground
 {
@@ -181,123 +182,58 @@ namespace Playground
             public override void Write(byte[] buffer, int offset, int count) { }
         }
 
-        class MyGenericTypeHandlerCreator : GenericTypeHandlerCreator
+        class MyGenericIListTypeHandlerCreator : GenericTypeHandlerCreator
         {
-            public override bool SupportsType(Type type) => type.IsOfGenericType(typeof(IList<>));
-
-            protected override Type CastType(Type type)
+            public MyGenericIListTypeHandlerCreator() : base(typeof(IList<>))
             {
-                Type concreteType;
-                if (type.IsOfGenericType(typeof(List<>), out concreteType)) return concreteType;
-                else if (type.IsOfGenericType(typeof(IList<>), out concreteType)) return concreteType;                
-                return type;
-            }           
+            }
 
-            protected override void CreateAndSetGenericTypeHandler<T, ARG1>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
-            {
-
-                Type type = typeof(T);
-                Type elementType = typeof(ARG1);
-                var elementTypeHandler = api.GetCachedTypeHandler(elementType);
-                JsonDataTypeCategory typeCategory = elementTypeHandler.NoRefTypes ? JsonDataTypeCategory.Array_WithoutRefChildren : JsonDataTypeCategory.Array;                
-
-                if (api.Writer.TryPreparePrimitiveWriteDelegate<ARG1>(out var primitiveWrite))
+            protected override void CreateAndSetGenericTypeHandler<ARG1>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
+            {                
+                var elementTypeHandler = api.GetCachedTypeHandler(typeof(ARG1));                
+                ItemHandler<IList<ARG1>> itemHandler;
+                if (!api.RequiresHandler && api.Writer.TryPreparePrimitiveWriteDelegate<ARG1>(out var primitiveWrite))
                 {
-                    if (type.IsOfGenericType(typeof(List<>)))
+                    itemHandler = list =>
                     {
-                        ItemHandler<List<ARG1>> itemHandler = list =>
+                        var count = list.Count;
+                        for (int i = 0; i < count; i++)
                         {
-                            var count = list.Count;
-                            for (int i = 0; i < count; i++)
-                            {
-                                primitiveWrite(list[i]);
-                                api.Writer.WriteComma();
-                            }
-                            api.Writer.RemoveTrailingComma();
-                        };
-                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
-                    }
-                    else
-                    {
-                        ItemHandler<IList<ARG1>> itemHandler = list =>
-                        {
-                            var count = list.Count;
-                            for (int i = 0; i < count; i++)
-                            {
-                                primitiveWrite(list[i]);
-                                api.Writer.WriteComma();
-                            }
-                            api.Writer.RemoveTrailingComma();
-                        };
-                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
-                    }
+                            primitiveWrite(list[i]);
+                            api.Writer.WriteComma();
+                        }
+                        api.Writer.RemoveTrailingComma();
+                    };                    
                 }
-                else if (elementTypeHandler.NoRefTypes)
+                else if (!!api.RequiresItemNames && elementTypeHandler.NoRefTypes)
                 {
-                    if (type.IsOfGenericType(typeof(List<>)))
+                    itemHandler = list =>
                     {
-                        ItemHandler<List<ARG1>> itemHandler = list =>
+                        var count = list.Count;
+                        for (int i = 0; i < count; i++)
                         {
-                            var count = list.Count;
-                            for (int i = 0; i < count; i++)
-                            {
-                                elementTypeHandler.HandleItem(list[i], default);
-                                api.Writer.WriteComma();
-                            }
-                            api.Writer.RemoveTrailingComma();
-                        };
-                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
-                    }
-                    else
-                    {
-                        ItemHandler<IList<ARG1>> itemHandler = list =>
-                        {
-                            var count = list.Count;
-                            for (int i = 0; i < count; i++)
-                            {
-                                elementTypeHandler.HandleItem(list[i], default);
-                                api.Writer.WriteComma();
-                            }
-                            api.Writer.RemoveTrailingComma();
-                        };
-                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
-                    }
+                            elementTypeHandler.HandleItem(list[i]);
+                            api.Writer.WriteComma();
+                        }
+                        api.Writer.RemoveTrailingComma();
+                    };                    
                 }
                 else
                 {
-                    if (type.IsOfGenericType(typeof(List<>)))
+                    itemHandler = list =>
                     {
-                        ItemHandler<List<ARG1>> itemHandler = list =>
+                        var count = list.Count;
+                        for (int i = 0; i < count; i++)
                         {
-                            var count = list.Count;
-                            for (int i = 0; i < count; i++)
-                            {
-                                if (list[i] == null) api.Writer.WriteNullValue();
-                                else if (list[i].GetType() == elementTypeHandler.HandlerType) elementTypeHandler.HandleItem(list[i], default);
-                                else api.GetCachedTypeHandler(list[i].GetType()).HandleItem(list[i], default);
-                                api.Writer.WriteComma();
-                            }
-                            api.Writer.RemoveTrailingComma();
-                        };
-                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
-                    }
-                    else
-                    {
-                        ItemHandler<IList<ARG1>> itemHandler = list =>
-                        {
-                            var count = list.Count;
-                            for (int i = 0; i < count; i++)
-                            {
-                                elementTypeHandler.HandleItem(list[i], default);
-                                api.Writer.WriteComma();
-                            }
-                            api.Writer.RemoveTrailingComma();
-                        };
-                        cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
-                    }
+                            elementTypeHandler.HandleItem(list[i], api.Writer.GetCollectionIndexName(i));
+                            api.Writer.WriteComma();
+                        }
+                        api.Writer.RemoveTrailingComma();
+                    };                    
                 }
 
-                
+                JsonDataTypeCategory typeCategory = elementTypeHandler.NoRefTypes ? JsonDataTypeCategory.Array_WithoutRefChildren : JsonDataTypeCategory.Array;
+                cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
             }
         }
 
@@ -315,10 +251,10 @@ namespace Playground
 
             //var testDto = new TestDto(99, new MyEmbedded1());
             //var testDto = -128;
-            IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+            //IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
             //var testDto = new TestDto2();
-            //var testDto = new MyEmbedded2();
-            //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
+            //var testDto = new MyEmbedded1();
+            var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
             //var testDto = new List<MyStruct>() { new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct() };
             //var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
@@ -380,8 +316,8 @@ namespace Playground
                 treatEnumerablesAsCollections = true,
             };
 
-            settings.AddCustomTypeHandlerCreator(new MyGenericTypeHandlerCreator());
-            
+            settings.AddCustomTypeHandlerCreator(new MyGenericIListTypeHandlerCreator());
+
             /*
             settings.AddCustomTypeHandlerCreator<int>(
                 FeatureJsonSerializer.JsonDataTypeCategory.Primitive,

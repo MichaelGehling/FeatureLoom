@@ -112,9 +112,8 @@ namespace Playground
                 {
                     if (elementType == defaultElementHandler.HandlerType) currentHandler = defaultElementHandler;
                     else currentHandler = GetCachedTypeHandler(elementType);
-                }
-                ArraySegment<byte> elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : default;                
-                currentHandler.HandleItem(element, elementName);                
+                }             
+                currentHandler.HandleItem(element, writer.GetCollectionIndexName(index));                
             }
 
             return currentHandler;
@@ -138,9 +137,8 @@ namespace Playground
                     else
                     {
                         Type elementType = element.GetType();
-                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
-                        ArraySegment<byte> itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : default;                        
-                        actualHandler.HandleItem(element, itemName);                        
+                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);                        
+                        actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                        
                     }
                     index++;
                 }
@@ -153,9 +151,8 @@ namespace Playground
                     else
                     {
                         Type elementType = element.GetType();
-                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);
-                        ArraySegment<byte> itemName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : default;                        
-                        actualHandler.HandleItem(element, itemName);                        
+                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);                    
+                        actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                        
                     }
                     index++;
                 }

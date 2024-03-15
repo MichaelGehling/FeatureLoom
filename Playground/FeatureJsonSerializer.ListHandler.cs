@@ -64,9 +64,8 @@ namespace Playground
                         {
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
-                            ArraySegment<byte> elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : default;                            
-                            actualHandler.HandleItem(element, elementName);                            
+                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);                            
+                            actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                            
                         }
                         index++;
                     }
@@ -80,9 +79,8 @@ namespace Playground
                         {
                             Type elementType = element.GetType();
                             CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
-                            ArraySegment<byte> elementName = settings.requiresItemNames ? writer.PrepareCollectionIndexName(index) : default;                            
-                            actualHandler.HandleItem(element, elementName);                            
+                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);                            
+                            actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                            
                         }
                         index++;
                     }
