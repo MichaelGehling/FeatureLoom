@@ -57,7 +57,7 @@ namespace Playground
                         valueHandler.HandleItem(pair.Value, default);
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, true, false);
+                typeHandler.SetItemHandler_Object(itemHandler, true);
             }
             else
             {
@@ -99,7 +99,7 @@ namespace Playground
                         }
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, false, false);
+                typeHandler.SetItemHandler_Object(itemHandler, false);
             }
         }
 

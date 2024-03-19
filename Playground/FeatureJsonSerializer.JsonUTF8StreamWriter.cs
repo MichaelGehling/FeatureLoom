@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using FeatureLoom.Helpers;
 using System.Reflection;
+using System.Linq;
 
 namespace Playground
 {
@@ -18,10 +19,10 @@ namespace Playground
             byte[] Buffer { get; }
             int BufferCount { get; }
 
-            void CloseCollection();
+            void CloseArray();
             void CloseObject();
             void EnsureFreeBufferSpace(int freeBytes);
-            void OpenCollection();
+            void OpenArray();
             void OpenObject();
             ArraySegment<byte> GetCollectionIndexName(int index);
             byte[] PrepareFieldNameBytes(string fieldname);
@@ -29,7 +30,6 @@ namespace Playground
             byte[] PrepareStringToBytes(string str);
             byte[] PrepareTextToBytes(string enumText);
             byte[] PrepareTypeInfo(string typeName);
-            void RemoveTrailingComma();
             void ResetBuffer();
             string ToString();
             void WriteBufferToStream();
@@ -52,6 +52,8 @@ namespace Playground
             void WriteUintValue(uint value);
             void WriteUlongValue(ulong value);
             void WriteUshortValue(ushort value);
+            void WriteGuidValue(Guid value);
+            void WriteDateTimeValue(DateTime value);
             void WriteBoolAsStringValue(bool value);
             void WriteByteAsStringValue(byte value);
             void WriteCharValueAsString(char value);
@@ -64,20 +66,19 @@ namespace Playground
             void WriteUintValueAsString(uint value);
             void WriteUlongValueAsString(ulong value);
             void WriteUshortValueAsString(ushort value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(bool value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(byte value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(char value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(double value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(float value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(int value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(long value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(sbyte value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(short value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(string str);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(uint value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ulong value);
-            ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ushort value);
-            //void WriteRefObject(ItemInfo itemInfo);
+            ArraySegment<byte> WriteBoolValueAsStringWithCopy(bool value);
+            ArraySegment<byte> WriteByteValueAsStringWithCopy(byte value);
+            ArraySegment<byte> WriteCharValueAsStringWithCopy(char value);
+            ArraySegment<byte> WriteDoubleValueAsStringWithCopy(double value);
+            ArraySegment<byte> WriteFloatValueAsStringWithCopy(float value);
+            ArraySegment<byte> WriteIntValueAsStringWithCopy(int value);
+            ArraySegment<byte> WriteLongValueAsStringWithCopy(long value);
+            ArraySegment<byte> WriteSbyteValueAsStringWithCopy(sbyte value);
+            ArraySegment<byte> WriteShortValueAsStringWithCopy(short value);
+            ArraySegment<byte> WriteStringValueAsStringWithCopy(string str);
+            ArraySegment<byte> WriteUintValueAsStringWithCopy(uint value);
+            ArraySegment<byte> WriteUlongValueAsStringWithCopy(ulong value);
+            ArraySegment<byte> WriteUshortValueAsStringWithCopy(ushort value);
             void WriteToBuffer(ArraySegment<byte> data);
             void WriteToBuffer(byte data);
             void WriteToBuffer(byte[] data);
@@ -100,15 +101,24 @@ namespace Playground
             private int mainBufferCount;
             private SlicedBuffer<byte> tempSlicedBuffer;
             private CompiledSettings settings;
+            private readonly bool indent;
+            private int currentIndentionDepth = 0;
+            private readonly int maxIndentationDepth;
+            private readonly byte[][] indentationLookup;
 
             public JsonUTF8StreamWriter(CompiledSettings settings)
             {
-                localBuffer = new byte[64];
+                localBuffer = new byte[128];
                 // We give some extra bytes in order to not always check remaining space
                 mainBuffer = new byte[settings.writeBufferChunkSize + 64];
                 // Used for temporarily needed names e.g. Dictionary
                 tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, 128);
-                this.settings = settings;                
+                this.settings = settings;
+
+                indent = settings.indent;
+                maxIndentationDepth = settings.maxIndentationDepth;
+                indentationLookup = new byte[maxIndentationDepth][];
+                InitIndentationLookup();
             }
 
             public override string ToString()
@@ -123,9 +133,33 @@ namespace Playground
                     return Encoding.UTF8.GetString(mainBuffer, 0, mainBufferCount);
                 }
             }
+           
+            private void InitIndentationLookup()
+            {                
+                if (!indent) return;                
+
+                List<byte> indentationBytes = new List<byte>();
+                indentationBytes.Add((byte)'\n');
+                for (int i = 0; i < settings.maxIndentationDepth; i++)
+                {                                        
+                    indentationLookup[i] = indentationBytes.ToArray();
+                    for (int j = 0; j < settings.indentationFactor; j++) indentationBytes.Add((byte)' ');
+                }
+            }
+
+            private void WriteNextLine()
+            {
+                var indentationBytes = indentationLookup[Math.Min(currentIndentionDepth,maxIndentationDepth)];
+                WriteToBuffer(indentationBytes);
+            }
+
 
             public byte[] Buffer => mainBuffer;
-            public int BufferCount => mainBufferCount;
+            public int BufferCount
+            {
+                get => mainBufferCount;
+                set => mainBufferCount = value;
+            }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteBufferToStream()
@@ -139,6 +173,7 @@ namespace Playground
             {
                 mainBufferCount = 0;
                 tempSlicedBuffer.Reset(true);
+                currentIndentionDepth = 0;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -227,8 +262,10 @@ namespace Playground
 
             public bool TryPreparePrimitiveWriteDelegate<T>(out Action<T> primitiveWriteDelegate)
             {
+                Type type = typeof(T);
                 primitiveWriteDelegate = null;
-                Type type = typeof(T);                
+                if (settings.itemHandlerCreators.Any(creator => creator.SupportsType(type))) return false;
+                
 
                 if (typeMap.TryGetValue(type, out string methodName))
                 {
@@ -259,11 +296,27 @@ namespace Playground
 
             static readonly byte OPEN_OBJECT = (byte)'{';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void OpenObject() => WriteToBufferWithoutCheck(OPEN_OBJECT);
+            public void OpenObject()
+            {
+                WriteToBufferWithoutCheck(OPEN_OBJECT);
+                if (indent)
+                {
+                    currentIndentionDepth++;
+                    WriteNextLine();
+                }
+            }
 
             static readonly byte CLOSE_OBJECT = (byte)'}';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void CloseObject() => WriteToBufferWithoutCheck(CLOSE_OBJECT);
+            public void CloseObject()
+            {
+                if (indent)
+                {
+                    currentIndentionDepth--;
+                    WriteNextLine();
+                }
+                WriteToBufferWithoutCheck(CLOSE_OBJECT);
+            }
 
             static readonly byte[] TYPEINFO_PRE = "\"$type\":\"".ToByteArray();
             static readonly byte TYPEINFO_POST = (byte)'\"';
@@ -309,7 +362,20 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(long value)
+            public void WriteIntPtrValue(IntPtr value)
+            {
+                WriteSignedInteger(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteUintPtrValue(UIntPtr value)
+            {
+                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+                else WriteString(value.ToString());
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public ArraySegment<byte> WriteLongValueAsStringWithCopy(long value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -337,17 +403,19 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteUlongValue(ulong value)
             {
-                WriteUnsignedInteger((long)value);
+                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+                else WriteString(value.ToString());
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ulong value)
+            public ArraySegment<byte> WriteUlongValueAsStringWithCopy(ulong value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
                 var countBefore = mainBufferCount;
 
-                WriteUnsignedInteger((long)value);
+                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+                else WriteString(value.ToString());
 
                 var writtenBytes = mainBufferCount - countBefore;
                 var slice = tempSlicedBuffer.GetSlice(writtenBytes);
@@ -361,7 +429,8 @@ namespace Playground
             public void WriteUlongValueAsString(ulong value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
-                WriteUnsignedInteger((long)value);
+                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+                else WriteString(value.ToString());
                 WriteToBufferWithoutCheck(QUOTES);
             }
 
@@ -372,7 +441,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(int value)
+            public ArraySegment<byte> WriteIntValueAsStringWithCopy(int value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -403,7 +472,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(uint value)
+            public ArraySegment<byte> WriteUintValueAsStringWithCopy(uint value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -434,7 +503,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(byte value)
+            public ArraySegment<byte> WriteByteValueAsStringWithCopy(byte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -465,7 +534,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(sbyte value)
+            public ArraySegment<byte> WriteSbyteValueAsStringWithCopy(sbyte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -496,7 +565,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(short value)
+            public ArraySegment<byte> WriteShortValueAsStringWithCopy(short value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -527,7 +596,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(ushort value)
+            public ArraySegment<byte> WriteUshortValueAsStringWithCopy(ushort value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -558,7 +627,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(float value)
+            public ArraySegment<byte> WriteFloatValueAsStringWithCopy(float value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -595,7 +664,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(double value)
+            public ArraySegment<byte> WriteDoubleValueAsStringWithCopy(double value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -629,7 +698,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(bool value)
+            public ArraySegment<byte> WriteBoolValueAsStringWithCopy(bool value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -669,7 +738,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(string str)
+            public ArraySegment<byte> WriteStringValueAsStringWithCopy(string str)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -702,7 +771,7 @@ namespace Playground
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WritePrimitiveValueAsStringWithCopy(char value)
+            public ArraySegment<byte> WriteCharValueAsStringWithCopy(char value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -748,28 +817,42 @@ namespace Playground
                 while (reverseItemInfoStack.TryPop(out itemInfo))
                 {
                     var name = itemInfo.ItemName;
-                    if (name[0] != OPENCOLLECTION) WriteDot();
+                    if (name[0] != OPENARRAY) WriteDot();
                     WriteToBuffer(name);
                 }
                 WriteToBuffer(REFOBJECT_POST);
             }
 
-            static readonly byte OPENCOLLECTION = (byte)'[';
+            static readonly byte OPENARRAY = (byte)'[';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void OpenCollection() => WriteToBufferWithoutCheck(OPENCOLLECTION);
+            public void OpenArray()
+            {
+                WriteToBufferWithoutCheck(OPENARRAY);
+                if (indent)
+                {
+                    currentIndentionDepth++;
+                    WriteNextLine();
+                }
+            }
 
-            static readonly byte CLOSECOLLECTION = (byte)']';
+            static readonly byte CLOSEARRAY = (byte)']';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void CloseCollection() => WriteToBufferWithoutCheck(CLOSECOLLECTION);
+            public void CloseArray()
+            {
+                if (indent)
+                {
+                    currentIndentionDepth--;
+                    WriteNextLine();
+                }
+                WriteToBufferWithoutCheck(CLOSEARRAY);
+            }
 
             static readonly byte COMMA = (byte)',';
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteComma() => WriteToBufferWithoutCheck(COMMA);
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void RemoveTrailingComma()
+            public void WriteComma()
             {
-                if (mainBuffer[mainBufferCount - 1] == COMMA) mainBufferCount--;
+                WriteToBufferWithoutCheck(COMMA);
+                if (indent) WriteNextLine();                
             }
 
             static readonly byte DOT = (byte)'.';
@@ -1475,6 +1558,161 @@ namespace Playground
             }
 
 
+            private static readonly byte[] HexMap = System.Text.Encoding.UTF8.GetBytes("0123456789abcdef");
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteByteAsHexWithoutCheck(byte value)
+            {
+                WriteToBufferWithoutCheck(HexMap[value >> 4]);
+                WriteToBufferWithoutCheck(HexMap[value & 0xF]);
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteByteAsHex(byte value)
+            {
+                EnsureFreeBufferSpace(2);
+                WriteToBufferWithoutCheck(HexMap[value >> 4]);
+                WriteToBufferWithoutCheck(HexMap[value & 0xF]);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteGuidValue(Guid guid)
+            {
+                EnsureFreeBufferSpace(38);  // GUID string length + 4 hyphens + 2 "
+#if NETSTANDARD2_0
+                // Fallback for .NET Standard 2.0 using ToByteArray and manual byte processing
+                byte[] guidBytes = guid.ToByteArray();
+#else
+                // Default case for .NET Standard 2.1+ and other frameworks supporting Span<T>
+                Span<byte> guidBytesSpan = new Span<byte>(localBuffer, 0, 16);
+                guid.TryWriteBytes(guidBytesSpan); // loacalBuffer is always bigger than 16 bytes
+                byte[] guidBytes = localBuffer;
+#endif
+                WriteToBufferWithoutCheck((byte)'"');
+                WriteByteAsHexWithoutCheck(guidBytes[3]);
+                WriteByteAsHexWithoutCheck(guidBytes[2]);
+                WriteByteAsHexWithoutCheck(guidBytes[1]);
+                WriteByteAsHexWithoutCheck(guidBytes[0]);
+                WriteToBufferWithoutCheck((byte)'-');
+                WriteByteAsHexWithoutCheck(guidBytes[5]);
+                WriteByteAsHexWithoutCheck(guidBytes[4]);
+                WriteToBufferWithoutCheck((byte)'-');
+                WriteByteAsHexWithoutCheck(guidBytes[7]);
+                WriteByteAsHexWithoutCheck(guidBytes[6]);
+                WriteToBufferWithoutCheck((byte)'-');
+                WriteByteAsHexWithoutCheck(guidBytes[8]);
+                WriteByteAsHexWithoutCheck(guidBytes[9]);
+                WriteToBufferWithoutCheck((byte)'-');
+                WriteByteAsHexWithoutCheck(guidBytes[10]);
+                WriteByteAsHexWithoutCheck(guidBytes[11]);
+                WriteByteAsHexWithoutCheck(guidBytes[12]);
+                WriteByteAsHexWithoutCheck(guidBytes[13]);
+                WriteByteAsHexWithoutCheck(guidBytes[14]);
+                WriteByteAsHexWithoutCheck(guidBytes[15]);
+                WriteToBufferWithoutCheck((byte)'"');
+            }
+
+            public void WriteDateTimeValue(DateTime dateTime)
+            {
+                EnsureFreeBufferSpace(32);
+
+                WriteToBufferWithoutCheck((byte)'"');
+                // Write Year
+                Write4Digits(dateTime.Year);
+                WriteToBufferWithoutCheck((byte)'-');
+                // Write Month
+                Write2Digits(dateTime.Month);
+                WriteToBufferWithoutCheck((byte)'-');
+                // Write Day
+                Write2Digits(dateTime.Day);
+                WriteToBufferWithoutCheck((byte)'T');
+                // Write Hour
+                Write2Digits(dateTime.Hour);
+                WriteToBufferWithoutCheck((byte)':');
+                // Write Minute
+                Write2Digits(dateTime.Minute);
+                WriteToBufferWithoutCheck((byte)':');
+                // Write Second
+                Write2Digits(dateTime.Second);
+                WriteToBufferWithoutCheck((byte)'.');
+                // Write Fractional second
+                Write7Digits((int)(dateTime.Ticks % TimeSpan.TicksPerSecond));
+
+                if (dateTime.Kind == DateTimeKind.Utc)
+                {
+                    WriteToBufferWithoutCheck((byte)'Z');
+                }
+                else if (dateTime.Kind == DateTimeKind.Local)
+                {
+                    TimeSpan offsetSpan = TimeZoneInfo.Local.GetUtcOffset(dateTime);
+                    bool isNegative = offsetSpan.Ticks < 0;
+                    WriteToBufferWithoutCheck((byte)(isNegative ? '-' : '+'));
+                    Write2Digits(Math.Abs(offsetSpan.Hours));
+                    WriteToBufferWithoutCheck((byte)':');
+                    Write2Digits(Math.Abs(offsetSpan.Minutes));
+                }
+                WriteToBufferWithoutCheck((byte)'"');
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+
+            private void Write4Digits(int value)
+            {
+                int temp;
+                temp = Math.DivRem(value, 1000, out value);
+                WriteDigit(temp);
+
+                temp = Math.DivRem(value, 100, out value);
+                WriteDigit(temp);
+
+                temp = Math.DivRem(value, 10, out value);
+                WriteDigit(temp);
+                WriteDigit(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void Write2Digits(int value)
+            {
+                int div;
+                div = Math.DivRem(value, 10, out value);
+                WriteDigit(div);
+                WriteDigit(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void Write7Digits(int value)
+            {
+                // First digit
+                int digit = Math.DivRem(value, 1000000, out value);
+                WriteDigit(digit);
+
+                // Second digit
+                digit = Math.DivRem(value, 100000, out value);
+                WriteDigit(digit);
+
+                // Third digit
+                digit = Math.DivRem(value, 10000, out value);
+                WriteDigit(digit);
+
+                // Fourth digit
+                digit = Math.DivRem(value, 1000, out value);
+                WriteDigit(digit);
+
+                // Fifth digit
+                digit = Math.DivRem(value, 100, out value);
+                WriteDigit(digit);
+
+                // Sixth digit
+                digit = Math.DivRem(value, 10, out value);
+                WriteDigit(digit);
+
+                // Seventh digit
+                WriteDigit(value);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private void WriteDigit(int value)
+            {
+                WriteToBufferWithoutCheck((byte)('0' + value));
+            }
         }
 
     }

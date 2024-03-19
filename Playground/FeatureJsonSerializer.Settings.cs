@@ -21,6 +21,9 @@ namespace Playground
             public bool treatEnumerablesAsCollections = true;
             public int writeBufferChunkSize = 64 * 1024;
             public int tempBufferSize = 8 * 1024;
+            public bool indent = false;
+            public int maxIndentationDepth = 50;
+            public int indentationFactor = 2;
             public List<ITypeHandlerCreator> customTypeHandlerCreators = new List<ITypeHandlerCreator>();
 
             public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, bool onlyExactType = true)
@@ -72,6 +75,9 @@ namespace Playground
             public readonly bool treatEnumerablesAsCollections;
             public readonly int writeBufferChunkSize;
             public readonly int tempBufferSize;
+            public readonly bool indent;
+            public readonly int maxIndentationDepth;
+            public readonly int indentationFactor;
             public readonly ITypeHandlerCreator[] itemHandlerCreators;
 
             public readonly bool requiresItemNames;
@@ -87,6 +93,9 @@ namespace Playground
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
                 writeBufferChunkSize = settings.writeBufferChunkSize;
                 tempBufferSize = settings.tempBufferSize;
+                indent = settings.indent;
+                maxIndentationDepth = settings.maxIndentationDepth;
+                indentationFactor = settings.indentationFactor;
                 itemHandlerCreators = settings.customTypeHandlerCreators.Where(creator => creator != null).ToArray();
 
                 requiresItemNames = referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef;

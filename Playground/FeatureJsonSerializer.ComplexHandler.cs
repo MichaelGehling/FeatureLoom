@@ -7,6 +7,7 @@ using System.Reflection;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
+using static Playground.FeatureJsonSerializer;
 
 namespace Playground
 {
@@ -52,45 +53,8 @@ namespace Playground
                 fieldValueWriters.Add(writer);
             }
 
-            bool isPrimitive = allFieldsNoRefs && !itemType.IsClass;
-            if (fieldValueWriters.Count == 0)
-            {
-                ItemHandler<T> itemHandler = (complexItem) =>
-                {
-                    // do nothing
-                };
-
-                typeHandler.SetItemHandler_Object(itemHandler, true, true);               
-            }
-            else
-            {
-                ItemHandler<T> itemHandler;
-                if (allFieldsNoRefs)
-                {
-                    itemHandler = (complexItem) =>
-                    {
-                        fieldValueWriters[0].Invoke(complexItem);
-                        for (int i = 1; i < fieldValueWriters.Count; i++)
-                        {
-                            writer.WriteComma();
-                            fieldValueWriters[i].Invoke(complexItem);
-                        }
-                    };
-                }
-                else
-                {
-                    itemHandler = (complexItem) =>
-                    {
-                        fieldValueWriters[0].Invoke(complexItem);
-                        for (int i = 1; i < fieldValueWriters.Count; i++)
-                        {
-                            writer.WriteComma();
-                            fieldValueWriters[i].Invoke(complexItem);
-                        }
-                    };
-                }
-                typeHandler.SetItemHandler_Object(itemHandler, allFieldsNoRefs, false);
-            }
+            var fieldValueWritersArray = fieldValueWriters.ToArray();
+            typeHandler.SetItemHandler_Object(fieldValueWritersArray, allFieldsNoRefs);
         }
 
         private Type GetFieldOrPropertyType(MemberInfo fieldOrPropertyInfo)
@@ -123,7 +87,16 @@ namespace Playground
             
             Type expectedValueType = typeof(V);
 
-            if (fieldTypeHandler.NoRefTypes)
+            if (writer.TryPreparePrimitiveWriteDelegate<V>(out var primitiveWriteDelegate))
+            {
+                return (parentItem) =>
+                {
+                    writer.WriteToBuffer(fieldNameAndColonBytes);
+                    V value = getValue(parentItem);
+                    primitiveWriteDelegate(value);
+                };
+            }
+            else if (fieldTypeHandler.NoRefTypes)
             {
                 return (parentItem) =>
                 {

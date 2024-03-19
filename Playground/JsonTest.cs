@@ -72,19 +72,14 @@ namespace Playground
 
         public string MyProperty { get; set; } = "propValue";
 
-        public TestDto(int myInt, MyEmbedded1 myEmbedded)
+        public TestDto()
         {
-            this.myInt = myInt;
-            //this.myEmbedded = myEmbedded;
             //this.self = this;
 
             myEmbeddedDict["1"] = new MyEmbedded1();
             myEmbeddedDict["2"] = new MyEmbedded1();
             myEmbeddedDict["1_"] = myEmbeddedDict["1"];
-
-            //myObjects.Add(myEmbedded);
         }
-        public TestDto() { }
 
 /*        public override void Mutate()
         {
@@ -112,7 +107,7 @@ namespace Playground
 
     public class MyEmbedded1 : IMyInterface
     {
-        public int x = 1;
+        public int? x = 1;
     }
 
     public class MyEmbedded2 : IMyInterface
@@ -152,6 +147,7 @@ namespace Playground
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };     
+     
     }
 
     public class TestDto3
@@ -197,38 +193,56 @@ namespace Playground
                     itemHandler = list =>
                     {
                         var count = list.Count;
-                        for (int i = 0; i < count; i++)
+                        if (count >= 1) primitiveWrite(list[0]);
+                        for (int i = 1; i < count; i++)
                         {
-                            primitiveWrite(list[i]);
                             api.Writer.WriteComma();
-                        }
-                        api.Writer.RemoveTrailingComma();
+                            primitiveWrite(list[i]);                            
+                        }                        
                     };                    
                 }
-                else if (!!api.RequiresItemNames && elementTypeHandler.NoRefTypes)
+                else if (!api.RequiresItemNames && elementTypeHandler.NoRefTypes)
                 {
                     itemHandler = list =>
                     {
                         var count = list.Count;
-                        for (int i = 0; i < count; i++)
+                        if (count >= 1) elementTypeHandler.HandleItem(list[0]);
+                        for (int i = 1; i < count; i++)
                         {
-                            elementTypeHandler.HandleItem(list[i]);
                             api.Writer.WriteComma();
+                            elementTypeHandler.HandleItem(list[i]);
                         }
-                        api.Writer.RemoveTrailingComma();
                     };                    
                 }
                 else
                 {
                     itemHandler = list =>
                     {
+                        var lastElementTypeHandler = elementTypeHandler;
                         var count = list.Count;
-                        for (int i = 0; i < count; i++)
+                        if (count >= 1)
                         {
-                            elementTypeHandler.HandleItem(list[i], api.Writer.GetCollectionIndexName(i));
-                            api.Writer.WriteComma();
+                            var element = list[0];
+                            if (element == null) api.Writer.WriteNullValue();
+                            else
+                            {
+                                Type elementType = element.GetType();
+                                if (elementType != lastElementTypeHandler.HandlerType) lastElementTypeHandler = api.GetCachedTypeHandler(elementType);
+                                lastElementTypeHandler.HandleItem(element, api.Writer.GetCollectionIndexName(0));
+                            }
                         }
-                        api.Writer.RemoveTrailingComma();
+                        for (int i = 1; i < count; i++)
+                        {
+                            api.Writer.WriteComma();
+                            var element = list[i];
+                            if (element == null) api.Writer.WriteNullValue();
+                            else
+                            {
+                                Type elementType = element.GetType();
+                                if (elementType != lastElementTypeHandler.HandlerType) lastElementTypeHandler = api.GetCachedTypeHandler(elementType);
+                                lastElementTypeHandler.HandleItem(element, api.Writer.GetCollectionIndexName(i));
+                            }
+                        }
                     };                    
                 }
 
@@ -244,17 +258,18 @@ namespace Playground
             {
                 IncludeFields = true,
                 //ReferenceHandler = ReferenceHandler.Preserve
+                //WriteIndented = true
 
             };
 
             int iterations = 1_000_000;
 
-            //var testDto = new TestDto(99, new MyEmbedded1());
+            //var testDto = new TestDto();
             //var testDto = -128;
             //IEnumerable testDto = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
-            //var testDto = new TestDto2();
+            var testDto = new TestDto2();
             //var testDto = new MyEmbedded1();
-            var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
+            //var testDto = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
             //var testDto = new List<MyStruct>() { new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct(), new MyStruct() };
             //var testDto = new List<float>() { 0.1f, 1.1f, 12.1f, 123.1f, 1234.1f, 12345.1f, 123456.1f, 1234567.1f, 12345678.1f, 123456789.1f };
             //var testDto = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
@@ -265,6 +280,7 @@ namespace Playground
             //var testDto = 1234567.7f; 
             //var testDto = 12345678.0;
             //var testDto = 0;
+            //var testDto = true;
             //var testDto = 123456789012345678901234567890.0;            
             //var testDto = "Hello: \\, \", \\, \n";
             //var testDto = "Mystring1";            
@@ -299,8 +315,11 @@ namespace Playground
             };*/
             //var testDto = new KeyValuePair<object, int>(new MyEmbedded1(), 1);
             //var testDto = new decimal(123.123);
+            //var testDto = RandomGenerator.GUID();
+            //var testDto = AppTime.Now;
+            //var testDto = (int?)null;
 
-            Type testDtoType = testDto.GetType();
+            //Type testDtoType = testDto.GetType();
             string json;
             //byte[] json;
 
@@ -314,6 +333,7 @@ namespace Playground
                 referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
                 enumAsString = true,
                 treatEnumerablesAsCollections = true,
+                indent = true
             };
 
             settings.AddCustomTypeHandlerCreator(new MyGenericIListTypeHandlerCreator());
@@ -397,12 +417,12 @@ namespace Playground
 
             Console.WriteLine("FeatureJsonSerializer:");
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));
-            Console.WriteLine("\nSystem.Text.Json:");
+            Console.WriteLine("\nSystem.Text.Json:");            
             Console.WriteLine(JsonSerializer.Serialize(testDto, opt));
             Console.WriteLine("\nUtf8Json:");
             Console.WriteLine(UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto)));
 
-            featureJsonSerializer = new FeatureJsonSerializer(settings);
+            //featureJsonSerializer = new FeatureJsonSerializer(settings);
 
             TimeSpan elapsed;
             long beforeCollection;

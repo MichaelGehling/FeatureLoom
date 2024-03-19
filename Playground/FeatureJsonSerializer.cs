@@ -39,8 +39,7 @@ namespace Playground
             Array,
             Object,
             Array_WithoutRefChildren,
-            Object_WithoutRefChildren,
-            Object_Empty
+            Object_WithoutRefChildren
         }
 
         public FeatureJsonSerializer(Settings settings = null)
@@ -112,14 +111,12 @@ namespace Playground
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void CreateItemInfoForClass<T>(T item, ArraySegment<byte> itemName)
         {            
-            if (!settings.requiresItemInfos) return;
             currentItemInfo = itemInfoRecycler.TakeItemInfo(currentItemInfo, item, itemName);            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void CreateItemInfoForStruct(ArraySegment<byte> itemName)
         {
-            if (!settings.requiresItemInfos) return;
             currentItemInfo = itemInfoRecycler.TakeItemInfo(currentItemInfo, null, itemName);
         }
 
@@ -196,19 +193,19 @@ namespace Playground
             else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WritePrimitiveValueAsString(value.ToString()));
             else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WritePrimitiveValueAsString(value.ToString()));
 
-            if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(char)) stringValueWriter.SetWriterMethod<char>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(sbyte)) stringValueWriter.SetWriterMethod<sbyte>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(short)) stringValueWriter.SetWriterMethod<short>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(int)) stringValueWriter.SetWriterMethod<int>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(long)) stringValueWriter.SetWriterMethod<long>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(byte)) stringValueWriter.SetWriterMethod<byte>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(ushort)) stringValueWriter.SetWriterMethod<ushort>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(uint)) stringValueWriter.SetWriterMethod<uint>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WritePrimitiveValueAsStringWithCopy);
-            else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WritePrimitiveValueAsStringWithCopy(value.ToString()));
-            else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WritePrimitiveValueAsStringWithCopy(value.ToString()));
+            if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WriteStringValueAsStringWithCopy);
+            else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WriteBoolValueAsStringWithCopy);
+            else if (itemType == typeof(char)) stringValueWriter.SetWriterMethod<char>(writer.WriteCharValueAsStringWithCopy);
+            else if (itemType == typeof(sbyte)) stringValueWriter.SetWriterMethod<sbyte>(writer.WriteSbyteValueAsStringWithCopy);
+            else if (itemType == typeof(short)) stringValueWriter.SetWriterMethod<short>(writer.WriteShortValueAsStringWithCopy);
+            else if (itemType == typeof(int)) stringValueWriter.SetWriterMethod<int>(writer.WriteIntValueAsStringWithCopy);
+            else if (itemType == typeof(long)) stringValueWriter.SetWriterMethod<long>(writer.WriteLongValueAsStringWithCopy);
+            else if (itemType == typeof(byte)) stringValueWriter.SetWriterMethod<byte>(writer.WriteByteValueAsStringWithCopy);
+            else if (itemType == typeof(ushort)) stringValueWriter.SetWriterMethod<ushort>(writer.WriteUshortValueAsStringWithCopy);
+            else if (itemType == typeof(uint)) stringValueWriter.SetWriterMethod<uint>(writer.WriteUintValueAsStringWithCopy);
+            else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsStringWithCopy);
+            else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
+            else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
 
             return stringValueWriter.HasMethod;
         }
@@ -236,7 +233,7 @@ namespace Playground
             }
 
 
-            if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WriteIntValue);
+            if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WriteIntValue);            
             else if (itemType == typeof(uint)) typeHandler.SetItemHandler_Primitive<uint>(writer.WriteUintValue);
             else if (itemType == typeof(long)) typeHandler.SetItemHandler_Primitive<long>(writer.WriteLongValue);
             else if (itemType == typeof(ulong)) typeHandler.SetItemHandler_Primitive<ulong>(writer.WriteUlongValue);
@@ -249,10 +246,11 @@ namespace Playground
             else if (itemType == typeof(double)) typeHandler.SetItemHandler_Primitive<double>(writer.WriteDoubleValue);
             else if (itemType == typeof(decimal)) typeHandler.SetItemHandler_Primitive<decimal>(writer.WriteDecimalValue);
             else if (itemType == typeof(char)) typeHandler.SetItemHandler_Primitive<char>(writer.WriteCharValue);
-            else if (itemType == typeof(IntPtr)) typeHandler.SetItemHandler_Primitive<IntPtr>(value => writer.WriteLongValue(value)); //Make specialized
-            else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler_Primitive<UIntPtr>(value => writer.WriteUlongValue(value)); //Make specialized
-            else if (itemType == typeof(Guid)) typeHandler.SetItemHandler_Primitive<Guid>(value => writer.WriteStringValue(value.ToString())); //Make specialized
-            else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler_Primitive<DateTime>(value => writer.WriteStringValue(value.ToString())); //Make specialized
+            else if (itemType == typeof(bool)) typeHandler.SetItemHandler_Primitive<bool>(writer.WriteBoolValue);
+            else if (itemType == typeof(IntPtr)) typeHandler.SetItemHandler_Primitive<IntPtr>(writer.WriteIntPtrValue);
+            else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler_Primitive<UIntPtr>(writer.WriteUintPtrValue);
+            else if (itemType == typeof(Guid)) typeHandler.SetItemHandler_Primitive<Guid>(writer.WriteGuidValue);
+            else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler_Primitive<DateTime>(writer.WriteDateTimeValue);
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
