@@ -8,15 +8,17 @@ namespace FeatureLoom.Extensions
     {
         public static string GetSimplifiedTypeName(this Type type) => TypeNameHelper.GetSimplifiedTypeName(type);
 
-        public static bool IsNullable(this Type type) => Nullable.GetUnderlyingType(type) != null;
+        public static bool IsNullable(this Type type) => !type.IsValueType || Nullable.GetUnderlyingType(type) != null;
 
         public static bool ImplementsGenericInterface(this Type typeToCheck, Type genericInterfaceType)
         {
+            if (typeToCheck.IsGenericType && typeToCheck.GetGenericTypeDefinition() == genericInterfaceType) return true;
             return typeToCheck.GetInterfaces().Any(x => x.IsGenericType && x.GetGenericTypeDefinition() == genericInterfaceType);
         }
 
         public static bool ImplementsInterface(this Type typeToCheck, Type interfaceType)
         {
+            if (typeToCheck == interfaceType) return true;
             return typeToCheck.GetInterfaces().Any(x => x == interfaceType);
         }
 

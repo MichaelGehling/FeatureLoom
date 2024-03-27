@@ -254,6 +254,13 @@ namespace Playground
         public static async Task Run()
         {
 
+            string jsonString = " [\"Hello\", null]";
+            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer();
+            featureJsonDeserializer.TryDeserialize<List<string>>(jsonString.ToStream(), out var result);
+
+
+
+
             var opt = new JsonSerializerOptions()
             {
                 IncludeFields = true,

@@ -33,15 +33,6 @@ namespace Playground
         public delegate void ItemHandler<T>(T item);
         public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
 
-        public enum JsonDataTypeCategory
-        {
-            Primitive,
-            Array,
-            Object,
-            Array_WithoutRefChildren,
-            Object_WithoutRefChildren
-        }
-
         public FeatureJsonSerializer(Settings settings = null)
         {           
             this.settings = new CompiledSettings(settings ?? new Settings());
@@ -213,7 +204,7 @@ namespace Playground
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private CachedTypeHandler GetCachedTypeHandler(Type itemType)
         {
-            return typeHandlerCache.TryGetValue(itemType, out var typeCacheItem) ? typeCacheItem : CreateCachedTypeHandler(itemType);
+            return typeHandlerCache.TryGetValue(itemType, out var cachedTypeHandler) ? cachedTypeHandler : CreateCachedTypeHandler(itemType);
         }
 
 

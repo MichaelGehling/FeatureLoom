@@ -17,7 +17,6 @@ namespace Playground
 
         public sealed class CachedTypeHandler : ICachedTypeHandler
         {
-            public readonly static MethodInfo setItemHandlerMethodInfo = typeof(CachedTypeHandler).GetMethod("SetItemHandler");
             private FeatureJsonSerializer serializer;
             private JsonUTF8StreamWriter writer;
             private Delegate itemHandler;
