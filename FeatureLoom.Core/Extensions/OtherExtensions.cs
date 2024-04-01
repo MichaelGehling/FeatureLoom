@@ -203,5 +203,14 @@ namespace FeatureLoom.Extensions
             genericCreateMethod.Invoke(obj, argumentValues);
         }
 
+        public static RET InvokeGenericMethod<RET>(this object obj, string methodName, Type[] typeArguments, params object[] argumentValues)
+        {
+            var createMethod = obj.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .FirstOrDefault(method => method.Name == methodName && method.GetGenericArguments().Length == typeArguments.Length);
+            if (createMethod == null) throw new NotSupportedException();
+            var genericCreateMethod = createMethod.MakeGenericMethod(typeArguments);
+            return (RET)genericCreateMethod.Invoke(obj, argumentValues);
+        }
+
     }
 }

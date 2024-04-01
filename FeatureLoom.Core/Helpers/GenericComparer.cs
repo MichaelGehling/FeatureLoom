@@ -34,4 +34,5 @@ namespace FeatureLoom.Helpers
             return obj.GetHashCode();
         }
     }
+
 }

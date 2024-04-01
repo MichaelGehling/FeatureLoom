@@ -119,7 +119,7 @@ namespace Playground
     public class MyEmbedded3 : IMyInterface
     {
         public short y = 2;
-        public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
+        public List<int> intList = new List<int>() { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
     }
@@ -254,9 +254,19 @@ namespace Playground
         public static async Task Run()
         {
 
-            string jsonString = " [\"Hello\", null]";
+            string jsonString = """
+                                
+                                {
+                                    "y":99,
+                                    "intList":[9,8,7,6,5,4,3,2,1],
+                                    "strList": ["Hello", "World", "!"],
+                                    "myEmbedded1" : {
+                                        "x" : 42
+                                    }
+                                }
+                                """;
             FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer();
-            featureJsonDeserializer.TryDeserialize<List<string>>(jsonString.ToStream(), out var result);
+            featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
 
 
 

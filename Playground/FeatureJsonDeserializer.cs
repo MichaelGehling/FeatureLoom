@@ -11,6 +11,11 @@ using FeatureLoom.Extensions;
 using System.Reflection;
 using System.Collections;
 using System.Runtime.CompilerServices;
+using FeatureLoom.Helpers;
+using System.Text.Unicode;
+using System.Linq.Expressions;
+using Microsoft.VisualBasic.FileIO;
+using FeatureLoom.DependencyInversion;
 
 namespace Playground
 {
@@ -35,6 +40,7 @@ namespace Playground
         static readonly FilterResult[] map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds = CreateFilterMap_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds();
         static readonly FilterResult[] map_SkipFiguresUntilExponentOrNumberEnds = CreateFilterMap_SkipFiguresUntilExponentOrNumberEnds();
         static readonly FilterResult[] map_SkipFiguresUntilNumberEnds = CreateFilterMap_SkipFiguresUntilNumberEnds();
+        static readonly FilterResult[] map_SkipWhitespacesUntilObjectStarts = CreateFilterMap_SkipWhitespacesUntilObjectStarts();
 
         static ulong[] exponentFactorMap = CreateExponentFactorMap();
 
@@ -50,6 +56,19 @@ namespace Playground
             }
             return map;
         }
+
+        public class Settings
+        {
+            public DataAccess dataAccess = DataAccess.PublicAndPrivateFields;
+        }
+
+        public enum DataAccess
+        {
+            PublicAndPrivateFields = 0,
+            PublicFieldsAndProperties = 1
+        }
+
+        Settings settings = new Settings();
 
         public FeatureJsonDeserializer()
         {            
@@ -90,16 +109,123 @@ namespace Playground
             else if (itemType == typeof(bool)) cachedTypeReader.SetTypeReader(ReadBoolValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(bool?)) cachedTypeReader.SetTypeReader(ReadNullableBoolValue, JsonDataTypeCategory.Primitive);
             else if (TryCreateEnumerableTypeReader(itemType, cachedTypeReader)) { }
-            else throw new NotImplementedException();
+            else this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { itemType }, cachedTypeReader);
 
             return cachedTypeReader;
+        }
+
+        public static Func<T> CompileConstructor<T>()
+        {
+            var newExpr = Expression.New(typeof(T));
+            var lambda = Expression.Lambda<Func<T>>(newExpr);
+            return lambda.Compile();
+        }
+
+        public static Func<P, T> CompileConstructor<T, P>()
+        {
+            var param = Expression.Parameter(typeof(P), "value");
+            var newExpr = Expression.New(typeof(T).GetConstructor(new[] { typeof(P) }), param);
+            var lambda = Expression.Lambda<Func<P, T>>(newExpr, param);
+            return lambda.Compile();
+        }
+
+        private void CreateComplexTypeReader<T>(CachedTypeReader cachedTypeReader)
+        {
+            Type itemType = typeof(T);
+
+            var memberInfos = new List<MemberInfo>();
+            if (settings.dataAccess == DataAccess.PublicFieldsAndProperties)
+            {
+                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.SetMethod != null));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance));
+            }
+            else
+            {
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
+                Type t = itemType.BaseType;
+                while (t != null)
+                {
+                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !memberInfos.Any(field => field.Name == baseField.Name)));
+                    t = t.BaseType;
+                }
+            }
+
+            Dictionary<EquatableByteSegment, Action<T>> itemFieldWriters = new();
+            foreach (var memberInfo in memberInfos)
+            {
+                Type fieldType = GetFieldOrPropertyType(memberInfo);
+                
+                var itemFieldWriter = this.InvokeGenericMethod<Action<T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType }, memberInfo);
+                var itemFieldName = new EquatableByteSegment(memberInfo.Name.ToByteArray());
+                itemFieldWriters[itemFieldName] = itemFieldWriter;
+            }
+
+            var constructor = CompileConstructor<T>();
+
+            Func<T> typeReader = () =>
+            {
+                T item = constructor();
+
+                SkipWhiteSpaces();
+                if (CurrentByte != '{') throw new Exception("Failed reading object");
+                TryNextByte();
+                
+                while (true)
+                {
+                    SkipWhiteSpaces();
+                    if (CurrentByte == '}') return item;
+
+                    if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                    SkipWhiteSpaces();
+                    if (CurrentByte != ':') throw new Exception("Failed reading object");
+                    TryNextByte();
+                    if (!itemFieldWriters.TryGetValue(fieldName, out var fieldWriter)) throw new Exception("Failed reading object");
+                    fieldWriter.Invoke(item);
+                    SkipWhiteSpaces();
+                    if (CurrentByte == ',') TryNextByte();
+                }
+            };
+            
+            cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
+            
+        }
+
+        private Action<T> CreateItemFieldWriter<T, V>(MemberInfo memberInfo)
+        {
+            Type itemType = typeof(T);
+            Type fieldType = typeof(V);
+
+            var target = Expression.Parameter(itemType, "target");
+            var value = Expression.Parameter(fieldType, "value");
+
+            MemberExpression memberAccess = memberInfo is FieldInfo field ? Expression.Field(target, field) :
+                             memberInfo is PropertyInfo property && property.CanWrite ? Expression.Property(target, property) : null;
+            BinaryExpression assignExpression = Expression.Assign(memberAccess, value);
+            var lambda = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
+            Action<T, V> setValue = lambda.Compile();
+
+            var fieldTypeReader = GetCachedTypeReader(fieldType);
+
+            return parentItem =>
+            {
+                V value = fieldTypeReader.ReadItem<V>();
+                setValue(parentItem, value);
+            };
+        }
+
+        private Type GetFieldOrPropertyType(MemberInfo fieldOrPropertyInfo)
+        {
+            if (fieldOrPropertyInfo is FieldInfo fieldInfo) return fieldInfo.FieldType;
+            else if (fieldOrPropertyInfo is PropertyInfo propertyInfo) return propertyInfo.PropertyType;
+            throw new Exception("Not a FieldType or PropertyType");
         }
 
         private bool TryCreateEnumerableTypeReader(Type itemType, CachedTypeReader cachedTypeReader)
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType)) return false;
             if (itemType.IsInterface) throw new NotImplementedException();
-                        
+            var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
+
             this.InvokeGenericMethod(nameof(CreateEnumerableTypeReader), new Type[] {itemType, elementType}, cachedTypeReader);
 
             return true;
@@ -108,21 +234,23 @@ namespace Playground
         private void CreateEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
         {
             Type itemType = typeof(T);
-            Type elementType = typeof(E);            
-            var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
+            Type elementType = typeof(E);
 
             var elementReaderType = typeof(ElementReader<>).MakeGenericType(elementType);
             var elementReaderConstructor = elementReaderType.GetConstructor(new[] { typeof(FeatureJsonDeserializer) });
-            var elementReader = elementReaderConstructor.Invoke(new object[] { this });
+            var elementReader = (IEnumerable<E>)elementReaderConstructor.Invoke(new object[] { this });
 
-            var constructor = itemType.GetConstructor(new Type[] { enumerableType });
+            var constructor = CompileConstructor<T, IEnumerable<E>>();
 
+            List<E> elementBuffer = new List<E>();
             cachedTypeReader.SetTypeReader<T>(() =>
             {
                 SkipWhiteSpaces();
                 if (CurrentByte != '[') throw new Exception("Failed reading Array");
                 if (!TryNextByte()) throw new Exception("Failed reading Array");
-                T item = (T)constructor.Invoke(new object[] { elementReader });                
+                elementBuffer.AddRange(elementReader);
+                T item = constructor(elementBuffer);
+                elementBuffer.Clear();
                 if (CurrentByte != ']') throw new Exception("Failed reading Array");
                 TryNextByte();
                 return item;
@@ -605,6 +733,18 @@ namespace Playground
             Skip,
             Found,
             Unexpected
+        }
+
+        static FilterResult[] CreateFilterMap_SkipWhitespacesUntilObjectStarts()
+        {
+            FilterResult[] map = new FilterResult[256];
+            for (int i = 0; i < map.Length; i++)
+            {
+                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Skip;
+                else if (i == '{') map[i] = FilterResult.Found;
+                else map[i] = FilterResult.Unexpected;
+            }
+            return map;
         }
 
         static FilterResult[] CreateFilterMap_SkipWhitespacesUntilBoolStarts()
