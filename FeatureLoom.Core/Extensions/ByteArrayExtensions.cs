@@ -100,5 +100,15 @@ namespace FeatureLoom.Extensions
             Array.Copy(source, sourceOffset, slice.Array, 0, count);
         }
 
+        public static T[] ToArray<T>(ArraySegment<T> segment)
+        {
+            if (segment.Array == null)
+                throw new ArgumentNullException(nameof(segment.Array), "Array is null.");
+
+            T[] result = new T[segment.Count];
+            Array.Copy(segment.Array, segment.Offset, result, 0, segment.Count);
+            return result;
+        }
+
     }
 }

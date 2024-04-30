@@ -1,4 +1,5 @@
 ﻿using System;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Helpers
 {
@@ -24,6 +25,15 @@ namespace FeatureLoom.Helpers
         {
             return wrapper.segment;
         }
+
+        // Implicit conversion from ByteSegmentWrapper to ArraySegment<byte>
+        public static implicit operator byte[](EquatableByteSegment wrapper)
+        {
+            return wrapper.segment.ToArray();
+        }
+
+        public ArraySegment<byte> Segment => segment;
+        public byte[] ToArray() => segment.ToArray();
 
         public bool Equals(EquatableByteSegment other)
         {

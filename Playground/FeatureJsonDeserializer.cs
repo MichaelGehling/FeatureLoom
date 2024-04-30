@@ -41,6 +41,7 @@ namespace Playground
         static readonly FilterResult[] map_SkipFiguresUntilExponentOrNumberEnds = CreateFilterMap_SkipFiguresUntilExponentOrNumberEnds();
         static readonly FilterResult[] map_SkipFiguresUntilNumberEnds = CreateFilterMap_SkipFiguresUntilNumberEnds();
         static readonly FilterResult[] map_SkipWhitespacesUntilObjectStarts = CreateFilterMap_SkipWhitespacesUntilObjectStarts();
+        static readonly TypeResult[] map_TypeStart = CreateTypeStartMap();
 
         static ulong[] exponentFactorMap = CreateExponentFactorMap();
 
@@ -173,17 +174,20 @@ namespace Playground
                 while (true)
                 {
                     SkipWhiteSpaces();
-                    if (CurrentByte == '}') return item;
+                    if (CurrentByte == '}') break;
 
                     if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
                     SkipWhiteSpaces();
                     if (CurrentByte != ':') throw new Exception("Failed reading object");
                     TryNextByte();
-                    if (!itemFieldWriters.TryGetValue(fieldName, out var fieldWriter)) throw new Exception("Failed reading object");
-                    fieldWriter.Invoke(item);
+                    if (itemFieldWriters.TryGetValue(fieldName, out var fieldWriter)) fieldWriter.Invoke(item);
+                    else SkipValue();
                     SkipWhiteSpaces();
                     if (CurrentByte == ',') TryNextByte();
                 }
+
+                if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
+                return item;
             };
             
             cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
@@ -223,7 +227,7 @@ namespace Playground
         private bool TryCreateEnumerableTypeReader(Type itemType, CachedTypeReader cachedTypeReader)
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType)) return false;
-            if (itemType.IsInterface) throw new NotImplementedException();
+            if (itemType.IsInterface) throw new NotImplementedException();  //TODO
             var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
 
             this.InvokeGenericMethod(nameof(CreateEnumerableTypeReader), new Type[] {itemType, elementType}, cachedTypeReader);
@@ -512,24 +516,108 @@ namespace Playground
 
         private byte CurrentByte => buffer[bufferPos];
 
-        /*
-        Action[] CreateMap_HandleNextToken()
+        void SkipValue()
         {
-            Action[] map = new Action[256];
-            for (byte i = 0; i < map.Length; i++)
+            var valueType = map_TypeStart[CurrentByte];
+            if (valueType == TypeResult.Whitespace)
             {
-                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = null;
-                else if (i >= '0' && i <= '9') map[i] = HandleNumber;
-                else if (i == '\"') map[i] = HandleString;
-                else if (i == 'N' || i == 'n') map[i] = HandleNull;
-                else if (i == 't' || i == 'T' || i == 'f' || i == 'F') map[i] = HandleBool;
-                else if (i == '{') map[i] = HandleObject;
-                else if (i == '[') map[i] = HandleArray;
-                else map[i] = HandleInvalidByte;
+                SkipWhiteSpaces();
+                valueType = map_TypeStart[CurrentByte];
             }
-            return map;
+
+            switch (valueType)
+            {
+                case TypeResult.String: SkipString(); break;
+                case TypeResult.Object: SkipObject(); break;
+                case TypeResult.Bool: SkipBool(); break;
+                case TypeResult.Null: SkipNull(); break;
+                case TypeResult.Array: SkipArray(); break;
+                case TypeResult.Number: SkipNumber(); break;
+                default: throw new Exception("Invalid character for value");
+            }
         }
-        */
+
+        private void SkipNumber()
+        {
+            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
+        }
+
+        private void SkipArray()
+        {
+            SkipWhiteSpaces();
+            if (CurrentByte != '[') throw new Exception("Failed reading array");
+            if (!TryNextByte()) throw new Exception("Failed reading array");
+            SkipWhiteSpaces();
+            while (CurrentByte != ']')
+            {
+                SkipValue();
+                SkipWhiteSpaces();
+                if (CurrentByte == ',')
+                {
+                    if (!TryNextByte()) throw new Exception("Failed reading array");
+                    SkipWhiteSpaces();
+                }
+                else if (CurrentByte != ']') throw new Exception("Failed reading array");
+            }
+
+            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
+        }
+
+        private void SkipNull()
+        {
+            SkipWhiteSpaces();
+            byte b;
+            
+            b = CurrentByte;
+            if (b != 'N' && b != 'n') throw new Exception("Failed reading null value");
+            
+            if (!TryNextByte()) throw new Exception("Failed reading null value");            
+            b = CurrentByte;
+            if (b != 'U' && b != 'u') throw new Exception("Failed reading null value");
+            
+            if (!TryNextByte()) throw new Exception("Failed reading null value");
+            b = CurrentByte;
+            if (b != 'L' && b != 'l') throw new Exception("Failed reading null value");
+            
+            if (!TryNextByte()) throw new Exception("Failed reading null value");
+            b = CurrentByte;
+            if (b != 'L' && b != 'l') throw new Exception("Failed reading null value");
+            
+            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
+        }
+
+        private void SkipBool()
+        {
+            _ = ReadBoolValue();
+        }
+
+        private void SkipObject()
+        {
+            SkipWhiteSpaces();
+            if (CurrentByte != '{') throw new Exception("Failed reading object");
+            TryNextByte();
+
+            while (true)
+            {
+                SkipWhiteSpaces();
+                if (CurrentByte == '}') break;
+
+                if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                SkipWhiteSpaces();
+                if (CurrentByte != ':') throw new Exception("Failed reading object");
+                TryNextByte();
+                SkipValue();
+                SkipWhiteSpaces();
+                if (CurrentByte == ',') TryNextByte();
+            }
+
+            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
+        }
+
+        private void SkipString()
+        {
+            if (!TryReadStringBytes(out var _)) throw new Exception("Failed reading string");
+        }
 
         ulong BytesToInteger(ArraySegment<byte> bytes)
         {
@@ -735,6 +823,18 @@ namespace Playground
             Unexpected
         }
 
+        enum TypeResult
+        {
+            Whitespace,
+            Object,
+            Number,
+            String,
+            Null,
+            Bool,
+            Array,
+            Invalid
+        }
+
         static FilterResult[] CreateFilterMap_SkipWhitespacesUntilObjectStarts()
         {
             FilterResult[] map = new FilterResult[256];
@@ -873,6 +973,23 @@ namespace Playground
                 if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
                 else if (i == ',' || i == ']' || i == '}') map[i] = FilterResult.Found;
                 else map[i] = FilterResult.Unexpected;
+            }
+            return map;
+        }
+
+        static TypeResult[] CreateTypeStartMap()
+        {
+            TypeResult[] map = new TypeResult[256];
+            for (int i = 0; i < map.Length; i++)
+            {
+                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = TypeResult.Whitespace;
+                else if ((i >= '0' && i <= '9') || i == '-') map[i] = TypeResult.Number;
+                else if (i == '\"') map[i] = TypeResult.String;
+                else if (i == 'N' || i == 'n') map[i] = TypeResult.Null;
+                else if (i == 'T' || i == 't' || i == 'F' || i == 'f') map[i] = TypeResult.Bool;
+                else if (i == '{') map[i] = TypeResult.Object;
+                else if (i == '[') map[i] = TypeResult.Array;
+                else map[i] = TypeResult.Invalid;
             }
             return map;
         }

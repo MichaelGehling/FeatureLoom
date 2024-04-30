@@ -257,12 +257,18 @@ namespace Playground
             string jsonString = """
                                 
                                 {
-                                    "y":99,
-                                    "intList":[9,8,7,6,5,4,3,2,1],
-                                    "strList": ["Hello", "World", "!"],
+                                    "UnknownField_object" : { "a" : 123, "b" : null },
+                                    "UnknownField_number" : 123.321,
+                                    "UnknownField_string" : "Something",
+                                    "UnknownField_array" : [9,8,7,6,5,4,3,2,1],
+                                    "UnknownField_bool" : true,
+                                    "UnknownField_null" : null,
                                     "myEmbedded1" : {
                                         "x" : 42
-                                    }
+                                    },
+                                    "y":99,
+                                    "intList":[9,8,7,6,5,4,3,2,1],
+                                    "strList": ["Hello", "World", "!"]                                    
                                 }
                                 """;
             FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer();
