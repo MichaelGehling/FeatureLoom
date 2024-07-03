@@ -105,6 +105,11 @@ namespace Playground
 
     }
 
+    public interface IMyGenericInterface<T>
+    {
+
+    }
+
     public class MyEmbedded1 : IMyInterface
     {
         public int? x = 1;
@@ -118,10 +123,21 @@ namespace Playground
 
     public class MyEmbedded3 : IMyInterface
     {
+        public MyEmbedded3(short y)
+        {
+            this.y = y;
+        }
+
+        public IMyInterface interfaceObject = new MyEmbedded1();
         public short y = 2;
         public List<int> intList = new List<int>() { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
+    }
+
+    public class MyGenericEmbedded<T> : IMyInterface, IMyGenericInterface<T>
+    {
+        T x = default(T);
     }
 
     public struct MyStruct
@@ -257,6 +273,7 @@ namespace Playground
             string jsonString = """
                                 
                                 {
+                                    "interfaceObject" : { "x" : 1111 },
                                     "UnknownField_object" : { "a" : 123, "b" : null },
                                     "UnknownField_number" : 123.321,
                                     "UnknownField_string" : "Something",
@@ -271,9 +288,12 @@ namespace Playground
                                     "strList": ["Hello", "World", "!"]                                    
                                 }
                                 """;
-            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer();
+            FeatureJsonDeserializer.Settings deserializerSettings = new FeatureJsonDeserializer.Settings();
+            deserializerSettings.AddTypeMapping<IMyInterface, MyGenericEmbedded<float>>();
+            deserializerSettings.AddGenericTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
+            deserializerSettings.AddConstructor<MyEmbedded3>(() => new MyEmbedded3(default));
+            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(deserializerSettings);
             featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
-
 
 
 
