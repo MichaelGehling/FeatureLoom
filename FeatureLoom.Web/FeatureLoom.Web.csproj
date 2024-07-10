@@ -54,7 +54,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.1" />
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.60.3" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.3.1" />
   </ItemGroup>
 

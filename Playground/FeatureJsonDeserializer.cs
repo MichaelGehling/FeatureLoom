@@ -31,6 +31,7 @@ namespace Playground
         Stream stream;
 
         Dictionary<Type, CachedTypeReader> typeReaderCache = new();
+        Dictionary<Type, object> typeConstructorMap = new();
 
         static readonly FilterResult[] map_SkipWhitespaces = CreateFilterMap_SkipWhitespaces();
         static readonly FilterResult[] map_IsFieldEnd = CreateFilterMap_IsFieldEnd();
@@ -61,6 +62,17 @@ namespace Playground
         public class Settings
         {
             public DataAccess dataAccess = DataAccess.PublicAndPrivateFields;
+            public Dictionary<Type, object> constructors = new();
+            public Dictionary<Type, Type> typeMapping = new();
+            public Dictionary<Type, Type> genericTypeMapping = new();
+            public void AddConstructor<T>(Func<T> constructor) => constructors[typeof(T)] = constructor;            
+            public void AddTypeMapping<BASE_T, IMPL_T>() where IMPL_T : BASE_T => typeMapping[typeof(BASE_T)] = typeof(IMPL_T);            
+            public void AddGenericTypeMapping(Type genericBaseType, Type genericImplType)
+            {
+                if (!genericImplType.IsOfGenericType(genericBaseType)) throw new Exception($"{TypeNameHelper.GetSimplifiedTypeName(genericBaseType)} is not implemented by {TypeNameHelper.GetSimplifiedTypeName(genericImplType)}");
+                genericTypeMapping[genericBaseType] = genericImplType;
+            }
+            
         }
 
         public enum DataAccess
@@ -69,10 +81,11 @@ namespace Playground
             PublicFieldsAndProperties = 1
         }
 
-        Settings settings = new Settings();
+        Settings settings;
 
-        public FeatureJsonDeserializer()
-        {            
+        public FeatureJsonDeserializer(Settings settings = null)
+        {                        
+            this.settings = settings ?? new Settings();
         }
 
         CachedTypeReader GetCachedTypeReader(Type itemType)
@@ -83,6 +96,21 @@ namespace Playground
 
         CachedTypeReader CreateCachedTypeReader(Type itemType)
         {
+            if (settings.typeMapping.TryGetValue(itemType, out Type mappedType))
+            {
+                CachedTypeReader mappedTypeReader = GetCachedTypeReader(mappedType);
+                typeReaderCache[itemType] = mappedTypeReader;
+                return mappedTypeReader;
+            }
+            if (itemType.IsGenericType && settings.genericTypeMapping.Count > 0)
+            {
+                Type genericType = itemType.GetGenericTypeDefinition();                
+                if (settings.genericTypeMapping.TryGetValue(genericType, out Type genericMappedType))
+                {
+
+                }
+            }
+
             CachedTypeReader cachedTypeReader = new CachedTypeReader(this);
             typeReaderCache[itemType] = cachedTypeReader;
 
@@ -116,9 +144,20 @@ namespace Playground
             return cachedTypeReader;
         }
 
+        public Func<T> GetConstructor<T>()
+        {
+            Type type = typeof(T);
+            if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> constructor) return constructor;
+            if (null != type.GetConstructor(Array.Empty<Type>())) return CompileConstructor<T>();
+
+            throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)}. Use AddConstructor in Settings.");
+        }
+
+
         public static Func<T> CompileConstructor<T>()
         {
-            var newExpr = Expression.New(typeof(T));
+            Type type = typeof(T);
+            var newExpr = Expression.New(type);
             var lambda = Expression.Lambda<Func<T>>(newExpr);
             return lambda.Compile();
         }
@@ -183,7 +222,7 @@ namespace Playground
                 itemFieldWriters[itemFieldName] = itemFieldWriter;
             }
 
-            var constructor = CompileConstructor<T>();
+            var constructor = GetConstructor<T>();
 
             Func<T> typeReader = () =>
             {
@@ -666,6 +705,7 @@ namespace Playground
         ulong BytesToInteger(ArraySegment<byte> bytes)
         {
             ulong value = 0;
+            if (bytes.Count == 0) return value;
             value += (byte)(bytes[0] - (byte)'0');
             for (int i = 1; i < bytes.Count; i++)
             {
