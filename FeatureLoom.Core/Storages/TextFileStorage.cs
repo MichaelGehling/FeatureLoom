@@ -13,6 +13,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace FeatureLoom.Storages
 {
@@ -48,12 +49,20 @@ namespace FeatureLoom.Storages
         private ProcessingEndpoint<FileSystemObserver.ChangeNotification> fileChangeProcessor;
         private DuplicateMessageSuppressor duplicateMessageSuppressor;
 
+        private bool useWindowsPaths = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        private string validPathSeperator = "/";
+        private string invalidPathSeperator = "\\";
+
         public TextFileStorage(string category, Config config = default)
         {
             this.category = category;
             this.config = config ?? new Config();
             config = this.config;
 
+            if (useWindowsPaths) SwapHelper.Swap(ref validPathSeperator, ref invalidPathSeperator);
+            config.basePath = config.basePath.Replace(invalidPathSeperator, validPathSeperator);
+            config.fileSuffix = config.fileSuffix.Replace(invalidPathSeperator, validPathSeperator);
+            
             if (config.IsUriDefault) config.Uri = "TextFileStorageConfig" + "_" + this.category;
 
             if (config.ConfigCategory != this.category) config.TryUpdateFromStorage(false);
@@ -137,7 +146,7 @@ namespace FeatureLoom.Storages
         {
             if (notification.changeType.IsFlagSet(WatcherChangeTypes.Created))
             {
-                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix.Replace('/', '\\')));
+                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
                 foreach (var fileInfo in addedFileInfos)
                 {
                     lock (fileSet)
@@ -152,7 +161,7 @@ namespace FeatureLoom.Storages
             {
                 UpdateOnRemovedDir();
 
-                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix.Replace('/', '\\')));
+                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
                 foreach (var fileInfo in addedFileInfos)
                 {
                     lock (fileSet)
@@ -278,7 +287,7 @@ namespace FeatureLoom.Storages
         {
             if (!rootDir.RefreshAnd().Exists) return new HashSet<string>();
 
-            var fileInfos = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix.Replace('/', '\\')));
+            var fileInfos = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
             var newFileSet = new HashSet<string>();
             foreach (var info in fileInfos)
             {
@@ -316,10 +325,10 @@ namespace FeatureLoom.Storages
 
         protected virtual string FilePathToUri(string filePath)
         {
-            if (!filePath.StartsWith(rootDir.FullName) || !filePath.EndsWith(config.fileSuffix.Replace('/', '\\'))) return null;
+            if (!filePath.StartsWith(rootDir.FullName) || !filePath.EndsWith(config.fileSuffix)) return null;
             string basePath = rootDir.FullName;
-            if (!basePath.EndsWith("\\")) basePath += "\\";
-            filePath.TryExtract($"{basePath}{{rawUri}}{config.fileSuffix.Replace('/', '\\')}", out string rawUri);            
+            if (!basePath.EndsWith(validPathSeperator)) basePath += validPathSeperator;
+            filePath.TryExtract($"{basePath}{{rawUri}}{config.fileSuffix}", out string rawUri);            
             return rawUri.Replace('\\', '/');
         }
 
@@ -409,7 +418,7 @@ namespace FeatureLoom.Storages
                     if (!rootDir.RefreshAnd().Exists) return (true, Array.Empty<string>());
 
                     var uris = new List<string>();
-                    var files = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*"+ config.fileSuffix.Replace('/','\\')));
+                    var files = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*"+ config.fileSuffix));
                     foreach (var file in files)
                     {
                         string uri = FilePathToUri(file.FullName);
