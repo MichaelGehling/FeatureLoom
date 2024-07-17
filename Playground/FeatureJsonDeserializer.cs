@@ -137,6 +137,7 @@ namespace Playground
             else if (itemType == typeof(float?)) cachedTypeReader.SetTypeReader(ReadNullableFloatValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(bool)) cachedTypeReader.SetTypeReader(ReadBoolValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(bool?)) cachedTypeReader.SetTypeReader(ReadNullableBoolValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(object)) cachedTypeReader.SetTypeReader(ReadObjectValue, JsonDataTypeCategory.Object);
             else if (TryCreateEnumerableTypeReader(itemType, cachedTypeReader)) { }
             else this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { itemType }, cachedTypeReader);
 
@@ -167,6 +168,27 @@ namespace Playground
             var newExpr = Expression.New(typeof(T).GetConstructor(new[] { typeof(P) }), param);
             var lambda = Expression.Lambda<Func<P, T>>(newExpr, param);
             return lambda.Compile();
+        }
+
+        private object ReadObjectValue()
+        {
+            var valueType = map_TypeStart[CurrentByte];
+            if (valueType == TypeResult.Whitespace)
+            {
+                SkipWhiteSpaces();
+                valueType = map_TypeStart[CurrentByte];
+            }
+
+            switch (valueType)
+            {
+                case TypeResult.String: return ReadStringValue(); break;
+                //case TypeResult.Object: return ReadJsonValueObject(); break;
+                case TypeResult.Bool: return ReadBoolValue(); break;
+                case TypeResult.Null: return ReadNullValue(); break;
+                //case TypeResult.Array: return ReadArray(); break;
+                //case TypeResult.Number: ReadNumberValue(); break;
+                default: throw new Exception("Invalid character for value");
+            }
         }
 
         private void CreateComplexTypeReader<T>(CachedTypeReader cachedTypeReader)
@@ -346,6 +368,28 @@ namespace Playground
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
             return Encoding.UTF8.GetString(stringBytes.Array, stringBytes.Offset, stringBytes.Count);
+        }
+
+        public object ReadNullValue()
+        {
+            SkipWhiteSpaces();
+            byte b = CurrentByte;
+            if (b != 'n' && b != 'N') throw new Exception("Failed reading null");
+
+            if (!TryNextByte()) throw new Exception("Failed reading null");
+            b = CurrentByte;
+            if (b != 'u' && b != 'U') throw new Exception("Failed reading null");
+
+            if (!TryNextByte()) throw new Exception("Failed reading null");
+            b = CurrentByte;
+            if (b != 'l' && b != 'L') throw new Exception("Failed reading null");
+
+            if (!TryNextByte()) throw new Exception("Failed reading null");
+            b = CurrentByte;
+            if (b != 'l' && b != 'L') throw new Exception("Failed reading null");
+
+            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading null");
+            return null;
         }
 
         public bool ReadBoolValue()
