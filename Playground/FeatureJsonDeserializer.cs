@@ -182,11 +182,11 @@ namespace Playground
             switch (valueType)
             {
                 case TypeResult.String: return ReadStringValue(); break;
-                case TypeResult.Object: return ReadJsonValueObject(); break;
+                //case TypeResult.Object: return ReadJsonValueObject(); break;
                 case TypeResult.Bool: return ReadBoolValue(); break;
                 case TypeResult.Null: return ReadNullValue(); break;
-                case TypeResult.Array: return ReadArray(); break;
-                case TypeResult.Number: SkipNumber(); break;
+                //case TypeResult.Array: return ReadArray(); break;
+                //case TypeResult.Number: ReadNumberValue(); break;
                 default: throw new Exception("Invalid character for value");
             }
         }
