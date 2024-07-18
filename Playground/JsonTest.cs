@@ -19,9 +19,9 @@ using System.Text;
 using System.Text.Json.Serialization;
 using FeatureLoom.Security;
 using FeatureLoom.Extensions;
-using static Playground.FeatureJsonSerializer;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection;
+using System.Security.Cryptography;
 
 namespace Playground
 {
@@ -131,7 +131,7 @@ namespace Playground
         public IMyInterface interfaceObject = new MyEmbedded1();
         public short y = 2;
         public List<int> intList = new List<int>() { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
-        public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
+        public string[] strArray = { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
     }
 
@@ -140,9 +140,15 @@ namespace Playground
         T x = default(T);
     }
 
-    public struct MyStruct
+    public readonly struct MyStruct
     {
+        public MyStruct(int x)
+        {
+            this.x = x;
+        }
 
+        private readonly int x;
+        public int X { get => x; }
     }
 
     public class TestDto2
@@ -194,16 +200,16 @@ namespace Playground
             public override void Write(byte[] buffer, int offset, int count) { }
         }
 
-        class MyGenericIListTypeHandlerCreator : GenericTypeHandlerCreator
+        class MyGenericIListTypeHandlerCreator : FeatureJsonSerializer.GenericTypeHandlerCreator
         {
             public MyGenericIListTypeHandlerCreator() : base(typeof(IList<>))
             {
             }
 
-            protected override void CreateAndSetGenericTypeHandler<ARG1>(ExtensionApi api, ICachedTypeHandler cachedTypeHandler)
+            protected override void CreateAndSetGenericTypeHandler<ARG1>(FeatureJsonSerializer.ExtensionApi api, FeatureJsonSerializer.ICachedTypeHandler cachedTypeHandler)
             {                
-                var elementTypeHandler = api.GetCachedTypeHandler(typeof(ARG1));                
-                ItemHandler<IList<ARG1>> itemHandler;
+                var elementTypeHandler = api.GetCachedTypeHandler(typeof(ARG1));
+                FeatureJsonSerializer.ItemHandler<IList<ARG1>> itemHandler;
                 if (!api.RequiresHandler && api.Writer.TryPreparePrimitiveWriteDelegate<ARG1>(out var primitiveWrite))
                 {
                     itemHandler = list =>
@@ -269,6 +275,19 @@ namespace Playground
 
         public static async Task Run()
         {
+            FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+            {
+
+            });
+            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+            {
+
+            });
+
+
+            var input = "Hello: \\, \", \\, \n";
+            string json = featureJsonSerializer.Serialize(input);
+            featureJsonDeserializer.TryDeserialize(json.ToStream(), out string output);
 
             string jsonString = """
                                 
@@ -285,16 +304,40 @@ namespace Playground
                                     },
                                     "y":99,
                                     "intList":[9,8,7,6,5,4,3,2,1],
-                                    "strList": ["Hello", "World", "!"]                                    
+                                    "strArray": ["Hello", "World", "!"]                                    
                                 }
                                 """;
+            /*jsonString = """
+                         {
+                            "field1": 123,
+                            "field2": 456
+                         }
+                         """;
+
+            jsonString = """
+                         [
+                            { "key": "field1", "value": 123},
+                            { "key": "field2", "value": 456}
+                         ]
+                         """;
+            */
+
+            jsonString = """
+                         {
+                            "x": 123
+                         }
+                         """;
             FeatureJsonDeserializer.Settings deserializerSettings = new FeatureJsonDeserializer.Settings();
             deserializerSettings.AddTypeMapping<IMyInterface, MyGenericEmbedded<float>>();
             deserializerSettings.AddGenericTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
             deserializerSettings.AddConstructor<MyEmbedded3>(() => new MyEmbedded3(default));
-            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(deserializerSettings);
-            featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
-
+            //deserializerSettings.AddConstructor<KeyValuePair<string, int>>(() => new KeyValuePair<string, int>(default, default));
+            //deserializerSettings.AddConstructor<KeyValuePair<string, object>>(() => new KeyValuePair<string, object>(default, default));
+            //deserializerSettings.AddConstructor<KeyValuePair<object, object>>(() => new KeyValuePair<object, object>(default, default));
+            featureJsonDeserializer = new FeatureJsonDeserializer(deserializerSettings);
+            //featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
+            //featureJsonDeserializer.TryDeserialize<int[][]>(jsonString.ToStream(), out var result);
+            featureJsonDeserializer.TryDeserialize<MyStruct>(jsonString.ToStream(), out var result);
 
 
             var opt = new JsonSerializerOptions()
@@ -363,7 +406,6 @@ namespace Playground
             //var testDto = (int?)null;
 
             //Type testDtoType = testDto.GetType();
-            string json;
             //byte[] json;
 
             //Stream stream = new NullStream();
@@ -456,7 +498,7 @@ namespace Playground
                 });
             */
 
-            FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(settings);
+            featureJsonSerializer = new FeatureJsonSerializer(settings);
 
             Console.WriteLine("FeatureJsonSerializer:");
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));

@@ -119,7 +119,7 @@ namespace Playground
         private static async Task Main()
         {
 
-            var rw = new TextFileStorage("pathTest", new TextFileStorage.Config()
+            /*var rw = new TextFileStorage("pathTest", new TextFileStorage.Config()
             {
                 basePath = "./pathTestBasePath",
                 fileSuffix = "/bla.json",
@@ -130,6 +130,7 @@ namespace Playground
             (await rw.TryReadAsync<string>("myUri")).TryOut(out var content);
 
             Console.ReadKey();
+            */
 
             await JsonTest.Run();
 
