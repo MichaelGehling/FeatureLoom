@@ -111,7 +111,7 @@ namespace FeatureLoom.Helpers
                 var type = x.GetType();
                 if (type != y.GetType()) return false;
 
-                // Check if this type has already been visited
+                // Check if this type has already been visited -> TODO: This does not make sense, or does it? Shouldn't we check if the object has already been visited?
                 if (visited.ObjIfExists?.Contains(type) ?? false) return true;
                 visited.Obj.Add(type);
 
@@ -124,6 +124,7 @@ namespace FeatureLoom.Helpers
                     {
                         if (!Equals(xValue, yValue)) return false;
                     }
+                    // TODO Handle collections
                     else
                     {
                         if (!DeepEquals(xValue, yValue, visited)) return false;

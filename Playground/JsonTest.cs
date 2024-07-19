@@ -279,15 +279,15 @@ namespace Playground
             {
 
             });
-            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
-            {
 
-            });
+            var desSettings = new FeatureJsonDeserializer.Settings();
+            desSettings.AddConstructor<IEnumerable>(() => new List<object>());
+            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(desSettings);
 
 
-            var input = "Hello: \\, \", \\, \n";
+            var input = new MyEmbedded1();
             string json = featureJsonSerializer.Serialize(input);
-            featureJsonDeserializer.TryDeserialize(json.ToStream(), out string output);
+            featureJsonDeserializer.TryDeserialize(json.ToStream(), out MyEmbedded1 output);
 
             string jsonString = """
                                 

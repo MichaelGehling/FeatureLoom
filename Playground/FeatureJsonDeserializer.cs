@@ -140,7 +140,8 @@ namespace Playground
             else if (itemType == typeof(float?)) cachedTypeReader.SetTypeReader(ReadNullableFloatValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(bool)) cachedTypeReader.SetTypeReader(ReadBoolValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(bool?)) cachedTypeReader.SetTypeReader(ReadNullableBoolValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(object)) cachedTypeReader.SetTypeReader(ReadUnknownValue, JsonDataTypeCategory.Object);            
+            else if (itemType == typeof(object)) cachedTypeReader.SetTypeReader(ReadUnknownValue, JsonDataTypeCategory.Object);
+            else if (itemType.IsEnum) this.InvokeGenericMethod(nameof(CreateEnumReader), new Type[] { itemType }, cachedTypeReader);
             else if (TryCreateDictionaryTypeReader(itemType, cachedTypeReader)) { }
             else if (TryCreateEnumerableTypeReader(itemType, cachedTypeReader)) { }
             else this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { itemType }, cachedTypeReader);
@@ -173,6 +174,33 @@ namespace Playground
             var newExpr = Expression.New(typeof(T).GetConstructor(new[] { typeof(P) }), param);
             var lambda = Expression.Lambda<Func<P, T>>(newExpr, param);
             return lambda.Compile();
+        }
+
+        private void CreateEnumReader<T>(CachedTypeReader cachedTypeReader) where T: struct, Enum
+        {
+            cachedTypeReader.SetTypeReader(() =>
+            {
+                var valueType = map_TypeStart[CurrentByte];
+                if (valueType == TypeResult.Whitespace)
+                {
+                    SkipWhiteSpaces();
+                    valueType = map_TypeStart[CurrentByte];
+                }
+
+                if (valueType == TypeResult.Number)
+                {
+                    int i = ReadIntValue();
+                    if (!EnumHelper.TryFromInt(i, out T value)) throw new Exception("Invalid number for enum value");
+                    return value;
+                }
+                else if (valueType == TypeResult.String)
+                {
+                    string s = ReadStringValue();
+                    if (!EnumHelper.TryFromString(s, out T value)) throw new Exception("Invalid string for enum value");
+                    return value;
+                }
+                else throw new Exception("Invalid character for determining enum value");
+            }, JsonDataTypeCategory.Primitive);
         }
 
         private object ReadUnknownValue()

@@ -223,8 +223,8 @@ namespace Playground
                 return typeHandler;
             }
 
-
-            if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WriteIntValue);            
+            
+            if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WriteIntValue);
             else if (itemType == typeof(uint)) typeHandler.SetItemHandler_Primitive<uint>(writer.WriteUintValue);
             else if (itemType == typeof(long)) typeHandler.SetItemHandler_Primitive<long>(writer.WriteLongValue);
             else if (itemType == typeof(ulong)) typeHandler.SetItemHandler_Primitive<ulong>(writer.WriteUlongValue);
@@ -242,6 +242,25 @@ namespace Playground
             else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler_Primitive<UIntPtr>(writer.WriteUintPtrValue);
             else if (itemType == typeof(Guid)) typeHandler.SetItemHandler_Primitive<Guid>(writer.WriteGuidValue);
             else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler_Primitive<DateTime>(writer.WriteDateTimeValue);
+
+            else if (itemType == typeof(int?)) typeHandler.SetItemHandler_Primitive<int?>(v => { if (v.HasValue) writer.WriteIntValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(uint?)) typeHandler.SetItemHandler_Primitive<uint?>(v => { if (v.HasValue) writer.WriteUintValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(long?)) typeHandler.SetItemHandler_Primitive<long?>(v => { if (v.HasValue) writer.WriteLongValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(ulong?)) typeHandler.SetItemHandler_Primitive<ulong?>(v => { if (v.HasValue) writer.WriteUlongValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(short?)) typeHandler.SetItemHandler_Primitive<short?>(v => { if (v.HasValue) writer.WriteShortValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(ushort?)) typeHandler.SetItemHandler_Primitive<ushort?>(v => { if (v.HasValue) writer.WriteUshortValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(sbyte?)) typeHandler.SetItemHandler_Primitive<sbyte?>(v => { if (v.HasValue) writer.WriteSbyteValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(byte?)) typeHandler.SetItemHandler_Primitive<byte?>(v => { if (v.HasValue) writer.WriteByteValue(v.Value); else writer.WriteNullValue(); });            
+            else if (itemType == typeof(float?)) typeHandler.SetItemHandler_Primitive<float?>(v => { if (v.HasValue) writer.WriteFloatValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(double?)) typeHandler.SetItemHandler_Primitive<double?>(v => { if (v.HasValue) writer.WriteDoubleValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(decimal?)) typeHandler.SetItemHandler_Primitive<decimal?>(v => { if (v.HasValue) writer.WriteDecimalValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(char?)) typeHandler.SetItemHandler_Primitive<char?>(v => { if (v.HasValue) writer.WriteCharValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(bool?)) typeHandler.SetItemHandler_Primitive<bool?>(v => { if (v.HasValue) writer.WriteBoolValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(IntPtr?)) typeHandler.SetItemHandler_Primitive<IntPtr?>(v => { if (v.HasValue) writer.WriteIntPtrValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(UIntPtr?)) typeHandler.SetItemHandler_Primitive<UIntPtr?>(v => { if (v.HasValue) writer.WriteUintPtrValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(Guid?)) typeHandler.SetItemHandler_Primitive<Guid?>(v => { if (v.HasValue) writer.WriteGuidValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(DateTime?)) typeHandler.SetItemHandler_Primitive<DateTime?>(v => { if (v.HasValue) writer.WriteDateTimeValue(v.Value); else writer.WriteNullValue(); });
+
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
