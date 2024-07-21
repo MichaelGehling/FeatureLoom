@@ -1266,6 +1266,8 @@ namespace Playground
             return !(bufferPos + numBytes >= bufferFillLevel);
         }
 
+        int CountRemainingBytes() => bufferFillLevel - bufferPos;
+
         bool PeekNull()
         {
             if (!CheckBytesRemaining(3)) return false;            
@@ -1287,6 +1289,15 @@ namespace Playground
 
             return true;
         }
+
+       /* private bool TryCheckProvidedType(Type expectedType, out Type providedType)
+        {
+            providedType = null;
+            int remainingBytes = CountRemainingBytes();
+
+        }
+       */
+
 
         enum FilterResult
         {
