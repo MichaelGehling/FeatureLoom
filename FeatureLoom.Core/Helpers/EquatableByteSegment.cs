@@ -14,19 +14,25 @@ namespace FeatureLoom.Helpers
             this.hashCode = ComputeHashCode(segment);
         }
 
-        // Implicit conversion from ArraySegment<byte> to ByteSegmentWrapper
+        // Implicit conversion from ArraySegment<byte> to EquatableByteSegment
         public static implicit operator EquatableByteSegment(ArraySegment<byte> segment)
         {
             return new EquatableByteSegment(segment);
         }
 
-        // Implicit conversion from ByteSegmentWrapper to ArraySegment<byte>
+        // Implicit conversion from byte[] to EquatableByteSegment
+        public static implicit operator EquatableByteSegment(byte[] byteArray)
+        {
+            return new EquatableByteSegment(new ArraySegment<byte>(byteArray));
+        }
+
+        // Implicit conversion from EquatableByteSegment to ArraySegment<byte>
         public static implicit operator ArraySegment<byte>(EquatableByteSegment wrapper)
         {
             return wrapper.segment;
         }
 
-        // Implicit conversion from ByteSegmentWrapper to ArraySegment<byte>
+        // Implicit conversion from EquatableByteSegment to ArraySegment<byte>
         public static implicit operator byte[](EquatableByteSegment wrapper)
         {
             return wrapper.segment.ToArray();
@@ -37,6 +43,7 @@ namespace FeatureLoom.Helpers
 
         public bool Equals(EquatableByteSegment other)
         {
+            if (hashCode != other.hashCode) return false;
             if (segment.Count != other.segment.Count) return false;
 
             for (int i = 0; i < segment.Count; i++)
@@ -63,7 +70,8 @@ namespace FeatureLoom.Helpers
             unchecked // Overflow is fine, just wrap
             {
                 int hash = 17;
-                for (int i = segment.Offset; i < segment.Offset + segment.Count; i++)
+                var limit = segment.Offset + segment.Count;
+                for (int i = segment.Offset; i < limit; i++)
                     hash = hash * 23 + segment.Array[i];
                 return hash;
             }

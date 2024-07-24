@@ -27,10 +27,14 @@ namespace Playground
         const int BUFFER_SIZE = 1024 * 64;
         byte[] buffer = new byte[BUFFER_SIZE];
         int bufferPos = 0;
+        int pinnedBufferPos = -1;
         int bufferFillLevel = 0;
         int bufferResetLevel = BUFFER_SIZE - (1024 * 8);
         long totalBytesRead = 0;
-        Stream stream;
+        Stream stream;        
+        EquatableByteSegment currentItemName = Array.Empty<byte>();
+        private SlicedBuffer<byte> tempSlicedBuffer;
+        EquatableByteSegment rootName = "$".ToByteArray();
 
         Dictionary<Type, CachedTypeReader> typeReaderCache = new();
         Dictionary<Type, object> typeConstructorMap = new();
@@ -88,6 +92,13 @@ namespace Playground
         public FeatureJsonDeserializer(Settings settings = null)
         {                        
             this.settings = settings ?? new Settings();
+            tempSlicedBuffer = new SlicedBuffer<byte>(128 * 1024, 256, 128 * 1024);
+        }
+
+        private void Reset()
+        {
+            currentItemName = Array.Empty<byte>();
+            tempSlicedBuffer.Reset(true, false);            
         }
 
         CachedTypeReader GetCachedTypeReader(Type itemType)
@@ -322,7 +333,36 @@ namespace Playground
                 var itemFieldName = new EquatableByteSegment(name.ToByteArray());
                 itemFieldWriters[itemFieldName] = itemFieldWriter;
             }
+/*
+            // Add ref handler
+            itemFieldWriters[new EquatableByteSegment("$Ref".ToByteArray())] = item =>
+            {
+                if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
+                if (!refItems.TryGetValue(stringBytes, out object refObj)) return item;
+                if (!(refObj is T refItem)) return item;
+                
+                SkipWhiteSpaces();
+                if (CurrentByte == '}') return refItem;
 
+                // Skip all following fields until the object's end is found
+                if (CurrentByte == ',') TryNextByte();
+                while (true)
+                {
+                    SkipWhiteSpaces();
+                    if (CurrentByte == '}') break;
+
+                    if (!TryReadStringBytes(out var _)) throw new Exception("Failed reading object");
+                    SkipWhiteSpaces();
+                    if (CurrentByte != ':') throw new Exception("Failed reading object");
+                    TryNextByte();
+                    SkipValue();
+                    SkipWhiteSpaces();
+                    if (CurrentByte == ',') TryNextByte();
+                }
+
+                return refItem;
+            };
+*/
             var constructor = GetConstructor<T>();
 
             Func<T> typeReader = () =>
@@ -618,7 +658,6 @@ namespace Playground
         public string ReadStringValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
-            //return Encoding.UTF8.GetString(stringBytes.Array, stringBytes.Offset, stringBytes.Count); //TODO: Implement UTF8 decoding using a StringBuilder. Escaped characters must be unescaped!
             return DecodeUtf8(stringBytes);
         }
 
@@ -1289,14 +1328,6 @@ namespace Playground
 
             return true;
         }
-
-       /* private bool TryCheckProvidedType(Type expectedType, out Type providedType)
-        {
-            providedType = null;
-            int remainingBytes = CountRemainingBytes();
-
-        }
-       */
 
 
         enum FilterResult

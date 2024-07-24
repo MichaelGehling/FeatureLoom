@@ -37,7 +37,7 @@ namespace Playground
         {           
             this.settings = new CompiledSettings(settings ?? new Settings());
             writer = new JsonUTF8StreamWriter(this.settings);
-            itemInfoRecycler = new ItemInfoRecycler(this);
+            itemInfoRecycler = new ItemInfoRecycler(settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef);
             rootName = new ArraySegment<byte>(writer.PrepareRootName());
             this.extensionApi = new ExtensionApi(this);
         }
@@ -309,18 +309,18 @@ namespace Playground
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryHandleItemAsRef<T>(T item, ItemInfo itemInfo, Type itemType)
+        private bool TryHandleItemAsRef<T>(T item, Type itemType)
         {
-            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || itemInfo == null || item == null || !itemType.IsClass) return false;
-            return TryHandleObjAsRef(item, itemInfo, itemType);
+            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || currentItemInfo == null || item == null || !itemType.IsClass) return false;
+            return TryHandleObjAsRef(item, itemType);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryHandleObjAsRef(object obj, ItemInfo itemInfo, Type itemType)
+        private bool TryHandleObjAsRef(object obj, Type itemType)
         {
             if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
             {
-                if (!objToItemInfo.TryAdd(obj, itemInfo))
+                if (!objToItemInfo.TryAdd(obj, currentItemInfo))
                 {
                     writer.WriteRefObject(objToItemInfo[obj]);
                     return true;
@@ -328,7 +328,7 @@ namespace Playground
             }
             else
             {
-                itemInfo = itemInfo.parentInfo;
+                var itemInfo = currentItemInfo.parentInfo;
                 while (itemInfo != null)
                 {
                     if (itemInfo.objItem == obj)

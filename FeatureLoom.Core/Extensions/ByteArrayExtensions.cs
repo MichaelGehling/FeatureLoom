@@ -100,6 +100,25 @@ namespace FeatureLoom.Extensions
             Array.Copy(source, sourceOffset, slice.Array, 0, count);
         }
 
+        public static void CopyFrom<T>(this ArraySegment<T> slice, ArraySegment<T> source)
+        {
+            if (slice.Count < source.Count) throw new ArgumentOutOfRangeException("count");
+            Array.Copy(source.Array, source.Offset, slice.Array, 0, source.Count);
+        }
+
+        public static void CopyFrom<T>(this ArraySegment<T> slice, int offset, T[] source, int sourceOffset, int count)
+        {
+            if (slice.Count < count) throw new ArgumentOutOfRangeException("count");
+            Array.Copy(source, sourceOffset, slice.Array, offset, count);
+        }
+
+        public static void CopyFrom<T>(this ArraySegment<T> slice, int offset, ArraySegment<T> source)
+        {
+            if (slice.Count < source.Count) throw new ArgumentOutOfRangeException("count");
+            Array.Copy(source.Array, source.Offset, slice.Array, offset, source.Count);
+        }
+
+
         public static T[] ToArray<T>(ArraySegment<T> segment)
         {
             if (segment.Array == null)

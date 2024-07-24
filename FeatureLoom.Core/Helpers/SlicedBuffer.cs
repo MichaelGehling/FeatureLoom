@@ -16,14 +16,39 @@ namespace FeatureLoom.Helpers
     {
         T[] buffer;
         int capacity;
+        int initCapacity;
         int position;
         int wasteLimit;
-        
+        int capacityGrowth;
+
+        public SlicedBuffer(int capacity)
+        {
+            initCapacity = capacity;
+            this.capacity = capacity;
+            this.wasteLimit = capacity;
+            buffer = new T[capacity];
+            this.position = 0;
+            this.capacityGrowth = 0;
+        }
+
         public SlicedBuffer(int capacity, int wasteLimit)
-        {                   
+        {
+            initCapacity = capacity;
+            this.capacity = capacity;
             this.wasteLimit = wasteLimit <= capacity ? wasteLimit : capacity;
             buffer = new T[capacity];
             this.position = 0;
+            this.capacityGrowth = 0;
+        }
+
+        public SlicedBuffer(int capacity, int wasteLimit, int capacityGrowth)
+        {
+            initCapacity = capacity;
+            this.capacity = capacity;
+            this.wasteLimit = wasteLimit <= capacity ? wasteLimit : capacity;
+            buffer = new T[capacity];
+            this.position = 0;
+            this.capacityGrowth = capacityGrowth;
         }
 
         void RenewBuffer()
@@ -41,12 +66,13 @@ namespace FeatureLoom.Helpers
                 position += size;
                 return slice;
             }
-            else if (leftCapacity > wasteLimit || size > capacity)
+            else if (size > wasteLimit)
             {
                 return new ArraySegment<T>(new T[size]);
             }
             else
             {
+                capacity += capacityGrowth;
                 RenewBuffer();
                 var slice = new ArraySegment<T>(buffer, position, size);
                 position += size;
@@ -54,10 +80,12 @@ namespace FeatureLoom.Helpers
             }
         }
 
-        public void Reset(bool reuseExistingBuffer)
+        public void Reset(bool reuseExistingBuffer, bool resetCapacity = false)
         {
+            if (resetCapacity) capacity = initCapacity;
+
             if (reuseExistingBuffer) position = 0;
             else RenewBuffer();
-        }
+        }        
     }
 }
