@@ -129,6 +129,12 @@ namespace FeatureLoom.Forms
             return property;
         }
 
+        public bool EditEnabled
+        {
+            get => this.propertyTable.Enabled;
+            set => this.propertyTable.Enabled = value;
+        }
+
         public int CountProperties => properties.Count;
 
         public int PageSize
@@ -305,8 +311,8 @@ namespace FeatureLoom.Forms
             //using (this.LayoutSuspension())
             {
                 int rowIndex = propertyTable.GetPositionFromControl(property.GetLabelControl()).Row;
-                propertyTable.RemoveRowAt(rowIndex);
-                UpdateSizes();
+                if (rowIndex >= 0) propertyTable.RemoveRowAt(rowIndex);
+                if (updateRowIndicies) UpdateSizes();
             }
             if (updateRowIndicies) UpdateRowIndicies();
             sender.Send(new PropertyEventNotification(property.Name, PropertyEvent.Removed));
