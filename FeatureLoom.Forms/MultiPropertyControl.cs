@@ -194,7 +194,10 @@ namespace FeatureLoom.Forms
             {
                 //using (this.LayoutSuspension())
                 {
-                    var rowStyle = propertyTable.RowStyles[property.Position];
+
+                    RowStyle rowStyle;
+                    if (property.Position >= 0 && property.Position < propertyTable.RowStyles.Count) rowStyle = propertyTable.RowStyles[property.Position];
+                    else rowStyle = new RowStyle();
                     propertyTable.RemoveRowAt(property.Position);
                     propertyTable.InsertRowAt(targetRowIndex, new RowStyle(rowStyle.SizeType, rowStyle.Height));
                     property.MoveControls(targetRowIndex);

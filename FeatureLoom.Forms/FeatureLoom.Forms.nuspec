@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>FeatureLoom.Forms</id>
-    <version>0.4.1.1-alpha</version>
+    <version>0.4.1.2-alpha</version>
     <title>FeatureLoom.Forms</title>
     <authors>Michael Gehling</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
