@@ -228,11 +228,11 @@ namespace Playground
                     itemHandler = list =>
                     {
                         var count = list.Count;
-                        if (count >= 1) elementTypeHandler.HandleItem(list[0]);
+                        if (count >= 1) elementTypeHandler.HandleItem(list[0], default);
                         for (int i = 1; i < count; i++)
                         {
                             api.Writer.WriteComma();
-                            elementTypeHandler.HandleItem(list[i]);
+                            elementTypeHandler.HandleItem(list[i], default);
                         }
                     };                    
                 }

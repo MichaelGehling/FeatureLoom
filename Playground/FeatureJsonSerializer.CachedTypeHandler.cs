@@ -82,13 +82,13 @@ namespace Playground
                 }
                 else
                 {
-                    temp = (item, expectedType, itemInfo) =>
+                    temp = (item, _, _) =>
                     {
                         itemHandler.Invoke(item);
                     };
                 }
                 this.itemHandler = temp;
-                this.objectItemHandler = (item, expectedType, baseJob) => temp.Invoke((T)item, expectedType, baseJob);
+                this.objectItemHandler = (item, callType, itemName) => temp.Invoke((T)item, callType, itemName);
             }
 
             public void SetItemHandler_Array<T>(ItemHandler<T> itemHandler, bool noRefChildren)
@@ -106,7 +106,7 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                if (!serializer.TryHandleItemAsRef(item, callType))
                                 {
                                     writer.OpenArray();
                                     itemHandler.Invoke(item);
@@ -134,7 +134,7 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                if (!serializer.TryHandleItemAsRef(item, callType))
                                 {
                                     Type itemType = item.GetType();
                                     bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
@@ -190,7 +190,7 @@ namespace Playground
                     }
                 }
                 this.itemHandler = temp;
-                this.objectItemHandler = (item, callType, baseJob) => temp.Invoke((T)item, callType, baseJob);
+                this.objectItemHandler = (item, callType, itemName) => temp.Invoke((T)item, callType, itemName);
             }
 
             public void SetItemHandler_Object<T>(ItemHandler<T> itemHandler, bool noRefChildren)
@@ -208,7 +208,7 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                if (!serializer.TryHandleItemAsRef(item, callType))
                                 {
                                     writer.OpenObject();
                                     itemHandler.Invoke(item);                                    
@@ -222,7 +222,7 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                if (!serializer.TryHandleItemAsRef(item, callType))
                                 {
                                     Type itemType = item.GetType();
                                     writer.OpenObject();
@@ -333,7 +333,7 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                if (!serializer.TryHandleItemAsRef(item, callType))
                                 {
                                     writer.OpenObject();
                                     if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
@@ -352,7 +352,7 @@ namespace Playground
                             temp = (item, callType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, serializer.currentItemInfo, callType))
+                                if (!serializer.TryHandleItemAsRef(item, callType))
                                 {
                                     Type itemType = item.GetType();
                                     writer.OpenObject();
@@ -469,21 +469,6 @@ namespace Playground
                 else
                 {
                     objectItemHandler(item, callType, fieldName);
-                }
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void HandleItem<T>(T item)
-            {
-                Type callType = typeof(T);
-                if (callType == handlerType)
-                {
-                    Action<T, Type, ArraySegment<byte>> typedItemHandler = (Action<T, Type, ArraySegment<byte>>)itemHandler;
-                    typedItemHandler.Invoke(item, callType, default);
-                }
-                else
-                {
-                    objectItemHandler(item, callType, default);
                 }
             }
         }
