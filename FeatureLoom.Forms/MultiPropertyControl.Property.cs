@@ -29,10 +29,11 @@ namespace FeatureLoom.Forms
             private Sender<PropertyEventNotification> sender;
             private Label label = new Label();
             private Field[] fields;            
-            private RowStyle rowStyle = new RowStyle();                  
+            private RowStyle rowStyle = new RowStyle();
+            private bool isVisible = false;
 
             public Property(MultiPropertyControl parentControl, TableLayoutPanel table, int rowIndex, int numFields, string name, Sender<PropertyEventNotification>  sender)
-            {
+            {                
                 this.parentControl = parentControl;
                 this.fields = new Field[numFields];
                 for (int i=0; i< fields.Length; i++) fields[i].readOnly = parentControl.readOnlyDefault;
@@ -41,12 +42,7 @@ namespace FeatureLoom.Forms
                 this.sender = sender;
                 this.name = name;
 
-                propertyTable.RowStyles.Insert(rowIndex, rowStyle);
-                propertyTable.Controls.Add(label, 0, rowIndex);
-                label.Click += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.Clicked));
-
-                nameCount++;
-
+                this.label.Visible = isVisible;
                 this.label.Anchor = System.Windows.Forms.AnchorStyles.Right;
                 this.label.AutoSize = true;
                 this.label.Location = new System.Drawing.Point(3, 6);
@@ -54,8 +50,35 @@ namespace FeatureLoom.Forms
                 this.label.Size = new System.Drawing.Size(10, 10);
                 this.label.Text = name;
 
+                propertyTable.RowStyles.Insert(rowIndex, rowStyle);
+                propertyTable.Controls.Add(label, 0, rowIndex);
+                label.Click += (o, e) => sender.Send(new PropertyEventNotification(this.name, PropertyEvent.Clicked));
+
+                nameCount++;
+
+                
+
                 parentControl.UpdateSizes();
             }
+
+            public bool IsVisible
+            {
+                get => isVisible;
+                set 
+                {
+                    if (isVisible != value)
+                    {
+                        isVisible = value;
+                        label.Visible = isVisible;
+                        foreach (var field in fields)
+                        {
+                            if (field.control != null) field.control.Visible = isVisible;
+                        }
+                    }
+                }
+            }
+
+            internal int RowIndex => rowIndex;
 
             public bool TryFindControl(Control control, out int fieldIndex)
             {
@@ -182,6 +205,7 @@ namespace FeatureLoom.Forms
                 if (fields[fieldIndex].control == null)
                 {
                     TextBox control = new TextBox();
+                    control.Visible = isVisible;
                     fields[fieldIndex].control = control;
                     propertyTable.Controls.Add(control, fieldIndex + 1, rowIndex);
 
@@ -281,6 +305,7 @@ namespace FeatureLoom.Forms
                     RemoveField(fieldIndex);
 
                     ComboBox control = new ComboBox();
+                    control.Visible = isVisible;
                     fields[fieldIndex].control = control;
                     propertyTable.Controls.Add(control, fieldIndex + 1, rowIndex);
 
@@ -395,6 +420,7 @@ namespace FeatureLoom.Forms
                 RemoveField(fieldIndex);
 
                 var control = customControl;
+                control.Visible = isVisible;
                 fields[fieldIndex].control = control;                
                 propertyTable.Controls.Add(control, fieldIndex + 1, rowIndex);
 

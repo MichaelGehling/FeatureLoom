@@ -9,14 +9,19 @@ using System.Collections;
 namespace FeatureLoom.Forms
 {
     public partial class MultiPropertyControl : UserControl
-    {
+    {        
+        private int visiblePropertyOffset = 0;
+        private int pageSize = 30;
+        private bool autoPageResize = true;
+        private bool showPageControl = true;
+
         private int numFieldColumns = 0;
         private bool readOnlyDefault = false;
         private Dictionary<string, Property> properties = new Dictionary<string, Property>();
 
         private Sender<PropertyEventNotification> sender = new Sender<PropertyEventNotification>();
         public IMessageSource<PropertyEventNotification> PropertyEventNotifier => sender;
-
+                
         public class PropertyEventNotification
         {
             public PropertyEventNotification(string propertyName, PropertyEvent @event, int fieldIndex = -1, object parameter = null)
@@ -53,8 +58,39 @@ namespace FeatureLoom.Forms
         {            
             InitializeComponent();
             SetNumFieldColumns(numFieldColumns, defaultColumnStyle);
-            Resize += (o, e) => UpdateSizes();                  
-        }        
+            Resize += (o, e) => UpdateSizes();
+            buttonScrollAllUp.Click += (o, e) =>
+            {
+                visiblePropertyOffset = 0;
+                UpdateVisibility();
+            };
+            buttonScrollPageUp.Click += (o, e) =>
+            {
+                visiblePropertyOffset = (visiblePropertyOffset - pageSize).ClampLow(0);
+                UpdateVisibility();
+            };
+            buttonScrollItemUp.Click += (o, e) =>
+            {
+                visiblePropertyOffset = (visiblePropertyOffset - 1).ClampLow(0);
+                UpdateVisibility();
+            };
+            buttonScrollItemDown.Click += (o, e) =>
+            {
+                visiblePropertyOffset = (visiblePropertyOffset + 1).ClampHigh(properties.Count - pageSize);
+                UpdateVisibility();
+            };
+            buttonScrollPageDown.Click += (o, e) =>
+            {
+                visiblePropertyOffset = (visiblePropertyOffset + pageSize).ClampHigh(properties.Count - pageSize);
+                UpdateVisibility();
+            };
+            buttonScrollAllDown.Click += (o, e) =>
+            {
+                visiblePropertyOffset = properties.Count - pageSize;
+                UpdateVisibility();
+            };
+
+        }   
 
         public void SetNumFieldColumns(int numFieldColumns, ColumnStyle defaultColumnStyle = null)
         {
@@ -95,6 +131,53 @@ namespace FeatureLoom.Forms
 
         public int CountProperties => properties.Count;
 
+        public int PageSize
+        {
+            get => pageSize;
+            set
+            {
+                if (pageSize != value)
+                {
+                    pageSize = value;
+                    UpdateVisibility();
+                }
+            }
+        }
+
+        public int VisiblePropertyOffset
+        {
+            get => visiblePropertyOffset;
+            set
+            {
+                if (visiblePropertyOffset != value)
+                {
+                    visiblePropertyOffset = value.Clamp(0, properties.Count - pageSize);
+                    UpdateVisibility();
+                }
+            }
+        }
+
+        public bool AutoPageResize
+        {
+            get => autoPageResize;
+            set
+            {
+                autoPageResize = value;
+                UpdateSizes();
+            }
+        }
+
+        public bool ShowPageControl
+        {
+            get => showPageControl;
+            set
+            {
+                showPageControl = value;  
+                this.pageControlsPanel.Visible = showPageControl;
+                UpdateSizes();
+            }
+        }
+
         public bool ExistsProperty(string name) => properties.ContainsKey(name);
 
         public bool TryGetProperty(string name, out Property property) => properties.TryGetValue(name, out property);
@@ -118,6 +201,21 @@ namespace FeatureLoom.Forms
             }
         }
 
+        private void UpdateVisibility()
+        {
+            using (this.LayoutSuspension())
+            {
+                visiblePropertyOffset = visiblePropertyOffset.Clamp(0, properties.Count - pageSize);
+                this.pageControlsPanel.Visible = properties.Count > pageSize ? showPageControl : false;
+                int firstVisible = visiblePropertyOffset;
+                int lastVisible = visiblePropertyOffset + pageSize - 1;
+                foreach (var property in properties.Values)
+                {
+                    property.IsVisible = property.RowIndex >= firstVisible && property.RowIndex <= lastVisible;
+                }
+            }
+        }
+
         private Property AddProperty(string name)
         {
             Property property;
@@ -129,6 +227,8 @@ namespace FeatureLoom.Forms
                 property = new Property(this, propertyTable, rowIndex, numFieldColumns,  name, sender);
                 properties.Add(name, property);                
             }
+            UpdateVisibility();
+            UpdateSizes();
             sender.Send(new PropertyEventNotification(name, PropertyEvent.Created));
             return property;
         }
@@ -166,13 +266,28 @@ namespace FeatureLoom.Forms
 
         private void UpdateSizes()
         {
-            //using (this.LayoutSuspension())
+
+            if (autoPageResize)
             {
-                int scrollBarOffset = this.Width > propertyTable.PreferredSize.Width ? 0 : 25;
-                this.MinimumSize = new Size(0, propertyTable.PreferredSize.Height + scrollBarOffset);
-                this.AutoScrollMinSize = propertyTable.PreferredSize;
+                int tableHeight = this.propertyTable.PreferredSize.Height;
+                int spaceForTable = this.Height - (this.pageControlsPanel.Visible ? this.pageControlsPanel.Height : 0);
+
+                while (tableHeight < spaceForTable && pageSize < properties.Count)
+                {
+                    pageSize += 1;
+                    UpdateVisibility();
+                    tableHeight = this.propertyTable.PreferredSize.Height;
+                    spaceForTable = this.Height - (this.pageControlsPanel.Visible ? this.pageControlsPanel.Height : 0);
+                }
+
+                while (tableHeight > spaceForTable && pageSize > 0)
+                {
+                    pageSize -= 1;
+                    UpdateVisibility();
+                    tableHeight = this.propertyTable.PreferredSize.Height;
+                    spaceForTable = this.Height - (this.pageControlsPanel.Visible ? this.pageControlsPanel.Height : 0);
+                }
             }
-            
         }
 
         private void RenameProperty(string name, string newName)
@@ -203,6 +318,7 @@ namespace FeatureLoom.Forms
             {
                 property.UpdateRowIndex();
             }
+            UpdateVisibility();
         }
 
         public IEnumerable<Property> GetProperties()
