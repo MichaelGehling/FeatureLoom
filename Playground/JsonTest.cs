@@ -277,17 +277,17 @@ namespace Playground
         {
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
-
+                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo
             });
 
             var desSettings = new FeatureJsonDeserializer.Settings();
-            desSettings.AddConstructor<IEnumerable>(() => new List<object>());
+            desSettings.AddTypeMapping<IEnumerable, List<object>>();
             FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(desSettings);
 
 
-            var input = new MyEmbedded1();
+            var input = new TestDto();
             string json = featureJsonSerializer.Serialize(input);
-            featureJsonDeserializer.TryDeserialize(json.ToStream(), out MyEmbedded1 output);
+            featureJsonDeserializer.TryDeserialize(json.ToStream(), out TestDto output);
 
             string jsonString = """
                                 

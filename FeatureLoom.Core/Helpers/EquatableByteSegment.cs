@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Helpers
@@ -74,6 +75,19 @@ namespace FeatureLoom.Helpers
                 for (int i = segment.Offset; i < limit; i++)
                     hash = hash * 23 + segment.Array[i];
                 return hash;
+            }
+        }
+
+        public override string ToString()
+        {
+            if (segment.Array == null) return null;
+            try
+            {
+                return System.Text.Encoding.UTF8.GetString(segment.Array, segment.Offset, segment.Count);
+            }
+            catch
+            {
+                return Convert.ToBase64String(segment.Array, segment.Offset, segment.Count);
             }
         }
     }

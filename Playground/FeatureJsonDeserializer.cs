@@ -18,6 +18,7 @@ using Microsoft.VisualBasic.FileIO;
 using FeatureLoom.DependencyInversion;
 using Newtonsoft.Json.Linq;
 using FeatureLoom.Collections;
+using Microsoft.Extensions.Hosting;
 
 namespace Playground
 {
@@ -31,10 +32,12 @@ namespace Playground
         int bufferFillLevel = 0;
         int bufferResetLevel = BUFFER_SIZE - (1024 * 8);
         long totalBytesRead = 0;
-        Stream stream;        
-        EquatableByteSegment currentItemName = Array.Empty<byte>();
+        Stream stream;                
         private SlicedBuffer<byte> tempSlicedBuffer;
         EquatableByteSegment rootName = "$".ToByteArray();
+        EquatableByteSegment currentItemName = "$".ToByteArray();
+        int currentItemInfoIndex = -1;
+        List<ItemInfo> itemInfos = new List<ItemInfo>();
 
         Dictionary<Type, CachedTypeReader> typeReaderCache = new();
         Dictionary<Type, object> typeConstructorMap = new();
@@ -51,6 +54,19 @@ namespace Playground
         static readonly TypeResult[] map_TypeStart = CreateTypeStartMap();
 
         static ulong[] exponentFactorMap = CreateExponentFactorMap();
+
+        struct ItemInfo
+        {
+            public EquatableByteSegment name;
+            public int parentIndex;
+            public object itemRef;
+
+            public ItemInfo(EquatableByteSegment name, int parentIndex)
+            {
+                this.name = name;
+                this.parentIndex = parentIndex;
+            }
+        }
 
         static ulong[] CreateExponentFactorMap()
         {
@@ -97,8 +113,32 @@ namespace Playground
 
         private void Reset()
         {
-            currentItemName = Array.Empty<byte>();
-            tempSlicedBuffer.Reset(true, false);            
+            List<int> itemInfoIndices = new List<int>();
+            Console.WriteLine("-----");
+            for(int i = 0; i < itemInfos.Count; i++)
+            {                                                
+                int pi = i;
+                while (pi != -1)
+                {
+                    itemInfoIndices.Add(pi);
+                    pi = itemInfos[pi].parentIndex;
+                }
+                for (int x = itemInfoIndices.Count - 1; x >= 0; x--)
+                {
+                    int index = itemInfoIndices[x];
+                    var info = itemInfos[index];
+                    string name = info.name.ToString();
+                    if (name != "$" && !name.StartsWith('[')) Console.Write(".");
+                    Console.Write(name);
+                }
+                Console.WriteLine();
+                itemInfoIndices.Clear();
+            }            
+
+            currentItemName = rootName;
+            tempSlicedBuffer.Reset(true, false);
+            itemInfos.Clear();
+            currentItemInfoIndex = -1;
         }
 
         CachedTypeReader GetCachedTypeReader(Type itemType)
@@ -120,7 +160,7 @@ namespace Playground
                 Type genericType = itemType.GetGenericTypeDefinition();                
                 if (settings.genericTypeMapping.TryGetValue(genericType, out Type genericMappedType))
                 {
-
+                    // TODO
                 }
             }
 
@@ -273,11 +313,11 @@ namespace Playground
                         SkipWhiteSpaces();
                         if (CurrentByte == '}') break;
 
-                        K fieldName = keyReader.ReadItem<K>();
+                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
                         SkipWhiteSpaces();
                         if (CurrentByte != ':') throw new Exception("Failed reading object to Dictionary");
                         TryNextByte();
-                        V value = valueReader.ReadItem<V>();
+                        V value = valueReader.ReadValue<V>(fieldNameBytes);
                         dict[fieldName] = value;
                         SkipWhiteSpaces();
                         if (CurrentByte == ',') TryNextByte();
@@ -326,11 +366,10 @@ namespace Playground
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
-                
-                var itemFieldWriter = this.InvokeGenericMethod<Func<T,T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType }, memberInfo);
                 string name = memberInfo.Name;
-                if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName)) name = backingFieldName;
                 var itemFieldName = new EquatableByteSegment(name.ToByteArray());
+                var itemFieldWriter = this.InvokeGenericMethod<Func<T,T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType }, memberInfo, itemFieldName);                
+                if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName)) name = backingFieldName;                
                 itemFieldWriters[itemFieldName] = itemFieldWriter;
             }
 /*
@@ -397,7 +436,7 @@ namespace Playground
         }
 
 
-        private Func<T,T> CreateItemFieldWriter<T, V>(MemberInfo memberInfo)
+        private Func<T,T> CreateItemFieldWriter<T, V>(MemberInfo memberInfo, EquatableByteSegment fieldName)
         {
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
@@ -412,7 +451,7 @@ namespace Playground
                     {
                         return parentItem =>
                         {
-                            V value = fieldTypeReader.ReadItem<V>();
+                            V value = fieldTypeReader.ReadValue<V>(fieldName);
                             var boxedItem = (object)parentItem;
                             fieldInfo.SetValue(boxedItem, value);
                             parentItem = (T)boxedItem;
@@ -423,7 +462,7 @@ namespace Playground
                     {
                         return parentItem =>
                         {
-                            V value = fieldTypeReader.ReadItem<V>();
+                            V value = fieldTypeReader.ReadValue<V>(fieldName);
                             fieldInfo.SetValue(parentItem, value);
                             return parentItem;
                         };
@@ -432,7 +471,7 @@ namespace Playground
                 else
                 {
                     // Use expression tree for normal writable field
-                    return CreateFieldWriterUsingExpression<T, V>(fieldInfo);
+                    return CreateFieldWriterUsingExpression<T, V>(fieldInfo, fieldName);
                 }
             }
             else if (memberInfo is PropertyInfo propertyInfo)
@@ -440,7 +479,7 @@ namespace Playground
                 if (propertyInfo.CanWrite)
                 {
                     // Use expression tree for writable property
-                    return CreatePropertyWriterUsingExpression<T, V>(propertyInfo);
+                    return CreatePropertyWriterUsingExpression<T, V>(propertyInfo, fieldName);
                 }
                 else if (HasInitAccessor(propertyInfo))
                 {
@@ -450,7 +489,7 @@ namespace Playground
                     {
                         return parentItem =>
                         {
-                            V value = fieldTypeReader.ReadItem<V>();
+                            V value = fieldTypeReader.ReadValue<V>(fieldName);
                             var boxedItem = (object)parentItem;
                             propertyInfo.SetValue(boxedItem, value);
                             parentItem = (T)boxedItem;
@@ -461,7 +500,7 @@ namespace Playground
                     {
                         return parentItem =>
                         {
-                            V value = fieldTypeReader.ReadItem<V>();
+                            V value = fieldTypeReader.ReadValue<V>(fieldName);
                             propertyInfo.SetValue(parentItem, value);
                             return parentItem;
                         };
@@ -479,7 +518,7 @@ namespace Playground
             return setMethod != null && setMethod.ReturnParameter.GetRequiredCustomModifiers().Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
         }
 
-        private Func<T,T> CreateFieldWriterUsingExpression<T, V>(FieldInfo fieldInfo)
+        private Func<T,T> CreateFieldWriterUsingExpression<T, V>(FieldInfo fieldInfo, EquatableByteSegment fieldName)
         {
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
@@ -494,13 +533,13 @@ namespace Playground
             var fieldTypeReader = GetCachedTypeReader(fieldType);
             return parentItem =>
             {
-                V value = fieldTypeReader.ReadItem<V>();
+                V value = fieldTypeReader.ReadValue<V>(fieldName);
                 setValue(parentItem, value);
                 return parentItem;
             };
         }
 
-        private Func<T,T> CreatePropertyWriterUsingExpression<T, V>(PropertyInfo propertyInfo)
+        private Func<T,T> CreatePropertyWriterUsingExpression<T, V>(PropertyInfo propertyInfo, EquatableByteSegment fieldName)
         {
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
@@ -515,7 +554,7 @@ namespace Playground
             var fieldTypeReader = GetCachedTypeReader(fieldType);
             return parentItem =>
             {
-                V value = fieldTypeReader.ReadItem<V>();
+                V value = fieldTypeReader.ReadValue<V>(fieldName);
                 setValue(parentItem, value);
                 return parentItem;
             };
@@ -555,16 +594,24 @@ namespace Playground
 
         private bool TryCreateEnumerableTypeReader(Type itemType, CachedTypeReader cachedTypeReader)
         {
-            if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType)) return false;
-            if (itemType.IsInterface) throw new NotImplementedException();  //TODO
-            var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
-
-            this.InvokeGenericMethod(nameof(CreateEnumerableTypeReader), new Type[] {itemType, elementType}, cachedTypeReader);
+            if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))
+            {
+                var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
+                this.InvokeGenericMethod(nameof(CreateGenericEnumerableTypeReader), new Type[] { itemType, elementType }, cachedTypeReader);
+            }
+            else if (itemType.ImplementsInterface(typeof(IEnumerable)))
+            {
+                this.InvokeGenericMethod(nameof(CreateEnumerableTypeReader), new Type[] { itemType }, cachedTypeReader);
+            }
+            else
+            {
+                return false;
+            }
 
             return true;
         }
 
-        private void CreateEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
+        private void CreateGenericEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
         {
             var elementReader = new ElementReader<E>(this);
 
@@ -586,11 +633,44 @@ namespace Playground
             }, JsonDataTypeCategory.Array);
         }
 
-        class ElementReader<T> : IEnumerable<T>, IEnumerator<T>
+        private void CreateEnumerableTypeReader<T>(CachedTypeReader cachedTypeReader)
+        {
+            var elementReader = new ElementReader<object>(this);
+
+            var constructor = CompileConstructor<T, IEnumerable>();
+
+            Pool<List<object>> pool = new Pool<List<object>>(() => new List<object>(), l => l.Clear());
+            cachedTypeReader.SetTypeReader<T>(() =>
+            {
+                SkipWhiteSpaces();
+                if (CurrentByte != '[') throw new Exception("Failed reading Array");
+                if (!TryNextByte()) throw new Exception("Failed reading Array");
+                List<object> elementBuffer = pool.Take();
+                elementBuffer.AddRange(elementReader);
+                T item = constructor(elementBuffer);
+                pool.Return(elementBuffer);
+                if (CurrentByte != ']') throw new Exception("Failed reading Array");
+                TryNextByte();
+                return item;
+            }, JsonDataTypeCategory.Array);
+        }
+
+        List<EquatableByteSegment> arrayElementNameCache = new List<EquatableByteSegment>();
+        EquatableByteSegment GetArrayElementName(int index)
+        {
+            while (arrayElementNameCache.Count <= index)
+            {
+                arrayElementNameCache.Add(new EquatableByteSegment($"[{index}]".ToByteArray()));
+            }               
+            return arrayElementNameCache[index];            
+        }
+
+        class ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
         {
             FeatureJsonDeserializer deserializer;
             CachedTypeReader reader;
             T current = default;
+            int index = -1;
 
             public ElementReader(FeatureJsonDeserializer deserializer)
             {
@@ -603,24 +683,33 @@ namespace Playground
             object IEnumerator.Current => current;
 
             public bool MoveNext()
-            {
+            {                
                 deserializer.SkipWhiteSpaces();
-                if (deserializer.CurrentByte == ']') return false;                
-                current = reader.ReadItem<T>();
+                if (deserializer.CurrentByte == ']')
+                {
+                    Reset();
+                    return false;
+                }
+                current = reader.ReadValue<T>(deserializer.GetArrayElementName(++index));
                 deserializer.SkipWhiteSpaces();
                 if (deserializer.CurrentByte == ',') deserializer.TryNextByte();
-                else if (deserializer.CurrentByte != ']') throw new Exception("Failed reading Array");
+                else if (deserializer.CurrentByte != ']')
+                {
+                    Reset();
+                    throw new Exception("Failed reading Array");
+                }
                 return true;               
             }
 
             public void Reset()
             {
+                index = -1;
                 current = default;
             }
 
             public void Dispose()
             {
-                current = default;
+                Reset();
             }
 
             public IEnumerator<T> GetEnumerator() => this;        
@@ -657,7 +746,7 @@ namespace Playground
 
         public string ReadStringValue()
         {
-            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
+            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");            
             return DecodeUtf8(stringBytes);
         }
 
@@ -991,11 +1080,17 @@ namespace Playground
                 */
                 bufferFillLevel = stream.Read(buffer, 0, buffer.Length);
                 var reader = GetCachedTypeReader(typeof(T));
-                item = reader.ReadItem<T>();
+                item = reader.ReadValue<T>(rootName);
                 return true;
+            }
+            catch
+            {
+                item = default;
+                return false;
             }
             finally
             {
+                Reset();
                 serializerLock.Exit();
             }
         }
