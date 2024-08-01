@@ -12,6 +12,7 @@ namespace Playground
             private Delegate itemReader;
             private Func<object> objectItemReader;
             private Type readerType;
+            private bool isRefType;
 
             public CachedTypeReader(FeatureJsonDeserializer serializer)
             {
@@ -20,17 +21,32 @@ namespace Playground
 
             public void SetTypeReader<T>(Func<T> typeReader, JsonDataTypeCategory category)
             {
-                this.readerType = typeof(T);                                
+                this.readerType = typeof(T);
+                this.isRefType = !readerType.IsValueType;
                 bool isNullable = readerType.IsNullable();
                 Func<T> temp;
                 if (isNullable)
                 {
-                    temp = () =>
+                    if (isRefType)
                     {
-                        deserializer.SkipWhiteSpaces();
-                        if (deserializer.PeekNull()) return default;                            
-                        return typeReader.Invoke();
-                    };
+                        temp = () =>
+                        {
+                            deserializer.SkipWhiteSpaces();
+                            if (deserializer.TryReadNull()) return default;
+                            if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                            return typeReader.Invoke();
+                        };
+                    }
+                    else
+                    {
+                        temp = () =>
+                        {
+                            deserializer.SkipWhiteSpaces();
+                            if (deserializer.TryReadNull()) return default;
+                            return typeReader.Invoke();
+                        };
+                    }
+
                 }
                 else
                 {

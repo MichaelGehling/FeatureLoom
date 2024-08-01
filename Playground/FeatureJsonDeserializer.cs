@@ -27,6 +27,7 @@ namespace Playground
         MicroValueLock serializerLock = new MicroValueLock();
         const int BUFFER_SIZE = 1024 * 64;
         byte[] buffer = new byte[BUFFER_SIZE];
+        Stack<int> peekStack = new Stack<int>();
         int bufferPos = 0;
         int pinnedBufferPos = -1;
         int bufferFillLevel = 0;
@@ -44,7 +45,6 @@ namespace Playground
 
         static readonly FilterResult[] map_SkipWhitespaces = CreateFilterMap_SkipWhitespaces();
         static readonly FilterResult[] map_IsFieldEnd = CreateFilterMap_IsFieldEnd();
-        static readonly FilterResult[] map_SkipWhitespacesUntilStringStarts = CreateFilterMap_SkipWhitespacesUntilStringStarts();
         static readonly FilterResult[] map_SkipCharsUntilStringEndsOrMultiByteChar = CreateFilterMap_SkipCharsUntilStringEndsOrMultiByteChar();
         static readonly FilterResult[] map_SkipWhitespacesUntilNumberStarts = CreateFilterMap_SkipWhitespacesUntilNumberStarts();
         static readonly FilterResult[] map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds = CreateFilterMap_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds();
@@ -129,8 +129,11 @@ namespace Playground
                     var info = itemInfos[index];
                     string name = info.name.ToString();
                     if (name != "$" && !name.StartsWith('[')) Console.Write(".");
-                    Console.Write(name);
+                    Console.Write(name);                    
                 }
+                Console.Write(" : ");
+                if (itemInfos[i].itemRef == null) Console.Write("null");
+                else Console.Write(itemInfos[i].itemRef.GetType().ToString());
                 Console.WriteLine();
                 itemInfoIndices.Clear();
             }            
@@ -200,16 +203,52 @@ namespace Playground
             return cachedTypeReader;
         }
 
-        private Func<T> GetConstructor<T>()
+        private void SetItemRefInCurrentItemInfo(object item)
         {
-            Type type = typeof(T);
-            if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> constructor) return constructor;
-            if (null != type.GetConstructor(Array.Empty<Type>())) return CompileConstructor<T>();
-            if (type.IsValueType) return () => default;
-
-            throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)}. Use AddConstructor in Settings.");
+            var itemInfo = itemInfos[currentItemInfoIndex];
+            itemInfo.itemRef = item;
+            itemInfos[currentItemInfoIndex] = itemInfo;
         }
 
+        private Func<T> GetConstructor<T>()
+        {
+            Func<T> constructor = null;
+            Type type = typeof(T);
+            if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> typedConstructor) constructor = typedConstructor;
+            else if (null != type.GetConstructor(Array.Empty<Type>())) constructor = CompileConstructor<T>();
+            else if (type.IsValueType) return () => default;
+
+            if (constructor == null) throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)}. Use AddConstructor in Settings.");
+
+            if (!type.IsValueType) // TODO check for ref-support active
+            {
+                return () =>
+                {
+                    T item = constructor();
+                    SetItemRefInCurrentItemInfo(item);
+                    return item;
+                };
+            }
+            else return constructor;
+
+        }
+
+        private Func<P, T> GetConstructor<T, P>()
+        {
+            Type type = typeof(T);
+            Func<P, T> constructor = CompileConstructor<T, P>();
+
+            if (!type.IsValueType) // TODO check for ref-support active
+            {
+                return (parameter) =>
+                {
+                    T item = constructor(parameter);
+                    SetItemRefInCurrentItemInfo(item);
+                    return item;
+                };
+            }
+            else return constructor;
+        }
 
         private static Func<T> CompileConstructor<T>()
         {
@@ -296,7 +335,7 @@ namespace Playground
 
         private void CreateDictionaryTypeReader<T, K, V>(CachedTypeReader cachedTypeReader) where T : IDictionary<K, V>, new()
         {
-            var constructor = CompileConstructor<T>();
+            var constructor = GetConstructor<T>();
             var elementReader = new ElementReader<KeyValuePair<K, V>>(this);
             var keyReader = GetCachedTypeReader(typeof(K));
             var valueReader = GetCachedTypeReader(typeof(V));
@@ -584,6 +623,7 @@ namespace Playground
                 List<E> elementBuffer = pool.Take();
                 elementBuffer.AddRange(elementReader);
                 E[] item = elementBuffer.ToArray();
+                SetItemRefInCurrentItemInfo(item);
                 pool.Return(elementBuffer);
                 if (CurrentByte != ']') throw new Exception("Failed reading Array");
                 TryNextByte();
@@ -615,7 +655,7 @@ namespace Playground
         {
             var elementReader = new ElementReader<E>(this);
 
-            var constructor = CompileConstructor<T, IEnumerable<E>>();
+            var constructor = GetConstructor<T, IEnumerable<E>>();
 
             Pool<List<E>> pool = new Pool<List<E>>(() => new List<E>(), l => l.Clear());            
             cachedTypeReader.SetTypeReader<T>(() =>
@@ -637,7 +677,7 @@ namespace Playground
         {
             var elementReader = new ElementReader<object>(this);
 
-            var constructor = CompileConstructor<T, IEnumerable>();
+            var constructor = GetConstructor<T, IEnumerable>();
 
             Pool<List<object>> pool = new Pool<List<object>>(() => new List<object>(), l => l.Clear());
             cachedTypeReader.SetTypeReader<T>(() =>
@@ -1115,17 +1155,20 @@ namespace Playground
             return false;            
         }
 
+        private bool TrySkipBytes(int numBytesToSkip)
+        {
+            if (!CheckBytesRemaining(numBytesToSkip)) return false;
+            bufferPos += numBytesToSkip;
+            return true;
+        }
+
         private byte CurrentByte => buffer[bufferPos];
 
         void SkipValue()
         {
-            var valueType = map_TypeStart[CurrentByte];
-            if (valueType == TypeResult.Whitespace)
-            {
-                SkipWhiteSpaces();
-                valueType = map_TypeStart[CurrentByte];
-            }
+            SkipWhiteSpaces();
 
+            var valueType = map_TypeStart[CurrentByte];
             switch (valueType)
             {
                 case TypeResult.String: SkipString(); break;
@@ -1166,25 +1209,7 @@ namespace Playground
 
         private void SkipNull()
         {
-            SkipWhiteSpaces();
-            byte b;
-            
-            b = CurrentByte;
-            if (b != 'N' && b != 'n') throw new Exception("Failed reading null value");
-            
-            if (!TryNextByte()) throw new Exception("Failed reading null value");            
-            b = CurrentByte;
-            if (b != 'U' && b != 'u') throw new Exception("Failed reading null value");
-            
-            if (!TryNextByte()) throw new Exception("Failed reading null value");
-            b = CurrentByte;
-            if (b != 'L' && b != 'l') throw new Exception("Failed reading null value");
-            
-            if (!TryNextByte()) throw new Exception("Failed reading null value");
-            b = CurrentByte;
-            if (b != 'L' && b != 'l') throw new Exception("Failed reading null value");
-            
-            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
+            if (!TryReadNull()) throw new Exception("Failed reading null value");
         }
 
         private void SkipBool()
@@ -1212,7 +1237,7 @@ namespace Playground
                 if (CurrentByte == ',') TryNextByte();
             }
 
-            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
+            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading object");
         }
 
         private void SkipString()
@@ -1235,57 +1260,41 @@ namespace Playground
 
         bool TryReadNumberBytes(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative)
         {
-            integerBytes = default;
-            decimalBytes = default;
-            exponentBytes = default;
-            isNegative = false;
-            isExponentNegative = false;
+            peekStack.Push(bufferPos);
+            bool success = Try(out isNegative, out integerBytes, out decimalBytes, out exponentBytes, out isExponentNegative);
+            if (success) peekStack.Pop();
+            else bufferPos = peekStack.Pop();
+            return success;
 
-            // Skip whitespaces until number starts
-            while (true)
+            bool Try(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative)
             {
-                byte b = CurrentByte;
-                var result = map_SkipWhitespacesUntilNumberStarts[b];
-                if (result == FilterResult.Found) break;
-                else if (result == FilterResult.Skip) { if (!TryNextByte()) return false; }                
-                else if (result == FilterResult.Unexpected) return false;
-            }
-            
-            // Check if negative
-            isNegative = CurrentByte == '-';
-            if (isNegative && !TryNextByte()) return false;
-            int startPos = bufferPos;
+                integerBytes = default;
+                decimalBytes = default;
+                exponentBytes = default;
+                isNegative = false;
+                isExponentNegative = false;
 
-            bool couldNotSkip = false;
-            // Read integer part
-            while (true)
-            {
-                byte b = CurrentByte;
-                FilterResult result = map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds[b];
-                if (result == FilterResult.Skip) 
-                {
-                    if (!TryNextByte())
-                    {
-                        couldNotSkip = true;
-                        break;
-                    }
-                }
-                else if (result == FilterResult.Found) break;
-                else if (result == FilterResult.Unexpected) return false;
-            }
-            int count = bufferPos - startPos;
-            if (couldNotSkip) count++;
-            integerBytes = new ArraySegment<byte>(buffer, startPos, count);
-
-            if (CurrentByte == '.')
-            {                
-                TryNextByte();
-                // Read decimal part
-                startPos = bufferPos;
+                // Skip whitespaces until number starts
                 while (true)
                 {
                     byte b = CurrentByte;
-                    FilterResult result = map_SkipFiguresUntilExponentOrNumberEnds[b];
+                    var result = map_SkipWhitespacesUntilNumberStarts[b];
+                    if (result == FilterResult.Found) break;
+                    else if (result == FilterResult.Skip) { if (!TryNextByte()) return false; }
+                    else if (result == FilterResult.Unexpected) return false;
+                }
+
+                // Check if negative
+                isNegative = CurrentByte == '-';
+                if (isNegative && !TryNextByte()) return false;
+                int startPos = bufferPos;
+
+                bool couldNotSkip = false;
+                // Read integer part
+                while (true)
+                {
+                    byte b = CurrentByte;
+                    FilterResult result = map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds[b];
                     if (result == FilterResult.Skip)
                     {
                         if (!TryNextByte())
@@ -1297,101 +1306,129 @@ namespace Playground
                     else if (result == FilterResult.Found) break;
                     else if (result == FilterResult.Unexpected) return false;
                 }
-                count = bufferPos - startPos;
+                int count = bufferPos - startPos;
                 if (couldNotSkip) count++;
-                decimalBytes = new ArraySegment<byte>(buffer, startPos, count);
-            }
+                integerBytes = new ArraySegment<byte>(buffer, startPos, count);
 
-            if (CurrentByte == 'e' || CurrentByte == 'E')
-            {
-                TryNextByte();
-                // Read exponent part
-                isExponentNegative = CurrentByte == '-';
-                if (isExponentNegative) TryNextByte();
-                startPos = bufferPos;
-                while (true)
+                if (CurrentByte == '.')
                 {
-                    byte b = CurrentByte;
-                    FilterResult result = map_SkipFiguresUntilNumberEnds[b];
-                    if (result == FilterResult.Skip)
+                    TryNextByte();
+                    // Read decimal part
+                    startPos = bufferPos;
+                    while (true)
                     {
-                        if (!TryNextByte())
+                        byte b = CurrentByte;
+                        FilterResult result = map_SkipFiguresUntilExponentOrNumberEnds[b];
+                        if (result == FilterResult.Skip)
                         {
-                            couldNotSkip = true;
-                            break;
+                            if (!TryNextByte())
+                            {
+                                couldNotSkip = true;
+                                break;
+                            }
                         }
+                        else if (result == FilterResult.Found) break;
+                        else if (result == FilterResult.Unexpected) return false;
                     }
-                    else if (result == FilterResult.Found) break;
-                    else if (result == FilterResult.Unexpected) return false;
+                    count = bufferPos - startPos;
+                    if (couldNotSkip) count++;
+                    decimalBytes = new ArraySegment<byte>(buffer, startPos, count);
                 }
-                count = bufferPos - startPos;
-                if (couldNotSkip) count++;
-                exponentBytes = new ArraySegment<byte>(buffer, startPos, count);
-            }
 
-            return true;
+                if (CurrentByte == 'e' || CurrentByte == 'E')
+                {
+                    TryNextByte();
+                    // Read exponent part
+                    isExponentNegative = CurrentByte == '-';
+                    if (isExponentNegative) TryNextByte();
+                    startPos = bufferPos;
+                    while (true)
+                    {
+                        byte b = CurrentByte;
+                        FilterResult result = map_SkipFiguresUntilNumberEnds[b];
+                        if (result == FilterResult.Skip)
+                        {
+                            if (!TryNextByte())
+                            {
+                                couldNotSkip = true;
+                                break;
+                            }
+                        }
+                        else if (result == FilterResult.Found) break;
+                        else if (result == FilterResult.Unexpected) return false;
+                    }
+                    count = bufferPos - startPos;
+                    if (couldNotSkip) count++;
+                    exponentBytes = new ArraySegment<byte>(buffer, startPos, count);
+                }
+
+                return true;
+            }
         }
 
         bool TryReadStringBytes(out ArraySegment<byte> stringBytes)
         {
-            stringBytes = default;
+            peekStack.Push(bufferPos);
+            bool success = Try(out stringBytes);
+            if (success) peekStack.Pop();
+            else bufferPos = peekStack.Pop();
+            return success;
 
-            // Skip whitespaces until string starts
-            do
+            bool Try(out ArraySegment<byte> stringBytes)
             {
-                byte b = CurrentByte;
-                var result = map_SkipWhitespacesUntilStringStarts[b];
-                if (result == FilterResult.Found) break;
-                else if (result == FilterResult.Unexpected) return false;
-            } while (TryNextByte());
-            
-            int startPos = bufferPos+1;
+                stringBytes = default;
 
-            // Skip chars until string ends
-            while (TryNextByte())
-            {
-                byte b = CurrentByte;
-                FilterResult result = map_SkipCharsUntilStringEndsOrMultiByteChar[b];
-                if (result == FilterResult.Skip) continue;
-                else if (result == FilterResult.Found)
+                // Skip whitespaces until string starts
+                SkipWhiteSpaces();
+                if (CurrentByte != (byte)'"') return false;
+
+                int startPos = bufferPos + 1;
+
+                // Skip chars until string ends
+                while (TryNextByte())
                 {
-                    if (b == (byte)'\\')
+                    byte b = CurrentByte;
+                    FilterResult result = map_SkipCharsUntilStringEndsOrMultiByteChar[b];
+                    if (result == FilterResult.Skip) continue;
+                    else if (result == FilterResult.Found)
                     {
-                        TryNextByte();
+                        if (b == (byte)'\\')
+                        {
+                            TryNextByte();
+                        }
+                        else if (b == (byte)'"')
+                        {
+                            stringBytes = new ArraySegment<byte>(buffer, startPos, bufferPos - startPos);
+                            TryNextByte();
+                            return true;
+                        }
+                        else if ((b & 0b11100000) == 0b11000000) // skip 1 byte
+                        {
+                            TryNextByte();
+                        }
+                        else if ((b & 0b11110000) == 0b11100000) // skip 2 bytes
+                        {
+                            TryNextByte();
+                            TryNextByte();
+                        }
+                        else if ((b & 0b11111000) == 0b11110000) // skip 3 bytes
+                        {
+                            TryNextByte();
+                            TryNextByte();
+                            TryNextByte();
+                        }
                     }
-                    else if (b == (byte)'"')
-                    {
-                        stringBytes = new ArraySegment<byte>(buffer, startPos, bufferPos - startPos);
-                        TryNextByte();
-                        return true;
-                    }
-                    else if ((b & 0b11100000) == 0b11000000) // skip 1 byte
-                    {
-                        TryNextByte();
-                    }
-                    else if ((b & 0b11110000) == 0b11100000) // skip 2 bytes
-                    {
-                        TryNextByte();
-                        TryNextByte();
-                    }
-                    else if ((b & 0b11111000) == 0b11110000) // skip 3 bytes
-                    {
-                        TryNextByte();
-                        TryNextByte();
-                        TryNextByte();
-                    }
+                    else return false;
                 }
-                else return false;
+                return false;
             }
-            return false;
         }
 
         void SkipWhiteSpaces()
         {
             do
             {
-                var result = map_SkipWhitespaces[CurrentByte];
-                if (result == FilterResult.Found) return;
+                if (map_SkipWhitespaces[CurrentByte] == FilterResult.Found) return;
             } while (TryNextByte());
         }
         
@@ -1402,26 +1439,184 @@ namespace Playground
 
         int CountRemainingBytes() => bufferFillLevel - bufferPos;
 
-        bool PeekNull()
+        EquatableByteSegment refFieldName = "$ref".ToByteArray();
+
+        bool TryReadRefObject<T>(out bool pathIsValid, out bool typeIsCompatible, out T refObject)
         {
-            if (!CheckBytesRemaining(3)) return false;            
-            int peekPos = bufferPos;
-            if (buffer[peekPos] != 'n' && buffer[peekPos] != 'N') return false;
-            peekPos++;
-            if (buffer[peekPos] != 'u' && buffer[peekPos] != 'U') return false;
-            peekPos++;
-            if (buffer[peekPos] != 'l' && buffer[peekPos] != 'L') return false;
-            peekPos++;
-            if (buffer[peekPos] != 'l' && buffer[peekPos] != 'L') return false;
+            peekStack.Push(bufferPos);
+            bool success = Try(out pathIsValid, out typeIsCompatible, out refObject);
+            if (success) peekStack.Pop();
+            else bufferPos = peekStack.Pop();
+            return success;
 
-            if (CheckBytesRemaining(4))
+            bool Try(out bool pathIsValid, out bool typeIsCompatible, out T itemRef)
             {
-                bufferPos += 4;
-                if (map_IsFieldEnd[buffer[++peekPos]] != FilterResult.Found) return false;
-            }
-            else bufferPos += 3;
+                pathIsValid = false;
+                typeIsCompatible = false;
+                itemRef = default;
 
-            return true;
+                // IMPORTANT: At the moment, the ref-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
+                SkipWhiteSpaces();
+                if (CurrentByte != (byte)'{') return false;
+                TryNextByte();
+                if (!TryReadStringBytes(out var fieldName)) return false;
+                if (!refFieldName.Equals(fieldName)) return false;
+                SkipWhiteSpaces();
+                if (CurrentByte != (byte)':') return false;
+                TryNextByte();
+                if (!TryReadStringBytes(out var refPath)) return false;
+                SkipWhiteSpaces();
+                if (CurrentByte == ',') TryNextByte();
+
+                // Skip the rest
+                while (true)
+                {
+                    SkipWhiteSpaces();
+                    if (CurrentByte == '}') break;
+
+                    if (!TryReadStringBytes(out var _)) return false;
+                    SkipWhiteSpaces();
+                    if (CurrentByte != ':') return false;
+                    TryNextByte();
+                    SkipValue();
+                    SkipWhiteSpaces();
+                    if (CurrentByte == ',') TryNextByte();
+                }
+                if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) return false;
+
+                
+                
+                // TODO find object
+                if (refPath.Count <= 0) return false;
+                List<EquatableByteSegment> fieldPathSegments = new List<EquatableByteSegment>();
+                int pos = 0;
+                int startPos = 0;
+                int segmentLength = 0;
+                int refPathCount = refPath.Count;
+                byte b = refPath[pos];
+
+                while (true)
+                {
+                    if (b == '[')
+                    {
+                        while (true)
+                        {
+                            pos++;
+                            if (pos >= refPathCount) return false;
+                            b = refPath[pos];
+                            if (b == ']')
+                            {
+                                segmentLength = pos - startPos + 1;
+                                pos++;
+                                break;
+                            }
+                        }
+                        EquatableByteSegment segment = refPath.Slice(startPos, segmentLength);
+                        fieldPathSegments.Add(segment);
+                        if (pos >= refPathCount) break;
+                    }
+                    else
+                    {
+                        while (true)
+                        {
+                            pos++;
+                            if (pos >= refPathCount)
+                            {
+                                segmentLength = pos - startPos;
+                                break;
+                            }
+                            b = refPath[pos];
+                            if (b == '.')
+                            {
+                                segmentLength = pos - startPos;
+                                pos++;
+                                break;
+                            }
+                            if (b == '[')
+                            {
+                                segmentLength = pos - startPos;
+                                break;
+                            }
+
+                        }
+                        EquatableByteSegment segment = refPath.Slice(startPos, segmentLength);
+                        fieldPathSegments.Add(segment);
+                        if (pos >= refPathCount) break;
+                    }
+                    startPos = pos;
+                    b = refPath[pos];
+                }
+
+
+                object potentialItemRef = null;
+                int lastSegmentIndex = fieldPathSegments.Count - 1;
+                var referencedFieldName = fieldPathSegments[lastSegmentIndex];
+                foreach(var info in itemInfos)
+                {
+                    if (info.name.Equals(referencedFieldName))
+                    {
+                        potentialItemRef = info.itemRef;
+                        int segmentIndex = lastSegmentIndex - 1;
+                        int parentIndex = info.parentIndex;
+                        ItemInfo parentInfo;
+                        while (segmentIndex != -1 && parentIndex != -1)
+                        {
+                            var segment = fieldPathSegments[segmentIndex];
+                            parentInfo = itemInfos[parentIndex];
+                            if (!parentInfo.name.Equals(segment)) break;                            
+                            parentIndex = parentInfo.parentIndex;
+                            segmentIndex--;
+                        }
+
+                        pathIsValid = parentIndex == -1 && segmentIndex == -1;
+                        if (pathIsValid) break;
+                    }
+                }
+
+                if (pathIsValid && potentialItemRef is T compatibleItemRef)
+                {
+                    typeIsCompatible = true;
+                    itemRef = compatibleItemRef;
+                }
+
+                return true;
+            }
+        }
+
+        bool TryReadNull()
+        {
+
+            peekStack.Push(bufferPos);
+            bool success = Try();
+            if (success) peekStack.Pop();
+            else bufferPos = peekStack.Pop();
+            return success;
+
+            bool Try()
+            {
+                SkipWhiteSpaces();
+                byte b;
+
+                if (!TryNextByte()) return false;
+                b = CurrentByte;
+                if (b != 'n' && b != 'N') return false;
+                if (!TryNextByte()) return false;
+                b = CurrentByte;
+                if (b != 'u' && b != 'U') return false;
+                if (!TryNextByte()) return false;
+                b = CurrentByte;
+                if (b != 'l' && b != 'L') return false;
+                if (!TryNextByte()) return false;
+                b = CurrentByte;
+                if (b != 'l' && b != 'L') return false;
+
+                // Check for field end
+                if (!TryNextByte()) return true;
+                b = CurrentByte;
+                if (map_IsFieldEnd[b] != FilterResult.Found) return false;
+
+                return true;
+            }
         }
 
 
@@ -1476,18 +1671,6 @@ namespace Playground
                 if ("trueTRUEfalseFALSE".Contains((char)i)) map[i] = FilterResult.Skip;
                 else if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
                 else if (i == ',' || i == ']' || i == '}') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-
-        static FilterResult[] CreateFilterMap_SkipWhitespacesUntilStringStarts()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Skip;                
-                else if (i == '\"') map[i] = FilterResult.Found;
                 else map[i] = FilterResult.Unexpected;
             }
             return map;

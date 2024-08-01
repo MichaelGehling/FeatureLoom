@@ -74,11 +74,11 @@ namespace Playground
 
         public TestDto()
         {
-            //this.self = this;
+            this.self = this;
 
-            myEmbeddedDict["1"] = new MyEmbedded1();
-            myEmbeddedDict["2"] = new MyEmbedded1();
-            myEmbeddedDict["1_"] = myEmbeddedDict["1"];
+            myEmbeddedDict["prop1"] = new MyEmbedded1() { x = 42 };
+            myEmbeddedDict["prop2"] = new MyEmbedded1();
+            myEmbeddedDict["prop1ref"] = myEmbeddedDict["prop1"];
         }
 
 /*        public override void Mutate()
