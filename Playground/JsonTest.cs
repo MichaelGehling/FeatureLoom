@@ -65,10 +65,11 @@ namespace Playground
         public List<string> strList = new List<string>() { "Hallo1", "Hallo2", "Hallo3", "Hallo4", "Hallo5" };
         public int[] intList = new int[] { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
         public List<float> myFloats = new List<float>() { 123.1f, 23.4f, 236.34f, 87.0f, 0f, 1234.0f, 0.12345f };
+        
+        public object someObj = "Something";
+        public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1() { x=43}, new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
         public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
-        public object someObj = "Something";
-        public List<MyEmbedded1> embeddedList = new List<MyEmbedded1>() { new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1(), new MyEmbedded1() };
 
         public string MyProperty { get; set; } = "propValue";
 
@@ -76,9 +77,9 @@ namespace Playground
         {
             this.self = this;
 
-            myEmbeddedDict["prop1"] = new MyEmbedded1() { x = 42 };
+            myEmbeddedDict["prop1"] = new MyEmbedded1();
             myEmbeddedDict["prop2"] = new MyEmbedded1();
-            myEmbeddedDict["prop1ref"] = myEmbeddedDict["prop1"];
+            myEmbeddedDict["prop1ref"] = embeddedList[0];
         }
 
 /*        public override void Mutate()

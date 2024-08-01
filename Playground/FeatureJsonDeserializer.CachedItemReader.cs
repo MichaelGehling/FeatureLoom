@@ -13,6 +13,7 @@ namespace Playground
             private Func<object> objectItemReader;
             private Type readerType;
             private bool isRefType;
+            private JsonDataTypeCategory category;
 
             public CachedTypeReader(FeatureJsonDeserializer serializer)
             {
@@ -22,6 +23,7 @@ namespace Playground
             public void SetTypeReader<T>(Func<T> typeReader, JsonDataTypeCategory category)
             {
                 this.readerType = typeof(T);
+                this.category = category;
                 this.isRefType = !readerType.IsValueType;
                 bool isNullable = readerType.IsNullable();
                 Func<T> temp;
@@ -58,50 +60,47 @@ namespace Playground
 
             public T ReadFieldName<T>(out EquatableByteSegment itemName)
             {
-                deserializer.SkipWhiteSpaces();
-                if (deserializer.CurrentByte != '"') throw new Exception("Not a proper field name");
-                int itemNameStartPos = deserializer.bufferPos + 1;
-
-                Type callType = typeof(T);
-                T result;
-                if (callType == this.readerType)
+                if (category == JsonDataTypeCategory.Primitive)
                 {
-                    Func<T> typedItemReader = (Func<T>)itemReader;
-                    result = typedItemReader.Invoke();
+                    itemName = default;
+                    return ReadItem<T>();
                 }
                 else
                 {
-                    result = (T)objectItemReader.Invoke();
-                }
+                    deserializer.SkipWhiteSpaces();
+                    if (deserializer.CurrentByte != '"') throw new Exception("Not a proper field name");
+                    int itemNameStartPos = deserializer.bufferPos + 1;
 
-                if (deserializer.buffer[deserializer.bufferPos - 1] != '"') throw new Exception("Not a proper field name");
-                int itemNameLength = deserializer.bufferPos - itemNameStartPos - 1;
-                var nameBuffer = deserializer.tempSlicedBuffer.GetSlice(itemNameLength);
-                nameBuffer.CopyFrom(deserializer.buffer, itemNameStartPos, itemNameLength);
-                itemName = nameBuffer;
-                return result;
+                    T result = ReadItem<T>();
+
+                    if (deserializer.buffer[deserializer.bufferPos - 1] != '"') throw new Exception("Not a proper field name");
+                    int itemNameLength = deserializer.bufferPos - itemNameStartPos - 1;
+                    var nameBuffer = deserializer.tempSlicedBuffer.GetSlice(itemNameLength);
+                    nameBuffer.CopyFrom(deserializer.buffer, itemNameStartPos, itemNameLength);
+                    itemName = nameBuffer;
+
+                    return result;
+                }
             }
 
             public T ReadValue<T>(EquatableByteSegment itemName)
             {
-                ItemInfo myItemInfo = new ItemInfo(itemName, deserializer.currentItemInfoIndex);
-                deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
-                deserializer.itemInfos.Add(myItemInfo);
 
-                Type callType = typeof(T);
-                T result;
-                if (callType == this.readerType)
+                if (category == JsonDataTypeCategory.Primitive)
                 {
-                    Func<T> typedItemReader = (Func<T>)itemReader;
-                    result = typedItemReader.Invoke();
+                    return ReadItem<T>();
                 }
                 else
                 {
-                    result = (T)objectItemReader.Invoke();
-                }
+                    ItemInfo myItemInfo = new ItemInfo(itemName, deserializer.currentItemInfoIndex);
+                    deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
+                    deserializer.itemInfos.Add(myItemInfo);
 
-                deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
-                return result;
+                    T result = ReadItem<T>();
+
+                    deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
+                    return result;
+                }
             }
 
             public T ReadItem<T>()

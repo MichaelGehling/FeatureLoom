@@ -112,32 +112,7 @@ namespace Playground
         }
 
         private void Reset()
-        {
-            List<int> itemInfoIndices = new List<int>();
-            Console.WriteLine("-----");
-            for(int i = 0; i < itemInfos.Count; i++)
-            {                                                
-                int pi = i;
-                while (pi != -1)
-                {
-                    itemInfoIndices.Add(pi);
-                    pi = itemInfos[pi].parentIndex;
-                }
-                for (int x = itemInfoIndices.Count - 1; x >= 0; x--)
-                {
-                    int index = itemInfoIndices[x];
-                    var info = itemInfos[index];
-                    string name = info.name.ToString();
-                    if (name != "$" && !name.StartsWith('[')) Console.Write(".");
-                    Console.Write(name);                    
-                }
-                Console.Write(" : ");
-                if (itemInfos[i].itemRef == null) Console.Write("null");
-                else Console.Write(itemInfos[i].itemRef.GetType().ToString());
-                Console.WriteLine();
-                itemInfoIndices.Clear();
-            }            
-
+        {       
             currentItemName = rootName;
             tempSlicedBuffer.Reset(true, false);
             itemInfos.Clear();
@@ -1440,6 +1415,7 @@ namespace Playground
         int CountRemainingBytes() => bufferFillLevel - bufferPos;
 
         EquatableByteSegment refFieldName = "$ref".ToByteArray();
+        List<EquatableByteSegment> fieldPathSegments = new List<EquatableByteSegment>();
 
         bool TryReadRefObject<T>(out bool pathIsValid, out bool typeIsCompatible, out T refObject)
         {
@@ -1447,6 +1423,8 @@ namespace Playground
             bool success = Try(out pathIsValid, out typeIsCompatible, out refObject);
             if (success) peekStack.Pop();
             else bufferPos = peekStack.Pop();
+
+            fieldPathSegments.Clear();
             return success;
 
             bool Try(out bool pathIsValid, out bool typeIsCompatible, out T itemRef)
@@ -1488,7 +1466,6 @@ namespace Playground
                 
                 // TODO find object
                 if (refPath.Count <= 0) return false;
-                List<EquatableByteSegment> fieldPathSegments = new List<EquatableByteSegment>();
                 int pos = 0;
                 int startPos = 0;
                 int segmentLength = 0;
