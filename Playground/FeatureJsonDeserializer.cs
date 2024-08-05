@@ -19,6 +19,7 @@ using FeatureLoom.DependencyInversion;
 using Newtonsoft.Json.Linq;
 using FeatureLoom.Collections;
 using Microsoft.Extensions.Hosting;
+using Microsoft.VisualBasic;
 
 namespace Playground
 {
@@ -85,9 +86,18 @@ namespace Playground
         {
             public DataAccess dataAccess = DataAccess.PublicAndPrivateFields;
             public Dictionary<Type, object> constructors = new();
+            public Dictionary<(Type, Type), object> constructorsWithParam = new();
             public Dictionary<Type, Type> typeMapping = new();
             public Dictionary<Type, Type> genericTypeMapping = new();
+
+            public Settings()
+            {
+                AddTypeMapping<IEnumerable, List<object>>();
+                AddGenericTypeMapping(typeof(IEnumerable<>), typeof(List<>));
+            }
+
             public void AddConstructor<T>(Func<T> constructor) => constructors[typeof(T)] = constructor;
+            public void AddConstructorWithParameter<T, P>(Func<P,T> constructor) => constructorsWithParam[(typeof(T), typeof(P))] = constructor;
             public void AddTypeMapping<BASE_T, IMPL_T>() where IMPL_T : BASE_T => typeMapping[typeof(BASE_T)] = typeof(IMPL_T);            
             public void AddGenericTypeMapping(Type genericBaseType, Type genericImplType)
             {
@@ -129,7 +139,7 @@ namespace Playground
         {
             if (settings.typeMapping.TryGetValue(itemType, out Type mappedType))
             {
-                CachedTypeReader mappedTypeReader = GetCachedTypeReader(mappedType);
+                CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType);
                 typeReaderCache[itemType] = mappedTypeReader;
                 return mappedTypeReader;
             }
@@ -138,7 +148,7 @@ namespace Playground
                 Type genericType = itemType.GetGenericTypeDefinition();                
                 if (settings.genericTypeMapping.TryGetValue(genericType, out Type genericMappedType))
                 {
-                    // TODO
+                    itemType = genericMappedType.MakeGenericType(itemType.GenericTypeArguments);
                 }
             }
 
@@ -210,8 +220,12 @@ namespace Playground
 
         private Func<P, T> GetConstructor<T, P>()
         {
-            Type type = typeof(T);
-            Func<P, T> constructor = CompileConstructor<T, P>();
+            Func<P, T> constructor = null;
+            Type type = typeof(T);            
+            if (settings.constructorsWithParam.TryGetValue((type, typeof(P)), out object c) && c is Func<P, T> typedConstructor) constructor = typedConstructor;
+            else if (null != type.GetConstructor(new Type[] {typeof(P)})) constructor = CompileConstructor<T, P>();
+
+            if (constructor == null) throw new Exception($"No constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
 
             if (!type.IsValueType) // TODO check for ref-support active
             {
@@ -283,7 +297,7 @@ namespace Playground
                 case TypeResult.Object: return ReadObjectValueAsDictionary();
                 case TypeResult.Bool: return ReadBoolValue();
                 case TypeResult.Null: return ReadNullValue();
-                case TypeResult.Array: return ReadArrayValueAsObject();
+                case TypeResult.Array: return ReadArrayValueAsList(); // ReadArrayValueAsObject();
                 case TypeResult.Number: return ReadNumberValueAsObject();
                 default: throw new Exception("Invalid character for determining value");
             }
@@ -386,36 +400,6 @@ namespace Playground
                 if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName)) name = backingFieldName;                
                 itemFieldWriters[itemFieldName] = itemFieldWriter;
             }
-/*
-            // Add ref handler
-            itemFieldWriters[new EquatableByteSegment("$Ref".ToByteArray())] = item =>
-            {
-                if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
-                if (!refItems.TryGetValue(stringBytes, out object refObj)) return item;
-                if (!(refObj is T refItem)) return item;
-                
-                SkipWhiteSpaces();
-                if (CurrentByte == '}') return refItem;
-
-                // Skip all following fields until the object's end is found
-                if (CurrentByte == ',') TryNextByte();
-                while (true)
-                {
-                    SkipWhiteSpaces();
-                    if (CurrentByte == '}') break;
-
-                    if (!TryReadStringBytes(out var _)) throw new Exception("Failed reading object");
-                    SkipWhiteSpaces();
-                    if (CurrentByte != ':') throw new Exception("Failed reading object");
-                    TryNextByte();
-                    SkipValue();
-                    SkipWhiteSpaces();
-                    if (CurrentByte == ',') TryNextByte();
-                }
-
-                return refItem;
-            };
-*/
             var constructor = GetConstructor<T>();
 
             Func<T> typeReader = () =>
@@ -652,7 +636,7 @@ namespace Playground
         {
             var elementReader = new ElementReader<object>(this);
 
-            var constructor = GetConstructor<T, IEnumerable>();
+            Func<IEnumerable, T> constructor = GetConstructor<T, IEnumerable>();
 
             Pool<List<object>> pool = new Pool<List<object>>(() => new List<object>(), l => l.Clear());
             cachedTypeReader.SetTypeReader<T>(() =>
@@ -732,31 +716,11 @@ namespace Playground
             IEnumerator IEnumerable.GetEnumerator() => this;
         }
 
-        Pool<List<object>> objectBufferPool = new Pool<List<object>>(() => new List<object>(), l => l.Clear());
-
-
-        public object[] ReadArrayValueAsObject()
-        {                        
-            if (CurrentByte != '[') throw new Exception("Failed reading Array");
-            if (!TryNextByte()) throw new Exception("Failed reading Array");
-
-            List<object> objectBuffer = objectBufferPool.Take();
-            while (true)
-            {
-                SkipWhiteSpaces();
-                if (CurrentByte == ']') break;
-                object current = ReadUnknownValue();
-                objectBuffer.Add(current);
-                SkipWhiteSpaces();
-                if (CurrentByte == ',') TryNextByte();
-                else if (CurrentByte != ']') throw new Exception("Failed reading Array");
-            }
-
-            object[] objectArray = objectBuffer.Count > 0 ? objectBuffer.ToArray() : Array.Empty<object>();
-            objectBufferPool.Return(objectBuffer);
-            if (CurrentByte != ']') throw new Exception("Failed reading Array");
-            TryNextByte();
-            return objectArray;            
+        CachedTypeReader cachedObjectListReader = null;
+        private List<object> ReadArrayValueAsList()
+        {
+            if (cachedObjectListReader == null) cachedObjectListReader = CreateCachedTypeReader(typeof(List<object>));
+            return cachedObjectListReader.ReadItem<List<object>>();
         }
 
         public string ReadStringValue()
@@ -1413,6 +1377,101 @@ namespace Playground
         }
 
         int CountRemainingBytes() => bufferFillLevel - bufferPos;
+        
+        EquatableByteSegment typeFieldName = "$type".ToByteArray();
+        EquatableByteSegment valueFieldName = "$value".ToByteArray();
+        bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
+        {
+            item = default;            
+            peekStack.Push(bufferPos);
+
+            if (!FindProposedType(out CachedTypeReader proposedTypeReader, out bool foundValueField))
+            {
+                bufferPos = peekStack.Pop();                
+                return false;
+            }
+
+            if (foundValueField)
+            {
+                peekStack.Pop();
+                // bufferPos is currently at the position of the actual value, so read it from here, but handle the rest of the type object afterwards                
+                if (proposedTypeReader != null) item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
+                else item = originalTypeReader.ReadItem<T>();
+                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
+                return true;
+            }
+            else
+            {
+                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.
+                bufferPos = peekStack.Pop();
+                if (proposedTypeReader == null) return false;
+                item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
+                return true;
+            }
+
+            bool FindProposedType(out CachedTypeReader proposedTypeReader, out bool foundValueField)
+            {
+                proposedTypeReader = null;
+                foundValueField = false;
+
+                // IMPORTANT: Currently, the type-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
+
+                // 1. find $type field
+                SkipWhiteSpaces();
+                if (CurrentByte != (byte)'{') return false;
+                TryNextByte();
+                // TODO compare byte per byte to fail early
+                if (!TryReadStringBytes(out var fieldName)) return false;
+                if (!typeFieldName.Equals(fieldName)) return false;
+                SkipWhiteSpaces();
+                if (CurrentByte != (byte)':') return false;
+                TryNextByte();
+                if (!TryReadStringBytes(out var proposedTypeBytes)) return false;
+
+                // 2. get proposedTypeReader, if possible
+                string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.Array, proposedTypeBytes.Offset, proposedTypeBytes.Count);
+                Type proposedType = TypeNameHelper.GetTypeFromSimplifiedName(proposedTypename);
+                Type expectedType = typeof(T);
+                if (proposedType != null && proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);
+
+                // 3. look if next is $value field
+                SkipWhiteSpaces();
+                if (CurrentByte != ',') return true;
+                TryNextByte();
+                // TODO compare byte per byte to fail early
+                if (!TryReadStringBytes(out fieldName)) return true;
+                if (!valueFieldName.Equals(fieldName)) return true;
+                SkipWhiteSpaces();
+                if (CurrentByte != (byte)':') return true;
+                TryNextByte();
+
+                // 4. $value field found
+                foundValueField = true;
+                return true;
+            };
+
+        }
+
+        private bool TrySkipRemainingFieldsOfObject()
+        {
+            SkipWhiteSpaces();
+            if (CurrentByte == ',') TryNextByte();
+            while (true)
+            {
+                SkipWhiteSpaces();
+                if (CurrentByte == '}') break;
+
+                if (!TryReadStringBytes(out var _)) return false;
+                SkipWhiteSpaces();
+                if (CurrentByte != ':') return false;
+                TryNextByte();
+                SkipValue();
+                SkipWhiteSpaces();
+                if (CurrentByte == ',') TryNextByte();
+            }
+            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) return false;
+            return true;
+        }
 
         EquatableByteSegment refFieldName = "$ref".ToByteArray();
         List<EquatableByteSegment> fieldPathSegments = new List<EquatableByteSegment>();
@@ -1433,10 +1492,11 @@ namespace Playground
                 typeIsCompatible = false;
                 itemRef = default;
 
-                // IMPORTANT: At the moment, the ref-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
+                // IMPORTANT: Currently, the ref-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
                 SkipWhiteSpaces();
                 if (CurrentByte != (byte)'{') return false;
                 TryNextByte();
+                // TODO compare byte per byte to fail early
                 if (!TryReadStringBytes(out var fieldName)) return false;
                 if (!refFieldName.Equals(fieldName)) return false;
                 SkipWhiteSpaces();

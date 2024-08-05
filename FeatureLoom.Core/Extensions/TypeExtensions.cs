@@ -25,6 +25,11 @@ namespace FeatureLoom.Extensions
 
         public static Type GetFirstTypeParamOfGenericInterface(this Type typeToCheck, Type genericInterfaceType)
         {
+            if (typeToCheck.IsGenericType && typeToCheck.GetGenericTypeDefinition() == genericInterfaceType)
+            {
+                return typeToCheck.GetGenericArguments()[0];
+            }
+
             foreach (var type in typeToCheck.GetInterfaces())
             {
                 if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
@@ -37,6 +42,11 @@ namespace FeatureLoom.Extensions
 
         public static Type[] GetAllTypeParamsOfGenericInterface(this Type typeToCheck, Type genericInterfaceType)
         {
+            if (typeToCheck.IsGenericType && typeToCheck.GetGenericTypeDefinition() == genericInterfaceType)
+            {
+                return typeToCheck.GetGenericArguments();
+            }
+
             foreach (var type in typeToCheck.GetInterfaces())
             {
                 if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
@@ -50,6 +60,11 @@ namespace FeatureLoom.Extensions
         public static bool TryGetTypeParamsOfGenericInterface(this Type typeToCheck, Type genericInterfaceType, out Type param1)
         {
             param1 = null;
+            if (typeToCheck.IsGenericType && typeToCheck.GetGenericTypeDefinition() == genericInterfaceType)
+            {
+                return typeToCheck.GetGenericArguments().TryElementsOut(out param1);
+            }
+
             foreach (var type in typeToCheck.GetInterfaces())
             {
                 if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
@@ -64,6 +79,12 @@ namespace FeatureLoom.Extensions
         {
             param1 = null; 
             param2 = null;
+
+            if (typeToCheck.IsGenericType && typeToCheck.GetGenericTypeDefinition() == genericInterfaceType)
+            {
+                return typeToCheck.GetGenericArguments().TryElementsOut(out param1, out param2);
+            }
+
             foreach (var type in typeToCheck.GetInterfaces())
             {
                 if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)
@@ -79,6 +100,12 @@ namespace FeatureLoom.Extensions
             param1 = null;
             param2 = null;
             param3 = null;
+
+            if (typeToCheck.IsGenericType && typeToCheck.GetGenericTypeDefinition() == genericInterfaceType)
+            {
+                return typeToCheck.GetGenericArguments().TryElementsOut(out param1, out param2, out param3);
+            }
+
             foreach (var type in typeToCheck.GetInterfaces())
             {
                 if (type.IsGenericType && type.GetGenericTypeDefinition() == genericInterfaceType)

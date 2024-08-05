@@ -60,18 +60,18 @@ namespace Playground
 
             public T ReadFieldName<T>(out EquatableByteSegment itemName)
             {
-                if (category == JsonDataTypeCategory.Primitive)
+                /*if (category == JsonDataTypeCategory.Primitive)
                 {
                     itemName = default;
-                    return ReadItem<T>();
+                    return ReadItemIgnoreProposedType<T>();
                 }
-                else
+                else*/
                 {
                     deserializer.SkipWhiteSpaces();
                     if (deserializer.CurrentByte != '"') throw new Exception("Not a proper field name");
                     int itemNameStartPos = deserializer.bufferPos + 1;
 
-                    T result = ReadItem<T>();
+                    T result = ReadItemIgnoreProposedType<T>();
 
                     if (deserializer.buffer[deserializer.bufferPos - 1] != '"') throw new Exception("Not a proper field name");
                     int itemNameLength = deserializer.bufferPos - itemNameStartPos - 1;
@@ -87,7 +87,7 @@ namespace Playground
             {
 
                 if (category == JsonDataTypeCategory.Primitive)
-                {
+                {                    
                     return ReadItem<T>();
                 }
                 else
@@ -104,6 +104,25 @@ namespace Playground
             }
 
             public T ReadItem<T>()
+            {
+                if (deserializer.TryReadAsProposedType(this, out T item)) return item;
+
+                Type callType = typeof(T);
+                T result;
+                if (callType == this.readerType)
+                {
+                    Func<T> typedItemReader = (Func<T>)itemReader;
+                    result = typedItemReader.Invoke();
+                }
+                else
+                {
+                    result = (T)objectItemReader.Invoke();
+                }
+
+                return result;
+            }
+
+            public T ReadItemIgnoreProposedType<T>()
             {
                 Type callType = typeof(T);
                 T result;

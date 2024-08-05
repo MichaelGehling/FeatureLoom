@@ -27,8 +27,8 @@ namespace Playground
 {
     public class BaseDto
     {
-        //private double privBase = 0.77;
-        public int protBase = 1;
+        private double privBase = 0.77;
+        protected int protBase = 1;
         public int pubBase = 2;
 
         public virtual void Mutate()
@@ -43,12 +43,12 @@ namespace Playground
     {
         public TestEnum testEnum = TestEnum.TestB;
         public object self;
-        //private int privInt = 42;
+        private int privInt = 42;
         public int myInt = 123;
         public string myString = "Hello: \\, \", \\, \n";
         public MyEmbedded1 myEmbedded1 = new MyEmbedded1();
         public MyEmbedded2 myEmbedded2 = new MyEmbedded2();
-        public IEnumerable myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
+        public IEnumerable myObjects = new HashSet<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
 
         public string str1 = "Mystring1";
         public string str2 = "Mystring2";
@@ -72,7 +72,7 @@ namespace Playground
         public Dictionary<string, MyEmbedded1> myEmbeddedDict = new Dictionary<string, MyEmbedded1>();
 
         public string MyProperty { get; set; } = "propValue";
-
+        
         public TestDto()
         {
             this.self = this;
@@ -278,17 +278,17 @@ namespace Playground
         {
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
-                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo
+                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
+                //typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo
             });
 
-            var desSettings = new FeatureJsonDeserializer.Settings();
-            desSettings.AddTypeMapping<IEnumerable, List<object>>();
+            var desSettings = new FeatureJsonDeserializer.Settings();    
             FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(desSettings);
 
 
             var input = new TestDto();
             string json = featureJsonSerializer.Serialize(input);
-            featureJsonDeserializer.TryDeserialize(json.ToStream(), out TestDto output);
+            featureJsonDeserializer.TryDeserialize(json.ToStream(), out object output);
 
             string jsonString = """
                                 
