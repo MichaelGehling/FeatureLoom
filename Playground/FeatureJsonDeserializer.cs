@@ -33,7 +33,7 @@ namespace Playground
         int bufferStartPos = 0;
         int pinnedBufferPos = -1;
         int bufferFillLevel = 0;
-        int bufferFillMargin = 1024 * 8;
+        int bufferResetLevel = BUFFER_SIZE - (1024 * 8);
         long totalBytesRead = 0;
         Stream stream;                
         private SlicedBuffer<byte> tempSlicedBuffer;
@@ -1068,6 +1068,11 @@ namespace Playground
                         item = default;
                         return false;
                     }
+                }
+                else if (bufferStartPos > bufferResetLevel)
+                {
+                    ResetBuffer(true);
+                    bufferPos = bufferStartPos;
                 }
                 else if (bufferPos == bufferFillLevel - 1)
                 {
