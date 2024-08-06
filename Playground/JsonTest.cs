@@ -287,8 +287,21 @@ namespace Playground
 
 
             var input = new TestDto();
-            string json = featureJsonSerializer.Serialize(input);
-            featureJsonDeserializer.TryDeserialize(json.ToStream(), out object output);
+
+            MemoryStream memoryStream = new MemoryStream();
+            for (int i = 0; i < 100000; i++)
+            {
+                featureJsonSerializer.Serialize(memoryStream, input);
+                memoryStream.WriteByte((byte)' ');
+            }
+
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            int counter = 0;
+            while (featureJsonDeserializer.TryDeserialize(memoryStream, out TestDto output))
+            {
+                Console.WriteLine(++counter);
+            }
+
 
             string jsonString = """
                                 

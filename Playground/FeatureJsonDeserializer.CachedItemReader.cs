@@ -60,27 +60,19 @@ namespace Playground
 
             public T ReadFieldName<T>(out EquatableByteSegment itemName)
             {
-                /*if (category == JsonDataTypeCategory.Primitive)
-                {
-                    itemName = default;
-                    return ReadItemIgnoreProposedType<T>();
-                }
-                else*/
-                {
-                    deserializer.SkipWhiteSpaces();
-                    if (deserializer.CurrentByte != '"') throw new Exception("Not a proper field name");
-                    int itemNameStartPos = deserializer.bufferPos + 1;
+                deserializer.SkipWhiteSpaces();
+                if (deserializer.CurrentByte != '"') throw new Exception("Not a proper field name");
+                int itemNameStartPos = deserializer.bufferPos + 1;
 
-                    T result = ReadItemIgnoreProposedType<T>();
+                T result = ReadItemIgnoreProposedType<T>();
 
-                    if (deserializer.buffer[deserializer.bufferPos - 1] != '"') throw new Exception("Not a proper field name");
-                    int itemNameLength = deserializer.bufferPos - itemNameStartPos - 1;
-                    var nameBuffer = deserializer.tempSlicedBuffer.GetSlice(itemNameLength);
-                    nameBuffer.CopyFrom(deserializer.buffer, itemNameStartPos, itemNameLength);
-                    itemName = nameBuffer;
+                if (deserializer.buffer[deserializer.bufferPos - 1] != '"') throw new Exception("Not a proper field name");
+                int itemNameLength = deserializer.bufferPos - itemNameStartPos - 1;
+                var nameBuffer = deserializer.tempSlicedBuffer.GetSlice(itemNameLength);
+                nameBuffer.CopyFrom(deserializer.buffer, itemNameStartPos, itemNameLength);
+                itemName = nameBuffer;
 
-                    return result;
-                }
+                return result;
             }
 
             public T ReadValue<T>(EquatableByteSegment itemName)

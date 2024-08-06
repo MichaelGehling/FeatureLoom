@@ -30,9 +30,10 @@ namespace Playground
         byte[] buffer = new byte[BUFFER_SIZE];
         Stack<int> peekStack = new Stack<int>();
         int bufferPos = 0;
+        int bufferStartPos = 0;
         int pinnedBufferPos = -1;
         int bufferFillLevel = 0;
-        int bufferResetLevel = BUFFER_SIZE - (1024 * 8);
+        int bufferFillMargin = 1024 * 8;
         long totalBytesRead = 0;
         Stream stream;                
         private SlicedBuffer<byte> tempSlicedBuffer;
@@ -115,6 +116,7 @@ namespace Playground
 
         Settings settings;
 
+
         public FeatureJsonDeserializer(Settings settings = null)
         {                        
             this.settings = settings ?? new Settings();
@@ -122,7 +124,14 @@ namespace Playground
         }
 
         private void Reset()
-        {       
+        {
+            if (!(this.stream?.CanRead ?? false))
+            {
+                this.stream = null;
+                bufferPos = 0;
+            }
+            bufferStartPos = bufferPos;
+            peekStack.Clear();
             currentItemName = rootName;
             tempSlicedBuffer.Reset(true, false);
             itemInfos.Clear();
@@ -341,7 +350,7 @@ namespace Playground
                         SkipWhiteSpaces();
                         if (CurrentByte == '}') break;
 
-                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
+                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes); // TODO: Check what to do to make integers and other types work as a dictionary key
                         SkipWhiteSpaces();
                         if (CurrentByte != ':') throw new Exception("Failed reading object to Dictionary");
                         TryNextByte();
@@ -735,6 +744,7 @@ namespace Playground
         {
             int i = bytes.Offset;
             int end = bytes.Offset + bytes.Count;
+            var buffer = bytes.Array;
 
             while (i < end)
             {
@@ -1044,25 +1054,77 @@ namespace Playground
         public float ReadFloatValue() => (float)ReadDoubleValue();
         public float? ReadNullableFloatValue() => (float?)ReadDoubleValue();
 
-        public bool TryDeserialize<T>(Stream stream, out T item, bool continueReading = true)
+        public bool TryDeserialize<T>(Stream stream, out T item)
         {
             serializerLock.Enter();
             try
             {                
-                this.stream = stream;
-                /*if (!continueReading || bufferPos >= bufferFillLevel)
+                if (this.stream != stream)
                 {
-                    bufferFillLevel = 0;
-                    bufferPos = 0;
+                    ResetBuffer(false);
+                    this.stream = stream;
+                    if (!TryReadToBuffer())
+                    {
+                        item = default;
+                        return false;
+                    }
                 }
-                totalBytesRead = bufferFillLevel - bufferPos;
-                */
-                bufferFillLevel = stream.Read(buffer, 0, buffer.Length);
+                else if (bufferPos == bufferFillLevel - 1)
+                {
+                    if (!TryReadToBuffer())
+                    {
+                        item = default;
+                        return false;
+                    }
+                }
                 var reader = GetCachedTypeReader(typeof(T));
                 item = reader.ReadValue<T>(rootName);
                 return true;
             }
-            catch
+            catch(BufferExceededException)
+            {
+                if (bufferStartPos == 0) throw; // Buffer is too small to keep complete json value
+
+                // Try to make some more space in the buffer and start over again
+                try
+                {
+                    ResetBuffer(true);
+                    bufferPos = bufferStartPos;
+
+                    peekStack.Clear();
+                    currentItemName = rootName;
+                    tempSlicedBuffer.Reset(true, false);
+                    itemInfos.Clear();
+                    currentItemInfoIndex = -1;
+
+                    if (!TryReadToBuffer())
+                    {
+                        item = default;
+                        return false;
+                    }
+                    else if (bufferPos == bufferFillLevel - 1)
+                    {
+                        if (!TryReadToBuffer())
+                        {
+                            item = default;
+                            return false;
+                        }
+                    }
+                    var reader = GetCachedTypeReader(typeof(T));
+                    item = reader.ReadValue<T>(rootName);
+                    return true;
+                }
+                catch (BufferExceededException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    item = default;
+                    return false;
+                }
+            }
+            catch(Exception e)
             {
                 item = default;
                 return false;
@@ -1074,31 +1136,45 @@ namespace Playground
             }
         }
 
-        private async Task<bool> TryReadToBuffer()
+        private void ResetBuffer(bool keepUnusedBytes)
         {
-            if (bufferFillLevel > bufferResetLevel)
+            if (keepUnusedBytes)
+            {
+                int bytesToKeep = bufferFillLevel - bufferStartPos;
+                Array.Copy(buffer, bufferStartPos, buffer, 0, bytesToKeep);
+                bufferPos = bytesToKeep;
+                bufferStartPos = 0;
+                bufferFillLevel = bytesToKeep;
+            }
+            else
             {
                 bufferPos = 0;
+                bufferStartPos = 0;
                 bufferFillLevel = 0;
             }
-            int bytesRead = await stream.ReadAsync(buffer, bufferFillLevel, buffer.Length - bufferFillLevel);
+        }
+
+        class BufferExceededException : Exception
+        {
+
+        }
+
+        private bool TryReadToBuffer()
+        {
+            int bufferSizeLeft = buffer.Length - bufferFillLevel;
+            if (bufferSizeLeft == 0) throw new BufferExceededException();
+            int bytesRead = stream.Read(buffer, bufferFillLevel, bufferSizeLeft);
             totalBytesRead += bytesRead;
             bufferFillLevel += bytesRead;
-            return bufferFillLevel > bufferPos;
+            return bytesRead > 0;
         }
 
         private bool TryNextByte()
         {
             if (++bufferPos < bufferFillLevel) return true;
-            --bufferPos;
+            if (TryReadToBuffer()) return true;
+            bufferPos--;
             return false;            
-        }
-
-        private bool TrySkipBytes(int numBytesToSkip)
-        {
-            if (!CheckBytesRemaining(numBytesToSkip)) return false;
-            bufferPos += numBytesToSkip;
-            return true;
         }
 
         private byte CurrentByte => buffer[bufferPos];
@@ -1369,11 +1445,6 @@ namespace Playground
             {
                 if (map_SkipWhitespaces[CurrentByte] == FilterResult.Found) return;
             } while (TryNextByte());
-        }
-        
-        bool CheckBytesRemaining(int numBytes)
-        {
-            return !(bufferPos + numBytes >= bufferFillLevel);
         }
 
         int CountRemainingBytes() => bufferFillLevel - bufferPos;
