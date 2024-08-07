@@ -22,6 +22,9 @@ using FeatureLoom.Extensions;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
+using Newtonsoft.Json;
+using System.Threading;
 
 namespace Playground
 {
@@ -75,7 +78,7 @@ namespace Playground
         
         public TestDto()
         {
-            this.self = this;
+            //this.self = this;
 
             myEmbeddedDict["prop1"] = new MyEmbedded1();
             myEmbeddedDict["prop2"] = new MyEmbedded1();
@@ -274,35 +277,98 @@ namespace Playground
             }
         }
 
+
+        public class JsonStreamProcessor<T>
+        {
+            private readonly Stream _stream;
+            private readonly Action<T> processor;
+
+            public JsonStreamProcessor(Stream stream, Action<T> processor)
+            {
+                _stream = stream;
+                this.processor = processor;
+            }
+
+            public async Task ProcessStreamAsync()
+            {
+                using var streamReader = new StreamReader(_stream);
+                using var jsonReader = new JsonTextReader(streamReader)
+                {
+                    SupportMultipleContent = true  // Allow multiple JSON objects in the stream
+                };
+
+                var serializer = new Newtonsoft.Json.JsonSerializer();
+
+                try
+                {
+                    while (await jsonReader.ReadAsync())
+                    {
+                        //if (jsonReader.TokenType == JsonToken.StartObject)
+                        {
+                            // Deserialize the JSON object
+                            T jsonObject = serializer.Deserialize<T>(jsonReader);
+                            //processor(jsonObject);
+                        }
+                    }
+                }
+                catch (Newtonsoft.Json.JsonException ex)
+                {
+                    Console.WriteLine($"JSON parsing error: {ex.Message}");
+                    // Handle parsing errors as needed
+                }
+            }
+        }
+
+
+
         public static async Task Run()
         {
             FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
-                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
-                //typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo
+                //typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
+                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,                               
             });
 
             var desSettings = new FeatureJsonDeserializer.Settings();    
             FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(desSettings);
 
 
-            var input = new TestDto();
-
-            MemoryStream memoryStream = new MemoryStream();
-            for (int i = 0; i < 100000; i++)
+            var input = new TestDto2();
+            int iterations = 100_000;
+            MemoryStream memoryStream;
+            while (true)
             {
-                featureJsonSerializer.Serialize(memoryStream, input);
-                memoryStream.WriteByte((byte)' ');
+                Thread.Sleep(1000);
+
+                var tkx = AppTime.TimeKeeper;
+                memoryStream = new MemoryStream();
+                for (int i = 0; i < iterations; i++)
+                {
+                    featureJsonSerializer.Serialize(memoryStream, input);                
+                    //System.Text.Json.JsonSerializer.Serialize(memoryStream, input);
+                    memoryStream.WriteByte((byte)'\n');
+                }
+                Console.WriteLine("S: " + (iterations / tkx.Elapsed.TotalSeconds).ToString());
+
+                Thread.Sleep(1000);
+
+                memoryStream.Seek(0, SeekOrigin.Begin);
+                tkx.Restart();                
+                while (featureJsonDeserializer.TryDeserialize(memoryStream, out TestDto2 output))
+                {
+
+                }
+                Console.WriteLine("FL:" + (iterations / tkx.Elapsed.TotalSeconds).ToString());
+
+                Thread.Sleep(1000);
+
+                memoryStream.Seek(0, SeekOrigin.Begin);
+                tkx.Restart();               
+                var jsonStreamProcessor = new JsonStreamProcessor<TestDto2>(memoryStream, null);
+                await jsonStreamProcessor.ProcessStreamAsync();
+                Console.WriteLine("JN:" + (iterations / tkx.Elapsed.TotalSeconds).ToString());
             }
-
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            int counter = 0;
-            while (featureJsonDeserializer.TryDeserialize(memoryStream, out TestDto output))
-            {
-                Console.WriteLine(++counter);
-            }
-
-
             string jsonString = """
                                 
                                 {
@@ -362,7 +428,7 @@ namespace Playground
 
             };
 
-            int iterations = 1_000_000;
+            iterations = 1_000_000;
 
             //var testDto = new TestDto();
             //var testDto = -128;
@@ -517,7 +583,7 @@ namespace Playground
             Console.WriteLine("FeatureJsonSerializer:");
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));
             Console.WriteLine("\nSystem.Text.Json:");            
-            Console.WriteLine(JsonSerializer.Serialize(testDto, opt));
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(testDto, opt));
             Console.WriteLine("\nUtf8Json:");
             Console.WriteLine(UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto)));
 
@@ -567,7 +633,7 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                    JsonSerializer.Serialize(stream, testDto, opt);
+                    System.Text.Json.JsonSerializer.Serialize(stream, testDto, opt);
                     //json = JsonSerializer.Serialize(testDto, opt);
                     stream.Position = 0;
                 }

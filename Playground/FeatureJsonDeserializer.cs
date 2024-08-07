@@ -20,6 +20,7 @@ using Newtonsoft.Json.Linq;
 using FeatureLoom.Collections;
 using Microsoft.Extensions.Hosting;
 using Microsoft.VisualBasic;
+using static Playground.FeatureJsonSerializer;
 
 namespace Playground
 {
@@ -35,7 +36,8 @@ namespace Playground
         int bufferFillLevel = 0;
         int bufferResetLevel = BUFFER_SIZE - (1024 * 8);
         long totalBytesRead = 0;
-        Stream stream;                
+
+        Stream stream;
         private SlicedBuffer<byte> tempSlicedBuffer;
         EquatableByteSegment rootName = "$".ToByteArray();
         EquatableByteSegment currentItemName = "$".ToByteArray();
@@ -90,6 +92,8 @@ namespace Playground
             public Dictionary<(Type, Type), object> constructorsWithParam = new();
             public Dictionary<Type, Type> typeMapping = new();
             public Dictionary<Type, Type> genericTypeMapping = new();
+            public bool enableReferenceResolution = false;
+            public bool enableProposedTypes = false;
 
             public Settings()
             {
@@ -98,14 +102,14 @@ namespace Playground
             }
 
             public void AddConstructor<T>(Func<T> constructor) => constructors[typeof(T)] = constructor;
-            public void AddConstructorWithParameter<T, P>(Func<P,T> constructor) => constructorsWithParam[(typeof(T), typeof(P))] = constructor;
-            public void AddTypeMapping<BASE_T, IMPL_T>() where IMPL_T : BASE_T => typeMapping[typeof(BASE_T)] = typeof(IMPL_T);            
+            public void AddConstructorWithParameter<T, P>(Func<P, T> constructor) => constructorsWithParam[(typeof(T), typeof(P))] = constructor;
+            public void AddTypeMapping<BASE_T, IMPL_T>() where IMPL_T : BASE_T => typeMapping[typeof(BASE_T)] = typeof(IMPL_T);
             public void AddGenericTypeMapping(Type genericBaseType, Type genericImplType)
             {
                 if (!genericImplType.IsOfGenericType(genericBaseType)) throw new Exception($"{TypeNameHelper.GetSimplifiedTypeName(genericBaseType)} is not implemented by {TypeNameHelper.GetSimplifiedTypeName(genericImplType)}");
                 genericTypeMapping[genericBaseType] = genericImplType;
             }
-            
+
         }
 
         public enum DataAccess
@@ -118,7 +122,7 @@ namespace Playground
 
 
         public FeatureJsonDeserializer(Settings settings = null)
-        {                        
+        {
             this.settings = settings ?? new Settings();
             tempSlicedBuffer = new SlicedBuffer<byte>(128 * 1024, 256, 128 * 1024);
         }
@@ -132,12 +136,17 @@ namespace Playground
             }
             bufferStartPos = bufferPos;
             peekStack.Clear();
-            currentItemName = rootName;
-            tempSlicedBuffer.Reset(true, false);
-            itemInfos.Clear();
-            currentItemInfoIndex = -1;
+
+            if (settings.enableReferenceResolution)
+            {
+                currentItemName = rootName;
+                tempSlicedBuffer.Reset(true, false);
+                itemInfos.Clear();
+                currentItemInfoIndex = -1;
+            }
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         CachedTypeReader GetCachedTypeReader(Type itemType)
         {
             if (typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
@@ -154,7 +163,7 @@ namespace Playground
             }
             if (itemType.IsGenericType && settings.genericTypeMapping.Count > 0)
             {
-                Type genericType = itemType.GetGenericTypeDefinition();                
+                Type genericType = itemType.GetGenericTypeDefinition();
                 if (settings.genericTypeMapping.TryGetValue(genericType, out Type genericMappedType))
                 {
                     itemType = genericMappedType.MakeGenericType(itemType.GenericTypeArguments);
@@ -197,6 +206,7 @@ namespace Playground
             return cachedTypeReader;
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SetItemRefInCurrentItemInfo(object item)
         {
             var itemInfo = itemInfos[currentItemInfoIndex];
@@ -214,7 +224,7 @@ namespace Playground
 
             if (constructor == null) throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)}. Use AddConstructor in Settings.");
 
-            if (!type.IsValueType) // TODO check for ref-support active
+            if (!type.IsValueType && settings.enableReferenceResolution)
             {
                 return () =>
                 {
@@ -230,13 +240,13 @@ namespace Playground
         private Func<P, T> GetConstructor<T, P>()
         {
             Func<P, T> constructor = null;
-            Type type = typeof(T);            
+            Type type = typeof(T);
             if (settings.constructorsWithParam.TryGetValue((type, typeof(P)), out object c) && c is Func<P, T> typedConstructor) constructor = typedConstructor;
-            else if (null != type.GetConstructor(new Type[] {typeof(P)})) constructor = CompileConstructor<T, P>();
+            else if (null != type.GetConstructor(new Type[] { typeof(P) })) constructor = CompileConstructor<T, P>();
 
             if (constructor == null) throw new Exception($"No constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
 
-            if (!type.IsValueType) // TODO check for ref-support active
+            if (!type.IsValueType && settings.enableReferenceResolution)
             {
                 return (parameter) =>
                 {
@@ -264,7 +274,7 @@ namespace Playground
             return lambda.Compile();
         }
 
-        private void CreateEnumReader<T>(CachedTypeReader cachedTypeReader) where T: struct, Enum
+        private void CreateEnumReader<T>(CachedTypeReader cachedTypeReader) where T : struct, Enum
         {
             cachedTypeReader.SetTypeReader(() =>
             {
@@ -314,6 +324,7 @@ namespace Playground
 
         CachedTypeReader cachedStringObjectDictionaryReader = null;
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private Dictionary<string, object> ReadObjectValueAsDictionary()
         {
             if (cachedStringObjectDictionaryReader == null) cachedStringObjectDictionaryReader = CreateCachedTypeReader(typeof(Dictionary<string, object>));
@@ -365,7 +376,7 @@ namespace Playground
                 else if (CurrentByte == '[')
                 {
                     if (!TryNextByte()) throw new Exception("Failed reading Array to Dictionary");
-                    foreach(var element in elementReader)
+                    foreach (var element in elementReader)
                     {
                         dict.Add(element.Key, element.Value);
                     }
@@ -399,14 +410,14 @@ namespace Playground
                 }
             }
 
-            Dictionary<EquatableByteSegment, Func<T,T>> itemFieldWriters = new();
+            Dictionary<EquatableByteSegment, Func<T, T>> itemFieldWriters = new();
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
                 string name = memberInfo.Name;
                 var itemFieldName = new EquatableByteSegment(name.ToByteArray());
-                var itemFieldWriter = this.InvokeGenericMethod<Func<T,T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType }, memberInfo, itemFieldName);                
-                if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName)) name = backingFieldName;                
+                var itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType }, memberInfo, itemFieldName);
+                if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName)) name = backingFieldName;
                 itemFieldWriters[itemFieldName] = itemFieldWriter;
             }
             var constructor = GetConstructor<T>();
@@ -418,7 +429,7 @@ namespace Playground
                 SkipWhiteSpaces();
                 if (CurrentByte != '{') throw new Exception("Failed reading object");
                 TryNextByte();
-                
+
                 while (true)
                 {
                     SkipWhiteSpaces();
@@ -437,13 +448,13 @@ namespace Playground
                 if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading object");
                 return item;
             };
-            
+
             cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
-            
+
         }
 
 
-        private Func<T,T> CreateItemFieldWriter<T, V>(MemberInfo memberInfo, EquatableByteSegment fieldName)
+        private Func<T, T> CreateItemFieldWriter<T, V>(MemberInfo memberInfo, EquatableByteSegment fieldName)
         {
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
@@ -525,7 +536,7 @@ namespace Playground
             return setMethod != null && setMethod.ReturnParameter.GetRequiredCustomModifiers().Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
         }
 
-        private Func<T,T> CreateFieldWriterUsingExpression<T, V>(FieldInfo fieldInfo, EquatableByteSegment fieldName)
+        private Func<T, T> CreateFieldWriterUsingExpression<T, V>(FieldInfo fieldInfo, EquatableByteSegment fieldName)
         {
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
@@ -546,7 +557,7 @@ namespace Playground
             };
         }
 
-        private Func<T,T> CreatePropertyWriterUsingExpression<T, V>(PropertyInfo propertyInfo, EquatableByteSegment fieldName)
+        private Func<T, T> CreatePropertyWriterUsingExpression<T, V>(PropertyInfo propertyInfo, EquatableByteSegment fieldName)
         {
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
@@ -591,7 +602,7 @@ namespace Playground
                 List<E> elementBuffer = pool.Take();
                 elementBuffer.AddRange(elementReader);
                 E[] item = elementBuffer.ToArray();
-                SetItemRefInCurrentItemInfo(item);
+                if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
                 pool.Return(elementBuffer);
                 if (CurrentByte != ']') throw new Exception("Failed reading Array");
                 TryNextByte();
@@ -602,7 +613,13 @@ namespace Playground
 
         private bool TryCreateEnumerableTypeReader(Type itemType, CachedTypeReader cachedTypeReader)
         {
-            if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))
+
+            /*if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IList<>), out Type elementType))
+            {
+                var enumerableType = typeof(IList<>).MakeGenericType(elementType);
+                this.InvokeGenericMethod(nameof(CreateGenericListTypeReader), new Type[] { itemType, elementType }, cachedTypeReader);
+            }
+            else */if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))
             {
                 var enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
                 this.InvokeGenericMethod(nameof(CreateGenericEnumerableTypeReader), new Type[] { itemType, elementType }, cachedTypeReader);
@@ -619,22 +636,46 @@ namespace Playground
             return true;
         }
 
-        private void CreateGenericEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
+        private void CreateGenericListTypeReader<T, E>(CachedTypeReader cachedTypeReader) where T : IList<E>
         {
             var elementReader = new ElementReader<E>(this);
 
-            var constructor = GetConstructor<T, IEnumerable<E>>();
-
-            Pool<List<E>> pool = new Pool<List<E>>(() => new List<E>(), l => l.Clear());            
+            var constructor = GetConstructor<T>();
+            
             cachedTypeReader.SetTypeReader<T>(() =>
             {
                 SkipWhiteSpaces();
                 if (CurrentByte != '[') throw new Exception("Failed reading Array");
                 if (!TryNextByte()) throw new Exception("Failed reading Array");
-                List<E> elementBuffer = pool.Take();
+                
+                T item = constructor();
+                while (elementReader.MoveNext())
+                {
+                    item.Add(elementReader.Current);
+                }
+
+                if (CurrentByte != ']') throw new Exception("Failed reading Array");
+                TryNextByte();
+                return item;
+            }, JsonDataTypeCategory.Array);
+        }
+
+        private void CreateGenericEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
+        {
+            var constructor = GetConstructor<T, IEnumerable<E>>();
+
+            Pool<ElementReader<E>> elementReaderPool = new Pool<ElementReader<E>>(() => new ElementReader<E>(this), l => l.Reset());
+            Pool<List<E>> bufferPool = new Pool<List<E>>(() => new List<E>(), l => l.Clear());
+            cachedTypeReader.SetTypeReader(() =>
+            {
+                SkipWhiteSpaces();
+                if (CurrentByte != '[') throw new Exception("Failed reading Array");
+                if (!TryNextByte()) throw new Exception("Failed reading Array");
+                ElementReader<E> elementReader = elementReaderPool.Take();
+                List<E> elementBuffer = bufferPool.Take();
                 elementBuffer.AddRange(elementReader);
                 T item = constructor(elementBuffer);
-                pool.Return(elementBuffer);
+                bufferPool.Return(elementBuffer);
                 if (CurrentByte != ']') throw new Exception("Failed reading Array");
                 TryNextByte();
                 return item;
@@ -642,17 +683,17 @@ namespace Playground
         }
 
         private void CreateEnumerableTypeReader<T>(CachedTypeReader cachedTypeReader)
-        {
-            var elementReader = new ElementReader<object>(this);
+        {            
 
             Func<IEnumerable, T> constructor = GetConstructor<T, IEnumerable>();
-
+            Pool<ElementReader<object>> elementReaderPool = new Pool<ElementReader<object>>(() => new ElementReader<object>(this), l => l.Reset());
             Pool<List<object>> pool = new Pool<List<object>>(() => new List<object>(), l => l.Clear());
             cachedTypeReader.SetTypeReader<T>(() =>
             {
                 SkipWhiteSpaces();
                 if (CurrentByte != '[') throw new Exception("Failed reading Array");
                 if (!TryNextByte()) throw new Exception("Failed reading Array");
+                ElementReader<object> elementReader = elementReaderPool.Take();
                 List<object> elementBuffer = pool.Take();
                 elementBuffer.AddRange(elementReader);
                 T item = constructor(elementBuffer);
@@ -664,13 +705,14 @@ namespace Playground
         }
 
         List<EquatableByteSegment> arrayElementNameCache = new List<EquatableByteSegment>();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         EquatableByteSegment GetArrayElementName(int index)
         {
             while (arrayElementNameCache.Count <= index)
             {
                 arrayElementNameCache.Add(new EquatableByteSegment($"[{index}]".ToByteArray()));
-            }               
-            return arrayElementNameCache[index];            
+            }
+            return arrayElementNameCache[index];
         }
 
         class ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
@@ -690,56 +732,63 @@ namespace Playground
 
             object IEnumerator.Current => current;
 
+            // [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
-            {                
+            {
                 deserializer.SkipWhiteSpaces();
                 if (deserializer.CurrentByte == ']')
                 {
-                    Reset();
+                    //Reset();
                     return false;
                 }
-                current = reader.ReadValue<T>(deserializer.GetArrayElementName(++index));
+                if (deserializer.settings.enableReferenceResolution) current = reader.ReadValue<T>(deserializer.GetArrayElementName(++index));
+                else reader.ReadItem<T>();
                 deserializer.SkipWhiteSpaces();
                 if (deserializer.CurrentByte == ',') deserializer.TryNextByte();
                 else if (deserializer.CurrentByte != ']')
                 {
-                    Reset();
+                    //Reset();
                     throw new Exception("Failed reading Array");
                 }
-                return true;               
+                return true;
             }
 
+            // [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Reset()
             {
                 index = -1;
                 current = default;
             }
 
+            // [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
                 Reset();
             }
 
-            public IEnumerator<T> GetEnumerator() => this;        
+            // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public IEnumerator<T> GetEnumerator() => this;
 
+            // [MethodImpl(MethodImplOptions.AggressiveInlining)]
             IEnumerator IEnumerable.GetEnumerator() => this;
         }
 
         CachedTypeReader cachedObjectListReader = null;
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private List<object> ReadArrayValueAsList()
         {
             if (cachedObjectListReader == null) cachedObjectListReader = CreateCachedTypeReader(typeof(List<object>));
             return cachedObjectListReader.ReadItem<List<object>>();
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public string ReadStringValue()
         {
-            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");            
+            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
             return DecodeUtf8(stringBytes);
         }
 
         StringBuilder stringBuilder = new StringBuilder();
-
         private string DecodeUtf8(ArraySegment<byte> bytes)
         {
             int i = bytes.Offset;
@@ -753,7 +802,7 @@ namespace Playground
                 if (b == '\\' && i < end)
                 {
                     b = buffer[i++];
-                    
+
                     if (b == 'b') stringBuilder.Append('\b');
                     else if (b == 'f') stringBuilder.Append('\f');
                     else if (b == 'n') stringBuilder.Append('\n');
@@ -818,7 +867,7 @@ namespace Playground
                 }
             }
 
-            string result =  stringBuilder.ToString();
+            string result = stringBuilder.ToString();
             stringBuilder.Clear();
             return result;
         }
@@ -863,7 +912,7 @@ namespace Playground
                 b = CurrentByte;
                 if (b != 'e' && b != 'E') throw new Exception("Failed reading boolean");
 
-                if(TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
+                if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
                 return true;
             }
             else if (b == 'f' || b == 'F')
@@ -890,6 +939,7 @@ namespace Playground
             else throw new Exception("Failed reading boolean");
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool? ReadNullableBoolValue() => ReadBoolValue();
 
         public object ReadNumberValueAsObject()
@@ -931,7 +981,7 @@ namespace Playground
                 }
                 else
                 {
-                    if (integerPart > long.MaxValue) return integerPart;                    
+                    if (integerPart > long.MaxValue) return integerPart;
                     long value = (long)integerPart;
                     if (value > int.MaxValue) return value;
                     return (int)value;
@@ -939,6 +989,7 @@ namespace Playground
             }
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long ReadLongValue()
         {
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
@@ -958,32 +1009,44 @@ namespace Playground
 
             return value;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long? ReadNullableLongValue() => ReadLongValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int ReadIntValue()
         {
             long longValue = ReadLongValue();
             if (longValue > int.MaxValue || longValue < int.MinValue) throw new Exception("Value is out of bounds.");
             return (int)longValue;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int? ReadNullableIntValue() => ReadIntValue();
-        
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public short ReadShortValue()
         {
             long longValue = ReadLongValue();
             if (longValue > short.MaxValue || longValue < short.MinValue) throw new Exception("Value is out of bounds.");
             return (short)longValue;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public short? ReadNullableShortValue() => ReadShortValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sbyte ReadSbyteValue()
         {
             long longValue = ReadLongValue();
             if (longValue > sbyte.MaxValue || longValue < sbyte.MinValue) throw new Exception("Value is out of bounds.");
             return (sbyte)longValue;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sbyte? ReadNullableSbyteValue() => ReadSbyteValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadUlongValue()
         {
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
@@ -1002,36 +1065,48 @@ namespace Playground
 
             return value;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong? ReadNullableUlongValue() => ReadUlongValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ReadUintValue()
         {
             ulong longValue = ReadUlongValue();
             if (longValue > uint.MaxValue) throw new Exception("Value is out of bounds.");
             return (uint)longValue;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint? ReadNullableUintValue() => ReadUintValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ushort ReadUshortValue()
         {
             ulong longValue = ReadUlongValue();
             if (longValue > ushort.MaxValue) throw new Exception("Value is out of bounds.");
             return (ushort)longValue;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ushort? ReadNullableUshortValue() => ReadUshortValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByteValue()
         {
             ulong longValue = ReadUlongValue();
             if (longValue > byte.MaxValue) throw new Exception("Value is out of bounds.");
             return (byte)longValue;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte? ReadNullableByteValue() => ReadByteValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double ReadDoubleValue()
         {
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
-            
+
 
             ulong integerPart = integerBytes.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
             double decimalPart = decimalBytes.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
@@ -1049,16 +1124,24 @@ namespace Playground
 
             return value;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double? ReadNullableDoubleValue() => ReadDoubleValue();
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float ReadFloatValue() => (float)ReadDoubleValue();
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float? ReadNullableFloatValue() => (float?)ReadDoubleValue();
+
+        CachedTypeReader lastTypeReader = null;
+        Type lastTypeReaderType = null;
 
         public bool TryDeserialize<T>(Stream stream, out T item)
         {
             serializerLock.Enter();
             try
-            {                
+            {
                 if (this.stream != stream)
                 {
                     ResetBuffer(false);
@@ -1074,7 +1157,7 @@ namespace Playground
                     ResetBuffer(true);
                     bufferPos = bufferStartPos;
                 }
-                else if (bufferPos == bufferFillLevel - 1)
+                else if (bufferPos >= bufferFillLevel - 1)
                 {
                     if (!TryReadToBuffer())
                     {
@@ -1082,11 +1165,21 @@ namespace Playground
                         return false;
                     }
                 }
-                var reader = GetCachedTypeReader(typeof(T));
-                item = reader.ReadValue<T>(rootName);
+                var itemType = typeof(T);
+                if (lastTypeReaderType == itemType)
+                {
+                    item = lastTypeReader.ReadValue<T>(rootName);
+                }
+                else
+                {
+                    var reader = GetCachedTypeReader(itemType);
+                    item = reader.ReadValue<T>(rootName);
+                    lastTypeReader = reader;
+                    lastTypeReaderType = itemType;
+                }
                 return true;
             }
-            catch(BufferExceededException)
+            catch (BufferExceededException)
             {
                 if (bufferStartPos == 0) throw; // Buffer is too small to keep complete json value
 
@@ -1129,7 +1222,7 @@ namespace Playground
                     return false;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 item = default;
                 return false;
@@ -1174,12 +1267,13 @@ namespace Playground
             return bytesRead > 0;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryNextByte()
         {
             if (++bufferPos < bufferFillLevel) return true;
             if (TryReadToBuffer()) return true;
             bufferPos--;
-            return false;            
+            return false;
         }
 
         private byte CurrentByte => buffer[bufferPos];
@@ -1201,6 +1295,7 @@ namespace Playground
             }
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipNumber()
         {
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
@@ -1227,16 +1322,19 @@ namespace Playground
             if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipNull()
         {
             if (!TryReadNull()) throw new Exception("Failed reading null value");
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipBool()
         {
             _ = ReadBoolValue();
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipObject()
         {
             SkipWhiteSpaces();
@@ -1260,11 +1358,13 @@ namespace Playground
             if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading object");
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipString()
         {
             if (!TryReadStringBytes(out var _)) throw new Exception("Failed reading string");
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         ulong BytesToInteger(ArraySegment<byte> bytes)
         {
             ulong value = 0;
@@ -1273,7 +1373,7 @@ namespace Playground
             for (int i = 1; i < bytes.Count; i++)
             {
                 value *= 10;
-                value += (byte)(bytes[i] - (byte)'0');                
+                value += (byte)(bytes[i] - (byte)'0');
             }
             return value;
         }
@@ -1286,6 +1386,7 @@ namespace Playground
             else bufferPos = peekStack.Pop();
             return success;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool Try(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative)
             {
                 integerBytes = default;
@@ -1394,6 +1495,7 @@ namespace Playground
             else bufferPos = peekStack.Pop();
             return success;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool Try(out ArraySegment<byte> stringBytes)
             {
                 stringBytes = default;
@@ -1412,16 +1514,16 @@ namespace Playground
                     if (result == FilterResult.Skip) continue;
                     else if (result == FilterResult.Found)
                     {
-                        if (b == (byte)'\\')
-                        {
-                            TryNextByte();
-                        }
-                        else if (b == (byte)'"')
+                        if (b == (byte)'"')
                         {
                             stringBytes = new ArraySegment<byte>(buffer, startPos, bufferPos - startPos);
                             TryNextByte();
                             return true;
                         }
+                        else if (b == (byte)'\\')
+                        {
+                            TryNextByte();
+                        }                        
                         else if ((b & 0b11100000) == 0b11000000) // skip 1 byte
                         {
                             TryNextByte();
@@ -1444,6 +1546,7 @@ namespace Playground
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void SkipWhiteSpaces()
         {
             do
@@ -1452,18 +1555,19 @@ namespace Playground
             } while (TryNextByte());
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int CountRemainingBytes() => bufferFillLevel - bufferPos;
-        
+
         EquatableByteSegment typeFieldName = "$type".ToByteArray();
         EquatableByteSegment valueFieldName = "$value".ToByteArray();
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
         {
-            item = default;            
+            item = default;
             peekStack.Push(bufferPos);
 
             if (!FindProposedType(out CachedTypeReader proposedTypeReader, out bool foundValueField))
             {
-                bufferPos = peekStack.Pop();                
+                bufferPos = peekStack.Pop();
                 return false;
             }
 
@@ -1598,8 +1702,8 @@ namespace Playground
                 }
                 if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) return false;
 
-                
-                
+
+
                 // TODO find object
                 if (refPath.Count <= 0) return false;
                 int pos = 0;
@@ -1664,7 +1768,7 @@ namespace Playground
                 object potentialItemRef = null;
                 int lastSegmentIndex = fieldPathSegments.Count - 1;
                 var referencedFieldName = fieldPathSegments[lastSegmentIndex];
-                foreach(var info in itemInfos)
+                foreach (var info in itemInfos)
                 {
                     if (info.name.Equals(referencedFieldName))
                     {
@@ -1676,7 +1780,7 @@ namespace Playground
                         {
                             var segment = fieldPathSegments[segmentIndex];
                             parentInfo = itemInfos[parentIndex];
-                            if (!parentInfo.name.Equals(segment)) break;                            
+                            if (!parentInfo.name.Equals(segment)) break;
                             parentIndex = parentInfo.parentIndex;
                             segmentIndex--;
                         }
@@ -1696,8 +1800,11 @@ namespace Playground
             }
         }
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadNull()
         {
+            byte b = CurrentByte;
+            if (b != 'n' && b != 'N') return false;
 
             peekStack.Push(bufferPos);
             bool success = Try();
@@ -1705,12 +1812,12 @@ namespace Playground
             else bufferPos = peekStack.Pop();
             return success;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool Try()
             {
-                SkipWhiteSpaces();
+                //SkipWhiteSpaces();
                 byte b;
 
-                if (!TryNextByte()) return false;
                 b = CurrentByte;
                 if (b != 'n' && b != 'N') return false;
                 if (!TryNextByte()) return false;
@@ -1793,7 +1900,7 @@ namespace Playground
         {
             FilterResult[] map = new FilterResult[256];
             for (int b = 0; b < map.Length; b++)
-            {                
+            {
                 if (b == '\"') map[b] = FilterResult.Found;
                 else if (b == '\\') map[b] = FilterResult.Found;
                 else if ((b & 0b11100000) == 0b11000000) map[b] = FilterResult.Found;
