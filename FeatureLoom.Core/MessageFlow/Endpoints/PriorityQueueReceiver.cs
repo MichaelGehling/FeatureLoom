@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Collections;
+using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System;
@@ -115,32 +116,69 @@ namespace FeatureLoom.MessageFlow
             return success;
         }
 
-        public T[] ReceiveAll()
-        {
-            if (IsEmpty) return Array.Empty<T>();
 
-            T[] messages;
-            using (queueLock.Lock())
+
+        public int ReceiveMany(ref T[] items)
+        {
+            if (IsEmpty) return 0;
+            int numElementsReturned = 0;
+            using (queueLock.Lock(true))
             {
-                messages = queue.ToArray();
-                queue.Clear();
+                if (items.EmptyOrNull()) items = new T[queue.Count];
+                if (queue.Count == items.Length)
+                {
+                    numElementsReturned = queue.Count;
+                    queue.CopyTo(items, 0);
+                    queue.Clear();
+                }
+                else if (queue.Count < items.Length)
+                {
+                    numElementsReturned = queue.Count;
+                    queue.CopyTo(items, 0);
+                    Array.Clear(items, queue.Count, items.Length - queue.Count);
+                    queue.Clear();
+                }
+                else
+                {
+                    numElementsReturned = items.Length;
+                    for (int i = 0; i < items.Length; i++)
+                    {
+                        items[i] = queue.Dequeue();
+                    }
+                }
             }
             if (IsEmpty) readerWakeEvent.Reset();
             if (!IsFull) writerWakeEvent.Set();
-            return messages;
+            return numElementsReturned;
         }
 
-        public bool TryPeek(out T nextItem)
+        public int PeekMany(ref T[] items)
         {
-            nextItem = default;
-            if (IsEmpty) return false;
-
-            using (queueLock.Lock())
+            if (IsEmpty) return 0;
+            int numElementsReturned = 0;
+            using (queueLock.Lock(true))
             {
-                if (IsEmpty) return false;
-                nextItem = queue.Peek();
-                return true;
+                if (items.EmptyOrNull()) items = new T[queue.Count];
+                if (queue.Count == items.Length)
+                {
+                    numElementsReturned = queue.Count;
+                    queue.CopyTo(items, 0);
+                }
+                else if (queue.Count < items.Length)
+                {
+                    numElementsReturned = queue.Count;
+                    queue.CopyTo(items, 0);
+                    Array.Clear(items, queue.Count, items.Length - queue.Count);
+                }
+                else
+                {
+                    queue.CopyToArray(items, items.Length);
+                    Array.Clear(items, queue.Count, items.Length - queue.Count);
+                }
             }
+            if (IsEmpty) readerWakeEvent.Reset();
+            if (!IsFull) writerWakeEvent.Set();
+            return numElementsReturned;
         }
 
         public T[] PeekAll()

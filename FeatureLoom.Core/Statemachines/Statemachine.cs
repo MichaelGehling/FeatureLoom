@@ -180,6 +180,8 @@ namespace FeatureLoom.Statemachines
                 {
                     job.ExecutionState = ExecutionState.Paused;
                     job.PauseRequested = false;
+                    job.SendUpdate();
+                    continue;
                 }
 
                 if (!_states.TryGetValue(job.CurrentStateName, out var state))

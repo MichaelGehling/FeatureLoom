@@ -79,17 +79,32 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public T[] ReceiveAll()
-        {
-            if (IsEmpty) return Array.Empty<T>();
 
+        public int ReceiveMany(ref T[] items)
+        {
+            if (IsEmpty) return 0;
             using (myLock.Lock(true))
             {
-                if (IsEmpty) return Array.Empty<T>();
+                if (IsEmpty) return 0;
                 T message = receivedMessage;
                 receivedMessage = default;
+                if (items.EmptyOrNull()) items = message.ToSingleEntryArray();
+                else items[0] = message;
                 readerWakeEvent.Reset();
-                return message.ToSingleEntryArray();
+                return 1;
+            }
+        }
+
+        public int PeekMany(ref T[] items)
+        {
+            if (IsEmpty) return 0;
+            using (myLock.Lock(true))
+            {
+                if (IsEmpty) return 0;
+                T message = receivedMessage;
+                if (items.EmptyOrNull()) items = message.ToSingleEntryArray();
+                else items[0] = message;
+                return 1;
             }
         }
 
@@ -105,19 +120,6 @@ namespace FeatureLoom.MessageFlow
                 return true;
             }
         }
-
-        public T[] PeekAll()
-        {
-            if (IsEmpty) return Array.Empty<T>();
-
-            using (myLock.Lock())
-            {
-                if (IsEmpty) return Array.Empty<T>();
-                T message = receivedMessage;
-                return message.ToSingleEntryArray();
-            }
-        }
-
         public void Clear()
         {
             using (myLock.Lock())
@@ -187,7 +189,7 @@ namespace FeatureLoom.MessageFlow
         public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
         {
             return ((IAsyncWaitHandle)readerWakeEvent).TryConvertToWaitHandle(out waitHandle);
-        }
+        }        
 
         public Task WaitingTask => ((IAsyncWaitHandle)readerWakeEvent).WaitingTask;
     }

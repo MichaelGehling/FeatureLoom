@@ -93,17 +93,32 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public T[] ReceiveAll()
-        {
-            if (IsEmpty) return Array.Empty<T>();
 
-            using (myLock.Lock())
+        public int ReceiveMany(ref T[] items)
+        {
+            if (IsEmpty) return 0;
+            using (myLock.Lock(true))
             {
-                if (IsEmpty) return Array.Empty<T>();
+                if (IsEmpty) return 0;
                 T message = receivedMessage;
                 receivedMessage = default;
+                if (items.EmptyOrNull()) items = message.ToSingleEntryArray();
+                else items[0] = message;
                 readerWakeEvent.Reset();
-                return message.ToSingleEntryArray();
+                return 1;
+            }
+        }
+
+        public int PeekMany(ref T[] items)
+        {
+            if (IsEmpty) return 0;
+            using (myLock.Lock(true))
+            {
+                if (IsEmpty) return 0;
+                T message = receivedMessage;
+                if (items.EmptyOrNull()) items = message.ToSingleEntryArray();
+                else items[0] = message;
+                return 1;
             }
         }
 
@@ -120,17 +135,7 @@ namespace FeatureLoom.MessageFlow
             }
         }
 
-        public T[] PeekAll()
-        {
-            if (IsEmpty) return Array.Empty<T>();
 
-            using (myLock.Lock())
-            {
-                if (IsEmpty) return Array.Empty<T>();
-                T message = receivedMessage;
-                return message.ToSingleEntryArray();
-            }
-        }
 
         public void Clear()
         {

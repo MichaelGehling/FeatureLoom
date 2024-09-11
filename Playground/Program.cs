@@ -30,6 +30,7 @@ using System.Data;
 using System.Net.WebSockets;
 using Microsoft.Identity.Client;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
+using System.Reflection.Emit;
 
 namespace Playground
 {

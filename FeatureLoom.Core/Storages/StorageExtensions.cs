@@ -84,6 +84,6 @@ namespace FeatureLoom.Storages
                 dict[uri] = item;
             }
             return (true, dict);
-        }
+        }                
     }
 }

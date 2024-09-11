@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Dynamic;
 
 namespace FeatureLoom.Helpers
 {
@@ -11,6 +12,11 @@ namespace FeatureLoom.Helpers
         public GenericComparer(Func<T, T, int> compare)
         {
             this.compare = compare;
+        }
+
+        public static GenericComparer<T> CreateBySelect<V>(Func<T, V> selectCompareValue) where V: IComparable
+        {
+            return new GenericComparer<T>((x, y) => selectCompareValue(x).CompareTo(selectCompareValue(y)));
         }
 
         public int Compare(T x, T y)

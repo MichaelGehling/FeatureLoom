@@ -11,7 +11,6 @@ namespace FeatureLoom.Logging
 {
     public class ConsoleLogger : IMessageSink
     {
-        private readonly bool hasConsole = ConsoleHelper.CheckHasConsole();
         private StringBuilder stringBuilder = new StringBuilder();
         private MicroLock stringBuilderLock = new MicroLock();
 
@@ -36,8 +35,8 @@ namespace FeatureLoom.Logging
 
         public void Post<M>(in M message)
         {
-            if (message == null) return;
-            if (!hasConsole) return;
+            if (!ConsoleHelper.CheckHasConsole()) return;
+            if (message == null) return;            
 
             config.TryUpdateFromStorage(true);
 
@@ -52,24 +51,17 @@ namespace FeatureLoom.Logging
                         stringBuilder?.Clear();
                     }
 
-                    ConsoleHelper.UseLocked(() =>
-                    {
-                        var oldBgColor = Console.BackgroundColor;
-                        var oldColor = Console.ForegroundColor;
-                        Console.BackgroundColor = config.backgroundColor;
-                        if (config.loglevelColors != null && config.loglevelColors.TryGetValue(logMessage.level, out var color)) Console.ForegroundColor = color;
-                        
-                        if (logMessage.level == Loglevel.ERROR) Console.Error.WriteLine(strMsg);
-                        else Console.WriteLine(strMsg);
+                    ConsoleColor? fgColor = null;
+                    ConsoleColor? bgColor = config.backgroundColor;
+                    if (config.loglevelColors != null && config.loglevelColors.TryGetValue(logMessage.level, out var color)) fgColor = color;
 
-                        Console.ForegroundColor = oldColor;
-                        Console.BackgroundColor = oldBgColor;
-                    });
+                    if (logMessage.level == Loglevel.ERROR) ConsoleHelper.WriteLineToError(strMsg, fgColor, bgColor);
+                    else ConsoleHelper.WriteLine(strMsg, fgColor, bgColor);
                 }
             }
             else
             {
-                Console.WriteLine(message.ToString());
+                ConsoleHelper.WriteLine(message.ToString());
             }
         }
 

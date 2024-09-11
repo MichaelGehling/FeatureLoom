@@ -14,10 +14,10 @@ namespace FeatureLoom.MessageFlow
 
         bool TryReceive(out T message);
 
-        T[] ReceiveAll();
-
         bool TryPeek(out T nextItem);
 
-        T[] PeekAll();
+        int ReceiveMany(ref T[] items);
+
+        int PeekMany(ref T[] items);
     }
 }

@@ -35,13 +35,13 @@ namespace FeatureLoom.Time
 
             if (duration >= TimeSpan.Zero)
             {
-                this.utcStartTime = GetTime();
+                this.utcStartTime = GetTime(duration);
                 duration = duration.ClampHigh(DateTime.MaxValue.Subtract(utcStartTime));
                 this.utcEndTime = utcStartTime + duration;                
             }
             else
             {
-                this.utcEndTime = GetTime();
+                this.utcEndTime = GetTime(duration);
                 duration = duration.ClampLow(DateTime.MaxValue.Subtract(utcEndTime));
                 this.utcStartTime = utcEndTime + duration;
             }

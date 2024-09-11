@@ -132,6 +132,8 @@ namespace Playground
             this.y = y;
         }
 
+       
+
         public IMyInterface interfaceObject = new MyEmbedded1();
         public short y = 2;
         public List<int> intList = new List<int>() { 0, 1, -2, 10, -22, 100, -222, 1000, -2222, 10000, -22222 };
@@ -323,7 +325,7 @@ namespace Playground
 
         public static async Task Run()
         {
-            FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+          /*  FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
                 //typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
@@ -369,6 +371,9 @@ namespace Playground
                 await jsonStreamProcessor.ProcessStreamAsync();
                 Console.WriteLine("JN:" + (iterations / tkx.Elapsed.TotalSeconds).ToString());
             }
+
+            */
+
             string jsonString = """
                                 
                                 {
@@ -403,21 +408,41 @@ namespace Playground
             */
 
             jsonString = """
+                         123.123
+                         "Hallo!"
                          {
-                            "x": 123
+                            "x": 987,                             
+                         }
+                         {                         
+                            "y": 1234,     
+                            "intList": null
+                         }
+                         {
+                            "bla": 123,
+                            "blu": "aakskd"
                          }
                          """;
             FeatureJsonDeserializer.Settings deserializerSettings = new FeatureJsonDeserializer.Settings();
-            deserializerSettings.AddTypeMapping<IMyInterface, MyGenericEmbedded<float>>();
+            deserializerSettings.AddMultiOptionTypeMapping(typeof(object), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
+            deserializerSettings.AddMultiOptionTypeMapping(typeof(IMyInterface), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
             deserializerSettings.AddGenericTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
             deserializerSettings.AddConstructor<MyEmbedded3>(() => new MyEmbedded3(default));
+            deserializerSettings.skipMultiOptionOnZeroMatch = false;
             //deserializerSettings.AddConstructor<KeyValuePair<string, int>>(() => new KeyValuePair<string, int>(default, default));
             //deserializerSettings.AddConstructor<KeyValuePair<string, object>>(() => new KeyValuePair<string, object>(default, default));
             //deserializerSettings.AddConstructor<KeyValuePair<object, object>>(() => new KeyValuePair<object, object>(default, default));
-            featureJsonDeserializer = new FeatureJsonDeserializer(deserializerSettings);
+            var featureJsonDeserializer = new FeatureJsonDeserializer(deserializerSettings);
             //featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
             //featureJsonDeserializer.TryDeserialize<int[][]>(jsonString.ToStream(), out var result);
-            featureJsonDeserializer.TryDeserialize<MyStruct>(jsonString.ToStream(), out var result);
+            var jsonStream = jsonString.ToStream();
+            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result);
+            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result2);
+            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result3);
+            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result4);
+            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result5);
+
+
+
 
 
             var opt = new JsonSerializerOptions()
@@ -428,7 +453,7 @@ namespace Playground
 
             };
 
-            iterations = 1_000_000;
+            int iterations = 1_000_000;
 
             //var testDto = new TestDto();
             //var testDto = -128;
@@ -578,7 +603,7 @@ namespace Playground
                 });
             */
 
-            featureJsonSerializer = new FeatureJsonSerializer(settings);
+            var featureJsonSerializer = new FeatureJsonSerializer(settings);
 
             Console.WriteLine("FeatureJsonSerializer:");
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));
@@ -616,9 +641,9 @@ namespace Playground
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {                    
-                    featureJsonSerializer.Serialize(stream, testDto);
+                    featureJsonSerializer.Serialize(jsonStream, testDto);
                     //json = featureJsonSerializer.Serialize(testDto);
-                    stream.Position = 0;
+                    jsonStream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 var elapsed_A = elapsed;
@@ -633,9 +658,9 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                    System.Text.Json.JsonSerializer.Serialize(stream, testDto, opt);
+                    System.Text.Json.JsonSerializer.Serialize(jsonStream, testDto, opt);
                     //json = JsonSerializer.Serialize(testDto, opt);
-                    stream.Position = 0;
+                    jsonStream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 var elapsed_B = elapsed;
@@ -650,10 +675,10 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                    Utf8Json.JsonSerializer.Serialize(stream, testDto);
+                    Utf8Json.JsonSerializer.Serialize(jsonStream, testDto);
                     //json = UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto));
                     //json = JsonSerializer.Serialize(testDto, opt);
-                    stream.Position = 0;
+                    jsonStream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 var elapsed_C = elapsed;

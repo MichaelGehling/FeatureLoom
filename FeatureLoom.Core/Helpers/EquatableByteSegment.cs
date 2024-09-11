@@ -15,6 +15,18 @@ namespace FeatureLoom.Helpers
             this.hashCode = ComputeHashCode(segment);
         }
 
+        public EquatableByteSegment(byte[] array, int offset, int count)
+        {
+            this.segment = new ArraySegment<byte>(array, offset, count);
+            this.hashCode = ComputeHashCode(segment);
+        }
+
+        public EquatableByteSegment(string str)
+        {
+            this.segment = new ArraySegment<byte>(str.ToByteArray());
+            this.hashCode = ComputeHashCode(segment);
+        }
+
         // Implicit conversion from ArraySegment<byte> to EquatableByteSegment
         public static implicit operator EquatableByteSegment(ArraySegment<byte> segment)
         {
