@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonDeserializer
     {

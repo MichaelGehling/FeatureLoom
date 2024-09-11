@@ -1,4 +1,4 @@
-﻿namespace Playground
+﻿namespace FeatureLoom.Serialization
 {
     public enum JsonDataTypeCategory
     {

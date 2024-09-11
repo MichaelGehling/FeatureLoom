@@ -5,7 +5,7 @@ using FeatureLoom.Extensions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer
     {

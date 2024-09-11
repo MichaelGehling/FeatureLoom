@@ -2,7 +2,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     internal class ItemInfo
     {

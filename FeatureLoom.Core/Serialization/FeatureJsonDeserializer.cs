@@ -1,29 +1,20 @@
 ﻿using FeatureLoom.Synchronization;
-using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using FeatureLoom.Extensions;
 using System.Reflection;
 using System.Collections;
 using System.Runtime.CompilerServices;
 using FeatureLoom.Helpers;
-using System.Text.Unicode;
 using System.Linq.Expressions;
-using Microsoft.VisualBasic.FileIO;
-using FeatureLoom.DependencyInversion;
-using Newtonsoft.Json.Linq;
 using FeatureLoom.Collections;
-using Microsoft.Extensions.Hosting;
-using Microsoft.VisualBasic;
-using static Playground.FeatureJsonSerializer;
+using static FeatureLoom.Serialization.FeatureJsonSerializer;
 using System.Collections.Concurrent;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonDeserializer
     {
@@ -792,13 +783,20 @@ namespace Playground
 
             throw new InvalidOperationException("MemberInfo must be a writable field, property, or init-only property.");
         }
-
+#if NET5_0_OR_GREATER
         private bool HasInitAccessor(PropertyInfo propertyInfo)
         {
             // Use reflection to check if the property has an init accessor
             var setMethod = propertyInfo.SetMethod;
             return setMethod != null && setMethod.ReturnParameter.GetRequiredCustomModifiers().Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
         }
+#else
+        private bool HasInitAccessor(PropertyInfo propertyInfo)
+        {
+            // .NET Standard 2.0 + 2.1 doesn't support init-only properties, so return false
+            return false;
+        }
+#endif
 
         private Func<C, C> CreateFieldWriterUsingExpression<T, V, C>(FieldInfo fieldInfo, EquatableByteSegment fieldName) where T : C
         {
@@ -1815,11 +1813,11 @@ namespace Playground
         {
             ulong value = 0;
             if (bytes.Count == 0) return value;
-            value += (byte)(bytes[0] - (byte)'0');
+            value += (byte)(bytes.Get(0) - (byte)'0');
             for (int i = 1; i < bytes.Count; i++)
             {
                 value *= 10;
-                value += (byte)(bytes[i] - (byte)'0');
+                value += (byte)(bytes.Get(i) - (byte)'0');
             }
             return value;
         }
@@ -2156,7 +2154,7 @@ namespace Playground
                 int startPos = 0;
                 int segmentLength = 0;
                 int refPathCount = refPath.Count;
-                byte b = refPath[pos];
+                byte b = refPath.Get(pos);
 
                 while (true)
                 {
@@ -2166,7 +2164,7 @@ namespace Playground
                         {
                             pos++;
                             if (pos >= refPathCount) return false;
-                            b = refPath[pos];
+                            b = refPath.Get(pos);
                             if (b == ']')
                             {
                                 segmentLength = pos - startPos + 1;
@@ -2188,7 +2186,7 @@ namespace Playground
                                 segmentLength = pos - startPos;
                                 break;
                             }
-                            b = refPath[pos];
+                            b = refPath.Get(pos);
                             if (b == '.')
                             {
                                 segmentLength = pos - startPos;
@@ -2207,7 +2205,7 @@ namespace Playground
                         if (pos >= refPathCount) break;
                     }
                     startPos = pos;
-                    b = refPath[pos];
+                    b = refPath.Get(pos);
                 }
 
 

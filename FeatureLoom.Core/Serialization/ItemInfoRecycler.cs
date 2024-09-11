@@ -1,10 +1,11 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
-namespace Playground;
+namespace FeatureLoom.Serialization;
 
 internal class ItemInfoRecycler
 {

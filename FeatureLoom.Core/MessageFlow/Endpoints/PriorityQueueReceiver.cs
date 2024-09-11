@@ -181,14 +181,17 @@ namespace FeatureLoom.MessageFlow
             return numElementsReturned;
         }
 
-        public T[] PeekAll()
+        public bool TryPeek(out T nextItem)
         {
-            if (IsEmpty) return Array.Empty<T>();
+            nextItem = default;
+            if (IsEmpty) return false;
 
             using (queueLock.Lock())
             {
-                return queue.ToArray();
-            }            
+                if (IsEmpty) return false;
+                nextItem = queue.Peek();
+                return true;
+            }
         }
 
         public void Clear()

@@ -5,13 +5,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using FeatureLoom.Extensions;
 using System.Collections;
-using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
-using System.Linq;
-using Microsoft.VisualBasic;
-using System.Linq.Expressions;
-using Newtonsoft.Json.Linq;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer
     {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer
     {

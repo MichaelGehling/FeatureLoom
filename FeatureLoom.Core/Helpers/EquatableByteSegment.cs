@@ -21,6 +21,12 @@ namespace FeatureLoom.Helpers
             this.hashCode = ComputeHashCode(segment);
         }
 
+        public EquatableByteSegment(byte[] array)
+        {
+            this.segment = new ArraySegment<byte>(array);
+            this.hashCode = ComputeHashCode(segment);
+        }
+
         public EquatableByteSegment(string str)
         {
             this.segment = new ArraySegment<byte>(str.ToByteArray());

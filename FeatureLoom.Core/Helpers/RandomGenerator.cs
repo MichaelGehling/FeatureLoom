@@ -236,16 +236,14 @@ namespace FeatureLoom.Helpers
             }
             else if (offset == 0 && length == bytes.Length)
             {
-#if NETSTANDARD2_1_OR_GREATER                
-                Rng.NextBytes(bytes.AsSpan<byte>(offset, length));                
-                return bytes;
-#elif NETSTANDARD2_0
+#if NETSTANDARD2_0
                 byte[] randomBytes = new byte[length];
                 Rng.NextBytes(randomBytes);
                 randomBytes.CopyTo(bytes, offset);
                 return bytes;
 #else
-#error Target Framework not supported
+                Rng.NextBytes(bytes.AsSpan<byte>(offset, length));
+                return bytes;
 #endif
             }
             else

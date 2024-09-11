@@ -9,13 +9,11 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Data;
-using System.Reflection.Metadata;
 using System.Reflection;
-using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using FeatureLoom.Helpers;
 using FeatureLoom.Collections;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer
     {

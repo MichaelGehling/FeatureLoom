@@ -94,6 +94,22 @@ namespace FeatureLoom.Extensions
             return true;
         }
 
+#if NETSTANDARD2_0
+        public static void CopyTo<T>(this ArraySegment<T> source, T[] destination, int destinationIndex)
+        {
+            // Check for null arguments
+            if (destination == null)
+                throw new ArgumentNullException(nameof(destination));
+            if (destinationIndex < 0 || destinationIndex >= destination.Length)
+                throw new ArgumentOutOfRangeException(nameof(destinationIndex));
+            if (source.Count + destinationIndex > destination.Length)
+                throw new ArgumentException("Destination array is not large enough to hold the source data.");
+
+            // Copy elements from source to destination
+            Array.Copy(source.Array, source.Offset, destination, destinationIndex, source.Count);
+        }
+#endif
+
         public static void CopyFrom<T>(this ArraySegment<T> slice, T[] source, int sourceOffset, int count)
         {
             if (slice.Count < count) throw new ArgumentOutOfRangeException("count");
@@ -127,6 +143,40 @@ namespace FeatureLoom.Extensions
             T[] result = new T[segment.Count];
             Array.Copy(segment.Array, segment.Offset, result, 0, segment.Count);
             return result;
+        }
+
+        public static byte Get(this ArraySegment<byte> segment, int index)
+        {
+#if NETSTANDARD2_0
+            if (segment.Array == null) throw new InvalidOperationException("The underlying array is null.");
+            return segment.Array[segment.Offset + index];
+#else
+            return segment[index];
+#endif
+        }
+
+        // Slice method for .NET Standard 2.0
+        public static ArraySegment<T> Slice<T>(this ArraySegment<T> segment, int index)
+        {
+#if NETSTANDARD2_0
+            if (index < 0 || index > segment.Count) throw new ArgumentOutOfRangeException(nameof(index), "Index is out of the range of the ArraySegment.");
+            return new ArraySegment<T>(segment.Array, segment.Offset + index, segment.Count - index);
+#else
+            // Use the built-in Slice method for .NET Standard 2.1 and later
+            return segment.Slice(index);
+#endif
+        }
+
+        // Slice method for .NET Standard 2.0 with start index and length
+        public static ArraySegment<T> Slice<T>(this ArraySegment<T> segment, int index, int length)
+        {
+#if NETSTANDARD2_0
+            if (index < 0 || length < 0 || index + length > segment.Count) throw new ArgumentOutOfRangeException(nameof(index), "Index or length is out of the range of the ArraySegment.");       
+            return new ArraySegment<T>(segment.Array, segment.Offset + index, length);
+#else
+            // Use the built-in Slice method for .NET Standard 2.1 and later
+            return segment.Slice(index, length);
+#endif
         }
 
     }

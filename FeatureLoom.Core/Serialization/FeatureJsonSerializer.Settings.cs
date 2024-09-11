@@ -4,9 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using static Playground.FeatureJsonSerializer;
+using static FeatureLoom.Serialization.FeatureJsonSerializer;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
 
     public sealed partial class FeatureJsonSerializer

@@ -1,14 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Reflection.Metadata;
-using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 using FeatureLoom.Extensions;
-using FeatureLoom.Helpers;
-using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer
     {

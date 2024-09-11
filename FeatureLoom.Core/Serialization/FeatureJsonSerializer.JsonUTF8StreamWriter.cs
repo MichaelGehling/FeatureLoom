@@ -3,14 +3,12 @@ using FeatureLoom.Extensions;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System;
-using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
-using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using FeatureLoom.Helpers;
 using System.Reflection;
 using System.Linq;
 
-namespace Playground
+namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer
     {
@@ -364,13 +362,13 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteIntPtrValue(IntPtr value)
             {
-                WriteSignedInteger(value);
+                WriteSignedInteger((long)value);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteUintPtrValue(UIntPtr value)
             {
-                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+                if ((long)value <= long.MaxValue) WriteUnsignedInteger((long)value);
                 else WriteString(value.ToString());
             }
 
@@ -817,7 +815,7 @@ namespace Playground
                 while (reverseItemInfoStack.TryPop(out itemInfo))
                 {
                     var name = itemInfo.ItemName;
-                    if (name[0] != OPENARRAY) WriteDot();
+                    if (name.Get(0) != OPENARRAY) WriteDot();
                     WriteToBuffer(name);
                 }
                 WriteToBuffer(REFOBJECT_POST);
@@ -1236,6 +1234,9 @@ namespace Playground
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private bool IsSpecial(float value)
             {
+#if NETSTANDARD2_0
+                return IsSpecial((double)value);
+#else
                 if (Single.IsNaN(value)) return true;   // NaN
                 int bits = BitConverter.SingleToInt32Bits(value);
                 const int mask = 0x7F800000;            // Mask to isolate the exponent bits for float
@@ -1243,6 +1244,7 @@ namespace Playground
                 if (maskedBits == 0) return true;       // Subnormal
                 if (maskedBits == mask) return true;    // Infinity
                 return false;
+#endif
             }
 
             private void WriteFloat(float value)
@@ -1288,49 +1290,14 @@ namespace Playground
                     if (IsSpecial(value))
                     {
                         if (Single.IsNaN(value)) WriteToBuffer(NAN);
-                        if (Single.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
-                        if (Single.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
-                        if (Single.IsSubnormal(value)) WriteString(value.ToString());
+                        else if (Single.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
+                        else if (Single.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
+                        else if (IsSubnormal((double)value)) WriteString(value.ToString());
                         return true;
                     }
 
                     return false;
-                }
-
-                static float CalculateNumDigits(float value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
-                {
-                    const int MAX_SIGNIFICANT_DIGITS = 7;
-                    const int POS_EXPONENT_LIMIT = 7;
-                    const int NEG_EXPONENT_LIMIT = -5;
-
-                    int bits = BitConverter.SingleToInt32Bits(value);
-                    int binaryExponent = ((bits >> 23) & 0xFF) - 127;
-                    exponent = (int)(binaryExponent * 0.34f);
-                    numIntegralDigits = Math.Max(0, exponent + 1);
-                    numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
-                    printExponent = false;
-
-
-                    if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
-                    {
-                        printExponent = true;
-                        value = (float)(value * Math.Pow(10, -exponent));
-                        while (value < 1)
-                        {
-                            value *= 10;
-                            exponent -= 1;
-                        }
-                        while (value >= 10)
-                        {
-                            value /= 10;
-                            exponent += 1;
-                        }
-                        numIntegralDigits = 1;
-                        numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 2;
-                    }
-
-                    return value;
-                }
+                }                
 
                 void WriteIntegralPart(int numIntegralDigits, float integralPart)
                 {
@@ -1402,6 +1369,46 @@ namespace Playground
 
             }
 
+            static float CalculateNumDigits(float value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
+            {
+
+#if NETSTANDARD2_0
+                return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent);
+#else
+                    const int MAX_SIGNIFICANT_DIGITS = 7;
+                    const int POS_EXPONENT_LIMIT = 7;
+                    const int NEG_EXPONENT_LIMIT = -5;
+
+                    int bits = BitConverter.SingleToInt32Bits(value);
+                    int binaryExponent = ((bits >> 23) & 0xFF) - 127;
+                    exponent = (int)(binaryExponent * 0.34f);
+                    numIntegralDigits = Math.Max(0, exponent + 1);
+                    numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+                    printExponent = false;
+
+
+                    if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                    {
+                        printExponent = true;
+                        value = (float)(value * Math.Pow(10, -exponent));
+                        while (value < 1)
+                        {
+                            value *= 10;
+                            exponent -= 1;
+                        }
+                        while (value >= 10)
+                        {
+                            value /= 10;
+                            exponent += 1;
+                        }
+                        numIntegralDigits = 1;
+                        numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 2;
+                    }
+
+                    return value;
+#endif
+            }
+
             private void WriteDouble(double value)
             {
                 if (HandleSpecialCases(value)) return;
@@ -1445,48 +1452,16 @@ namespace Playground
                     if (IsSpecial(value))
                     {
                         if (Double.IsNaN(value)) WriteToBuffer(NAN);
-                        if (Double.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
-                        if (Double.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
-                        if (Double.IsSubnormal(value)) WriteString(value.ToString());
+                        else if (Double.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
+                        else if (Double.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
+                        else if (IsSubnormal(value)) WriteString(value.ToString());
                         return true;
                     }
 
                     return false;
                 }
 
-                static double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
-                {
-                    const int MAX_SIGNIFICANT_DIGITS = 16;
-                    const int POS_EXPONENT_LIMIT = 13;
-                    const int NEG_EXPONENT_LIMIT = -5;
-
-                    long bits = BitConverter.DoubleToInt64Bits(value);
-                    int binaryExponent = (int)((bits >> 52) & 0x7FF) - 1023;
-                    exponent = (int)(binaryExponent * 0.34f);
-                    numIntegralDigits = Math.Max(0, exponent + 1);
-                    numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
-                    printExponent = false;
-
-                    if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
-                    {
-                        printExponent = true;
-                        value = (value * Math.Pow(10, -exponent));
-                        while (value < 1)
-                        {
-                            value *= 10;
-                            exponent -= 1;
-                        }
-                        while (value >= 10)
-                        {
-                            value /= 10;
-                            exponent += 1;
-                        }
-                        numIntegralDigits = 1;
-                        numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 3;
-                    }
-
-                    return value;
-                }
+                
 
                 void WriteIntegralPart(int numIntegralDigits, double integralPart)
                 {
@@ -1555,6 +1530,58 @@ namespace Playground
                     }
                 }
 
+            }
+
+            static double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
+            {
+                const int MAX_SIGNIFICANT_DIGITS = 16;
+                const int POS_EXPONENT_LIMIT = 13;
+                const int NEG_EXPONENT_LIMIT = -5;
+
+                long bits = BitConverter.DoubleToInt64Bits(value);
+                int binaryExponent = (int)((bits >> 52) & 0x7FF) - 1023;
+                exponent = (int)(binaryExponent * 0.34f);
+                numIntegralDigits = Math.Max(0, exponent + 1);
+                numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+                printExponent = false;
+
+                if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                {
+                    printExponent = true;
+                    value = (value * Math.Pow(10, -exponent));
+                    while (value < 1)
+                    {
+                        value *= 10;
+                        exponent -= 1;
+                    }
+                    while (value >= 10)
+                    {
+                        value /= 10;
+                        exponent += 1;
+                    }
+                    numIntegralDigits = 1;
+                    numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 3;
+                }
+
+                return value;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static bool IsSubnormal(double value)
+            {
+#if NETSTANDARD2_1_OR_GREATER
+                    return Double.IsSubnormal(value);
+#else
+                long bits = BitConverter.DoubleToInt64Bits(value);
+                const long exponentMask = 0x7FF0000000000000L;  // Exponent bits
+                const long fractionMask = 0x000FFFFFFFFFFFFFL;  // Fraction bits
+
+                long exponent = bits & exponentMask;
+                long fraction = bits & fractionMask;
+
+                // Subnormal numbers have an exponent of 0 but a non-zero fraction
+                return exponent == 0 && fraction != 0;
+#endif
             }
 
 
