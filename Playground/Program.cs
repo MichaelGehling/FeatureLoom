@@ -31,6 +31,8 @@ using System.Net.WebSockets;
 using Microsoft.Identity.Client;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using System.Reflection.Emit;
+using System.Buffers.Text;
+using FeatureLoom.Core.Serialization;
 
 namespace Playground
 {
@@ -121,6 +123,17 @@ namespace Playground
 
         private static async Task Main()
         {
+            string inputText = "That is a test!";
+            var inputBytes = inputText.ToByteArray();
+            byte[] output1 = new byte[inputBytes.Length * 2];            
+            Base64.EncodeToUtf8(inputBytes, output1, out int bytesConsumed, out int bytesWritten, true);
+
+
+            MemoryStream outputStream = new MemoryStream();
+            var base64Stream = new Base64EncodingStream(outputStream);            
+            base64Stream.Write(inputBytes, 0, inputBytes.Length);
+            base64Stream.Flush();
+            var output2 = outputStream.ToArray();
 
             /*var rw = new TextFileStorage("pathTest", new TextFileStorage.Config()
             {
