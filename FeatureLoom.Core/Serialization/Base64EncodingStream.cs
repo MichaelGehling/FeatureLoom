@@ -50,12 +50,13 @@ public class Base64EncodingStream : Stream
             }
         }
 
-        // Step 2: Process full chunks of 3 bytes directly
-        while (inputPos + 3 <= maxInputPos)
+        // Step 2: Process full chunks of 3 bytes directly (current byte + 2)
+        while (inputPos + 2 <= maxInputPos)
         {            
             _inputBuffer[0] = buffer[inputPos++];
             _inputBuffer[1] = buffer[inputPos++];
             _inputBuffer[2] = buffer[inputPos++];
+            _inputBufferIndex = 3;
             WriteBufferedBytesToBase64();
             _inputBufferIndex = 0;
         }
@@ -66,9 +67,36 @@ public class Base64EncodingStream : Stream
             _inputBuffer[_inputBufferIndex++] = buffer[inputPos++];
         }
     }
-    
+
     private void WriteBufferedBytesToBase64()
     {
+        // If the output buffer is full, write it to the underlying stream
+        if (_outputBufferIndex + 4 >= _outputBuffer.Length)
+        {
+            _outputStream.Write(_outputBuffer, 0, _outputBufferIndex);
+            _outputBufferIndex = 0;
+        }
+
+        int bufferValue = (_inputBuffer[0] << 16) & 0xFFFFFF;
+        bufferValue |= (_inputBuffer[1] << 8);
+        bufferValue |= _inputBuffer[2];
+
+        // Encode 3 bytes into 4 Base64 bytes
+        _outputBuffer[_outputBufferIndex++] = Base64Chars[(bufferValue >> 18) & 0x3F];
+        _outputBuffer[_outputBufferIndex++] = Base64Chars[(bufferValue >> 12) & 0x3F];
+        _outputBuffer[_outputBufferIndex++] = Base64Chars[(bufferValue >> 6) & 0x3F];
+        _outputBuffer[_outputBufferIndex++] = Base64Chars[bufferValue & 0x3F];        
+    }
+
+    private void WriteRemainingBufferedBytesToBase64()
+    {
+        // If the output buffer is full, write it to the underlying stream
+        if (_outputBufferIndex + 4 >= _outputBuffer.Length)
+        {
+            _outputStream.Write(_outputBuffer, 0, _outputBufferIndex);
+            _outputBufferIndex = 0;
+        }
+
         int bufferValue = (_inputBuffer[0] << 16) & 0xFFFFFF;
         if (_inputBufferIndex > 1) bufferValue |= (_inputBuffer[1] << 8);
         if (_inputBufferIndex > 2) bufferValue |= _inputBuffer[2];
@@ -78,13 +106,6 @@ public class Base64EncodingStream : Stream
         _outputBuffer[_outputBufferIndex++] = Base64Chars[(bufferValue >> 12) & 0x3F];
         _outputBuffer[_outputBufferIndex++] = _inputBufferIndex > 1 ? Base64Chars[(bufferValue >> 6) & 0x3F] : (byte)'=';
         _outputBuffer[_outputBufferIndex++] = _inputBufferIndex > 2 ? Base64Chars[bufferValue & 0x3F] : (byte)'=';
-
-        // If the output buffer is full, write it to the underlying stream
-        if (_outputBufferIndex == _outputBuffer.Length)
-        {
-            _outputStream.Write(_outputBuffer, 0, _outputBufferIndex);
-            _outputBufferIndex = 0;
-        }
     }
 
     // Flush the buffer and ensure all Base64 data is written
@@ -93,7 +114,7 @@ public class Base64EncodingStream : Stream
         if (_inputBufferIndex > 0)
         {
             // Encode any remaining bytes in the input buffer
-            WriteBufferedBytesToBase64();
+            WriteRemainingBufferedBytesToBase64();
             _inputBufferIndex = 0;
         }
 

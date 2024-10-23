@@ -120,6 +120,15 @@ namespace Playground
         public int? x = 1;
     }
 
+    public class MyEmbedded1x : IMyInterface
+    {
+        public int? x = 1;
+
+        protected MyEmbedded1x()
+        {
+        }
+    }
+
     public class MyEmbedded2 : IMyInterface
     {
         public IEnumerable myObjects = new List<object>() { 99.9f, new MyEmbedded1(), "Hallo" };
@@ -322,6 +331,11 @@ namespace Playground
             }
         }
 
+        public struct TestStruct
+        {
+            public int i;
+            private Guid guid;
+        }
 
 
         public static async Task Run()
@@ -409,6 +423,10 @@ namespace Playground
             */
 
             jsonString = """
+                         "NaN"
+                         { "i": 123, "guid": "f0ed1af3-4412-4f08-8237-3e2e3e6d29ef"}
+                         [{"x": 123}, {"x": 456}]
+                         [1,2,3]
                          123.123
                          "Hallo!"
                          {
@@ -422,13 +440,15 @@ namespace Playground
                             "bla": 123,
                             "blu": "aakskd"
                          }
+
+
                          """;
             FeatureJsonDeserializer.Settings deserializerSettings = new FeatureJsonDeserializer.Settings();
             deserializerSettings.AddMultiOptionTypeMapping(typeof(object), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
             deserializerSettings.AddMultiOptionTypeMapping(typeof(IMyInterface), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
             deserializerSettings.AddGenericTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
             deserializerSettings.AddConstructor<MyEmbedded3>(() => new MyEmbedded3(default));
-            deserializerSettings.skipMultiOptionOnZeroMatch = false;
+            //deserializerSettings.initialBufferSize = 20;
             //deserializerSettings.AddConstructor<KeyValuePair<string, int>>(() => new KeyValuePair<string, int>(default, default));
             //deserializerSettings.AddConstructor<KeyValuePair<string, object>>(() => new KeyValuePair<string, object>(default, default));
             //deserializerSettings.AddConstructor<KeyValuePair<object, object>>(() => new KeyValuePair<object, object>(default, default));
@@ -436,11 +456,27 @@ namespace Playground
             //featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
             //featureJsonDeserializer.TryDeserialize<int[][]>(jsonString.ToStream(), out var result);
             var jsonStream = jsonString.ToStream();
-            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result);
-            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result2);
-            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result3);
-            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result4);
-            featureJsonDeserializer.TryDeserialize<object>(jsonStream, out var result5);
+
+            featureJsonDeserializer.SetDataSource(jsonStream);
+            bool dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<double>(out var d);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<TestStruct>(out var testStruct);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<object>(out var result);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<object>(out var result2);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<object>(out var result3);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<object>(out var result4);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<object>(out var result5);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<object>(out var result6);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<object>(out var result7);
+            dataLeft = featureJsonDeserializer.IsAnyDataLeft();
 
 
 

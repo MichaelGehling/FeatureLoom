@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -116,6 +117,21 @@ namespace FeatureLoom.Extensions
             Array.Copy(source, sourceOffset, slice.Array, slice.Offset, count);
         }
 
+        public static void CopyFrom<T>(this ArraySegment<T> slice, IList<T> source, int sourceOffset, int count)
+        {
+            if (slice.Count < count) throw new ArgumentOutOfRangeException("count");
+            if (source is T[] sourceArray) CopyFrom(slice, sourceArray, sourceOffset, count);
+            else if (source is List<T> sourceList) sourceList.CopyTo(sourceOffset, slice.Array, slice.Offset, count);
+            else
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    int sourceIndex = sourceOffset + i;
+                    slice.Array[i] = source[sourceIndex];
+                }
+            }
+        }
+
         public static void CopyFrom<T>(this ArraySegment<T> slice, ArraySegment<T> source)
         {
             if (slice.Count < source.Count) throw new ArgumentOutOfRangeException("count");
@@ -126,6 +142,21 @@ namespace FeatureLoom.Extensions
         {
             if (slice.Count < count) throw new ArgumentOutOfRangeException("count");
             Array.Copy(source, sourceOffset, slice.Array, slice.Offset + offset, count);
+        }
+
+        public static void CopyFrom<T>(this ArraySegment<T> slice, int offset, IList<T> source, int sourceOffset, int count)
+        {
+            if (slice.Count < count) throw new ArgumentOutOfRangeException("count");
+            if (source is T[] sourceArray) CopyFrom(slice, offset, sourceArray, sourceOffset, count);
+            else if (source is List<T> sourceList) sourceList.CopyTo(sourceOffset, slice.Array, offset + slice.Offset, count);
+            else
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    int sourceIndex = sourceOffset + i;
+                    slice.Array[offset + i] = source[sourceIndex];
+                }
+            }
         }
 
         public static void CopyFrom<T>(this ArraySegment<T> slice, int offset, ArraySegment<T> source)

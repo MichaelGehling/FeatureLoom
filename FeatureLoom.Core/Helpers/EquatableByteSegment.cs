@@ -74,6 +74,19 @@ namespace FeatureLoom.Helpers
             return true;
         }
 
+        public bool Equals(ArraySegment<byte> other)
+        {
+            if (segment.Count != other.Count) return false;
+
+            for (int i = 0; i < segment.Count; i++)
+            {
+                if (segment.Array[segment.Offset + i] != other.Array[other.Offset + i])
+                    return false;
+            }
+
+            return true;
+        }
+
         public override bool Equals(object obj)
         {
             return obj is EquatableByteSegment other && Equals(other);

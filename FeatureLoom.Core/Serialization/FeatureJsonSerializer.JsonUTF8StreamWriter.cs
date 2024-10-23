@@ -97,6 +97,7 @@ namespace FeatureLoom.Serialization
             private byte[] localBuffer;
             private byte[] mainBuffer;
             private int mainBufferCount;
+            private int mainBufferLimit;
             private SlicedBuffer<byte> tempSlicedBuffer;
             private CompiledSettings settings;
             private readonly bool indent;
@@ -106,9 +107,10 @@ namespace FeatureLoom.Serialization
 
             public JsonUTF8StreamWriter(CompiledSettings settings)
             {
+                mainBufferLimit = settings.writeBufferChunkSize;
                 localBuffer = new byte[128];
                 // We give some extra bytes in order to not always check remaining space
-                mainBuffer = new byte[settings.writeBufferChunkSize + 64];
+                mainBuffer = new byte[mainBufferLimit + 64];
                 // Used for temporarily needed names e.g. Dictionary
                 tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, 128);
                 this.settings = settings;
@@ -177,7 +179,7 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteToBuffer(byte[] data, int offset, int count)
             {
-                if (mainBufferCount + count > mainBuffer.Length) WriteBufferToStream();
+                if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
                 Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
                 mainBufferCount += count;
             }
@@ -197,7 +199,7 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteToBuffer(ArraySegment<byte> data)
             {
-                if (mainBufferCount + data.Count > mainBuffer.Length) WriteBufferToStream();
+                if (mainBufferCount + data.Count > mainBufferLimit) WriteBufferToStream();
                 data.CopyTo(mainBuffer, mainBufferCount);
                 mainBufferCount += data.Count;
             }
@@ -205,7 +207,7 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteToBuffer(byte data)
             {
-                if (mainBufferCount >= mainBuffer.Length) WriteBufferToStream();
+                if (mainBufferCount >= mainBufferLimit) WriteBufferToStream();
                 mainBuffer[mainBufferCount++] = data;
             }
 
@@ -237,7 +239,7 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void EnsureFreeBufferSpace(int freeBytes)
             {
-                if (mainBufferCount + freeBytes >= mainBuffer.Length) WriteBufferToStream();
+                if (mainBufferCount + freeBytes >= mainBufferLimit) WriteBufferToStream();
             }
 
             static Dictionary<Type, string> typeMap = new Dictionary<Type, string>
@@ -1002,7 +1004,7 @@ namespace FeatureLoom.Serialization
                 while (charIndex < str.Length)
                 {
                     EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
-                    int guaranteedCharSpace = (mainBuffer.Length - mainBufferCount) / MAX_CHAR_LENGTH;
+                    int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
                     int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
 
                     for (; charIndex < charIndexLimit; charIndex++)
@@ -1069,7 +1071,7 @@ namespace FeatureLoom.Serialization
                 while (charIndex < str.Length)
                 {
                     EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
-                    int guaranteedCharSpace = (mainBuffer.Length - mainBufferCount) / MAX_CHAR_LENGTH;
+                    int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
                     int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
 
                     for (; charIndex < charIndexLimit; charIndex++)
@@ -1140,7 +1142,7 @@ namespace FeatureLoom.Serialization
                     return;
                 }
 
-                const int maxDigits = 20;
+                const int maxDigits = 25;
                 int index = maxDigits;
                 while (value >= 10)
                 {
@@ -1178,7 +1180,7 @@ namespace FeatureLoom.Serialization
                     return;
                 }
 
-                const int maxDigits = 20;
+                const int maxDigits = 25;
                 int index = maxDigits;
                 while (value >= 10)
                 {
@@ -1200,7 +1202,7 @@ namespace FeatureLoom.Serialization
                     return;
                 }
 
-                const int maxDigits = 20;
+                const int maxDigits = 25;
                 int index = maxDigits;
                 while (value >= 10)
                 {

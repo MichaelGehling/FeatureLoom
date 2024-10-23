@@ -53,7 +53,7 @@ namespace FeatureLoom.Helpers
 
         void RenewBuffer()
         {
-            buffer = new T[buffer.Length];
+            buffer = new T[capacity];
             this.position = 0;
         }
 

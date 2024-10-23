@@ -13,20 +13,22 @@ using System.Linq.Expressions;
 using FeatureLoom.Collections;
 using static FeatureLoom.Serialization.FeatureJsonSerializer;
 using System.Collections.Concurrent;
+using System.Net;
+using System.ComponentModel;
+using System.Runtime.Serialization.Formatters;
 
 namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonDeserializer
     {
         MicroValueLock serializerLock = new MicroValueLock();
-        const int BUFFER_SIZE = 1024 * 64;
-        byte[] buffer = new byte[BUFFER_SIZE];
+        byte[] buffer;
         Stack<int> peekStack = new Stack<int>();
         int bufferPos = 0;
         int bufferStartPos = 0;
         int pinnedBufferPos = -1;
         int bufferFillLevel = 0;
-        int bufferResetLevel = BUFFER_SIZE - (1024 * 8);
+        int bufferResetLevel;
         long totalBytesRead = 0;
 
         Stream stream;
@@ -49,7 +51,7 @@ namespace FeatureLoom.Serialization
         static readonly FilterResult[] map_SkipWhitespacesUntilObjectStarts = CreateFilterMap_SkipWhitespacesUntilObjectStarts();
         static readonly TypeResult[] map_TypeStart = CreateTypeStartMap();
 
-        static ulong[] exponentFactorMap = CreateExponentFactorMap();
+        static ulong[] exponentFactorMap = CreateExponentFactorMap(19);
 
         struct ItemInfo
         {
@@ -64,9 +66,9 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        static ulong[] CreateExponentFactorMap()
+        static ulong[] CreateExponentFactorMap(int maxExponent)
         {
-            ulong[] map = new ulong[21];
+            ulong[] map = new ulong[maxExponent + 1];
             ulong factor = 1;
             map[0] = factor;
             for (int i = 1; i < map.Length; i++)
@@ -87,7 +89,8 @@ namespace FeatureLoom.Serialization
             public Dictionary<Type, Type> genericTypeMapping = new();
             public bool enableReferenceResolution = false;
             public bool enableProposedTypes = false;
-            public bool skipMultiOptionOnZeroMatch = true;
+            public int initialBufferSize = 1024 * 64;
+            public bool tryCastArraysOfUnknownValues = true;
 
             public Settings()
             {
@@ -140,6 +143,8 @@ namespace FeatureLoom.Serialization
         {
             this.settings = settings ?? new Settings();
             tempSlicedBuffer = new SlicedBuffer<byte>(128 * 1024, 256, 128 * 1024);
+            buffer = new byte[settings.initialBufferSize];
+            bufferResetLevel = (int)(buffer.Length * 0.8);
         }
 
         private void Reset()
@@ -148,6 +153,11 @@ namespace FeatureLoom.Serialization
             {
                 this.stream = null;
                 bufferPos = 0;
+            }
+            if (bufferPos >= bufferFillLevel - 1)
+            {
+                bufferPos = 0;
+                bufferFillLevel = 0;
             }
             bufferStartPos = bufferPos;
             peekStack.Clear();
@@ -159,6 +169,14 @@ namespace FeatureLoom.Serialization
                 itemInfos.Clear();
                 currentItemInfoIndex = -1;
             }
+        }
+
+        public string ShowBufferAroundCurrentPosition(int before = 100, int after = 50)
+        {
+            int startPos = (bufferPos - before).ClampLow(0);
+            int endPos = (bufferPos + after).ClampHigh(bufferFillLevel - 1);
+            EquatableByteSegment segment = new EquatableByteSegment(buffer, startPos, endPos - startPos + 1);
+            return segment.ToString();
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -217,13 +235,22 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(double?)) cachedTypeReader.SetTypeReader(ReadNullableDoubleValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(float)) cachedTypeReader.SetTypeReader(ReadFloatValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(float?)) cachedTypeReader.SetTypeReader(ReadNullableFloatValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(decimal)) cachedTypeReader.SetTypeReader(ReadDecimalValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(decimal?)) cachedTypeReader.SetTypeReader(ReadNullableDecimalValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(bool)) cachedTypeReader.SetTypeReader(ReadBoolValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(bool?)) cachedTypeReader.SetTypeReader(ReadNullableBoolValue, JsonDataTypeCategory.Primitive);            
+            else if (itemType == typeof(bool?)) cachedTypeReader.SetTypeReader(ReadNullableBoolValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(char)) cachedTypeReader.SetTypeReader(ReadCharValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(char?)) cachedTypeReader.SetTypeReader(ReadNullableCharValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(DateTime)) cachedTypeReader.SetTypeReader(ReadDateTimeValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(DateTime?)) cachedTypeReader.SetTypeReader(ReadNullableDateTimeValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(Guid)) cachedTypeReader.SetTypeReader(ReadGuidValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(Guid?)) cachedTypeReader.SetTypeReader(ReadNullableGuidValue, JsonDataTypeCategory.Primitive);
+            // TODO IntPtr + UIntPtr
             else if (itemType.IsEnum) this.InvokeGenericMethod(nameof(CreateEnumReader), new Type[] { itemType }, cachedTypeReader);
             else if (itemType == typeof(object)) CreateUnknownObjectReader(cachedTypeReader);
             else if (TryCreateDictionaryTypeReader(itemType, cachedTypeReader)) { }
             else if (TryCreateEnumerableTypeReader(itemType, cachedTypeReader)) { }
-            else this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { itemType }, cachedTypeReader);
+            else this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { itemType }, cachedTypeReader, true);
 
             return cachedTypeReader;
         }
@@ -514,10 +541,26 @@ namespace FeatureLoom.Serialization
         private void CreateMultiOptionComplexTypeReader<T>(CachedTypeReader cachedTypeReader, Type[] typeOptions)
         {
 
-            Type[] objectTypeOptions = typeOptions.Where(t => !t.IsPrimitive && !t.ImplementsGenericInterface(typeof(IDictionary<,>))).ToArray();
+            Type[] objectTypeOptions = typeOptions
+                .Where(t => !t.IsPrimitive && !t.ImplementsGenericInterface(typeof(IDictionary<,>)))
+                .ToArray();            
+
+            CachedTypeReader[] objectTypeReaders = objectTypeOptions
+                .Select(t =>
+                {
+                    if (typeof(T) == t)                     
+                    {
+                        var selftypeReader = new CachedTypeReader(this);
+                        CreateComplexTypeReader<T>(selftypeReader, false);
+                        return selftypeReader;
+                    }
+                    else return GetCachedTypeReader(t);
+                })
+                .ToArray();
+
             Type dictType = typeOptions.FirstOrDefault(t => t.ImplementsGenericInterface(typeof(IDictionary<,>)));
-            CachedTypeReader[] objectTypeReaders = objectTypeOptions.Select(t => GetCachedTypeReader(t)).ToArray();
             CachedTypeReader dictTypeReader = dictType != null ? GetCachedTypeReader(dictType) : null;
+
             int numOptions = typeOptions.Length;
 
             Dictionary<EquatableByteSegment, List<bool>> fieldNameToIsTypeMember = new();            
@@ -553,6 +596,12 @@ namespace FeatureLoom.Serialization
                     }
                     indicesList[i] = true;
                 }
+
+                // Mark all fields that are equally available for all types
+                foreach(var pair in fieldNameToIsTypeMember)
+                {
+                    if (pair.Value.All(v => v == true)) fieldNameToIsTypeMember[pair.Key] = null;
+                }
             }
 
             Pool<List<int>> ratingsPool = new Pool<List<int>>(() => new(), l => l.Clear(), 1000, false);
@@ -562,14 +611,14 @@ namespace FeatureLoom.Serialization
                 SkipWhiteSpaces();
                 var ratings = ratingsPool.Take();
                 ratings.AddRange(Enumerable.Repeat(0, numOptions));
-                int totalFields = 0;
 
                 peekStack.Push(bufferPos);
                 
                 if (CurrentByte != '{') throw new Exception("Failed reading object");
                 TryNextByte();
-                int primeIndex = -1;
-                int primeRating = 0;
+                int selectionIndex = -1;
+                int fallbackIndex = -1;
+                int selectionRating = 0;
 
                 while (true)
                 {
@@ -577,35 +626,43 @@ namespace FeatureLoom.Serialization
                     if (CurrentByte == '}') break;
 
                     if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
-                    totalFields++;
                     if (fieldNameToIsTypeMember.TryGetValue(fieldName, out var typeIndices))
                     {
-                        for (var i = 0; i < typeIndices.Count; i++)
+                        if (typeIndices == null)
                         {
-                            if (typeIndices[i])
+                            // If field is available for every type and no type is yet fallback, set the first as fallback
+                            if (fallbackIndex == -1) fallbackIndex = 0;
+                        }
+                        else
+                        {
+                            for (var i = 0; i < typeIndices.Count; i++)
                             {
-                                int rating = ratings[i];
-                                rating++;
-                                ratings[i] = rating;
-                                if (primeIndex == i)
+                                if (typeIndices[i])
                                 {
-                                    primeRating = rating;
-                                }
-                                else if (rating == primeRating)
-                                {
-                                    primeRating = rating;
-                                    primeIndex = -1;
-                                }
-                                else if (rating > primeRating)
-                                {
-                                    primeRating = rating;
-                                    primeIndex = i;
+                                    int rating = ratings[i];
+                                    rating++;
+                                    ratings[i] = rating;
+                                    if (selectionIndex == i)
+                                    {
+                                        selectionRating = rating;
+                                    }
+                                    else if (rating == selectionRating)
+                                    {
+                                        selectionRating = rating;
+                                        if (selectionIndex != -1) fallbackIndex = selectionIndex;
+                                        selectionIndex = -1;
+                                    }
+                                    else if (rating > selectionRating)
+                                    {
+                                        selectionRating = rating;
+                                        selectionIndex = i;
+                                    }
                                 }
                             }
                         }
                     }
 
-                    if (primeIndex != -1 && primeRating > 0 && totalFields > 3) break;
+                    if (selectionIndex != -1) break;
 
                     SkipWhiteSpaces();
                     if (CurrentByte != ':') throw new Exception("Failed reading object");
@@ -617,28 +674,34 @@ namespace FeatureLoom.Serialization
                 ratingsPool.Return(ratings);
                 bufferPos = peekStack.Pop();
 
-                if (primeIndex == -1)
+                if (selectionIndex == -1)
                 {
-                    if (settings.skipMultiOptionOnZeroMatch)
+                    if (fallbackIndex != -1)
+                    {
+                        selectionIndex = fallbackIndex;
+                    }
+                    else if (dictTypeReader != null)
+                    {
+                        return dictTypeReader.ReadItem<T>();
+                    }
+                    else
                     {
                         SkipObject();
                         return default;
                     }
-                    else if (dictTypeReader != null) return dictTypeReader.ReadItem<T>();                    
-                    else primeIndex = 0;
                 }
-                return objectTypeReaders[primeIndex].ReadItem<T>();
+                return objectTypeReaders[selectionIndex].ReadItem<T>();
             };
 
             cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
         }        
 
-        private void CreateComplexTypeReader<T>(CachedTypeReader cachedTypeReader)
+        private void CreateComplexTypeReader<T>(CachedTypeReader cachedTypeReader, bool checkForMultiOptions)
         {
             Type itemType = typeof(T);
 
 
-            if (settings.multiOptionTypeMapping.TryGetValue(itemType, out Type[] mappedTypeOptions))
+            if (checkForMultiOptions && settings.multiOptionTypeMapping.TryGetValue(itemType, out Type[] mappedTypeOptions))
             {
                 this.InvokeGenericMethod(nameof(CreateMultiOptionComplexTypeReader), new Type[] { itemType }, cachedTypeReader, mappedTypeOptions);
                 return;
@@ -803,20 +866,48 @@ namespace FeatureLoom.Serialization
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
 
+            var fieldTypeReader = GetCachedTypeReader(fieldType);
+
             var target = Expression.Parameter(itemType, "target");
             var value = Expression.Parameter(fieldType, "value");
-            MemberExpression memberAccess = Expression.Field(target, fieldInfo);
-            BinaryExpression assignExpression = Expression.Assign(memberAccess, value);
-            var lambda = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
-            Action<T, V> setValue = lambda.Compile();
+            var memberAccess = Expression.Field(target, fieldInfo);
 
-            var fieldTypeReader = GetCachedTypeReader(fieldType);
-            return parentItem =>
+            if (itemType.IsValueType) // For structs: create an expression that modifies and returns the struct
             {
-                V value = fieldTypeReader.ReadValue<V>(fieldName);
-                setValue((T)parentItem, value);
-                return parentItem;
-            };
+                // Create an expression to set the field value on the struct
+                var assignExpression = Expression.Assign(memberAccess, value);
+
+                // Create a block expression that modifies the struct
+                var body = Expression.Block(
+                    assignExpression,
+                    target // Return the modified struct
+                );
+
+                var lambda = Expression.Lambda<Func<T, V, T>>(body, target, value);
+                var setValueAndReturn = lambda.Compile();
+
+                return parentItem =>
+                {
+                    // Read the new field value
+                    V newFieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                    parentItem = setValueAndReturn((T)parentItem, newFieldValue);
+                    return parentItem;
+                };
+            }
+            else // For reference types: the previous expression-based approach works
+            {
+                BinaryExpression assignExpression = Expression.Assign(memberAccess, value);
+                var lambda = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
+
+                Action<T, V> setValue = lambda.Compile();
+
+                return parentItem =>
+                {
+                    V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                    setValue((T)parentItem, fieldValue);
+                    return parentItem;
+                };
+            }
         }
 
         private Func<C, C> CreatePropertyWriterUsingExpression<T, V, C>(PropertyInfo propertyInfo, EquatableByteSegment fieldName) where T : C
@@ -824,20 +915,48 @@ namespace FeatureLoom.Serialization
             Type itemType = typeof(T);
             Type fieldType = typeof(V);
 
+            var fieldTypeReader = GetCachedTypeReader(fieldType);
+
             var target = Expression.Parameter(itemType, "target");
             var value = Expression.Parameter(fieldType, "value");
-            MemberExpression memberAccess = Expression.Property(target, propertyInfo);
-            BinaryExpression assignExpression = Expression.Assign(memberAccess, value);
-            var lambda = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
-            Action<T, V> setValue = lambda.Compile();
+            var memberAccess = Expression.Property(target, propertyInfo);
 
-            var fieldTypeReader = GetCachedTypeReader(fieldType);
-            return parentItem =>
+            if (itemType.IsValueType) // For structs: create an expression that modifies and returns the struct
             {
-                V value = fieldTypeReader.ReadValue<V>(fieldName);
-                setValue((T)parentItem, value);
-                return parentItem;
-            };
+                // Create an expression to set the field value on the struct
+                var assignExpression = Expression.Assign(memberAccess, value);
+
+                // Create a block expression that modifies the struct
+                var body = Expression.Block(
+                    assignExpression,
+                    target // Return the modified struct
+                );
+
+                var lambda = Expression.Lambda<Func<T, V, T>>(body, target, value);
+                var setValueAndReturn = lambda.Compile();
+
+                return parentItem =>
+                {
+                    // Read the new field value
+                    V newFieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                    parentItem = setValueAndReturn((T)parentItem, newFieldValue);
+                    return parentItem;
+                };
+            }
+            else // For reference types: the previous expression-based approach works
+            {
+                BinaryExpression assignExpression = Expression.Assign(memberAccess, value);
+                var lambda = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
+
+                Action<T, V> setValue = lambda.Compile();
+
+                return parentItem =>
+                {
+                    V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                    setValue((T)parentItem, fieldValue);
+                    return parentItem;
+                };
+            }
         }
 
         private Type GetFieldOrPropertyType(MemberInfo fieldOrPropertyInfo)
@@ -1004,7 +1123,7 @@ namespace FeatureLoom.Serialization
                     return false;
                 }
                 if (deserializer.settings.enableReferenceResolution) current = reader.ReadValue<T>(deserializer.GetArrayElementName(++index));
-                else reader.ReadItem<T>();
+                else current = reader.ReadItem<T>();
                 deserializer.SkipWhiteSpaces();
                 if (deserializer.CurrentByte == ',') deserializer.TryNextByte();
                 else if (deserializer.CurrentByte != ']')
@@ -1035,12 +1154,18 @@ namespace FeatureLoom.Serialization
             IEnumerator IEnumerable.GetEnumerator() => this;
         }
 
+        ListCaster listCaster = new ListCaster();
+
         CachedTypeReader cachedObjectListReader = null;
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private List<object> ReadArrayValueAsList()
+        private object ReadArrayValueAsList()
         {
             if (cachedObjectListReader == null) cachedObjectListReader = CreateCachedTypeReader(typeof(List<object>));
-            return cachedObjectListReader.ReadItem<List<object>>();
+            var objectsList = cachedObjectListReader.ReadItem<List<object>>();
+            if (!settings.tryCastArraysOfUnknownValues || objectsList.Count == 0) return objectsList;
+            
+            var castedList = listCaster.CastListToCommonType(objectsList, out _);
+            return castedList;            
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1052,6 +1177,45 @@ namespace FeatureLoom.Serialization
             stringBuilder.Clear();
             return result;
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public char ReadCharValue()
+        {
+            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
+            DecodeUtf8(stringBytes, stringBuilder);
+            if (stringBuilder.Length == 0) throw new Exception("string for reading char is empty");
+            char c = stringBuilder[0];
+            stringBuilder.Clear();
+            return c;
+        }
+
+        public char? ReadNullableCharValue() => ReadCharValue();        
+
+        public DateTime ReadDateTimeValue()
+        {
+            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
+            DecodeUtf8(stringBytes, stringBuilder);
+            string str = stringBuilder.ToString();
+            stringBuilder.Clear();
+            //TODO: Make optimized version using span<char> to avoid garbage
+            DateTime.TryParse(str, out DateTime result);
+            return result;
+        }
+
+        public DateTime? ReadNullableDateTimeValue() => ReadDateTimeValue();
+
+        public Guid ReadGuidValue()
+        {
+            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
+            DecodeUtf8(stringBytes, stringBuilder);
+            string str = stringBuilder.ToString();
+            stringBuilder.Clear();
+            //TODO: Make optimized version using span<char> to avoid garbage
+            Guid.TryParse(str, out Guid result);
+            return result;
+        }
+
+        public Guid? ReadNullableGuidValue() => ReadGuidValue();
 
         StringBuilder stringBuilder = new StringBuilder();
         private static void DecodeUtf8(ArraySegment<byte> bytes, StringBuilder stringBuilder)
@@ -1210,16 +1374,15 @@ namespace FeatureLoom.Serialization
             {
                 ulong integerPart = integerBytes.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
                 double decimalPart = decimalBytes.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
-                double value = decimalPart / exponentFactorMap[decimalBytes.Count];
+                double value = ApplyExponent(decimalPart, -decimalBytes.Count);
                 value += integerPart;
                 if (isNegative) value *= -1;
 
                 if (exponentBytes.Array != null)
                 {
                     int exp = (int)BytesToInteger(exponentBytes);
-                    int expFactor = (int)exponentFactorMap[exp];
-                    if (isExponentNegative) value /= expFactor;
-                    else value *= expFactor;
+                    if (isExponentNegative) exp = -exp;
+                    value = ApplyExponent(value, exp);
                 }
 
                 return value;
@@ -1230,8 +1393,7 @@ namespace FeatureLoom.Serialization
                 if (exponentBytes.Array != null)
                 {
                     int exp = (int)BytesToInteger(exponentBytes);
-                    ulong expFactor = exponentFactorMap[exp];
-                    integerPart *= expFactor;
+                    integerPart = ApplyExponent(integerPart, exp);                    
                 }
 
                 if (isNegative)
@@ -1256,17 +1418,17 @@ namespace FeatureLoom.Serialization
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
             if (decimalBytes.Array != null) throw new Exception("Decimal found for integer");
 
-            ulong integerPart = BytesToInteger(integerBytes);
-            long value = (long)integerPart;
-            if (isNegative) value *= -1;
+            ulong integerPart = BytesToInteger(integerBytes);            
 
             if (exponentBytes.Array != null)
             {
                 int exp = (int)BytesToInteger(exponentBytes);
-                long expFactor = (long)exponentFactorMap[exp];
-                if (isExponentNegative) value /= expFactor;
-                else value *= expFactor;
+                if (isExponentNegative) exp = -exp;
+                integerPart = ApplyExponent(integerPart, exp);                
             }
+
+            long value = (long)integerPart;
+            if (isNegative) value *= -1;
 
             return value;
         }
@@ -1319,9 +1481,8 @@ namespace FeatureLoom.Serialization
             if (exponentBytes.Array != null)
             {
                 int exp = (int)BytesToInteger(exponentBytes);
-                ulong expFactor = exponentFactorMap[exp];
-                if (isExponentNegative) value /= expFactor;
-                else value *= expFactor;
+                if (isExponentNegative) exp = -exp;
+                value = ApplyExponent(value, exp);
             }
 
             return value;
@@ -1363,24 +1524,36 @@ namespace FeatureLoom.Serialization
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte? ReadNullableByteValue() => ReadByteValue();
 
+        EquatableByteSegment SPECIAL_NUMBER_NAN = "NaN".ToByteArray();
+        EquatableByteSegment SPECIAL_NUMBER_POS_INFINITY = "Infinity".ToByteArray();
+        EquatableByteSegment SPECIAL_NUMBER_NEG_INFINITY = "-Infinity".ToByteArray();
+
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double ReadDoubleValue()
         {
+            SkipWhiteSpaces();
+            if (CurrentByte == (byte)'"')
+            {
+                if (!TryReadStringBytes(out var str)) throw new Exception("Invalid string found for a number: could not read it");
+                if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
+                if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
+                if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;
+                throw new Exception($"Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
+            }
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
 
 
             ulong integerPart = integerBytes.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
             double decimalPart = decimalBytes.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
-            double value = decimalPart / exponentFactorMap[decimalBytes.Count];
+            double value = ApplyExponent(decimalPart, -decimalBytes.Count);        
             value += integerPart;
             if (isNegative) value *= -1;
 
             if (exponentBytes.Array != null)
             {
                 int exp = (int)BytesToInteger(exponentBytes);
-                int expFactor = (int)exponentFactorMap[exp];
-                if (isExponentNegative) value /= expFactor;
-                else value *= expFactor;
+                if (isExponentNegative) exp = -exp;
+                value = ApplyExponent(value, exp);
             }
 
             return value;
@@ -1388,6 +1561,17 @@ namespace FeatureLoom.Serialization
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double? ReadNullableDoubleValue() => ReadDoubleValue();
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public decimal ReadDecimalValue()
+        {
+            double dbl = ReadDoubleValue();
+            if (double.IsNaN(dbl) || double.IsInfinity(dbl)) throw new Exception("Decimals cannot be NaN or Infinity");
+            return (decimal)dbl;
+        }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public decimal? ReadNullableDecimalValue() => (decimal)ReadDecimalValue();
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float ReadFloatValue() => (float)ReadDoubleValue();
@@ -1398,58 +1582,100 @@ namespace FeatureLoom.Serialization
         CachedTypeReader lastTypeReader = null;
         Type lastTypeReaderType = null;
 
-        public bool TryDeserialize<T>(Stream stream, out T item)
+        public void SetDataSource(Stream stream)
         {
             serializerLock.Enter();
             try
             {
-                if (this.stream != stream)
-                {
-                    ResetBuffer(false);
-                    this.stream = stream;
-                    if (!TryReadToBuffer())
-                    {
-                        item = default;
-                        return false;
-                    }
-                }
-                else if (bufferStartPos > bufferResetLevel)
-                {
-                    ResetBuffer(true);
-                    bufferPos = bufferStartPos;
-                }
-                else if (bufferPos >= bufferFillLevel - 1)
-                {
-                    if (!TryReadToBuffer())
-                    {
-                        item = default;
-                        return false;
-                    }
-                }
-                var itemType = typeof(T);
-                if (lastTypeReaderType == itemType)
-                {
-                    item = lastTypeReader.ReadValue<T>(rootName);
-                }
-                else
-                {
-                    var reader = GetCachedTypeReader(itemType);
-                    item = reader.ReadValue<T>(rootName);
-                    lastTypeReader = reader;
-                    lastTypeReaderType = itemType;
-                }
-                return true;
+                SetDataSourceUnsafe(stream);
             }
-            catch (BufferExceededException)
-            {
-                if (bufferStartPos == 0) throw; // Buffer is too small to keep complete json value
+            finally 
+            { 
+                serializerLock.Exit(); 
+            }
+        }
 
-                // Try to make some more space in the buffer and start over again
+        private void SetDataSourceUnsafe(Stream stream)
+        {
+            if (this.stream != stream)
+            {
+                ResetBuffer(false, false);
+                this.stream = stream;
+            }
+        }
+
+        public bool IsAnyDataLeft()
+        {
+            serializerLock.Enter();
+            try
+            {                                
+                if (bufferPos <= bufferFillLevel - 1)
+                {
+                    // Ignore whitespaces and check if any other character is found
+                    SkipWhiteSpaces();
+                    if (map_SkipWhitespaces[CurrentByte] == FilterResult.Found) return true;                    
+                }
+
+                int bufferSizeLeft = buffer.Length - bufferFillLevel;
+                if (bufferSizeLeft == 0) ResetBuffer(true, false);
+                if (!TryReadToBuffer()) return false;
+
+                // Ignore whitespaces and check if any other character is found
+                SkipWhiteSpaces();
+                return map_SkipWhitespaces[CurrentByte] == FilterResult.Found;
+            }
+            finally 
+            { 
+                serializerLock.Exit(); 
+            }
+        }
+
+        private bool TryDeserializeUnsafe<T>(out T item)
+        {
+            item = default;
+            bool retry = false;
+            do
+            {
+                retry = false;
                 try
                 {
-                    ResetBuffer(true);
-                    bufferPos = bufferStartPos;
+                    if (bufferStartPos > bufferResetLevel)
+                    {
+                        ResetBuffer(true, false);
+                        bufferPos = bufferStartPos;
+                    }
+                    else if (bufferPos > bufferFillLevel - 1)
+                    {
+                        if (!TryReadToBuffer())
+                        {
+                            item = default;
+                            return false;
+                        }
+                    }
+                    
+                    // Return false if only whitespaces are left (otherwise we would throw an exception)
+                    SkipWhiteSpaces();  
+                    if (map_SkipWhitespaces[CurrentByte] == FilterResult.Skip) return false;
 
+                    var itemType = typeof(T);
+                    if (lastTypeReaderType == itemType)
+                    {
+                        item = lastTypeReader.ReadValue<T>(rootName);
+                    }
+                    else
+                    {
+                        var reader = GetCachedTypeReader(itemType);
+                        lastTypeReader = reader;
+                        lastTypeReaderType = itemType;
+                        item = reader.ReadValue<T>(rootName);
+                    }
+                    return true;
+                }
+                catch (BufferExceededException)
+                {
+                    bool growBuffer = bufferStartPos < (int)(buffer.Length * 0.5);
+                    ResetBuffer(true, growBuffer);
+                    bufferPos = bufferStartPos;
                     peekStack.Clear();
                     currentItemName = rootName;
                     tempSlicedBuffer.Reset(true, false);
@@ -1461,46 +1687,65 @@ namespace FeatureLoom.Serialization
                         item = default;
                         return false;
                     }
-                    else if (bufferPos == bufferFillLevel - 1)
-                    {
-                        if (!TryReadToBuffer())
-                        {
-                            item = default;
-                            return false;
-                        }
-                    }
-                    var reader = GetCachedTypeReader(typeof(T));
-                    item = reader.ReadValue<T>(rootName);
-                    return true;
-                }
-                catch (BufferExceededException)
-                {
-                    throw;
+
+                    retry = true;
                 }
                 catch (Exception e)
-                {
-                    item = default;
-                    return false;
+                {                    
+                    throw;
                 }
-            }
-            catch (Exception e)
+                finally
+                {
+                    if (!retry)
+                    {
+                        Reset();
+                    }
+                }
+            } while (retry);
+
+            return false;
+        }
+
+        public bool TryDeserialize<T>(out T item)
+        {
+            serializerLock.Enter();
+            try
             {
-                item = default;
-                return false;
+                return TryDeserializeUnsafe(out item);
             }
             finally
             {
-                Reset();
                 serializerLock.Exit();
             }
         }
 
-        private void ResetBuffer(bool keepUnusedBytes)
+        public bool TryDeserialize<T>(Stream stream, out T item)
         {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnsafe(stream);
+                return TryDeserializeUnsafe(out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        private void ResetBuffer(bool keepUnusedBytes, bool grow)
+        {
+            byte[] newBuffer = buffer;
+            if (grow)
+            {
+                newBuffer = new byte[buffer.Length * 2];
+                bufferResetLevel = (int)(newBuffer.Length * 0.8);
+            }
+
             if (keepUnusedBytes)
             {
                 int bytesToKeep = bufferFillLevel - bufferStartPos;
-                Array.Copy(buffer, bufferStartPos, buffer, 0, bytesToKeep);
+                Array.Copy(buffer, bufferStartPos, newBuffer, 0, bytesToKeep);
                 bufferPos = bytesToKeep;
                 bufferStartPos = 0;
                 bufferFillLevel = bytesToKeep;
@@ -1511,6 +1756,7 @@ namespace FeatureLoom.Serialization
                 bufferStartPos = 0;
                 bufferFillLevel = 0;
             }
+            buffer = newBuffer;
         }
 
         class BufferExceededException : Exception
@@ -1520,12 +1766,21 @@ namespace FeatureLoom.Serialization
 
         private bool TryReadToBuffer()
         {
+            if (stream == null) return false;
+            if (!stream.CanRead) return false;
+
             int bufferSizeLeft = buffer.Length - bufferFillLevel;
-            if (bufferSizeLeft == 0) throw new BufferExceededException();
-            int bytesRead = stream.Read(buffer, bufferFillLevel, bufferSizeLeft);
-            totalBytesRead += bytesRead;
-            bufferFillLevel += bytesRead;
-            return bytesRead > 0;
+            if (bufferSizeLeft == 0) throw new BufferExceededException(); try
+            {
+                int bytesRead = stream.Read(buffer, bufferFillLevel, bufferSizeLeft);
+                totalBytesRead += bytesRead;
+                bufferFillLevel += bytesRead;
+                return bytesRead > 0;
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1539,189 +1794,7 @@ namespace FeatureLoom.Serialization
 
         private byte CurrentByte => buffer[bufferPos];
 
-        /*
-
-
-        public abstract class ScannedBufferValue
-        {
-            protected EquatableByteSegment valueSegment;
-
-            public ScannedBufferValue(EquatableByteSegment valueSegment)
-            {
-                this.valueSegment = valueSegment;
-            }
-        }
-
-        public class ScannedBufferString : ScannedBufferValue
-        {
-            private FeatureJsonDeserializer deserializer;
-
-            public ScannedBufferString(FeatureJsonDeserializer deserializer, EquatableByteSegment valueSegment) : base(valueSegment)
-            {
-                this.deserializer = deserializer;
-            }
-
-            public string GetValue()
-            {                                
-                DecodeUtf8(valueSegment, deserializer.stringBuilder);
-                string str = deserializer.stringBuilder.ToString();
-                deserializer.stringBuilder.Clear();
-                return str;
-            }
-        }
-
-        public class ScannedBufferBool : ScannedBufferValue
-        {
-            private bool value;
-
-            public ScannedBufferBool(bool value, EquatableByteSegment valueSegment) : base(valueSegment)
-            {
-                this.value = value;
-            }
-
-            public bool GetValue() => value;
-        }
-
-        public class ScannedBufferNull: ScannedBufferValue
-        {
-            public ScannedBufferNull(EquatableByteSegment valueSegment) : base(valueSegment)
-            {
-
-            }
-
-            public object GetValue() => null;
-        }
-
-        public class ScannedBufferObject : ScannedBufferValue
-        {
-            private Dictionary<EquatableByteSegment, ScannedBufferValue> fields;
-
-            public ScannedBufferObject(EquatableByteSegment valueSegment, Dictionary<EquatableByteSegment, ScannedBufferValue> fields) : base(TypeResult.Object, valueSegment)
-            {
-                this.fields = fields;
-            }
-        }
-
-        public class ScannedBufferArray : ScannedBufferValue
-        {
-            private IEnumerable<ScannedBufferValue> elements;
-
-            public ScannedBufferArray(EquatableByteSegment valueSegment, IEnumerable<ScannedBufferValue> elements) : base(TypeResult.Array, valueSegment)
-            {
-                this.elements = elements;
-            }
-        }
-
-        ScannedBufferValue ScanValue()
-        {
-            SkipWhiteSpaces();
-
-            var valueType = map_TypeStart[CurrentByte];
-            switch (valueType)
-            {
-                case TypeResult.String: return ScanString();
-                case TypeResult.Object: return ScanObject();
-                case TypeResult.Bool: return ScanBool();
-                case TypeResult.Null: return ScanNull();
-                case TypeResult.Array: return ScanArray();
-                case TypeResult.Number: return ScanNumber();
-                default: throw new Exception("Invalid character for scanning any value");
-            }
-        }
-
-        private ScannedBufferString ScanString()
-        {
-            SkipWhiteSpaces();
-            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed scanning string");
-            return new ScannedBufferString(this, stringBytes);            
-        }
-
-        private ScannedBufferBool ScanBool()
-        {
-            SkipWhiteSpaces();            
-            int startPos = bufferPos;
-            bool value = ReadBoolValue();
-            return new ScannedBufferBool(value, new EquatableByteSegment(buffer, startPos, bufferPos - startPos));
-        }
-
-        private ScannedBufferNull ScanNull()
-        {
-            SkipWhiteSpaces();
-            int startPos = bufferPos;
-            SkipNull();
-            return new ScannedBufferNull(new EquatableByteSegment(buffer, startPos, bufferPos - startPos));
-        }
-
-        private ScannedBufferNumber ScanNumber()
-        {
-            SkipWhiteSpaces();
-            int startPos = bufferPos;
-            ReadNumberValueAsObject();
-            return new ScannedBufferNumber(TypeResult.Null, new EquatableByteSegment(buffer, startPos, bufferPos - startPos));
-        }
-
-        private ScannedBufferArray ScanArray()
-        {
-            SkipWhiteSpaces();
-            int startPos = bufferPos;            
-            if (CurrentByte != '[') throw new Exception("Failed scanning array");
-            if (!TryNextByte()) throw new Exception("Failed scanning array");
-            SkipWhiteSpaces();
-
-            List<ScannedBufferValue> array = new List<ScannedBufferValue>();
-
-            while (CurrentByte != ']')
-            {
-                array.Add(ScanValue());
-                SkipWhiteSpaces();
-                if (CurrentByte == ',')
-                {
-                    if (!TryNextByte()) throw new Exception("Failed scanning array");
-                    SkipWhiteSpaces();
-                }
-                else if (CurrentByte != ']') throw new Exception("Failed scanning array");
-            }
-
-            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed scanning boolean");
-            return new ScannedBufferArray(new EquatableByteSegment(buffer, startPos, bufferPos - startPos), array);
-        }
-
-        private ScannedBufferObject ScanObject()
-        {
-            SkipWhiteSpaces();
-            if (CurrentByte != '{') throw new Exception("Failed scanning Object");
-
-
-            var fields = new Dictionary<EquatableByteSegment, ScannedBufferValue>();
-            int startPos = bufferPos;
-
-            TryNextByte();
-
-            while (true)
-            {
-                SkipWhiteSpaces();
-                if (CurrentByte == '}') break;
-
-                if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed scanning Object");
-                SkipWhiteSpaces();
-                if (CurrentByte != ':') throw new Exception("Failed scanning Object");
-                TryNextByte();
-                SkipWhiteSpaces();
-                fields[fieldName] = ScanValue();
-                SkipWhiteSpaces();
-                if (CurrentByte == ',') TryNextByte();
-            }
-
-            if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed scanning Object");
-
-            return new ScannedBufferObject(new EquatableByteSegment(buffer, startPos, bufferPos - startPos), fields);
-        }
-
-
-        */
-
-
-
+    
         void SkipValue()
         {
             SkipWhiteSpaces();
@@ -1806,6 +1879,116 @@ namespace FeatureLoom.Serialization
         private void SkipString()
         {
             if (!TryReadStringBytes(out var _)) throw new Exception("Failed reading string");
+        }
+
+        double ApplyExponent(double value, int exponent)
+        {
+            int maxExponentFactorLookup = exponentFactorMap.Length-1;
+            if (exponent < 0)
+            {
+                exponent = -exponent;
+
+                if (exponent <= maxExponentFactorLookup)
+                {
+                    ulong factor = exponentFactorMap[exponent];
+                    value = value / factor;
+                    return value;
+                }
+
+                while (exponent > 0)
+                {
+                    int partialExp = exponent;
+                    if (exponent > maxExponentFactorLookup)
+                    {
+                        partialExp = maxExponentFactorLookup;
+                        exponent -= maxExponentFactorLookup;
+                    }
+                    else exponent = 0;
+
+                    ulong factor = exponentFactorMap[partialExp];
+                    value = value / factor;
+                }
+                return value;
+            }
+            else
+            {
+                if (exponent <= maxExponentFactorLookup)
+                {
+                    ulong factor = exponentFactorMap[exponent];
+                    value = value * factor;
+                    return value;
+                }
+
+                while (exponent > 0)
+                {
+                    int partialExp = exponent;
+                    if (exponent > maxExponentFactorLookup)
+                    {
+                        partialExp = maxExponentFactorLookup;
+                        exponent -= maxExponentFactorLookup;
+                    }
+                    else exponent = 0;
+
+                    ulong factor = exponentFactorMap[partialExp];
+                    value = value * factor;
+                }
+                return value;
+            }                   
+        }
+
+        ulong ApplyExponent(ulong value, int exponent)
+        {
+            int maxExponentFactorLookup = exponentFactorMap.Length - 1;
+            if (exponent < 0)
+            {
+                exponent = -exponent;
+
+                if (exponent <= maxExponentFactorLookup)
+                {
+                    ulong factor = exponentFactorMap[exponent];
+                    value = value / factor;
+                    return value;
+                }
+
+                while (exponent > 0)
+                {
+                    int partialExp = exponent;
+                    if (exponent > maxExponentFactorLookup)
+                    {
+                        partialExp = maxExponentFactorLookup;
+                        exponent -= maxExponentFactorLookup;
+                    }
+                    else exponent = 0;
+
+                    ulong factor = exponentFactorMap[partialExp];
+                    value = value / factor;
+                }
+                return value;
+            }
+            else
+            {
+                if (exponent <= maxExponentFactorLookup)
+                {
+                    ulong factor = exponentFactorMap[exponent];
+                    value = value * factor;
+                    return value;
+                }
+
+                while (exponent > 0)
+                {
+                    int partialExp = exponent;
+                    if (exponent > maxExponentFactorLookup)
+                    {
+                        partialExp = maxExponentFactorLookup;
+                        exponent -= maxExponentFactorLookup;
+                    }
+                    else exponent = 0;
+
+                    ulong factor = exponentFactorMap[partialExp];
+                    value = value * factor;
+                }
+                return value;
+            }
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]

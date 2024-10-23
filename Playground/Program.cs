@@ -32,7 +32,6 @@ using Microsoft.Identity.Client;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using System.Reflection.Emit;
 using System.Buffers.Text;
-using FeatureLoom.Core.Serialization;
 
 namespace Playground
 {
@@ -123,6 +122,20 @@ namespace Playground
 
         private static async Task Main()
         {
+
+            /*
+            var batchTK = AppTime.TimeKeeper;
+            Batcher<int> batcher = new Batcher<int>(5, 1.Seconds(), 100.Milliseconds());
+            batcher.ProcessMessage<int[]>(batch => ConsoleHelper.WriteLine($"time: {batchTK.Elapsed.TotalSeconds} num elements: {batch.Length}, Elements: [{batch.AllItemsToString(",")}]"));
+
+            for(int i = 0; i < 100; i++)
+            {
+                batcher.Send(i);
+                await AppTime.WaitAsync(RandomGenerator.Int32(100, 500).Milliseconds());
+            }
+
+            await AppTime.WaitAsync(10.Minutes());
+
             string inputText = "That is a test!";
             var inputBytes = inputText.ToByteArray();
             byte[] output1 = new byte[inputBytes.Length * 2];            
@@ -134,7 +147,7 @@ namespace Playground
             base64Stream.Write(inputBytes, 0, inputBytes.Length);
             base64Stream.Flush();
             var output2 = outputStream.ToArray();
-
+            */
             /*var rw = new TextFileStorage("pathTest", new TextFileStorage.Config()
             {
                 basePath = "./pathTestBasePath",

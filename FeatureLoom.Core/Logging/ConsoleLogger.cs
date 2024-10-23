@@ -28,14 +28,15 @@ namespace FeatureLoom.Logging
                 [Loglevel.DEBUG] = ConsoleColor.Gray,
                 [Loglevel.TRACE] = ConsoleColor.DarkGray,
             };
-            public ConsoleColor backgroundColor = ConsoleColor.Black;            
+            public ConsoleColor backgroundColor = ConsoleColor.Black;
+            public bool omitLoggingWithoutConsole = true;
         }
 
         public Config config = new Config();
 
         public void Post<M>(in M message)
         {
-            if (!ConsoleHelper.CheckHasConsole()) return;
+            if (config.omitLoggingWithoutConsole && !ConsoleHelper.CheckHasConsole()) return;
             if (message == null) return;            
 
             config.TryUpdateFromStorage(true);

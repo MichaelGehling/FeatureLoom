@@ -95,13 +95,13 @@ namespace FeatureLoom.Serialization
             {
                 this.handlerType = typeof(T);
                 this.isPrimitive = false;
-                this.noRefTypes = noRefChildren && !this.handlerType.IsClass;
+                this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
                 Action<T, Type, ArraySegment<byte>> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                     {
-                        if (this.handlerType.IsClass)
+                        if (!this.handlerType.IsValueType)
                         {
                             temp = (item, callType, itemName) =>
                             {
@@ -129,7 +129,7 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        if (this.handlerType.IsClass)
+                        if (!this.handlerType.IsValueType)
                         {
                             temp = (item, callType, itemName) =>
                             {
@@ -197,11 +197,11 @@ namespace FeatureLoom.Serialization
             {
                 this.handlerType = typeof(T);
                 this.isPrimitive = false;                
-                this.noRefTypes = noRefChildren && !this.handlerType.IsClass;
+                this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
                 Action<T, Type, ArraySegment<byte>> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
-                    if (this.handlerType.IsClass)
+                    if (!this.handlerType.IsValueType)
                     {
                         if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                         {
@@ -322,11 +322,11 @@ namespace FeatureLoom.Serialization
             {
                 this.handlerType = typeof(T);
                 this.isPrimitive = false;
-                this.noRefTypes = noRefChildren && !this.handlerType.IsClass;
+                this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
                 Action<T, Type, ArraySegment<byte>> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
-                    if (this.handlerType.IsClass)
+                    if (!this.handlerType.IsValueType)
                     {
                         if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                         {
