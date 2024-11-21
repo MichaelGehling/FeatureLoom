@@ -16,6 +16,8 @@ namespace FeatureLoom.Serialization
             private bool isRefType;
             private JsonDataTypeCategory category;
 
+            public JsonDataTypeCategory JsonTypeCategory => category;
+
             public CachedTypeReader(FeatureJsonDeserializer serializer)
             {
                 this.deserializer = serializer;
@@ -35,7 +37,7 @@ namespace FeatureLoom.Serialization
                         temp = () =>
                         {
                             deserializer.SkipWhiteSpaces();
-                            if (deserializer.TryReadNull()) return default;
+                            if (deserializer.TryReadNullValue()) return default;
                             if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
                             return typeReader.Invoke();
                         };
@@ -45,7 +47,7 @@ namespace FeatureLoom.Serialization
                         temp = () =>
                         {
                             deserializer.SkipWhiteSpaces();
-                            if (deserializer.TryReadNull()) return default;
+                            if (deserializer.TryReadNullValue()) return default;
                             return typeReader.Invoke();
                         };
                     }

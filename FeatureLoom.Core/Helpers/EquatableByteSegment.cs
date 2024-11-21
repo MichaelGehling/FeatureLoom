@@ -7,30 +7,26 @@ namespace FeatureLoom.Helpers
     public struct EquatableByteSegment : IEquatable<EquatableByteSegment>
     {
         private readonly ArraySegment<byte> segment;
-        private readonly int hashCode;
+        private int? hashCode;        
 
         public EquatableByteSegment(ArraySegment<byte> segment)
         {
             this.segment = segment;
-            this.hashCode = ComputeHashCode(segment);
         }
 
         public EquatableByteSegment(byte[] array, int offset, int count)
         {
             this.segment = new ArraySegment<byte>(array, offset, count);
-            this.hashCode = ComputeHashCode(segment);
         }
 
         public EquatableByteSegment(byte[] array)
         {
             this.segment = new ArraySegment<byte>(array);
-            this.hashCode = ComputeHashCode(segment);
         }
 
         public EquatableByteSegment(string str)
         {
             this.segment = new ArraySegment<byte>(str.ToByteArray());
-            this.hashCode = ComputeHashCode(segment);
         }
 
         // Implicit conversion from ArraySegment<byte> to EquatableByteSegment
@@ -57,13 +53,17 @@ namespace FeatureLoom.Helpers
             return wrapper.segment.ToArray();
         }
 
+        public bool IsValid => segment.Array != null;
+        public int Count => segment.Count;
+        public bool IsEmptyOrInvalid => !IsValid || segment.Count == 0;
+
         public ArraySegment<byte> Segment => segment;
         public byte[] ToArray() => segment.ToArray();
 
         public bool Equals(EquatableByteSegment other)
         {
-            if (hashCode != other.hashCode) return false;
             if (segment.Count != other.segment.Count) return false;
+            if (GetHashCode() != other.GetHashCode()) return false;            
 
             for (int i = 0; i < segment.Count; i++)
             {
@@ -94,7 +94,8 @@ namespace FeatureLoom.Helpers
 
         public override int GetHashCode()
         {
-            return hashCode;
+            if (!hashCode.HasValue) hashCode = ComputeHashCode(Segment);
+            return hashCode.Value;
         }
 
         private static int ComputeHashCode(ArraySegment<byte> segment)

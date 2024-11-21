@@ -21,6 +21,7 @@ namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonDeserializer
     {
+
         MicroValueLock serializerLock = new MicroValueLock();
         byte[] buffer;
         Stack<int> peekStack = new Stack<int>();
@@ -37,6 +38,8 @@ namespace FeatureLoom.Serialization
         EquatableByteSegment currentItemName = "$".ToByteArray();
         int currentItemInfoIndex = -1;
         List<ItemInfo> itemInfos = new List<ItemInfo>();
+
+        ExtensionApi extensionApi;
 
         Dictionary<Type, CachedTypeReader> typeReaderCache = new();
         Dictionary<Type, object> typeConstructorMap = new();
@@ -145,6 +148,7 @@ namespace FeatureLoom.Serialization
             tempSlicedBuffer = new SlicedBuffer<byte>(128 * 1024, 256, 128 * 1024);
             buffer = new byte[settings.initialBufferSize];
             bufferResetLevel = (int)(buffer.Length * 0.8);
+            extensionApi = new ExtensionApi(this);
         }
 
         private void Reset()
@@ -179,7 +183,7 @@ namespace FeatureLoom.Serialization
             return segment.ToString();
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         CachedTypeReader GetCachedTypeReader(Type itemType)
         {
             if (typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
@@ -194,13 +198,7 @@ namespace FeatureLoom.Serialization
                 typeReaderCache[itemType] = mappedTypeReader;
                 return mappedTypeReader;
             }
-            /*if (settings.multiOptionTypeMapping.TryGetValue(itemType, out Type[] mappedTypeOptions))
-            {
-                CachedTypeReader mappedTypeReader = new CachedTypeReader(this);
-                typeReaderCache[itemType] = mappedTypeReader;
-                this.InvokeGenericMethod(nameof(CreateMultiOptionComplexTypeReader), new Type[] { itemType }, mappedTypeReader, mappedTypeOptions);                
-                return mappedTypeReader;
-            }*/
+
             if (itemType.IsGenericType && settings.genericTypeMapping.Count > 0)
             {
                 Type genericType = itemType.GetGenericTypeDefinition();
@@ -255,7 +253,7 @@ namespace FeatureLoom.Serialization
             return cachedTypeReader;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SetItemRefInCurrentItemInfo(object item)
         {
             var itemInfo = itemInfos[currentItemInfoIndex];
@@ -474,7 +472,7 @@ namespace FeatureLoom.Serialization
                 else throw new Exception("Failed reading Dictionary");
 
                 return dict;
-            }, JsonDataTypeCategory.Array);
+            }, JsonDataTypeCategory.Object);
         }
 
         private void CreateUnknownObjectReader(CachedTypeReader cachedTypeReader)
@@ -1087,7 +1085,7 @@ namespace FeatureLoom.Serialization
 
         List<EquatableByteSegment> arrayElementNameCache = new List<EquatableByteSegment>();
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        EquatableByteSegment GetArrayElementName(int index)
+        private EquatableByteSegment GetArrayElementName(int index)
         {
             while (arrayElementNameCache.Count <= index)
             {
@@ -1096,7 +1094,7 @@ namespace FeatureLoom.Serialization
             return arrayElementNameCache[index];
         }
 
-        class ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
+        private class ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
         {
             FeatureJsonDeserializer deserializer;
             CachedTypeReader reader;
@@ -1168,8 +1166,42 @@ namespace FeatureLoom.Serialization
             return castedList;            
         }
 
+        private bool TryReadObjectValue<T>(out T value, EquatableByteSegment itemName)
+        {
+            value = default;
+            try
+            {
+                var typeReader = GetCachedTypeReader(typeof(T));                
+                if (typeReader.JsonTypeCategory != JsonDataTypeCategory.Object) return false;
+                if (itemName.IsEmptyOrInvalid) value = typeReader.ReadItem<T>();
+                else value = typeReader.ReadValue<T>(itemName);
+            }
+            catch
+            {
+                return false;
+            }
+            return true;            
+        }
+
+        private bool TryReadArrayValue<T>(out T value, EquatableByteSegment itemName) where T : IEnumerable
+        {
+            value = default;
+            try
+            {
+                var typeReader = GetCachedTypeReader(typeof(T));
+                if (typeReader.JsonTypeCategory != JsonDataTypeCategory.Array) return false;
+                if (itemName.IsEmptyOrInvalid) value = typeReader.ReadItem<T>();
+                else value = typeReader.ReadValue<T>(itemName);
+            }
+            catch
+            {
+                return false;
+            }
+            return true;
+        }
+
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public string ReadStringValue()
+        private string ReadStringValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
             DecodeUtf8(stringBytes, stringBuilder);
@@ -1178,8 +1210,18 @@ namespace FeatureLoom.Serialization
             return result;
         }
 
+        private bool TryReadStringValue(out string value)
+        {
+            value = null;
+            if (!TryReadStringBytes(out var stringBytes)) return false;
+            DecodeUtf8(stringBytes, stringBuilder);
+            value = stringBuilder.ToString();
+            stringBuilder.Clear();
+            return true;
+        }
+
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public char ReadCharValue()
+        private char ReadCharValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
             DecodeUtf8(stringBytes, stringBuilder);
@@ -1189,9 +1231,9 @@ namespace FeatureLoom.Serialization
             return c;
         }
 
-        public char? ReadNullableCharValue() => ReadCharValue();        
+        private char? ReadNullableCharValue() => ReadCharValue();
 
-        public DateTime ReadDateTimeValue()
+        private DateTime ReadDateTimeValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
             DecodeUtf8(stringBytes, stringBuilder);
@@ -1202,9 +1244,9 @@ namespace FeatureLoom.Serialization
             return result;
         }
 
-        public DateTime? ReadNullableDateTimeValue() => ReadDateTimeValue();
+        private DateTime? ReadNullableDateTimeValue() => ReadDateTimeValue();
 
-        public Guid ReadGuidValue()
+        private Guid ReadGuidValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
             DecodeUtf8(stringBytes, stringBuilder);
@@ -1215,7 +1257,7 @@ namespace FeatureLoom.Serialization
             return result;
         }
 
-        public Guid? ReadNullableGuidValue() => ReadGuidValue();
+        private Guid? ReadNullableGuidValue() => ReadGuidValue();
 
         StringBuilder stringBuilder = new StringBuilder();
         private static void DecodeUtf8(ArraySegment<byte> bytes, StringBuilder stringBuilder)
@@ -1297,7 +1339,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public object ReadNullValue()
+        private object ReadNullValue()
         {
             SkipWhiteSpaces();
             byte b = CurrentByte;
@@ -1319,57 +1361,79 @@ namespace FeatureLoom.Serialization
             return null;
         }
 
-        public bool ReadBoolValue()
+        private bool ReadBoolValue()
         {
-            SkipWhiteSpaces();
-            byte b = CurrentByte;
-            if (b == 't' || b == 'T')
-            {
-                if (!TryNextByte()) throw new Exception("Failed reading boolean");
-                b = CurrentByte;
-                if (b != 'r' && b != 'R') throw new Exception("Failed reading boolean");
-
-                if (!TryNextByte()) throw new Exception("Failed reading boolean");
-                b = CurrentByte;
-                if (b != 'u' && b != 'U') throw new Exception("Failed reading boolean");
-
-                if (!TryNextByte()) throw new Exception("Failed reading boolean");
-                b = CurrentByte;
-                if (b != 'e' && b != 'E') throw new Exception("Failed reading boolean");
-
-                if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
-                return true;
-            }
-            else if (b == 'f' || b == 'F')
-            {
-                if (!TryNextByte()) throw new Exception("Failed reading boolean");
-                b = CurrentByte;
-                if (b != 'a' && b != 'A') throw new Exception("Failed reading boolean");
-
-                if (!TryNextByte()) throw new Exception("Failed reading boolean");
-                b = CurrentByte;
-                if (b != 'l' && b != 'L') throw new Exception("Failed reading boolean");
-
-                if (!TryNextByte()) throw new Exception("Failed reading boolean");
-                b = CurrentByte;
-                if (b != 's' && b != 'S') throw new Exception("Failed reading boolean");
-
-                if (!TryNextByte()) throw new Exception("Failed reading boolean");
-                b = CurrentByte;
-                if (b != 'e' && b != 'E') throw new Exception("Failed reading boolean");
-
-                if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) throw new Exception("Failed reading boolean");
-                return false;
-            }
-            else throw new Exception("Failed reading boolean");
+            if (!TryReadBoolValue(out bool value)) throw new Exception("Failed reading boolean");
+            return value;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool? ReadNullableBoolValue() => ReadBoolValue();
-
-        public object ReadNumberValueAsObject()
+        private bool TryReadBoolValue(out bool value)
         {
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
+            value = default;
+            peekStack.Push(bufferPos);
+            bool success = Try(out value);
+            if (success) peekStack.Pop();
+            else bufferPos = peekStack.Pop();
+            return success;
+
+            bool Try(out bool value)
+            {
+                value = default;
+
+                SkipWhiteSpaces();
+                byte b = CurrentByte;
+                if (b == 't' || b == 'T')
+                {
+                    if (!TryNextByte()) return false;
+                    b = CurrentByte;
+                    if (b != 'r' && b != 'R') return false;
+
+                    if (!TryNextByte()) return false;
+                    b = CurrentByte;
+                    if (b != 'u' && b != 'U') return false;
+
+                    if (!TryNextByte()) return false;
+                    b = CurrentByte;
+                    if (b != 'e' && b != 'E') return false;
+
+                    if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) return false;
+                    value = true;
+                    return true;
+                }
+                else if (b == 'f' || b == 'F')
+                {
+                    if (!TryNextByte()) return false;
+                    b = CurrentByte;
+                    if (b != 'a' && b != 'A') return false;
+
+                    if (!TryNextByte()) return false;
+                    b = CurrentByte;
+                    if (b != 'l' && b != 'L') return false;
+
+                    if (!TryNextByte()) return false;
+                    b = CurrentByte;
+                    if (b != 's' && b != 'S') return false;
+
+                    if (!TryNextByte()) return false;
+                    b = CurrentByte;
+                    if (b != 'e' && b != 'E') return false;
+
+                    if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) return false;
+                    value = false;
+                    return true;
+                }
+                else return false;
+            }
+        }
+
+
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool? ReadNullableBoolValue() => ReadBoolValue();
+
+        private object ReadNumberValueAsObject()
+        {
+            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all)) throw new Exception("Failed reading number");
             if (decimalBytes.Array != null || isExponentNegative)
             {
                 ulong integerPart = integerBytes.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
@@ -1415,22 +1479,28 @@ namespace FeatureLoom.Serialization
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long ReadLongValue()
         {
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
-            if (decimalBytes.Array != null) throw new Exception("Decimal found for integer");
+            if (!TryReadSignedIntegerValue(out long value)) throw new Exception("Failed reading integer number");
+            return value;
+        }
 
-            ulong integerPart = BytesToInteger(integerBytes);            
+        public bool TryReadSignedIntegerValue(out long value)
+        {
+            value = default;
+            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.signedInteger)) return false;
+
+            ulong integerPart = BytesToInteger(integerBytes);
 
             if (exponentBytes.Array != null)
             {
                 int exp = (int)BytesToInteger(exponentBytes);
                 if (isExponentNegative) exp = -exp;
-                integerPart = ApplyExponent(integerPart, exp);                
+                integerPart = ApplyExponent(integerPart, exp);
             }
 
-            long value = (long)integerPart;
+            value = (long)integerPart;
             if (isNegative) value *= -1;
 
-            return value;
+            return true;
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1472,11 +1542,16 @@ namespace FeatureLoom.Serialization
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadUlongValue()
         {
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
-            if (decimalBytes.Array != null) throw new Exception("Decimal found for integer");
-            if (isNegative) throw new Exception("Value is out of bounds.");
+            if (!TryReadUnsignedIntegerValue(out ulong value)) throw new Exception("Failed reading unsigned integer number");
+            return value;
+        }
 
-            ulong value = BytesToInteger(integerBytes);
+        public bool TryReadUnsignedIntegerValue(out ulong value)
+        {
+            value = default;
+            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.unsignedInteger)) return false;
+
+            ulong integerPart = BytesToInteger(integerBytes);
 
             if (exponentBytes.Array != null)
             {
@@ -1485,7 +1560,7 @@ namespace FeatureLoom.Serialization
                 value = ApplyExponent(value, exp);
             }
 
-            return value;
+            return true;
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1533,15 +1608,15 @@ namespace FeatureLoom.Serialization
         {
             SkipWhiteSpaces();
             if (CurrentByte == (byte)'"')
-            {
-                if (!TryReadStringBytes(out var str)) throw new Exception("Invalid string found for a number: could not read it");
+            {                
+                if (!TryReadStringBytes(out var str)) throw new Exception("Invalid string found for a number: could not read it");                
                 if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
                 if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
                 if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;
+
                 throw new Exception($"Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
             }
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
-
+            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber)) throw new Exception("Failed reading number");
 
             ulong integerPart = integerBytes.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
             double decimalPart = decimalBytes.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
@@ -1557,6 +1632,51 @@ namespace FeatureLoom.Serialization
             }
 
             return value;
+        }
+
+        public bool TryReadFloatingPointValue(out double value)
+        {
+            value = default;
+            SkipWhiteSpaces();
+            if (CurrentByte == (byte)'"')
+            {
+                peekStack.Push(bufferPos);
+                bool isValidString = TryReadStringBytes(out var str);
+                if (isValidString)
+                {
+                    if (SPECIAL_NUMBER_NAN.Equals(str)) value = double.NaN;
+                    else if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) value = double.PositiveInfinity;
+                    else if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) value = double.NegativeInfinity;
+                    else isValidString = false;
+                }
+                if (isValidString)
+                {
+                    peekStack.Pop();
+                    return true;
+                }
+                else
+                {
+                    bufferPos = peekStack.Pop();
+                    return false;
+                }
+            }
+
+            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber)) return false;
+
+            ulong integerPart = integerBytes.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
+            double decimalPart = decimalBytes.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
+            value = ApplyExponent(decimalPart, -decimalBytes.Count);
+            value += integerPart;
+            if (isNegative) value *= -1;
+
+            if (exponentBytes.Array != null)
+            {
+                int exp = (int)BytesToInteger(exponentBytes);
+                if (isExponentNegative) exp = -exp;
+                value = ApplyExponent(value, exp);
+            }
+
+            return true;
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1815,7 +1935,7 @@ namespace FeatureLoom.Serialization
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipNumber()
         {
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative)) throw new Exception("Failed reading number");
+            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all)) throw new Exception("Failed reading number");
         }
 
         private void SkipArray()
@@ -1842,7 +1962,7 @@ namespace FeatureLoom.Serialization
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipNull()
         {
-            if (!TryReadNull()) throw new Exception("Failed reading null value");
+            if (!TryReadNullValue()) throw new Exception("Failed reading null value");
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2005,16 +2125,28 @@ namespace FeatureLoom.Serialization
             return value;
         }
 
-        bool TryReadNumberBytes(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative)
+        [Flags]
+        enum ValidNumberComponents
+        {
+            negativeSign        = 1 << 0,
+            decimalPart         = 1 << 1,
+            exponent            = 1 << 2,
+            all                 = negativeSign | decimalPart | exponent,
+            floatingPointNumber = negativeSign | decimalPart | exponent,
+            signedInteger       = negativeSign | exponent,
+            unsignedInteger     = exponent,
+        }
+
+        bool TryReadNumberBytes(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
         {
             peekStack.Push(bufferPos);
-            bool success = Try(out isNegative, out integerBytes, out decimalBytes, out exponentBytes, out isExponentNegative);
+            bool success = Try(out isNegative, out integerBytes, out decimalBytes, out exponentBytes, out isExponentNegative, validComponents);
             if (success) peekStack.Pop();
             else bufferPos = peekStack.Pop();
             return success;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            bool Try(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative)
+            bool Try(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
             {
                 integerBytes = default;
                 decimalBytes = default;
@@ -2034,6 +2166,7 @@ namespace FeatureLoom.Serialization
 
                 // Check if negative
                 isNegative = CurrentByte == '-';
+                if (isNegative && !validComponents.IsFlagSet(ValidNumberComponents.negativeSign)) return false;
                 if (isNegative && !TryNextByte()) return false;
                 int startPos = bufferPos;
 
@@ -2060,6 +2193,8 @@ namespace FeatureLoom.Serialization
 
                 if (CurrentByte == '.')
                 {
+                    if (!validComponents.IsFlagSet(ValidNumberComponents.decimalPart)) return false;
+
                     TryNextByte();
                     // Read decimal part
                     startPos = bufferPos;
@@ -2085,6 +2220,8 @@ namespace FeatureLoom.Serialization
 
                 if (CurrentByte == 'e' || CurrentByte == 'E')
                 {
+                    if (!validComponents.IsFlagSet(ValidNumberComponents.exponent)) return false;
+
                     TryNextByte();
                     // Read exponent part
                     isExponentNegative = CurrentByte == '-';
@@ -2428,7 +2565,7 @@ namespace FeatureLoom.Serialization
         }
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool TryReadNull()
+        bool TryReadNullValue()
         {
             byte b = CurrentByte;
             if (b != 'n' && b != 'N') return false;
@@ -2442,7 +2579,7 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             bool Try()
             {
-                //SkipWhiteSpaces();
+                SkipWhiteSpaces();
                 byte b;
 
                 b = CurrentByte;

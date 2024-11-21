@@ -108,7 +108,7 @@ namespace FeatureLoom.Extensions
 
         public static bool TrySetValueByName<T, V>(this T obj, string fieldOrPropertyName, V value) where T : class
         {
-            var property = obj.GetType().GetProperty(fieldOrPropertyName);
+            var property = obj.GetType().GetProperty(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             if (property != null)
             {
                 if (!property.CanWrite) return false;
@@ -125,7 +125,7 @@ namespace FeatureLoom.Extensions
             }
             else
             {
-                var field = obj.GetType().GetField(fieldOrPropertyName);
+                var field = obj.GetType().GetField(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 if (field == null) return false;
 
                 if (field.FieldType.IsAssignableFrom(typeof(V)))
@@ -141,6 +141,63 @@ namespace FeatureLoom.Extensions
 
             return true;
         }
+
+        public static bool TryGetValueByName<T, V>(this T obj, string fieldOrPropertyName, out V value) where T : class
+        {
+            value = default;
+
+            var property = obj.GetType().GetProperty(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (property != null)
+            {
+                if (!property.CanRead) return false;
+
+                var propertyValue = property.GetValue(obj);
+                if (propertyValue is V typedValue)
+                {
+                    value = typedValue;
+                    return true;
+                }
+                else if (propertyValue is IConvertible convertible && typeof(V).IsAssignableFrom(typeof(IConvertible)))
+                {
+                    try
+                    {
+                        value = (V)Convert.ChangeType(convertible, typeof(V));
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+                return false;
+            }
+
+            var field = obj.GetType().GetField(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (field != null)
+            {
+                var fieldValue = field.GetValue(obj);
+                if (fieldValue is V typedFieldValue)
+                {
+                    value = typedFieldValue;
+                    return true;
+                }
+                else if (fieldValue is IConvertible fieldConvertible && typeof(V).IsAssignableFrom(typeof(IConvertible)))
+                {
+                    try
+                    {
+                        value = (V)Convert.ChangeType(fieldConvertible, typeof(V));
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return false;
+        }
+
 
         public static bool TryConvertTo<T>(this T obj, Type type, out object converted) where T : IConvertible
         {
