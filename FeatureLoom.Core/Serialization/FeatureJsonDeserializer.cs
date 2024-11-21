@@ -536,6 +536,8 @@ namespace FeatureLoom.Serialization
 
         }
 
+        private UndoReadHandle CreateUndoReadHandle(bool initUndo = true) => new UndoReadHandle(this, initUndo);
+
         private void CreateMultiOptionComplexTypeReader<T>(CachedTypeReader cachedTypeReader, Type[] typeOptions)
         {
 
@@ -610,67 +612,68 @@ namespace FeatureLoom.Serialization
                 var ratings = ratingsPool.Take();
                 ratings.AddRange(Enumerable.Repeat(0, numOptions));
 
-                peekStack.Push(bufferPos);
-                
                 if (CurrentByte != '{') throw new Exception("Failed reading object");
-                TryNextByte();
                 int selectionIndex = -1;
                 int fallbackIndex = -1;
                 int selectionRating = 0;
 
-                while (true)
-                {
-                    SkipWhiteSpaces();
-                    if (CurrentByte == '}') break;
+                using (CreateUndoReadHandle())
+                {                    
+                    TryNextByte();                    
 
-                    if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
-                    if (fieldNameToIsTypeMember.TryGetValue(fieldName, out var typeIndices))
+                    while (true)
                     {
-                        if (typeIndices == null)
+                        SkipWhiteSpaces();
+                        if (CurrentByte == '}') break;
+
+                        if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                        if (fieldNameToIsTypeMember.TryGetValue(fieldName, out var typeIndices))
                         {
-                            // If field is available for every type and no type is yet fallback, set the first as fallback
-                            if (fallbackIndex == -1) fallbackIndex = 0;
-                        }
-                        else
-                        {
-                            for (var i = 0; i < typeIndices.Count; i++)
+                            if (typeIndices == null)
                             {
-                                if (typeIndices[i])
+                                // If field is available for every type and no type is yet fallback, set the first as fallback
+                                if (fallbackIndex == -1) fallbackIndex = 0;
+                            }
+                            else
+                            {
+                                for (var i = 0; i < typeIndices.Count; i++)
                                 {
-                                    int rating = ratings[i];
-                                    rating++;
-                                    ratings[i] = rating;
-                                    if (selectionIndex == i)
+                                    if (typeIndices[i])
                                     {
-                                        selectionRating = rating;
-                                    }
-                                    else if (rating == selectionRating)
-                                    {
-                                        selectionRating = rating;
-                                        if (selectionIndex != -1) fallbackIndex = selectionIndex;
-                                        selectionIndex = -1;
-                                    }
-                                    else if (rating > selectionRating)
-                                    {
-                                        selectionRating = rating;
-                                        selectionIndex = i;
+                                        int rating = ratings[i];
+                                        rating++;
+                                        ratings[i] = rating;
+                                        if (selectionIndex == i)
+                                        {
+                                            selectionRating = rating;
+                                        }
+                                        else if (rating == selectionRating)
+                                        {
+                                            selectionRating = rating;
+                                            if (selectionIndex != -1) fallbackIndex = selectionIndex;
+                                            selectionIndex = -1;
+                                        }
+                                        else if (rating > selectionRating)
+                                        {
+                                            selectionRating = rating;
+                                            selectionIndex = i;
+                                        }
                                     }
                                 }
                             }
                         }
+
+                        if (selectionIndex != -1) break;
+
+                        SkipWhiteSpaces();
+                        if (CurrentByte != ':') throw new Exception("Failed reading object");
+                        TryNextByte();
+                        SkipValue();
+                        SkipWhiteSpaces();
+                        if (CurrentByte == ',') TryNextByte();
                     }
-
-                    if (selectionIndex != -1) break;
-
-                    SkipWhiteSpaces();
-                    if (CurrentByte != ':') throw new Exception("Failed reading object");
-                    TryNextByte();
-                    SkipValue();
-                    SkipWhiteSpaces();
-                    if (CurrentByte == ',') TryNextByte();
+                    ratingsPool.Return(ratings);
                 }
-                ratingsPool.Return(ratings);
-                bufferPos = peekStack.Pop();
 
                 if (selectionIndex == -1)
                 {
@@ -1369,14 +1372,8 @@ namespace FeatureLoom.Serialization
 
         private bool TryReadBoolValue(out bool value)
         {
-            value = default;
-            peekStack.Push(bufferPos);
-            bool success = Try(out value);
-            if (success) peekStack.Pop();
-            else bufferPos = peekStack.Pop();
-            return success;
-
-            bool Try(out bool value)
+            value = default;            
+            using (var undoHandle = CreateUndoReadHandle())
             {
                 value = default;
 
@@ -1398,6 +1395,7 @@ namespace FeatureLoom.Serialization
 
                     if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) return false;
                     value = true;
+                    undoHandle.SetUndoReading(false);
                     return true;
                 }
                 else if (b == 'f' || b == 'F')
@@ -1420,6 +1418,7 @@ namespace FeatureLoom.Serialization
 
                     if (TryNextByte() && map_IsFieldEnd[CurrentByte] != FilterResult.Found) return false;
                     value = false;
+                    undoHandle.SetUndoReading(false);
                     return true;
                 }
                 else return false;
@@ -1640,24 +1639,18 @@ namespace FeatureLoom.Serialization
             SkipWhiteSpaces();
             if (CurrentByte == (byte)'"')
             {
-                peekStack.Push(bufferPos);
-                bool isValidString = TryReadStringBytes(out var str);
-                if (isValidString)
-                {
-                    if (SPECIAL_NUMBER_NAN.Equals(str)) value = double.NaN;
-                    else if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) value = double.PositiveInfinity;
-                    else if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) value = double.NegativeInfinity;
-                    else isValidString = false;
-                }
-                if (isValidString)
-                {
-                    peekStack.Pop();
-                    return true;
-                }
-                else
-                {
-                    bufferPos = peekStack.Pop();
-                    return false;
+                using (var undoHandle = CreateUndoReadHandle())
+                {                    
+                    bool isValidString = TryReadStringBytes(out var str);
+                    if (isValidString)
+                    {
+                        if (SPECIAL_NUMBER_NAN.Equals(str)) value = double.NaN;
+                        else if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) value = double.PositiveInfinity;
+                        else if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) value = double.NegativeInfinity;
+                        else isValidString = false;
+                    }
+                    undoHandle.SetUndoReading(!isValidString);
+                    return isValidString;
                 }
             }
 
@@ -2139,14 +2132,7 @@ namespace FeatureLoom.Serialization
 
         bool TryReadNumberBytes(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
         {
-            peekStack.Push(bufferPos);
-            bool success = Try(out isNegative, out integerBytes, out decimalBytes, out exponentBytes, out isExponentNegative, validComponents);
-            if (success) peekStack.Pop();
-            else bufferPos = peekStack.Pop();
-            return success;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            bool Try(out bool isNegative, out ArraySegment<byte> integerBytes, out ArraySegment<byte> decimalBytes, out ArraySegment<byte> exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
+            using(var undoHandle = CreateUndoReadHandle())
             {
                 integerBytes = default;
                 decimalBytes = default;
@@ -2247,20 +2233,14 @@ namespace FeatureLoom.Serialization
                     exponentBytes = new ArraySegment<byte>(buffer, startPos, count);
                 }
 
+                undoHandle.SetUndoReading(false);
                 return true;
             }
         }
 
         bool TryReadStringBytes(out ArraySegment<byte> stringBytes)
         {
-            peekStack.Push(bufferPos);
-            bool success = Try(out stringBytes);
-            if (success) peekStack.Pop();
-            else bufferPos = peekStack.Pop();
-            return success;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            bool Try(out ArraySegment<byte> stringBytes)
+            using (var undoHandle = CreateUndoReadHandle())
             {
                 stringBytes = default;
 
@@ -2282,12 +2262,13 @@ namespace FeatureLoom.Serialization
                         {
                             stringBytes = new ArraySegment<byte>(buffer, startPos, bufferPos - startPos);
                             TryNextByte();
+                            undoHandle.SetUndoReading(false);
                             return true;
                         }
                         else if (b == (byte)'\\')
                         {
                             TryNextByte();
-                        }                        
+                        }
                         else if ((b & 0b11100000) == 0b11000000) // skip 1 byte
                         {
                             TryNextByte();
@@ -2327,18 +2308,17 @@ namespace FeatureLoom.Serialization
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
         {
             item = default;
-            peekStack.Push(bufferPos);
-
-            if (!FindProposedType(out CachedTypeReader proposedTypeReader, out bool foundValueField))
+            CachedTypeReader proposedTypeReader = null;
+            bool foundValueField = false;
+            using (var undoHandle = CreateUndoReadHandle())
             {
-                bufferPos = peekStack.Pop();
-                return false;
+                if (!FindProposedType(out proposedTypeReader, out foundValueField)) return false;
+                undoHandle.SetUndoReading(!foundValueField);
             }
 
             if (foundValueField)
-            {
-                peekStack.Pop();
-                // bufferPos is currently at the position of the actual value, so read it from here, but handle the rest of the type object afterwards                
+            {                
+                // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
                 if (proposedTypeReader != null) item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
                 else item = originalTypeReader.ReadItem<T>();
                 if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
@@ -2346,8 +2326,7 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.
-                bufferPos = peekStack.Pop();
+                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.                
                 if (proposedTypeReader == null) return false;
                 item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
                 return true;
@@ -2422,13 +2401,13 @@ namespace FeatureLoom.Serialization
 
         bool TryReadRefObject<T>(out bool pathIsValid, out bool typeIsCompatible, out T refObject)
         {
-            peekStack.Push(bufferPos);
-            bool success = Try(out pathIsValid, out typeIsCompatible, out refObject);
-            if (success) peekStack.Pop();
-            else bufferPos = peekStack.Pop();
-
-            fieldPathSegments.Clear();
-            return success;
+            using (var undoHandle = CreateUndoReadHandle())
+            {
+                bool success = Try(out pathIsValid, out typeIsCompatible, out refObject);                
+                undoHandle.SetUndoReading(!success);
+                fieldPathSegments.Clear();
+                return success;
+            }
 
             bool Try(out bool pathIsValid, out bool typeIsCompatible, out T itemRef)
             {
@@ -2566,18 +2545,8 @@ namespace FeatureLoom.Serialization
 
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadNullValue()
-        {
-            byte b = CurrentByte;
-            if (b != 'n' && b != 'N') return false;
-
-            peekStack.Push(bufferPos);
-            bool success = Try();
-            if (success) peekStack.Pop();
-            else bufferPos = peekStack.Pop();
-            return success;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            bool Try()
+        {            
+            using(var undoHandle = CreateUndoReadHandle())
             {
                 SkipWhiteSpaces();
                 byte b;
@@ -2595,12 +2564,17 @@ namespace FeatureLoom.Serialization
                 if (b != 'l' && b != 'L') return false;
 
                 // Check for field end
-                if (!TryNextByte()) return true;
+                if (!TryNextByte())
+                {
+                    undoHandle.SetUndoReading(false);
+                    return true;
+                }
                 b = CurrentByte;
                 if (map_IsFieldEnd[b] != FilterResult.Found) return false;
 
+                undoHandle.SetUndoReading(false);
                 return true;
-            }
+            }           
         }
 
 
