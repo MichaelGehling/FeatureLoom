@@ -21,6 +21,11 @@ namespace FeatureLoom.Serialization
             public CachedTypeReader(FeatureJsonDeserializer serializer)
             {
                 this.deserializer = serializer;
+            }            
+
+            public void SetCustomTypeReader<T>(ICustomTypeReader<T> customTypeReader)
+            {
+                SetTypeReader<T>(() => customTypeReader.ReadValue(deserializer.extensionApi), customTypeReader.JsonTypeCategory);
             }
 
             public void SetTypeReader<T>(Func<T> typeReader, JsonDataTypeCategory category)

@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
 using Newtonsoft.Json;
 using System.Threading;
 using FeatureLoom.Serialization;
+using System.Xml;
 
 namespace Playground
 {
@@ -423,6 +424,7 @@ namespace Playground
             */
 
             jsonString = """
+                         "<SomeXmlNode>content</SomeXmlNode>"
                          "NaN"
                          { "i": 123, "guid": "f0ed1af3-4412-4f08-8237-3e2e3e6d29ef"}
                          [{"x": 123}, {"x": 456}]
@@ -455,10 +457,24 @@ namespace Playground
             var featureJsonDeserializer = new FeatureJsonDeserializer(deserializerSettings);
             //featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
             //featureJsonDeserializer.TryDeserialize<int[][]>(jsonString.ToStream(), out var result);
+
+            deserializerSettings.AddCustomTypeReader<XmlElement>(new FeatureJsonDeserializer.CustomTypeReader<XmlElement>(
+                JsonDataTypeCategory.Primitive,
+                api =>
+                {
+                    if (api.TryReadStringValue(out string xmlString))
+                    {
+                        XmlElement xml = xmlString.ToXmlElement(null);
+                        return xml;
+                    }
+                    else throw new Exception("Not a string");
+                }));
+
             var jsonStream = jsonString.ToStream();
 
             featureJsonDeserializer.SetDataSource(jsonStream);
             bool dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+            featureJsonDeserializer.TryDeserialize<XmlElement>(out var xmlElement);
             featureJsonDeserializer.TryDeserialize<double>(out var d);
             dataLeft = featureJsonDeserializer.IsAnyDataLeft();
             featureJsonDeserializer.TryDeserialize<TestStruct>(out var testStruct);

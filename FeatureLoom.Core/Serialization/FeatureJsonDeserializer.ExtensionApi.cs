@@ -6,9 +6,7 @@ using System.Collections.Generic;
 namespace FeatureLoom.Serialization;
 
 public sealed partial class FeatureJsonDeserializer
-{
-
-
+{  
     public sealed class ExtensionApi
     {
         readonly FeatureJsonDeserializer deserializer;
