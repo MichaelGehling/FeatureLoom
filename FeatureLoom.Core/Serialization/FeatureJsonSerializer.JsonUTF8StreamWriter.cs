@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using FeatureLoom.Helpers;
 using System.Reflection;
 using System.Linq;
+using System.Globalization;
 
 namespace FeatureLoom.Serialization
 {
@@ -29,7 +30,6 @@ namespace FeatureLoom.Serialization
             byte[] PrepareTextToBytes(string enumText);
             byte[] PrepareTypeInfo(string typeName);
             void ResetBuffer();
-            string ToString();
             void WriteBufferToStream();
             void WriteColon();
             void WriteComma();
@@ -120,19 +120,6 @@ namespace FeatureLoom.Serialization
                 indentationLookup = new byte[maxIndentationDepth][];
                 InitIndentationLookup();
             }
-
-            public override string ToString()
-            {
-                if (stream.Length > 0)
-                {
-                    WriteBufferToStream();
-                    return stream.ReadToString();
-                }
-                else
-                {
-                    return Encoding.UTF8.GetString(mainBuffer, 0, mainBufferCount);
-                }
-            }
            
             private void InitIndentationLookup()
             {                
@@ -164,8 +151,15 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteBufferToStream()
             {
-                stream.Write(mainBuffer, 0, mainBufferCount);
-                mainBufferCount = 0;
+                try
+                {
+                    stream.Write(mainBuffer, 0, mainBufferCount);
+                    mainBufferCount = 0;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Failed writing to stream", ex);
+                }
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -904,6 +898,9 @@ namespace FeatureLoom.Serialization
 
             private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
             private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
+            private static readonly byte[] Int32MinValueBytes = int.MinValue.ToString().ToByteArray();
+            private static readonly byte[] Int64MinValueBytes = long.MinValue.ToString().ToByteArray();
+
             private static byte[][] InitNumberBytesLookup(bool negative, int size)
             {
                 byte[][] lookup = new byte[size][];
@@ -1122,17 +1119,28 @@ namespace FeatureLoom.Serialization
                 }
             }
 
-            private void WriteSignedInteger(long value)
+            private void WriteSignedInteger(long inputValue)
             {
+                var value = inputValue;
                 bool isNegative = value < 0;
                 if (isNegative)
                 {
                     value = -value;
                     if (value < NegativeNumberBytesLookup.Length)
                     {
-                        var bytes = NegativeNumberBytesLookup[value];
-                        WriteToBuffer(bytes);
-                        return;
+                        // If the value was long.MinValue negating it will cause an overflow and resulting again in long.MinValue,
+                        // so we handle it as a special number
+                        if (value == long.MinValue)
+                        {
+                            WriteToBuffer(Int64MinValueBytes);
+                            return;
+                        }
+                        else
+                        {
+                            var bytes = NegativeNumberBytesLookup[value];
+                            WriteToBuffer(bytes);
+                            return;
+                        }
                     }
                 }
                 if (value < PositiveNumberBytesLookup.Length)
@@ -1155,22 +1163,29 @@ namespace FeatureLoom.Serialization
                 WriteToBuffer(localBuffer, index + 1, maxDigits - index);
             }
 
-            /* private byte[] SignedIntegerToBytes(long value)
-             {
-                 if (value == 0) return ZERO;
-             }*/
 
-            private void WriteSignedInteger(int value)
+            private void WriteSignedInteger(int inputValue)
             {
+                var value = inputValue;
                 bool isNegative = value < 0;
                 if (isNegative)
                 {
                     value = -value;
                     if (value < NegativeNumberBytesLookup.Length)
                     {
-                        var bytes = NegativeNumberBytesLookup[value];
-                        WriteToBuffer(bytes);
-                        return;
+                        // If the value was int.MinValue negating it will cause an overflow and resulting again in int.MinValue,
+                        // so we handle it as a special number
+                        if (value == int.MinValue)
+                        {
+                            WriteToBuffer(Int32MinValueBytes);
+                            return;
+                        }
+                        else
+                        {
+                            var bytes = NegativeNumberBytesLookup[value];
+                            WriteToBuffer(bytes);
+                            return;
+                        }
                     }
                 }
                 else if (value < PositiveNumberBytesLookup.Length)
@@ -1193,8 +1208,9 @@ namespace FeatureLoom.Serialization
                 WriteToBuffer(localBuffer, index + 1, maxDigits - index);
             }
 
-            private void WriteUnsignedInteger(long value)
+            private void WriteUnsignedInteger(long inputValue)
             {
+                var value = inputValue;
                 if (value < PositiveNumberBytesLookup.Length)
                 {
                     var bytes = PositiveNumberBytesLookup[value];
@@ -1249,19 +1265,24 @@ namespace FeatureLoom.Serialization
 #endif
             }
 
-            private void WriteFloat(float value)
+            private void WriteFloat(float inputValue)
             {
+                var value = inputValue;
                 if (HandleSpecialCases(value)) return;
 
                 EnsureFreeBufferSpace(100);
 
-                if (value < 0)
+                bool isNegative = value < 0;
+                if (isNegative) value = -value;
+
+                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
+                if (failed)
                 {
-                    value = -value;
-                    WriteToBufferWithoutCheck((byte)'-');
+                    WriteString(inputValue.ToString(CultureInfo.InvariantCulture));
+                    return;
                 }
 
-                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent);
+                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
 
                 float integralPart = (float)Math.Floor(value);
                 float fractionalPart = value - integralPart;
@@ -1294,7 +1315,7 @@ namespace FeatureLoom.Serialization
                         if (Single.IsNaN(value)) WriteToBuffer(NAN);
                         else if (Single.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
                         else if (Single.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
-                        else if (IsSubnormal((double)value)) WriteString(value.ToString());
+                        else WriteString(value.ToString(CultureInfo.InvariantCulture)); // Then it must be subnormal
                         return true;
                     }
 
@@ -1371,59 +1392,72 @@ namespace FeatureLoom.Serialization
 
             }
 
-            static float CalculateNumDigits(float value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
+            float CalculateNumDigits(float value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed)
             {
 
 #if NETSTANDARD2_0
-                return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent);
+                return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent, out failed);
 #else
-                    const int MAX_SIGNIFICANT_DIGITS = 7;
-                    const int POS_EXPONENT_LIMIT = 7;
-                    const int NEG_EXPONENT_LIMIT = -5;
+                const int MAX_SIGNIFICANT_DIGITS = 7;
+                const int POS_EXPONENT_LIMIT = 7;
+                const int NEG_EXPONENT_LIMIT = -5;
 
-                    int bits = BitConverter.SingleToInt32Bits(value);
-                    int binaryExponent = ((bits >> 23) & 0xFF) - 127;
-                    exponent = (int)(binaryExponent * 0.34f);
-                    numIntegralDigits = Math.Max(0, exponent + 1);
-                    numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
-                    printExponent = false;
+                int bits = BitConverter.SingleToInt32Bits(value);
+                int binaryExponent = ((bits >> 23) & 0xFF) - 127;
+                exponent = (int)(binaryExponent * 0.34f);
+                numIntegralDigits = Math.Max(0, exponent + 1);
+                numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+                printExponent = false;
 
+                failed = false;
+                if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                {
+                    printExponent = true;
+                    value = (float)(value * Math.Pow(10, -exponent));
 
-                    if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                    if (value == 0 || IsSpecial(value))
                     {
-                        printExponent = true;
-                        value = (float)(value * Math.Pow(10, -exponent));
-                        while (value < 1)
-                        {
-                            value *= 10;
-                            exponent -= 1;
-                        }
-                        while (value >= 10)
-                        {
-                            value /= 10;
-                            exponent += 1;
-                        }
-                        numIntegralDigits = 1;
-                        numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 2;
+                        // In extreme cases, we can't calculate the digits properly.
+                        failed = true;
+                        return value;
                     }
 
-                    return value;
+                    while (value < 1)
+                    {
+                        value *= 10;
+                        exponent -= 1;
+                    }
+                    while (value >= 10)
+                    {
+                        value /= 10;
+                        exponent += 1;
+                    }
+                    numIntegralDigits = 1;
+                    numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 2;
+                }
+
+                return value;
 #endif
             }
 
-            private void WriteDouble(double value)
+            private void WriteDouble(double inputValue)
             {
+                var value = inputValue;
                 if (HandleSpecialCases(value)) return;
 
                 EnsureFreeBufferSpace(100);
 
-                if (value < 0)
+                bool isNegative = value < 0;
+                if (isNegative) value = -value;                
+
+                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
+                if (failed)
                 {
-                    value = -value;
-                    WriteToBufferWithoutCheck((byte)'-');
+                    WriteString(inputValue.ToString(CultureInfo.InvariantCulture));
+                    return;
                 }
 
-                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent);
+                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
 
                 double integralPart = Math.Floor(value);
                 double fractionalPart = value - integralPart;
@@ -1456,7 +1490,7 @@ namespace FeatureLoom.Serialization
                         if (Double.IsNaN(value)) WriteToBuffer(NAN);
                         else if (Double.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
                         else if (Double.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
-                        else if (IsSubnormal(value)) WriteString(value.ToString());
+                        else WriteString(value.ToString(CultureInfo.InvariantCulture)); // Then it must be subnormal
                         return true;
                     }
 
@@ -1534,12 +1568,13 @@ namespace FeatureLoom.Serialization
 
             }
 
-            static double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent)
+            double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed)
             {
                 const int MAX_SIGNIFICANT_DIGITS = 16;
                 const int POS_EXPONENT_LIMIT = 13;
                 const int NEG_EXPONENT_LIMIT = -5;
 
+                failed = false;
                 long bits = BitConverter.DoubleToInt64Bits(value);
                 int binaryExponent = (int)((bits >> 52) & 0x7FF) - 1023;
                 exponent = (int)(binaryExponent * 0.34f);
@@ -1551,6 +1586,14 @@ namespace FeatureLoom.Serialization
                 {
                     printExponent = true;
                     value = (value * Math.Pow(10, -exponent));
+
+                    if (value == 0 || IsSpecial(value))
+                    {
+                        // In extreme cases, we can't calculate the digits properly.
+                        failed = true;
+                        return value;
+                    }
+
                     while (value < 1)
                     {
                         value *= 10;
@@ -1568,12 +1611,11 @@ namespace FeatureLoom.Serialization
                 return value;
             }
 
+            /*
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static bool IsSubnormal(double value)
             {
-#if NETSTANDARD2_1_OR_GREATER
-                    return Double.IsSubnormal(value);
-#else
+#if NETSTANDARD2_0
                 long bits = BitConverter.DoubleToInt64Bits(value);
                 const long exponentMask = 0x7FF0000000000000L;  // Exponent bits
                 const long fractionMask = 0x000FFFFFFFFFFFFFL;  // Fraction bits
@@ -1583,8 +1625,11 @@ namespace FeatureLoom.Serialization
 
                 // Subnormal numbers have an exponent of 0 but a non-zero fraction
                 return exponent == 0 && fraction != 0;
+#else
+                return Double.IsSubnormal(value);                
 #endif
             }
+            */
 
 
             private static readonly byte[] HexMap = System.Text.Encoding.UTF8.GetBytes("0123456789abcdef");

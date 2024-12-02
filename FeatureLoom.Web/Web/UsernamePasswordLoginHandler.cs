@@ -43,7 +43,10 @@ namespace FeatureLoom.Web
                     if (identity.TryGetCredential(credentialHandler.CredentialType, out var storedCredential) && 
                         credentialHandler.VerifyCredential(usernamePassword, storedCredential))
                     {
-                        Session session = new Session(identity);
+                        Session session = Session.Current;
+                        if (session == null) session = new Session(identity);
+                        else session.UpdateIdentity(identity);
+                        
                         if (await session.TryStoreAsync())
                         {
                             response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout});

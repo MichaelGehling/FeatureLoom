@@ -341,17 +341,23 @@ namespace Playground
 
         public static async Task Run()
         {
-          /*  FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+            FeatureJsonSerializer featureJsonSerializer2 = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
                 //typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
                 typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
                 referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,                               
             });
 
+            float x1 = -1.19109e-35f;            
+            string str2 = featureJsonSerializer2.Serialize(x1);
+            Console.ReadKey();
+            
             var desSettings = new FeatureJsonDeserializer.Settings();    
-            FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(desSettings);
+            FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(desSettings);
 
-
+            featureJsonDeserializer2.TryDeserialize("-1.7976931348623157E+308".ToStream(), out double d2);
+            Console.ReadKey();
+            /*
             var input = new TestDto2();
             int iterations = 100_000;
             MemoryStream memoryStream;

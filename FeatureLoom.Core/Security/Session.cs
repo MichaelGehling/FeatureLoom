@@ -87,6 +87,7 @@ namespace FeatureLoom.Security
         {
             this.sessionId = CreateNewSessionId();
             this.identityId = identity.IdentityId;
+            this.identity = identity;
             this.timeout = defaultTimeout;
 
             creationTime = AppTime.CoarseNow;
@@ -95,6 +96,12 @@ namespace FeatureLoom.Security
 
         public Session()
         {
+        }
+
+        public void UpdateIdentity(Identity identity)
+        {
+            this.identity = identity;
+            this.identityId = identity.IdentityId;
         }
 
         [JsonIgnore]

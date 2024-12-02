@@ -1505,7 +1505,7 @@ namespace FeatureLoom.Serialization
             value = default;
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.unsignedInteger)) return false;
 
-            ulong integerPart = BytesToInteger(integerBytes);
+            value = BytesToInteger(integerBytes);
 
             if (exponentBytes.Array != null)
             {
@@ -2107,8 +2107,12 @@ namespace FeatureLoom.Serialization
 
                 // Check if negative
                 isNegative = CurrentByte == '-';
-                if (isNegative && !validComponents.IsFlagSet(ValidNumberComponents.negativeSign)) return false;
-                if (isNegative && !TryNextByte()) return false;
+                if (isNegative)
+                {
+                    if (!validComponents.IsFlagSet(ValidNumberComponents.negativeSign)) return false;
+                    if (!TryNextByte()) return false;
+                }                
+
                 int startPos = bufferPos;
 
                 bool couldNotSkip = false;
@@ -2166,7 +2170,7 @@ namespace FeatureLoom.Serialization
                     TryNextByte();
                     // Read exponent part
                     isExponentNegative = CurrentByte == '-';
-                    if (isExponentNegative) TryNextByte();
+                    if (isExponentNegative || CurrentByte == '+') TryNextByte();
                     startPos = bufferPos;
                     while (true)
                     {

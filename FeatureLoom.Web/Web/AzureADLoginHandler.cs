@@ -147,7 +147,10 @@ namespace FeatureLoom.Web
                         }                        
                     }
 
-                    Session session = new Session(identity);
+                    Session session = Session.Current;
+                    if (session == null) session = new Session(identity);
+                    else session.UpdateIdentity(identity);
+
                     if (await session.TryStoreAsync())
                     {
                         response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });

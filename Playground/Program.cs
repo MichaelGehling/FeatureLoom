@@ -87,7 +87,12 @@ namespace Playground
             }
         }
 
-        class TestClass
+        interface EmptyInterface
+        {
+
+        }
+
+        class TestClass : EmptyInterface
         {
             public int a = 1;
             private int p = 42;
@@ -122,6 +127,8 @@ namespace Playground
 
         private static async Task Main()
         {
+
+
 
             /*
             var batchTK = AppTime.TimeKeeper;

@@ -20,7 +20,7 @@ namespace FeatureLoom.Web
     {
         public string cookieName = "SessionId";
         public bool removeExceededSessionAndCookie = true;
-        public string anonymousIdentity = "Anonymous";
+        public string anonymousIdentity = "Anonymous";        
         public bool supportSessionIdInQueryString = true;
 
         public async Task<HandlerResult> InterceptRequestAsync(IWebRequest request, IWebResponse response)
@@ -64,9 +64,13 @@ namespace FeatureLoom.Web
                     identity = new Identity(anonymousIdentity, null);
                     _ = identity.StoreAsync();
                 }
+
                 Session session = new Session(identity);
+                if (session.Refresh())
+                {
+                    response.AddCookie(cookieName, session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });
+                }
                 Session.Current = session;
-                _ = session.TryStoreAsync();
             }
 
             return HandlerResult.NotHandled();

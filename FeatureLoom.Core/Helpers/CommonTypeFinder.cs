@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Synchronization;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,7 +13,7 @@ public static class CommonTypeFinder
     private static readonly Dictionary<(Type, Type), Type> typeCache = new();
     private static FeatureLock cacheLock = new FeatureLock();
 
-    public static Type GetCommonType(IEnumerable<object> objects)
+    public static Type GetCommonType(this IEnumerable objects)
     {
         if (objects.EmptyOrNull())
         {

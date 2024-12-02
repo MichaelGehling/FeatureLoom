@@ -39,6 +39,14 @@ namespace FeatureLoom.Serialization
             rootName = new ArraySegment<byte>(writer.PrepareRootName());
             this.extensionApi = new ExtensionApi(this);
         }
+
+        public string ShowBufferAsString()
+        {            
+            EquatableByteSegment segment = new EquatableByteSegment(writer.Buffer, 0, writer.BufferCount);
+            return segment.ToString();
+        }
+
+
         void FinishSerialization()
         {
             writer.ResetBuffer();

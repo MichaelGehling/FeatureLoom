@@ -10,6 +10,63 @@ namespace FeatureLoom.Extensions
 {
     public static class CollectionExtensions
     {
+        public static bool All(this IEnumerable items, Func<object, bool> check)
+        {
+            foreach(object item in items)
+            {
+                if (!check(item)) return false;
+            }
+            return true;
+        }
+
+        public static IEnumerable<T> Select<T>(this IEnumerable source, Func<object, T> selector)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (selector == null) throw new ArgumentNullException(nameof(selector));
+
+            return SelectIterator(source, selector);
+        }
+
+        private static IEnumerable<T> SelectIterator<T>(IEnumerable source, Func<object, T> selector)
+        {
+            foreach (var item in source)
+            {
+                yield return selector(item);
+            }
+        }
+
+        public static IEnumerable Skip(this IEnumerable source, int count)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (count < 0) throw new ArgumentOutOfRangeException(nameof(count), "Count cannot be negative.");
+
+            return SkipIterator(source, count);
+        }
+
+        private static IEnumerable SkipIterator(IEnumerable source, int count)
+        {
+            var enumerator = source.GetEnumerator();
+            try
+            {
+                // Skip the specified number of elements
+                while (count > 0 && enumerator.MoveNext())
+                {
+                    count--;
+                }
+
+                // Yield the remaining elements
+                while (enumerator.MoveNext())
+                {
+                    yield return enumerator.Current;
+                }
+            }
+            finally
+            {
+                if (enumerator is IDisposable disposable)
+                    disposable.Dispose();
+            }
+        }
+
         public static IEnumerator<T> GetEnumerator<T>(this T[] array) => ((IEnumerable<T>)array).GetEnumerator();
         public static ICollection<T> ToCollection<T>(this IEnumerable<T> enumerable) => new EnumerableAsCollection<T>(enumerable);
         public static int RemoveWhere<T>(this IList<T> list, Predicate<T> predicate)
