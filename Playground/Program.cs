@@ -127,7 +127,30 @@ namespace Playground
 
         private static async Task Main()
         {
+            AppTime.Wait(2500.Milliseconds());
+            AppTime.Wait(5.Milliseconds());
+            TimeKeeper tk;
+            int iterations = 1000;
+            TimeSpan[] results = new TimeSpan[iterations];
+            TimeSpan total = TimeSpan.Zero;
+            TimeSpan min = TimeSpan.MaxValue;
+            TimeSpan max = TimeSpan.MinValue;
+            for (int i = 0; i < iterations; i++)
+            {
+                tk = AppTime.TimeKeeper;
+                AppTime.WaitPrecisely(20.Milliseconds());
+                results[i] = tk.Elapsed;
+                total += results[i];
+                min = results[i].ClampHigh(min);
+                max = results[i].ClampLow(max);
+                ConsoleHelper.WriteLine(results[i].TotalMilliseconds.ToString());
+            }
 
+            results = results.Order().ToArray();
+
+            ConsoleHelper.WriteLine($"Med={results[iterations / 2].TotalMilliseconds}ms, 90th={results[(int)(iterations * 0.90)].TotalMilliseconds}ms, 95th={results[(int)(iterations * 0.95)].TotalMilliseconds}ms, 99th={results[(int)(iterations * 0.99)].TotalMilliseconds}ms, Mean={total.Divide(iterations).TotalMilliseconds}ms, Min={min.TotalMilliseconds}ms, Max={max.TotalMilliseconds}ms");            
+
+            Console.ReadKey();
 
 
             /*

@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Time;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Time;
 using System;
 
 namespace FeatureLoom.Scheduling
@@ -28,5 +29,9 @@ namespace FeatureLoom.Scheduling
         public TimeFrame ExecutionTimeFrame => timeFrame;
 
         public static implicit operator ScheduleStatus(TimeFrame timeFrame) => new ScheduleStatus(timeFrame);
+        public static ScheduleStatus WaitFor(TimeSpan minDelay) => new ScheduleStatus(minDelay, minDelay + 15.Milliseconds());
+        public static ScheduleStatus WaitExactlyFor(TimeSpan minDelay) => new ScheduleStatus(minDelay, minDelay);
+        public static ScheduleStatus WaitUntil(DateTime minDate) => new ScheduleStatus(minDate, minDate + 15.Milliseconds());
+        public static ScheduleStatus WaitExactlyUntil(DateTime minDate) => new ScheduleStatus(minDate, minDate);
     }
 }

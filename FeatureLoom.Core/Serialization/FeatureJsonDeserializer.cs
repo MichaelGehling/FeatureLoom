@@ -216,38 +216,18 @@ namespace FeatureLoom.Serialization
             itemInfos[currentItemInfoIndex] = itemInfo;
         }
 
-        private Func<T> GetConstructor<T>()
+        private Func<T> GetConstructor<T>(Type derivedType = null)
         {
             Func<T> constructor = null;
-            Type type = typeof(T);
-            if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> typedConstructor) constructor = typedConstructor;
-            else if (null != type.GetConstructor(Array.Empty<Type>())) constructor = CompileConstructor<T>();
+            Type type = derivedType ?? typeof(T);
+            if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> typedConstructor) constructor = () => typedConstructor();
             else if (type.IsValueType) return () => default;
-
-            if (constructor == null) throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)}. Use AddConstructor in Settings.");
-
-            if (!type.IsValueType && settings.enableReferenceResolution)
+            else if (!TryCompileConstructor<T>(out constructor, derivedType))
             {
-                return () =>
-                {
-                    T item = constructor();
-                    SetItemRefInCurrentItemInfo(item);
-                    return item;
-                };
+                throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)}.");
             }
-            else return constructor;
-        }
-
-        private Func<T> GetConstructor<T>(Type derivedType)
-        {
-            Func<T> constructor = null;
-            if (settings.constructors.TryGetValue(derivedType, out object c) && c is Func<T> typedConstructor) constructor = () => typedConstructor();
-            else if (null != derivedType.GetConstructor(Array.Empty<Type>())) constructor = CompileConstructor<T>(derivedType);
-            else if (derivedType.IsValueType) return () => default;
-
-            if (constructor == null) throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(derivedType)}.");
-
-            if (!derivedType.IsValueType && settings.enableReferenceResolution)
+            
+            if (!type.IsValueType && settings.enableReferenceResolution)
             {
                 return () =>
                 {
@@ -264,9 +244,10 @@ namespace FeatureLoom.Serialization
             Func<P, T> constructor = null;
             Type type = typeof(T);
             if (settings.constructorsWithParam.TryGetValue((type, typeof(P)), out object c) && c is Func<P, T> typedConstructor) constructor = typedConstructor;
-            else if (null != type.GetConstructor(new Type[] { typeof(P) })) constructor = CompileConstructor<T, P>();
-
-            if (constructor == null) throw new Exception($"No constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
+            else if (!TryCompileConstructor(out constructor))
+            {
+                throw new Exception($"No constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
+            }            
 
             if (!type.IsValueType && settings.enableReferenceResolution)
             {
@@ -279,40 +260,83 @@ namespace FeatureLoom.Serialization
             }
             else return constructor;
         }
-
-        private static Func<T> CompileConstructor<T>()
+    
+        private static bool TryCompileConstructor<T>(out Func<T> constructor, Type derivedType = null)
         {
-            Type type = typeof(T);
-            var newExpr = Expression.New(type);
-            var lambda = Expression.Lambda<Func<T>>(newExpr);
-            return lambda.Compile();
+            if (derivedType == null)
+            {
+                derivedType = typeof(T);
+            }
+            else
+            {
+                // Ensure the derivedType is actually a subclass of T
+                if (!typeof(T).IsAssignableFrom(derivedType)) throw new ArgumentException($"{derivedType.Name} is not a subclass of {typeof(T).Name}");
+            }
+
+            constructor = null; // Ensure the out parameter is initialized
+
+            var type = derivedType;
+
+            // Try to get the parameterless constructor, including non-public ones
+            var constructorInfo = type.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                Type.EmptyTypes,
+                null);
+
+            if (constructorInfo == null)
+            {
+                return false; // No parameterless constructor found
+            }
+
+            // Create a new expression for the constructor
+            var newExpression = Expression.New(constructorInfo);
+
+            // Compile the lambda into a delegate
+            constructor = Expression.Lambda<Func<T>>(newExpression, Array.Empty<ParameterExpression>()).Compile();
+
+            return true;
         }
 
-        private static Func<T> CompileConstructor<T>(Type derivedType)
+        private static bool TryCompileConstructor<T, P>(out Func<P, T> constructor, Type derivedType = null)
         {
-            // Ensure the derivedType is actually a subclass of T
-            if (!typeof(T).IsAssignableFrom(derivedType)) throw new ArgumentException($"{derivedType.Name} is not a subclass of {typeof(T).Name}");
+            if (derivedType == null)
+            {
+                derivedType = typeof(T);
+            }
+            else
+            {
+                // Ensure the derivedType is actually a subclass of T
+                if (!typeof(T).IsAssignableFrom(derivedType)) throw new ArgumentException($"{derivedType.Name} is not a subclass of {typeof(T).Name}");
+            }
 
-            // Create a New expression that instantiates the derived type
-            var newExpr = Expression.New(derivedType);
+            constructor = null; // Ensure the out parameter is initialized
 
-            // Cast the new expression result to type T
-            var castExpr = Expression.Convert(newExpr, typeof(T));
+            var type = derivedType;
+            var paramType = typeof(P);
 
-            // Create a lambda expression that returns T
-            var lambda = Expression.Lambda<Func<T>>(castExpr);
+            // Try to get the constructor that takes a single parameter of type P, including non-public ones
+            var constructorInfo = type.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(P) },
+                null);
 
-            // Compile the lambda expression into a Func<T>
-            return lambda.Compile();
-        }
+            if (constructorInfo == null)
+            {
+                return false; // No matching constructor found
+            }
 
+            // Create a parameter expression for the input parameter
+            var parameter = Expression.Parameter(typeof(P), "param");
 
-        private static Func<P, T> CompileConstructor<T, P>()
-        {
-            var param = Expression.Parameter(typeof(P), "value");
-            var newExpr = Expression.New(typeof(T).GetConstructor(new[] { typeof(P) }), param);
-            var lambda = Expression.Lambda<Func<P, T>>(newExpr, param);
-            return lambda.Compile();
+            // Create a new expression for the constructor
+            var newExpression = Expression.New(constructorInfo, parameter);
+
+            // Compile the lambda into a delegate
+            constructor = Expression.Lambda<Func<P, T>>(newExpression, parameter).Compile();
+
+            return true;
         }
 
         private void CreateEnumReader<T>(CachedTypeReader cachedTypeReader) where T : struct, Enum

@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -53,7 +54,26 @@ namespace FeatureLoom.MessageFlow
         {
             if (message != null && message is T typedMessage)
             {
-                if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
+                if (waitOnFullQueue && IsFull)
+                {
+                    TimeFrame waitTimeFrame = new TimeFrame(timeoutOnFullQueue);
+                    while (!waitTimeFrame.Elapsed())
+                    {
+                        if (!IsFull)
+                        {
+                            using (queueLock.Lock())
+                            {
+                                if (!IsFull)
+                                {
+                                    EnqueueInLock(typedMessage);
+                                    return;
+                                }
+                            }
+                        }
+                        writerWakeEvent.Wait(waitTimeFrame.Remaining());
+                    }
+                }
+
                 if (dropLatestMessageOnFullQueue && IsFull) alternativeSendingHelper.ObjIfExists?.Forward(in message);
                 else Enqueue(typedMessage);
             }
@@ -64,18 +84,58 @@ namespace FeatureLoom.MessageFlow
         {
             if (message != null && message is T typedMessage)
             {
-                if (waitOnFullQueue) writerWakeEvent.Wait(timeoutOnFullQueue);
-                if (dropLatestMessageOnFullQueue && IsFull) alternativeSendingHelper.ObjIfExists?.Forward(message);
+                if (waitOnFullQueue && IsFull)
+                {
+                    TimeFrame waitTimeFrame = new TimeFrame(timeoutOnFullQueue);
+                    while (!waitTimeFrame.Elapsed())
+                    {
+                        if (!IsFull)
+                        {
+                            using (queueLock.Lock())
+                            {
+                                if (!IsFull)
+                                {
+                                    EnqueueInLock(typedMessage);
+                                    return;
+                                }
+                            }
+                        }
+                        writerWakeEvent.Wait(waitTimeFrame.Remaining());
+                    }
+                }
+
+                if (dropLatestMessageOnFullQueue && IsFull) alternativeSendingHelper.ObjIfExists?.Forward(in message);
                 else Enqueue(typedMessage);
             }
-            else alternativeSendingHelper.ObjIfExists?.Forward(message);
+            else alternativeSendingHelper.ObjIfExists?.Forward(in message);
         }
 
         public async Task PostAsync<M>(M message)
         {
             if (message != null && message is T typedMessage)
             {
-                if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
+                if (waitOnFullQueue && IsFull)
+                {
+                    TimeSpan waitedTime = TimeSpan.Zero;
+
+                    while (waitedTime < timeoutOnFullQueue)
+                    {
+                        if (!IsFull)
+                        {
+                            using (queueLock.Lock())
+                            {
+                                if (!IsFull)
+                                {
+                                    EnqueueInLock(typedMessage);
+                                    return;
+                                }
+                            }
+                        }
+                        writerWakeEvent.Wait(timeoutOnFullQueue);
+                    }
+                }
+
+                if (waitOnFullQueue && IsFull) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
                 if (dropLatestMessageOnFullQueue && IsFull) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
                 else Enqueue(typedMessage);
             }
@@ -89,6 +149,15 @@ namespace FeatureLoom.MessageFlow
                 queue.Enqueue(message);
                 EnsureMaxSize();
             }
+            if (IsFull) writerWakeEvent.Reset();
+            readerWakeEvent.Set();
+        }
+
+        // ONLY USE IN LOCKED QUEUE!
+        private void EnqueueInLock(T message)
+        {            
+            queue.Enqueue(message);
+            EnsureMaxSize();
             if (IsFull) writerWakeEvent.Reset();
             readerWakeEvent.Set();
         }

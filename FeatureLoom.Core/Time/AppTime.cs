@@ -37,9 +37,19 @@ namespace FeatureLoom.Time
             GetService.Wait(timeout);
         }
 
+        public static void WaitPrecisely(TimeSpan timeout)
+        {
+            GetService.WaitPrecisely(timeout);
+        }
+
         public static void Wait(TimeSpan timeout, CancellationToken cancellationToken)
         {
             GetService.Wait(timeout, cancellationToken);
+        }
+
+        public static void WaitPrecisely(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            GetService.WaitPrecisely(timeout, cancellationToken);
         }
 
         public static void Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
@@ -52,17 +62,28 @@ namespace FeatureLoom.Time
             return GetService.WaitAsync(minTimeout, maxTimeout);
         }
 
+
         public static Task WaitAsync(TimeSpan timeout)
         {
             return GetService.WaitAsync(timeout);
         }
 
-        public static Task WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        public static Task WaitPreciselyAsync(TimeSpan timeout)
+        {
+            return GetService.WaitPreciselyAsync(timeout);
+        }
+
+        public static Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
             return GetService.WaitAsync(timeout, cancellationToken);
         }
 
-        public static Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
+        public static Task<bool> WaitPreciselyAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            return GetService.WaitPreciselyAsync(timeout, cancellationToken);
+        }
+
+        public static Task<bool> WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken)
         {
             return GetService.WaitAsync(minTimeout, maxTimeout, cancellationToken);
         }

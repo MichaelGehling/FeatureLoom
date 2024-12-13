@@ -12,7 +12,7 @@ namespace FeatureLoom.Time
         TimeSpan CoarsePrecision { get; }
         DateTime Now { get; }
         DateTime CoarseNow { get; }
-        void Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken);
-        Task WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken);
+        bool Wait(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken);
+        Task<bool> WaitAsync(TimeSpan minTimeout, TimeSpan maxTimeout, CancellationToken cancellationToken);
     }
 }

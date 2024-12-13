@@ -45,15 +45,15 @@ namespace FeatureLoom.Synchronization
             public ushort passiveWaitThresholdAsync = 35;
             // The lower this value, the more candidates will go to sleep (must not be smaller than PassiveWaitThreshold)
             public ushort sleepWaitThreshold = 200;
-            public ushort sleepWaitThresholdAsync = 50;
+            public ushort sleepWaitThresholdAsync = 60;
             // The lower this value, the later a sleeping candidate is waked up
-            public ushort awakeThreshold = 15;
+            public ushort awakeThreshold = 40;
             // The lower this value, the earlier the waiter must leave the synchronous path and the more often the waiter must make an async yield
             public ushort asyncYieldBaseFrequency = 120;
             // The weight of the former averageWaitCount vs. the current waitCount (e.g. 3 means 3:1)
             public ushort averageWeighting = 3;
             // How often the scheduler at least checks to wake up sleeping candidates (1 is 0.01ms, so 100 means 1.0ms). Whenever the lock is released the scheduler is triggered, anyway.
-            public ushort schedulerDelayFactor = 2200;
+            public ushort schedulerDelayFactor = 1500;
             // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
             // Comes with a quite noticeable performance cost, especially for high frequency locking.
             public bool restrictQueueJumping = false;
@@ -1739,11 +1739,12 @@ namespace FeatureLoom.Synchronization
         string ISchedule.Name => "FeatureLock";
         ScheduleStatus ISchedule.Trigger(DateTime now)
         {            
-            if (!IsScheduleActive) return TimeFrame.Invalid;
-            
-            TimeFrame nextTriggerTimeFrame = new(now, (0.01 * Settings.schedulerDelayFactor).Milliseconds());
+            if (!IsScheduleActive) return TimeFrame.Invalid;           
             var candidate = queueHead;
-            if (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly)) return nextTriggerTimeFrame;
+
+            ScheduleStatus scheduleStatus = new ScheduleStatus(1.Milliseconds(), (0.01 * Settings.schedulerDelayFactor).Milliseconds());
+
+            if (!IsReadOnlyLocked && !MustAwake(UpdateRank(candidate.ticket), candidate.isReadOnly)) return scheduleStatus;
 
             SleepHandle firstAwaking = null;
             SleepHandle lastAwaking = null;                                   
@@ -1786,8 +1787,8 @@ namespace FeatureLoom.Synchronization
                 candidate = candidate.Next;
             }
 
-            if (IsScheduleActive) return nextTriggerTimeFrame;
-            else return TimeFrame.Invalid;
+            if (IsScheduleActive) return scheduleStatus;
+            else return ScheduleStatus.Terminated;
         }
 
         void Sleep(ushort ticket, bool readOnly)

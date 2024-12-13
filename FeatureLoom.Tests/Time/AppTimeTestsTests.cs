@@ -1,7 +1,9 @@
 ﻿using FeatureLoom.Diagnostics;
 using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
+using System.Threading;
 using Xunit;
 
 namespace FeatureLoom.Time
@@ -15,5 +17,39 @@ namespace FeatureLoom.Time
 
             Assert.True((DateTime.UtcNow - AppTime.CoarseNow).Duration() < 20.Milliseconds());
         }
+        /*
+        [Fact]
+        public void WaitTimeIsCorrect()
+        {
+            TestHelper.PrepareTestContext();
+
+            var tk = AppTime.TimeKeeper;
+            AppTime.Wait(5.Milliseconds());            
+            Assert.True(tk.Elapsed > 5.Milliseconds());
+            Assert.True(tk.LastElapsed < 7.Milliseconds());
+            
+
+            tk = AppTime.TimeKeeper;
+            AppTime.Wait(20.Milliseconds());            
+            Assert.True(tk.Elapsed > 20.Milliseconds());
+            Assert.True(tk.LastElapsed < 25.Milliseconds());
+        }
+
+        [Fact]
+        public void WaitAsyncTimeIsCorrect()
+        {
+            TestHelper.PrepareTestContext();
+
+            var tk = AppTime.TimeKeeper;
+            AppTime.WaitAsync(5.Milliseconds()).WaitFor();
+            Assert.True(tk.Elapsed > 5.Milliseconds());
+            Assert.True(tk.LastElapsed < 8.Milliseconds());
+
+            tk = AppTime.TimeKeeper;
+            AppTime.WaitAsync(20.Milliseconds()).WaitFor();
+            Assert.True(tk.Elapsed > 20.Milliseconds());
+            Assert.True(tk.LastElapsed < 25.Milliseconds());
+        }
+        */
     }
 }

@@ -11,50 +11,46 @@ namespace FeatureLoom.Scheduling
     {        
         public static async Task InvokeDelayed(this Action action, TimeSpan minDelayTime, TimeSpan maxDelayTime, CancellationToken cancellationToken = default)
         {
-            await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken);
-            await Task.Run(action);
+            if (await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken)) action();            
         }
 
         public static async Task InvokeDelayed(this Func<Task> asyncAction, TimeSpan minDelayTime, TimeSpan maxDelayTime, CancellationToken cancellationToken = default)
         {
-            await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken);
-            await asyncAction();
+            if (await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken)) await asyncAction();            
         }
 
-        public static async Task<T> InvokeDelayed<T>(this Func<T> action, TimeSpan minDelayTime, TimeSpan maxDelayTime, CancellationToken cancellationToken = default)
+        public static async Task<T> InvokeDelayed<T>(this Func<T> action, TimeSpan minDelayTime, TimeSpan maxDelayTime, CancellationToken cancellationToken = default, T cancellationReturnValue = default)
         {
-            await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken);
-            return await Task.Run(action);
+            if (await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken)) return action();
+            else return cancellationReturnValue;
         }
 
-        public static async Task<T> InvokeDelayed<T>(this Func<Task<T>> asyncAction, TimeSpan minDelayTime, TimeSpan maxDelayTime, CancellationToken cancellationToken = default)
+        public static async Task<T> InvokeDelayed<T>(this Func<Task<T>> asyncAction, TimeSpan minDelayTime, TimeSpan maxDelayTime, CancellationToken cancellationToken = default, T cancellationReturnValue = default)
         {
-            await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken);
-            return await asyncAction();
+            if (await AppTime.WaitAsync(minDelayTime, maxDelayTime, cancellationToken)) return await asyncAction();
+            else return cancellationReturnValue;
         }
 
         public static async Task InvokeDelayed(this Action action, TimeSpan delayTime, CancellationToken cancellationToken = default)
         {
-            await AppTime.WaitAsync(delayTime, cancellationToken);
-            await Task.Run(action);
+            if (await AppTime.WaitAsync(delayTime, cancellationToken)) action();
         }
 
         public static async Task InvokeDelayed(this Func<Task> asyncAction, TimeSpan delayTime, CancellationToken cancellationToken = default)
         {
-            await AppTime.WaitAsync(delayTime, cancellationToken);
-            await asyncAction();
+            if (await AppTime.WaitAsync(delayTime, cancellationToken)) await asyncAction();
         }
 
-        public static async Task<T> InvokeDelayed<T>(this Func<T> action, TimeSpan delayTime, CancellationToken cancellationToken = default)
+        public static async Task<T> InvokeDelayed<T>(this Func<T> action, TimeSpan delayTime, CancellationToken cancellationToken = default, T cancellationReturnValue = default)
         {
-            await AppTime.WaitAsync(delayTime, cancellationToken);
-            return await Task.Run(action);
+            if (await AppTime.WaitAsync(delayTime, cancellationToken)) return action();
+            else return cancellationReturnValue;
         }
 
-        public static async Task<T> InvokeDelayed<T>(this Func<Task<T>> asyncAction, TimeSpan delayTime, CancellationToken cancellationToken = default)
+        public static async Task<T> InvokeDelayed<T>(this Func<Task<T>> asyncAction, TimeSpan delayTime, CancellationToken cancellationToken = default, T cancellationReturnValue = default)
         {
-            await AppTime.WaitAsync(delayTime, cancellationToken);
-            return await asyncAction();
+            if (await AppTime.WaitAsync(delayTime, cancellationToken)) return await asyncAction();
+            else return cancellationReturnValue;
         }
 
         /// <summary>
@@ -82,7 +78,7 @@ namespace FeatureLoom.Scheduling
         /// <returns>The created schedule.</returns>
         public static ActionSchedule ScheduleAction(this SchedulerService scheduler, string name, Action<DateTime> triggerAction, TimeSpan triggerTime)
         {
-            return ScheduleAction(scheduler, name, triggerAction, triggerTime, triggerTime.Multiply(1.01));
+            return ScheduleAction(scheduler, name, triggerAction, triggerTime, triggerTime + 20.Milliseconds());
         }
 
         /// <summary>
