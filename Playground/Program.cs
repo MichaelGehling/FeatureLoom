@@ -127,6 +127,31 @@ namespace Playground
 
         private static async Task Main()
         {
+
+            int counter = 0;
+            while (true)
+            {
+                AsyncManualResetEvent mre1 = new AsyncManualResetEvent(false);                
+
+                _ = Task.Run(() =>
+                {
+                    //AppTime.WaitPrecisely(5.Milliseconds());
+                    mre1.Set();                    
+                });
+                await mre1.WaitAsync();
+                
+                counter++;
+                ConsoleHelper.WriteLine(counter.ToString());
+            }
+
+
+
+
+
+
+
+
+
             AppTime.Wait(2500.Milliseconds());
             AppTime.Wait(5.Milliseconds());
             TimeKeeper tk;

@@ -46,6 +46,24 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock(Action action, bool prio)
+        {
+            bool lockTaken = false;
+            myLock.Enter(ref lockTaken);
+            if (lockTaken)
+            {
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    myLock.Exit(false);
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock()
         {
             bool lockTaken = false;

@@ -26,7 +26,35 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock(Action action, bool prio)
+        {
+            semaphore.Wait();
+            try
+            {
+                action();
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockAsync(Func<Task> action)
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task LockAsync(Func<Task> action, bool prio)
         {
             await semaphore.WaitAsync();
             try

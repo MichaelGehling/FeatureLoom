@@ -37,8 +37,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
             set => queueTest.numOverallMessages = value;
         }
 
-        [Benchmark]
-        public void FairFeatureLock_Lock() => queueTest.Run(fairFeatureLockSubjects.Lock);
+        //[Benchmark]
+        //public void FairFeatureLock_Lock() => queueTest.Run(fairFeatureLockSubjects.Lock);
 
     }
 }

@@ -22,7 +22,25 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock(Action action, bool prio)
+        {
+            using (perfLock.Lock(prio))
+            {
+                action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockPrio(Action action)
+        {
+            using (perfLock.Lock(true))
+            {
+                action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void LockPrio(Action action, bool prio)
         {
             using (perfLock.Lock(true))
             {
@@ -40,6 +58,15 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task LockAsync(Func<Task> action, bool prio)
+        {
+            using (await perfLock.LockAsync(prio))
+            {
+                await action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task LockPrioAsync(Func<Task> action)
         {
             using (await perfLock.LockAsync(true))
@@ -47,6 +74,15 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
                 await action();
             }
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task LockPrioAsync(Func<Task> action, bool prio)
+        {
+            using (await perfLock.LockAsync(true))
+            {
+                await action();
+            }
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockReadOnly(Action action)
