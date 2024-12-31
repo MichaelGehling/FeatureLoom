@@ -7,22 +7,23 @@ using System.Text;
 
 namespace FeatureLoom.Helpers
 {
-    public readonly struct TextSection : IEnumerable<char>
+    public struct TextSegment : IEnumerable<char>
     {
-        public static readonly TextSection Empty = new TextSection("");
+        public static readonly TextSegment Empty = new TextSegment("");
 
         readonly string text;
         readonly int startIndex;
         public readonly int length;
+        int? hashCode;
 
-        public TextSection(string text) : this()
+        public TextSegment(string text) : this()
         {
             this.text = text;
             this.startIndex = 0;
             this.length = text.Length;
         }
 
-        public TextSection(string text, int startIndex) : this()
+        public TextSegment(string text, int startIndex) : this()
         {
             if (startIndex >= text.Length)
             {
@@ -35,7 +36,7 @@ namespace FeatureLoom.Helpers
             this.length = text.Length - startIndex;
         }
 
-        public TextSection(string text, int startIndex, int length) : this()
+        public TextSegment(string text, int startIndex, int length) : this()
         {
             if (startIndex + length > text.Length)
             {
@@ -52,13 +53,13 @@ namespace FeatureLoom.Helpers
         public char this[int index] => text[startIndex + index];
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public TextSection SubSection(int startIndex) => new TextSection(text, this.startIndex + startIndex);
+        public TextSegment SubSegment(int startIndex) => new TextSegment(text, this.startIndex + startIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public TextSection SubSection(int startIndex, int length) => new TextSection(text, this.startIndex + startIndex, length);
+        public TextSegment SubSegment(int startIndex, int length) => new TextSegment(text, this.startIndex + startIndex, length);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryFindIndex(TextSection other, out int index)
+        public bool TryFindIndex(TextSegment other, out int index)
         {
             for (index = 0; index < length; index++)
             {
@@ -87,26 +88,26 @@ namespace FeatureLoom.Helpers
             return false;
         }
 
-        public struct SplitEnumerator : IEnumerator<TextSection>
+        public struct SplitEnumerator : IEnumerator<TextSegment>
         {
-            TextSection original;
-            TextSection remaining;
-            TextSection current;
+            TextSegment original;
+            TextSegment remaining;
+            TextSegment current;
             char seperator;
             bool skipEmpty;
             bool finished;
 
-            public SplitEnumerator(TextSection original, char seperator, bool skipEmpty)
+            public SplitEnumerator(TextSegment original, char seperator, bool skipEmpty)
             {
                 this.original = original;
                 this.remaining = original;
-                this.current = TextSection.Empty;
+                this.current = TextSegment.Empty;
                 this.seperator = seperator;
                 this.skipEmpty = skipEmpty;
                 this.finished = false;
             }
 
-            public TextSection Current => current;
+            public TextSegment Current => current;
 
             object IEnumerator.Current => current;
 
@@ -120,8 +121,8 @@ namespace FeatureLoom.Helpers
                 {
                     if (remaining.TryFindIndex(seperator, out int index))
                     {
-                        current = remaining.SubSection(0, index);
-                        remaining = remaining.SubSection(index + 1);
+                        current = remaining.SubSegment(0, index);
+                        remaining = remaining.SubSegment(index + 1);
                         if (current.length == 0 && skipEmpty) continue;
                         return true;
                     }
@@ -143,9 +144,9 @@ namespace FeatureLoom.Helpers
             }
         }
 
-        public EnumerableHelper<TextSection, SplitEnumerator> Split(char separator, bool skipEmpty = false)
+        public EnumerableHelper<TextSegment, SplitEnumerator> Split(char separator, bool skipEmpty = false)
         {
-            return new EnumerableHelper<TextSection, SplitEnumerator>(new SplitEnumerator(this, separator, skipEmpty));
+            return new EnumerableHelper<TextSegment, SplitEnumerator>(new SplitEnumerator(this, separator, skipEmpty));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -162,11 +163,13 @@ namespace FeatureLoom.Helpers
             return GetEnumerator();
         }
 
-        public static implicit operator TextSection(string text) => new TextSection(text);
-        public static implicit operator string(TextSection textSection) => textSection.ToString();
-        public static bool operator ==(TextSection left, TextSection right)
+        public static implicit operator TextSegment(string text) => new TextSegment(text);
+        public static implicit operator string(TextSegment textSegment) => textSegment.ToString();
+        public static bool operator ==(TextSegment left, TextSegment right)
         {
             if (left.length !=  right.length) return false;
+            if (left.GetHashCode() != right.GetHashCode()) return false;
+
             for (int i = 0;i < left.length;i++)
             {
                 if (left[i] != right[i]) return false;
@@ -174,16 +177,24 @@ namespace FeatureLoom.Helpers
             return true;
         }
 
-        public static bool operator !=(TextSection left, TextSection right) => !(left == right);
+        public static bool operator !=(TextSegment left, TextSegment right) => !(left == right);
 
         public override bool Equals(object obj)
         {            
-            if (obj is TextSection textSection) return this == textSection;
+            if (obj is TextSegment textSegment) return this == textSegment;
             if (obj is string str) return this == str;
             return false;
         }
 
+
         public override int GetHashCode()
+        {
+            if (!hashCode.HasValue) hashCode = ComputeHashCode();
+            return hashCode.Value;
+        }
+
+
+        private int ComputeHashCode()
         {
             // Initial hash values.
             int hash1 = 5381;

@@ -114,6 +114,8 @@ namespace FeatureLoom.Synchronization
         public bool Wait(TimeSpan timeout)
         {
             var lastSetCount = setCounter;
+            if (isSet) return true;
+
             if (setCounter != lastSetCount) return true;
             if (timeout <= TimeSpan.Zero) return false;
 
@@ -144,6 +146,8 @@ namespace FeatureLoom.Synchronization
         public bool Wait(CancellationToken cancellationToken)
         {
             var lastSetCount = setCounter;
+            if (isSet) return true;
+
             if (cancellationToken.IsCancellationRequested) return false;
             if (setCounter != lastSetCount) return true;
 

@@ -25,7 +25,7 @@ namespace FeatureLoom.Serialization
         Dictionary<Type, CachedKeyWriter> keyWriterCache = new();
         Dictionary<object, ItemInfo> objToItemInfo = new();
         ItemInfoRecycler itemInfoRecycler;
-        private ArraySegment<byte> rootName;
+        private ByteSegment rootName;
         ItemInfo currentItemInfo;
         ExtensionApi extensionApi;
         public delegate void ItemHandler<T>(T item);
@@ -36,13 +36,13 @@ namespace FeatureLoom.Serialization
             this.settings = new CompiledSettings(settings ?? new Settings());
             writer = new JsonUTF8StreamWriter(this.settings);
             itemInfoRecycler = new ItemInfoRecycler(settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef);
-            rootName = new ArraySegment<byte>(writer.PrepareRootName());
+            rootName = new ByteSegment(writer.PrepareRootName());
             this.extensionApi = new ExtensionApi(this);
         }
 
         public string ShowBufferAsString()
         {            
-            EquatableByteSegment segment = new EquatableByteSegment(writer.Buffer, 0, writer.BufferCount);
+            ByteSegment segment = new ByteSegment(writer.Buffer, 0, writer.BufferCount);
             return segment.ToString();
         }
 
@@ -106,13 +106,13 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void CreateItemInfoForClass<T>(T item, ArraySegment<byte> itemName)
+        void CreateItemInfoForClass<T>(T item, ByteSegment itemName)
         {            
             currentItemInfo = itemInfoRecycler.TakeItemInfo(currentItemInfo, item, itemName);            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void CreateItemInfoForStruct(ArraySegment<byte> itemName)
+        void CreateItemInfoForStruct(ByteSegment itemName)
         {
             currentItemInfo = itemInfoRecycler.TakeItemInfo(currentItemInfo, null, itemName);
         }

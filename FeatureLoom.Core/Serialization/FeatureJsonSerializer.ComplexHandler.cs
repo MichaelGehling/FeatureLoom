@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 
 namespace FeatureLoom.Serialization
 {
@@ -70,7 +71,7 @@ namespace FeatureLoom.Serialization
                 fieldName = fieldName.Substring("<", ">");
             }
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
-            var fieldNameBytes = new ArraySegment<byte>(JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName));
+            var fieldNameBytes = new ByteSegment(JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName));
 
             
             Type itemType = typeof(T);

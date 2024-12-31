@@ -24,7 +24,7 @@ namespace FeatureLoom.RPC
         public RpcCaller(TimeSpan timeout)
         {
             this.timeout = timeout;
-            this.timeoutSchedule = Service<SchedulerService>.Instance.ScheduleAction("StringRpcCaller_Timeout", now => CheckForTimeouts(now), this.timeout.Multiply(0.5));
+            timeoutSchedule = ((Action<DateTime>)CheckForTimeouts).ScheduleForRecurringExecution("RpcCaller_Timeout", timeout.Multiply(0.5));            
         }
 
         public void CheckForTimeouts(DateTime now)

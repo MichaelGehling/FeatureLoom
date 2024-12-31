@@ -15,7 +15,7 @@ namespace FeatureLoom.Serialization
         {
             public TypeInfoHandling typeInfoHandling = TypeInfoHandling.AddDeviatingTypeInfo;
             public DataSelection dataSelection = DataSelection.PublicAndPrivateFields_CleanBackingFields;
-            public ReferenceCheck referenceCheck = ReferenceCheck.AlwaysReplaceByRef;
+            public ReferenceCheck referenceCheck = ReferenceCheck.NoRefCheck;
             public int bufferSize = -1;
             public bool enumAsString = false;
             public bool treatEnumerablesAsCollections = true;
