@@ -20,12 +20,12 @@ public partial class DeserializeComplexObjectTest
 {
     FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
     {
-
+        indent = true,
     });
 
     FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
-        initialBufferSize = 1024*1024*100,
+        initialBufferSize = 1024*1024*100,        
     });
 
     JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()

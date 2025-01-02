@@ -19,7 +19,7 @@ public sealed partial class FeatureJsonDeserializer
         public bool TryNextByte() => deserializer.buffer.TryNextByte();
         
         public void SkipNextValue() => deserializer.SkipValue();
-        public void SkipWhiteSpaces() => deserializer.SkipWhiteSpaces();
+        public byte SkipWhiteSpaces() => deserializer.SkipWhiteSpaces();
 
         public bool TryReadNullValue() => deserializer.TryReadNullValue();
         public bool TryReadStringValue(out string value) => deserializer.TryReadStringValue(out value);

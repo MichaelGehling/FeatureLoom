@@ -75,8 +75,8 @@ namespace FeatureLoom.Serialization
                 if (enableReferenceResolution)
                 {
 
-                    deserializer.SkipWhiteSpaces();
-                    if (deserializer.buffer.CurrentByte != '"') throw new Exception("Not a proper field name");                    
+                    byte b = deserializer.SkipWhiteSpaces();
+                    if (b != '"') throw new Exception("Not a proper field name");                    
                     var recording = deserializer.buffer.StartRecording(true);
 
                     T result = ReadItemIgnoreProposedType<T>();

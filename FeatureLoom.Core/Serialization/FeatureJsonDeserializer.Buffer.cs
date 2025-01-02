@@ -4,6 +4,7 @@ using System.IO;
 using FeatureLoom.Extensions;
 using System.Runtime.CompilerServices;
 using FeatureLoom.Helpers;
+using System.Diagnostics;
 
 namespace FeatureLoom.Serialization
 {
@@ -144,6 +145,7 @@ namespace FeatureLoom.Serialization
             public bool IsBufferCompletelyFilled => bufferFillLevel == buffer.Length;
             public bool IsBufferReadToEnd => bufferPos >= bufferFillLevel;
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public Recording StartRecording(bool skipCurrent = false) => new Recording(this, skipCurrent);            
             internal struct Recording
             {
@@ -157,6 +159,7 @@ namespace FeatureLoom.Serialization
                     if (skipCurrent) this.startBufferPos++;
                 }
 
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 public ByteSegment GetRecordedBytes(bool includeCurrentByte)
                 {
                     return new ByteSegment(buffer.buffer, startBufferPos, buffer.bufferPos - startBufferPos);
@@ -169,6 +172,7 @@ namespace FeatureLoom.Serialization
                 private int startBufferPos;
                 private bool undoReading;
 
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 public bool SetUndoReading(bool undo) => this.undoReading = undo;
 
                 public UndoReadHandle(Buffer buffer, bool initUndo) : this()
@@ -179,8 +183,10 @@ namespace FeatureLoom.Serialization
                     buffer.peekStack.Push(buffer.bufferPos);
                 }
 
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 public ByteSegment GetReadBytes() => new ByteSegment(buffer.buffer, startBufferPos, buffer.bufferPos - startBufferPos);
 
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 public void Dispose()
                 {
                     if (undoReading)

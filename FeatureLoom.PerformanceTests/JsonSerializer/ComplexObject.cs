@@ -39,10 +39,3 @@ public class ComplexObject
         Val1, Val2, Val3, Val4, Val5, Val6,
     }
 }
-
-public class SimpleObject
-{
-    public int id = 0;
-    public string name = "This is a string";
-    public double value = 123.456;
-}

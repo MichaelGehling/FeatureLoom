@@ -20,7 +20,7 @@ public partial class DeserializeSimpleObjectTest
 {
     FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
     {
-
+        indent = true,
     });
 
     FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
