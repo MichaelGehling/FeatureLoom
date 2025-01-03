@@ -679,7 +679,8 @@ namespace FeatureLoom.Serialization
                 }
             }
 
-            Dictionary<ByteSegment, Func<T, T>> itemFieldWriters = new();
+            Dictionary<ByteSegment, int> itemFieldWritersIndexLookup= new();
+            List<(ByteSegment name, Func<T, T> itemFieldWriter)> itemFieldWritersList = new();
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
@@ -691,13 +692,32 @@ namespace FeatureLoom.Serialization
                     name = backingFieldName;
                     itemFieldName = new ByteSegment(name.ToByteArray());
                 }
-                itemFieldWriters[itemFieldName] = itemFieldWriter;
+                itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
+                itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
             }
             var constructor = GetConstructor<T>();
+
+            bool TryFindFieldWriter(ByteSegment fieldName, ref int expectedFieldIndex, out Func<T,T> fieldWriter)
+            {
+                (ByteSegment name, fieldWriter) = itemFieldWritersList[expectedFieldIndex];
+                if (name == fieldName)
+                {
+                    expectedFieldIndex = (expectedFieldIndex+1) % itemFieldWritersList.Count;
+                    return true;
+                }
+                if (itemFieldWritersIndexLookup.TryGetValue(fieldName, out int index))
+                {
+                    expectedFieldIndex = (index+1) % itemFieldWritersList.Count;
+                    (_, fieldWriter) = itemFieldWritersList[index];
+                    return true;
+                }
+                return false;
+            }
 
             Func<T> typeReader = () =>
             {
                 T item = constructor();
+                int expectedFieldIndex = 0;
 
                 byte b = SkipWhiteSpaces();
                 if (b != '{') throw new Exception("Failed reading object");
@@ -712,7 +732,7 @@ namespace FeatureLoom.Serialization
                     b = SkipWhiteSpaces();
                     if (b != ':') throw new Exception("Failed reading object");
                     buffer.TryNextByte();
-                    if (itemFieldWriters.TryGetValue(fieldName, out var fieldWriter)) item = fieldWriter.Invoke(item);
+                    if (TryFindFieldWriter(fieldName, ref expectedFieldIndex, out var fieldWriter)) item = fieldWriter.Invoke(item);
                     else SkipValue();
                     b = SkipWhiteSpaces();
                     if (b == ',') buffer.TryNextByte();
@@ -724,6 +744,35 @@ namespace FeatureLoom.Serialization
 
             cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
 
+            Func<T,T> populatingTypeReader = (itemToPopulate) =>
+            {
+                T item = itemToPopulate;
+                int expectedFieldIndex = 0;
+
+                byte b = SkipWhiteSpaces();
+                if (b != '{') throw new Exception("Failed reading object");
+                buffer.TryNextByte();
+
+                while (true)
+                {
+                    b = SkipWhiteSpaces();
+                    if (b == '}') break;
+
+                    if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                    b = SkipWhiteSpaces();
+                    if (b != ':') throw new Exception("Failed reading object");
+                    buffer.TryNextByte();
+                    if (TryFindFieldWriter(fieldName, ref expectedFieldIndex, out var fieldWriter)) item = fieldWriter.Invoke(item);
+                    else SkipValue();
+                    b = SkipWhiteSpaces();
+                    if (b == ',') buffer.TryNextByte();
+                }
+
+                if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading object");
+                return item;
+            };
+
+            cachedTypeReader.SetPopulatingTypeReader(populatingTypeReader, JsonDataTypeCategory.Object);
         }
 
 
@@ -737,27 +786,7 @@ namespace FeatureLoom.Serialization
                 if (fieldInfo.IsInitOnly) // Check if the field is read-only
                 {
                     // Handle read-only fields
-                    var fieldTypeReader = GetCachedTypeReader(fieldType);
-                    if (itemType.IsValueType)
-                    {
-                        return parentItem =>
-                        {
-                            V value = fieldTypeReader.ReadValue<V>(fieldName);
-                            var boxedItem = (object)parentItem;
-                            fieldInfo.SetValue(boxedItem, value);
-                            parentItem = (T)boxedItem;
-                            return parentItem;
-                        };
-                    }
-                    else
-                    {
-                        return parentItem =>
-                        {
-                            V value = fieldTypeReader.ReadValue<V>(fieldName);
-                            fieldInfo.SetValue(parentItem, value);
-                            return parentItem;
-                        };
-                    }
+                    return CreateFieldWriterForInitOnlyFields<T, V, C>(fieldName, itemType, fieldType, fieldInfo);
                 }
                 else
                 {
@@ -775,31 +804,117 @@ namespace FeatureLoom.Serialization
                 else if (HasInitAccessor(propertyInfo))
                 {
                     // Handle init-only properties
-                    var fieldTypeReader = GetCachedTypeReader(fieldType);
-                    if (itemType.IsValueType)
-                    {
-                        return parentItem =>
-                        {
-                            V value = fieldTypeReader.ReadValue<V>(fieldName);
-                            var boxedItem = (object)parentItem;
-                            propertyInfo.SetValue(boxedItem, value);
-                            parentItem = (T)boxedItem;
-                            return parentItem;
-                        };
-                    }
-                    else
-                    {
-                        return parentItem =>
-                        {
-                            V value = fieldTypeReader.ReadValue<V>(fieldName);
-                            propertyInfo.SetValue(parentItem, value);
-                            return parentItem;
-                        };
-                    }
+                    return CreateFieldWriterForInitOnlyProperties<T, V, C>(fieldName, itemType, fieldType, propertyInfo);
                 }
             }
 
             throw new InvalidOperationException("MemberInfo must be a writable field, property, or init-only property.");
+        }
+
+        private Func<C, C> CreateFieldWriterForInitOnlyProperties<T, V, C>(ByteSegment fieldName, Type itemType, Type fieldType, PropertyInfo propertyInfo) where T : C
+        {            
+            var fieldTypeReader = GetCachedTypeReader(fieldType);
+            if (itemType.IsValueType)
+            {
+                if (CanTypeBePopulated(itemType) && propertyInfo.CanRead)
+                {
+                    return parentItem =>
+                    {
+                        V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                        var boxedItem = (object)parentItem;
+                        propertyInfo.SetValue(boxedItem, value);
+                        parentItem = (T)boxedItem;
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        var boxedItem = (object)parentItem;
+                        propertyInfo.SetValue(boxedItem, value);
+                        parentItem = (T)boxedItem;
+                        return parentItem;
+                    };
+                }
+            }
+            else
+            {
+                if (CanTypeBePopulated(itemType) && propertyInfo.CanRead)
+                {
+                    return parentItem =>
+                    {
+                        V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                        propertyInfo.SetValue(parentItem, value);
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        propertyInfo.SetValue(parentItem, value);
+                        return parentItem;
+                    };
+                }
+            }
+        }
+
+        private Func<C, C> CreateFieldWriterForInitOnlyFields<T, V, C>(ByteSegment fieldName, Type itemType, Type fieldType, FieldInfo fieldInfo) where T : C
+        {            
+            var fieldTypeReader = GetCachedTypeReader(fieldType);
+            if (itemType.IsValueType)
+            {
+                if (CanTypeBePopulated(itemType))
+                {
+                    return parentItem =>
+                    {
+                        V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                        var boxedItem = (object)parentItem;
+                        fieldInfo.SetValue(boxedItem, value);
+                        parentItem = (T)boxedItem;
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        var boxedItem = (object)parentItem;
+                        fieldInfo.SetValue(boxedItem, value);
+                        parentItem = (T)boxedItem;
+                        return parentItem;
+                    };
+                }
+            }
+            else
+            {
+                if (CanTypeBePopulated(itemType))
+                {
+                    return parentItem =>
+                    {
+                        V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                        fieldInfo.SetValue(parentItem, value);
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        fieldInfo.SetValue(parentItem, value);
+                        return parentItem;
+                    };
+                }
+            }
         }
 #if NET5_0_OR_GREATER
         private bool HasInitAccessor(PropertyInfo propertyInfo)
@@ -827,7 +942,7 @@ namespace FeatureLoom.Serialization
             var value = Expression.Parameter(fieldType, "value");
             var memberAccess = Expression.Field(target, fieldInfo);
 
-            if (itemType.IsValueType) // For structs: create an expression that modifies and returns the struct
+            if (itemType.IsValueType)
             {
                 // Create an expression to set the field value on the struct
                 var assignExpression = Expression.Assign(memberAccess, value);
@@ -838,30 +953,59 @@ namespace FeatureLoom.Serialization
                     target // Return the modified struct
                 );
 
-                var lambda = Expression.Lambda<Func<T, V, T>>(body, target, value);
-                var setValueAndReturn = lambda.Compile();
+                var lambdaSetter = Expression.Lambda<Func<T, V, T>>(body, target, value);
+                var setValueAndReturn = lambdaSetter.Compile();
 
-                return parentItem =>
+                var lambdaGetter = Expression.Lambda<Func<T, V>>(memberAccess, target);
+                Func<T, V> getValue = lambdaGetter.Compile();
+
+                if (CanTypeBePopulated(fieldType))
                 {
-                    // Read the new field value
-                    V newFieldValue = fieldTypeReader.ReadValue<V>(fieldName);
-                    parentItem = setValueAndReturn((T)parentItem, newFieldValue);
-                    return parentItem;
-                };
+                    return parentItem =>
+                    {
+                        V fieldValue = getValue((T)parentItem);
+                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                        parentItem = setValueAndReturn((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        parentItem = setValueAndReturn((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
             }
-            else // For reference types: the previous expression-based approach works
+            else
             {
                 BinaryExpression assignExpression = Expression.Assign(memberAccess, value);
-                var lambda = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
+                var lambdaSetter = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
+                Action<T, V> setValue = lambdaSetter.Compile();
 
-                Action<T, V> setValue = lambda.Compile();
-
-                return parentItem =>
+                var lambdaGetter = Expression.Lambda<Func<T, V>>(memberAccess, target);
+                Func<T, V> getValue = lambdaGetter.Compile();
+                if (CanTypeBePopulated(fieldType))
                 {
-                    V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
-                    setValue((T)parentItem, fieldValue);
-                    return parentItem;
-                };
+                    return parentItem =>
+                    {
+                        V fieldValue = getValue((T)parentItem);
+                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                        setValue((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        setValue((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
             }
         }
 
@@ -876,7 +1020,7 @@ namespace FeatureLoom.Serialization
             var value = Expression.Parameter(fieldType, "value");
             var memberAccess = Expression.Property(target, propertyInfo);
 
-            if (itemType.IsValueType) // For structs: create an expression that modifies and returns the struct
+            if (itemType.IsValueType)
             {
                 // Create an expression to set the field value on the struct
                 var assignExpression = Expression.Assign(memberAccess, value);
@@ -887,31 +1031,72 @@ namespace FeatureLoom.Serialization
                     target // Return the modified struct
                 );
 
-                var lambda = Expression.Lambda<Func<T, V, T>>(body, target, value);
-                var setValueAndReturn = lambda.Compile();
+                var lambdaSetter = Expression.Lambda<Func<T, V, T>>(body, target, value);
+                var setValueAndReturn = lambdaSetter.Compile();                
 
-                return parentItem =>
+                var lambdaGetter = Expression.Lambda<Func<T, V>>(memberAccess, target);
+                Func<T, V> getValue = lambdaGetter.Compile();
+
+                if (CanTypeBePopulated(fieldType) && propertyInfo.CanRead)
                 {
-                    // Read the new field value
-                    V newFieldValue = fieldTypeReader.ReadValue<V>(fieldName);
-                    parentItem = setValueAndReturn((T)parentItem, newFieldValue);
-                    return parentItem;
-                };
+                    return parentItem =>
+                    {
+                        V fieldValue = getValue((T)parentItem);
+                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                        parentItem = setValueAndReturn((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        parentItem = setValueAndReturn((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
             }
-            else // For reference types: the previous expression-based approach works
+            else
             {
                 BinaryExpression assignExpression = Expression.Assign(memberAccess, value);
-                var lambda = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
+                var lambdaSetter = Expression.Lambda<Action<T, V>>(assignExpression, target, value);
+                Action<T, V> setValue = lambdaSetter.Compile();
 
-                Action<T, V> setValue = lambda.Compile();
+                var lambdaGetter = Expression.Lambda<Func<T, V>>(memberAccess, target);
+                Func<T, V> getValue = lambdaGetter.Compile();
 
-                return parentItem =>
+                if (CanTypeBePopulated(fieldType) && propertyInfo.CanRead)
                 {
-                    V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
-                    setValue((T)parentItem, fieldValue);
-                    return parentItem;
-                };
+                    return parentItem =>
+                    {
+                        V fieldValue = getValue((T)parentItem);
+                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                        setValue((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
+                else
+                {
+                    return parentItem =>
+                    {
+                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        setValue((T)parentItem, fieldValue);
+                        return parentItem;
+                    };
+                }
             }
+        }
+
+        private static bool CanTypeBePopulated(Type type)
+        {            
+            if (type.IsPrimitive || type.IsEnum || type == typeof(string)) return false;
+            
+            type = Nullable.GetUnderlyingType(type);
+            if (type == null) return true;
+            if (type.IsPrimitive || type.IsEnum) return false;
+
+            return true;
         }
 
         private Type GetFieldOrPropertyType(MemberInfo fieldOrPropertyInfo)
@@ -1653,7 +1838,7 @@ namespace FeatureLoom.Serialization
             serializerLock.Enter();
             try
             {
-                SetDataSourceUnsafe(stream);
+                SetDataSourceUnlocked(stream);
             }
             finally 
             { 
@@ -1661,7 +1846,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        private void SetDataSourceUnsafe(Stream stream) => buffer.SetStream(stream);
+        private void SetDataSourceUnlocked(Stream stream) => buffer.SetStream(stream);
 
         public bool IsAnyDataLeft()
         {
@@ -1756,6 +1941,69 @@ namespace FeatureLoom.Serialization
             return false;
         }
 
+        private bool TryPopulateLocked<T>(ref T item)
+        {
+            bool retry = false;
+            do
+            {
+                retry = false;
+                try
+                {
+                    if (!buffer.TryPrepareDeserialization())
+                    {                        
+                        return false;
+                    }
+
+                    // Return false if only whitespaces are left (otherwise we would throw an exception)
+                    byte b = SkipWhiteSpaces();
+                    if (LookupCheck(map_SkipWhitespaces, b, FilterResult.Skip)) return false;
+
+                    var itemType = typeof(T);
+                    if (lastTypeReaderType == itemType)
+                    {
+                        item = lastTypeReader.ReadValue<T>(rootName, item);
+                    }
+                    else
+                    {
+                        var reader = GetCachedTypeReader(itemType);
+                        lastTypeReader = reader;
+                        lastTypeReaderType = itemType;
+                        item = reader.ReadValue<T>(rootName, item);
+                    }
+                    return true;
+                }
+                catch (BufferExceededException)
+                {
+
+                    buffer.ResetAfterBufferExceededException();
+
+                    currentItemName = rootName;
+                    itemInfos.Clear();
+                    currentItemInfoIndex = -1;
+
+                    if (!buffer.TryReadFromStream())
+                    {
+                        // At this point the item is probably partially populated
+                        return false;
+                    }
+
+                    retry = true;
+                }
+                catch (Exception e)
+                {
+                    throw;
+                }
+                finally
+                {
+                    if (!retry)
+                    {
+                        Reset();
+                    }
+                }
+            } while (retry);
+
+            return false;
+        }
         public bool TryDeserialize<T>(out T item)
         {
             serializerLock.Enter();
@@ -1774,8 +2022,35 @@ namespace FeatureLoom.Serialization
             serializerLock.Enter();
             try
             {
-                SetDataSourceUnsafe(stream);
+                SetDataSourceUnlocked(stream);
                 return TryDeserializeLocked(out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(ref T item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                return TryPopulateLocked(ref item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(Stream stream, ref T item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(stream);
+                return TryPopulateLocked(ref item);
             }
             finally
             {
@@ -2127,7 +2402,7 @@ namespace FeatureLoom.Serialization
                 while (buffer.TryNextByte())
                 {
                     b = buffer.CurrentByte;
-                    FilterResult result = Lookup(ref map_SkipCharsUntilStringEndsOrMultiByteChar_ref, b);
+                    FilterResult result = Lookup(ref map_SkipCharsUntilStringEndsOrMultiByteChar_ref, b);                    
                     if (result == FilterResult.Skip) continue;
                     else if (result == FilterResult.Found)
                     {
@@ -2235,7 +2510,7 @@ namespace FeatureLoom.Serialization
             bool foundValueField = false;
             using (var undoHandle = CreateUndoReadHandle())
             {
-                if (!FindProposedType(out proposedTypeReader, out foundValueField)) return false;
+                if (!FindProposedType(out proposedTypeReader, typeof(T), out foundValueField)) return false;
                 undoHandle.SetUndoReading(!foundValueField);
             }
 
@@ -2253,49 +2528,83 @@ namespace FeatureLoom.Serialization
                 if (proposedTypeReader == null) return false;
                 item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
                 return true;
+            }            
+        }
+
+        bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, T itemToPopulate, out T item)
+        {
+            item = default;
+            byte b = SkipWhiteSpaces();
+            if (b != (byte)'{') return false;
+
+            CachedTypeReader proposedTypeReader = null;
+            bool foundValueField = false;
+            using (var undoHandle = CreateUndoReadHandle())
+            {
+                if (!FindProposedType(out proposedTypeReader, typeof(T), out foundValueField)) return false;
+                undoHandle.SetUndoReading(!foundValueField);
             }
 
-            bool FindProposedType(out CachedTypeReader proposedTypeReader, out bool foundValueField)
+            if (foundValueField)
             {
-                proposedTypeReader = null;
-                foundValueField = false;
-
-                // IMPORTANT: Currently, the type-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
-
-                // 1. find $type field
-                byte b = SkipWhiteSpaces();
-                if (b != (byte)'{') return false;
-                buffer.TryNextByte();
-                // TODO compare byte per byte to fail early
-                if (!TryReadStringBytes(out var fieldName)) return false;
-                if (!typeFieldName.Equals(fieldName)) return false;
-                b = SkipWhiteSpaces();
-                if (b != (byte)':') return false;
-                buffer.TryNextByte();
-                if (!TryReadStringBytes(out var proposedTypeBytes)) return false;
-
-                // 2. get proposedTypeReader, if possible
-                string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);                
-                Type proposedType = TypeNameHelper.GetTypeFromSimplifiedName(proposedTypename);
-                Type expectedType = typeof(T);
-                if (proposedType != null && proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);
-
-                // 3. look if next is $value field
-                b = SkipWhiteSpaces();
-                if (b != ',') return true;
-                buffer.TryNextByte();
-                // TODO compare byte per byte to fail early
-                if (!TryReadStringBytes(out fieldName)) return true;
-                if (!valueFieldName.Equals(fieldName)) return true;
-                b = SkipWhiteSpaces();
-                if (b != (byte)':') return true;
-                buffer.TryNextByte();
-
-                // 4. $value field found
-                foundValueField = true;
+                // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
+                if (proposedTypeReader != null)
+                {                    
+                    if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadItemIgnoreProposedType<T>(itemToPopulate);
+                    else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
+                }
+                else item = originalTypeReader.ReadItem<T>(itemToPopulate);
+                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
                 return true;
-            };
+            }
+            else
+            {
+                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.                
+                if (proposedTypeReader == null) return false;
+                if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadItemIgnoreProposedType<T>(itemToPopulate);
+                else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
+                return true;
+            }
+        }
 
+        bool FindProposedType(out CachedTypeReader proposedTypeReader, Type expectedType, out bool foundValueField)
+        {
+            proposedTypeReader = null;
+            foundValueField = false;
+
+            // IMPORTANT: Currently, the type-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
+
+            // 1. find $type field
+            byte b = SkipWhiteSpaces();
+            if (b != (byte)'{') return false;
+            buffer.TryNextByte();
+            // TODO compare byte per byte to fail early
+            if (!TryReadStringBytes(out var fieldName)) return false;
+            if (!typeFieldName.Equals(fieldName)) return false;
+            b = SkipWhiteSpaces();
+            if (b != (byte)':') return false;
+            buffer.TryNextByte();
+            if (!TryReadStringBytes(out var proposedTypeBytes)) return false;
+
+            // 2. get proposedTypeReader, if possible
+            string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
+            Type proposedType = TypeNameHelper.GetTypeFromSimplifiedName(proposedTypename);
+            if (proposedType != null && proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);
+
+            // 3. look if next is $value field
+            b = SkipWhiteSpaces();
+            if (b != ',') return true;
+            buffer.TryNextByte();
+            // TODO compare byte per byte to fail early
+            if (!TryReadStringBytes(out fieldName)) return true;
+            if (!valueFieldName.Equals(fieldName)) return true;
+            b = SkipWhiteSpaces();
+            if (b != (byte)':') return true;
+            buffer.TryNextByte();
+
+            // 4. $value field found
+            foundValueField = true;
+            return true;
         }
 
         private bool TrySkipRemainingFieldsOfObject()

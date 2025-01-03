@@ -164,9 +164,10 @@ namespace FeatureLoom.Helpers
             return new EnumerableHelper<ByteSegment, SplitEnumerator>(new SplitEnumerator(this, separator, skipEmpty));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(ByteSegment other)
         {
-            if (segment.Count != other.segment.Count) return false;
+            if (segment.Count != other.segment.Count) return false;            
             if (GetHashCode() != other.GetHashCode()) return false;            
 
             for (int i = 0; i < segment.Count; i++)
@@ -178,6 +179,7 @@ namespace FeatureLoom.Helpers
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool Equals(object obj)
         {
             return obj is ByteSegment other && Equals(other);
@@ -187,20 +189,27 @@ namespace FeatureLoom.Helpers
 
         public static bool operator !=(ByteSegment left, ByteSegment right) => !left.Equals(right);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            if (!hashCode.HasValue) hashCode = ComputeHashCode(AsArraySegment);
+            if (hashCode.HasValue) return hashCode.Value;
+            hashCode = ComputeHashCode(AsArraySegment);
             return hashCode.Value;
         }
 
         private static int ComputeHashCode(ArraySegment<byte> segment)
         {
             unchecked // Overflow is fine, just wrap
-            {
+            {                
                 int hash = 17;
+                if (segment.Count == 0) return hash;
+
+                ref byte arrayRef = ref segment.Array[0];
                 var limit = segment.Offset + segment.Count;
                 for (int i = segment.Offset; i < limit; i++)
-                    hash = hash * 23 + segment.Array[i];
+                {
+                    hash = hash * 23 + Unsafe.Add(ref arrayRef, i);
+                }
                 return hash;
             }
         }
@@ -218,11 +227,13 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IEnumerator<byte> GetEnumerator()
         {
             return ((IEnumerable<byte>)segment).GetEnumerator();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         IEnumerator IEnumerable.GetEnumerator()
         {
             return ((IEnumerable)segment).GetEnumerator();

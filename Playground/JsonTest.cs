@@ -416,6 +416,11 @@ namespace Playground
             */
 
             jsonString = """
+                         {
+                            "privInt": 999,
+                            "myInt": 888,
+                            "myEmbedded1": { "x": 777 }
+                         }
                          "<SomeXmlNode>content</SomeXmlNode>"
                          "NaN"
                          { "i": 123, "guid": "f0ed1af3-4412-4f08-8237-3e2e3e6d29ef"}
@@ -466,6 +471,13 @@ namespace Playground
 
             featureJsonDeserializer.SetDataSource(jsonStream);
             bool dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+
+            TestDto itemToPopulate = new TestDto()
+            {
+                myString = "populated",
+            };
+            featureJsonDeserializer.TryPopulate(ref itemToPopulate);
+
             featureJsonDeserializer.TryDeserialize<XmlElement>(out var xmlElement);
             featureJsonDeserializer.TryDeserialize<double>(out var d);
             dataLeft = featureJsonDeserializer.IsAnyDataLeft();
