@@ -12,7 +12,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
         public int numConsumers = 1;
         public int numOverallMessages = 1_000_000;
 
-        public void Run(Action<Action> producerLock, Action<Action> consumerLock = null)
+        public void Run(Action<Action, bool> producerLock, Action<Action, bool> consumerLock = null)
         {
             if (consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
@@ -30,13 +30,14 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
                     bool empty = false;
                     while (!producersDone || !empty)
                     {
+                        empty = false;
                         consumerLock(() =>
                         {
                             if (!queue.TryDequeue(out _))
                             {
                                 empty = true;
                             }
-                        });
+                        }, false);
                     }
                 });
                 thread.Start();
@@ -54,7 +55,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
                         producerLock(() =>
                         {
                             queue.Enqueue(count++);
-                        });
+                        }, false);
                     }
                 });
                 thread.Start();
@@ -69,7 +70,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
             //if(!Task.WhenAll(consumerThreads.ToArray()).Wait(10000)) Console.Write("! TIMEOUT !");
         }
 
-        public void AsyncRun(Func<Func<Task>, Task> producerLock, Func<Func<Task>, Task> consumerLock = null)
+        public void AsyncRun(Func<Func<Task>, bool, Task> producerLock, Func<Func<Task>, bool, Task> consumerLock = null)
         {
             if (consumerLock == null) consumerLock = producerLock;
             Queue<int> queue = new Queue<int>();
@@ -87,6 +88,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
                     bool empty = false;
                     while (!empty || !producersDone)
                     {
+                        empty = false;
                         await consumerLock(() =>
                         {
                             if (!queue.TryDequeue(out _))
@@ -94,7 +96,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
                                 empty = true;
                             }
                             return Task.CompletedTask;
-                        });
+                        }, false);
                     }
                 }).Invoke());
             }
@@ -111,7 +113,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
                         {
                             queue.Enqueue(count++);
                             return Task.CompletedTask;
-                        });
+                        }, false);
                     }
                 }).Invoke());
             }

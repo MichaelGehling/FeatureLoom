@@ -20,7 +20,32 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock(Action action, bool prio)
+        {
+            lock (lockObj)
+            {
+                action();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TryLock(Action action)
+        {
+            if (Monitor.TryEnter(lockObj))
+            {
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    Monitor.Exit(lockObj);
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void TryLock(Action action, bool prio)
         {
             if (Monitor.TryEnter(lockObj))
             {

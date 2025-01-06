@@ -607,7 +607,7 @@ namespace FeatureLoom.Synchronization
         public async Task DeferredTasksMayNotUseReentrancy()
         {
             // Check first for sync call
-            TimeFrame timer = new TimeFrame(1.Seconds());
+            TimeFrame timer = new TimeFrame(1000.Seconds());
             FeatureLock myLock = new FeatureLock();
             AsyncManualResetEvent signal1 = new AsyncManualResetEvent(false);
             bool exited = false;

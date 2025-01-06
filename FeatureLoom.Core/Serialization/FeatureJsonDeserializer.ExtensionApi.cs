@@ -15,11 +15,11 @@ public sealed partial class FeatureJsonDeserializer
             this.deserializer = deserializer;
         }
 
-        public byte GetCurrentByte() => deserializer.CurrentByte;
-        public bool TryNextByte() => deserializer.TryNextByte();
+        public byte GetCurrentByte() => deserializer.buffer.CurrentByte;
+        public bool TryNextByte() => deserializer.buffer.TryNextByte();
         
         public void SkipNextValue() => deserializer.SkipValue();
-        public void SkipWhiteSpaces() => deserializer.SkipWhiteSpaces();
+        public byte SkipWhiteSpaces() => deserializer.SkipWhiteSpaces();
 
         public bool TryReadNullValue() => deserializer.TryReadNullValue();
         public bool TryReadStringValue(out string value) => deserializer.TryReadStringValue(out value);
@@ -27,10 +27,10 @@ public sealed partial class FeatureJsonDeserializer
         public bool TryReadSignedIntegerValue(out long value) => deserializer.TryReadSignedIntegerValue(out value);
         public bool TryReadUnsignedIntegerValue(out ulong value) => deserializer.TryReadUnsignedIntegerValue(out value);
         public bool TryReadFloatingPointValue(out double value) => deserializer.TryReadFloatingPointValue(out value);
-        public bool TryReadObjectValue<T>(out T obj, EquatableByteSegment fieldName) => deserializer.TryReadObjectValue(out obj, fieldName);
-        public bool TryReadObjectValue(out Dictionary<string, object> obj, EquatableByteSegment fieldName) => deserializer.TryReadObjectValue(out obj, fieldName);
-        public bool TryReadArrayValue<T>(out T array, EquatableByteSegment fieldName) where T : IEnumerable => deserializer.TryReadArrayValue(out array, fieldName);
-        public bool TryReadArrayValue(out List<object> array, EquatableByteSegment fieldName) => deserializer.TryReadArrayValue(out array, fieldName);
+        public bool TryReadObjectValue<T>(out T obj, ByteSegment fieldName) => deserializer.TryReadObjectValue(out obj, fieldName);
+        public bool TryReadObjectValue(out Dictionary<string, object> obj, ByteSegment fieldName) => deserializer.TryReadObjectValue(out obj, fieldName);
+        public bool TryReadArrayValue<T>(out T array, ByteSegment fieldName) where T : IEnumerable => deserializer.TryReadArrayValue(out array, fieldName);
+        public bool TryReadArrayValue(out List<object> array, ByteSegment fieldName) => deserializer.TryReadArrayValue(out array, fieldName);
 
         public string DecodeUtf8Bytes(ArraySegment<byte> bytes)
         {

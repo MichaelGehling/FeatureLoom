@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
 using FeatureLoom.Security;
+using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.Web
 {
@@ -64,13 +65,15 @@ namespace FeatureLoom.Web
 
         public void StartCleanupSchedule()
         {
-            cleanupSchedule = Service<SchedulerService>.Instance.ScheduleAction("AzureADLoginHandler_Cleanup", now =>
+            Action<DateTime> cleanUpAction = now =>
             {
-                foreach(var state in authStates)
+                foreach (var state in authStates)
                 {
                     if (now > state.Value.timeStamp + authStateTimeout) authStates.TryRemove(state.Key, out _);
                 }
-            }, authStateTimeout.Multiply(0.5));
+            };
+
+            cleanupSchedule = cleanUpAction.ScheduleForRecurringExecution("AzureADLoginHandler_Cleanup", authStateTimeout.Multiply(0.5));
         }
 
         public void StopCleanupSchedule() => cleanupSchedule = null;

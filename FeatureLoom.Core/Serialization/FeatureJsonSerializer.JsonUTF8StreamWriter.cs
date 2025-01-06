@@ -23,7 +23,7 @@ namespace FeatureLoom.Serialization
             void EnsureFreeBufferSpace(int freeBytes);
             void OpenArray();
             void OpenObject();
-            ArraySegment<byte> GetCollectionIndexName(int index);
+            ByteSegment GetCollectionIndexName(int index);
             byte[] PrepareFieldNameBytes(string fieldname);
             byte[] PrepareRootName();
             byte[] PrepareStringToBytes(string str);
@@ -64,20 +64,20 @@ namespace FeatureLoom.Serialization
             void WriteUintValueAsString(uint value);
             void WriteUlongValueAsString(ulong value);
             void WriteUshortValueAsString(ushort value);
-            ArraySegment<byte> WriteBoolValueAsStringWithCopy(bool value);
-            ArraySegment<byte> WriteByteValueAsStringWithCopy(byte value);
-            ArraySegment<byte> WriteCharValueAsStringWithCopy(char value);
-            ArraySegment<byte> WriteDoubleValueAsStringWithCopy(double value);
-            ArraySegment<byte> WriteFloatValueAsStringWithCopy(float value);
-            ArraySegment<byte> WriteIntValueAsStringWithCopy(int value);
-            ArraySegment<byte> WriteLongValueAsStringWithCopy(long value);
-            ArraySegment<byte> WriteSbyteValueAsStringWithCopy(sbyte value);
-            ArraySegment<byte> WriteShortValueAsStringWithCopy(short value);
-            ArraySegment<byte> WriteStringValueAsStringWithCopy(string str);
-            ArraySegment<byte> WriteUintValueAsStringWithCopy(uint value);
-            ArraySegment<byte> WriteUlongValueAsStringWithCopy(ulong value);
-            ArraySegment<byte> WriteUshortValueAsStringWithCopy(ushort value);
-            void WriteToBuffer(ArraySegment<byte> data);
+            ByteSegment WriteBoolValueAsStringWithCopy(bool value);
+            ByteSegment WriteByteValueAsStringWithCopy(byte value);
+            ByteSegment WriteCharValueAsStringWithCopy(char value);
+            ByteSegment WriteDoubleValueAsStringWithCopy(double value);
+            ByteSegment WriteFloatValueAsStringWithCopy(float value);
+            ByteSegment WriteIntValueAsStringWithCopy(int value);
+            ByteSegment WriteLongValueAsStringWithCopy(long value);
+            ByteSegment WriteSbyteValueAsStringWithCopy(sbyte value);
+            ByteSegment WriteShortValueAsStringWithCopy(short value);
+            ByteSegment WriteStringValueAsStringWithCopy(string str);
+            ByteSegment WriteUintValueAsStringWithCopy(uint value);
+            ByteSegment WriteUlongValueAsStringWithCopy(ulong value);
+            ByteSegment WriteUshortValueAsStringWithCopy(ushort value);
+            void WriteToBuffer(ByteSegment data);
             void WriteToBuffer(byte data);
             void WriteToBuffer(byte[] data);
             void WriteToBuffer(byte[] data, int count);
@@ -191,10 +191,10 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBuffer(ArraySegment<byte> data)
+            public void WriteToBuffer(ByteSegment data)
             {
                 if (mainBufferCount + data.Count > mainBufferLimit) WriteBufferToStream();
-                data.CopyTo(mainBuffer, mainBufferCount);
+                data.AsArraySegment.CopyTo(mainBuffer, mainBufferCount);
                 mainBufferCount += data.Count;
             }
 
@@ -369,7 +369,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteLongValueAsStringWithCopy(long value)
+            public ByteSegment WriteLongValueAsStringWithCopy(long value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -402,7 +402,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteUlongValueAsStringWithCopy(ulong value)
+            public ByteSegment WriteUlongValueAsStringWithCopy(ulong value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -435,7 +435,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteIntValueAsStringWithCopy(int value)
+            public ByteSegment WriteIntValueAsStringWithCopy(int value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -466,7 +466,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteUintValueAsStringWithCopy(uint value)
+            public ByteSegment WriteUintValueAsStringWithCopy(uint value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -497,7 +497,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteByteValueAsStringWithCopy(byte value)
+            public ByteSegment WriteByteValueAsStringWithCopy(byte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -528,7 +528,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteSbyteValueAsStringWithCopy(sbyte value)
+            public ByteSegment WriteSbyteValueAsStringWithCopy(sbyte value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -559,7 +559,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteShortValueAsStringWithCopy(short value)
+            public ByteSegment WriteShortValueAsStringWithCopy(short value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -590,7 +590,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteUshortValueAsStringWithCopy(ushort value)
+            public ByteSegment WriteUshortValueAsStringWithCopy(ushort value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -621,7 +621,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteFloatValueAsStringWithCopy(float value)
+            public ByteSegment WriteFloatValueAsStringWithCopy(float value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -658,7 +658,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteDoubleValueAsStringWithCopy(double value)
+            public ByteSegment WriteDoubleValueAsStringWithCopy(double value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -692,7 +692,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteBoolValueAsStringWithCopy(bool value)
+            public ByteSegment WriteBoolValueAsStringWithCopy(bool value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -732,7 +732,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteStringValueAsStringWithCopy(string str)
+            public ByteSegment WriteStringValueAsStringWithCopy(string str)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -765,7 +765,7 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ArraySegment<byte> WriteCharValueAsStringWithCopy(char value)
+            public ByteSegment WriteCharValueAsStringWithCopy(char value)
             {
                 WriteToBufferWithoutCheck(QUOTES);
                 EnsureFreeBufferSpace(64);
@@ -880,8 +880,9 @@ namespace FeatureLoom.Serialization
                 return Encoding.UTF8.GetBytes($"\"{enumText}\"");
             }
 
-            List<ArraySegment<byte>> indexNameList = new List<ArraySegment<byte>>();
-            public ArraySegment<byte> GetCollectionIndexName(int index)
+            List<ByteSegment> indexNameList = new List<ByteSegment>();
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public ByteSegment GetCollectionIndexName(int index)
             {
                 if (!settings.requiresItemNames) return default;
 
@@ -892,7 +893,7 @@ namespace FeatureLoom.Serialization
                         indexNameList.Add(default);
                     }
                 }
-                if (indexNameList[index].Array == null) indexNameList[index] = new ArraySegment<byte>($"[{index}]".ToByteArray());
+                if (!indexNameList[index].IsValid) indexNameList[index] = new ByteSegment($"[{index}]");
                 return indexNameList[index];
             }
 

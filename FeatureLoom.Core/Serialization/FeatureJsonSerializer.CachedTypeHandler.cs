@@ -20,7 +20,7 @@ namespace FeatureLoom.Serialization
             private FeatureJsonSerializer serializer;
             private JsonUTF8StreamWriter writer;
             private Delegate itemHandler;
-            private Action<object, Type, ArraySegment<byte>> objectItemHandler;
+            private Action<object, Type, ByteSegment> objectItemHandler;
             private Type handlerType;
             private bool isPrimitive;
             private bool noRefTypes;
@@ -54,7 +54,7 @@ namespace FeatureLoom.Serialization
                 this.handlerType = typeof(T);
                 this.isPrimitive = true;
                 this.noRefTypes = true;
-                Action<T, Type, ArraySegment<byte>> temp;
+                Action<T, Type, ByteSegment> temp;
                 if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
                 {
                     temp = (item, _, _) =>
@@ -96,7 +96,7 @@ namespace FeatureLoom.Serialization
                 this.handlerType = typeof(T);
                 this.isPrimitive = false;
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
-                Action<T, Type, ArraySegment<byte>> temp;
+                Action<T, Type, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
@@ -198,7 +198,7 @@ namespace FeatureLoom.Serialization
                 this.handlerType = typeof(T);
                 this.isPrimitive = false;                
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
-                Action<T, Type, ArraySegment<byte>> temp;
+                Action<T, Type, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (!this.handlerType.IsValueType)
@@ -323,7 +323,7 @@ namespace FeatureLoom.Serialization
                 this.handlerType = typeof(T);
                 this.isPrimitive = false;
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
-                Action<T, Type, ArraySegment<byte>> temp;
+                Action<T, Type, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (!this.handlerType.IsValueType)
@@ -458,12 +458,12 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void HandleItem<T>(T item, ArraySegment<byte> fieldName)
+            public void HandleItem<T>(T item, ByteSegment fieldName)
             {
                 Type callType = typeof(T);
                 if (callType == handlerType)
                 {
-                    Action<T, Type, ArraySegment<byte>> typedItemHandler = (Action<T, Type, ArraySegment<byte> >)itemHandler;
+                    Action<T, Type, ByteSegment> typedItemHandler = (Action<T, Type, ByteSegment >)itemHandler;
                     typedItemHandler.Invoke(item, callType, fieldName);
                 }
                 else
@@ -487,11 +487,11 @@ namespace FeatureLoom.Serialization
 
         public bool HasMethod => writerDelegate != null;
 
-        public void SetWriterMethod<T>(Func<T, ArraySegment<byte>> writerDelegate) => this.writerDelegateWithCopy = writerDelegate;
+        public void SetWriterMethod<T>(Func<T, ByteSegment> writerDelegate) => this.writerDelegateWithCopy = writerDelegate;
         public void SetWriterMethod<T>(Action<T> writerDelegate) => this.writerDelegate = writerDelegate;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ArraySegment<byte> WriteKeyAsStringWithCopy<T>(T item)
+        public ByteSegment WriteKeyAsStringWithCopy<T>(T item)
         {
             if (skipCopy)
             {
@@ -501,7 +501,7 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                var write = (Func<T, ArraySegment<byte>>)writerDelegateWithCopy;
+                var write = (Func<T, ByteSegment>)writerDelegateWithCopy;
                 return write(item);
             }
         }

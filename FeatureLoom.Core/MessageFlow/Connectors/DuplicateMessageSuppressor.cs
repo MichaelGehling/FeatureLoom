@@ -18,10 +18,9 @@ namespace FeatureLoom.MessageFlow
         private readonly TimeSpan suppressionTime;
         private readonly TimeSpan cleanupPeriode = 10.Seconds();
         private readonly Func<object, object, bool> isDuplicate;
-        private TimeSpan cleanupTolerance = 1.Seconds();
         private ISchedule scheduledAction;
 
-        public DuplicateMessageSuppressor(TimeSpan suppressionTime, Func<object, object, bool> isDuplicate = null, TimeSpan cleanupPeriode = default, TimeSpan cleanupTolerance = default)
+        public DuplicateMessageSuppressor(TimeSpan suppressionTime, Func<object, object, bool> isDuplicate = null, TimeSpan cleanupPeriode = default)
         {
             this.suppressionTime = suppressionTime;
             if (isDuplicate == null) isDuplicate = (a, b) => a.Equals(b);
@@ -30,16 +29,15 @@ namespace FeatureLoom.MessageFlow
             if (cleanupPeriode == default) cleanupPeriode = this.cleanupPeriode;
             cleanupPeriode = cleanupPeriode.Clamp(suppressionTime.Multiply(100), TimeSpan.MaxValue);
             this.cleanupPeriode = cleanupPeriode;
-            
-            if (this.cleanupTolerance != default) this.cleanupTolerance = cleanupTolerance;
 
-            this.scheduledAction = Service<SchedulerService>.Instance.ScheduleAction("DuplicateMessageSuppressor", now => 
+            Action<DateTime> cleanUpAction = now =>
             {
                 using (suppressorsLock.Lock())
                 {
                     CleanUpSuppressors(now);
                 }
-            }, cleanupPeriode, cleanupPeriode + cleanupTolerance);
+            };
+            this.scheduledAction = cleanUpAction.ScheduleForRecurringExecution("DuplicateMessageSuppressor", cleanupPeriode);
         }
 
         public void AddSuppressor<M>(M suppressorMessage)

@@ -30,6 +30,20 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock(Action action, bool prio)
+        {
+            try
+            {
+                myLock.EnterWriteLock();
+                action();
+            }
+            finally
+            {
+                if (myLock.IsWriteLockHeld) myLock.ExitWriteLock();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void LockReadOnly(Action action)
         {
             try

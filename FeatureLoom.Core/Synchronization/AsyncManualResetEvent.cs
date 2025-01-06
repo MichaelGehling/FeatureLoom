@@ -27,19 +27,16 @@ namespace FeatureLoom.Synchronization
         private volatile byte setCounter = 0;
 
         /// <summary>
-        /// Before actually going to sleep, the waiting thread may spin/yield some cycles.
-        /// The spin times rise exponentially until the value of 4. 
-        /// Every further cycle is a yield.
+        /// Before actually going to sleep, the waiting thread may yield some cycles.
+        /// We don't use spinning to reduce CPU load and it rarely makes a difference.
         /// </summary>
-        public ushort SpinYieldCyclesForSyncWait { get; set; } = 20;
+        public ushort YieldCyclesForSyncWait { get; set; } = 100;
         /// <summary>
-        /// Before actually going to sleep, the waiting thread may spin/yield some cycles.
-        /// The spin times rise exponentially until the value of 4. 
-        /// Every further cycle is a yield.
-        /// NOTE: Spinning and Yielding may speed up async waiting a lot, but it also contradict the purpose
-        /// of async programming, as it blocks the thread for some time. Therefor the default is 0.
+        /// Before actually going to sleep, the waiting thread may yield some cycles.
+        /// We don't use spinning to reduce CPU load and it rarely makes a difference.
+        /// NOTE: Yielding the thread contradicts the idea of async computation, and yielding the task is too slow, so the default is 0.
         /// </summary>
-        public ushort SpinYieldCyclesForAsyncWait { get; set; } = 0;
+        public ushort YieldCyclesForAsyncWait { get; set; } = 0;
 
 
         private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -91,18 +88,20 @@ namespace FeatureLoom.Synchronization
             var lastSetCount = setCounter;
             if (isSet) return true;
 
-            for(int i=0; i < SpinYieldCyclesForSyncWait; i++)
+            for(int i=0; i < YieldCyclesForSyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (setCounter != lastSetCount) return true;
             }
 
             anySyncWaiter = true;
-            Thread.MemoryBarrier();
-            if (setCounter != lastSetCount) return true;
-
-            lock (monitorObj) Monitor.Wait(monitorObj);
+            Thread.MemoryBarrier();    
+            
+            lock (monitorObj)
+            {
+                if (setCounter != lastSetCount) return true;
+                Monitor.Wait(monitorObj);
+            }
             return true;
         }
 
@@ -116,22 +115,26 @@ namespace FeatureLoom.Synchronization
         {
             var lastSetCount = setCounter;
             if (isSet) return true;
+
+            if (setCounter != lastSetCount) return true;
             if (timeout <= TimeSpan.Zero) return false;
 
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
+            for (int i = 0; i < YieldCyclesForSyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (setCounter != lastSetCount) return true;
                 if (timer.Elapsed()) return false;
             }
 
             anySyncWaiter = true;
             Thread.MemoryBarrier();
-            if (setCounter != lastSetCount) return true;
 
-            lock (monitorObj) return Monitor.Wait(monitorObj,timer.Remaining());
+            lock (monitorObj)
+            {
+                if (setCounter != lastSetCount) return true;
+                return Monitor.Wait(monitorObj, timer.Remaining());
+            }
         }
 
         /// <summary>
@@ -143,26 +146,30 @@ namespace FeatureLoom.Synchronization
         public bool Wait(CancellationToken cancellationToken)
         {
             var lastSetCount = setCounter;
-            if (cancellationToken.IsCancellationRequested) return false;
             if (isSet) return true;
 
-            for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
+            if (cancellationToken.IsCancellationRequested) return false;
+            if (setCounter != lastSetCount) return true;
+
+            for (int i = 0; i < YieldCyclesForSyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return false;
                 if (setCounter != lastSetCount) return true;
             }
 
             anySyncWaiter = true;
-            Thread.MemoryBarrier();
-            if (setCounter != lastSetCount) return true;
+            Thread.MemoryBarrier();            
 
             do
             {
                 using (cancellationToken.Register(Cancellation, this))
                 {
-                    lock (monitorObj) Monitor.Wait(monitorObj);
+                    lock (monitorObj)
+                    {
+                        if (setCounter != lastSetCount) return true;
+                        Monitor.Wait(monitorObj);
+                    }
                 }
             }
             while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
@@ -184,24 +191,26 @@ namespace FeatureLoom.Synchronization
             if (timeout <= TimeSpan.Zero) return false;
 
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < SpinYieldCyclesForSyncWait; i++)
+            for (int i = 0; i < YieldCyclesForSyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return false;
                 if (setCounter != lastSetCount) return true;
                 if (timer.Elapsed()) return false;
             }
 
             anySyncWaiter = true;
-            Thread.MemoryBarrier();
-            if (setCounter != lastSetCount) return true;
+            Thread.MemoryBarrier();            
 
             do
             {
                 using (cancellationToken.Register(Cancellation, this))
                 {
-                    lock (monitorObj) if (!Monitor.Wait(monitorObj, timer.Remaining())) return false;
+                    lock (monitorObj)
+                    {
+                        if (setCounter != lastSetCount) return true;
+                        if (!Monitor.Wait(monitorObj, timer.Remaining())) return false;
+                    }
                 }
             }
             while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
@@ -224,14 +233,15 @@ namespace FeatureLoom.Synchronization
             var lastSetCount = setCounter;
             if (isSet) return storedResult_true;
 
-            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (setCounter != lastSetCount) return storedResult_true;
             }
 
             anyAsyncWaiter = true;
+            Thread.MemoryBarrier();
+
             var task = tcs.Task;
             if (setCounter != lastSetCount) return storedResult_true;
             return task;
@@ -250,15 +260,16 @@ namespace FeatureLoom.Synchronization
             if (timeout <= TimeSpan.Zero) return storedResult_false;
 
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (setCounter != lastSetCount) return storedResult_true;
                 if (timer.Elapsed()) return storedResult_false;
             }
 
             anyAsyncWaiter = true;
+            Thread.MemoryBarrier();
+
             var task = tcs.Task.WaitAsync(timeout);
             if (setCounter != lastSetCount) return storedResult_true;
             return task;
@@ -276,15 +287,16 @@ namespace FeatureLoom.Synchronization
             if (cancellationToken.IsCancellationRequested) return storedResult_false;
             if (isSet) return storedResult_true;
 
-            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return storedResult_false;
                 if (setCounter != lastSetCount) return storedResult_true;
             }
 
             anyAsyncWaiter = true;
+            Thread.MemoryBarrier();
+
             var task = tcs.Task.WaitAsync(cancellationToken);
             if (setCounter != lastSetCount) return storedResult_true;
             return task;
@@ -305,16 +317,17 @@ namespace FeatureLoom.Synchronization
             if (timeout <= TimeSpan.Zero) return storedResult_false;
 
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < SpinYieldCyclesForAsyncWait; i++)
+            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
             {
-                if (i <= 3) Thread.SpinWait(4 << i);
-                else Thread.Yield();
+                Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return storedResult_false;
                 if (setCounter != lastSetCount) return storedResult_true;
                 if (timer.Elapsed()) return storedResult_false;
             }
 
             anyAsyncWaiter = true;
+            Thread.MemoryBarrier();
+
             var task = tcs.Task.WaitAsync(timeout, cancellationToken);
             if (setCounter != lastSetCount) return storedResult_true;
             return task;
@@ -337,10 +350,11 @@ namespace FeatureLoom.Synchronization
 
             isSet = true;
             setCounter++;
+            Thread.MemoryBarrier();
 
             if (anyAsyncWaiter)
             {
-                anyAsyncWaiter = false;
+                anyAsyncWaiter = false;                
                 tcs.SetResult(true);
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
@@ -348,7 +362,6 @@ namespace FeatureLoom.Synchronization
             {
                 anySyncWaiter = false;
                 lock (monitorObj) Monitor.PulseAll(monitorObj);
-                //Thread.Yield();
             }
             if (eventWaitHandle != null)
             {

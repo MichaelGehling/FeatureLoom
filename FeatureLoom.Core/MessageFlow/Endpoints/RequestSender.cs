@@ -37,7 +37,7 @@ namespace FeatureLoom.MessageFlow
 
         private void StartTimeoutCheck()
         {
-            schedule = Service<SchedulerService>.Instance.ScheduleAction("RequestSenderTimeout", now => CleanupTimeouts(now), timeout.Multiply(0.5));
+            schedule = ((Action<DateTime>)CleanupTimeouts).ScheduleForRecurringExecution("RequestSenderTimeout", timeout.Multiply(0.5));
         }
 
         public Task<RESP> SendRequestAsync(REQ message)

@@ -341,22 +341,8 @@ namespace Playground
 
         public static async Task Run()
         {
-            FeatureJsonSerializer featureJsonSerializer2 = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
-            {
-                //typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
-                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,                               
-            });
 
-            float x1 = -1.19109e-35f;            
-            string str2 = featureJsonSerializer2.Serialize(x1);
-            Console.ReadKey();
-            
-            var desSettings = new FeatureJsonDeserializer.Settings();    
-            FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(desSettings);
 
-            featureJsonDeserializer2.TryDeserialize("-1.7976931348623157E+308".ToStream(), out double d2);
-            Console.ReadKey();
             /*
             var input = new TestDto2();
             int iterations = 100_000;
@@ -430,6 +416,11 @@ namespace Playground
             */
 
             jsonString = """
+                         {
+                            "privInt": 999,
+                            "myInt": 888,
+                            "myEmbedded1": { "x": 777 }
+                         }
                          "<SomeXmlNode>content</SomeXmlNode>"
                          "NaN"
                          { "i": 123, "guid": "f0ed1af3-4412-4f08-8237-3e2e3e6d29ef"}
@@ -442,7 +433,7 @@ namespace Playground
                          }
                          {                         
                             "y": 1234,     
-                            "intList": null
+                            "intList": [1,2,3,4,5]
                          }
                          {
                             "bla": 123,
@@ -480,6 +471,13 @@ namespace Playground
 
             featureJsonDeserializer.SetDataSource(jsonStream);
             bool dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+
+            TestDto itemToPopulate = new TestDto()
+            {
+                myString = "populated",
+            };
+            featureJsonDeserializer.TryPopulate(ref itemToPopulate);
+
             featureJsonDeserializer.TryDeserialize<XmlElement>(out var xmlElement);
             featureJsonDeserializer.TryDeserialize<double>(out var d);
             dataLeft = featureJsonDeserializer.IsAnyDataLeft();
@@ -700,9 +698,9 @@ namespace Playground
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {                    
-                    featureJsonSerializer.Serialize(jsonStream, testDto);
+                    featureJsonSerializer.Serialize(stream, testDto);
                     //json = featureJsonSerializer.Serialize(testDto);
-                    jsonStream.Position = 0;
+                    stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 var elapsed_A = elapsed;
@@ -717,9 +715,9 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                    System.Text.Json.JsonSerializer.Serialize(jsonStream, testDto, opt);
+                    System.Text.Json.JsonSerializer.Serialize(stream, testDto, opt);
                     //json = JsonSerializer.Serialize(testDto, opt);
-                    jsonStream.Position = 0;
+                    stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 var elapsed_B = elapsed;
@@ -734,10 +732,10 @@ namespace Playground
                 for (int i = 0; i < iterations; i++)
                 {
                     //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                    Utf8Json.JsonSerializer.Serialize(jsonStream, testDto);
+                    Utf8Json.JsonSerializer.Serialize(stream, testDto);
                     //json = UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto));
                     //json = JsonSerializer.Serialize(testDto, opt);
-                    jsonStream.Position = 0;
+                    stream.Position = 0;
                 }
                 elapsed = tk.Elapsed;
                 var elapsed_C = elapsed;
