@@ -168,5 +168,75 @@ namespace FeatureLoom.Extensions
             return toType.IsAssignableFrom(fromType);
         }
 
+        public static bool IsNumericType(this Type type)
+        {
+            return Type.GetTypeCode(type) switch
+            {
+                TypeCode.Byte or
+                TypeCode.SByte or
+                TypeCode.Int16 or
+                TypeCode.UInt16 or
+                TypeCode.Int32 or
+                TypeCode.UInt32 or
+                TypeCode.Int64 or
+                TypeCode.UInt64 or
+                TypeCode.Single or
+                TypeCode.Double or
+                TypeCode.Decimal => true,
+                _ => false
+            };
+        }
+
+        public static bool IsIntegerType(this Type type)
+        {
+            return Type.GetTypeCode(type) switch
+            {
+                TypeCode.Byte or
+                TypeCode.SByte or
+                TypeCode.Int16 or
+                TypeCode.UInt16 or
+                TypeCode.Int32 or
+                TypeCode.UInt32 or
+                TypeCode.Int64 or
+                TypeCode.UInt64 => true,
+                _ => false
+            };
+        }
+
+        public static bool IsSignedIntegerType(this Type type)
+        {
+            return Type.GetTypeCode(type) switch
+            {
+                TypeCode.SByte or
+                TypeCode.Int16 or
+                TypeCode.Int32 or
+                TypeCode.Int64 => true,
+                _ => false
+            };
+        }
+
+        public static bool IsUnsignedIntegerType(this Type type)
+        {
+            return Type.GetTypeCode(type) switch
+            {
+                TypeCode.Byte or
+                TypeCode.UInt16 or
+                TypeCode.UInt32 or
+                TypeCode.UInt64 => true,
+                _ => false
+            };
+        }
+
+        public static bool IsDecimalType(this Type type)
+        {
+            return Type.GetTypeCode(type) switch
+            {
+                TypeCode.Single or
+                TypeCode.Double or
+                TypeCode.Decimal => true,
+                _ => false
+            };
+        }
+
     }
 }

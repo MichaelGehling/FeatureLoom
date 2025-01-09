@@ -108,7 +108,18 @@ namespace FeatureLoom.Extensions
 
         public static bool TrySetValueByName<T, V>(this T obj, string fieldOrPropertyName, V value) where T : class
         {
-            var property = obj.GetType().GetProperty(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            Type type = obj.GetType();
+
+            var property = type.GetProperty(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (property == null)
+            {
+                Type baseType = type.BaseType;
+                while (baseType != null && property == null)
+                {
+                    property = baseType.GetProperty(fieldOrPropertyName, BindingFlags.NonPublic | BindingFlags.Instance);
+                    baseType = baseType.BaseType;
+                }
+            }
             if (property != null)
             {
                 if (!property.CanWrite) return false;
@@ -116,37 +127,59 @@ namespace FeatureLoom.Extensions
                 if (property.PropertyType.IsAssignableFrom(typeof(V)))
                 {
                     property.SetValue(obj, value);
+                    return true;
                 }
                 else if (value is IConvertible convertible && convertible.TryConvertTo(property.PropertyType, out object converted))
                 {
                     property.SetValue(obj, converted);
+                    return true;
                 }
                 else return false;
             }
-            else
-            {
-                var field = obj.GetType().GetField(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (field == null) return false;
 
+            var field = type.GetField(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (field == null)
+            {
+                Type baseType = type.BaseType;
+                while (baseType != null && field == null)
+                {
+                    field = baseType.GetField(fieldOrPropertyName, BindingFlags.NonPublic | BindingFlags.Instance);
+                    baseType = baseType.BaseType;
+                }
+            }
+            if (field != null)
+            {
                 if (field.FieldType.IsAssignableFrom(typeof(V)))
                 {
                     field.SetValue(obj, value);
+                    return true;
                 }
                 else if (value is IConvertible convertible && convertible.TryConvertTo(field.FieldType, out object converted))
                 {
                     field.SetValue(obj, converted);
+                    return true;
                 }
                 else return false;
             }
 
-            return true;
+            return false;
         }
 
         public static bool TryGetValueByName<T, V>(this T obj, string fieldOrPropertyName, out V value) where T : class
         {
             value = default;
+            Type type = obj.GetType();
 
-            var property = obj.GetType().GetProperty(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var property = type.GetProperty(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (property == null)
+            {
+                Type baseType = type.BaseType;
+                while (baseType != null && property == null)
+                {
+                    property = baseType.GetProperty(fieldOrPropertyName, BindingFlags.NonPublic | BindingFlags.Instance);
+                    baseType = baseType.BaseType;
+                }
+            }
             if (property != null)
             {
                 if (!property.CanRead) return false;
@@ -172,7 +205,16 @@ namespace FeatureLoom.Extensions
                 return false;
             }
 
-            var field = obj.GetType().GetField(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var field = type.GetField(fieldOrPropertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (field == null)
+            {
+                Type baseType = type.BaseType;
+                while (baseType != null && field == null)
+                {
+                    field = baseType.GetField(fieldOrPropertyName, BindingFlags.NonPublic | BindingFlags.Instance);
+                    baseType = baseType.BaseType;
+                }
+            }
             if (field != null)
             {
                 var fieldValue = field.GetValue(obj);
