@@ -270,7 +270,7 @@ namespace FeatureLoom.Synchronization
             anyAsyncWaiter = true;
             Thread.MemoryBarrier();
 
-            var task = tcs.Task.WaitAsync(timeout);
+            var task = tcs.Task.TryWaitAsync(timeout);
             if (setCounter != lastSetCount) return storedResult_true;
             return task;
         }
@@ -297,7 +297,7 @@ namespace FeatureLoom.Synchronization
             anyAsyncWaiter = true;
             Thread.MemoryBarrier();
 
-            var task = tcs.Task.WaitAsync(cancellationToken);
+            var task = tcs.Task.TryWaitAsync(cancellationToken);
             if (setCounter != lastSetCount) return storedResult_true;
             return task;
         }
@@ -328,7 +328,7 @@ namespace FeatureLoom.Synchronization
             anyAsyncWaiter = true;
             Thread.MemoryBarrier();
 
-            var task = tcs.Task.WaitAsync(timeout, cancellationToken);
+            var task = tcs.Task.TryWaitAsync(timeout, cancellationToken);
             if (setCounter != lastSetCount) return storedResult_true;
             return task;
         }

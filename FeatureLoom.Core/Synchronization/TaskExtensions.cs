@@ -32,25 +32,25 @@ namespace FeatureLoom.Synchronization
             }
         }
 
-        public static void WaitFor(this Task task, bool unwrapExeption = true)
+        public static void WaitFor(this Task task, bool unwrapException = true)
         {
-            if (unwrapExeption) task.GetAwaiter().GetResult();
+            if (unwrapException) task.GetAwaiter().GetResult();
             else task.Wait();
         }
 
-        public static T WaitFor<T>(this Task<T> task, bool unwrapExeption = true)
+        public static T WaitFor<T>(this Task<T> task, bool unwrapException = true)
         {
-            if (unwrapExeption) return task.GetAwaiter().GetResult();
+            if (unwrapException) return task.GetAwaiter().GetResult();
             else return task.Result;
         }
 
-        public static bool WaitFor<OUT>(this Task<(bool, OUT)> task, out OUT result, bool unwrapExeption = true)
+        public static bool WaitFor<OUT>(this Task<(bool, OUT)> task, out OUT result, bool unwrapException = true)
         {
-            if (unwrapExeption) return task.GetAwaiter().GetResult().TryOut(out result);
+            if (unwrapException) return task.GetAwaiter().GetResult().TryOut(out result);
             else return task.Result.TryOut(out result);
         }
 
-        public async static Task<bool> WaitAsync(this Task task)
+        public async static Task<bool> TryWaitAsync(this Task task)
         {
             if (task.IsCanceled || task.IsFaulted) return false;
             else if (task.IsCompleted) return true;
@@ -61,10 +61,22 @@ namespace FeatureLoom.Synchronization
             else return true;
         }
 
-        public async static Task<bool> WaitAsync(this Task task, TimeSpan timeout)
+        public async static Task<bool> TryWaitAsync(this Task task, TimeSpan timeout)
         {
             if (task.IsCanceled || task.IsFaulted) return false;
             else if (task.IsCompleted) return true;
+#if NET8_0_OR_GREATER
+            try
+            {
+                await task.WaitAsync(timeout).ConfigureAwait(false);
+            }
+            catch
+            {
+                return false;
+            }
+            return true;
+#else
+
 
             await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
 
@@ -114,13 +126,25 @@ namespace FeatureLoom.Synchronization
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
             */
+#endif
         }
 
-        public async static Task<bool> WaitAsync(this Task task, CancellationToken cancellationToken)
+        public async static Task<bool> TryWaitAsync(this Task task, CancellationToken cancellationToken)
         {
             if (task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested) return false;
             else if (task.IsCompleted) return true;
 
+#if NET8_0_OR_GREATER
+            try
+            {
+                await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                return false;
+            }
+            return true;
+#else
             /*try
             {
                 using(var cancelRegistration = cancellationToken.Register(() => throw new TaskCanceledException(task), true))
@@ -174,13 +198,26 @@ namespace FeatureLoom.Synchronization
 
             if (task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
+#endif
         }
 
-        public async static Task<bool> WaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken)
+        public async static Task<bool> TryWaitAsync(this Task task, TimeSpan timeout, CancellationToken cancellationToken)
         {
             if (task.IsCanceled || task.IsFaulted || cancellationToken.IsCancellationRequested || timeout < TimeSpan.Zero) return false;
             else if (task.IsCompleted) return true;
             if (timeout == TimeSpan.Zero) return false;
+
+#if NET8_0_OR_GREATER
+            try
+            {
+                await task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                return false;
+            }
+            return true;
+#else
 
             try
             {
@@ -237,6 +274,7 @@ namespace FeatureLoom.Synchronization
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
             */
+#endif
         }
 
         public static Task AsTask(this CancellationToken cancellationToken)

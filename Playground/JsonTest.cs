@@ -475,6 +475,7 @@ namespace Playground
             TestDto itemToPopulate = new TestDto()
             {
                 myString = "populated",
+                myInt = -100
             };
             featureJsonDeserializer.TryPopulate(ref itemToPopulate);
 

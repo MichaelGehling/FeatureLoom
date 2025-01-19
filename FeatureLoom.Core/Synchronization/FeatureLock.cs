@@ -1834,7 +1834,7 @@ namespace FeatureLoom.Synchronization
             var sleepHandle = new SleepHandle(ticket, true, readOnly);
             AddSleepHandle(sleepHandle);
             bool elapsed = false;
-            if (sleepHandle.sleeping) elapsed = !await sleepHandle.tcs.Task.WaitAsync(remaining).ConfigureAwait(false);
+            if (sleepHandle.sleeping) elapsed = !await sleepHandle.tcs.Task.TryWaitAsync(remaining).ConfigureAwait(false);
             sleepHandle.sleeping = false;
 
             return elapsed;

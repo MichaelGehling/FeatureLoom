@@ -34,8 +34,7 @@ public sealed partial class FeatureJsonDeserializer
 
         public string DecodeUtf8Bytes(ArraySegment<byte> bytes)
         {
-            DecodeUtf8(bytes, deserializer.stringBuilder);
-            string str = deserializer.stringBuilder.ToString();
+            string str = Utf8Converter.DecodeUtf8ToString(bytes, deserializer.stringBuilder);            
             deserializer.stringBuilder.Clear();
             return str;
         }

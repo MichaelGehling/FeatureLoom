@@ -101,7 +101,7 @@ namespace FeatureLoom.Synchronization
 
             if (!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(token);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(token);
             return true;
         }
 
@@ -167,7 +167,7 @@ namespace FeatureLoom.Synchronization
 
             if (!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeout);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(timeout);
             return true;
         }
 
@@ -212,7 +212,7 @@ namespace FeatureLoom.Synchronization
 
             if (!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).WaitAsync(timeout, token);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(timeout, token);
             return true;
         }
 
@@ -307,7 +307,7 @@ namespace FeatureLoom.Synchronization
             }
 
             Task[] tasks = asyncWaitHandles.GetWaitingTasks();
-            await Task.WhenAny(tasks).WaitAsync(token);
+            await Task.WhenAny(tasks).TryWaitAsync(token);
             for (int i = 0; i < tasks.Length; i++)
             {
                 if (tasks[i].IsCompleted) return i;
@@ -414,7 +414,7 @@ namespace FeatureLoom.Synchronization
             }
 
             Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
-            await Task.WhenAny(tasks).WaitAsync(token);
+            await Task.WhenAny(tasks).TryWaitAsync(token);
             for (int i = 0; i < tasks.Length - 1; i++)
             {
                 if (tasks[i].IsCompleted) return i;
@@ -440,22 +440,22 @@ namespace FeatureLoom.Synchronization
 
         public Task<bool> WaitAsync()
         {
-            return task.WaitAsync();
+            return task.TryWaitAsync();
         }
 
         public Task<bool> WaitAsync(TimeSpan timeout)
         {
-            return task.WaitAsync(timeout);
+            return task.TryWaitAsync(timeout);
         }
 
         public Task<bool> WaitAsync(CancellationToken cancellationToken)
         {
-            return task.WaitAsync(cancellationToken);
+            return task.TryWaitAsync(cancellationToken);
         }
 
         public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
-            return task.WaitAsync(timeout, cancellationToken);
+            return task.TryWaitAsync(timeout, cancellationToken);
         }
 
         public bool Wait()

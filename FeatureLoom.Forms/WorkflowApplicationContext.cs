@@ -43,7 +43,7 @@ namespace FeatureLoom.Forms
                     if (msg.executionPhase == Workflow.ExecutionPhase.Finished ||
                        msg.executionPhase == Workflow.ExecutionPhase.Invalid)
                     {
-                        if (!await runner.PauseAllWorkflows(true).WaitAsync(5.Seconds()))
+                        if (!await runner.PauseAllWorkflows(true).TryWaitAsync(5.Seconds()))
                         {
                             throw new Exception($"Failed to stop all workflows!\n{runner.RunningWorkflows.AllItemsToString()}");
                         }

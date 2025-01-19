@@ -19,6 +19,7 @@ using System.Runtime.Serialization.Formatters;
 using System.Net.Http.Headers;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace FeatureLoom.Serialization
 {
@@ -373,8 +374,18 @@ namespace FeatureLoom.Serialization
         private bool TryCreateDictionaryTypeReader(Type itemType, CachedTypeReader cachedTypeReader)
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type keyType, out Type valueType)) return false;
-            if (itemType.IsInterface) throw new NotImplementedException();  //TODO
-            var dictionaryType = typeof(IDictionary<,>).MakeGenericType(keyType, valueType);
+            if (itemType.IsInterface)
+            {
+                if (itemType == typeof(IDictionary<,>))
+                {
+                    itemType = typeof(Dictionary<,>).MakeGenericType(keyType, valueType);
+                }
+                else
+                {
+                    //TODO: Find implementation for interface
+                    throw new NotImplementedException();
+                }
+            }            
 
             this.InvokeGenericMethod(nameof(CreateDictionaryTypeReader), new Type[] { itemType, keyType, valueType }, cachedTypeReader);
 
@@ -387,6 +398,15 @@ namespace FeatureLoom.Serialization
             var elementReader = new ElementReader<KeyValuePair<K, V>>(this);
             var keyReader = GetCachedTypeReader(typeof(K));
             var valueReader = GetCachedTypeReader(typeof(V));
+            var keyValuePairReader = GetCachedTypeReader(typeof(KeyValuePair<K, V>));
+            bool isValueRefType = typeof(V).IsByRef;
+            bool canValueBePopulated = CanTypeBePopulated(typeof(V));
+            List<K> keysToKeep = new List<K>();
+            ByteSegment keyProperty = "Key".ToByteArray();
+            ByteSegment keyField = "key".ToByteArray();
+            ByteSegment valueProperty = "Value".ToByteArray();
+            ByteSegment valueField = "value".ToByteArray();
+
 
             cachedTypeReader.SetTypeReader(() =>
             {
@@ -400,7 +420,7 @@ namespace FeatureLoom.Serialization
                         b = SkipWhiteSpaces();
                         if (b == '}') break;
 
-                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes); // TODO: Check what to do to make integers and other types work as a dictionary key
+                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
                         b = SkipWhiteSpaces();
                         if (b != ':') throw new Exception("Failed reading object to Dictionary");
                         buffer.TryNextByte();
@@ -412,7 +432,7 @@ namespace FeatureLoom.Serialization
 
                     if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading object to Dictionary");
                 }
-                else if (buffer.CurrentByte == '[')
+                else if (b == '[')
                 {
                     if (!buffer.TryNextByte()) throw new Exception("Failed reading Array to Dictionary");
                     foreach (var element in elementReader)
@@ -426,6 +446,150 @@ namespace FeatureLoom.Serialization
 
                 return dict;
             }, JsonDataTypeCategory.Object);
+
+            if (canValueBePopulated)
+            {
+                List<KeyValuePair<K, V>> keyValueList = new();
+                cachedTypeReader.SetPopulatingTypeReader<T>((itemToPopulate) =>
+                {
+                    T dict = itemToPopulate;                    
+                    try
+                    {
+                        byte b = SkipWhiteSpaces();
+                        if (b == '{')
+                        {
+                            if (!buffer.TryNextByte()) throw new Exception("Failed reading Object to Dictionary");
+                            while (true)
+                            {
+                                b = SkipWhiteSpaces();
+                                if (b == '}') break;
+
+                                K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes); 
+                                keysToKeep.Add(fieldName);
+                                b = SkipWhiteSpaces();
+                                if (b != ':') throw new Exception("Failed reading object to Dictionary");
+                                buffer.TryNextByte();
+                                if (dict.TryGetValue(fieldName, out V value)) value = valueReader.ReadValue<V>(fieldNameBytes, value);                                
+                                else value = valueReader.ReadValue<V>(fieldNameBytes);                                
+                                keyValueList.Add(new KeyValuePair<K, V>(fieldName, value));
+                                b = SkipWhiteSpaces();
+                                if (b == ',') buffer.TryNextByte();
+                            }
+
+                            if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading object to Dictionary");
+                        }
+                        else if (buffer.CurrentByte == '[')
+                        {
+                            if (!buffer.TryNextByte()) throw new Exception("Failed reading Array to Dictionary");
+                            while (true)
+                            {
+                                b = SkipWhiteSpaces();
+                                if (b == ']') break;
+                                buffer.TryNextByte();
+
+                                // Look for start of KeyValuePair object
+                                b = SkipWhiteSpaces();
+                                if (b != '{') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                buffer.TryNextByte();
+
+                                // Look for field name "Key" and read its value
+                                if (!TryReadStringBytes(out var keyFieldName)) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                if (keyFieldName != keyField && keyFieldName != keyProperty) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                b = SkipWhiteSpaces();
+                                if (b != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                buffer.TryNextByte();
+                                K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
+
+                                // next element
+                                b = SkipWhiteSpaces();
+                                if (b != ',') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                buffer.TryNextByte();
+
+                                // Look for field name "Value"
+                                if (!TryReadStringBytes(out var valueFieldName)) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                if (valueFieldName != valueField && valueFieldName != valueProperty) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                b = SkipWhiteSpaces();
+                                if (b != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                buffer.TryNextByte();
+                                // If the field name exists in dictionary, populate its value, otherwise add it as new 
+                                if (dict.TryGetValue(fieldName, out V value)) value = valueReader.ReadValue<V>(fieldNameBytes, value);
+                                else value = valueReader.ReadValue<V>(fieldNameBytes);
+                                keyValueList.Add(new KeyValuePair<K, V>(fieldName, value));
+                                
+                                // Look for end of KEyValuePair object
+                                b = SkipWhiteSpaces();
+                                if (b != '}') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                buffer.TryNextByte();
+
+                                // Look for comma in case of next KeyValuePair
+                                b = SkipWhiteSpaces();
+                                if (b == ',') buffer.TryNextByte();
+                            }
+                            if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array to Dictionary");
+                            buffer.TryNextByte();
+                        }
+                        else throw new Exception("Failed reading Dictionary");
+
+                    }
+                    finally
+                    {
+                        keyValueList.Clear();
+                    }
+
+                    dict.Clear();
+                    for (int i=0; i < keyValueList.Count; i++)
+                    {
+                        dict.Add(keyValueList[i]);
+                    }
+
+                    return dict;
+                }, JsonDataTypeCategory.Object);
+            }
+            else
+            {
+                cachedTypeReader.SetPopulatingTypeReader<T>((itemToPopulate) =>
+                {
+                    T dict = itemToPopulate;
+                    dict.Clear();
+
+                    byte b = SkipWhiteSpaces();
+                    if (b == '{')
+                    {
+                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Object to Dictionary");
+                        while (true)
+                        {
+                            b = SkipWhiteSpaces();
+                            if (b == '}') break;
+
+                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes); // TODO: Check what to do to make integers and other types work as a dictionary key
+                            keysToKeep.Add(fieldName);
+                            b = SkipWhiteSpaces();
+                            if (b != ':') throw new Exception("Failed reading object to Dictionary");
+                            buffer.TryNextByte();
+                            V value = valueReader.ReadValue<V>(fieldNameBytes);
+                            dict[fieldName] = value;
+                            b = SkipWhiteSpaces();
+                            if (b == ',') buffer.TryNextByte();
+                        }
+
+                        if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading object to Dictionary");
+                    }
+                    else if (buffer.CurrentByte == '[')
+                    {
+                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array to Dictionary");
+                        foreach (var element in elementReader)
+                        {
+                            dict.Add(element.Key, element.Value);
+                        }
+                        if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array to Dictionary");
+                        buffer.TryNextByte();
+                    }
+                    else throw new Exception("Failed reading Dictionary");
+
+                    return dict;
+                }, JsonDataTypeCategory.Object);
+            }
+        
         }
 
         private void CreateUnknownObjectReader(CachedTypeReader cachedTypeReader)
@@ -1342,12 +1506,10 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private string ReadStringValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
-            DecodeUtf8(stringBytes, stringBuilder);
-            string result = stringBuilder.ToString();
+            string result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
             stringBuilder.Clear();
             return result;
         }
@@ -1356,17 +1518,15 @@ namespace FeatureLoom.Serialization
         {
             value = null;
             if (!TryReadStringBytes(out var stringBytes)) return false;
-            DecodeUtf8(stringBytes, stringBuilder);
-            value = stringBuilder.ToString();
+            value = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
             stringBuilder.Clear();
             return true;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private char ReadCharValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
-            DecodeUtf8(stringBytes, stringBuilder);
+            Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
             if (stringBuilder.Length == 0) throw new Exception("string for reading char is empty");
             char c = stringBuilder[0];
             stringBuilder.Clear();
@@ -1378,11 +1538,37 @@ namespace FeatureLoom.Serialization
         private DateTime ReadDateTimeValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
-            DecodeUtf8(stringBytes, stringBuilder);
-            string str = stringBuilder.ToString();
+            DateTime result;
+#if NET5_0_OR_GREATER
+            Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
+            ReadOnlySpan<char> span = new ReadOnlySpan<char>();                        
+            foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+            {
+                if (span.IsEmpty) span = chunk.Span; // First chunk, that is good
+                else
+                {
+                    // second chunk is bad and we need to reset to fall back to copying (This is very unlikely for a DateTime string)
+                    span = new ReadOnlySpan<char>();
+                    break;
+                }
+            }
+            if (span.IsEmpty)
+            {
+                var chars = charSlicedBuffer.GetSlice(stringBuilder.Length);
+                stringBuilder.CopyTo(0, chars.Array, chars.Offset, stringBuilder.Length);
+                span = chars;
+                charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
+            }
+            result = DateTime.Parse(span);            
+#elif NETSTANDARD2_1_OR_GREATER
+            ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);            
+            result = DateTime.Parse(span);            
+            charSlicedBuffer.Reset(true);
+#else
+            string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);            
+            result = DateTime.Parse(str);                        
+#endif
             stringBuilder.Clear();
-            //TODO: Make optimized version using span<char> to avoid garbage
-            DateTime.TryParse(str, out DateTime result);
             return result;
         }
 
@@ -1391,95 +1577,44 @@ namespace FeatureLoom.Serialization
         private Guid ReadGuidValue()
         {
             if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
-            DecodeUtf8(stringBytes, stringBuilder);
-            string str = stringBuilder.ToString();
+            Guid result;
+#if NET5_0_OR_GREATER
+            Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
+            ReadOnlySpan<char> span = new ReadOnlySpan<char>();
+            foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+            {
+                if (span.IsEmpty) span = chunk.Span; // First chunk, that is good
+                else
+                {
+                    // second chunk is bad and we need to reset to fall back to copying (This is very unlikely for a Guid string)
+                    span = new ReadOnlySpan<char>();
+                    break;
+                }
+            }
+            if (span.IsEmpty)
+            {
+                var chars = charSlicedBuffer.GetSlice(stringBuilder.Length);
+                stringBuilder.CopyTo(0, chars.Array, chars.Offset, stringBuilder.Length);
+                span = chars;
+                charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
+            }
+            result = Guid.Parse(span);
+#elif NETSTANDARD2_1_OR_GREATER
+            ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);            
+            result = Guid.Parse(span);            
+            charSlicedBuffer.Reset(true);
+#else
+            string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);            
+            result = Guid.Parse(str);                        
+#endif
             stringBuilder.Clear();
-            //TODO: Make optimized version using span<char> to avoid garbage
-            Guid.TryParse(str, out Guid result);
             return result;
         }
 
         private Guid? ReadNullableGuidValue() => ReadGuidValue();
 
-        StringBuilder stringBuilder = new StringBuilder();
-        private static void DecodeUtf8(ArraySegment<byte> bytes, StringBuilder stringBuilder)
-        {
-            int i = bytes.Offset;
-            int end = bytes.Offset + bytes.Count;
-            var buffer = bytes.Array;
-
-            while (i < end)
-            {
-                byte b = buffer[i++];
-
-                if (b == '\\' && i < end)
-                {
-                    b = buffer[i++];
-
-                    if (b == 'b') stringBuilder.Append('\b');
-                    else if (b == 'f') stringBuilder.Append('\f');
-                    else if (b == 'n') stringBuilder.Append('\n');
-                    else if (b == 'r') stringBuilder.Append('\r');
-                    else if (b == 't') stringBuilder.Append('\t');
-                    else if (b == 'u')
-                    {
-                        if (i + 4 > end) stringBuilder.Append((char)b);
-                        else
-                        {
-                            byte b1 = buffer[i++];
-                            byte b2 = buffer[i++];
-                            byte b3 = buffer[i++];
-                            byte b4 = buffer[i++];
-                            int codepoint = ((b1 & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
-                            if (codepoint > 0xFFFF)
-                            {
-                                codepoint -= 0x10000;
-                                stringBuilder.Append((char)(0xD800 | (codepoint >> 10)));
-                                stringBuilder.Append((char)(0xDC00 | (codepoint & 0x3FF)));
-                            }
-                            else
-                            {
-                                stringBuilder.Append((char)codepoint);
-                            }
-                        }
-                    }
-                    else stringBuilder.Append((char)b);
-                }
-                else if (b < 0x80)
-                {
-                    stringBuilder.Append((char)b);
-                }
-                else if (b < 0xE0)
-                {
-                    byte b2 = buffer[i++];
-                    stringBuilder.Append((char)(((b & 0x1F) << 6) | (b2 & 0x3F)));
-                }
-                else if (b < 0xF0)
-                {
-                    byte b2 = buffer[i++];
-                    byte b3 = buffer[i++];
-                    stringBuilder.Append((char)(((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F)));
-                }
-                else
-                {
-                    byte b2 = buffer[i++];
-                    byte b3 = buffer[i++];
-                    byte b4 = buffer[i++];
-                    int codepoint = ((b & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
-
-                    if (codepoint > 0xFFFF)
-                    {
-                        codepoint -= 0x10000;
-                        stringBuilder.Append((char)(0xD800 | (codepoint >> 10)));
-                        stringBuilder.Append((char)(0xDC00 | (codepoint & 0x3FF)));
-                    }
-                    else
-                    {
-                        stringBuilder.Append((char)codepoint);
-                    }
-                }
-            }
-        }
+        StringBuilder stringBuilder = new StringBuilder(1024 * 8);
+        SlicedBuffer<char> charSlicedBuffer = new SlicedBuffer<char>(1024 * 8);
 
         private object ReadNullValue()
         {
