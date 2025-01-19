@@ -89,7 +89,7 @@ namespace FeatureLoom.Serialization
         public FeatureJsonDeserializer(Settings settings = null)
         {
             this.settings = settings ?? new Settings();            
-            buffer.Init(settings.initialBufferSize);            
+            buffer.Init(this.settings.initialBufferSize);            
             extensionApi = new ExtensionApi(this);
         }
 
@@ -1010,9 +1010,16 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
-                        propertyInfo.SetValue(parentItem, value);
+                        if (TryReadNullValue())
+                        {
+                            propertyInfo.SetValue(parentItem, null);
+                        }
+                        else
+                        {
+                            V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                            value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                            propertyInfo.SetValue(parentItem, value);
+                        }                        
                         return parentItem;
                     };
                 }
@@ -1063,9 +1070,16 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
-                        fieldInfo.SetValue(parentItem, value);
+                        if (TryReadNullValue())
+                        {
+                            fieldInfo.SetValue(parentItem, null);
+                        }
+                        else
+                        {
+                            V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                            value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                            fieldInfo.SetValue(parentItem, value);
+                        }
                         return parentItem;
                     };
                 }
@@ -1155,9 +1169,16 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V fieldValue = getValue((T)parentItem);
-                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
-                        setValue((T)parentItem, fieldValue);
+                        if (TryReadNullValue())
+                        {
+                            setValue((T)parentItem, default);
+                        }
+                        else
+                        {
+                            V fieldValue = getValue((T)parentItem);
+                            fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                            setValue((T)parentItem, fieldValue);
+                        }
                         return parentItem;
                     };
                 }
@@ -1234,9 +1255,16 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V fieldValue = getValue((T)parentItem);
-                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
-                        setValue((T)parentItem, fieldValue);
+                        if (TryReadNullValue())
+                        {
+                            setValue((T)parentItem, default);
+                        }
+                        else
+                        {
+                            V fieldValue = getValue((T)parentItem);
+                            fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                            setValue((T)parentItem, fieldValue);
+                        }
                         return parentItem;
                     };
                 }
@@ -1981,7 +2009,21 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        public void SetDataSource(String json)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(json);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
         private void SetDataSourceUnlocked(Stream stream) => buffer.SetStream(stream);
+        private void SetDataSourceUnlocked(string json) => buffer.SetStream(json.ToStream());
 
         public bool IsAnyDataLeft()
         {
@@ -2076,6 +2118,71 @@ namespace FeatureLoom.Serialization
             return false;
         }
 
+        private bool TryDeserializeLocked(Type itemType, out object item)
+        {
+            item = default;
+            bool retry = false;
+            do
+            {
+                retry = false;
+                try
+                {
+                    if (!buffer.TryPrepareDeserialization())
+                    {
+                        item = default;
+                        return false;
+                    }
+
+                    // Return false if only whitespaces are left (otherwise we would throw an exception)
+                    byte b = SkipWhiteSpaces();
+                    if (LookupCheck(map_SkipWhitespaces, b, FilterResult.Skip)) return false;
+
+                    if (lastTypeReaderType == itemType)
+                    {
+                        item = lastTypeReader.ReadValue<object>(rootName);
+                    }
+                    else
+                    {
+                        var reader = GetCachedTypeReader(itemType);
+                        lastTypeReader = reader;
+                        lastTypeReaderType = itemType;
+                        item = reader.ReadValue<object>(rootName);
+                    }
+                    return true;
+                }
+                catch (BufferExceededException)
+                {
+
+                    buffer.ResetAfterBufferExceededException();
+
+                    currentItemName = rootName;
+                    itemInfos.Clear();
+                    currentItemInfoIndex = -1;
+
+                    if (!buffer.TryReadFromStream())
+                    {
+                        item = default;
+                        return false;
+                    }
+
+                    retry = true;
+                }
+                catch (Exception e)
+                {
+                    throw;
+                }
+                finally
+                {
+                    if (!retry)
+                    {
+                        Reset();
+                    }
+                }
+            } while (retry);
+
+            return false;
+        }
+
         private bool TryPopulateLocked<T>(ref T item)
         {
             bool retry = false;
@@ -2152,6 +2259,19 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        public bool TryDeserialize(Type type, out object item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                return TryDeserializeLocked(type, out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
         public bool TryDeserialize<T>(Stream stream, out T item)
         {
             serializerLock.Enter();
@@ -2159,6 +2279,48 @@ namespace FeatureLoom.Serialization
             {
                 SetDataSourceUnlocked(stream);
                 return TryDeserializeLocked(out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryDeserialize(Stream stream, Type type, out object item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(stream);
+                return TryDeserializeLocked(type, out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryDeserialize<T>(string json , out T item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(json);
+                return TryDeserializeLocked(out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryDeserialize(string json, Type type, out object item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(json);
+                return TryDeserializeLocked(type, out item);
             }
             finally
             {
@@ -2185,6 +2347,20 @@ namespace FeatureLoom.Serialization
             try
             {
                 SetDataSourceUnlocked(stream);
+                return TryPopulateLocked(ref item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(string json, ref T item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(json);
                 return TryPopulateLocked(ref item);
             }
             finally

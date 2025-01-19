@@ -35,7 +35,7 @@ namespace FeatureLoom.Serialization
         {           
             this.settings = new CompiledSettings(settings ?? new Settings());
             writer = new JsonUTF8StreamWriter(this.settings);
-            itemInfoRecycler = new ItemInfoRecycler(settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef);
+            itemInfoRecycler = new ItemInfoRecycler(this.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef);
             rootName = new ByteSegment(writer.PrepareRootName());
             this.extensionApi = new ExtensionApi(this);
         }

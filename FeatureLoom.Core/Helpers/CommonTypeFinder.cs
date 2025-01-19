@@ -21,20 +21,30 @@ public static class CommonTypeFinder
         }
 
         // Get the types of all objects in the list without creating a new list
-        var types = objects.Select(obj => obj.GetType()).Distinct();
+        var types = objects.Select(obj => obj?.GetType()).Distinct();
 
         // If all objects are of the same type
         if (types.Skip(1).Any())
-        {
+        {            
             var lockHandle = cacheLock.LockReadOnly();
             try
             {
                 // If more than one type, proceed to find the common base type
+                bool nullFound = false;
+                bool notNullableTypeFound = false;
                 Type commonBaseType = types.First(); // Get the first type
                 foreach (var type in types.Skip(1))
                 {
+                    if (type == null)
+                    {
+                        nullFound = true;
+                        continue;
+                    }
+                    if (!type.IsNullable()) notNullableTypeFound |= true;
+                    if (nullFound && notNullableTypeFound) return typeof(object);
+
                     commonBaseType = GetCommonBaseType(commonBaseType, type, ref lockHandle);
-                    if (commonBaseType == null) return typeof(object);
+                    if (commonBaseType == null) return typeof(object);                    
                 }
                 return commonBaseType;
             }
@@ -46,7 +56,9 @@ public static class CommonTypeFinder
         else
         {
             // If there is only one type
-            return types.First(); // All types are the same
+            Type type = types.First(); // All types are the same
+            if (type == null) type = typeof(object);
+            return type;
         }
     }
 
