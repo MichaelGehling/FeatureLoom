@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
+using FeatureLoom.Extensions;
+using System.Data;
 
 namespace FeatureLoom.Collections
 {
@@ -99,19 +101,20 @@ namespace FeatureLoom.Collections
             using (storageLock.Lock())
             {
                 DateTime now = AppTime.CoarseNow;
-                if (!storage.TryGetValue(key, out CacheItem item))
-                {                    
-                    item = new CacheItem()
-                    {
-                        key = key,
-                        value = value,
-                        size = newSize,
-                        creationTime = now,
-                        lastAccessTime = now,
-                        accessCount = 0,
-                        priorityFactor = priorityFactor
-                    };
-                    storage.Add(key, item);
+
+                CacheItem item = storage.GetOrCreate(key, init => new CacheItem()
+                {
+                    key = init.key,
+                    value = init.value,
+                    size = init.newSize,
+                    creationTime = init.now,
+                    lastAccessTime = init.now,
+                    accessCount = 0,
+                    priorityFactor = init.priorityFactor
+                }, (key, value, newSize, now, priorityFactor), out bool existed);
+
+                if (!existed)
+                {                                        
                     totalSize += item.size;
                 }
                 else
