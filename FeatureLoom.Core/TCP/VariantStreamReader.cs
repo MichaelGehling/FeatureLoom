@@ -45,15 +45,15 @@ namespace FeatureLoom.TCP
 
         public async Task<object> ReadMessage(Stream stream, CancellationToken cancellationToken)
         {
-            if (!startMarker.EmptyOrNull() && !await FindStartMarker(stream, cancellationToken)) return null;
+            if (!startMarker.EmptyOrNull() && !await FindStartMarker(stream, cancellationToken).ConfigureAwait(false)) return null;
             
-            int typeInfoLength = await ReadTypeInfoLength(stream, cancellationToken);
+            int typeInfoLength = await ReadTypeInfoLength(stream, cancellationToken).ConfigureAwait(false);
             if (typeInfoLength < 0) return null;
 
-            var reader = await FindMessageReader(typeInfoLength, stream, cancellationToken);
+            var reader = await FindMessageReader(typeInfoLength, stream, cancellationToken).ConfigureAwait(false);
             memoryStream.Position += typeInfoLength;
 
-            int messageLength = await ReadMessageLength(stream, cancellationToken);
+            int messageLength = await ReadMessageLength(stream, cancellationToken).ConfigureAwait(false);
             if (messageLength < 0) return null;
             int messageEndPos = (int)memoryStream.Position + messageLength;
             
@@ -64,8 +64,8 @@ namespace FeatureLoom.TCP
                 return bytes;
             }
 
-            if (!await EnsureNextChunkInMemoryStream(stream, messageLength, cancellationToken)) return null;
-            object message = await reader.ReadMessage(memoryStream, messageLength, cancellationToken);
+            if (!await EnsureNextChunkInMemoryStream(stream, messageLength, cancellationToken).ConfigureAwait(false)) return null;
+            object message = await reader.ReadMessage(memoryStream, messageLength, cancellationToken).ConfigureAwait(false);
             memoryStream.Position = messageEndPos;
             return message;
         }
@@ -74,7 +74,7 @@ namespace FeatureLoom.TCP
         {
             if (cancellationToken.IsCancellationRequested) return -1;
 
-            if (!await EnsureNextChunkInMemoryStream(stream, sizeof(int), cancellationToken)) return -1;
+            if (!await EnsureNextChunkInMemoryStream(stream, sizeof(int), cancellationToken).ConfigureAwait(false)) return -1;
             int messageLength = binaryReader.ReadInt32();
             return messageLength;
         }
@@ -83,7 +83,7 @@ namespace FeatureLoom.TCP
         {
             if (cancellationToken.IsCancellationRequested) return null;
             
-            if (!await EnsureNextChunkInMemoryStream(stream, typeInfoLength, cancellationToken)) return null;
+            if (!await EnsureNextChunkInMemoryStream(stream, typeInfoLength, cancellationToken).ConfigureAwait(false)) return null;
             var buffer = memoryStream.GetBuffer();
             foreach(var reader in readers)
             {
@@ -99,7 +99,7 @@ namespace FeatureLoom.TCP
         {
             if (cancellationToken.IsCancellationRequested) return -1;
 
-            if (!await EnsureNextChunkInMemoryStream(stream, 1, cancellationToken)) return -1;
+            if (!await EnsureNextChunkInMemoryStream(stream, 1, cancellationToken).ConfigureAwait(false)) return -1;
             int typeInfoLength = memoryStream.ReadByte();        
             return typeInfoLength;
         }
@@ -111,7 +111,7 @@ namespace FeatureLoom.TCP
             {
                 if (cancellationToken.IsCancellationRequested) return false;
                 
-                if (!await EnsureNextChunkInMemoryStream(stream, nextChunkSize, cancellationToken)) return false;
+                if (!await EnsureNextChunkInMemoryStream(stream, nextChunkSize, cancellationToken).ConfigureAwait(false)) return false;
 
                 if (cancellationToken.IsCancellationRequested) return false;
                 
@@ -133,7 +133,7 @@ namespace FeatureLoom.TCP
             while (memoryStream.GetSizeOfLeftData() < nextChunkSize)
             {
                 EnsureFreeMemoryStreamCapacity(nextChunkSize);
-                int numBytesRead = await stream.ReadAsync(memoryStream.GetBuffer(), (int)memoryStream.Length, memoryStream.GetLeftCapacity(), cancellationToken);
+                int numBytesRead = await stream.ReadAsync(memoryStream.GetBuffer(), (int)memoryStream.Length, memoryStream.GetLeftCapacity(), cancellationToken).ConfigureAwait(false);
                 if (numBytesRead > 0)
                 {
                     var pos = memoryStream.Position;

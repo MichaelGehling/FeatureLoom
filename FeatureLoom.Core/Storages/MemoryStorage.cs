@@ -52,7 +52,7 @@ namespace FeatureLoom.Storages
             bool success = TrySerialize(data, out byte[] newData);
             if (!success) return false;
 
-            using (await dataSetLock.LockAsync())
+            using (await dataSetLock.LockAsync().ConfigureAwait(false))
             {            
                 if (dataSet.TryGetValue(uri, out byte[] oldData))
                 {
@@ -75,8 +75,8 @@ namespace FeatureLoom.Storages
             UpdateEvent updateEvent = UpdateEvent.Created;
             try
             {
-                var newData = await sourceStream.ReadToByteArrayAsync(config.bufferSize);
-                using (await dataSetLock.LockAsync())
+                var newData = await sourceStream.ReadToByteArrayAsync(config.bufferSize).ConfigureAwait(false);
+                using (await dataSetLock.LockAsync().ConfigureAwait(false))
                 {
                     if (!dataSet.TryGetValue(uri, out byte[] data))
                     {
@@ -104,7 +104,7 @@ namespace FeatureLoom.Storages
         public async Task<bool> TryDeleteAsync(string uri)
         {
             bool removed;
-            using (await dataSetLock.LockAsync())
+            using (await dataSetLock.LockAsync().ConfigureAwait(false))
             {
                 removed = dataSet.Remove(uri);
             }
@@ -114,7 +114,7 @@ namespace FeatureLoom.Storages
 
         public async Task<(bool, string[])> TryListUrisAsync(string pattern = null)
         {
-            using (await dataSetLock.LockReadOnlyAsync())
+            using (await dataSetLock.LockReadOnlyAsync().ConfigureAwait(false))
             {
                 if (!pattern.EmptyOrNull())
                 {
@@ -128,7 +128,7 @@ namespace FeatureLoom.Storages
         public async Task<(bool, T)> TryReadAsync<T>(string uri)
         {
             byte[] serializedData = null;
-            using (await dataSetLock.LockReadOnlyAsync())
+            using (await dataSetLock.LockReadOnlyAsync().ConfigureAwait(false))
             {
                 if (!dataSet.TryGetValue(uri, out serializedData)) return (false, default);                
             }
@@ -140,7 +140,7 @@ namespace FeatureLoom.Storages
         public async Task<bool> TryReadAsync(string uri, Func<Stream, Task> consumer)
         {
             byte[] serializedData = null;            
-            using (await dataSetLock.LockReadOnlyAsync())
+            using (await dataSetLock.LockReadOnlyAsync().ConfigureAwait(false))
             {
                 if (!dataSet.TryGetValue(uri, out serializedData)) return false;
             }            
@@ -163,7 +163,7 @@ namespace FeatureLoom.Storages
             UpdateEvent updateEvent = UpdateEvent.Created;
             if (!TrySerialize(data, out byte[] serializedData)) return false;
 
-            using (await dataSetLock.LockAsync())
+            using (await dataSetLock.LockAsync().ConfigureAwait(false))
             {                
                 if (dataSet.TryAdd(uri, serializedData))
                 {
@@ -185,8 +185,8 @@ namespace FeatureLoom.Storages
             UpdateEvent updateEvent = UpdateEvent.Created;
             try
             {
-                var data = await sourceStream.ReadToByteArrayAsync(config.bufferSize);
-                using (await dataSetLock.LockAsync())
+                var data = await sourceStream.ReadToByteArrayAsync(config.bufferSize).ConfigureAwait(false);
+                using (await dataSetLock.LockAsync().ConfigureAwait(false))
                 {
                     if (dataSet.TryAdd(uri, data))
                     {

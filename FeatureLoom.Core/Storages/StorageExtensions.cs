@@ -24,8 +24,8 @@ namespace FeatureLoom.Storages
             bool success = true;
             success &= await reader.TryReadAsync(sourceUri, async stream =>
             {
-                success &= await writer.TryWriteAsync(targetUri, stream);                
-            });
+                success &= await writer.TryWriteAsync(targetUri, stream).ConfigureAwait(false);                
+            }).ConfigureAwait(false);
             return success;
         }
 
@@ -38,11 +38,11 @@ namespace FeatureLoom.Storages
         
         public static async Task<bool> TryCopy(this IStorageReader reader, IStorageWriter writer, string uriFilterPattern = null)
         {
-            if (!(await reader.TryListUrisAsync(uriFilterPattern)).TryOut(out var uris)) return false;
+            if (!(await reader.TryListUrisAsync(uriFilterPattern).ConfigureAwait(false)).TryOut(out var uris)) return false;
             bool success = true;
             foreach(var uri in uris)
             {
-                success &= await TryCopy(reader, uri, writer, uri);
+                success &= await TryCopy(reader, uri, writer, uri).ConfigureAwait(false);
             }
             return success;
         }
@@ -56,13 +56,13 @@ namespace FeatureLoom.Storages
 
         public static async Task<bool> TryCopy(this IStorageReader reader, IStorageWriter writer, Func<string,string> uriConverter, string uriFilterPattern = null)
         {
-            if (!(await reader.TryListUrisAsync(uriFilterPattern)).TryOut(out var uris)) return false;
+            if (!(await reader.TryListUrisAsync(uriFilterPattern).ConfigureAwait(false)).TryOut(out var uris)) return false;
             bool success = true;
             foreach (var uri in uris)
             {
                 var targetUri = uriConverter(uri);
                 if (targetUri == null) continue;
-                success &= await TryCopy(reader, uri, writer, targetUri);
+                success &= await TryCopy(reader, uri, writer, targetUri).ConfigureAwait(false);
             }
             return success;
         }
@@ -76,11 +76,11 @@ namespace FeatureLoom.Storages
 
         public async static Task<(bool, Dictionary<string,T>)> TryReadAllAsync<T>(this IStorageReader reader, string uriPattern = null)
         {
-            if (!(await reader.TryListUrisAsync(uriPattern)).TryOut(out var uris)) return (false, null);
+            if (!(await reader.TryListUrisAsync(uriPattern).ConfigureAwait(false)).TryOut(out var uris)) return (false, null);
             Dictionary<string, T> dict = new();
             foreach(var uri in uris)
             {
-                if (!(await reader.TryReadAsync<T>(uri)).TryOut(out var item)) return (false, null);
+                if (!(await reader.TryReadAsync<T>(uri).ConfigureAwait(false)).TryOut(out var item)) return (false, null);
                 dict[uri] = item;
             }
             return (true, dict);

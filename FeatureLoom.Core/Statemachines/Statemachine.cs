@@ -192,7 +192,7 @@ namespace FeatureLoom.Statemachines
 
                 try
                 {
-                    job.CurrentStateName = await state.action(job.Context, job.CancellationToken);
+                    job.CurrentStateName = await state.action(job.Context, job.CancellationToken).ConfigureAwait(false);
 
                     if (job.CurrentStateName.EmptyOrNull()) job.ExecutionState = ExecutionState.Finished;
                     else if (job.CancellationToken.IsCancellationRequested) job.ExecutionState = ExecutionState.Interrupted;

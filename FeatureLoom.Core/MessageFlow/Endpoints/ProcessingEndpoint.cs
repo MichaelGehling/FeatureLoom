@@ -47,7 +47,7 @@ namespace FeatureLoom.MessageFlow
         {
             this.processingAsync = async t =>
             {
-                await processingAsync(t);
+                await processingAsync(t).ConfigureAwait(false);
                 return true;
             };
         }
@@ -111,7 +111,7 @@ namespace FeatureLoom.MessageFlow
                 }
                 else
                 {
-                    if (!await processingAsync(msgT))
+                    if (!await processingAsync(msgT).ConfigureAwait(false))
                     {
                         await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
                     }

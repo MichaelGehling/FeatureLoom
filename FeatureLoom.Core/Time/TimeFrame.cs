@@ -95,8 +95,8 @@ namespace FeatureLoom.Time
             }
         }
 
-        public bool IsInvalid => utcStartTime == default && utcEndTime == default;
-        public bool IsValid => utcStartTime != default || utcEndTime != default;
+        public bool IsInvalid => utcStartTime == default || utcEndTime == default;
+        public bool IsValid => !IsInvalid;
 
         public bool Elapsed() => Elapsed(GetTime());
 
@@ -127,52 +127,60 @@ namespace FeatureLoom.Time
 
         public bool Overlaps(TimeFrame otherTimeFrame) => IsInvalid ? false : (utcStartTime >= otherTimeFrame.utcStartTime && utcStartTime < otherTimeFrame.utcEndTime) || (utcEndTime <= otherTimeFrame.utcEndTime && utcEndTime > otherTimeFrame.utcStartTime);
 
-        public Task WaitForStartAsync()
+        public Task WaitForStartAsync(bool precisely = false)
         {
             var waitTime = TimeUntilStart().ClampLow(TimeSpan.Zero);
-            return AppTime.WaitAsync(waitTime, waitTime);
+            if (precisely) return AppTime.WaitPreciselyAsync(waitTime);
+            else return AppTime.WaitAsync(waitTime);
         }
 
-        public Task WaitForStartAsync(DateTime now)
+        public Task WaitForStartAsync(DateTime now, bool precisely = false)
         {
             var waitTime = TimeUntilStart(now).ClampLow(TimeSpan.Zero);
-            return AppTime.WaitAsync(waitTime, waitTime);
+            if (precisely) return AppTime.WaitPreciselyAsync(waitTime);
+            else return AppTime.WaitAsync(waitTime);
         }
 
-        public Task WaitForEndAsync()
+        public Task WaitForEndAsync(bool precisely = false)
         {
             var waitTime = Remaining().ClampLow(TimeSpan.Zero);
-            return AppTime.WaitAsync(waitTime, waitTime);
+            if (precisely) return AppTime.WaitPreciselyAsync(waitTime);
+            else return AppTime.WaitAsync(waitTime);
         }
 
-    public Task WaitForEndAsync(DateTime now)
+    public Task WaitForEndAsync(DateTime now, bool precisely = false)
         {
             var waitTime = Remaining(now).ClampLow(TimeSpan.Zero);
-            return AppTime.WaitAsync(waitTime, waitTime);
+            if (precisely) return AppTime.WaitPreciselyAsync(waitTime);
+            else return AppTime.WaitAsync(waitTime);
         }
 
-        public void WaitForStart()
+        public void WaitForStart(bool precisely = false)
         {
             var waitTime = TimeUntilStart().ClampLow(TimeSpan.Zero);
-            AppTime.Wait(waitTime, waitTime);
+            if (precisely) AppTime.WaitPrecisely(waitTime);
+            else AppTime.Wait(waitTime);
         }
         
-        public void WaitForStart(DateTime now)
+        public void WaitForStart(DateTime now, bool precisely = false)
         {
             var waitTime = TimeUntilStart(now).ClampLow(TimeSpan.Zero);
-            AppTime.Wait(waitTime, waitTime);
+            if (precisely) AppTime.WaitPrecisely(waitTime);
+            else AppTime.Wait(waitTime);
         }
 
-        public void WaitForEnd()
+        public void WaitForEnd(bool precisely = false)
         {
             var waitTime = Remaining().ClampLow(TimeSpan.Zero);
-            AppTime.Wait(waitTime, waitTime);
+            if (precisely) AppTime.WaitPrecisely(waitTime);
+            else AppTime.Wait(waitTime);
         }
 
-        public void WaitForEnd(DateTime now)
+        public void WaitForEnd(DateTime now, bool precisely = false)
         {
             var waitTime = Remaining(now).ClampLow(TimeSpan.Zero);
-            AppTime.Wait(waitTime, waitTime);
+            if (precisely) AppTime.WaitPrecisely(waitTime);
+            else AppTime.Wait(waitTime);
         }
     }
 }

@@ -75,7 +75,7 @@ namespace FeatureLoom.Storages
         public async Task<(bool, T)> TryReadAsync<T>(string uri)
         {
             T data = default;
-            await Task.Run(() => TryRead<T>(uri, out data));
+            await Task.Run(() => TryRead<T>(uri, out data)).ConfigureAwait(false);
             return (true, data);
         }
 
@@ -88,7 +88,7 @@ namespace FeatureLoom.Storages
                 if (!dir.Exists) return (true, Array.Empty<string>());
 
                 List<string> uris = new List<string>();
-                var files = await dir.GetFilesAsync($"*{config.fileSuffix}", SearchOption.AllDirectories);
+                var files = await dir.GetFilesAsync($"*{config.fileSuffix}", SearchOption.AllDirectories).ConfigureAwait(false);
                 int basePathLength = dir.FullName.Length + 1;
                 foreach (var file in files)
                 {

@@ -99,7 +99,7 @@ namespace FeatureLoom.Storages
                     }
                     else return m1.Equals(m2);
                 });
-                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(async msg => await ProcessChangeNotification(msg));
+                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(async msg => await ProcessChangeNotification(msg).ConfigureAwait(false));
                 fileObserver.ConnectTo(duplicateMessageSuppressor).ConnectTo(fileChangeProcessor);
                 fileSystemObservationActive = true;
             }
@@ -120,7 +120,7 @@ namespace FeatureLoom.Storages
                 ActivateFileSystemObservation(false);
             }
 
-            await Task.Delay(config.fileChangeNotificationDelay);
+            await Task.Delay(config.fileChangeNotificationDelay).ConfigureAwait(false);
 
             if (notification.changeType.IsFlagSet(WatcherChangeTypes.Deleted))
             {
@@ -470,7 +470,7 @@ namespace FeatureLoom.Storages
                     using (var stream = fileInfo.OpenText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        var fileContent = await stream.ReadToEndAsync();
+                        var fileContent = await stream.ReadToEndAsync().ConfigureAwait(false);
 
                         success = TryDeserialize(fileContent, out data);
 
@@ -498,7 +498,7 @@ namespace FeatureLoom.Storages
                 if (cache != null && cache.TryGet(uri, out string cacheString))
                 {
                     var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
-                    await consumer(stream);
+                    await consumer(stream).ConfigureAwait(false);
                     return true;
                 }
 
@@ -515,17 +515,17 @@ namespace FeatureLoom.Storages
                             using (var memoryStream = new MemoryStream())
                             using (var textReader = new StreamReader(memoryStream))
                             {
-                                await stream.CopyToAsync(memoryStream);
+                                await stream.CopyToAsync(memoryStream).ConfigureAwait(false);
                                 memoryStream.Position = 0;
-                                await consumer(memoryStream);
+                                await consumer(memoryStream).ConfigureAwait(false);
                                 memoryStream.Position = 0;
-                                string fileContent = await textReader.ReadToEndAsync();
+                                string fileContent = await textReader.ReadToEndAsync().ConfigureAwait(false);
                                 cache?.Add(uri, fileContent);
                             }
                         }
                         else
                         {
-                            await consumer(stream);
+                            await consumer(stream).ConfigureAwait(false);
                         }
 
                         return true;
@@ -565,7 +565,7 @@ namespace FeatureLoom.Storages
                     using (var stream = fileInfo.CreateText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        await stream.WriteAsync(fileContent);
+                        await stream.WriteAsync(fileContent).ConfigureAwait(false);
                         lock (fileSet)
                         {
                             fileSet.Add(fileInfo.FullName);
@@ -604,7 +604,7 @@ namespace FeatureLoom.Storages
                     if (!sourceStream.CanSeek)
                     {
                         MemoryStream memoryStream = new MemoryStream();
-                        await sourceStream.CopyToAsync(memoryStream);
+                        await sourceStream.CopyToAsync(memoryStream).ConfigureAwait(false);
                         sourceStream = memoryStream;
                         sourceStream.Position = 0;
                         disposeStream = true;
@@ -613,7 +613,7 @@ namespace FeatureLoom.Storages
                     var origPosition = sourceStream.Position;
                     // Without using, otherwise the streamreader would dispose the stream already here!
                     var textReader = new StreamReader(sourceStream);
-                    fileContent = await textReader.ReadToEndAsync();
+                    fileContent = await textReader.ReadToEndAsync().ConfigureAwait(false);
                     sourceStream.Position = origPosition;
                     cache?.Add(uri, fileContent);                                        
                 }
@@ -628,7 +628,7 @@ namespace FeatureLoom.Storages
                 {
                     if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.SetLength(0);
-                    await sourceStream.CopyToAsync(stream);                    
+                    await sourceStream.CopyToAsync(stream).ConfigureAwait(false);                    
 
                     lock (fileSet)
                     {
@@ -669,7 +669,7 @@ namespace FeatureLoom.Storages
                     using (var stream = fileInfo.AppendText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        await stream.WriteAsync(fileContent);
+                        await stream.WriteAsync(fileContent).ConfigureAwait(false);
                         return true;
                     }
 
@@ -697,7 +697,7 @@ namespace FeatureLoom.Storages
                 {
                     if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.Seek(0, SeekOrigin.End);
-                    await sourceStream.CopyToAsync(stream);
+                    await sourceStream.CopyToAsync(stream).ConfigureAwait(false);
                     return true;
                 }
             }

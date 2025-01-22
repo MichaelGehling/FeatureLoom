@@ -53,10 +53,10 @@ namespace FeatureLoom.MessageFlow
                 {                    
                     if (ForwardingMethod == ForwardingMethod.Synchronous) sourceHelper.Forward(message);
                     if (ForwardingMethod == ForwardingMethod.SynchronousByRef) sourceHelper.Forward(in message);
-                    if (ForwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(message);
+                    if (ForwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(message).ConfigureAwait(false);
                 }
                 
-                await messageSource.WaitForIdAsync(NextMessageId, CancellationToken);
+                await messageSource.WaitForIdAsync(NextMessageId, CancellationToken).ConfigureAwait(false);
             }
         }
 

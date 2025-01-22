@@ -73,15 +73,15 @@ namespace FeatureLoom.Logging
         {
             await Task.Yield();
 
-            await UpdateConfigAsync();
+            await UpdateConfigAsync().ConfigureAwait(false);
             if (config.newFileOnStartup) ArchiveCurrentLogfile();
             while(true)
             {
-                await UpdateConfigAsync();
-                await receiver.WaitAsync();
+                await UpdateConfigAsync().ConfigureAwait(false);
+                await receiver.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    await WriteToLogFileAsync();
+                    await WriteToLogFileAsync().ConfigureAwait(false);
                 }
                 catch(Exception e)
                 {
@@ -97,14 +97,14 @@ namespace FeatureLoom.Logging
                 }
                 if (config.delayAfterWritingInMs > 0)
                 {
-                    await delayBypass.WaitAsync(config.delayAfterWritingInMs.Milliseconds());
+                    await delayBypass.WaitAsync(config.delayAfterWritingInMs.Milliseconds()).ConfigureAwait(false);
                 }
             }
         }
 
         private async Task UpdateConfigAsync()
         {
-            await config.TryUpdateFromStorageAsync(true);
+            await config.TryUpdateFromStorageAsync(true).ConfigureAwait(false);
             receiver.maxQueueSize = config.maxQueueSize;
         }
 
@@ -128,7 +128,7 @@ namespace FeatureLoom.Logging
             using (StreamWriter writer = new StreamWriter(stream))
             {
                 if (updateCreationTime) logFileInfo.CreationTime = AppTime.CoarseNow;
-                if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear());
+                if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear()).ConfigureAwait(false);
 
                 while (!receiver.IsEmpty)
                 {
@@ -137,7 +137,7 @@ namespace FeatureLoom.Logging
                     {
                         if (logMsg.level <= config.logFileLoglevel)
                         {
-                            await writer.WriteLineAsync(logMsg.PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear());
+                            await writer.WriteLineAsync(logMsg.PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear()).ConfigureAwait(false);
                         }
                     }
                 }

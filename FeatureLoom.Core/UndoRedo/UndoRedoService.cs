@@ -102,7 +102,7 @@ namespace FeatureLoom.UndoRedo
         public bool CurrentlyRedoing => redoing;
 
         public Transaction StartTransaction(string description = null) => new Transaction(this, myLock.LockReentrant(), description);
-        public async Task<Transaction> StartTransactionAsync(string description = null) => new Transaction(this, await myLock.LockReentrantAsync(), description);
+        public async Task<Transaction> StartTransactionAsync(string description = null) => new Transaction(this, await myLock.LockReentrantAsync().ConfigureAwait(false), description);
 
         public IMessageSource<Notification> UpdateNotificationSource => updateForwarder;
 
@@ -191,7 +191,7 @@ namespace FeatureLoom.UndoRedo
         /*
         public async Task DoWithUndoAsync(Func<Task> doAction, Func<Task> undoAction)
         {
-            await doAction.Invoke();
+            await doAction.Invoke().ConfigureAwait(false);
 
             AddUndo(() =>
             {

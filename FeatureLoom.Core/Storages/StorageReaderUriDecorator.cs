@@ -59,7 +59,7 @@ namespace FeatureLoom.Storages
         {
             uriPattern = transformUri(uriPattern);
             if (uriPattern == null) return (false, default);
-            if (!(await reader.TryListUrisAsync(uriPattern)).TryOut(out string[] uris)) return (false, default);
+            if (!(await reader.TryListUrisAsync(uriPattern).ConfigureAwait(false)).TryOut(out string[] uris)) return (false, default);
             uris = uris.Select(uri => retransformUri(uri)).Where(uri => uri != null).ToArray();
             return (true, uris);
         }

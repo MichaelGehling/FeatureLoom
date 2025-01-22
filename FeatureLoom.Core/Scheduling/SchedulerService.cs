@@ -48,6 +48,7 @@ namespace FeatureLoom.Scheduling
                     schedulerThread = new Thread(RunScheduling);
                     schedulerThread.Name = "Scheduler";
                     schedulerThread.IsBackground = true;
+                    schedulerThread.Priority = ThreadPriority.Highest;
                     schedulerThread.Start();
                 }
                 else

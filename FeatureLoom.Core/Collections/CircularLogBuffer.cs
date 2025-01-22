@@ -194,7 +194,7 @@ namespace FeatureLoom.Collections
 
         public async Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
         {
-            await WaitForIdAsync(firstRequestedId, ct);
+            await WaitForIdAsync(firstRequestedId, ct).ConfigureAwait(false);
             var result = GetAllAvailable(firstRequestedId, maxItems, out long firstProvidedId, out long lastProvidedId);
             return (result, firstProvidedId, lastProvidedId);
         }
@@ -205,7 +205,7 @@ namespace FeatureLoom.Collections
         {
             while (number > counter)
             {
-                if (!myLock.IsLocked) await newEntryEvent.Obj.WaitAsync(ct);
+                if (!myLock.IsLocked) await newEntryEvent.Obj.WaitAsync(ct).ConfigureAwait(false);
             }
         }
 

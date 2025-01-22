@@ -121,7 +121,7 @@ namespace FeatureLoom.Synchronization
         {
             while(repeat && !cancellationToken.IsCancellationRequested)
             {
-                if (await waitHandle.WaitAsync(cancellationToken))
+                if (await waitHandle.WaitAsync(cancellationToken).ConfigureAwait(false))
                 {
                     action();
                 }
@@ -142,7 +142,7 @@ namespace FeatureLoom.Synchronization
         {
             while (repeat && !cancellationToken.IsCancellationRequested)
             {
-                if (await waitHandle.WaitAsync(cancellationToken))
+                if (await waitHandle.WaitAsync(cancellationToken).ConfigureAwait(false))
                 {
                     action(actionArgument);
                 }
@@ -162,9 +162,9 @@ namespace FeatureLoom.Synchronization
         {
             while (repeat && !cancellationToken.IsCancellationRequested)
             {
-                if (await waitHandle.WaitAsync(cancellationToken))
+                if (await waitHandle.WaitAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    await action();
+                    await action().ConfigureAwait(false);
                 }
             }
         }
@@ -183,9 +183,9 @@ namespace FeatureLoom.Synchronization
         {
             while (repeat && !cancellationToken.IsCancellationRequested)
             {
-                if (await waitHandle.WaitAsync(cancellationToken))
+                if (await waitHandle.WaitAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    await action(actionArgument);
+                    await action(actionArgument).ConfigureAwait(false);
                 }
             }
         }

@@ -24,7 +24,7 @@ namespace FeatureLoom.Security
             using (cacheLock.Lock())
             {
                 var reader = Storage.GetReader(StorageCategory);
-                if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                if (!(await reader.TryReadAllAsync<Identity>().ConfigureAwait(false)).TryOut(out cache)) throw new Exception("Failed update cache from storage");
             }
         }
 
@@ -37,7 +37,7 @@ namespace FeatureLoom.Security
                 {
                     lockHandle.UpgradeToWriteMode();
                     var reader = Storage.GetReader(StorageCategory);
-                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                    if (!(await reader.TryReadAllAsync<Identity>().ConfigureAwait(false)).TryOut(out cache)) throw new Exception("Failed update cache from storage");
                 }
                 return cache.Keys.ToArray();
             }
@@ -52,7 +52,7 @@ namespace FeatureLoom.Security
                 {
                     lockHandle.UpgradeToWriteMode();
                     var reader = Storage.GetReader(StorageCategory);
-                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                    if (!(await reader.TryReadAllAsync<Identity>().ConfigureAwait(false)).TryOut(out cache)) throw new Exception("Failed update cache from storage");
                 }
                 return cache.Values.ToArray();
             }
@@ -67,14 +67,14 @@ namespace FeatureLoom.Security
                 {
                     lockHandle.UpgradeToWriteMode();
                     var reader = Storage.GetReader(StorageCategory);
-                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                    if (!(await reader.TryReadAllAsync<Identity>().ConfigureAwait(false)).TryOut(out cache)) throw new Exception("Failed update cache from storage");
                     forceUpdateCache = false;
                 }
 
                 if (forceUpdateCache)
                 {
                     var reader = Storage.GetReader(StorageCategory);
-                    if (!(await reader.TryReadAsync<Identity>(identityId)).TryOut(out var identity)) return (false, null);
+                    if (!(await reader.TryReadAsync<Identity>(identityId).ConfigureAwait(false)).TryOut(out var identity)) return (false, null);
                     cache[identityId] = identity;
                     return (true, identity);
                 }
@@ -94,7 +94,7 @@ namespace FeatureLoom.Security
                 {
                     lockHandle.UpgradeToWriteMode();
                     var reader = Storage.GetReader(StorageCategory);
-                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                    if (!(await reader.TryReadAllAsync<Identity>().ConfigureAwait(false)).TryOut(out cache)) throw new Exception("Failed update cache from storage");
                 }
                 return cache.ContainsKey(identityId);
             }
@@ -194,12 +194,12 @@ namespace FeatureLoom.Security
                 if (cache == null)
                 {                    
                     var reader = Storage.GetReader(StorageCategory);
-                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                    if (!(await reader.TryReadAllAsync<Identity>().ConfigureAwait(false)).TryOut(out cache)) throw new Exception("Failed update cache from storage");
                 }
                 
                 cache[identityId] = this;                
             }
-            if (!await Storage.GetWriter(storageCategory).TryWriteAsync(identityId, this)) throw new Exception($"Failed writing identity {identityId} to storage");
+            if (!await Storage.GetWriter(storageCategory).TryWriteAsync(identityId, this).ConfigureAwait(false)) throw new Exception($"Failed writing identity {identityId} to storage");
         }
 
         public async Task RemoveFromStorageAsync()
@@ -209,12 +209,12 @@ namespace FeatureLoom.Security
                 if (cache == null)
                 {
                     var reader = Storage.GetReader(StorageCategory);
-                    if (!(await reader.TryReadAllAsync<Identity>()).TryOut(out cache)) throw new Exception("Failed update cache from storage");
+                    if (!(await reader.TryReadAllAsync<Identity>().ConfigureAwait(false)).TryOut(out cache)) throw new Exception("Failed update cache from storage");
                 }
 
                 cache.Remove(identityId);
             }
-            if (!await Storage.GetWriter(storageCategory).TryDeleteAsync(identityId)) throw new Exception($"Failed removing identity {identityId} from storage");
+            if (!await Storage.GetWriter(storageCategory).TryDeleteAsync(identityId).ConfigureAwait(false)) throw new Exception($"Failed removing identity {identityId} from storage");
         }
 
         public void AddRole(IdentityRole role, bool storeChanges)

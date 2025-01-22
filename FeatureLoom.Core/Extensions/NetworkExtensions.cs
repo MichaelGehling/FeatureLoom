@@ -10,7 +10,7 @@ namespace FeatureLoom.Extensions
             IPAddress ipAddress;
             if (useDns)
             {
-                var hostEntry = await Dns.GetHostEntryAsync(str);
+                var hostEntry = await Dns.GetHostEntryAsync(str).ConfigureAwait(false);
                 ipAddress = hostEntry.AddressList[0];
             }
             else

@@ -87,14 +87,14 @@ namespace FeatureLoom.MessageFlow
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await receiver.WaitAsync();
+                await receiver.WaitAsync().ConfigureAwait(false);
                 while (receiver.TryReceive(out ForwardingMessage forwardingMessage))
                 {
                     try
                     {
                         if (forwardingMessage.forwardingMethod == ForwardingMethod.Synchronous) sourceHelper.Forward(forwardingMessage.message);
                         else if (forwardingMessage.forwardingMethod == ForwardingMethod.SynchronousByRef) sourceHelper.Forward(in forwardingMessage.message);
-                        else if (forwardingMessage.forwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(forwardingMessage.message);
+                        else if (forwardingMessage.forwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(forwardingMessage.message).ConfigureAwait(false);
                     }
                     catch (Exception e)
                     {

@@ -132,7 +132,7 @@ namespace FeatureLoom.Workflows
             if (step != null)
             {
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
-                await controller.ExecuteStepAsync(context, step);
+                await controller.ExecuteStepAsync(context, step).ConfigureAwait(false);
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished, executionState, executionPhase);
                 return EvaluteExecutionStateAfterExecution(context);
             }

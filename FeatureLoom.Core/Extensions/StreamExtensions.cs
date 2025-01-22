@@ -34,7 +34,7 @@ namespace FeatureLoom.Extensions
 
             do
             {
-                bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
                 if (bytesRead < buffer.Length) finished = true;
                 if (bytesRead > 0)
                 {

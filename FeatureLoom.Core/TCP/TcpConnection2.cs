@@ -51,7 +51,7 @@ namespace FeatureLoom.TCP
                 Log.ERROR(this.GetHandle(), $"Could not get stream from tcpClient or stream upgrade failed.", e.ToString());
             }
 
-            messageWriter = new ProcessingEndpoint<object>(async msg => await WriteMessage(msg));
+            messageWriter = new ProcessingEndpoint<object>(async msg => await WriteMessage(msg).ConfigureAwait(false));
             Task.Run(StartReceiving);
         }
 
@@ -73,7 +73,7 @@ namespace FeatureLoom.TCP
             {
                 try
                 {
-                    object message = await reader.ReadMessage(stream, cts.Token);
+                    object message = await reader.ReadMessage(stream, cts.Token).ConfigureAwait(false);
                     if (message != null)
                     {
                         if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, handle);
@@ -105,7 +105,7 @@ namespace FeatureLoom.TCP
 
             try
             {                
-                await writer.WriteMessage(message, stream, cts.Token);
+                await writer.WriteMessage(message, stream, cts.Token).ConfigureAwait(false);
             }
             catch (Exception e)
             {
