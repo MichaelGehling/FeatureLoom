@@ -30,7 +30,7 @@ namespace FeatureLoom.TCP
                         .If(c => c.decodingResult == DecodingResult.Incomplete || c.bufferReadPosition == c.bufferFillState)
                             .Do(async c =>
                             {
-                                var bytesRead = await c.stream.ReadAsync(c.buffer, c.bufferFillState, c.bufferSize - c.bufferFillState, c.CancellationToken);
+                                var bytesRead = await c.stream.ReadAsync(c.buffer, c.bufferFillState, c.bufferSize - c.bufferFillState, c.CancellationToken).ConfigureAwait(false);
                                 // Client may not recognize diconnection, so when stream is exhausted, connection is closed
                                 if (bytesRead == 0) c.client.Close();
                                 else c.bufferFillState += bytesRead;
@@ -107,7 +107,7 @@ namespace FeatureLoom.TCP
             this.buffer = new byte[this.bufferSize];
 
             routingFilter = new MessageConverter<object, object>(msg => FilterOrUnwrapMessage(msg));
-            tcpWriter = new ProcessingEndpoint<byte[]>(async buffer => await WriteToTcpStream(buffer));
+            tcpWriter = new ProcessingEndpoint<byte[]>(async buffer => await WriteToTcpStream(buffer).ConfigureAwait(false));
             routingFilter.ConnectTo(tcpWriter);
 
             this.Run();
@@ -138,7 +138,7 @@ namespace FeatureLoom.TCP
 
             try
             {
-                await stream.WriteAsync(buffer, 0, buffer.Length);
+                await stream.WriteAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
                 return true;
             }
             catch (Exception e)

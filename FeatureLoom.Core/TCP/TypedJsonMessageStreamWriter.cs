@@ -20,7 +20,7 @@ namespace FeatureLoom.TCP
         {            
             UpdateStreamWriter(stream);                        
             serializer.Serialize(jsonWriter, message);
-            await jsonWriter.FlushAsync();            
+            await jsonWriter.FlushAsync().ConfigureAwait(false);            
         }
 
         void UpdateStreamWriter(Stream stream)

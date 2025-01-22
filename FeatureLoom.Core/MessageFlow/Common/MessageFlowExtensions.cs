@@ -160,7 +160,7 @@ namespace FeatureLoom.MessageFlow
             T message = default;
             while (!receiver.TryReceive(out message))
             {
-                if (!(await receiver.WaitHandle.WaitAsync(token))) return (false, message);
+                if (!(await receiver.WaitHandle.WaitAsync(token).ConfigureAwait(false))) return (false, message);
             }
             return (true, message);
         }
@@ -187,7 +187,7 @@ namespace FeatureLoom.MessageFlow
             TimeFrame timer = new TimeFrame(timeout);
             do
             {
-                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample)))) return (false, message);
+                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample)).ConfigureAwait(false))) return (false, message);
             }
             while (!receiver.TryReceive(out message) && !timer.Elapsed());
 
@@ -216,7 +216,7 @@ namespace FeatureLoom.MessageFlow
             TimeFrame timer = new TimeFrame(timeout);
             do
             {
-                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample), token))) return (false, message);
+                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample), token).ConfigureAwait(false))) return (false, message);
             }
             while (!receiver.TryReceive(out message) && !timer.Elapsed());
 

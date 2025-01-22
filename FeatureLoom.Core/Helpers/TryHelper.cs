@@ -38,7 +38,7 @@ namespace FeatureLoom.Helpers
         {
             try
             {
-                var result = await function();
+                var result = await function().ConfigureAwait(false);
                 return (true, result);
             }
             catch
@@ -77,7 +77,7 @@ namespace FeatureLoom.Helpers
         {
             try
             {
-                await action();
+                await action().ConfigureAwait(false);
                 return true;
             }
             catch

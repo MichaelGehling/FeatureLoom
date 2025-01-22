@@ -35,7 +35,7 @@ namespace FeatureLoom.TCP
                     .Step("Check initially for config update and try connect")
                         .Do(async c =>
                         {
-                            await c.UpdateConfig(c.initialConfigUpdate);
+                            await c.UpdateConfig(c.initialConfigUpdate).ConfigureAwait(false);
                             c.initialConfigUpdate = false;
                         })
                     .Step("If set inactive goto waiting for activation")
@@ -54,13 +54,13 @@ namespace FeatureLoom.TCP
                         .WaitFor(c => c.config.SubscriptionWaitHandle, c => c.reconnectionCheckTimer.Remaining().ClampLow(TimeSpan.Zero))
                     .Step("If config change available, apply it, eventually try to reconnect")
                         .If(c => c.config.HasSubscriptionUpdate)
-                            .Do(async c => await c.UpdateConfig(false))
+                            .Do(async c => await c.UpdateConfig(false).ConfigureAwait(false))
                     .Step("If set inactive goto waiting for activation")
                         .If(c => !c.config.active)
                             .Goto(waitingForActivation)
                     .Step("If disconnected and reconnection timer elapsed try to reconnect and reset timer")
                         .If(c => c.connection?.Disconnected ?? true && c.reconnectionCheckTimer.Elapsed())
-                            .Do(async c => await c.TryConnect(false))
+                            .Do(async c => await c.TryConnect(false).ConfigureAwait(false))
                     .Step("If connected go to observing connection, otherwise continue reconnecting")
                         .If(c => c.connection?.Connected ?? false)
                             .Goto(observingConnection)
@@ -72,7 +72,7 @@ namespace FeatureLoom.TCP
                         .WaitForAny(c => c.disconnectionAndConfigUpdateWaitHandles)
                     .Step("If config change available, apply it")
                         .If(c => c.config.HasSubscriptionUpdate)
-                            .Do(async c => await c.UpdateConfig(false))
+                            .Do(async c => await c.UpdateConfig(false).ConfigureAwait(false))
                     .Step("If set inactive goto waiting for activation")
                         .If(c => !c.config.active)
                             .Goto(waitingForActivation)
@@ -88,7 +88,7 @@ namespace FeatureLoom.TCP
                     .Step("Wait for a config change")
                         .WaitFor(c => c.config.SubscriptionWaitHandle)
                     .Step("Apply config change and try to connect if active")
-                        .Do(async c => await c.UpdateConfig(false))
+                        .Do(async c => await c.UpdateConfig(false).ConfigureAwait(false))
                     .Step("If still inactive continue waiting")
                         .If(c => !c.config.active)
                             .Loop()
@@ -164,7 +164,7 @@ namespace FeatureLoom.TCP
         {
             bool result = false;
             var oldConfig = config;
-            if (await config.TryUpdateFromStorageAsync(true) || initial)
+            if (await config.TryUpdateFromStorageAsync(true).ConfigureAwait(false) || initial)
             {
                 if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
 
@@ -179,7 +179,7 @@ namespace FeatureLoom.TCP
                     result = true;
                     if (config.active)
                     {
-                        await TryConnect(initial);
+                        await TryConnect(initial).ConfigureAwait(false);
                     }
                     else
                     {
@@ -207,7 +207,7 @@ namespace FeatureLoom.TCP
         {
             try
             {
-                IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns);
+                IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns).ConfigureAwait(false);
 
                 if (connection != null)
                 {
@@ -218,7 +218,7 @@ namespace FeatureLoom.TCP
 
                 Log.INFO(this.GetHandle(), $"Trying to connect to {ipAddress}:{config.port.ToString()}");
                 TcpClient newClient = new TcpClient(ipAddress.AddressFamily);
-                await newClient.ConnectAsync(ipAddress, config.port);
+                await newClient.ConnectAsync(ipAddress, config.port).ConfigureAwait(false);
                 if (newClient.Connected)
                 {
                     IStreamUpgrader sslUpgrader = null;

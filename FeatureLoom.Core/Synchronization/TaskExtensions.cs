@@ -121,7 +121,7 @@ namespace FeatureLoom.Synchronization
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-            await tcs.Task;
+            await tcs.Task.ConfigureAwait(false);
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -149,7 +149,7 @@ namespace FeatureLoom.Synchronization
             {
                 using(var cancelRegistration = cancellationToken.Register(() => throw new TaskCanceledException(task), true))
                 {
-                    await task;
+                    await task.ConfigureAwait(false);
                 }
             }
             catch(TaskCanceledException)
@@ -269,7 +269,7 @@ namespace FeatureLoom.Synchronization
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-            await tcs.Task;
+            await tcs.Task.ConfigureAwait(false);
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;

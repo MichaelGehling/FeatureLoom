@@ -30,7 +30,7 @@ namespace FeatureLoom.TCP
                     .Step("Check for config update and set up TCP server")
                         .Do(async c =>
                         {
-                            await c.UpdateConfigAsync(c.initialConfigUpdate);
+                            await c.UpdateConfigAsync(c.initialConfigUpdate).ConfigureAwait(false);
                             c.initialConfigUpdate = false;
                         })
                     .Step("If server was successfully started, begin waiting for connection requests, else wait for for a config change")
@@ -62,7 +62,7 @@ namespace FeatureLoom.TCP
                     .Step("Wait for connection request or other event")
                         .WaitForAny(c => c.awaited.ToArray())
                     .Step("If config update available apply it and if TCP server has to be restarted restart running state")
-                        .If(async c => c.config.HasSubscriptionUpdate && await c.UpdateConfigAsync(false))
+                        .If(async c => c.config.HasSubscriptionUpdate && await c.UpdateConfigAsync(false).ConfigureAwait(false))
                             .Loop()
                     .Step("Prepare new connection if requested")
                         .If(c => c.awaitedConnectionRequest.IsCompleted)
@@ -186,14 +186,14 @@ namespace FeatureLoom.TCP
         {
             bool result = false;
             var oldConfig = config;
-            if (await config.TryUpdateFromStorageAsync(true) || initial)
+            if (await config.TryUpdateFromStorageAsync(true).ConfigureAwait(false) || initial)
             {
                 if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
 
                 if (initial || ConfigChanged(oldConfig))
                 {
                     result = true;
-                    if (config.active) await RestartServer(initial);
+                    if (config.active) await RestartServer(initial).ConfigureAwait(false);
                     else if (!initial) DeactivateServer();
                 }
             }
@@ -219,9 +219,9 @@ namespace FeatureLoom.TCP
         {
             try
             {
-                if (config.x509CertificateName != null) (await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(config.x509CertificateName)).TryOut(out this.serverCertificate);
+                if (config.x509CertificateName != null) (await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(config.x509CertificateName).ConfigureAwait(false)).TryOut(out this.serverCertificate);
 
-                IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns);
+                IPAddress ipAddress = await config.hostAddress.ResolveToIpAddressAsync(config.resolveByDns).ConfigureAwait(false);
 
                 if (!initial)
                 {

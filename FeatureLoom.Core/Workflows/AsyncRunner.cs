@@ -9,7 +9,7 @@ namespace FeatureLoom.Workflows
             AddToRunningWorkflows(workflow);
             try
             {                
-                while (await workflow.ExecuteNextStepAsync(executionController)) ;
+                while (await workflow.ExecuteNextStepAsync(executionController).ConfigureAwait(false)) ;
             }
             finally
             {

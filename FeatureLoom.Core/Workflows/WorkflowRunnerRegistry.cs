@@ -146,7 +146,7 @@ namespace FeatureLoom.Workflows
             {
                 tasks.Add(runner.PauseAllWorkflows(tryCancelWaitingStep));
             }
-            await Task.WhenAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray()).ConfigureAwait(false);
         }
 
         private class ContextData : IServiceContextData

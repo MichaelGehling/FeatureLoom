@@ -29,7 +29,7 @@ namespace FeatureLoom.Workflows
                 do
                 {
                     var executionState = workflow.CurrentExecutionState;
-                    if (isAsyncMap[executionState.stateIndex][executionState.stepIndex]) running = await workflow.ExecuteNextStepAsync(executionController);
+                    if (isAsyncMap[executionState.stateIndex][executionState.stepIndex]) running = await workflow.ExecuteNextStepAsync(executionController).ConfigureAwait(false);
                     else running = workflow.ExecuteNextStep(executionController);
                 }
                 while (running);

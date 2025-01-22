@@ -59,8 +59,8 @@ namespace FeatureLoom.TCP
         {
             cts = new CancellationTokenSource();
             if (listner != null) return;
-            await StartServer();
-            await Task.WhenAll(HandleConnectionRequests(), HandleDisconnections());
+            await StartServer().ConfigureAwait(false);
+            await Task.WhenAll(HandleConnectionRequests(), HandleDisconnections()).ConfigureAwait(false);
             Stop();
         }
 
@@ -96,9 +96,9 @@ namespace FeatureLoom.TCP
         {
             try
             {
-                if (settings.x509CertificateName != null) (await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(settings.x509CertificateName)).TryOut(out this.serverCertificate);
+                if (settings.x509CertificateName != null) (await Storage.GetReader("certificate").TryReadAsync<X509Certificate2>(settings.x509CertificateName).ConfigureAwait(false)).TryOut(out this.serverCertificate);
 
-                IPAddress ipAddress = await settings.hostAddress.ResolveToIpAddressAsync(settings.resolveByDns);
+                IPAddress ipAddress = await settings.hostAddress.ResolveToIpAddressAsync(settings.resolveByDns).ConfigureAwait(false);
 
                 if (connections.Count > 0) DisconnectAllClients();
 
@@ -122,7 +122,7 @@ namespace FeatureLoom.TCP
             {
                 try
                 {
-                    TcpClient client = await listner.AcceptTcpClientAsync();
+                    TcpClient client = await listner.AcceptTcpClientAsync().ConfigureAwait(false);
                     ConnectClient(client);
                 }
                 catch (InvalidOperationException)
@@ -150,7 +150,7 @@ namespace FeatureLoom.TCP
                     else connectionWaitEvent.Reset();
                 }
 
-                await AppTime.WaitAsync(settings.checkDisconnectionCycleTime.Multiply(0.9), settings.checkDisconnectionCycleTime, cts.Token);
+                await AppTime.WaitAsync(settings.checkDisconnectionCycleTime.Multiply(0.9), settings.checkDisconnectionCycleTime, cts.Token).ConfigureAwait(false);
             }
         }
 

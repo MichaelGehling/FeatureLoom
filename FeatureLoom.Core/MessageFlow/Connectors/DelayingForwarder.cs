@@ -64,16 +64,16 @@ namespace FeatureLoom.MessageFlow
         {
             if (blocking)
             {
-                await AppTime.WaitAsync(minDelay, maxDelay);
-                await sourceHelper.ForwardAsync(message);
+                await AppTime.WaitAsync(minDelay, maxDelay).ConfigureAwait(false);
+                await sourceHelper.ForwardAsync(message).ConfigureAwait(false);
             }
             else
             {
                 var tk = AppTime.TimeKeeper;
                 _ = Task.Run(async () =>
                 {
-                    await AppTime.WaitAsync(minDelay - tk.Elapsed, maxDelay - tk.LastElapsed);
-                    await sourceHelper.ForwardAsync(message);
+                    await AppTime.WaitAsync(minDelay - tk.Elapsed, maxDelay - tk.LastElapsed).ConfigureAwait(false);
+                    await sourceHelper.ForwardAsync(message).ConfigureAwait(false);
                 });
             }            
         }

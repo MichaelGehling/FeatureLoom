@@ -135,7 +135,7 @@ namespace FeatureLoom.MessageFlow
                     }
                 }
 
-                if (waitOnFullQueue && IsFull) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
+                if (waitOnFullQueue && IsFull) await writerWakeEvent.WaitAsync(timeoutOnFullQueue).ConfigureAwait(false);
                 if (dropLatestMessageOnFullQueue && IsFull) await (alternativeSendingHelper.ObjIfExists?.ForwardAsync(message) ?? Task.CompletedTask);
                 else Enqueue(typedMessage);
             }

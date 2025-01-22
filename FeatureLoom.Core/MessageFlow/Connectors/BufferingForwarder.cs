@@ -68,8 +68,8 @@ namespace FeatureLoom.MessageFlow
         public async Task PostAsync<M>(M message)
         {
             var task = sourceHelper.ForwardAsync(message);
-            if (message is T msgT) using (await bufferLock.LockAsync()) buffer.Add(msgT);
-            await task;
+            if (message is T msgT) using (await bufferLock.LockAsync().ConfigureAwait(false)) buffer.Add(msgT);
+            await task.ConfigureAwait(false);
         }
 
         public T[] GetAllBufferEntries()

@@ -35,25 +35,25 @@ namespace FeatureLoom.Extensions
         // TODO: check if newer versions of .Net Core provides this method without using threadPool
         public async static Task<FileInfo[]> GetFilesAsync(this DirectoryInfo dir)
         {            
-            return await Task.Run(() => dir.GetFiles());
+            return await Task.Run(() => dir.GetFiles()).ConfigureAwait(false);
         }
 
         // TODO: check if newer versions of .Net Core provides this method without using threadPool
         public async static Task<FileInfo[]> GetFilesAsync(this DirectoryInfo dir, string searchPattern, SearchOption searchOption)
         {
-            return await Task.Run(() => dir.GetFiles(searchPattern, searchOption));
+            return await Task.Run(() => dir.GetFiles(searchPattern, searchOption)).ConfigureAwait(false);
         }
 
         // TODO: check if newer versions of .Net Core provides this method without using threadPool
         public async static Task<DirectoryInfo[]> GetDirectoriesAsync(this DirectoryInfo dir)
         {
-            return await Task.Run(() => dir.GetDirectories());
+            return await Task.Run(() => dir.GetDirectories()).ConfigureAwait(false);
         }
 
         // TODO: check if newer versions of .Net Core provides this method without using threadPool
         public async static Task<DirectoryInfo[]> GetDirectoriesAsync(this DirectoryInfo dir, string searchPattern, SearchOption searchOption)
         {
-            return await Task.Run(() => dir.GetDirectories(searchPattern, searchOption));
+            return await Task.Run(() => dir.GetDirectories(searchPattern, searchOption)).ConfigureAwait(false);
         }
     }
 

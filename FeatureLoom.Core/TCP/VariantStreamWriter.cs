@@ -81,14 +81,14 @@ namespace FeatureLoom.TCP
             long lengthPos = memoryStream.Length;
             binaryWriter.Write((uint)0);
             long messagePos = memoryStream.Length;
-            await writer.WriteMessage(message, memoryStream, cancellationToken);
+            await writer.WriteMessage(message, memoryStream, cancellationToken).ConfigureAwait(false);
             long messageLength = memoryStream.Length - messagePos;
             memoryStream.Position = lengthPos;
             binaryWriter.Write((int)messageLength);
 
             memoryStream.Position = 0;
-            await memoryStream.CopyToAsync(stream, (int)memoryStream.Length.ClampHigh(settings.maxStreamCopyBufferSize), cancellationToken);
-            await stream.FlushAsync(cancellationToken);
+            await memoryStream.CopyToAsync(stream, (int)memoryStream.Length.ClampHigh(settings.maxStreamCopyBufferSize), cancellationToken).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             // Reset
             memoryStream.SetLength(0);

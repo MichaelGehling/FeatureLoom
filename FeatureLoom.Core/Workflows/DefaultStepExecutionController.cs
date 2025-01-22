@@ -69,7 +69,7 @@ namespace FeatureLoom.Workflows
             PartialStep<C> partialStep = step;
             try
             {
-                while (!await CheckConditionAsync(context, partialStep) && proceedStep)
+                while (!await CheckConditionAsync(context, partialStep).ConfigureAwait(false) && proceedStep)
                 {
                     if (partialStep.doElse != null)
                     {
@@ -82,11 +82,11 @@ namespace FeatureLoom.Workflows
                 {
                     if (partialStep.hasAction)
                     {
-                        await DoActionAsync(context, partialStep);
+                        await DoActionAsync(context, partialStep).ConfigureAwait(false);
                     }
                     else if (partialStep.hasWaiting)
                     {
-                        proceedStep = await DoWaitingAsync(context, step, proceedStep, partialStep);
+                        proceedStep = await DoWaitingAsync(context, step, proceedStep, partialStep).ConfigureAwait(false);
                     }
 
                     if (partialStep.targetStates != null || partialStep.finishStateMachine)
@@ -97,7 +97,7 @@ namespace FeatureLoom.Workflows
             }
             catch (Exception e)
             {
-                nextExecutionState = await HandleExceptionAsync(context, step, currentExecutionState, nextExecutionState, e);
+                nextExecutionState = await HandleExceptionAsync(context, step, currentExecutionState, nextExecutionState, e).ConfigureAwait(false);
                 proceedStep = false;
             }
 
@@ -306,7 +306,7 @@ namespace FeatureLoom.Workflows
                 }
                 else if (step.onExceptionAsync != null)
                 {
-                    await HandleAsyncExceptionActionAsync(context, step, e);
+                    await HandleAsyncExceptionActionAsync(context, step, e).ConfigureAwait(false);
                 }
                 else if (step.onExceptionTargetState != null)
                 {
@@ -343,7 +343,7 @@ namespace FeatureLoom.Workflows
         private static async Task HandleAsyncExceptionActionAsync<C>(C context, Step<C> step, Exception e) where C : class, IStateMachineContext
         {
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.ExceptionWithAction, e);
-            await step.onExceptionAsync(context, e);
+            await step.onExceptionAsync(context, e).ConfigureAwait(false);
         }
 
         private static async Task DoActionAsync<C>(C context, PartialStep<C> partialStep) where C : class, IStateMachineContext
@@ -353,7 +353,7 @@ namespace FeatureLoom.Workflows
             {
                 try
                 {
-                    await partialStep.actionAsync(context);
+                    await partialStep.actionAsync(context).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
@@ -374,7 +374,7 @@ namespace FeatureLoom.Workflows
                 }
                 else if (partialStep.conditionAsync != null)
                 {
-                    if (!await partialStep.conditionAsync(context)) result = false;
+                    if (!await partialStep.conditionAsync(context).ConfigureAwait(false)) result = false;
                 }
             }
 

@@ -62,7 +62,7 @@ namespace FeatureLoom.Synchronization
 
             if (!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks());
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).ConfigureAwait(false);
             return true;
         }
 
@@ -101,7 +101,7 @@ namespace FeatureLoom.Synchronization
 
             if (!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(token);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(token).ConfigureAwait(false);
             return true;
         }
 
@@ -167,7 +167,7 @@ namespace FeatureLoom.Synchronization
 
             if (!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(timeout);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(timeout).ConfigureAwait(false);
             return true;
         }
 
@@ -212,7 +212,7 @@ namespace FeatureLoom.Synchronization
 
             if (!anyWouldWait) return true;
 
-            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(timeout, token);
+            await Task.WhenAll(asyncWaitHandles.GetWaitingTasks()).TryWaitAsync(timeout, token).ConfigureAwait(false);
             return true;
         }
 
@@ -255,7 +255,7 @@ namespace FeatureLoom.Synchronization
             }
 
             Task[] tasks = asyncWaitHandles.GetWaitingTasks();
-            await Task.WhenAny(tasks);
+            await Task.WhenAny(tasks).ConfigureAwait(false);
             for (int i = 0; i < tasks.Length; i++)
             {
                 if (tasks[i].IsCompleted) return i;
@@ -307,7 +307,7 @@ namespace FeatureLoom.Synchronization
             }
 
             Task[] tasks = asyncWaitHandles.GetWaitingTasks();
-            await Task.WhenAny(tasks).TryWaitAsync(token);
+            await Task.WhenAny(tasks).TryWaitAsync(token).ConfigureAwait(false);
             for (int i = 0; i < tasks.Length; i++)
             {
                 if (tasks[i].IsCompleted) return i;
@@ -358,7 +358,7 @@ namespace FeatureLoom.Synchronization
             }
 
             Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
-            await Task.WhenAny(tasks);
+            await Task.WhenAny(tasks).ConfigureAwait(false);
             for (int i = 0; i < tasks.Length - 1; i++)
             {
                 if (tasks[i].IsCompleted) return i;
@@ -414,7 +414,7 @@ namespace FeatureLoom.Synchronization
             }
 
             Task[] tasks = asyncWaitHandles.GetWaitingTasks(Task.Delay(timeout));
-            await Task.WhenAny(tasks).TryWaitAsync(token);
+            await Task.WhenAny(tasks).TryWaitAsync(token).ConfigureAwait(false);
             for (int i = 0; i < tasks.Length - 1; i++)
             {
                 if (tasks[i].IsCompleted) return i;

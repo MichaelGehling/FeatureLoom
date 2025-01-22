@@ -666,7 +666,7 @@ namespace FeatureLoom.Synchronization
         // Yields thread to wait asynchronously
         private async Task YieldThreadAsync()
         {
-            if (Settings.sleepForAsyncYieldInSyncContext && SynchronizationContext.Current != null) await Task.Delay(1);
+            if (Settings.sleepForAsyncYieldInSyncContext && SynchronizationContext.Current != null) await Task.Delay(1).ConfigureAwait(false);
             else await Task.Yield();
         }
         #endregion HelperMethods
@@ -794,7 +794,7 @@ namespace FeatureLoom.Synchronization
 
         private async Task<LockHandle> LockAsync_Wait_ContinueWithAwaiting(LockMode mode, ushort ticket, bool prioritized, bool readOnly, int counter, bool yieldNow)
         {
-            if (yieldNow) await YieldThreadAsync();
+            if (yieldNow) await YieldThreadAsync().ConfigureAwait(false);
             int rank;
             bool skip;
             do
@@ -803,8 +803,8 @@ namespace FeatureLoom.Synchronization
                 if (MustWaitAsyncPassive(prioritized, rank, readOnly))
                 {
                     skip = true;
-                    if (MustWaitAsyncSleeping(rank, readOnly)) await SleepAsync(ticket, readOnly);
-                    else if (MustYieldAsyncThread(rank, prioritized, ++counter)) await YieldThreadAsync();
+                    if (MustWaitAsyncSleeping(rank, readOnly)) await SleepAsync(ticket, readOnly).ConfigureAwait(false);
+                    else if (MustYieldAsyncThread(rank, prioritized, ++counter)) await YieldThreadAsync().ConfigureAwait(false);
                     else YieldCpuTime(true);
                 }
                 else
@@ -814,7 +814,7 @@ namespace FeatureLoom.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        if (MustYieldAsyncThread(rank, prioritized, ++counter)) await YieldThreadAsync();
+                        if (MustYieldAsyncThread(rank, prioritized, ++counter)) await YieldThreadAsync().ConfigureAwait(false);
                         else YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
@@ -959,7 +959,7 @@ namespace FeatureLoom.Synchronization
             while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
                 prioritizedWaiting = true;
-                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await YieldThreadAsync();
+                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await YieldThreadAsync().ConfigureAwait(false);
                 else YieldCpuTime(false);
             }
             lazyObj.waitingForUpgrade = FALSE;
@@ -1251,7 +1251,7 @@ namespace FeatureLoom.Synchronization
 
         private async Task<LockAttempt> TryLockAsync_Wait_ContinueWithAwaiting(LockMode mode, TimeFrame timer, ushort ticket, bool prioritized, bool readOnly, int counter, bool yieldNow)
         {
-            if (yieldNow) await YieldThreadAsync();
+            if (yieldNow) await YieldThreadAsync().ConfigureAwait(false);
             int rank;
             bool skip;
             do
@@ -1266,8 +1266,8 @@ namespace FeatureLoom.Synchronization
                 if (MustWaitAsyncPassive(prioritized, rank, readOnly))
                 {
                     skip = true;
-                    if (MustWaitAsyncSleeping(rank, readOnly)) await TrySleepAsync(timer, ticket, readOnly);
-                    else if (MustYieldAsyncThread(rank, prioritized, counter++)) await YieldThreadAsync();
+                    if (MustWaitAsyncSleeping(rank, readOnly)) await TrySleepAsync(timer, ticket, readOnly).ConfigureAwait(false);
+                    else if (MustYieldAsyncThread(rank, prioritized, counter++)) await YieldThreadAsync().ConfigureAwait(false);
                     else YieldCpuTime(true);
                 }
                 else
@@ -1277,7 +1277,7 @@ namespace FeatureLoom.Synchronization
                     if (MustStillWait(prioritized, readOnly))
                     {
                         if (rank == 0) IncWaitCounter();
-                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await YieldThreadAsync();
+                        if (MustYieldAsyncThread(rank, prioritized, counter++)) await YieldThreadAsync().ConfigureAwait(false);
                         else YieldCpuTime(false);
                         skip = MustStillWait(prioritized, readOnly);
                     }
@@ -1451,7 +1451,7 @@ namespace FeatureLoom.Synchronization
                     return new LockAttempt(new LockHandle());
                 }
 
-                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await YieldThreadAsync();
+                if (MustYieldAsyncThread_ForReentranceUpgrade(++counter)) await YieldThreadAsync().ConfigureAwait(false);
                 else YieldCpuTime(false);
             }
             lazyObj.waitingForUpgrade = FALSE;

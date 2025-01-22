@@ -21,8 +21,8 @@ namespace FeatureLoom.Workflows
             if (!ignoreCurrentState) trigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
-            if (timeout == default) await trigger.WaitAsync();
-            else success = await trigger.WaitAsync(timeout);
+            if (timeout == default) await trigger.WaitAsync().ConfigureAwait(false);
+            else success = await trigger.WaitAsync(timeout).ConfigureAwait(false);
 
             workflow.ExecutionInfoSource.DisconnectFrom(trigger);
             return success;
@@ -53,12 +53,12 @@ namespace FeatureLoom.Workflows
             startTrigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
-            if (timeout == default) await startTrigger.WaitAsync();
+            if (timeout == default) await startTrigger.WaitAsync().ConfigureAwait(false);
             else
             {
                 DateTime now = AppTime.Now;
                 timeFrame = new TimeFrame(now, timeout);
-                success = await startTrigger.WaitAsync(timeFrame.Remaining(now));
+                success = await startTrigger.WaitAsync(timeFrame.Remaining(now)).ConfigureAwait(false);
             }
 
             workflow.ExecutionInfoSource.DisconnectFrom(startTrigger);
@@ -70,8 +70,8 @@ namespace FeatureLoom.Workflows
                 workflow.ExecutionInfoSource.ConnectTo(endTrigger);
                 endTrigger.Post(workflow.CreateExecutionInfo());
 
-                if (timeout == default) await endTrigger.WaitAsync();
-                else success = await endTrigger.WaitAsync(timeFrame.Remaining());
+                if (timeout == default) await endTrigger.WaitAsync().ConfigureAwait(false);
+                else success = await endTrigger.WaitAsync(timeFrame.Remaining()).ConfigureAwait(false);
 
                 workflow.ExecutionInfoSource.DisconnectFrom(endTrigger);
             }

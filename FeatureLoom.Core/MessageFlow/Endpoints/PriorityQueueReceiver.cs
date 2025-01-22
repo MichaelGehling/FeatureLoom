@@ -74,7 +74,7 @@ namespace FeatureLoom.MessageFlow
         {
             if (message != null && message is T typedMessage)
             {
-                if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue);
+                if (waitOnFullQueue) await writerWakeEvent.WaitAsync(timeoutOnFullQueue).ConfigureAwait(false);
                 Enqueue(typedMessage);
             }
             else await alternativeSendingHelper.ObjIfExists?.ForwardAsync(message);
