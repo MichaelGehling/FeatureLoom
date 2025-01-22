@@ -17,20 +17,20 @@ namespace FeatureLoom.Time
 
             Assert.True((DateTime.UtcNow - AppTime.CoarseNow).Duration() < 20.Milliseconds());
         }
-        /*
+        
         [Fact]
         public void WaitTimeIsCorrect()
         {
             TestHelper.PrepareTestContext();
 
             var tk = AppTime.TimeKeeper;
-            AppTime.Wait(5.Milliseconds());            
+            AppTime.WaitPrecisely(5.Milliseconds());            
             Assert.True(tk.Elapsed > 5.Milliseconds());
             Assert.True(tk.LastElapsed < 7.Milliseconds());
             
 
             tk = AppTime.TimeKeeper;
-            AppTime.Wait(20.Milliseconds());            
+            AppTime.WaitPrecisely(20.Milliseconds());            
             Assert.True(tk.Elapsed > 20.Milliseconds());
             Assert.True(tk.LastElapsed < 25.Milliseconds());
         }
@@ -41,15 +41,15 @@ namespace FeatureLoom.Time
             TestHelper.PrepareTestContext();
 
             var tk = AppTime.TimeKeeper;
-            AppTime.WaitAsync(5.Milliseconds()).WaitFor();
+            AppTime.WaitPreciselyAsync(5.Milliseconds()).WaitFor();
             Assert.True(tk.Elapsed > 5.Milliseconds());
             Assert.True(tk.LastElapsed < 8.Milliseconds());
 
             tk = AppTime.TimeKeeper;
-            AppTime.WaitAsync(20.Milliseconds()).WaitFor();
+            AppTime.WaitPreciselyAsync(20.Milliseconds()).WaitFor();
             Assert.True(tk.Elapsed > 20.Milliseconds());
             Assert.True(tk.LastElapsed < 25.Milliseconds());
         }
-        */
+        
     }
 }
