@@ -461,7 +461,7 @@ namespace Playground
                 {
                     if (api.TryReadStringValue(out string xmlString))
                     {
-                        XmlElement xml = xmlString.ToXmlElement(null);
+                        XmlElement xml = XmlHelper.ToXmlElement(xmlString);
                         return xml;
                     }
                     else throw new Exception("Not a string");
