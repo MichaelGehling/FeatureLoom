@@ -6,6 +6,8 @@ using System.Reflection;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 
+using Newtonsoft.Json;
+
 namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer
@@ -23,16 +25,20 @@ namespace FeatureLoom.Serialization
             var memberInfos = new List<MemberInfo>();
             if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
             {
-                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.GetMethod != null));
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance));                
+                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(prop => prop.GetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field =>!field.IsDefined(typeof(JsonIgnoreAttribute), true)));                
             }
             else
             {
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
                 Type t = itemType.BaseType;
                 while (t != null)
                 {
-                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !memberInfos.Any(field => field.Name == baseField.Name)));
+                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
                     t = t.BaseType;
                 }
             }

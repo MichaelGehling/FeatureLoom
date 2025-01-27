@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
@@ -51,12 +52,14 @@ namespace FeatureLoom.Helpers
             this.capacityGrowth = capacityGrowth;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void RenewBuffer()
         {
             buffer = new T[capacity];
             this.position = 0;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ArraySegment<T> GetSlice(int size)
         {
             int leftCapacity = buffer.Length - position;
@@ -80,12 +83,39 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Reset(bool reuseExistingBuffer, bool resetCapacity = false)
         {
-            if (resetCapacity) capacity = initCapacity;
-
             if (reuseExistingBuffer) position = 0;
-            else RenewBuffer();
-        }        
+            else
+            {
+                if (resetCapacity) capacity = initCapacity;
+                RenewBuffer();
+            }
+        }
+
+        // Returns a new ArraySegment with the extended size, but filled with the elements from the input ArraySegment
+        // If the input ArraySegment is the latest element of the sliceBuffer and capacity is sufficient,
+        // the data does not has to be copied, but simply the size of the original ArraySegment is increased.
+        // This can be used to grow the latest slice step by step very efficiently, as long as no other slice was created in the meantime.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ArraySegment<T> ExtendSlice(ArraySegment<T> slice, int additionalElements)
+        {
+            if (additionalElements == 0) return slice;
+            int leftCapacity = buffer.Length - position;
+            if (slice.Array == this.buffer && 
+               slice.Offset + slice.Count == this.position &&
+               leftCapacity >= additionalElements)
+            {
+                position += additionalElements;
+                return new ArraySegment<T>(buffer, slice.Offset, slice.Count + additionalElements);
+            }
+            else
+            {
+                var newSlice = GetSlice(slice.Count + additionalElements);
+                newSlice.CopyFrom(slice);
+                return newSlice;
+            }
+        }
     }
 }
