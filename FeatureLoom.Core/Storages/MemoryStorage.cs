@@ -229,24 +229,19 @@ namespace FeatureLoom.Storages
                 }
                 catch (Exception e)
                 {
-                    if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing! bytes[] is no proper UTF8 string!", e.ToString());
+                    if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing! bytes is no proper UTF8 string!", e.ToString());
                     data = default;
                     return false;
                 }
             }
-
-            try
+                        
+            if (JsonHelper.DefaultDeserializer.TryDeserialize(bytes, out data)) return true;
+            else
             {
-                string json = Encoding.UTF8.GetString(bytes);
-                data = json.FromJson<T>();
-                return true;
-            }
-            catch (Exception e)
-            {
-                if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!", e.ToString());
+                if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!");
                 data = default;
                 return false;
-            }
+            }            
         }
 
         protected virtual bool TrySerialize<T>(T data, out byte[] bytes)
@@ -265,8 +260,9 @@ namespace FeatureLoom.Storages
 
             try
             {
-                string json = data.ToJson();
-                bytes = json.ToByteArray(Encoding.UTF8);
+                MemoryStream stream = new MemoryStream();
+                JsonHelper.DefaultSerializer.Serialize(stream, data);
+                bytes = stream.ToArray();
                 return true;
             }
             catch (Exception e)

@@ -21,10 +21,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         private AsyncExRWSubjects asyncExRWSubjects = new AsyncExRWSubjects();
         private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
         private FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
-        private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
-        private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
         private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
         [Benchmark(Baseline = true)]
@@ -64,19 +61,11 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         public void SemaphoreSlim_LockAsync_() => semaphoreSlimSubjects.LockAsync().WaitFor();
 
         [Benchmark]
-        public void VSAsyncReaderWriterLock_LockAsync_() => vSAsyncReaderWriterLockSubjects.LockAsync().WaitFor();
-
-        [Benchmark]
         public void AsyncEx_LockAsync_() => asyncExSubjects.LockAsync().WaitFor();
 
         [Benchmark]
         public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockAsync().WaitFor();
 
-        [Benchmark]
-        public void Bmbsqd_LockAsync_() => bmbsqdSubjects.LockAsync().WaitFor();
-
-        [Benchmark]
-        public void NeoSmart_LockAsync_() => neoSmartSubjects.LockAsync().WaitFor();
         /*
         [Benchmark]
         public void ReentrantFeatureLock_Lock() => featureLockSubjects.ReentrantLock();

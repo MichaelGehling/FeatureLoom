@@ -1,5 +1,4 @@
 ﻿using FeatureLoom.Serialization;
-using Newtonsoft.Json;
 
 namespace FeatureLoom.RPC
 {
@@ -22,7 +21,7 @@ namespace FeatureLoom.RPC
 
         public string ResultToJson()
         {
-            return result.ToJson();
+            return JsonHelper.DefaultSerializer.Serialize(result);
         }
     }
 }

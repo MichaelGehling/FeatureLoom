@@ -6,23 +6,22 @@ using System;
 using System.Net;
 using System.Threading.Tasks;
 using FeatureLoom.DependencyInversion;
+using FeatureLoom.Serialization;
 
 namespace FeatureLoom.Web
 {
     public class HttpServerReceiver : IMessageSource, IWebRequestHandler
     {
         private readonly int bufferSize;
-        private readonly string route;
-        private IWebMessageTranslator translator;        
+        private readonly string route;    
 
         private SourceValueHelper sourceHelper;
 
-        public HttpServerReceiver(string route, IWebMessageTranslator translator, int bufferSize = 1024 * 128)
+        public HttpServerReceiver(string route, int bufferSize = 1024 * 128)
         {
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.route = route;
-            this.translator = translator;
             this.bufferSize = bufferSize;
         }
 
@@ -57,8 +56,8 @@ namespace FeatureLoom.Web
 
             try
             {
-                string bodyString = await request.ReadAsync();
-                if (translator.TryTranslate(bodyString, out object message))
+                string bodyString = await request.ReadAsync();               
+                if (JsonHelper.DefaultDeserializer.TryDeserialize(bodyString, out object message))
                 {
                     await sourceHelper.ForwardAsync(message);
                     return HandlerResult.Handled_OK();

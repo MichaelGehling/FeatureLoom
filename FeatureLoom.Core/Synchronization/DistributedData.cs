@@ -50,7 +50,7 @@ namespace FeatureLoom.Synchronization
                         if (update.timestamp > this.timestamp)
                         {
                             var value = data.Value;
-                            value = update.serializedData.FromJson<T>();
+                            if (!JsonHelper.DefaultDeserializer.TryDeserialize(update.serializedData, out value)) throw new Exception("Failed on deserializing");
                             data.SetValue(value);
                             this.timestamp = update.timestamp;
                             return true;
@@ -74,7 +74,8 @@ namespace FeatureLoom.Synchronization
                     using (var data = sharedData.GetReadAccess())
                     {
                         this.timestamp = AppTime.Now;
-                        DistributedDataUpdate update = new DistributedDataUpdate(data.Value.ToJson(), uri, this.timestamp);
+                        string json = JsonHelper.DefaultSerializer.Serialize(data.Value);
+                        DistributedDataUpdate update = new DistributedDataUpdate(json, uri, this.timestamp);
                         updateSender.Send(update);
                         return true;
                     }

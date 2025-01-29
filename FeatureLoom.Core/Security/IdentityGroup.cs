@@ -6,7 +6,7 @@ using System.Text;
 using System.Linq;
 using System.Threading.Tasks;
 using FeatureLoom.Storages;
-using Newtonsoft.Json;
+using FeatureLoom.Serialization;
 
 namespace FeatureLoom.Security
 {

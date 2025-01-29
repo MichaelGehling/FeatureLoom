@@ -41,6 +41,14 @@ namespace FeatureLoom.Web
         private List<IWebResultHandler> resultHandlers = new List<IWebResultHandler>();
         private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
+        FeatureJsonSerializer jsonSerializer = new FeatureJsonSerializer(new()
+        {
+            indent = false,
+            referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+            dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
+            enumAsString = true,
+            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,            
+        });
         public DefaultWebServer()
         {
             favicon = Resource.favicon;
@@ -372,7 +380,7 @@ namespace FeatureLoom.Web
                 if (result.data is string str) await response.WriteAsync(str);
                 else if (result.data is byte[] bytes) await response.Stream.WriteAsync(bytes, 0, bytes.Length);
                 else if (result.data is Stream stream) await stream.CopyToAsync(response.Stream);
-                else await response.WriteAsync(Json.SerializeToJson(result.data));
+                else await jsonSerializer.SerializeAsync(response.Stream, result.data);                
 
                 return true;
             }

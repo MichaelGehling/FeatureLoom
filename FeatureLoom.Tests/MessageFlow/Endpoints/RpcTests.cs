@@ -98,7 +98,7 @@ namespace FeatureLoom.RPC
                 return response;
             });
 
-            string result2 = caller.CallAsync("RepeatString2 {str:\"Abc \", num:2}").WaitFor();
+            string result2 = caller.CallAsync("RepeatString2 {\"str\":\"Abc \", \"num\":2}").WaitFor();
             Assert.Equal("Abc Abc ", result2);
         }
 

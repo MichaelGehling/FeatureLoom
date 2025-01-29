@@ -17,7 +17,7 @@ using System.Net;
 using System.ComponentModel;
 using System.Runtime.Serialization.Formatters;
 using System.Net.Http.Headers;
-using Newtonsoft.Json.Linq;
+using FeatureLoom.Serialization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -356,7 +356,7 @@ namespace FeatureLoom.Serialization
                 case TypeResult.Object: return ReadObjectValueAsDictionary();
                 case TypeResult.Bool: return ReadBoolValue();
                 case TypeResult.Null: return ReadNullValue();
-                case TypeResult.Array: return ReadArrayValueAsList(); // ReadArrayValueAsObject();
+                case TypeResult.Array: return ReadArrayValueAsList();
                 case TypeResult.Number: return ReadNumberValueAsObject();
                 default: throw new Exception("Invalid character for determining value");
             }
@@ -394,6 +394,12 @@ namespace FeatureLoom.Serialization
 
         private void CreateDictionaryTypeReader<T, K, V>(CachedTypeReader cachedTypeReader) where T : IDictionary<K, V>, new()
         {
+            if (typeof(T).IsAbstract)
+            {
+                cachedTypeReader.MakeAbstract<T>(JsonDataTypeCategory.Object);
+                return;
+            }
+
             var constructor = GetConstructor<T>();
             var elementReader = new ElementReader<KeyValuePair<K, V>>(this);
             var keyReader = GetCachedTypeReader(typeof(K));
@@ -533,13 +539,12 @@ namespace FeatureLoom.Serialization
                     }
                     finally
                     {
+                        dict.Clear();
+                        for (int i = 0; i < keyValueList.Count; i++)
+                        {
+                            dict.Add(keyValueList[i]);
+                        }
                         keyValueList.Clear();
-                    }
-
-                    dict.Clear();
-                    for (int i=0; i < keyValueList.Count; i++)
-                    {
-                        dict.Add(keyValueList[i]);
                     }
 
                     return dict;
@@ -826,19 +831,29 @@ namespace FeatureLoom.Serialization
                 return;
             }
 
+            if (itemType.IsAbstract)
+            {
+                cachedTypeReader.MakeAbstract<T>(JsonDataTypeCategory.Object);
+                return;
+            }
+
             var memberInfos = new List<MemberInfo>();
             if (settings.dataAccess == DataAccess.PublicFieldsAndProperties)
             {
-                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.SetMethod != null));
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance));
+                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(prop => prop.SetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
             }
             else
             {
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
                 Type t = itemType.BaseType;
                 while (t != null)
                 {
-                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !memberInfos.Any(field => field.Name == baseField.Name)));
+                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
                     t = t.BaseType;
                 }
             }
@@ -1351,6 +1366,12 @@ namespace FeatureLoom.Serialization
 
         private void CreateGenericListTypeReader<T, E>(CachedTypeReader cachedTypeReader) where T : IList<E>
         {
+            if (typeof(T).IsAbstract)
+            {
+                cachedTypeReader.MakeAbstract<T>(JsonDataTypeCategory.Object);
+                return;
+            }
+
             var elementReader = new ElementReader<E>(this);
 
             var constructor = GetConstructor<T>();
@@ -1375,6 +1396,12 @@ namespace FeatureLoom.Serialization
 
         private void CreateGenericEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
         {
+            if (typeof(T).IsAbstract)
+            {
+                cachedTypeReader.MakeAbstract<T>(JsonDataTypeCategory.Object);
+                return;
+            }
+
             var constructor = GetConstructor<T, IEnumerable<E>>();
 
             Pool<ElementReader<E>> elementReaderPool = new Pool<ElementReader<E>>(() => new ElementReader<E>(this), l => l.Reset(), 1000, false);
@@ -1396,7 +1423,12 @@ namespace FeatureLoom.Serialization
         }
 
         private void CreateEnumerableTypeReader<T>(CachedTypeReader cachedTypeReader)
-        {            
+        {
+            if (typeof(T).IsAbstract)
+            {
+                cachedTypeReader.MakeAbstract<T>(JsonDataTypeCategory.Object);
+                return;
+            }
 
             Func<IEnumerable, T> constructor = GetConstructor<T, IEnumerable>();
             Pool<ElementReader<object>> elementReaderPool = new Pool<ElementReader<object>>(() => new ElementReader<object>(this), l => l.Reset(), 1000, false);
@@ -1497,7 +1529,7 @@ namespace FeatureLoom.Serialization
             if (!settings.tryCastArraysOfUnknownValues || objectsList.Count == 0) return objectsList;
             
             var castedList = listCaster.CastListToCommonType(objectsList, out _);
-            return castedList;            
+            return castedList;
         }
 
         private bool TryReadObjectValue<T>(out T value, ByteSegment itemName)
@@ -2022,8 +2054,22 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        private void SetDataSourceUnlocked(Stream stream) => buffer.SetStream(stream);
-        private void SetDataSourceUnlocked(string json) => buffer.SetStream(json.ToStream());
+        public void SetDataSource(ByteSegment uft8Bytes)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(uft8Bytes);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        private void SetDataSourceUnlocked(Stream stream) => buffer.SetSource(stream);
+        private void SetDataSourceUnlocked(string json) => buffer.SetSource(json);
+        private void SetDataSourceUnlocked(ByteSegment jsonBytes) => buffer.SetSource(jsonBytes);
 
         public bool IsAnyDataLeft()
         {
@@ -2199,7 +2245,7 @@ namespace FeatureLoom.Serialization
                     // Return false if only whitespaces are left (otherwise we would throw an exception)
                     byte b = SkipWhiteSpaces();
                     if (LookupCheck(map_SkipWhitespaces, b, FilterResult.Skip)) return false;
-
+                    
                     var itemType = typeof(T);
                     if (lastTypeReaderType == itemType)
                     {
@@ -2328,7 +2374,35 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public bool TryPopulate<T>(ref T item)
+        public bool TryDeserialize<T>(ByteSegment utf8Bytes, out T item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(utf8Bytes);
+                return TryDeserializeLocked(out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryDeserialize(ByteSegment utf8Bytes, Type type, out object item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(utf8Bytes);
+                return TryDeserializeLocked(type, out item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(ref T item) where T : struct
         {
             serializerLock.Enter();
             try
@@ -2341,7 +2415,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public bool TryPopulate<T>(Stream stream, ref T item)
+        public bool TryPopulate<T>(Stream stream, ref T item) where T : struct
         {
             serializerLock.Enter();
             try
@@ -2355,12 +2429,81 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public bool TryPopulate<T>(string json, ref T item)
+        public bool TryPopulate<T>(string json, ref T item) where T : struct
         {
             serializerLock.Enter();
             try
             {
                 SetDataSourceUnlocked(json);
+                return TryPopulateLocked(ref item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(ByteSegment utf8Bytes, ref T item) where T : struct
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(utf8Bytes);
+                return TryPopulateLocked(ref item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(T item) where T : class
+        {
+            serializerLock.Enter();
+            try
+            {
+                return TryPopulateLocked(ref item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(Stream stream, T item) where T : class
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(stream);
+                return TryPopulateLocked(ref item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(string json, T item) where T : class
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(json);
+                return TryPopulateLocked(ref item);
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
+
+        public bool TryPopulate<T>(ByteSegment utf8Bytes, T item) where T : class
+        {
+            serializerLock.Enter();
+            try
+            {
+                SetDataSourceUnlocked(utf8Bytes);
                 return TryPopulateLocked(ref item);
             }
             finally

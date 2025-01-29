@@ -1,6 +1,6 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Synchronization;
-using Newtonsoft.Json.Serialization;
+using FeatureLoom.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Data;

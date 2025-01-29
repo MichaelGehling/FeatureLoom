@@ -36,7 +36,13 @@ namespace FeatureLoom.Web
             try
             {
                 string data = await request.ReadAsync();
-                var usernamePassword = data.FromJson<UsernamePassword>();
+                if (!JsonHelper.DefaultDeserializer.TryDeserialize(data, out UsernamePassword usernamePassword))
+                {
+                    Log.INFO(this.GetHandle(), "Login failed, due to misformed credentials!");
+
+                    await processingTimeFrame.WaitForEndAsync();
+                    return HandlerResult.Handled_Unauthorized();
+                }
 
                 if ((await Identity.TryGetIdentityAsync(usernamePassword.username)).TryOut(out Identity identity))
                 {

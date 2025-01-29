@@ -118,7 +118,7 @@ namespace FeatureLoom.RPC
                 if (!param.EmptyOrNull()) parameters.Add(param);
             }
             string parameterSet = CreateJsonParamString(parameters);
-            string reqStr = $"{{method:\"{methodName}\", requestId:{requestId.ToString()}, noResponse:{(noResponse ? "true" : "false")}, parameterSet:{parameterSet}}}";
+            string reqStr = $"{{\"method\":\"{methodName}\", \"requestId\":{requestId.ToString()}, \"noResponse\":{(noResponse ? "true" : "false")}, \"parameterSet\":{parameterSet}}}";
             return reqStr;
         }
 
@@ -132,7 +132,7 @@ namespace FeatureLoom.RPC
                 int paramCount = 1;
                 foreach (string p in parameters)
                 {
-                    result += $"Item{(paramCount++).ToString()}:{p},";
+                    result += $"\"Item{paramCount++}\":{p},";
                 }
                 result = result.TrimEnd(',') + '}';
                 return result;

@@ -1,7 +1,7 @@
 ﻿using FeatureLoom.Synchronization;
 using System.Collections.Generic;
 using System.Linq;
-using Newtonsoft.Json;
+using FeatureLoom.Serialization;
 using System.Text.RegularExpressions;
 
 namespace FeatureLoom.Security

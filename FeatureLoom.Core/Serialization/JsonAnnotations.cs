@@ -4,10 +4,10 @@ using System.Text;
 
 namespace FeatureLoom.Serialization
 {
-    /*
+    
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
     public class JsonIgnoreAttribute : Attribute
     {
     }
-    */
+   
 }

@@ -128,18 +128,6 @@ namespace Playground
         private static async Task Main()
         {
 
-            Service<SchedulerService>.Instance.ScheduleAction("time", now =>
-            {
-                ConsoleHelper.WriteLine(AppTime.Now.ToString());
-            }, 1.Seconds(), CancellationToken.None);
-
-            Service<SchedulerService>.Instance.ScheduleAction("star", now =>
-            {
-                ConsoleHelper.WriteLine("***");
-            }, 1.Seconds(), CancellationToken.None);
-
-            Console.ReadKey();
-
             /*
             var batchTK = AppTime.TimeKeeper;
             Batcher<int> batcher = new Batcher<int>(5, 1.Seconds(), 100.Milliseconds());

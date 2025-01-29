@@ -354,17 +354,11 @@ namespace FeatureLoom.Storages
             }
             else
             {
-                try
-                {
-                    data = str.FromJson<T>();
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!", e.ToString());
-                    data = default;
-                    return false;
-                }
+                if (JsonHelper.DefaultDeserializer.TryDeserialize<T>(str, out data)) return true;
+
+                if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), $"Failed on deserializing to type {typeof(T)}!");
+                data = default;
+                return false;
             }
         }
 
@@ -376,10 +370,10 @@ namespace FeatureLoom.Storages
                 return true;
             }
             else
-            {
+            {                
                 try
                 {
-                    str = data.ToJson();
+                    str = JsonHelper.DefaultSerializer.Serialize(data);
                     return true;
                 }
                 catch (Exception e)

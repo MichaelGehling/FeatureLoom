@@ -14,8 +14,7 @@ using System.IO;
 using System.Threading;
 using System.ComponentModel;
 using System.Text;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Bson;
+using FeatureLoom.Serialization;
 
 namespace FeatureLoom.TCP
 {

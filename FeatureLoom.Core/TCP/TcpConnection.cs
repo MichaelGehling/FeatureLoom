@@ -11,7 +11,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using FeatureLoom.Extensions;
 using System.Threading;
-using Newtonsoft.Json;
+using FeatureLoom.Serialization;
 
 namespace FeatureLoom.TCP
 {

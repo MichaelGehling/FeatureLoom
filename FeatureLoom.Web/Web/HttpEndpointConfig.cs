@@ -1,7 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.Synchronization;
-using Newtonsoft.Json;
+using FeatureLoom.Serialization;
 using System;
 using System.Net;
 

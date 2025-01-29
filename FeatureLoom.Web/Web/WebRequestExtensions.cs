@@ -12,7 +12,7 @@ namespace FeatureLoom.Web
             string body = await request.ReadAsync();
             if (body.EmptyOrNull()) return (false, default(T));
             if (body is T bodyStr) return (true, bodyStr);
-            if (Json.TryParseJson(body, out T result)) return (true, result);
+            if (JsonHelper.DefaultDeserializer.TryDeserialize(body, out T result)) return (true, result);
             return (false, default(T));
         }
 
@@ -20,7 +20,7 @@ namespace FeatureLoom.Web
         {
             if (request.TryGetQueryItem(key, out string strItem))
             {
-                if (Json.TryParseJson(strItem, out item)) return true;
+                if (JsonHelper.DefaultDeserializer.TryDeserialize(strItem, out item)) return true;
             }
 
             item = default;
@@ -31,7 +31,7 @@ namespace FeatureLoom.Web
         {
             if (request.TryGetCookie(key, out string strCookie))
             {
-                if (Json.TryParseJson(strCookie, out cookie)) return true;
+                if (JsonHelper.DefaultDeserializer.TryDeserialize(strCookie, out cookie)) return true;
             }
 
             cookie = default;

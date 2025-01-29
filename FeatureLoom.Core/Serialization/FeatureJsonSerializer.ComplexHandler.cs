@@ -6,8 +6,6 @@ using System.Reflection;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 
-using Newtonsoft.Json;
-
 namespace FeatureLoom.Serialization
 {
     public sealed partial class FeatureJsonSerializer

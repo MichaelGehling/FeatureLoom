@@ -14,11 +14,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         private AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
         private AsyncExRWSubjects asyncExRwSubjects = new AsyncExRWSubjects();
-        private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
         private MicroValueLockSubjects microValueLockSubjects = new MicroValueLockSubjects();
         private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
-        private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
         private MixedPerformanceTest test = new MixedPerformanceTest(5);
 

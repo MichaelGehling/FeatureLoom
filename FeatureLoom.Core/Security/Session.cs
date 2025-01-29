@@ -5,7 +5,7 @@ using FeatureLoom.DependencyInversion;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
-using Newtonsoft.Json;
+using FeatureLoom.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;

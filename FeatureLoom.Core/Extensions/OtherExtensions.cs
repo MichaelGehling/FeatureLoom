@@ -247,22 +247,12 @@ namespace FeatureLoom.Extensions
             try
             {
                 converted = Convert.ChangeType(obj, type);
+                return true;
             }
             catch
             {
-                try
-                {
-                    if (obj is string str)
-                    {
-                        converted = Json.DeserializeFromJson(str, type);
-                    }
-                }
-                catch
-                {
-                }
-            }
-
-            return converted != null;
+                return (obj is string str && JsonHelper.DefaultDeserializer.TryDeserialize(str, out converted));
+            }            
         }
 
         public static bool TryConvertTo<TIN, TOUT>(this TIN obj, out TOUT converted) 

@@ -161,8 +161,47 @@ namespace FeatureLoom.Serialization
             {
                 FinishSerialization();
                 serializerLock.Exit();
+            }        
+        }
+
+        // Will only write async to the stream for the final data chunk,
+        // so define a sufficient buffer, otherwise the intermediate writings will be blocking!
+        public async Task SerializeAsync<T>(Stream stream, T item)
+        {
+            serializerLock.Enter();
+            try
+            {
+                writer.stream = stream;
+
+                if (item == null)
+                {
+                    writer.WriteNullValue();
+                    return;
+                }
+
+                Type itemType = item.GetType();
+
+                if (lastTypeHandlerType == itemType)
+                {
+                    lastTypeHandler.HandleItem(item, rootName);
+                }
+                else
+                {
+                    var typeHandler = GetCachedTypeHandler(itemType);
+
+                    typeHandler.HandleItem(item, rootName);
+
+                    lastTypeHandler = typeHandler;
+                    lastTypeHandlerType = typeHandler.HandlerType;
+                }
+
+                await writer.WriteBufferToStreamAsync();
             }
-        
+            finally
+            {
+                FinishSerialization();
+                serializerLock.Exit();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

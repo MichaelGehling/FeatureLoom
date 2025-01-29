@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using FeatureLoom.Serialization;
 
 namespace FeatureLoom.RPC
 {

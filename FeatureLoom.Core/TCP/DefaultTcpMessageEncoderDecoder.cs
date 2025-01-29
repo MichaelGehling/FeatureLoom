@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Serialization;
@@ -20,7 +21,7 @@ namespace FeatureLoom.TCP
         private Config config;
 
         private Encoding encoding = Encoding.UTF8;
-        private byte[] headerStartMarkerBytes = null;
+        private byte[] headerStartMarkerBytes = null;        
 
         public DefaultTcpMessageEncoderDecoder(Config config = null)
         {
@@ -41,7 +42,7 @@ namespace FeatureLoom.TCP
                 if (!(obj is byte[]) && !(obj is string))
                 {
                     if (type == 0) type = 1;
-                    obj = obj.ToJson(Json.ComplexObjectsStructure_SerializerSettings);
+                    obj = JsonHelper.DefaultSerializer.Serialize(obj);                    
                 }
 
                 if (obj is string strObj)
@@ -137,9 +138,8 @@ namespace FeatureLoom.TCP
                         decodedMessage = stringResult;
                         return DecodingResult.Complete;
 
-                    case 1:
-                        string json = encoding.GetString(buffer, bufferReadPosition, payloadLength);
-                        decodedMessage = Json.DeserializeFromJson(json, typeof(object), Json.ComplexObjectsStructure_SerializerSettings);
+                    case 1:                        
+                        if (!JsonHelper.DefaultDeserializer.TryDeserialize(new ByteSegment(buffer, bufferReadPosition, payloadLength), out decodedMessage)) throw new Exception("Failed deserializing json");
                         return DecodingResult.Complete;
 
                     default:

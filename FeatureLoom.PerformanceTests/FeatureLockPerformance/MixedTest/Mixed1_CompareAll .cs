@@ -16,11 +16,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         private AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
         private AsyncExRWSubjects asyncExRwSubjects = new AsyncExRWSubjects();
-        private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
         private MicroValueLockSubjects microValueLockSubjects = new MicroValueLockSubjects();
         private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
-        private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
 
         private MixedPerformanceTest test = new MixedPerformanceTest(1);
 
@@ -72,14 +69,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.MixedTest
         [Benchmark]
         public void AsyncExRW_LockAsync_() => test.Run(asyncExRwSubjects.LockAsync);
 
-        [Benchmark]
-        public void NeoSmart_LockAsync_() => test.Run(neoSmartSubjects.LockAsync);
-
-        [Benchmark]
-        public void bmbsqd_LockAsync_() => test.Run(bmbsqdSubjects.LockAsync);
-
-        [Benchmark]
-        public void vSRWLock_LockAsync_() => test.Run(vSAsyncReaderWriterLockSubjects.LockAsync);
         /*
         [Benchmark]
         public void FeatureLock_LockReentrant() => test.Run(featureLockSubjects.ReentrantLock);

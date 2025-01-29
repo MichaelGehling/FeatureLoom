@@ -34,7 +34,7 @@ namespace FeatureLoom.RPC
                 }
                 else if (message is string stringMessage)
                 {
-                    if (stringMessage.TryParseJson(out RpcRequest<P1, R> rpcRequest) && rpcRequest.method == this.name)
+                    if (JsonHelper.DefaultDeserializer.TryDeserialize(stringMessage, out RpcRequest<P1, R> rpcRequest) && rpcRequest.method == this.name)
                     {
                         HandleRpcRequest(rpcRequest);
                         return true;

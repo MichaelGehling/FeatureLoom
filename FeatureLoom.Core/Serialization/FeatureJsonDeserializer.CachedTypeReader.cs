@@ -13,11 +13,13 @@ namespace FeatureLoom.Serialization
             private Delegate itemReader;
             private Delegate populatingItemReader;
             private Func<object> objectItemReader;
+            private Func<object, object> populatingObjectItemReader;
             private Type readerType;
             private bool isRefType;
             private JsonDataTypeCategory category;
             private readonly bool enableReferenceResolution;
             private readonly bool enableProposedTypes;
+            private bool isAbstract = false;
 
             public JsonDataTypeCategory JsonTypeCategory => category;
 
@@ -29,6 +31,15 @@ namespace FeatureLoom.Serialization
                 enableReferenceResolution = deserializer.settings.enableReferenceResolution;
                 enableProposedTypes = deserializer.settings.enableProposedTypes;
             }            
+
+            public void MakeAbstract<T>(JsonDataTypeCategory category)
+            {
+                isAbstract = true;
+                this.readerType = typeof(T);
+                this.category = category;
+                this.isRefType = !readerType.IsValueType;
+                bool isNullable = readerType.IsNullable();
+            }
 
             public void SetCustomTypeReader<T>(ICustomTypeReader<T> customTypeReader)
             {
@@ -108,6 +119,7 @@ namespace FeatureLoom.Serialization
                     temp = typeReader;
                 }
                 this.populatingItemReader = temp;
+                this.populatingObjectItemReader = (item) => (object)temp.Invoke((T)item);
             }
 
             public T ReadFieldName<T>(out ByteSegment itemName)
@@ -156,7 +168,7 @@ namespace FeatureLoom.Serialization
 
             public T ReadValue<T>(ByteSegment itemName, T itemToPopulate)
             {
-                if (this.populatingItemReader == null || itemToPopulate == null) return ReadValue<T>(itemName);
+                if ((this.populatingItemReader == null && !isAbstract) || itemToPopulate == null) return ReadValue<T>(itemName);
 
                 if (category == JsonDataTypeCategory.Primitive)
                 {
@@ -185,15 +197,22 @@ namespace FeatureLoom.Serialization
                 if (enableProposedTypes && deserializer.TryReadAsProposedType(this, out T item)) return item;
 
                 Type callType = typeof(T);
-                T result;
+                T result;                
                 if (callType == this.readerType)
                 {
+                    if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
+
                     Func<T> typedItemReader = (Func<T>)itemReader;
                     result = typedItemReader.Invoke();
                 }
                 else
                 {
-                    result = (T)objectItemReader.Invoke();
+                    if (!isAbstract) result = (T)objectItemReader.Invoke();
+                    else
+                    {
+                        var typedReader = deserializer.GetCachedTypeReader(callType);
+                        result = typedReader.ReadItem<T>();
+                    }
                 }
 
                 return result;
@@ -202,7 +221,7 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public T ReadItem<T>(T itemToPopulate)
             {
-                if (this.populatingItemReader == null || itemToPopulate == null) return ReadItem<T>();
+                if ((this.populatingItemReader == null && !isAbstract) || itemToPopulate == null) return ReadItem<T>();
 
                 if (enableProposedTypes && deserializer.TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
 
@@ -210,8 +229,17 @@ namespace FeatureLoom.Serialization
                 T result;
                 if (itemType == this.readerType)
                 {
-                    Func<T,T> typedItemReader = (Func<T,T>)populatingItemReader;
-                    result = typedItemReader.Invoke(itemToPopulate);
+                    if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
+                    Type callType = typeof(T);
+                    if (callType == this.readerType)
+                    {
+                        Func<T, T> typedItemReader = (Func<T, T>)populatingItemReader;
+                        result = typedItemReader.Invoke(itemToPopulate);
+                    }
+                    else
+                    {
+                        result = (T)populatingObjectItemReader.Invoke(itemToPopulate);
+                    }
                 }
                 else
                 {
@@ -229,12 +257,19 @@ namespace FeatureLoom.Serialization
                 T result;
                 if (callType == this.readerType)
                 {
+                    if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
+
                     Func<T> typedItemReader = (Func<T>)itemReader;
                     result = typedItemReader.Invoke();
                 }
                 else
-                {
-                    result = (T)objectItemReader.Invoke();
+                {                    
+                    if (!isAbstract) result = (T)objectItemReader.Invoke();
+                    else
+                    {
+                        var typedReader = deserializer.GetCachedTypeReader(callType);
+                        result = typedReader.ReadItemIgnoreProposedType<T>();
+                    }
                 }
 
                 return result;
@@ -243,14 +278,23 @@ namespace FeatureLoom.Serialization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public T ReadItemIgnoreProposedType<T>(T itemToPopulate)
             {
-                if (this.populatingItemReader == null || itemToPopulate == null) return ReadItemIgnoreProposedType<T>();
+                if ((this.populatingItemReader == null && !isAbstract) || itemToPopulate == null) return ReadItemIgnoreProposedType<T>();
 
                 Type itemType = itemToPopulate.GetType();
                 T result;
                 if (itemType == this.readerType)
                 {
-                    Func<T, T> typedItemReader = (Func<T, T>)populatingItemReader;
-                    result = typedItemReader.Invoke(itemToPopulate);
+                    if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
+                    Type callType = typeof(T);
+                    if (callType == this.readerType)
+                    {
+                        Func<T, T> typedItemReader = (Func<T, T>)populatingItemReader;
+                        result = typedItemReader.Invoke(itemToPopulate);
+                    }
+                    else
+                    {
+                        result = (T)populatingObjectItemReader.Invoke(itemToPopulate);
+                    }
                 }
                 else
                 {

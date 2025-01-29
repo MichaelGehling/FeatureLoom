@@ -7,7 +7,6 @@ using FeatureLoom.Serialization;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using FeatureLoom.Web;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -55,7 +54,6 @@ namespace FeatureLoom.MessageFlow
         SourceHelper sourceHelper = new SourceHelper();
         WebSocket webSocket;
         MemoryStream writeBuffer = new MemoryStream();
-        JsonTextWriter jsonWriter;
         FeatureLock writeLock = new FeatureLock();
         CancellationTokenSource cts = new CancellationTokenSource();
         bool closed;
@@ -71,8 +69,6 @@ namespace FeatureLoom.MessageFlow
         public WebSocketEndpoint(WebSocket webSocket, Type deserializationType = null, bool useConnectionMetaDataForMessages = true, int readBufferSize = 4096) 
         { 
             endpointHandle = this.GetHandle();
-            jsonWriter = new JsonTextWriter(new StreamWriter(writeBuffer));
-
 
             if (webSocket == null) throw new ArgumentNullException(nameof(webSocket));
             this.deserializationType = deserializationType;
@@ -96,8 +92,6 @@ namespace FeatureLoom.MessageFlow
 
             var readBuffer = new ArraySegment<byte>(new byte[readBufferSize]);
             using (var ms = new MemoryStream())
-            using (var streamReader = new StreamReader(ms))
-            using (var jsonTextReader = new JsonTextReader(streamReader))
             {
                 while (!closed)
                 {
@@ -141,11 +135,26 @@ namespace FeatureLoom.MessageFlow
                     {
                         ms.Position = 0;
                         object message;
-                        message = streamReader.ReadToEnd();
-                        if (deserializationType != null) message = Json.DeserializeFromJson(message.ToString(), deserializationType); //TODO Optimize, serializer should directly work on stream, but last try failed and the smae message was read again and again.
+                        if (deserializationType != null)
+                        {
+                            while(JsonHelper.DefaultDeserializer.TryDeserialize(ms, deserializationType, out message))
+                            {
+                                if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, this.endpointHandle);
+                                _ = sourceHelper.ForwardAsync(message);
+                            }
 
-                        if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, this.endpointHandle);
-                        _ = sourceHelper.ForwardAsync(message);
+                            if (ms.Position < ms.Length)
+                            {
+                                Log.ERROR(this.GetHandle(), $"Failed deserializing message to type {deserializationType.Name}, skipping {ms.Length - ms.Position} bytes");
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            message = ms.ToArray();
+                            if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, this.endpointHandle);
+                            _ = sourceHelper.ForwardAsync(message);
+                        }
 
                         ms.Position = 0;
                         ms.SetLength(0);
@@ -213,9 +222,8 @@ namespace FeatureLoom.MessageFlow
             }            
 
             using (await writeLock.LockAsync())
-            {
-                Json.Default_Serializer.Serialize(jsonWriter, message);
-                jsonWriter.Flush();
+            {                
+                JsonHelper.DefaultSerializer.Serialize(writeBuffer, message);
                 await webSocket.SendAsync(new ArraySegment<byte>(writeBuffer.GetBuffer(), 0, (int)writeBuffer.Length), WebSocketMessageType.Text, true, cts.Token);
                 writeBuffer.Position = 0;
                 writeBuffer.SetLength(0);

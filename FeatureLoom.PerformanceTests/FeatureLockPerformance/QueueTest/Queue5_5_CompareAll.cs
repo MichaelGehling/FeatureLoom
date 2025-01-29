@@ -21,11 +21,8 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.QueueTest
         private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         private AsyncExSubjects asyncExSubjects = new AsyncExSubjects();
         private AsyncExRWSubjects asyncExRwSubjects = new AsyncExRWSubjects();
-        private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
         private FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
         private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
-        private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
         private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
         private QueuePerformanceTest queueTest = new QueuePerformanceTest();

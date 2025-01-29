@@ -33,8 +33,12 @@ namespace FeatureLoom.Web
             
             try
             {
-                string data = await request.ReadAsync();
-                var usernamePassword = data.FromJson<UsernamePassword>();
+                string data = await request.ReadAsync();                
+                if (!JsonHelper.DefaultDeserializer.TryDeserialize(data, out UsernamePassword usernamePassword))
+                {
+                    Log.WARNING(this.GetHandle(), "Failed to process signup data");
+                    return HandlerResult.Handled_BadRequest();
+                }
 
                 if ((await Identity.TryGetIdentityAsync(usernamePassword.username)).Item1)
                 {                    

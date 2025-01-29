@@ -4,7 +4,6 @@ using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
 using FeatureLoom.Serialization;
 using FeatureLoom.Synchronization;
-using Newtonsoft.Json;
 using System.Threading.Tasks;
 using FeatureLoom.Extensions;
 using System;
@@ -12,13 +11,27 @@ using System.Threading;
 using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
-using Newtonsoft.Json.Linq;
 
 namespace FeatureLoom.Storages
 {
     public abstract class Configuration
-    {
+    {        
         public static string defaultCategory = "config";
+        public static FeatureJsonDeserializer deserializer = new FeatureJsonDeserializer(new()
+        {
+            enableProposedTypes = false,
+            dataAccess = FeatureJsonDeserializer.DataAccess.PublicAndPrivateFields,
+            enableReferenceResolution = false,            
+        });
+
+        public static FeatureJsonSerializer serializer = new FeatureJsonSerializer(new()
+        {
+            indent = true,
+            enumAsString = true,
+            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+            referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+            dataSelection = FeatureJsonSerializer.DataSelection.PublicAndPrivateFields,            
+        });
 
         [JsonIgnore]
         private string configUri;
@@ -47,7 +60,7 @@ namespace FeatureLoom.Storages
         public virtual string ConfigCategory => defaultCategory;
 
         [JsonIgnore]
-        protected LazyValue<LatestMessageReceiver<ChangeUpdate<string>>> subscriptionReceiver = new LazyValue<LatestMessageReceiver<ChangeUpdate<string>>>();
+        protected LazyValue<LatestMessageReceiver<ChangeUpdate<string>>> subscriptionReceiver = new();
 
         [JsonIgnore]
         protected IStorageReader reader;
@@ -93,12 +106,14 @@ namespace FeatureLoom.Storages
 
         public Task<bool> TryWriteToStorageAsync()
         {
-            return Writer.TryWriteAsync(Uri, this);
+            string json = serializer.Serialize(this);
+            return Writer.TryWriteAsync(Uri, json);
         }
 
         public bool TryWriteToStorage()
         {
-            return Writer.TryWriteAsync(Uri, this).WaitFor();
+            string json = serializer.Serialize(this);
+            return Writer.TryWriteAsync(Uri, json).WaitFor();
         }
 
         public async Task<bool> TryUpdateFromStorageAsync(bool useSubscription)
@@ -125,18 +140,13 @@ namespace FeatureLoom.Storages
             {
                 success = (await Reader.TryReadAsync<string>(this.Uri).ConfigureAwait(false)).TryOut(out json);
             }
+
             if (success)
-            {
-                try
-                {
-                    this.UpdateFromJson(json);
-                    Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");
-                }
-                catch
-                {
-                    success = false;
-                }
+            {                
+                success = deserializer.TryPopulate(json, this);
             }
+
+            if (success) Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");            
             return success;
         }
 
@@ -166,16 +176,10 @@ namespace FeatureLoom.Storages
             }
             if (success)
             {
-                try
-                {
-                    this.UpdateFromJson(json);
-                    Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");
-                }
-                catch
-                {
-                    success = false;
-                }
+                success = deserializer.TryPopulate(json, this);                
             }
+
+            if (success) Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");            
             return success;
         }
     }
@@ -223,7 +227,10 @@ namespace FeatureLoom.Storages
 
                 string jsonValue = envs[varName].ToString();
                 if (field.FieldType == typeof(string)) jsonValue = '"' + jsonValue.TrimChar('"') + '"';
-                field.SetValue(config, Json.DeserializeFromJson(jsonValue, field.FieldType));
+                if (Configuration.deserializer.TryDeserialize(jsonValue, field.FieldType, out object value))
+                {
+                    field.SetValue(config, value);
+                }
             }
         }
 
@@ -265,17 +272,18 @@ namespace FeatureLoom.Storages
                     jsonValue = values[0];
                 }
 
-                try
+                if (Configuration.deserializer.TryDeserialize(jsonValue, field.FieldType, out object value))
                 {
-                    field.SetValue(config, Json.DeserializeFromJson(jsonValue, field.FieldType));
+                    field.SetValue(config, value);
                 }
-                catch
+                else
                 {
-                    try
+                    jsonValue = '"' + jsonValue + '"';
+                    if (Configuration.deserializer.TryDeserialize(jsonValue, field.FieldType, out value))
                     {
-                        field.SetValue(config, Json.DeserializeFromJson('"' + jsonValue + '"', field.FieldType));
+                        field.SetValue(config, value);
                     }
-                    catch
+                    else
                     {
                         Log.WARNING($"Failed to apply argument {varName}");
                     }

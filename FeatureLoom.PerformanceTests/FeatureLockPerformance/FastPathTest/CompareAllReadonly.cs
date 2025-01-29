@@ -20,10 +20,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         private AsyncExRWSubjects asyncExRWSubjects = new AsyncExRWSubjects();
         private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        private NeoSmartSubjects neoSmartSubjects = new NeoSmartSubjects();
         private FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
-        private BmbsqdSubjects bmbsqdSubjects = new BmbsqdSubjects();
-        private VSAsyncReaderWriterLockSubjects vSAsyncReaderWriterLockSubjects = new VSAsyncReaderWriterLockSubjects();
         private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
 
         [Benchmark]
@@ -46,9 +43,6 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
 
         [Benchmark]
         public void FeatureLock_LockAsync_() => featureLockSubjects.LockReadOnlyAsync().WaitFor();
-
-        [Benchmark]
-        public void VSAsyncReaderWriterLock_LockAsync_() => vSAsyncReaderWriterLockSubjects.LockReadOnlyAsync().WaitFor();
 
         [Benchmark]
         public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockReadOnlyAsync().WaitFor();

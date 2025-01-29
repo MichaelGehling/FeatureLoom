@@ -10,7 +10,7 @@ public static class Utf8Converter
 {
     static SlicedBuffer<char> sharedSlicedBuffer = new SlicedBuffer<char>(1024, 1024);
     static MicroLock sharedBufferLock = new MicroLock();
-    static Pool<StringBuilder> stringBuilderPool = new Pool<StringBuilder>(() => new StringBuilder(1024), sb => sb.Clear());
+    static Pool<StringBuilder> stringBuilderPool = new Pool<StringBuilder>(() => new StringBuilder(1024), sb => sb.Clear());        
 
     public static void DecodeUtf8ToStringBuilder(ArraySegment<byte> bytes, StringBuilder stringBuilder)
     {

@@ -64,14 +64,14 @@ namespace FeatureLoom.Logging
 
         public FileLogger(Config config = null)
         {
-            this.config = config ?? new Config();
-            this.config.TryUpdateFromStorage(false);
+            this.config = config ?? new Config();            
             Task.Run(Run);
         }
 
         async Task Run()
         {
             await Task.Yield();
+            this.config.TryUpdateFromStorage(false);
 
             await UpdateConfigAsync().ConfigureAwait(false);
             if (config.newFileOnStartup) ArchiveCurrentLogfile();

@@ -9,6 +9,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using FeatureLoom.DependencyInversion;
+using FeatureLoom.Serialization;
 
 namespace FeatureLoom.Web
 {
@@ -16,7 +17,6 @@ namespace FeatureLoom.Web
     {
         private CircularLogBuffer<string> ringBuffer;
         private readonly string route;
-        private IWebMessageTranslator translator;
         public string Route => route;
 
         string[] supportedMethods = { "GET" };
@@ -25,29 +25,24 @@ namespace FeatureLoom.Web
 
         public bool RouteMustMatchExactly => true;
 
-        public HttpServerFetchProvider(string route, IWebMessageTranslator translator, int bufferSize = 100)
+        public HttpServerFetchProvider(string route, int bufferSize = 100)
         {
             if (!route.StartsWith("/")) route = "/" + route;
             route = route.TrimEnd("/");
             this.route = route;
             ringBuffer = new CircularLogBuffer<string>(bufferSize);
-            this.translator = translator;
         }
 
         public void Post<M>(in M message)
         {
-            if (translator.TryTranslate(message, out string json))
-            {
-                ringBuffer.Add(json);
-            }
+            string json = JsonHelper.DefaultSerializer.Serialize(message);
+            ringBuffer.Add(json);
         }
 
         public void Post<M>(M message)
         {
-            if (translator.TryTranslate(message, out string json))
-            {
-                ringBuffer.Add(json);
-            }
+            string json = JsonHelper.DefaultSerializer.Serialize(message);
+            ringBuffer.Add(json);
         }
 
         public Task PostAsync<M>(M message)

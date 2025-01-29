@@ -8,6 +8,7 @@ using FeatureLoom.Helpers;
 using System.Reflection;
 using System.Linq;
 using System.Globalization;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Serialization
 {
@@ -154,6 +155,20 @@ namespace FeatureLoom.Serialization
                 try
                 {
                     stream.Write(mainBuffer, 0, mainBufferCount);
+                    mainBufferCount = 0;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Failed writing to stream", ex);
+                }
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public async Task WriteBufferToStreamAsync()
+            {
+                try
+                {
+                    await stream.WriteAsync(mainBuffer, 0, mainBufferCount);
                     mainBufferCount = 0;
                 }
                 catch (Exception ex)

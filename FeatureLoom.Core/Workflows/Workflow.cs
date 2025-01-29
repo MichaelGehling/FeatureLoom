@@ -2,7 +2,7 @@
 using FeatureLoom.Helpers;
 
 using FeatureLoom.MetaDatas;
-using Newtonsoft.Json;
+using FeatureLoom.Serialization;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;

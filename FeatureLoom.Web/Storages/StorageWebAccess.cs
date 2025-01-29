@@ -153,9 +153,9 @@ namespace FeatureLoom.Storages
                 }
             }
             else
-            {
-                T obj = request.Stream.FromJson<T>();
-                if (await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").TrimChar('/'), obj))
+            {                
+                if (JsonHelper.DefaultDeserializer.TryDeserialize(request.Stream, out T obj) && 
+                    await writer.TryWriteAsync(request.RelativePath.Replace("%20", " ").TrimChar('/'), obj))
                 {
                     return HandlerResult.Handled_OK();
                 }

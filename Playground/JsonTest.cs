@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Text.Json;
-using Newtonsoft.Json.Linq;
+using FeatureLoom.Serialization;
 using Microsoft.VisualBasic;
 using FeatureLoom.Workflows;
 using Microsoft.Extensions.Primitives;
@@ -11,8 +11,6 @@ using FeatureLoom.Time;
 using System.Reflection.Metadata;
 using System.IO;
 using FeatureLoom.TCP;
-//using Microsoft.VisualBasic.FileIO;
-//using System.Text.Json.Serialization;
 using System.Collections;
 using System.Linq;
 using System.Text;
@@ -23,7 +21,6 @@ using System.Reflection.Metadata.Ecma335;
 using System.Reflection;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
-using Newtonsoft.Json;
 using System.Threading;
 using FeatureLoom.Serialization;
 using System.Xml;
@@ -291,47 +288,6 @@ namespace Playground
         }
 
 
-        public class JsonStreamProcessor<T>
-        {
-            private readonly Stream _stream;
-            private readonly Action<T> processor;
-
-            public JsonStreamProcessor(Stream stream, Action<T> processor)
-            {
-                _stream = stream;
-                this.processor = processor;
-            }
-
-            public async Task ProcessStreamAsync()
-            {
-                using var streamReader = new StreamReader(_stream);
-                using var jsonReader = new JsonTextReader(streamReader)
-                {
-                    SupportMultipleContent = true  // Allow multiple JSON objects in the stream
-                };
-
-                var serializer = new Newtonsoft.Json.JsonSerializer();
-
-                try
-                {
-                    while (await jsonReader.ReadAsync())
-                    {
-                        //if (jsonReader.TokenType == JsonToken.StartObject)
-                        {
-                            // Deserialize the JSON object
-                            T jsonObject = serializer.Deserialize<T>(jsonReader);
-                            //processor(jsonObject);
-                        }
-                    }
-                }
-                catch (Newtonsoft.Json.JsonException ex)
-                {
-                    Console.WriteLine($"JSON parsing error: {ex.Message}");
-                    // Handle parsing errors as needed
-                }
-            }
-        }
-
         public struct TestStruct
         {
             public int i;
@@ -477,7 +433,7 @@ namespace Playground
                 myString = "populated",
                 myInt = -100
             };
-            featureJsonDeserializer.TryPopulate(ref itemToPopulate);
+            featureJsonDeserializer.TryPopulate(itemToPopulate);
 
             featureJsonDeserializer.TryDeserialize<XmlElement>(out var xmlElement);
             featureJsonDeserializer.TryDeserialize<double>(out var d);
@@ -667,8 +623,6 @@ namespace Playground
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));
             Console.WriteLine("\nSystem.Text.Json:");            
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(testDto, opt));
-            Console.WriteLine("\nUtf8Json:");
-            Console.WriteLine(UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto)));
 
             //featureJsonSerializer = new FeatureJsonSerializer(settings);
 
@@ -681,21 +635,6 @@ namespace Playground
             Console.WriteLine("SerializerTest");
             while (true)
             {
-               /* tk.Restart();
-                for (int i = 0; i < iterations; i++)
-                {
-                    // Do nothing
-                    stream.Position = 0;
-                }
-                elapsed = tk.Elapsed;
-                var elapsed_DUMMY = elapsed;
-                beforeCollection = GC.GetTotalMemory(false);
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                afterCollection = GC.GetTotalMemory(false);
-                Console.WriteLine($"EmptyLoop:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(0.5.Seconds());
-               */
                 tk.Restart();
                 for (int i = 0; i < iterations; i++)
                 {                    
@@ -729,25 +668,7 @@ namespace Playground
                 Console.WriteLine($"Text.Json:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(0.5.Seconds());
 
-                tk.Restart();
-                for (int i = 0; i < iterations; i++)
-                {
-                    //json = JsonSerializer.SerializeToUtf8Bytes(testDto, testDtoType, opt);
-                    Utf8Json.JsonSerializer.Serialize(stream, testDto);
-                    //json = UTF8Encoding.UTF8.GetString(Utf8Json.JsonSerializer.Serialize(testDto));
-                    //json = JsonSerializer.Serialize(testDto, opt);
-                    stream.Position = 0;
-                }
-                elapsed = tk.Elapsed;
-                var elapsed_C = elapsed;
-                beforeCollection = GC.GetTotalMemory(false);
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                afterCollection = GC.GetTotalMemory(false);
-                Console.WriteLine($"Utf8Json:        {elapsed} / {(beforeCollection - afterCollection)} bytes");
-                AppTime.Wait(0.5.Seconds());
-
-                Console.WriteLine($"JsonSerializerF/Text.Json:  {(elapsed_A/elapsed_B).ToString("F")}% of time");
+             
      
                 
             }

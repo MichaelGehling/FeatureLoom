@@ -5,6 +5,7 @@ using FeatureLoom.Extensions;
 using System.Runtime.CompilerServices;
 using FeatureLoom.Helpers;
 using System.Diagnostics;
+using System.Text;
 
 namespace FeatureLoom.Serialization
 {
@@ -29,12 +30,44 @@ namespace FeatureLoom.Serialization
                 bufferResetLevel = (int)(bufferSize * 0.8);
             }
 
-            public void SetStream(Stream stream)
+            public void SetSource(Stream stream)
             {
                 if (stream == this.stream) return;
 
                 ResetBuffer(false, false);
                 this.stream = stream;
+            }
+
+            public void SetSource(string str)
+            {
+                this.stream = null;
+
+                int expectedSize = (int)(str.Length * 1.2);
+                if (expectedSize <= buffer.Length) ResetBuffer(false, false);
+                else ResetBuffer(false, true, expectedSize);
+
+                try
+                {
+                    bufferFillLevel = Encoding.UTF8.GetBytes(str, 0, str.Length, buffer, 0);
+                }
+                catch (ArgumentException ex)
+                {
+                    int maxRequiredSize = str.Length * 2;
+                    ResetBuffer(false, true, maxRequiredSize);
+                    bufferFillLevel = Encoding.UTF8.GetBytes(str, 0, str.Length, buffer, 0);
+                }
+            }
+
+            public void SetSource(ByteSegment bytes)
+            {
+                this.stream = null;
+
+                int size = bytes.Count;
+                if (size < buffer.Length) ResetBuffer(false, false);
+                else ResetBuffer(false, true, size);
+
+                bytes.CopyToArray(buffer, size);
+                bufferFillLevel = size;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -84,12 +117,13 @@ namespace FeatureLoom.Serialization
                 return true;
             }
 
-            public void ResetBuffer(bool keepUnusedBytes, bool grow)
+            public void ResetBuffer(bool keepUnusedBytes, bool grow, int newSize = 0)
             {
                 byte[] newBuffer = buffer;
                 if (grow)
                 {
-                    newBuffer = new byte[buffer.Length * 2];
+                    if (newSize <= 0) newSize = buffer.Length * 2;
+                    newBuffer = new byte[newSize];
                     bufferResetLevel = (int)(newBuffer.Length * 0.8);
                 }
 
@@ -162,7 +196,9 @@ namespace FeatureLoom.Serialization
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 public ByteSegment GetRecordedBytes(bool includeCurrentByte)
                 {
-                    return new ByteSegment(buffer.buffer, startBufferPos, buffer.bufferPos - startBufferPos);
+                    int count = buffer.bufferPos - startBufferPos;
+                    if (includeCurrentByte) count++;
+                    return new ByteSegment(buffer.buffer, startBufferPos, count);
                 }
             }
 
