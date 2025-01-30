@@ -5,6 +5,9 @@ using System.Text;
 using System.Xml.Schema;
 using System.Xml;
 using System.Xml.Serialization;
+using System.ComponentModel;
+using System.Linq;
+using System.Reflection;
 
 namespace FeatureLoom.Serialization;
 
@@ -129,6 +132,27 @@ public static class XmlHelper
             // Assume we want only the first (and primary) schema, which contains nested types
             schema = xmlSchemas.Count > 0 ? xmlSchemas[0] : null;
             if (schema == null) return false;
+
+            // Ensure required and optional elements are correctly set
+            foreach (XmlSchemaElement element in schema.Items.OfType<XmlSchemaElement>())
+            {
+                var prop = type.GetProperty(element.Name);
+                if (prop != null)
+                {
+                    var xmlElementAttr = prop.GetCustomAttribute<XmlElementAttribute>();
+                    bool isRequired = xmlElementAttr != null && !xmlElementAttr.IsNullable;
+                    bool hasDefault = prop.GetCustomAttribute<DefaultValueAttribute>() != null;
+
+                    if (isRequired)
+                    {
+                        element.MinOccurs = 1; // Make it mandatory
+                    }
+                    else if (hasDefault)
+                    {
+                        element.MinOccurs = 0; // Make it optional
+                    }
+                }
+            }
 
             using (StringWriter stringWriter = new StringWriter())
             using (XmlTextWriter xmlWriter = new XmlTextWriter(stringWriter))
