@@ -252,5 +252,45 @@ namespace FeatureLoom.Helpers
         }
 
         #endregion
+
+        // Base class
+        private class A
+        {
+            public int Value;
+        }
+
+        // Derived class with an extra field.
+        private class B : A
+        {
+            public int Extra;
+        }
+
+        [Fact]
+        public void StrictTypeCheck_ShouldReturnFalse_WhenRuntimeTypesDiffer()
+        {
+            // Create an instance of A.
+            A a = new A { Value = 10 };
+            // Create an instance of B (which is an A with extra data).
+            A b = new B { Value = 10, Extra = 20 };
+
+            // With strictTypeCheck set to true, the runtime types are compared
+            // so even though the base field "Value" is equal, the extra field in B
+            // makes the types different.
+            Assert.False(DeepComparer.AreEqual(a, b, strictTypeCheck: true));
+        }
+
+        [Fact]
+        public void StrictTypeCheckDisabled_ShouldReturnTrue_WhenBaseFieldsAreEqual()
+        {
+            // Create an instance of A.
+            A a = new A { Value = 10 };
+            // Create an instance of B (which is an A with extra data).
+            A b = new B { Value = 10, Extra = 20 };
+
+            // When strictTypeCheck is false, the deep comparison only examines
+            // the fields defined on the compile–time type (A) and ignores extra fields
+            // present in the runtime type (B).
+            Assert.True(DeepComparer.AreEqual(a, b, strictTypeCheck: false));
+        }
     }
 }

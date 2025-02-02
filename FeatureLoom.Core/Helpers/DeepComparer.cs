@@ -14,8 +14,10 @@ namespace FeatureLoom.Helpers
         /// <summary>
         /// Public API: compares two objects deeply for equality.
         /// </summary>
-        public static bool AreEqual<T>(T x, T y)
+        public static bool AreEqual<T>(T x, T y, bool strictTypeCheck = true)
         {
+            if (strictTypeCheck && x != null && y != null && x.GetType() != y.GetType())
+                return false;
             var visited = new HashSet<ReferencePair>(ReferencePair.Comparer);
             return InternalDeepEquals(x, y, visited);
         }
