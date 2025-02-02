@@ -1,154 +1,396 @@
-﻿using FeatureLoom.Synchronization;
-using System;
+﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
+using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.Helpers
 {
     public static class DeepComparer
-    {        
+    {
+        /// <summary>
+        /// Public API: compares two objects deeply for equality.
+        /// </summary>
         public static bool AreEqual<T>(T x, T y)
         {
-            return GenericDeepComparer<T>.AreEqual(x, y);
+            var visited = new HashSet<ReferencePair>(ReferencePair.Comparer);
+            return InternalDeepEquals(x, y, visited);
         }
 
+        /// <summary>
+        /// Extension method version.
+        /// </summary>
         public static bool EqualsDeep<T>(this T x, T y) => AreEqual(x, y);
 
-        private static class GenericDeepComparer<T>
+        #region Internal Comparison Methods
+
+        /// <summary>
+        /// Main entry point for deep comparison.
+        /// </summary>
+        internal static bool InternalDeepEquals<T>(T x, T y, ISet<ReferencePair> visited)
         {
-            private static readonly Func<T, T, LazyValue<HashSet<Type>>, bool> defaultComparer = CreateDeepComparer(typeof(T));
+            // Check for reference equality or both null.
+            if (ReferenceEquals(x, y))
+                return true;
+            if (x is null || y is null)
+                return false;
 
-            // Cache for all compiled comparer functions for inherited runtime types
-            private static readonly LazyValue<Dictionary<Type, Func<T, T, LazyValue<HashSet<Type>>, bool>>> comparerCache = new();
+            // For primitive (or value–like) types, use their Equals.
+            var type = typeof(T);
+            if (IsPrimitive(type))
+                return x.Equals(y);
 
-            private static readonly FeatureLock cacheLock = new();
+            // Cycle detection: record the current pair (by reference).
+            var pair = new ReferencePair(x, y);
+            if (!visited.Add(pair))
+                return true; // already compared this pair
 
-            public static bool AreEqual(T x, T y)
+            // Retrieve or create a compiled delegate for type T.
+            var comparer = ComparerCache<T>.GetOrCreateComparer();
+            return comparer(x, y, visited);
+        }
+
+        /// <summary>
+        /// Compares two IEnumerable instances element–by–element.
+        /// </summary>
+        internal static bool CompareEnumerables(IEnumerable a, IEnumerable b, ISet<ReferencePair> visited)
+        {
+            if (a == null || b == null)
+                return a == b;
+
+            var enumA = a.GetEnumerator();
+            var enumB = b.GetEnumerator();
+
+            while (true)
             {
-                var visited = new LazyValue<HashSet<Type>>();
-                return AreEqual(x, y, visited);
+                bool movedA = enumA.MoveNext();
+                bool movedB = enumB.MoveNext();
+
+                if (movedA != movedB)
+                    return false; // different length
+
+                if (!movedA) // end reached in both
+                    break;
+
+                if (!InternalDeepEquals(enumA.Current, enumB.Current, visited))
+                    return false;
             }
+            return true;
+        }
 
-            private static bool AreEqual(T x, T y, LazyValue<HashSet<Type>> visited)
+        /// <summary>
+        /// Optimized helper for comparing two IList&lt;TItem&gt; instances.
+        /// Compares Count first, then iterates by index.
+        /// </summary>
+        internal static bool CompareLists<TItem>(IList<TItem> a, IList<TItem> b, ISet<ReferencePair> visited)
+        {
+            if (a == null || b == null)
+                return a == b;
+
+            if (a.Count != b.Count)
+                return false;
+
+            for (int i = 0; i < a.Count; i++)
             {
-                if (ReferenceEquals(x, y)) return true;
-                if (x == null || y == null) return false;
-
-                var runtimeType = x.GetType();
-                if (runtimeType != y.GetType()) return false;
-
-                var comparer = GetRuntimeTypeComparer(runtimeType);
-                return comparer(x, y, visited);
+                if (!InternalDeepEquals(a[i], b[i], visited))
+                    return false;
             }
+            return true;
+        }
 
-            private static Func<T, T, LazyValue<HashSet<Type>>, bool> GetRuntimeTypeComparer(Type runtimeType)
+        /// <summary>
+        /// Optimized helper for comparing two IDictionary&lt;TKey, TValue&gt; instances in an order–independent manner.
+        /// </summary>
+        internal static bool CompareDictionaries<TKey, TValue>(IDictionary<TKey, TValue> a, IDictionary<TKey, TValue> b, ISet<ReferencePair> visited)
+        {
+            if (a == null || b == null)
+                return a == b;
+
+            if (a.Count != b.Count)
+                return false;
+
+            // For each key/value in a, ensure b contains a deep–equal key and matching value.
+            foreach (var kvp in a)
             {
-                if (runtimeType == typeof(T)) return defaultComparer;
-
-                using (cacheLock.Lock())
+                // Check if b contains an equivalent key.
+                if (!b.TryGetValue(kvp.Key, out var bValue))
                 {
-                    if (!comparerCache.Obj.TryGetValue(runtimeType, out var comparer))
+                    // The key might not be found using standard equality.
+                    bool found = false;
+                    foreach (var key in b.Keys)
                     {
-                        comparer = CreateDeepComparer(runtimeType);
-                        comparerCache.Obj[runtimeType] = comparer;
+                        if (InternalDeepEquals(kvp.Key, key, visited))
+                        {
+                            bValue = b[key];
+                            found = true;
+                            break;
+                        }
                     }
-                    return comparer;
+                    if (!found)
+                        return false;
                 }
+                if (!InternalDeepEquals(kvp.Value, bValue, visited))
+                    return false;
             }
+            return true;
+        }
 
-            private static Func<T, T, LazyValue<HashSet<Type>>, bool> CreateDeepComparer(Type runtimeType)
+        #endregion
+
+        #region Primitive & Reflection Helpers
+
+        /// <summary>
+        /// Returns true if the type is considered “primitive” for deep comparison purposes.
+        /// </summary>
+        private static bool IsPrimitive(Type type)
+        {
+            return type.IsPrimitive ||
+                   type.IsEnum ||
+                   type == typeof(string) ||
+                   type == typeof(decimal) ||
+                   type == typeof(DateTime) ||
+                   type == typeof(DateTimeOffset) ||
+                   type == typeof(TimeSpan) ||
+                   type == typeof(Guid) ||
+                   type == typeof(Uri) ||
+                   (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>) &&
+                    IsPrimitive(Nullable.GetUnderlyingType(type)));
+        }
+
+        /// <summary>
+        /// Caches all instance fields (public, non–public, inherited) for a given type.
+        /// </summary>
+        internal static class ReflectionCache
+        {
+            private static readonly ConcurrentDictionary<Type, FieldInfo[]> Cache = new();
+
+            public static FieldInfo[] GetAllFields(Type type)
             {
-                var xParam = Expression.Parameter(typeof(T), "x");
-                var yParam = Expression.Parameter(typeof(T), "y");
-                var visitedParam = Expression.Parameter(typeof(LazyValue<HashSet<Type>>), "visited");
+                return Cache.GetOrAdd(type, t =>
+                {
+                    const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                    var fields = new List<FieldInfo>();
+                    while (t != null)
+                    {
+                        fields.AddRange(t.GetFields(flags));
+                        t = t.BaseType;
+                    }
+                    return fields.ToArray();
+                });
+            }
+        }
+
+        #endregion
+
+        #region Delegate Cache
+
+        /// <summary>
+        /// Caches a compiled delegate for comparing two objects of type T.
+        /// </summary>
+        internal static class ComparerCache<T>
+        {
+            // Delegate signature: (T x, T y, ISet<ReferencePair> visited) => bool.
+            internal static readonly Func<T, T, ISet<ReferencePair>, bool> Comparer = CreateComparer();
+
+            internal static Func<T, T, ISet<ReferencePair>, bool> GetOrCreateComparer() => Comparer;
+
+            /// <summary>
+            /// Builds an expression tree to compare two objects of type T.
+            /// </summary>
+            private static Func<T, T, ISet<ReferencePair>, bool> CreateComparer()
+            {
+                var type = typeof(T);
+
+                // If T is primitive, simply use Equals.
+                if (IsPrimitive(type))
+                {
+                    return (x, y, visited) => x.Equals(y);
+                }
+
+                // Special handling for dictionaries.
+                var dictInterface = type.GetInterfaces()
+                    .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>));
+                if (dictInterface != null)
+                {
+                    var genericArgs = dictInterface.GetGenericArguments();
+                    var keyType = genericArgs[0];
+                    var valueType = genericArgs[1];
+                    var method = typeof(DeepComparer).GetMethod(nameof(CompareDictionaries), BindingFlags.NonPublic | BindingFlags.Static)
+                        .MakeGenericMethod(keyType, valueType);
+                    return (x, y, visited) => (bool)method.Invoke(null, new object[] { x, y, visited });
+                }
+
+                // Special handling for IEnumerable (but not string).
+                if (typeof(IEnumerable).IsAssignableFrom(type) && type != typeof(string))
+                {
+                    // Try to use optimized IList<T> if available.
+                    var ilistInterface = type.GetInterfaces()
+                        .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IList<>));
+                    if (ilistInterface != null)
+                    {
+                        var itemType = ilistInterface.GetGenericArguments()[0];
+                        var method = typeof(DeepComparer).GetMethod(nameof(CompareLists), BindingFlags.NonPublic | BindingFlags.Static)
+                            .MakeGenericMethod(itemType);
+                        return (x, y, visited) => (bool)method.Invoke(null, new object[] { x, y, visited });
+                    }
+                    // Otherwise fall back to generic enumerable comparison.
+                    return (x, y, visited) => CompareEnumerables((IEnumerable)x, (IEnumerable)y, visited);
+                }
+
+                // Build lambda parameters: (T x, T y, ISet<ReferencePair> visited)
+                var xParam = Expression.Parameter(type, "x");
+                var yParam = Expression.Parameter(type, "y");
+                var visitedParam = Expression.Parameter(typeof(ISet<ReferencePair>), "visited");
+
+                // Get all instance fields.
+                var fields = ReflectionCache.GetAllFields(type);
+                // If no fields, always return true.
+                if (fields.Length == 0)
+                {
+                    return Expression.Lambda<Func<T, T, ISet<ReferencePair>, bool>>(
+                        Expression.Constant(true),
+                        xParam, yParam, visitedParam).Compile();
+                }
+
+                // Build a chain of comparisons for each field.
                 Expression body = Expression.Constant(true);
 
-                var fields = GetAllFields(runtimeType);
                 foreach (var field in fields)
                 {
-                    var xField = Expression.Field(xParam, field);
-                    var yField = Expression.Field(yParam, field);
+                    var fieldType = field.FieldType;
+                    Expression xField = Expression.Field(xParam, field);
+                    Expression yField = Expression.Field(yParam, field);
 
-                    Expression equalExpression;
-                    if (IsPrimitiveType(field.FieldType))
+                    Expression fieldComparison;
+
+                    if (IsPrimitive(fieldType))
                     {
-                        equalExpression = Expression.Equal(xField, yField);
+                        // For primitives (and strings), call Equals.
+                        fieldComparison = Expression.Call(
+                            xField,
+                            fieldType.GetMethod("Equals", new Type[] { fieldType }),
+                            yField);
+                    }
+                    else if (fieldType == typeof(string))
+                    {
+                        // Strings use Equals.
+                        fieldComparison = Expression.Call(xField, fieldType.GetMethod("Equals", new[] { fieldType }), yField);
+                    }
+                    else if (typeof(IEnumerable).IsAssignableFrom(fieldType) && fieldType != typeof(string))
+                    {
+                        // Handle dictionaries first.
+                        var fieldDictInterface = fieldType.GetInterfaces()
+                            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>));
+                        if (fieldDictInterface != null)
+                        {
+                            var genericArgs = fieldDictInterface.GetGenericArguments();
+                            var keyType = genericArgs[0];
+                            var valueType = genericArgs[1];
+                            var dictMethod = typeof(DeepComparer).GetMethod(nameof(CompareDictionaries), BindingFlags.NonPublic | BindingFlags.Static)
+                                .MakeGenericMethod(keyType, valueType);
+                            fieldComparison = Expression.Call(
+                                dictMethod,
+                                Expression.Convert(xField, fieldDictInterface),
+                                Expression.Convert(yField, fieldDictInterface),
+                                visitedParam);
+                        }
+                        else
+                        {
+                            // Try to use IList<T> optimization.
+                            var ilistInterface = fieldType.GetInterfaces()
+                                .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IList<>));
+                            if (ilistInterface != null)
+                            {
+                                var itemType = ilistInterface.GetGenericArguments()[0];
+                                var listMethod = typeof(DeepComparer).GetMethod(nameof(CompareLists), BindingFlags.NonPublic | BindingFlags.Static)
+                                    .MakeGenericMethod(itemType);
+                                fieldComparison = Expression.Call(
+                                    listMethod,
+                                    Expression.Convert(xField, ilistInterface),
+                                    Expression.Convert(yField, ilistInterface),
+                                    visitedParam);
+                            }
+                            else
+                            {
+                                // Fall back to comparing as IEnumerable.
+                                fieldComparison = Expression.Call(
+                                    typeof(DeepComparer).GetMethod(nameof(CompareEnumerables), BindingFlags.NonPublic | BindingFlags.Static),
+                                    Expression.Convert(xField, typeof(IEnumerable)),
+                                    Expression.Convert(yField, typeof(IEnumerable)),
+                                    visitedParam);
+                            }
+                        }
                     }
                     else
                     {
-                        // Obtain the DeepEquals method from the correct GenericObjectComparer
-                        var deepEqualsMethod = typeof(GenericDeepComparer<>).MakeGenericType(field.FieldType)
-                            .GetMethod("DeepEquals", BindingFlags.NonPublic | BindingFlags.Static)
-                            .MakeGenericMethod(field.FieldType);
-
-                        equalExpression = Expression.Call(deepEqualsMethod, xField, yField, visitedParam);
+                        // For all other types, recursively compare fields.
+                        var method = typeof(DeepComparer).GetMethod(nameof(InternalDeepEquals), BindingFlags.NonPublic | BindingFlags.Static)
+                            .MakeGenericMethod(fieldType);
+                        fieldComparison = Expression.Call(method, xField, yField, visitedParam);
                     }
-
-                    body = Expression.AndAlso(body, equalExpression);
+                    body = Expression.AndAlso(body, fieldComparison);
                 }
-
-                var comparer = Expression.Lambda<Func<T, T, LazyValue<HashSet<Type>>, bool>>(body, xParam, yParam, visitedParam).Compile();
-
-                return comparer;
+                var lambda = Expression.Lambda<Func<T, T, ISet<ReferencePair>, bool>>(body, xParam, yParam, visitedParam);
+                return lambda.Compile();
             }
-
-            private static IEnumerable<FieldInfo> GetAllFields(Type type)
-            {
-                if (type == null) return Enumerable.Empty<FieldInfo>();
-                BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-                return type.GetFields(flags).Concat(GetAllFields(type.BaseType));
-            }
-
-            private static bool DeepEquals<TField>(TField x, TField y, LazyValue<HashSet<Type>> visited)
-            {
-                if (ReferenceEquals(x, y)) return true;
-                if (x == null || y == null) return false;
-
-                var type = x.GetType();
-                if (type != y.GetType()) return false;
-
-                // Check if this type has already been visited -> TODO: This does not make sense, or does it? Shouldn't we check if the object has already been visited?
-                if (visited.ObjIfExists?.Contains(type) ?? false) return true;
-                visited.Obj.Add(type);
-
-                foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-                {
-                    var xValue = field.GetValue(x);
-                    var yValue = field.GetValue(y);
-
-                    if (IsPrimitiveType(field.FieldType))
-                    {
-                        if (!Equals(xValue, yValue)) return false;
-                    }
-                    // TODO Handle collections
-                    else
-                    {
-                        if (!DeepEquals(xValue, yValue, visited)) return false;
-                    }
-                }
-
-                return true;
-            }
-
-            private static bool IsPrimitiveType(Type type)
-            {
-                return type.IsPrimitive ||
-                       type == typeof(string) ||
-                       type == typeof(DateTime) ||
-                       type == typeof(Decimal) ||
-                       type == typeof(DateTimeOffset) ||
-                       type == typeof(TimeSpan) ||
-                       type == typeof(Guid) ||
-                       type == typeof(Uri) ||
-                       type.IsEnum ||
-                       (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>) && IsPrimitiveType(Nullable.GetUnderlyingType(type))); // Handle Nullable types
-            }
-
         }
-    }
 
+        #endregion
+
+        #region Cycle Detection Helper
+
+        /// <summary>
+        /// Records a pair of objects that have been compared to avoid infinite recursion.
+        /// </summary>
+        internal readonly struct ReferencePair
+        {
+            public object First { get; }
+            public object Second { get; }
+
+            public ReferencePair(object first, object second)
+            {
+                First = first;
+                Second = second;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is ReferencePair other)
+                {
+                    return ReferenceEquals(First, other.First) && ReferenceEquals(Second, other.Second);
+                }
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hashFirst = RuntimeHelpers.GetHashCode(First);
+                    int hashSecond = RuntimeHelpers.GetHashCode(Second);
+                    return (hashFirst * 397) ^ hashSecond;
+                }
+            }
+
+            public static IEqualityComparer<ReferencePair> Comparer { get; } = new ReferencePairComparer();
+
+            private class ReferencePairComparer : IEqualityComparer<ReferencePair>
+            {
+                public bool Equals(ReferencePair x, ReferencePair y)
+                {
+                    return ReferenceEquals(x.First, y.First) && ReferenceEquals(x.Second, y.Second);
+                }
+
+                public int GetHashCode(ReferencePair obj)
+                {
+                    return obj.GetHashCode();
+                }
+            }
+        }
+
+        #endregion
+    }
 }
