@@ -59,7 +59,7 @@ namespace FeatureLoom.RPC
                 {
                     if (myRequest.noResponse)
                     {
-                        OptLog.ERROR()?.Build($"Failed executing RPC call {myRequest.method}", e.ToString());
+                        OptLog.ERROR()?.Build($"Failed executing RPC call {myRequest.method}", e);
                     }
                     else
                     {

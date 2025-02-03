@@ -66,7 +66,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.WARNING()?.Build($"Certificate {uri} could not be loaded", e.ToString());
+                OptLog.WARNING()?.Build($"Certificate {uri} could not be loaded", e);
             }
 
             return false;
@@ -102,7 +102,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build("Reading files to retreive Uris failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading files to retreive Uris failed!", e);
                 return (false, null);
             }
         }

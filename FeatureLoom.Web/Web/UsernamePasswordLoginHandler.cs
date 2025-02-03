@@ -88,7 +88,7 @@ namespace FeatureLoom.Web
             }
             catch(Exception e)
             {
-                OptLog.WARNING()?.Build("Failed to process login data", e.ToString());
+                OptLog.WARNING()?.Build("Failed to process login data", e);
 
                 await processingTimeFrame.WaitForEndAsync();
                 return HandlerResult.Handled_BadRequest();

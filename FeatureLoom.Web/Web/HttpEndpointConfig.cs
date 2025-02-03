@@ -33,7 +33,7 @@ namespace FeatureLoom.Web
                 }
                 catch (Exception e)
                 {
-                    OptLog.ERROR()?.Build("Failed resolving hostName", e.ToString());
+                    OptLog.ERROR()?.Build("Failed resolving hostName", e);
                 }
             }
         }

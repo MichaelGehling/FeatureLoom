@@ -134,22 +134,31 @@ namespace Playground
             {
                 globalLogLevel = Loglevel.INFO,
             };
-            settings.blackListFilterSettings.Add(new OptLogService.LogFilterSettings()
+            /*settings.blackListFilterSettings.Add(new OptLogService.LogFilterSettings()
             {
                 sourceFileMask = "*Program.cs",
                 methodMask = "Main",
                 minloglevel = Loglevel.CRITICAL,
                 maxloglevel = Loglevel.CRITICAL,
             });
+            */
             OptLog.ApplySettings(settings);
 
-            OptLog.IMPORTANT()?.Build("Log this");
-            OptLog.CRITICAL()?.Build("Log this");
-            OptLog.ERROR()?.Build("Log this");
-            OptLog.WARNING()?.Build("Log this");
-            OptLog.INFO()?.Build("Log this");
-            OptLog.DEBUG()?.Build("Log this");
-            OptLog.TRACE()?.Build("Log this");
+            try
+            {
+                throw new Exception("Test Exception");
+            }
+            catch (Exception ex) 
+            {
+
+                OptLog.IMPORTANT()?.Build("Log this");
+                OptLog.CRITICAL()?.Build("Log this", ex);
+                OptLog.ERROR()?.Build("Log this");
+                OptLog.WARNING()?.Build("Log this");
+                OptLog.INFO()?.Build("Log this", ex);
+                OptLog.DEBUG()?.Build("Log this");
+                OptLog.TRACE()?.Build("Log this");
+            }
             
 
             await AppTime.WaitAsync(1.Hours());

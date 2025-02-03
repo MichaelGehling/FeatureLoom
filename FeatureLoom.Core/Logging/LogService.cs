@@ -48,7 +48,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.IMPORTANT, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.IMPORTANT, shortText, detailText, contextHandle.ToString(), caller, sourceFile, sourceLine));
         }
 
         public void ERROR(ObjectHandle contextHandle,
@@ -60,7 +60,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace || settings.addStackTraceToErrors) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.ERROR, shortText, detailText, contextHandle.ToString(), caller, sourceFile, sourceLine));
         }
 
         public void WARNING(ObjectHandle contextHandle,
@@ -72,7 +72,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.WARNING, shortText, detailText, contextHandle.ToString(), caller, sourceFile, sourceLine));
         }
 
         public void INFO(ObjectHandle contextHandle,
@@ -84,7 +84,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.INFO, shortText, detailText, contextHandle.ToString(), caller, sourceFile, sourceLine));
         }
 
         public void DEBUG(ObjectHandle contextHandle,
@@ -96,7 +96,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.DEBUG, shortText, detailText, contextHandle.ToString(), caller, sourceFile, sourceLine));
         }
 
         public void TRACE(ObjectHandle contextHandle,
@@ -108,7 +108,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.TRACE, shortText, detailText, contextHandle.ToString(), caller, sourceFile, sourceLine));
         }
 
         public void FORCE(string shortText,

@@ -153,7 +153,7 @@ namespace FeatureLoom.Helpers
                 }
                 catch (Exception e)
                 {
-                    OptLog.ERROR()?.Build($"Could not load assembly '{assemblyPath}'.", e.ToString());
+                    OptLog.ERROR()?.Build($"Could not load assembly '{assemblyPath}'.", e);
                 }
             }
 

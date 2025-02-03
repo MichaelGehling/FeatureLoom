@@ -76,7 +76,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build("Encoding failed!", e.ToString());
+                OptLog.ERROR()?.Build("Encoding failed!", e);
             }
             return null;
         }
@@ -150,7 +150,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                OptLog.WARNING()?.Build($"Decoding message payload failed!", e.ToString());
+                OptLog.WARNING()?.Build($"Decoding message payload failed!", e);
                 decodedMessage = null;
                 return DecodingResult.Invalid;
             }

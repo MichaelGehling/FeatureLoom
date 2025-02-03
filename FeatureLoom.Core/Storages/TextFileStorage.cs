@@ -277,7 +277,7 @@ namespace FeatureLoom.Storages
                     catch (Exception e)
                     {
                         cache?.Remove(uri);
-                        OptLog.WARNING()?.Build($"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
+                        OptLog.WARNING()?.Build($"Failed reading file {filePath} to cache. Cache entry was invalidated", e);
                     }
                 }
             }
@@ -378,7 +378,7 @@ namespace FeatureLoom.Storages
                 }
                 catch (Exception e)
                 {
-                    OptLog.ERROR()?.Build("Failed serializing persiting object", e.ToString());
+                    OptLog.ERROR()?.Build("Failed serializing persiting object", e);
                     str = default;
                     return false;
                 }
@@ -426,7 +426,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build("Reading files to retreive Uris failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading files to retreive Uris failed!", e);
                 return (false, null);
             }
         }
@@ -480,7 +480,7 @@ namespace FeatureLoom.Storages
             }
             catch(Exception e)
             {
-                OptLog.ERROR()?.Build("Reading file failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading file failed!", e);
                 return (false, default);
             }
         }
@@ -529,7 +529,7 @@ namespace FeatureLoom.Storages
             }
             catch(Exception e)
             {
-                OptLog.ERROR()?.Build("Reading file failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading file failed!", e);
                 return false;
             }
         }
@@ -578,7 +578,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e);
                 return false;
             }
         }
@@ -639,7 +639,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e);
                 return false;
             }
             finally
@@ -672,7 +672,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e);
                 return false;
             }
         }
@@ -697,7 +697,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e);
                 return false;
             }
         }
@@ -733,7 +733,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
+                OptLog.ERROR()?.Build($"Failed on deleting file at {fileInfo.ToString()}", e);
                 return Task.FromResult(false);
             }
         }

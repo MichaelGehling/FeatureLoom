@@ -356,7 +356,7 @@ namespace FeatureLoom.Web
                     }
                 }
 
-                OptLog.ERROR()?.Build("Web request failed with an unhandled exception!", e.ToString());
+                OptLog.ERROR()?.Build("Web request failed with an unhandled exception!", e);
                 response.StatusCode = HttpStatusCode.InternalServerError;                
                 await ReactOnResult(request, response, HandlerResult.NotHandled_InternalServerError());
                 return;

@@ -85,7 +85,6 @@ namespace FeatureLoom.MessageFlow
 
         private async Task RunAsync(CancellationToken cancellationToken)
         {
-            OptLog.LogContext = this.GetHandle();
             while (!cancellationToken.IsCancellationRequested)
             {
                 await receiver.WaitAsync().ConfigureAwait(false);
@@ -99,7 +98,7 @@ namespace FeatureLoom.MessageFlow
                     }
                     catch (Exception e)
                     {
-                        OptLog.ERROR()?.Build("Exception caught in CurrentContextForwarder while sending.", e.ToString());
+                        OptLog.ERROR()?.Build("Exception caught in CurrentContextForwarder while sending.", e);
                     }
                 }
             }

@@ -48,7 +48,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Could not get stream from tcpClient or stream upgrade failed.", e.ToString());
+                OptLog.ERROR()?.Build($"Could not get stream from tcpClient or stream upgrade failed.", e);
             }
 
             messageWriter = new ProcessingEndpoint<object>(async msg => await WriteMessage(msg).ConfigureAwait(false));
@@ -82,7 +82,7 @@ namespace FeatureLoom.TCP
                 }
                 catch (Exception e)
                 {
-                    OptLog.ERROR()?.Build("Receiving on TCP connection failed.", e.ToString());
+                    OptLog.ERROR()?.Build("Receiving on TCP connection failed.", e);
                 }
                 if (!IsConnected) break;
             }
@@ -109,7 +109,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build("Writing on TCP connection failed.", e.ToString());
+                OptLog.ERROR()?.Build("Writing on TCP connection failed.", e);
             }
         }
 

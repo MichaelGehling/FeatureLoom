@@ -230,12 +230,12 @@ namespace FeatureLoom.TCP
             }
             catch (SocketException e)
             {
-                OptLog.INFO()?.Build($"TcpConnection could not be established to target hostname {config.hostAddress} and port {config.port.ToString()}! Connection will be retried!", e.ToString());
+                OptLog.INFO()?.Build($"TcpConnection could not be established to target hostname {config.hostAddress} and port {config.port}! Connection will be retried!", e);
                 connection?.Stop();
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"TcpConnection failed with target hostname {config.hostAddress} and port {config.port.ToString()}, due to a general problem!", e.ToString());
+                OptLog.ERROR()?.Build($"TcpConnection failed with target hostname {config.hostAddress} and port {config.port}, due to a general problem!", e);
                 connection?.Stop();
             }
 

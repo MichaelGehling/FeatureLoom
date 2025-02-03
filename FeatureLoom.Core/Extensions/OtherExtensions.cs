@@ -32,7 +32,8 @@ namespace FeatureLoom.Extensions
 
         public static Exception InnerOrSelf(this Exception e)
         {
-            return e.InnerException ?? e;
+            while (e.InnerException != null) e = e.InnerException;
+            return e;
         }
 
         public static bool TryClone<T>(this T obj, out T clone)

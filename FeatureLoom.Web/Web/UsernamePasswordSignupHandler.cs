@@ -78,7 +78,7 @@ namespace FeatureLoom.Web
             }
             catch(Exception e)
             {
-                OptLog.WARNING()?.Build("Failed to process signup data", e.ToString());                
+                OptLog.WARNING()?.Build("Failed to process signup data", e);                
                 return HandlerResult.Handled_BadRequest();
             }
 

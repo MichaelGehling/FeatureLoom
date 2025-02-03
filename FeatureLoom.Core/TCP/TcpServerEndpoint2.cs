@@ -131,7 +131,7 @@ namespace FeatureLoom.TCP
                 }
                 catch (Exception e)
                 {
-                    OptLog.ERROR()?.Build("Error occurred while waiting for client connections", e.ToString());
+                    OptLog.ERROR()?.Build("Error occurred while waiting for client connections", e);
                 }
             }
         }

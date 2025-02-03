@@ -137,7 +137,7 @@ namespace FeatureLoom.Workflows
             catch (Exception e) when (e.InnerOrSelf() is TaskCanceledException)
             {
                 proceed = false;
-                OptLog.DEBUG()?.Build("Waiting was cancelled!", e.InnerOrSelf().ToString());
+                OptLog.DEBUG()?.Build("Waiting was cancelled!", e.InnerOrSelf());
             }
             context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
@@ -230,7 +230,7 @@ namespace FeatureLoom.Workflows
                 }
                 catch (Exception e)
                 {
-                    if (e.InnerOrSelf() is TaskCanceledException) OptLog.DEBUG()?.Build("Async action was cancelled!", e.InnerOrSelf().ToString());
+                    if (e.InnerOrSelf() is TaskCanceledException) OptLog.DEBUG()?.Build("Async action was cancelled!", e.InnerOrSelf());
                     else throw e.InnerOrSelf();
                 }
             }
@@ -283,7 +283,7 @@ namespace FeatureLoom.Workflows
                 if (e.InnerOrSelf() is TaskCanceledException)
                 {
                     proceed = false;
-                    OptLog.DEBUG()?.Build("Waiting was cancelled!", e.InnerOrSelf().ToString());
+                    OptLog.DEBUG()?.Build("Waiting was cancelled!", e.InnerOrSelf());
                 }
                 else throw;
             }
@@ -357,7 +357,7 @@ namespace FeatureLoom.Workflows
                 }
                 catch (Exception e)
                 {
-                    if (e.InnerOrSelf() is TaskCanceledException) OptLog.DEBUG()?.Build("Async action was cancelled!", e.InnerOrSelf().ToString());
+                    if (e.InnerOrSelf() is TaskCanceledException) OptLog.DEBUG()?.Build("Async action was cancelled!", e.InnerOrSelf());
                     else throw e.InnerOrSelf();
                 }
             }

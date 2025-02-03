@@ -4,6 +4,7 @@ using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
+using FeatureLoom.Serialization;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using System;
@@ -30,7 +31,7 @@ public class OptLogService
     internal Settings settings = new Settings();
 
     Pool<FilteredLogger> loggerPool;
-    LazyValue<AsyncLocal<ObjectHandle>> roamingContext;
+    LazyValue<AsyncLocal<string>> roamingContext;
     LogFilter[] whiteListFilters_IMPORTANT = [];
     LogFilter[] blackListFilters_IMPORTANT = [];
     LogFilter[] whiteListFilters_CRITICAL = [];
@@ -97,9 +98,9 @@ public class OptLogService
         }
     }
 
-    public ObjectHandle LogContext
+    public string LogContext
     {
-        get => roamingContext.Exists ? roamingContext.Obj.Value : ObjectHandle.Invalid;
+        get => roamingContext.Exists ? roamingContext.Obj.Value : null;
         set
         {
             roamingContext.Obj.Value = value;
@@ -148,7 +149,7 @@ public class OptLogService
         public string? methodMask = null;
         public int? minLine;
         public int? maxLine;
-        public ObjectHandle contextFilter;
+        public string contextFilter;
     }
 
     class LogFilter
@@ -170,21 +171,21 @@ public class OptLogService
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Check(string method, string sourceFile, int sourceLine, ref ObjectHandle logContext)
+        public bool Check(string method, string sourceFile, int sourceLine, ref string logContext)
         {
             if (settings.sourceFileMask != null && !sourceFile.MatchesWildcard(settings.sourceFileMask)) return false;
             if (settings.methodMask != null && !method.MatchesWildcard(settings.methodMask)) return false;
             if (settings.minLine.HasValue && settings.maxLine.HasValue && (sourceLine < settings.minLine || sourceLine > settings.maxLine)) return false;
-            if (settings.contextFilter.IsValid)
+            if (settings.contextFilter != null)
             {
-                if (logContext.IsValid)
+                if (logContext != null)
                 {
                     if (logContext != settings.contextFilter) return false;
                 }
                 else if (parent.roamingContext.Exists)
                 {
                     var roamingContext = parent.roamingContext.Obj.Value;
-                    if (roamingContext.IsValid)
+                    if (roamingContext != null)
                     {
                         logContext = roamingContext;
                         if (logContext != settings.contextFilter) return false;
@@ -198,9 +199,9 @@ public class OptLogService
 
     public class FilteredLogger : IDisposable
     {
-        private OptLogService parent;
-        int logLevelValue;
-        ObjectHandle logContext;
+        internal OptLogService parent;
+        internal int logLevelValue;
+        string logContext;
         string method;
         string sourceFile;
         int sourceLine;
@@ -216,7 +217,7 @@ public class OptLogService
             parent.ReturnLoggerToPool(this);
         }
 
-        internal void Prepare(int logLevelValue, ObjectHandle logContext, string method, string sourceFile, int sourceLine)
+        internal void Prepare(int logLevelValue, string logContext, string method, string sourceFile, int sourceLine)
         {
             this.logLevelValue = logLevelValue;
             this.logContext = logContext;
@@ -225,12 +226,9 @@ public class OptLogService
             this.sourceLine = sourceLine;
         }
 
-        internal void ActuallyBuild(string shortText, string detailText, bool addStackTrace)
-        {
-            EnumHelper.TryFromInt(logLevelValue, out Loglevel logLevel);
-            if (!addStackTrace) addStackTrace = parent.settings.logLevelsToAddStackTrace.Contains(logLevel);
-            if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            var logMessage = new LogMessage(logLevel, shortText, detailText, logContext, method, sourceFile, sourceLine);
+        internal void ActuallyBuild(string message, string detailText, Loglevel loglevel)
+        {                        
+            var logMessage = new LogMessage(loglevel, message, detailText, logContext, method, sourceFile, sourceLine);
             Service<LogService>.Instance.SendLogMessage(in logMessage);
         }
 
@@ -241,49 +239,49 @@ public class OptLogService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger IMPORTANT(ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger IMPORTANT(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_IMPORTANT, whiteListFilters_IMPORTANT, loglevel_IMPORTANT, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger CRITICAL(ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger CRITICAL(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_CRITICAL, whiteListFilters_CRITICAL, loglevel_CRITICAL, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger ERROR(ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger ERROR(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_ERROR, whiteListFilters_ERROR, loglevel_ERROR, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger WARNING(ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger WARNING(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_WARNING, whiteListFilters_WARNING, loglevel_WARNING, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger INFO(ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger INFO(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_INFO, whiteListFilters_INFO, loglevel_INFO, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger DEBUG(ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger DEBUG(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_DEBUG, whiteListFilters_DEBUG, loglevel_DEBUG, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger TRACE(ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger TRACE(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_TRACE, whiteListFilters_TRACE, loglevel_TRACE, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger WithLevel(Loglevel loglevel, ObjectHandle logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger WithLevel(Loglevel loglevel, string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
     {
         switch (loglevel)
         {
@@ -299,7 +297,7 @@ public class OptLogService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private FilteredLogger LoggerIfPassed(string method, string sourceFile, int sourceLine, LogFilter[] blackListFilters, LogFilter[] whiteListFilters, int logLevel, ObjectHandle logContext)
+    private FilteredLogger LoggerIfPassed(string method, string sourceFile, int sourceLine, LogFilter[] blackListFilters, LogFilter[] whiteListFilters, int logLevel, string logContext)
     {
         if (globalLogLevel >= logLevel)
         {
@@ -319,12 +317,12 @@ public class OptLogService
         }
     }    
 
-    private FilteredLogger PrepareLogger(int logLevel, ObjectHandle logContext, string method, string sourceFile, int sourceLine)
+    private FilteredLogger PrepareLogger(int logLevel, string logContext, string method, string sourceFile, int sourceLine)
     {
-        if (!logContext.IsValid && roamingContext.Exists)
+        if (logContext == null && roamingContext.Exists)
         {
             var temp = roamingContext.Obj.Value;
-            if (temp.IsValid) logContext = temp;
+            if (temp != null) logContext = temp;
         }
         var logger = loggerPool.Take();
         logger.Prepare(logLevel, logContext, method, sourceFile, sourceLine);
@@ -334,14 +332,96 @@ public class OptLogService
 
 public static class FilteredLoggerExtension
 {
-    public static void Build(this OptLogService.FilteredLogger? logger, string shortText, string detailText = null, bool addStackTrace = false)
+
+    private static void BuildHelper(OptLogService.FilteredLogger logger, string message, string detailText, bool addStackTrace)
+    {
+        EnumHelper.TryFromInt(logger.logLevelValue, out Loglevel loglevel);
+        if (!addStackTrace) addStackTrace = logger.parent.settings.logLevelsToAddStackTrace.Contains(loglevel);
+        if (addStackTrace)
+        {            
+            string stackTrace = Environment.StackTrace;
+            try
+            {
+                stackTrace.TryExtract(stackTrace.IndexOf("FeatureLoom.Logging.FilteredLoggerExtension.Build("), Environment.NewLine, "", out stackTrace);
+            }
+            catch 
+            { 
+                // simply use unshortened stacktrace
+            }
+            if (detailText.EmptyOrNull()) detailText = $"LogStacktrace:\n{stackTrace}";
+            else detailText = $"{detailText}\n LogStacktrace:\n{stackTrace}";
+        }
+        logger.ActuallyBuild(message, detailText, loglevel);
+    }
+
+    public static void Build(this OptLogService.FilteredLogger? logger, string message, bool addStackTrace, string detailText)
     {
         if (logger == null)
         {
             if (Service<OptLogService>.Instance.settings.logOnWrongUsage) Log.WARNING("OptLog is not used correctly. To improve performance use it with a null check, e.g. OptLog.ERROR()?.Build(\"My log message\")", "", true);
             return;
         }
-        else logger.ActuallyBuild(shortText, detailText, addStackTrace);
+        else
+        {
+            BuildHelper(logger, message, detailText, addStackTrace);
+        }
+    }
+
+    public static void Build(this OptLogService.FilteredLogger? logger, string message, string detailText)
+    {
+        if (logger == null)
+        {
+            if (Service<OptLogService>.Instance.settings.logOnWrongUsage) Log.WARNING("OptLog is not used correctly. To improve performance use it with a null check, e.g. OptLog.ERROR()?.Build(\"My log message\")", "", true);
+            return;
+        }
+        else
+        {
+            BuildHelper(logger, message, detailText, false);
+        }
+    }
+
+    public static void Build(this OptLogService.FilteredLogger? logger, string message, Exception exception)
+    {
+        if (logger == null)
+        {
+            if (Service<OptLogService>.Instance.settings.logOnWrongUsage) Log.WARNING("OptLog is not used correctly. To improve performance use it with a null check, e.g. OptLog.ERROR()?.Build(\"My log message\")", "", true);
+            return;
+        }
+        else
+        {
+            Exception e = exception.InnerOrSelf();
+            string exStackTrace = e.StackTrace;
+            if (exStackTrace != null)
+            {
+                string detailText = $"ExceptionMessage: {e.Message} \n ExceptionStackTrace:\n{e.StackTrace}";
+                EnumHelper.TryFromInt(logger.logLevelValue, out Loglevel loglevel);
+                logger.ActuallyBuild(message, detailText, loglevel);
+            }
+            else
+            {
+                BuildHelper(logger, message, $"ExceptionMessage: {e.Message} \n ExceptionStackTrace: n/a", false);
+            }
+        }
+    }
+
+    public static void Build(this OptLogService.FilteredLogger? logger, string message)
+    {
+        if (logger == null)
+        {
+            if (Service<OptLogService>.Instance.settings.logOnWrongUsage) Log.WARNING("OptLog is not used correctly. To improve performance use it with a null check, e.g. OptLog.ERROR()?.Build(\"My log message\")", "", true);
+            return;
+        }
+        else BuildHelper(logger, message, null, false);
+    }
+
+    public static void Build(this OptLogService.FilteredLogger? logger, string message, bool addStackTrace)
+    {
+        if (logger == null)
+        {
+            if (Service<OptLogService>.Instance.settings.logOnWrongUsage) Log.WARNING("OptLog is not used correctly. To improve performance use it with a null check, e.g. OptLog.ERROR()?.Build(\"My log message\")", "", true);
+            return;
+        }
+        else BuildHelper(logger, message, null, addStackTrace);
     }
 
     public static void Send(this OptLogService.FilteredLogger? logger, in LogMessage preparedLogMessage)

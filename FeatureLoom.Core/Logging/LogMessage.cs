@@ -10,14 +10,14 @@ namespace FeatureLoom.Logging
     public readonly struct LogMessage
     {
         public LogMessage(Loglevel level,
-                          string shortText,
-                          string detailText = "",
-                          ObjectHandle contextHandle = default,
+                          string message,
+                          string detailText = null,
+                          string logContext = null,
                           [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
                           [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "",
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
-            this.shortText = shortText;
+            this.message = message;
             this.level = level;
             this.timeStamp = AppTime.Now;
             if (detailText != null && detailText != "") detailText = $"\n  {detailText}";
@@ -26,14 +26,14 @@ namespace FeatureLoom.Logging
             this.sourceFile = sourceFile;
             this.sourceLine = sourceLine;
             this.threadId = Thread.CurrentThread.ManagedThreadId;
-            this.contextHandle = contextHandle;
+            this.logContext = logContext;
         }
 
         public readonly DateTime timeStamp;
-        public readonly string shortText;
+        public readonly string message;
         public readonly string detailText;
         public readonly Loglevel level;
-        public readonly ObjectHandle contextHandle;
+        public readonly string logContext;
         public readonly string caller;
         public readonly string sourceFile;
         public readonly int sourceLine;
@@ -56,13 +56,13 @@ namespace FeatureLoom.Logging
             return sb.AppendFormat(format,
                 timeStamp.ToString(timeStampFormat),
                 level.ToName(),
-                shortText,
+                message,
                 threadId.ToString(),
-                contextHandle.ToString(),
+                logContext ?? "unknown",
                 sourceFile,
                 sourceLine.ToString(),
                 caller,
-                detailText);
+                detailText ?? "");
         }
 
         public override string ToString()

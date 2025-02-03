@@ -18,7 +18,7 @@ namespace FeatureLoom.Workflows
                 }
                 catch (Exception e)
                 {
-                    OptLog.ERROR()?.Build($"Workflow failed! ({workflow.Name})", e.ToString());
+                    OptLog.ERROR()?.Build($"Workflow failed! ({workflow.Name})", e);
                 }
                 finally
                 {

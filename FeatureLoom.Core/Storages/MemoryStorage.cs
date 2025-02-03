@@ -93,7 +93,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing stream to MemoryStorage for uri {uri}!", e);
                 return false;
             }
 
@@ -201,7 +201,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing stream to MemoryStorage for uri {uri}!", e);
                 return false;
             }
 
@@ -229,7 +229,7 @@ namespace FeatureLoom.Storages
                 }
                 catch (Exception e)
                 {
-                    if (config.logFailedDeserialization) OptLog.WARNING()?.Build("Failed on deserializing! bytes is no proper UTF8 string!", e.ToString());
+                    if (config.logFailedDeserialization) OptLog.WARNING()?.Build("Failed on deserializing! bytes is no proper UTF8 string!", e);
                     data = default;
                     return false;
                 }
@@ -267,7 +267,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build("Failed serializing persisting object", e.ToString());
+                OptLog.ERROR()?.Build("Failed serializing persisting object", e);
                 bytes = default;
                 return false;
             }

@@ -48,7 +48,7 @@ namespace FeatureLoom.TCP
                         .CatchAndDo((c, e) =>
                         {
                             c.ResetBuffer(false);
-                            OptLog.ERROR(c.GetHandle())?.Build($"Decoding data from TCP connection failed! Buffer was reset and all data omitted.", e.ToString());
+                            OptLog.ERROR()?.Build($"Decoding data from TCP connection failed! Buffer was reset and all data omitted.", e);
                         })
                     .Step("If decoding was completed put message in routing wrapper and send it, else reset buffer, but preserve the unprocessed bytes if chance exists to fit more data into the buffer.")
                         .If(c => c.decodingResult == DecodingResult.Complete)
@@ -62,7 +62,7 @@ namespace FeatureLoom.TCP
                     .Step("Stop connection")
                         .Do(c =>
                         {
-                            OptLog.INFO(c.GetHandle())?.Build($"Connection was closed!");
+                            OptLog.INFO()?.Build($"Connection was closed!");
                             c.Stop(false);
                         })
                     .Step("Finish workflow")
@@ -100,7 +100,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Could not get stream from tcpClient or stream upgrade failed.", e.ToString());
+                OptLog.ERROR()?.Build($"Could not get stream from tcpClient or stream upgrade failed.", e);
             }
 
             this.bufferSize = bufferSize;
@@ -143,7 +143,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed when writing to stream, closing connection!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed when writing to stream, closing connection!", e);
                 this.client.Close();
                 return false;
             }

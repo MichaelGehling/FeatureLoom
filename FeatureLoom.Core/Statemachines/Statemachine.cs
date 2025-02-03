@@ -204,7 +204,7 @@ namespace FeatureLoom.Statemachines
                     job.ExecutionState = ExecutionState.Failed;
                     job.Exception = e;
                     job.SendUpdate();
-                    OptLog.ERROR()?.Build($"Execution of state {job.CurrentStateName} failed!", e.ToString());
+                    OptLog.ERROR()?.Build($"Execution of state {job.CurrentStateName} failed!", e);
                     return;
                 }
             }

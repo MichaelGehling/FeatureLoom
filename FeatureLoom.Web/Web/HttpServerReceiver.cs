@@ -70,7 +70,7 @@ namespace FeatureLoom.Web
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
+                OptLog.ERROR()?.Build($"Failed while reading, translating or sending a message from a post command. Route:{route}", e);
                 return HandlerResult.Handled_InternalServerError();
             }
         }

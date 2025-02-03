@@ -52,12 +52,12 @@ namespace FeatureLoom.Web
             }
             catch (TaskCanceledException cancelException)
             {
-                OptLog.WARNING()?.Build("Web RPC request timed out", cancelException.ToString());
+                OptLog.WARNING()?.Build("Web RPC request timed out", cancelException);
                 return HandlerResult.Handled_RequestTimeout();
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"Failed while building response! Route:{route}", e.ToString());
+                OptLog.ERROR()?.Build($"Failed while building response! Route:{route}", e);
                 return HandlerResult.Handled_InternalServerError();
 
             }

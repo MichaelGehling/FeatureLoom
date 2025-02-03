@@ -120,11 +120,11 @@ namespace FeatureLoom.MessageFlow
                         {
                             if (webSocket != null && webSocket.State > WebSocketState.Open && webSocket.State < WebSocketState.Aborted)
                             {
-                                OptLog.INFO()?.Build("Websocket was closed", ex.ToString());
+                                OptLog.INFO()?.Build("Websocket was closed", ex);
                             }
                             else
                             {
-                                OptLog.ERROR()?.Build("Websocket connection failed while listenting", ex.ToString());
+                                OptLog.ERROR()?.Build("Websocket connection failed while listenting", ex);
                             }
                             Dispose();
                         }
@@ -161,7 +161,7 @@ namespace FeatureLoom.MessageFlow
                     }
                     catch (Exception ex)
                     {
-                        OptLog.ERROR()?.Build("Failed to deserialize or forwarding message", ex.ToString());
+                        OptLog.ERROR()?.Build("Failed to deserialize or forwarding message", ex);
                     }
                 }
             }

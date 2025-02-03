@@ -238,11 +238,11 @@ namespace FeatureLoom.TCP
                 listner?.Stop();
                 listner = new TcpListener(ipAddress, config.port);
                 listner.Start();
-                OptLog.TRACE()?.Build($"TCP server started with hostname {config.hostAddress} and port {config.port.ToString()}.");
+                OptLog.TRACE()?.Build($"TCP server started with hostname {config.hostAddress} and port {config.port}.");
             }
             catch (Exception e)
             {
-                OptLog.ERROR()?.Build($"TcpListner failed to start with hostname {config.hostAddress} and port {config.port.ToString()}! {connections.Count.ToString()} connections will be disconnected!", e.ToString());
+                OptLog.ERROR()?.Build($"TcpListner failed to start with hostname {config.hostAddress} and port {config.port}! {connections.Count} connections will be disconnected!", e);
                 listner?.Stop();
                 listner = null;
                 foreach (var connection in connections) connection.Stop();
