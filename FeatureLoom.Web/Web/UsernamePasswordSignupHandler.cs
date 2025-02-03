@@ -36,7 +36,7 @@ namespace FeatureLoom.Web
                 string data = await request.ReadAsync();                
                 if (!JsonHelper.DefaultDeserializer.TryDeserialize(data, out UsernamePassword usernamePassword))
                 {
-                    Log.WARNING(this.GetHandle(), "Failed to process signup data");
+                    OptLog.WARNING()?.Build("Failed to process signup data");
                     return HandlerResult.Handled_BadRequest();
                 }
 
@@ -52,15 +52,15 @@ namespace FeatureLoom.Web
 
                     if (!TryHelper.Try(async ()=> await identity.StoreAsync()))
                     {
-                        Log.ERROR(this.GetHandle(), $"Failed storing new identity {usernamePassword.username}");
+                        OptLog.ERROR()?.Build($"Failed storing new identity {usernamePassword.username}");
                         return HandlerResult.Handled_InternalServerError();
                     }
 
-                    Log.INFO(this.GetHandle(), $"Signup successful for user [{usernamePassword.username}]");
+                    OptLog.INFO()?.Build($"Signup successful for user [{usernamePassword.username}]");
 
                     if (createSessionAfterSignup)
                     {
-                        Log.INFO(this.GetHandle(), $"Creating session for new identity [{usernamePassword.username}]");
+                        OptLog.INFO()?.Build($"Creating session for new identity [{usernamePassword.username}]");
 
                         Session session = new Session(identity);
                         if (await session.TryStoreAsync())
@@ -69,7 +69,7 @@ namespace FeatureLoom.Web
                         }
                         else
                         {
-                            Log.ERROR(this.GetHandle(), "Failed to store session!");
+                            OptLog.ERROR()?.Build("Failed to store session!");
                         }
                     }
 
@@ -78,7 +78,7 @@ namespace FeatureLoom.Web
             }
             catch(Exception e)
             {
-                Log.WARNING(this.GetHandle(), "Failed to process signup data", e.ToString());                
+                OptLog.WARNING()?.Build("Failed to process signup data", e.ToString());                
                 return HandlerResult.Handled_BadRequest();
             }
 

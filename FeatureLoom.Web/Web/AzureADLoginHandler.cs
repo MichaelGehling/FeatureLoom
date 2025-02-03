@@ -141,11 +141,11 @@ namespace FeatureLoom.Web
                         try
                         {
                             await identity.StoreAsync();
-                            Log.INFO(this.GetHandle(), $"Signup successful for user [{identityId}]");
+                            OptLog.INFO()?.Build($"Signup successful for user [{identityId}]");
                         }
                         catch
                         {
-                            Log.ERROR(this.GetHandle(), $"Failed storing new identity {identityId}");
+                            OptLog.ERROR()?.Build($"Failed storing new identity {identityId}");
                             return HandlerResult.Handled_InternalServerError();
                         }                        
                     }
@@ -157,18 +157,18 @@ namespace FeatureLoom.Web
                     if (await session.TryStoreAsync())
                     {
                         response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout });
-                        Log.INFO(this.GetHandle(), $"Login successful by user [{identityId}]");
+                        OptLog.INFO()?.Build($"Login successful by user [{identityId}]");
                         return response.Redirect(settings.baseUrl + state.originalPath);
                     }
                     else
                     {
-                        Log.ERROR(this.GetHandle(), "Failed to store session!");
+                        OptLog.ERROR()?.Build("Failed to store session!");
                         return HandlerResult.Handled_InternalServerError();
                     }
                 }
                 catch (MsalException ex)
                 {
-                    Log.ERROR(this.GetHandle(), $"Error acquiring token: {ex.Message}");
+                    OptLog.ERROR()?.Build($"Error acquiring token: {ex.Message}");
                     return HandlerResult.Handled_Unauthorized("Invalid authentication code");
                 }
 

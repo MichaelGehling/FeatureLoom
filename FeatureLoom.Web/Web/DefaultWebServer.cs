@@ -338,7 +338,7 @@ namespace FeatureLoom.Web
             }
             catch (WebResponseException e)
             {
-                if (e.LogLevel.HasValue) Log.SendLogMessage(new LogMessage(e.LogLevel.Value, e.InternalMessage));
+                if (e.LogLevel.HasValue) OptLog.WithLevel(e.LogLevel.Value).Build(e.InternalMessage);
                 response.StatusCode = e.StatusCode;
                 if (!e.ResponseMessage.EmptyOrNull()) await response.WriteAsync(e.ResponseMessage);                
                 await ReactOnResult(request, response, new HandlerResult(true, e.ResponseMessage, e.StatusCode));
@@ -356,7 +356,7 @@ namespace FeatureLoom.Web
                     }
                 }
 
-                Log.ERROR(this.GetHandle(), "Web request failed with an unhandled exception!", e.ToString());
+                OptLog.ERROR()?.Build("Web request failed with an unhandled exception!", e.ToString());
                 response.StatusCode = HttpStatusCode.InternalServerError;                
                 await ReactOnResult(request, response, HandlerResult.NotHandled_InternalServerError());
                 return;
@@ -367,8 +367,8 @@ namespace FeatureLoom.Web
         {
             if (response.ResponseSent)
             {
-                if (result.statusCode != response.StatusCode) Log.WARNING(this.GetHandle(), $"Response was already sent, but status code of result ({result.statusCode.ToString()}) and response ({response.StatusCode.ToString()}) differ!");
-                if (result.data != null) Log.WARNING(this.GetHandle(), $"Response was already sent, but result contained data, that cannot be delivered!");
+                if (result.statusCode != response.StatusCode) OptLog.WARNING()?.Build($"Response was already sent, but status code of result ({result.statusCode.ToString()}) and response ({response.StatusCode.ToString()}) differ!");
+                if (result.data != null) OptLog.WARNING()?.Build($"Response was already sent, but result contained data, that cannot be delivered!");
                 return true;
             }
 
@@ -414,7 +414,7 @@ namespace FeatureLoom.Web
                     }
                     else
                     {
-                        Log.ERROR(this.GetHandle(), $"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
+                        OptLog.ERROR()?.Build($"Certificate {endpoint.certificateName} could not be retreived! Endpoint was not established.");
                     }
                 }
                 else

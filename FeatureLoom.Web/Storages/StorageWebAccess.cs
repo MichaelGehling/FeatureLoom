@@ -102,7 +102,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.WARNING(this.GetHandle(), $"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());                
+                OptLog.WARNING()?.Build($"Failed storage web access ({request.Method}, {request.RelativePath})", e.ToString());                
                 return HandlerResult.Handled_InternalServerError();
             }
         }

@@ -92,7 +92,7 @@ namespace FeatureLoom.TCP
                 }
                 if (cts.IsCancellationRequested) return false;
 
-                Log.INFO(this.GetHandle(), $"Trying to connect to {ipAddress}:{settings.port.ToString()}");
+                OptLog.INFO()?.Build($"Trying to connect to {ipAddress}:{settings.port.ToString()}");
                 TcpClient newClient = new TcpClient(ipAddress.AddressFamily);
                 await newClient.ConnectAsync(ipAddress, settings.port);
                 if (newClient.Connected)
@@ -109,12 +109,12 @@ namespace FeatureLoom.TCP
             }
             catch (SocketException e)
             {
-                Log.INFO(this.GetHandle(), $"TcpConnection could not be established to target hostname {settings.hostAddress} and port {settings.port.ToString()}! Connection will be retried!", e.ToString());
+                OptLog.INFO()?.Build($"TcpConnection could not be established to target hostname {settings.hostAddress} and port {settings.port.ToString()}! Connection will be retried!", e.ToString());
                 connection?.Close();
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"TcpConnection failed with target hostname {settings.hostAddress} and port {settings.port.ToString()}, due to a general problem!", e.ToString());
+                OptLog.ERROR()?.Build($"TcpConnection failed with target hostname {settings.hostAddress} and port {settings.port.ToString()}, due to a general problem!", e.ToString());
                 connection?.Close();
             }
 

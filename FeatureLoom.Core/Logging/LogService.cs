@@ -48,7 +48,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.IMPORTANT, shortText, detailText, contextHandle, caller, sourceFile, sourceLine));
         }
 
         public void ERROR(ObjectHandle contextHandle,
@@ -119,7 +119,7 @@ namespace FeatureLoom.Logging
                           [System.Runtime.CompilerServices.CallerLineNumber] int sourceLine = 0)
         {
             if (addStackTrace) detailText = $"{(detailText.EmptyOrNull() ? "" : detailText + "\n")}{Environment.StackTrace.ReplaceBetween(null, Environment.NewLine, "", true).ReplaceBetween(null, Environment.NewLine, "", true)}";
-            SendLogMessage(new LogMessage(Loglevel.FORCE, shortText, detailText, default, caller, sourceFile, sourceLine));
+            SendLogMessage(new LogMessage(Loglevel.IMPORTANT, shortText, detailText, default, caller, sourceFile, sourceLine));
         }
 
         public void ERROR(string shortText,

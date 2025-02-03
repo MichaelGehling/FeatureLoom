@@ -186,7 +186,7 @@ namespace FeatureLoom.Statemachines
 
                 if (!_states.TryGetValue(job.CurrentStateName, out var state))
                 {
-                    Log.ERROR($"StateName {job.CurrentStateName} is invalid!");
+                    OptLog.ERROR()?.Build($"StateName {job.CurrentStateName} is invalid!");
                     throw new Exception($"StateName {job.CurrentStateName} is invalid!");
                 }
 
@@ -204,7 +204,7 @@ namespace FeatureLoom.Statemachines
                     job.ExecutionState = ExecutionState.Failed;
                     job.Exception = e;
                     job.SendUpdate();
-                    Log.ERROR($"Execution of state {job.CurrentStateName} failed!", e.ToString());
+                    OptLog.ERROR()?.Build($"Execution of state {job.CurrentStateName} failed!", e.ToString());
                     return;
                 }
             }

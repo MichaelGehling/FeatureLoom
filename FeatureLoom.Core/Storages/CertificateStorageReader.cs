@@ -66,7 +66,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.WARNING(this.GetHandle(), $"Certificate {uri} could not be loaded", e.ToString());
+                OptLog.WARNING()?.Build($"Certificate {uri} could not be loaded", e.ToString());
             }
 
             return false;
@@ -102,7 +102,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Reading files to retreive Uris failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading files to retreive Uris failed!", e.ToString());
                 return (false, null);
             }
         }
@@ -114,7 +114,7 @@ namespace FeatureLoom.Storages
 
         public bool TrySubscribeForChangeNotifications(string uriPattern, IMessageSink<ChangeNotification> notificationSink)
         {
-            Log.WARNING(this.GetHandle(), "Subscription is currently not supported!");
+            OptLog.WARNING()?.Build("Subscription is currently not supported!");
             return false;
         }
     }

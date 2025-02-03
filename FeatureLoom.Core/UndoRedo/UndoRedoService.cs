@@ -127,7 +127,7 @@ namespace FeatureLoom.UndoRedo
             }
 
             updateSender.Send(Notification.UndoPerformed);
-            Log.INFO(this.GetHandle(), "Undo permformed");
+            OptLog.INFO()?.Build("Undo permformed");
         }
 
         public void PerformRedo()
@@ -148,7 +148,7 @@ namespace FeatureLoom.UndoRedo
             }
 
             updateSender.Send(Notification.RedoPerformed);
-            Log.INFO(this.GetHandle(), "Redo permformed");
+            OptLog.INFO()?.Build("Redo permformed");
         }
 
         public void AddUndo(Action undo, string description = null)
@@ -168,12 +168,12 @@ namespace FeatureLoom.UndoRedo
             if (undoing)
             {
                 updateSender.Send(Notification.RedoJobAdded);
-                Log.INFO(this.GetHandle(), "Redo job added");
+                OptLog.INFO()?.Build("Redo job added");
             }
             else
             {
                 updateSender.Send(Notification.UndoJobAdded);
-                Log.INFO(this.GetHandle(), "Undo job added");
+                OptLog.INFO()?.Build("Undo job added");
             }
         }
 
@@ -210,7 +210,7 @@ namespace FeatureLoom.UndoRedo
             }
 
             updateSender.Send(Notification.Cleared);
-            Log.INFO(this.GetHandle(), "All undo and redo jobs cleared");
+            OptLog.INFO()?.Build("All undo and redo jobs cleared");
         }
 
 

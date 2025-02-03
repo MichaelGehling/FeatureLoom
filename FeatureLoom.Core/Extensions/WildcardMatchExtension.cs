@@ -9,6 +9,8 @@ namespace FeatureLoom.Extensions
     {
         public static bool MatchesWildcard(this string text, string pattern)
         {
+            if (text == null) return false;
+            if (pattern == null) return false;
             if (pattern.Length == 0) return text.Length == 0 ? true : false;            
 
             VariableTextSection remainingText = new VariableTextSection(text);

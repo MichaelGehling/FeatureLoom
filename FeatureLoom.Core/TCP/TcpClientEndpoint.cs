@@ -165,7 +165,7 @@ namespace FeatureLoom.TCP
             var oldConfig = config;
             if (await config.TryUpdateFromStorageAsync(true).ConfigureAwait(false) || initial)
             {
-                if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
+                if (!initial) OptLog.INFO()?.Build("Loading updated configuration!");
 
                 if (initial || oldConfig.reconnectionCheckTime != config.reconnectionCheckTime)
                 {
@@ -184,7 +184,7 @@ namespace FeatureLoom.TCP
                     {
                         if (!initial)
                         {
-                            Log.INFO(this.GetHandle(), $"TCP Client deactivated, connection will be disconnected.");
+                            OptLog.INFO()?.Build($"TCP Client deactivated, connection will be disconnected.");
                             connection?.Stop();
                         }
                     }
@@ -215,7 +215,7 @@ namespace FeatureLoom.TCP
                     connection = null;
                 }
 
-                Log.INFO(this.GetHandle(), $"Trying to connect to {ipAddress}:{config.port.ToString()}");
+                OptLog.INFO()?.Build($"Trying to connect to {ipAddress}:{config.port.ToString()}");
                 TcpClient newClient = new TcpClient(ipAddress.AddressFamily);
                 await newClient.ConnectAsync(ipAddress, config.port).ConfigureAwait(false);
                 if (newClient.Connected)
@@ -230,12 +230,12 @@ namespace FeatureLoom.TCP
             }
             catch (SocketException e)
             {
-                Log.INFO(this.GetHandle(), $"TcpConnection could not be established to target hostname {config.hostAddress} and port {config.port.ToString()}! Connection will be retried!", e.ToString());
+                OptLog.INFO()?.Build($"TcpConnection could not be established to target hostname {config.hostAddress} and port {config.port.ToString()}! Connection will be retried!", e.ToString());
                 connection?.Stop();
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"TcpConnection failed with target hostname {config.hostAddress} and port {config.port.ToString()}, due to a general problem!", e.ToString());
+                OptLog.ERROR()?.Build($"TcpConnection failed with target hostname {config.hostAddress} and port {config.port.ToString()}, due to a general problem!", e.ToString());
                 connection?.Stop();
             }
 

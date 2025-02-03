@@ -97,7 +97,7 @@ namespace FeatureLoom.Helpers
                 // Get generic type definition from all loaded assemblies
                 var genericTypeDef = GetTypeFromAssemblies(genericTypeDefName, AppDomain.CurrentDomain.GetAssemblies().OrderByDescending(ass=> checkedAssemblies.TryGetValue(ass, out var count) ? count.value : 0));
                 if (genericTypeDef == null) genericTypeDef = LoadAndGetTypeFromSupplementaryAssemblies(genericTypeDefName);
-                if (genericTypeDef == null) Log.ERROR($"Could not find type '{genericTypeDefName}'.");
+                if (genericTypeDef == null) OptLog.ERROR()?.Build($"Could not find type '{genericTypeDefName}'.");
                 type = genericTypeDef.MakeGenericType(genericTypeArgs);
             }
             else
@@ -105,7 +105,7 @@ namespace FeatureLoom.Helpers
                 // It's a simple type
                 type = GetTypeFromAssemblies(typeName, AppDomain.CurrentDomain.GetAssemblies().OrderByDescending(ass => checkedAssemblies.TryGetValue(ass, out var count) ? count.value : 0));
                 if (type == null) type = LoadAndGetTypeFromSupplementaryAssemblies(typeName);
-                if (type == null) Log.ERROR($"Could not find type '{typeName}'.");
+                if (type == null) OptLog.ERROR()?.Build($"Could not find type '{typeName}'.");
             }
 
             if (type != null) nameToType[typeName] = type;
@@ -153,7 +153,7 @@ namespace FeatureLoom.Helpers
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR($"Could not load assembly '{assemblyPath}'.", e.ToString());
+                    OptLog.ERROR()?.Build($"Could not load assembly '{assemblyPath}'.", e.ToString());
                 }
             }
 

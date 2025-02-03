@@ -64,13 +64,13 @@ namespace FeatureLoom.Web
                 }
                 else
                 {
-                    Log.WARNING(this.GetHandle(), $"Received message could not be translated. Route:{route}");
+                    OptLog.WARNING()?.Build($"Received message could not be translated. Route:{route}");
                     return HandlerResult.Handled_BadRequest("Received message could not be translated.");
                 }
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
+                OptLog.ERROR()?.Build($"Failed while reading, translating or sending a message from a post command. Route:{route}", e.ToString());
                 return HandlerResult.Handled_InternalServerError();
             }
         }

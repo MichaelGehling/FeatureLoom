@@ -39,13 +39,12 @@ namespace FeatureLoom.MessageFlow
 
         private async Task Run()
         {
-            ObjectHandle handle = this.GetHandle();
             while(!CancellationToken.IsCancellationRequested)
             {
                 while (!CancellationToken.IsCancellationRequested && NextMessageId < messageSource.OldestAvailableId)
                 {
                     var oldest = messageSource.OldestAvailableId;
-                    Log.WARNING(handle, $"Missed messages with log Ids {NextMessageId.ToString()} - {(oldest - 1).ToString()}");
+                    OptLog.WARNING()?.Build($"Missed messages with log Ids {NextMessageId.ToString()} - {(oldest - 1).ToString()}");
                     NextMessageId = oldest;
                 }
 

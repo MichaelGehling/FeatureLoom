@@ -59,7 +59,7 @@ namespace FeatureLoom.Synchronization
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR(this.GetHandle(), $"Failed deserializing data from distribution! Uri={uri}", e.ToString());
+                    OptLog.ERROR()?.Build($"Failed deserializing data from distribution! Uri={uri}", e.ToString());
                 }
             }
             return false;
@@ -82,7 +82,7 @@ namespace FeatureLoom.Synchronization
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR(this.GetHandle(), $"Failed serializing data for distribution! Uri={uri}", e.ToString());
+                    OptLog.ERROR()?.Build($"Failed serializing data for distribution! Uri={uri}", e.ToString());
                 }
             }
             return false;

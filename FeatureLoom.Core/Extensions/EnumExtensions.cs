@@ -39,5 +39,13 @@ namespace FeatureLoom.Extensions
             }
             else return returnIfFailed;
         }
+
+        public static int CompareTo<T>(this T left, T right) where T : struct, Enum => EnumHelper<T>.Compare(left, right);
+
+        public static bool EqualTo<T>(this T left, T right) where T : struct, Enum => EnumHelper<T>.Compare(left, right) == 0;
+        public static bool GreaterThan<T>(this T left, T right) where T : struct, Enum => EnumHelper<T>.Compare(left, right) > 0;
+        public static bool LessThan<T>(this T left, T right) where T : struct, Enum => EnumHelper<T>.Compare(left, right) < 0;
+        public static bool GreaterThanOrEqualTo<T>(this T left, T right) where T : struct, Enum => EnumHelper<T>.Compare(left, right) >= 0;
+        public static bool LessThanOrEqualTo<T>(this T left, T right) where T : struct, Enum => EnumHelper<T>.Compare(left, right) <= 0;
     }
 }

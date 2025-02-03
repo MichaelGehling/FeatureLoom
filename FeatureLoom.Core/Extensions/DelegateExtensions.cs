@@ -20,7 +20,7 @@ namespace FeatureLoom.Extensions
                     }
                     catch (Exception e)
                     {
-                        if (logOnException) Log.ERROR("Async function failed with an exception that was caught! ", e.ToString());
+                        if (logOnException) OptLog.ERROR()?.Build("Async function failed with an exception that was caught! ", e.ToString());
                     }
                 };
             }

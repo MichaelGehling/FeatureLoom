@@ -76,7 +76,7 @@ namespace FeatureLoom.TCP
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Encoding failed!", e.ToString());
+                OptLog.ERROR()?.Build("Encoding failed!", e.ToString());
             }
             return null;
         }
@@ -144,13 +144,13 @@ namespace FeatureLoom.TCP
 
                     default:
                         decodedMessage = null;
-                        Log.WARNING(this.GetHandle(), $"Unknown type byte {type.ToString()} in message buffer!");
+                        OptLog.WARNING()?.Build($"Unknown type byte {type.ToString()} in message buffer!");
                         return DecodingResult.Invalid;
                 }
             }
             catch (Exception e)
             {
-                Log.WARNING(this.GetHandle(), $"Decoding message payload failed!", e.ToString());
+                OptLog.WARNING()?.Build($"Decoding message payload failed!", e.ToString());
                 decodedMessage = null;
                 return DecodingResult.Invalid;
             }

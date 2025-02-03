@@ -106,7 +106,7 @@ $@"{{
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed while building response! Route:{route}", e.ToString());                
+                OptLog.ERROR()?.Build($"Failed while building response! Route:{route}", e.ToString());                
                 return HandlerResult.Handled_InternalServerError();
             }
         }

@@ -58,7 +58,7 @@ namespace FeatureLoom.Helpers
             IEnumerator IEnumerable.GetEnumerator()
             {
                 return GetEnumerator();
-            }
+            }            
         }
 
 
@@ -114,6 +114,11 @@ namespace FeatureLoom.Helpers
             }
         }
 
+        public static int Compare(T left, T right)
+        {
+            return Comparer<T>.Default.Compare(left, right);
+        }
+
         public static string ToName (T enumValue)
         {
             if (!initialized) Init();
@@ -162,7 +167,7 @@ namespace FeatureLoom.Helpers
         public static bool TryFromInt<T>(int intValue, out T enumValue) where T : struct, Enum => EnumHelper<T>.TryFromInt(intValue, out enumValue);
 
         public static bool IsFlagSet<T>(T enumValue, T enumFlag) where T : struct, Enum => EnumHelper<T>.IsFlagSet(enumValue, enumFlag);
-
+        
     }
 
 }

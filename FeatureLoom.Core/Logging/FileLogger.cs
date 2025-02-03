@@ -73,6 +73,8 @@ namespace FeatureLoom.Logging
             await Task.Yield();
             this.config.TryUpdateFromStorage(false);
 
+            var logHandle = this.GetHandle();
+
             await UpdateConfigAsync().ConfigureAwait(false);
             if (config.newFileOnStartup) ArchiveCurrentLogfile();
             while(true)
@@ -85,7 +87,7 @@ namespace FeatureLoom.Logging
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this.GetHandle(), $"Writing to log file failed.", e.ToString());
+                    OptLog.ERROR(logHandle)?.Build($"Writing to log file failed.", e.ToString());
                 }
                 try
                 {
@@ -93,7 +95,7 @@ namespace FeatureLoom.Logging
                 }
                 catch(Exception e)
                 {
-                    Log.ERROR(this.GetHandle(), $"Moving log file to archive failed.", e.ToString());
+                    OptLog.ERROR(logHandle)?.Build($"Moving log file to archive failed.", e.ToString());
                 }
                 if (config.delayAfterWritingInMs > 0)
                 {

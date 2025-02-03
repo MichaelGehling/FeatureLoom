@@ -93,7 +93,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
                 return false;
             }
 
@@ -201,7 +201,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing stream to MemoryStorage for uri {uri}!", e.ToString());
                 return false;
             }
 
@@ -229,7 +229,7 @@ namespace FeatureLoom.Storages
                 }
                 catch (Exception e)
                 {
-                    if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing! bytes is no proper UTF8 string!", e.ToString());
+                    if (config.logFailedDeserialization) OptLog.WARNING()?.Build("Failed on deserializing! bytes is no proper UTF8 string!", e.ToString());
                     data = default;
                     return false;
                 }
@@ -238,7 +238,7 @@ namespace FeatureLoom.Storages
             if (JsonHelper.DefaultDeserializer.TryDeserialize(bytes, out data)) return true;
             else
             {
-                if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), "Failed on deserializing!");
+                if (config.logFailedDeserialization) OptLog.WARNING()?.Build("Failed on deserializing!");
                 data = default;
                 return false;
             }            
@@ -267,7 +267,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Failed serializing persisting object", e.ToString());
+                OptLog.ERROR()?.Build("Failed serializing persisting object", e.ToString());
                 bytes = default;
                 return false;
             }

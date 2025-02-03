@@ -150,7 +150,7 @@ namespace FeatureLoom.RPC
         {
             if (message is RpcErrorResponse errorResponse)
             {
-                Log.ERROR(this.GetHandle(), "RPC call failed!", errorResponse.ErrorMessage);
+                OptLog.ERROR()?.Build("RPC call failed!", errorResponse.ErrorMessage);
             }
             else if (message is IRpcResponse)
             {
@@ -178,7 +178,7 @@ namespace FeatureLoom.RPC
         {
             if (message is RpcErrorResponse errorResponse)
             {
-                Log.ERROR(this.GetHandle(), "RPC call failed!", errorResponse.ErrorMessage);
+                OptLog.ERROR()?.Build("RPC call failed!", errorResponse.ErrorMessage);
             }
             else if (message is IRpcResponse)
             {

@@ -71,7 +71,7 @@ namespace FeatureLoom.Storages
 
         private void OnError(object sender, ErrorEventArgs e)
         {
-            Log.ERROR(this.GetHandle(), "FileSystemWatcher failed, will be reset!", e.GetException().ToString());
+            OptLog.ERROR(this.GetHandle())?.Build("FileSystemWatcher failed, will be reset!", e.GetException().ToString());
             InitWatchers(true);
         }
 

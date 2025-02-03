@@ -46,11 +46,11 @@ namespace FeatureLoom.Web
                         try 
                         {
                             await session.Identity.RemoveFromStorageAsync();
-                            Log.INFO(this.GetHandle(), $"Successfully deleted identity [{identityId}]");                            
+                            OptLog.INFO()?.Build($"Successfully deleted identity [{identityId}]");                            
                         }
                         catch
                         {
-                            Log.ERROR(this.GetHandle(), $"Failed deleting identity [{identityId}]");
+                            OptLog.ERROR()?.Build($"Failed deleting identity [{identityId}]");
                             failed = true;
                         }
                         
@@ -65,24 +65,24 @@ namespace FeatureLoom.Web
                     {
                         if (!Storage.GetReader(Identity.StorageCategory).Exists(identityId))
                         {
-                            Log.INFO(this.GetHandle(), $"Could not delete identity [{identityId}], because it does not exist.");
+                            OptLog.INFO()?.Build($"Could not delete identity [{identityId}], because it does not exist.");
                             return HandlerResult.Handled_NotFound();
                         }
                         else if (await Storage.GetWriter(Identity.StorageCategory).TryDeleteAsync(identityId))
                         {
-                            Log.INFO(this.GetHandle(), $"Successfully deleted identity [{identityId}]");
+                            OptLog.INFO()?.Build($"Successfully deleted identity [{identityId}]");
                             return HandlerResult.Handled_OK();
                         }
                         else
                         {
-                            Log.ERROR(this.GetHandle(), $"Failed deleting identity [{identityId}]");
+                            OptLog.ERROR()?.Build($"Failed deleting identity [{identityId}]");
                             return HandlerResult.Handled_InternalServerError();
                         }
                         
                     }
                     else
                     {
-                        Log.WARNING(this.GetHandle(), $"Access denied to delete identity [{identityId}]");
+                        OptLog.WARNING()?.Build($"Access denied to delete identity [{identityId}]");
                         return HandlerResult.Handled_Forbidden();
                     }
                 }

@@ -21,7 +21,8 @@ namespace FeatureLoom.Logging
             public Loglevel loglevel = Loglevel.WARNING;
             public Dictionary<Loglevel, ConsoleColor> loglevelColors = new Dictionary<Loglevel, ConsoleColor>() 
             {
-                [Loglevel.FORCE] = ConsoleColor.Cyan,
+                [Loglevel.IMPORTANT] = ConsoleColor.Cyan,
+                [Loglevel.CRITICAL] = ConsoleColor.DarkRed,
                 [Loglevel.ERROR] = ConsoleColor.Red,
                 [Loglevel.WARNING] = ConsoleColor.Yellow,
                 [Loglevel.INFO] = ConsoleColor.White,

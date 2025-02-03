@@ -188,7 +188,7 @@ namespace FeatureLoom.TCP
             var oldConfig = config;
             if (await config.TryUpdateFromStorageAsync(true).ConfigureAwait(false) || initial)
             {
-                if (!initial) Log.INFO(this.GetHandle(), "Loading updated configuration!");
+                if (!initial) OptLog.INFO()?.Build("Loading updated configuration!");
 
                 if (initial || ConfigChanged(oldConfig))
                 {
@@ -202,7 +202,7 @@ namespace FeatureLoom.TCP
 
         private void DeactivateServer()
         {
-            Log.INFO(this.GetHandle(), $"TCP Server deactivated. {connections.Count.ToString()} connections will be disconnected!");
+            OptLog.INFO()?.Build($"TCP Server deactivated. {connections.Count.ToString()} connections will be disconnected!");
             foreach (var connection in connections)
             {
                 connection.Stop();
@@ -225,7 +225,7 @@ namespace FeatureLoom.TCP
 
                 if (!initial)
                 {
-                    Log.WARNING(this.GetHandle(), $"TCP Server reset. {connections.Count.ToString()} connections will be disconnected!");
+                    OptLog.WARNING()?.Build($"TCP Server reset. {connections.Count.ToString()} connections will be disconnected!");
                     foreach (var connection in connections)
                     {
                         connection.Stop();
@@ -238,11 +238,11 @@ namespace FeatureLoom.TCP
                 listner?.Stop();
                 listner = new TcpListener(ipAddress, config.port);
                 listner.Start();
-                Log.TRACE(this.GetHandle(), $"TCP server started with hostname {config.hostAddress} and port {config.port.ToString()}.");
+                OptLog.TRACE()?.Build($"TCP server started with hostname {config.hostAddress} and port {config.port.ToString()}.");
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"TcpListner failed to start with hostname {config.hostAddress} and port {config.port.ToString()}! {connections.Count.ToString()} connections will be disconnected!", e.ToString());
+                OptLog.ERROR()?.Build($"TcpListner failed to start with hostname {config.hostAddress} and port {config.port.ToString()}! {connections.Count.ToString()} connections will be disconnected!", e.ToString());
                 listner?.Stop();
                 listner = null;
                 foreach (var connection in connections) connection.Stop();

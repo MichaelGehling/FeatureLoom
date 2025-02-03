@@ -29,7 +29,7 @@ namespace FeatureLoom.TCP
             if (ignoreFailedAuthentication) return true;
 
             if (sslPolicyErrors == SslPolicyErrors.None) return true;
-            Log.ERROR("Certificate error: {0}", sslPolicyErrors.ToName());
+            OptLog.ERROR()?.Build("Certificate error: {0}", sslPolicyErrors.ToName());
             // refuse connection
             return false;
         }

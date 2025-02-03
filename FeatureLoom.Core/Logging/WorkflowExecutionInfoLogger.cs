@@ -50,7 +50,7 @@ namespace FeatureLoom.Logging
             var stateName = state.Name;
             var stepName = state.StepInfos[stepIndex].Description;
 
-            Log.TRACE(wf.GetHandle(), $"Workflow {wf.Name}, event: {evnt}, phase: {phase.ToString()}, state: {stateIndex.ToString()}({stateName}), step: {stepIndex.ToString()}({stepName}).");
+            OptLog.TRACE()?.Build($"Workflow {wf.Name}, event: {evnt}, phase: {phase.ToString()}, state: {stateIndex.ToString()}({stateName}), step: {stepIndex.ToString()}({stepName}).");
         }
     }
 }

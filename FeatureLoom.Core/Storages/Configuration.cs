@@ -94,7 +94,7 @@ namespace FeatureLoom.Storages
 
             if (!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
             {
-                Log.ERROR(this.GetHandle(), "Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
+                OptLog.ERROR()?.Build("Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
             }
         }
 
@@ -146,7 +146,7 @@ namespace FeatureLoom.Storages
                 success = deserializer.TryPopulate(json, this);
             }
 
-            if (success) Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");            
+            if (success) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");            
             return success;
         }
 
@@ -179,7 +179,7 @@ namespace FeatureLoom.Storages
                 success = deserializer.TryPopulate(json, this);                
             }
 
-            if (success) Log.INFO(this.GetHandle(), $"Configuration loaded for {Uri}!");            
+            if (success) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");            
             return success;
         }
     }
@@ -257,7 +257,7 @@ namespace FeatureLoom.Storages
                 string jsonValue;
                 if (field.FieldType == typeof(string))
                 {
-                    if (values.Count > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
+                    if (values.Count > 1) OptLog.WARNING()?.Build($"For argument {varName} multiple values are defined. Only the first will be used. ");
                     jsonValue = '"' + values[0].TrimChar('"') + '"';
                 }
                 else if (field.FieldType.ImplementsGenericInterface(typeof(ICollection<>)))
@@ -268,7 +268,7 @@ namespace FeatureLoom.Storages
                 }                
                 else
                 {
-                    if (values.Count > 1) Log.WARNING($"For argument {varName} multiple values are defined. Only the first will be used. ");
+                    if (values.Count > 1) OptLog.WARNING()?.Build($"For argument {varName} multiple values are defined. Only the first will be used. ");
                     jsonValue = values[0];
                 }
 
@@ -285,7 +285,7 @@ namespace FeatureLoom.Storages
                     }
                     else
                     {
-                        Log.WARNING($"Failed to apply argument {varName}");
+                        OptLog.WARNING()?.Build($"Failed to apply argument {varName}");
                     }
                 }
             }

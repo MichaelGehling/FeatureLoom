@@ -121,7 +121,7 @@ namespace FeatureLoom.Workflows
             }
             else
             {
-                Log.WARNING(context.GetHandle(), $"Workflow {context.ContextName} reaches state/step \"{step.parentState.Name}\"/\"{step.Description}\" without any defined action!");
+                OptLog.WARNING()?.Build($"Workflow {context.ContextName} reaches state/step \"{step.parentState.Name}\"/\"{step.Description}\" without any defined action!");
             }
         }
 
@@ -137,7 +137,7 @@ namespace FeatureLoom.Workflows
             catch (Exception e) when (e.InnerOrSelf() is TaskCanceledException)
             {
                 proceed = false;
-                Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                OptLog.DEBUG()?.Build("Waiting was cancelled!", e.InnerOrSelf().ToString());
             }
             context.ExecutionPhase = Workflow.ExecutionPhase.Running;
             context.SendExecutionInfoEvent(Workflow.ExecutionEventList.EndWaiting);
@@ -230,7 +230,7 @@ namespace FeatureLoom.Workflows
                 }
                 catch (Exception e)
                 {
-                    if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context.GetHandle(), "Async action was cancelled!", e.InnerOrSelf().ToString());
+                    if (e.InnerOrSelf() is TaskCanceledException) OptLog.DEBUG()?.Build("Async action was cancelled!", e.InnerOrSelf().ToString());
                     else throw e.InnerOrSelf();
                 }
             }
@@ -283,7 +283,7 @@ namespace FeatureLoom.Workflows
                 if (e.InnerOrSelf() is TaskCanceledException)
                 {
                     proceed = false;
-                    Log.DEBUG(context.GetHandle(), "Waiting was cancelled!", e.InnerOrSelf().ToString());
+                    OptLog.DEBUG()?.Build("Waiting was cancelled!", e.InnerOrSelf().ToString());
                 }
                 else throw;
             }
@@ -357,7 +357,7 @@ namespace FeatureLoom.Workflows
                 }
                 catch (Exception e)
                 {
-                    if (e.InnerOrSelf() is TaskCanceledException) Log.DEBUG(context.GetHandle(), "Async action was cancelled!", e.InnerOrSelf().ToString());
+                    if (e.InnerOrSelf() is TaskCanceledException) OptLog.DEBUG()?.Build("Async action was cancelled!", e.InnerOrSelf().ToString());
                     else throw e.InnerOrSelf();
                 }
             }

@@ -38,7 +38,7 @@ namespace FeatureLoom.Web
                 string data = await request.ReadAsync();
                 if (!JsonHelper.DefaultDeserializer.TryDeserialize(data, out UsernamePassword usernamePassword))
                 {
-                    Log.INFO(this.GetHandle(), "Login failed, due to misformed credentials!");
+                    OptLog.INFO()?.Build("Login failed, due to misformed credentials!");
 
                     await processingTimeFrame.WaitForEndAsync();
                     return HandlerResult.Handled_Unauthorized();
@@ -56,14 +56,14 @@ namespace FeatureLoom.Web
                         if (await session.TryStoreAsync())
                         {
                             response.AddCookie("SessionId", session.SessionId, new Microsoft.AspNetCore.Http.CookieOptions() { MaxAge = session.Timeout});
-                            Log.INFO(this.GetHandle(), $"Login successful by user [{usernamePassword.username}]");
+                            OptLog.INFO()?.Build($"Login successful by user [{usernamePassword.username}]");
 
                             await processingTimeFrame.WaitForEndAsync();
                             return HandlerResult.Handled_OK(session.SessionId);
                         }
                         else
                         {
-                            Log.ERROR(this.GetHandle(), "Failed to store session!");
+                            OptLog.ERROR()?.Build("Failed to store session!");
 
                             await processingTimeFrame.WaitForEndAsync();
                             return HandlerResult.Handled_InternalServerError();
@@ -71,7 +71,7 @@ namespace FeatureLoom.Web
                     }
                     else
                     {
-                        Log.INFO(this.GetHandle(), "Login failed, due to wrong credentials!");
+                        OptLog.INFO()?.Build("Login failed, due to wrong credentials!");
 
                         await processingTimeFrame.WaitForEndAsync();
                         return HandlerResult.Handled_Unauthorized();
@@ -79,7 +79,7 @@ namespace FeatureLoom.Web
                 }
                 else
                 {
-                    Log.INFO(this.GetHandle(), "Login failed, due to unknown user [{usernamePassword.username}]!");
+                    OptLog.INFO()?.Build("Login failed, due to unknown user [{usernamePassword.username}]!");
 
                     await processingTimeFrame.WaitForEndAsync();
                     return HandlerResult.Handled_Unauthorized();
@@ -88,7 +88,7 @@ namespace FeatureLoom.Web
             }
             catch(Exception e)
             {
-                Log.WARNING(this.GetHandle(), "Failed to process login data", e.ToString());
+                OptLog.WARNING()?.Build("Failed to process login data", e.ToString());
 
                 await processingTimeFrame.WaitForEndAsync();
                 return HandlerResult.Handled_BadRequest();

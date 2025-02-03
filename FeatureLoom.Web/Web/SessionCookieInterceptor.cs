@@ -43,7 +43,7 @@ namespace FeatureLoom.Web
                         }
                         else
                         {
-                            Log.WARNING(this.GetHandle(), $"Identity {session.IdentityId} of session does not exist! Session will be invalidated.");
+                            OptLog.WARNING()?.Build($"Identity {session.IdentityId} of session does not exist! Session will be invalidated.");
                             await session.TryDeleteFromStorageAsync();
                             response.DeleteCookie(cookieName);
                             return HandlerResult.NotHandled();

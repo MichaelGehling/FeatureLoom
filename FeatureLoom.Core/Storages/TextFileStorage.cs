@@ -277,7 +277,7 @@ namespace FeatureLoom.Storages
                     catch (Exception e)
                     {
                         cache?.Remove(uri);
-                        Log.WARNING(this.GetHandle(), $"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
+                        OptLog.WARNING()?.Build($"Failed reading file {filePath} to cache. Cache entry was invalidated", e.ToString());
                     }
                 }
             }
@@ -337,7 +337,7 @@ namespace FeatureLoom.Storages
             string resultingPath = Path.GetFullPath(Path.Combine(rootDir.FullName, $"{uri}{config.fileSuffix}"));
             if (config.preventEscapingRootPath && !resultingPath.StartsWith(rootDir.FullName))
             {
-                Log.WARNING(this.GetHandle(), $"Resulting path ({resultingPath}) was not inside root path ({rootDir.FullName})");
+                OptLog.WARNING()?.Build($"Resulting path ({resultingPath}) was not inside root path ({rootDir.FullName})");
                 throw new Exception($"Resulting path ({resultingPath}) was not inside root path ({rootDir.FullName})");
             }
             return resultingPath;
@@ -356,7 +356,7 @@ namespace FeatureLoom.Storages
             {
                 if (JsonHelper.DefaultDeserializer.TryDeserialize<T>(str, out data)) return true;
 
-                if (config.logFailedDeserialization) Log.WARNING(this.GetHandle(), $"Failed on deserializing to type {typeof(T)}!");
+                if (config.logFailedDeserialization) OptLog.WARNING()?.Build($"Failed on deserializing to type {typeof(T)}!");
                 data = default;
                 return false;
             }
@@ -378,7 +378,7 @@ namespace FeatureLoom.Storages
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR(this.GetHandle(), "Failed serializing persiting object", e.ToString());
+                    OptLog.ERROR()?.Build("Failed serializing persiting object", e.ToString());
                     str = default;
                     return false;
                 }
@@ -426,7 +426,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Reading files to retreive Uris failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading files to retreive Uris failed!", e.ToString());
                 return (false, null);
             }
         }
@@ -451,7 +451,7 @@ namespace FeatureLoom.Storages
                     success = TryDeserialize(cacheString, out data);
                     if (!success)
                     {
-                        Log.WARNING(this.GetHandle(), $"Failed deserializing cached value for URI {uri}. Will removed from cache!");
+                        OptLog.WARNING()?.Build($"Failed deserializing cached value for URI {uri}. Will removed from cache!");
                         cache.Remove(uri);
                     }
                     return (success, data);
@@ -468,7 +468,7 @@ namespace FeatureLoom.Storages
 
                         success = TryDeserialize(fileContent, out data);
 
-                        if (!success) Log.WARNING(this.GetHandle(), $"Failed deserializing value for URI {uri}! (It will not be cached)");
+                        if (!success) OptLog.WARNING()?.Build($"Failed deserializing value for URI {uri}! (It will not be cached)");
                         else if (config.updateCacheOnRead)
                         {
                             cache?.Add(uri, fileContent);
@@ -480,7 +480,7 @@ namespace FeatureLoom.Storages
             }
             catch(Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Reading file failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading file failed!", e.ToString());
                 return (false, default);
             }
         }
@@ -529,7 +529,7 @@ namespace FeatureLoom.Storages
             }
             catch(Exception e)
             {
-                Log.ERROR(this.GetHandle(), "Reading file failed!", e.ToString());
+                OptLog.ERROR()?.Build("Reading file failed!", e.ToString());
                 return false;
             }
         }
@@ -578,7 +578,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -639,7 +639,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
             finally
@@ -672,7 +672,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -697,7 +697,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed writing file for uri {uri}!", e.ToString());
+                OptLog.ERROR()?.Build($"Failed writing file for uri {uri}!", e.ToString());
                 return false;
             }
         }
@@ -733,7 +733,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
+                OptLog.ERROR()?.Build($"Failed on deleting file at {fileInfo.ToString()}", e.ToString());
                 return Task.FromResult(false);
             }
         }

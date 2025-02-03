@@ -120,11 +120,11 @@ namespace FeatureLoom.MessageFlow
                         {
                             if (webSocket != null && webSocket.State > WebSocketState.Open && webSocket.State < WebSocketState.Aborted)
                             {
-                                Log.INFO(this.GetHandle(), "Websocket was closed", ex.ToString());
+                                OptLog.INFO()?.Build("Websocket was closed", ex.ToString());
                             }
                             else
                             {
-                                Log.ERROR(this.GetHandle(), "Websocket connection failed while listenting", ex.ToString());
+                                OptLog.ERROR()?.Build("Websocket connection failed while listenting", ex.ToString());
                             }
                             Dispose();
                         }
@@ -145,7 +145,7 @@ namespace FeatureLoom.MessageFlow
 
                             if (ms.Position < ms.Length)
                             {
-                                Log.ERROR(this.GetHandle(), $"Failed deserializing message to type {deserializationType.Name}, skipping {ms.Length - ms.Position} bytes");
+                                OptLog.ERROR()?.Build($"Failed deserializing message to type {deserializationType.Name}, skipping {ms.Length - ms.Position} bytes");
                                 continue;
                             }
                         }
@@ -161,7 +161,7 @@ namespace FeatureLoom.MessageFlow
                     }
                     catch (Exception ex)
                     {
-                        Log.ERROR(this.GetHandle(), "Failed to deserialize or forwarding message", ex.ToString());
+                        OptLog.ERROR()?.Build("Failed to deserialize or forwarding message", ex.ToString());
                     }
                 }
             }
@@ -212,7 +212,7 @@ namespace FeatureLoom.MessageFlow
 
             if (closed)
             {
-                Log.WARNING(this.GetHandle(), "Tried to send message via closed WebSocketEndpoint");
+                OptLog.WARNING()?.Build("Tried to send message via closed WebSocketEndpoint");
                 return;
             }
             if (webSocket.State > WebSocketState.Open)
@@ -247,11 +247,11 @@ namespace FeatureLoom.MessageFlow
             sourceHelper.Forward(new WebSocketControlMessage(Command.Closed, endpointHandle));
             if (webSocket.State < WebSocketState.CloseSent)
             {
-                Log.DEBUG(this.GetHandle(), "Sending close request on WebSocket");
+                OptLog.DEBUG()?.Build("Sending close request on WebSocket");
                 var closeTask = webSocket.CloseOutputAsync(WebSocketCloseStatus.EndpointUnavailable, "The endpoint was closed", cts.Token);
                 if (!closeTask.Wait(20.Milliseconds()))
                 {
-                    Log.WARNING(this.GetHandle(), "Close request was not finished within 20 ms, so WebSocket will be disposed anyway");
+                    OptLog.WARNING()?.Build("Close request was not finished within 20 ms, so WebSocket will be disposed anyway");
                 }
             }
             closeEvent.Set();

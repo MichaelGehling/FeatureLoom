@@ -169,7 +169,7 @@ namespace FeatureLoom.MessageFlow
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR(this.GetHandle(), "Exception caught in ActiveForwarder while sending.", e.ToString());
+                    OptLog.ERROR(this.GetHandle())?.Build("Exception caught in ActiveForwarder while sending.", e.ToString());
                 }
             }
 

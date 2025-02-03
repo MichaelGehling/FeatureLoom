@@ -105,11 +105,11 @@ namespace FeatureLoom.TCP
                 listner?.Stop();
                 listner = new TcpListener(ipAddress, settings.port);
                 listner.Start();
-                Log.TRACE(this.GetHandle(), $"TCP server started with hostname {settings.hostAddress} and port {settings.port.ToString()}.");
+                OptLog.TRACE()?.Build($"TCP server started with hostname {settings.hostAddress} and port {settings.port.ToString()}.");
             }
             catch (Exception e)
             {
-                Log.ERROR(this.GetHandle(), $"TcpListner failed to start with hostname {settings.hostAddress} and port {settings.port.ToString()}!", e.ToString());
+                OptLog.ERROR()?.Build($"TcpListner failed to start with hostname {settings.hostAddress} and port {settings.port.ToString()}!", e.ToString());
                 listner?.Stop();
                 listner = null;
                 DisconnectAllClients();                
@@ -131,7 +131,7 @@ namespace FeatureLoom.TCP
                 }
                 catch (Exception e)
                 {
-                    Log.ERROR("Error occurred while waiting for client connections", e.ToString());
+                    OptLog.ERROR()?.Build("Error occurred while waiting for client connections", e.ToString());
                 }
             }
         }

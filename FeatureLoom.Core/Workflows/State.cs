@@ -26,7 +26,7 @@ namespace FeatureLoom.Workflows
             var builder = parentStateMachine.BuildState(this, description) as StateBuilder<CT>;
             if (builder.state != this)
             {
-                Log.ERROR(parentStateMachine.GetHandle(), $"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
+                OptLog.ERROR()?.Build($"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
                 throw new Exception($"Tried to build state object {this.name}, not part of this statemachine {parentStateMachine.GetType().FullName}!");
             }
             return builder;
