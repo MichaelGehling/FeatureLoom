@@ -35,7 +35,7 @@ namespace FeatureLoom.Serialization
             MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
-            if (valueHandler.NoRefTypes)
+            if (!valueHandler.HandlerType.IsNullable())
             {
                 ItemHandler<T> itemHandler = (dict) =>
                 {
@@ -57,7 +57,7 @@ namespace FeatureLoom.Serialization
                         valueHandler.HandleItem(pair.Value, default);
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, true);
+                typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
             }
             else
             {
@@ -99,7 +99,7 @@ namespace FeatureLoom.Serialization
                         }
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, false);
+                typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
             }
         }
 

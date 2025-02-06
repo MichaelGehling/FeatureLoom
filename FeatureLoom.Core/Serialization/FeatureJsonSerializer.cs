@@ -268,7 +268,6 @@ namespace FeatureLoom.Serialization
                 return typeHandler;
             }
 
-            
             if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WriteIntValue);
             else if (itemType == typeof(uint)) typeHandler.SetItemHandler_Primitive<uint>(writer.WriteUintValue);
             else if (itemType == typeof(long)) typeHandler.SetItemHandler_Primitive<long>(writer.WriteLongValue);
@@ -307,11 +306,11 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(DateTime?)) typeHandler.SetItemHandler_Primitive<DateTime?>(v => { if (v.HasValue) writer.WriteDateTimeValue(v.Value); else writer.WriteNullValue(); });
 
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
+            else if (itemType.IsValueType && itemType.IsNullable() && Nullable.GetUnderlyingType(itemType).IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, Nullable.GetUnderlyingType(itemType), nameof(CreateNullableEnumItemHandler), true);
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateEnumerableItemHandler(typeHandler, itemType)) /* do nothing */;
-            else CreateComplexItemHandler(typeHandler, itemType);
-            
+            else CreateComplexItemHandler(typeHandler, itemType);           
             
             return typeHandler;
 
@@ -333,6 +332,26 @@ namespace FeatureLoom.Serialization
             else
             {
                 typeHandler.SetItemHandler_Primitive<T>(item => writer.WriteIntValue(item.ToInt()));
+            }
+        }
+
+        private void CreateNullableEnumItemHandler<T>(CachedTypeHandler typeHandler) where T : struct, Enum
+        {
+            if (settings.enumAsString)
+            {
+                typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
+                {
+                    if (item.HasValue) writer.WriteStringValue(item.Value.ToName());
+                    else writer.WriteNullValue();
+                });
+            }
+            else
+            {
+                typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
+                {
+                    if (item.HasValue) writer.WriteIntValue(item.Value.ToInt());
+                    else writer.WriteNullValue();
+                });
             }
         }
 

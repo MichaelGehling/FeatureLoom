@@ -456,6 +456,119 @@ namespace FeatureLoom.Serialization
                 this.itemHandler = temp;
                 this.objectItemHandler = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
             }
+            public void SetItemHandler_Object_ForNullableStruct<T>(Action<T>[] fieldHandlers, bool noRefChildren) where T : struct
+            {
+                this.handlerType = typeof(Nullable<T>);
+                this.isPrimitive = false;
+                this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
+                Action<Nullable<T>, Type, ByteSegment> temp;
+                if (serializer.settings.requiresItemInfos)
+                {
+                    if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
+                    {
+                        temp = (nullableItem, callType, itemName) =>
+                        {
+                            if (!nullableItem.HasValue)
+                            {
+                                writer.WriteNullValue();
+                                return;
+                            }
+                            T item = nullableItem.Value;
+                            serializer.CreateItemInfoForStruct(itemName);
+                            writer.OpenObject();
+                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
+                            for (int i = 1; i < fieldHandlers.Length; i++)
+                            {
+                                writer.WriteComma();
+                                fieldHandlers[i].Invoke(item);
+                            }
+                            writer.CloseObject();
+                            serializer.UseParentItemInfo();
+                        };
+                    }
+                    else
+                    {
+                        temp = (nullableItem, callType, itemName) =>
+                        {
+                            if (!nullableItem.HasValue)
+                            {
+                                writer.WriteNullValue();
+                                return;
+                            }
+                            T item = nullableItem.Value;
+                            serializer.CreateItemInfoForStruct(itemName);
+                            Type itemType = item.GetType();
+                            writer.OpenObject();
+                            if (serializer.TypeInfoRequired(itemType, callType))
+                            {
+                                writer.WriteToBuffer(preparedTypeInfo);
+                                if (fieldHandlers.Length >= 1) writer.WriteComma();
+                            }
+                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
+                            for (int i = 1; i < fieldHandlers.Length; i++)
+                            {
+                                writer.WriteComma();
+                                fieldHandlers[i].Invoke(item);
+                            }
+                            writer.CloseObject();
+                            serializer.UseParentItemInfo();
+                        };
+                    }
+                    
+                }
+                else
+                {
+                    if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
+                    {
+                        temp = (nullableItem, callType, itemName) =>
+                        {
+                            if (!nullableItem.HasValue)
+                            {
+                                writer.WriteNullValue();
+                                return;
+                            }
+                            T item = nullableItem.Value;
+                            writer.OpenObject();
+                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
+                            for (int i = 1; i < fieldHandlers.Length; i++)
+                            {
+                                writer.WriteComma();
+                                fieldHandlers[i].Invoke(item);
+                            }
+                            writer.CloseObject();
+                        };
+                    }
+                    else
+                    {
+                        temp = (nullableItem, callType, itemName) =>
+                        {
+                            if (!nullableItem.HasValue)
+                            {
+                                writer.WriteNullValue();
+                                return;
+                            }
+                            T item = nullableItem.Value;
+                            Type itemType = item.GetType();
+                            writer.OpenObject();
+                            if (serializer.TypeInfoRequired(itemType, callType))
+                            {
+                                writer.WriteToBuffer(preparedTypeInfo);
+                                if (fieldHandlers.Length >= 1) writer.WriteComma();
+                            }
+                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
+                            for (int i = 1; i < fieldHandlers.Length; i++)
+                            {
+                                writer.WriteComma();
+                                fieldHandlers[i].Invoke(item);
+                            }
+                            writer.CloseObject();
+                        };
+                    }
+                }
+
+                this.itemHandler = temp;
+                this.objectItemHandler = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
+            }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void HandleItem<T>(T item, ByteSegment fieldName)

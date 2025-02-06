@@ -122,11 +122,25 @@ namespace Playground
         }
 
 
+        public class XXX
+        {
+            public NullableStruct? mns;
+        }
 
+        public struct NullableStruct
+        {
+            public int x;
+        }
 
 
         private static async Task Main()
         {
+            XXX xxx = new XXX();
+            xxx.mns = new NullableStruct();
+
+            string result1 = JsonHelper.DefaultSerializer.Serialize(xxx);
+
+
             Log.DefaultConsoleLogger.config.loglevel = Loglevel.TRACE;
             Log.DefaultConsoleLogger.config.format = "";
             var OptLog = Service<OptLogService>.Instance;

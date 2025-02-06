@@ -26,7 +26,7 @@ namespace FeatureLoom.Serialization
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
-            if (elementHandler.NoRefTypes)
+            if (!elementHandler.HandlerType.IsNullable())
             {
                 ItemHandler<T> itemHandler = (list) =>
                 {

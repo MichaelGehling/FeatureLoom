@@ -13,9 +13,22 @@ namespace FeatureLoom.Serialization
 
         private void CreateComplexItemHandler(CachedTypeHandler typeHandler, Type itemType)
         {
-            MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateTypedComplexItemHandler), BindingFlags.NonPublic | BindingFlags.Instance);
-            MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
-            genericCreateMethod.Invoke(this, new object[] { typeHandler, itemType});
+
+            bool isNullableStruct = itemType.IsValueType && itemType.IsNullable();
+            if (isNullableStruct)
+            {
+                itemType = Nullable.GetUnderlyingType(itemType);
+                MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateTypedComplexItemHandler_ForNullableStruct), BindingFlags.NonPublic | BindingFlags.Instance);
+                MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
+                genericCreateMethod.Invoke(this, new object[] { typeHandler, itemType });
+            }
+            else
+            {
+                MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateTypedComplexItemHandler), BindingFlags.NonPublic | BindingFlags.Instance);
+                MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
+                genericCreateMethod.Invoke(this, new object[] { typeHandler, itemType });
+            }
+            
         }
 
         private void CreateTypedComplexItemHandler<T>(CachedTypeHandler typeHandler, Type itemType)
@@ -58,6 +71,46 @@ namespace FeatureLoom.Serialization
             typeHandler.SetItemHandler_Object(fieldValueWritersArray, allFieldsNoRefs);
         }
 
+        private void CreateTypedComplexItemHandler_ForNullableStruct<T>(CachedTypeHandler typeHandler, Type itemType) where T : struct
+        {
+            var memberInfos = new List<MemberInfo>();
+            if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
+            {
+                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(prop => prop.GetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
+            }
+            else
+            {
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
+                Type t = itemType.BaseType;
+                while (t != null)
+                {
+                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
+                    t = t.BaseType;
+                }
+            }
+
+            List<Action<T>> fieldValueWriters = new();
+            bool allFieldsNoRefs = true;
+            foreach (var memberInfo in memberInfos)
+            {
+                Type fieldType = GetFieldOrPropertyType(memberInfo);
+                var fieldTypeHandler = GetCachedTypeHandler(fieldType);
+                allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
+                MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
+                MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
+                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
+                fieldValueWriters.Add(writer);
+            }
+
+            var fieldValueWritersArray = fieldValueWriters.ToArray();
+            typeHandler.SetItemHandler_Object_ForNullableStruct(fieldValueWritersArray, allFieldsNoRefs);
+        }
+
         private Type GetFieldOrPropertyType(MemberInfo fieldOrPropertyInfo)
         {
             if (fieldOrPropertyInfo is FieldInfo fieldInfo) return fieldInfo.FieldType;
@@ -97,7 +150,7 @@ namespace FeatureLoom.Serialization
                     primitiveWriteDelegate(value);
                 };
             }
-            else if (fieldTypeHandler.NoRefTypes)
+            else if (!fieldTypeHandler.HandlerType.IsNullable())
             {
                 return (parentItem) =>
                 {
