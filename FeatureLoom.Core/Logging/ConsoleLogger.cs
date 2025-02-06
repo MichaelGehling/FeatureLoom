@@ -16,7 +16,7 @@ namespace FeatureLoom.Logging
 
         public class Config : Configuration
         {
-            public string format = "| {0} | ctxt{4} | thrd{3} | {1} | {2}| {8} |";
+            public string format = "| {0} | thrd{3} | {1} | {4} | {7} | {2}| {8} |";
             public string timeStampFormat = "HH:mm:ss.ffff";
             public Loglevel loglevel = Loglevel.WARNING;
             public Dictionary<Loglevel, ConsoleColor> loglevelColors = new Dictionary<Loglevel, ConsoleColor>() 

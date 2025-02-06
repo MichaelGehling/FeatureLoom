@@ -108,6 +108,12 @@ namespace FeatureLoom.Extensions
             return false;
         }
 
+        public static bool Contains<T>(this IReadOnlyList<T> self, T elementToFind)
+        {
+            for(int i = 0; i < self.Count; i++) if (Equals(self[i], elementToFind)) return true;
+            return false;
+        }
+
         public static T[] ToArray<T>(this IReadOnlyList<T> self)
         {
             var array = new T[self.Count];            

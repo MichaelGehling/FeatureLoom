@@ -39,7 +39,7 @@ namespace FeatureLoom.Logging
         public readonly int sourceLine;
         public readonly int threadId;
 
-        public static string defaultFormat = "| {0} | ctxt{4} | thrd{3} | {1} | {2} | File: {5} Line: {6} Method: {7} | {8} |";
+        public static string defaultFormat = "| {0} | thrd{3} | {1} | {4} | {7} | {2} | File: {5} Line: {6} | {8} |";
         public static string defaultTimeStampFormat = "yyyy-MM-dd HH:mm:ss.fffffff";
 
         public string Print(string format = null, string timeStampFormat = null)

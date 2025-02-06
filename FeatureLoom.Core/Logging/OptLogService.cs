@@ -149,7 +149,7 @@ public class OptLogService
         public string? methodMask = null;
         public int? minLine;
         public int? maxLine;
-        public string contextFilter;
+        public string contextMask;
     }
 
     class LogFilter
@@ -176,11 +176,11 @@ public class OptLogService
             if (settings.sourceFileMask != null && !sourceFile.MatchesWildcard(settings.sourceFileMask)) return false;
             if (settings.methodMask != null && !method.MatchesWildcard(settings.methodMask)) return false;
             if (settings.minLine.HasValue && settings.maxLine.HasValue && (sourceLine < settings.minLine || sourceLine > settings.maxLine)) return false;
-            if (settings.contextFilter != null)
+            if (settings.contextMask != null)
             {
                 if (logContext != null)
                 {
-                    if (logContext != settings.contextFilter) return false;
+                    if (!logContext.MatchesWildcard(settings.contextMask)) return false;
                 }
                 else if (parent.roamingContext.Exists)
                 {
@@ -188,7 +188,7 @@ public class OptLogService
                     if (roamingContext != null)
                     {
                         logContext = roamingContext;
-                        if (logContext != settings.contextFilter) return false;
+                        if (!logContext.MatchesWildcard(settings.contextMask)) return false;
                     }
                 }
             }
