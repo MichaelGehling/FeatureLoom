@@ -22,6 +22,7 @@ namespace FeatureLoom.Serialization
             public bool enableProposedTypes = false;
             public int initialBufferSize = 1024 * 64;
             public bool tryCastArraysOfUnknownValues = true;
+            public bool rethrowExceptions = true;
 
             public Settings()
             {

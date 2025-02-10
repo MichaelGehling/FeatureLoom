@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Extensions
@@ -300,6 +301,13 @@ namespace FeatureLoom.Extensions
             if (createMethod == null) throw new NotSupportedException();
             var genericCreateMethod = createMethod.MakeGenericMethod(typeArguments);
             return (RET)genericCreateMethod.Invoke(obj, argumentValues);
+        }
+
+        public static Task AwaitCancellation(this CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<object?>();
+            cancellationToken.Register(() => tcs.TrySetResult(null));
+            return tcs.Task;
         }
 
     }

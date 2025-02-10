@@ -106,81 +106,115 @@ namespace FeatureLoom.Storages
 
         public Task<bool> TryWriteToStorageAsync()
         {
-            string json = serializer.Serialize(this);
-            return Writer.TryWriteAsync(Uri, json);
+            try
+            {
+                string json = serializer.Serialize(this);
+                return Writer.TryWriteAsync(Uri, json);
+            }
+            catch (Exception ex)
+            {
+                OptLog.ERROR()?.Build($"Failed writing configuration {this.GetType().GetSimplifiedTypeName()} to storage", ex);
+                return Task.FromResult(false);
+            }
         }
 
         public bool TryWriteToStorage()
         {
-            string json = serializer.Serialize(this);
-            return Writer.TryWriteAsync(Uri, json).WaitFor();
+            try
+            {
+                string json = serializer.Serialize(this);
+                return Writer.TryWriteAsync(Uri, json).WaitFor();
+            }
+            catch (Exception ex)
+            {
+                OptLog.ERROR()?.Build($"Failed writing configuration {this.GetType().GetSimplifiedTypeName()} to storage", ex);
+                return false;
+            }
         }
 
         public async Task<bool> TryUpdateFromStorageAsync(bool useSubscription)
         {
-            bool success = false;
-            string json = null;
-            if (useSubscription)
+            try
             {
-                if (!subscriptionReceiver.Exists)
+                bool success = false;
+                string json = null;
+                if (useSubscription)
                 {
-                    success = (await Reader.TryReadAsync<string>(this.Uri).ConfigureAwait(false)).TryOut(out json);
-                    StartSubscription();
+                    if (!subscriptionReceiver.Exists)
+                    {
+                        success = (await Reader.TryReadAsync<string>(this.Uri).ConfigureAwait(false)).TryOut(out json);
+                        StartSubscription();
+                    }
+                    else
+                    {
+                        if (this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
+                        {
+                            success = changeUpdate.isValid;
+                            json = changeUpdate.item;
+                        }
+                    }
                 }
                 else
                 {
-                    if (this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
-                    {
-                        success = changeUpdate.isValid;
-                        json = changeUpdate.item;
-                    }
+                    success = (await Reader.TryReadAsync<string>(this.Uri).ConfigureAwait(false)).TryOut(out json);
                 }
+
+                if (success)
+                {
+                
+                        success = deserializer.TryPopulate(json, this);
+                
+                }
+
+                if (success) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");            
+                return success;
             }
-            else
+            catch (Exception ex)
             {
-                success = (await Reader.TryReadAsync<string>(this.Uri).ConfigureAwait(false)).TryOut(out json);
+                OptLog.ERROR()?.Build($"Failed updating configuration {this.GetType().GetSimplifiedTypeName()}", ex);
+                return false;
             }
-
-            if (success)
-            {                
-                success = deserializer.TryPopulate(json, this);
-            }
-
-            if (success) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");            
-            return success;
         }
 
         public bool TryUpdateFromStorage(bool useSubscription)
         {
-            bool success = false;
-            string json = null;
-            if (useSubscription)
+            try
             {
-                if (!subscriptionReceiver.Exists)
+                bool success = false;
+                string json = null;
+                if (useSubscription)
                 {
-                    success = Reader.TryReadAsync<string>(this.Uri).WaitFor(out json);
-                    StartSubscription();
+                    if (!subscriptionReceiver.Exists)
+                    {
+                        success = Reader.TryReadAsync<string>(this.Uri).WaitFor(out json);
+                        StartSubscription();
+                    }
+                    else
+                    {
+                        if (this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
+                        {
+                            success = changeUpdate.isValid;
+                            json = changeUpdate.item;
+                        }
+                    }
                 }
                 else
                 {
-                    if (this.subscriptionReceiver.Obj.TryReceive(out ChangeUpdate<string> changeUpdate))
-                    {
-                        success = changeUpdate.isValid;
-                        json = changeUpdate.item;
-                    }
+                    success = Reader.TryReadAsync<string>(this.Uri).WaitFor(out json);
                 }
-            }
-            else
-            {
-                success = Reader.TryReadAsync<string>(this.Uri).WaitFor(out json);
-            }
-            if (success)
-            {
-                success = deserializer.TryPopulate(json, this);                
-            }
+                if (success)
+                {
+                    success = deserializer.TryPopulate(json, this);
+                }
 
-            if (success) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");            
-            return success;
+                if (success) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");
+                return success;
+            }
+            catch (Exception ex)
+            {
+                OptLog.ERROR()?.Build($"Failed updating configuration {this.GetType().GetSimplifiedTypeName()}", ex);
+                return false;
+            }
         }
     }
 

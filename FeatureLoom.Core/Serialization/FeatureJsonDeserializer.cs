@@ -20,6 +20,7 @@ using System.Net.Http.Headers;
 using FeatureLoom.Serialization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using FeatureLoom.Logging;
 
 namespace FeatureLoom.Serialization
 {
@@ -2149,8 +2150,9 @@ namespace FeatureLoom.Serialization
                     retry = true;
                 }
                 catch (Exception e)
-                {                    
-                    throw;
+                {
+                    OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                    if (settings.rethrowExceptions) throw;
                 }
                 finally
                 {
@@ -2215,7 +2217,8 @@ namespace FeatureLoom.Serialization
                 }
                 catch (Exception e)
                 {
-                    throw;
+                    OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                    if (settings.rethrowExceptions) throw;
                 }
                 finally
                 {
@@ -2279,7 +2282,8 @@ namespace FeatureLoom.Serialization
                 }
                 catch (Exception e)
                 {
-                    throw;
+                    OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                    if (settings.rethrowExceptions) throw;
                 }
                 finally
                 {

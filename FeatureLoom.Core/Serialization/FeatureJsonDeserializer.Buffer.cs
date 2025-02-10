@@ -23,6 +23,7 @@ namespace FeatureLoom.Serialization
             Stream stream;
 
             public byte CurrentByte => buffer[bufferPos];
+            public int BufferPos => bufferPos;
 
             public void Init(int bufferSize)
             {
