@@ -107,6 +107,8 @@ public class OptLogService
         }
     }
 
+    public Loglevel GlobalLoglevel => settings.globalLogLevel;
+
     public void AddWhiteListFilter(LogFilterSettings logFilterSettings)
     {
         LogFilter logFilter = new LogFilter(this, logFilterSettings);

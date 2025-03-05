@@ -23,6 +23,8 @@ namespace FeatureLoom.Serialization
             public int initialBufferSize = 1024 * 64;
             public bool tryCastArraysOfUnknownValues = true;
             public bool rethrowExceptions = true;
+            public bool logCatchedExceptions = true;
+            public bool strict = false;
 
             public Settings()
             {
@@ -63,6 +65,11 @@ namespace FeatureLoom.Serialization
             public void AddCustomTypeReader<T>(ICustomTypeReader<T> customTypeReader)
             {
                 customTypeReaders[typeof(T)] = customTypeReader;
+            }
+
+            public void AddCustomTypeReader<T>(JsonDataTypeCategory category, Func<ExtensionApi, T> readType)
+            {
+                AddCustomTypeReader<T>(new CustomTypeReader<T>(category, readType));
             }
 
         }

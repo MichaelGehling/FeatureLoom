@@ -19,6 +19,48 @@ public sealed partial class FeatureJsonDeserializer
         public bool TryNextByte() => deserializer.buffer.TryNextByte();
         
         public void SkipNextValue() => deserializer.SkipValue();
+        public void ReadRawJsonValue(out ByteSegment utf8Bytes)
+        {
+            deserializer.SkipWhiteSpaces();
+            var rec = deserializer.buffer.StartRecording();            
+            deserializer.SkipValue();
+            utf8Bytes = rec.GetRecordedBytes(deserializer.buffer.IsBufferReadToEnd);
+        }
+
+        public bool TryReadRawJsonValue(out ByteSegment utf8Bytes)
+        {
+            deserializer.SkipWhiteSpaces();
+            using (var undoHandle = deserializer.CreateUndoReadHandle(true)) 
+            {
+                try
+                {
+                    deserializer.SkipValue();
+                    utf8Bytes = undoHandle.GetReadBytes();
+                    undoHandle.SetUndoReading(false);
+                    return true;
+                }
+                catch
+                {
+                    utf8Bytes = default;
+                    undoHandle.SetUndoReading(true);
+                    return false;
+                }
+            }            
+        }
+
+        public void ReadRawJsonValue(out string jsonValue)
+        {
+            ReadRawJsonValue(out ByteSegment utf8Bytes);
+            jsonValue = DecodeUtf8Bytes(utf8Bytes);
+        }
+
+        public bool TryReadRawJsonValue(out string jsonValue)
+        {
+            jsonValue = null;
+            if (!TryReadRawJsonValue(out ByteSegment utf8Bytes)) return false;
+            jsonValue = DecodeUtf8Bytes(utf8Bytes);
+            return true;
+        }
         public byte SkipWhiteSpaces() => deserializer.SkipWhiteSpaces();
 
         public bool TryReadNullValue() => deserializer.TryReadNullValue();

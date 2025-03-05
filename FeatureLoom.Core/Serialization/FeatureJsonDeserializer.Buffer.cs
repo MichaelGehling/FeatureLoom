@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using FeatureLoom.Helpers;
 using System.Diagnostics;
 using System.Text;
+using System.Collections.Specialized;
 
 namespace FeatureLoom.Serialization
 {
@@ -80,13 +81,25 @@ namespace FeatureLoom.Serialization
                 return false;
             }
 
+            public bool TrySkipBytes(int count)
+            {                
+                int bytesLeft = bufferFillLevel - bufferPos;
+                if (count > bytesLeft) return false;
+                bufferPos += count;
+                bufferPos = bufferPos.Clamp(0, bufferFillLevel - 1);
+                return true;
+            }
+
             public bool TryReadFromStream()
             {
                 if (stream == null) return false;
                 if (!stream.CanRead) return false;
 
                 int bufferSizeLeft = buffer.Length - bufferFillLevel;
-                if (bufferSizeLeft == 0) throw new BufferExceededException(); 
+                if (bufferSizeLeft == 0)
+                {
+                    throw new BufferExceededException();
+                }
                 try
                 {
                     int bytesRead = stream.Read(buffer, bufferFillLevel, bufferSizeLeft);
@@ -107,7 +120,7 @@ namespace FeatureLoom.Serialization
                     ResetBuffer(true, false);
                     bufferPos = bufferStartPos;                    
                 }
-                else if (bufferPos >= bufferFillLevel - 1)
+                else if (bufferPos >= bufferFillLevel)
                 {                    
                     if (!TryReadFromStream())
                     {
@@ -152,13 +165,20 @@ namespace FeatureLoom.Serialization
                     this.stream = null;
                 }
 
-                if (bufferPos >= bufferFillLevel - 1)
+                if (bufferPos >= bufferFillLevel)
                 {
                     bufferPos = 0;
                     bufferFillLevel = 0;
                 }
                 bufferStartPos = bufferPos;
                 peekStack.Clear();
+            }
+
+            public void ResetBufferAfterFullSkip()
+            {
+                bufferStartPos = bufferPos;
+                ResetBuffer(true, false);
+                bufferPos = bufferStartPos;
             }
 
             public void ResetAfterBufferExceededException()
@@ -176,6 +196,11 @@ namespace FeatureLoom.Serialization
                 ByteSegment segment = new ByteSegment(buffer, startPos, endPos - startPos + 1);
                 return segment.ToString();
             }
+
+            public ByteSegment GetRemainingBytes() => new ByteSegment(buffer, bufferPos, bufferFillLevel - bufferPos);
+
+            public int CountRemainingBytes => bufferFillLevel - bufferPos;
+            public int CountSizeLeft => buffer.Length - bufferFillLevel;
 
             public bool IsBufferCompletelyFilled => bufferFillLevel == buffer.Length;
             public bool IsBufferReadToEnd => bufferPos >= bufferFillLevel;

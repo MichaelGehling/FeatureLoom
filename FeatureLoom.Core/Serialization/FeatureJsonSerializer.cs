@@ -50,7 +50,11 @@ namespace FeatureLoom.Serialization
         void FinishSerialization()
         {
             writer.ResetBuffer();
-            if (memoryStream.Exists) memoryStream.Obj.Position = 0;
+            if (memoryStream.Exists)
+            {
+                memoryStream.Obj.Dispose();
+                memoryStream.RemoveObj();
+            }
             writer.stream = null;
             if (objToItemInfo.Count > 0) objToItemInfo.Clear();
             itemInfoRecycler.ResetPooledItemInfos();            
@@ -87,14 +91,14 @@ namespace FeatureLoom.Serialization
                     lastTypeHandlerType = typeHandler.HandlerType;
                 }
 
-                if (memoryStream.Obj.Length == 0)
+                if (memoryStream.Obj.Position == 0)
                 {
                     return Encoding.UTF8.GetString(writer.Buffer, 0, writer.BufferCount);
                 }
                 else
                 {
                     writer.WriteBufferToStream();
-                    return Encoding.UTF8.GetString(memoryStream.Obj.GetBuffer(), 0, (int)memoryStream.Obj.Length);
+                    return Encoding.UTF8.GetString(memoryStream.Obj.GetBuffer(), 0, (int)memoryStream.Obj.Position);
                 }                                        
             }
             finally
@@ -104,6 +108,7 @@ namespace FeatureLoom.Serialization
             }
             
         }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void CreateItemInfoForClass<T>(T item, ByteSegment itemName)
@@ -228,6 +233,7 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsString);
             else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WritePrimitiveValueAsString(value.ToString()));
             else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WritePrimitiveValueAsString(value.ToString()));
+            else if (itemType == typeof(TimeSpan)) stringValueWriter.SetWriterMethod<TimeSpan>(value => writer.WritePrimitiveValueAsString(value.ToString()));
 
             if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WriteStringValueAsStringWithCopy);
             else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WriteBoolValueAsStringWithCopy);
@@ -242,6 +248,7 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsStringWithCopy);
             else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
             else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
+            else if (itemType == typeof(TimeSpan)) stringValueWriter.SetWriterMethod<TimeSpan>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
 
             return stringValueWriter.HasMethod;
         }
@@ -286,6 +293,8 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler_Primitive<UIntPtr>(writer.WriteUintPtrValue);
             else if (itemType == typeof(Guid)) typeHandler.SetItemHandler_Primitive<Guid>(writer.WriteGuidValue);
             else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler_Primitive<DateTime>(writer.WriteDateTimeValue);
+            else if (itemType == typeof(TimeSpan)) typeHandler.SetItemHandler_Primitive<TimeSpan>(writer.WriteTimeSpanValue);
+            else if (itemType == typeof(JsonFragment)) typeHandler.SetItemHandler_Primitive<JsonFragment>(writer.WriteJsonFragmentValue);
 
             else if (itemType == typeof(int?)) typeHandler.SetItemHandler_Primitive<int?>(v => { if (v.HasValue) writer.WriteIntValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(uint?)) typeHandler.SetItemHandler_Primitive<uint?>(v => { if (v.HasValue) writer.WriteUintValue(v.Value); else writer.WriteNullValue(); });
@@ -294,7 +303,7 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(short?)) typeHandler.SetItemHandler_Primitive<short?>(v => { if (v.HasValue) writer.WriteShortValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(ushort?)) typeHandler.SetItemHandler_Primitive<ushort?>(v => { if (v.HasValue) writer.WriteUshortValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(sbyte?)) typeHandler.SetItemHandler_Primitive<sbyte?>(v => { if (v.HasValue) writer.WriteSbyteValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(byte?)) typeHandler.SetItemHandler_Primitive<byte?>(v => { if (v.HasValue) writer.WriteByteValue(v.Value); else writer.WriteNullValue(); });            
+            else if (itemType == typeof(byte?)) typeHandler.SetItemHandler_Primitive<byte?>(v => { if (v.HasValue) writer.WriteByteValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(float?)) typeHandler.SetItemHandler_Primitive<float?>(v => { if (v.HasValue) writer.WriteFloatValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(double?)) typeHandler.SetItemHandler_Primitive<double?>(v => { if (v.HasValue) writer.WriteDoubleValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(decimal?)) typeHandler.SetItemHandler_Primitive<decimal?>(v => { if (v.HasValue) writer.WriteDecimalValue(v.Value); else writer.WriteNullValue(); });
@@ -304,6 +313,8 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(UIntPtr?)) typeHandler.SetItemHandler_Primitive<UIntPtr?>(v => { if (v.HasValue) writer.WriteUintPtrValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(Guid?)) typeHandler.SetItemHandler_Primitive<Guid?>(v => { if (v.HasValue) writer.WriteGuidValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(DateTime?)) typeHandler.SetItemHandler_Primitive<DateTime?>(v => { if (v.HasValue) writer.WriteDateTimeValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(TimeSpan?)) typeHandler.SetItemHandler_Primitive<TimeSpan?>(v => { if (v.HasValue) writer.WriteTimeSpanValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(JsonFragment?)) typeHandler.SetItemHandler_Primitive<JsonFragment?>(v => { if (v.HasValue) writer.WriteJsonFragmentValue(v.Value); else writer.WriteNullValue(); });
 
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
             else if (itemType.IsValueType && itemType.IsNullable() && Nullable.GetUnderlyingType(itemType).IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, Nullable.GetUnderlyingType(itemType), nameof(CreateNullableEnumItemHandler), true);

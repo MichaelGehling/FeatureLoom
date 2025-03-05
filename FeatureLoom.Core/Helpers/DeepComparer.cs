@@ -6,6 +6,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Helpers
 {
@@ -270,16 +271,43 @@ namespace FeatureLoom.Helpers
 
                     if (IsPrimitive(fieldType))
                     {
-                        // For primitives (and strings), call Equals.
-                        fieldComparison = Expression.Call(
-                            xField,
-                            fieldType.GetMethod("Equals", new Type[] { fieldType }),
-                            yField);
-                    }
-                    else if (fieldType == typeof(string))
-                    {
-                        // Strings use Equals.
-                        fieldComparison = Expression.Call(xField, fieldType.GetMethod("Equals", new[] { fieldType }), yField);
+                        // Check if the field type is a non-nullable value type.
+                        if (!fieldType.IsNullable())
+                        {
+                            // For non-nullable value types (like int), simply call Equals.
+                            fieldComparison = Expression.Call(
+                                xField,
+                                fieldType.GetMethod("Equals", new Type[] { fieldType }),
+                                yField
+                            );
+                        }
+                        else
+                        {
+                            // For reference types or Nullable<T>, first check for nulls.
+                            var nullValue = Expression.Constant(null, fieldType);
+                            var bothNull = Expression.AndAlso(
+                                Expression.Equal(xField, nullValue),
+                                Expression.Equal(yField, nullValue)
+                            );
+                            var oneNull = Expression.OrElse(
+                                Expression.Equal(xField, nullValue),
+                                Expression.Equal(yField, nullValue)
+                            );
+                            var equalsCall = Expression.Call(
+                                xField,
+                                fieldType.GetMethod("Equals", new Type[] { fieldType }),
+                                yField
+                            );
+                            fieldComparison = Expression.Condition(
+                                bothNull,
+                                Expression.Constant(true),
+                                Expression.Condition(
+                                    oneNull,
+                                    Expression.Constant(false),
+                                    equalsCall
+                                )
+                            );
+                        }
                     }
                     else if (typeof(IEnumerable).IsAssignableFrom(fieldType) && fieldType != typeof(string))
                     {
@@ -352,10 +380,19 @@ namespace FeatureLoom.Helpers
             public object First { get; }
             public object Second { get; }
 
-            public ReferencePair(object first, object second)
+            public ReferencePair(object a, object b)
             {
-                First = first;
-                Second = second;
+                // Order the pair to ensure symmetry.
+                if (RuntimeHelpers.GetHashCode(a) <= RuntimeHelpers.GetHashCode(b))
+                {
+                    First = a;
+                    Second = b;
+                }
+                else
+                {
+                    First = b;
+                    Second = a;
+                }
             }
 
             public override bool Equals(object obj)

@@ -22,9 +22,19 @@ namespace FeatureLoom.Web
 {
     public partial class DefaultWebServer : IWebServer
     {
-        public class Config : Configuration
+        public static FeatureJsonSerializer.Settings DefaultSerializerSettings = new()
+        {
+            indent = false,
+            referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+            dataSelection = FeatureJsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
+            enumAsString = true,
+            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+        };
+
+    public class Config : Configuration
         {
             public HttpEndpointConfig[] endpointConfigs = { new HttpEndpointConfig(IPAddress.Loopback, 5000) };
+            public FeatureJsonSerializer.Settings serializerSettings = DefaultSerializerSettings;
         }
 
         private Config config = new Config();
@@ -41,14 +51,7 @@ namespace FeatureLoom.Web
         private List<IWebResultHandler> resultHandlers = new List<IWebResultHandler>();
         private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
-        FeatureJsonSerializer jsonSerializer = new FeatureJsonSerializer(new()
-        {
-            indent = false,
-            referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
-            dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-            enumAsString = true,
-            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,            
-        });
+        FeatureJsonSerializer jsonSerializer = new FeatureJsonSerializer(DefaultSerializerSettings);
         public DefaultWebServer()
         {
             favicon = Resource.favicon;
@@ -59,6 +62,8 @@ namespace FeatureLoom.Web
         {
             if (await config.TryUpdateFromStorageAsync(false))
             {
+                jsonSerializer = new FeatureJsonSerializer(config.serializerSettings ?? DefaultSerializerSettings);
+
                 bool wasRunning = running;
                 if (wasRunning) Stop();
                 foreach (var endpoint in config.endpointConfigs.EmptyIfNull())

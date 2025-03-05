@@ -106,7 +106,47 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public string ShowBufferAroundCurrentPosition(int before = 100, int after = 50) => buffer.ShowBufferAroundCurrentPosition(before, after);        
+        public string ShowBufferAroundCurrentPosition(int before = 100, int after = 50) => buffer.ShowBufferAroundCurrentPosition(before, after); 
+        
+        public void SkipBufferUntil(string delimiter, bool alsoSkipDelimiter, out bool found)
+        {
+            found = false;
+            if (delimiter.EmptyOrNull()) return;
+
+            serializerLock.Enter();
+            try
+            {                
+                ByteSegment delimiterBytes = Encoding.UTF8.GetBytes(delimiter);
+
+                if (buffer.CountRemainingBytes < delimiterBytes.Count)
+                {
+                    if (buffer.CountSizeLeft == 0) buffer.ResetBuffer(true, false);
+                    buffer.TryReadFromStream();
+                }
+                do
+                {
+                    ByteSegment bufferBytes = buffer.GetRemainingBytes();
+                    if (bufferBytes.TryFindIndex(delimiterBytes, out int index))
+                    {
+                        found = true;
+                        buffer.TrySkipBytes(index + (alsoSkipDelimiter ? delimiterBytes.Count : 0));
+                        buffer.ResetAfterReading();
+                        return;
+                    }
+                    buffer.TrySkipBytes(bufferBytes.Count - delimiterBytes.Count); //Ensure to keep the last chars for the case that the delimiter was split
+                    buffer.ResetBufferAfterFullSkip();
+                }
+                while (buffer.TryReadFromStream());
+            }
+            catch(Exception ex)
+            {
+                OptLog.ERROR()?.Build("Error occurred on skipping buffer.", ex);                
+            }
+            finally
+            {
+                serializerLock.Exit();
+            }
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         CachedTypeReader GetCachedTypeReader(Type itemType)
@@ -172,10 +212,18 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(char?)) cachedTypeReader.SetTypeReader(ReadNullableCharValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(DateTime)) cachedTypeReader.SetTypeReader(ReadDateTimeValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(DateTime?)) cachedTypeReader.SetTypeReader(ReadNullableDateTimeValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(TimeSpan)) cachedTypeReader.SetTypeReader(ReadTimeSpanValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(TimeSpan?)) cachedTypeReader.SetTypeReader(ReadNullableTimeSpanValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(Guid)) cachedTypeReader.SetTypeReader(ReadGuidValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(Guid?)) cachedTypeReader.SetTypeReader(ReadNullableGuidValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(JsonFragment)) cachedTypeReader.SetTypeReader(ReadJsonFragmentValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive);
             // TODO IntPtr + UIntPtr
-            else if (itemType.IsEnum) this.InvokeGenericMethod(nameof(CreateEnumReader), new Type[] { itemType }, cachedTypeReader);
+            else if (itemType.IsEnum || (Nullable.GetUnderlyingType(itemType)?.IsEnum ?? false))
+            {
+                if (!itemType.IsNullable()) this.InvokeGenericMethod(nameof(CreateEnumReader), new Type[] { itemType }, cachedTypeReader);
+                else this.InvokeGenericMethod(nameof(CreateNullableEnumReader), new Type[] { Nullable.GetUnderlyingType(itemType) }, cachedTypeReader);
+            }
             else if (itemType == typeof(object)) CreateUnknownObjectReader(cachedTypeReader);
             else if (TryCreateDictionaryTypeReader(itemType, cachedTypeReader)) { }
             else if (TryCreateEnumerableTypeReader(itemType, cachedTypeReader)) { }
@@ -319,6 +367,35 @@ namespace FeatureLoom.Serialization
         {
             cachedTypeReader.SetTypeReader(() =>
             {
+                var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
+                if (valueType == TypeResult.Whitespace)
+                {
+                    byte b = SkipWhiteSpaces();
+                    valueType = Lookup(map_TypeStart, b);
+                }
+
+                if (valueType == TypeResult.Number)
+                {
+                    int i = ReadIntValue();
+                    if (!EnumHelper.TryFromInt(i, out T value)) throw new Exception("Invalid number for enum value");
+                    return value;
+                }
+                else if (valueType == TypeResult.String)
+                {
+                    string s = ReadStringValue();
+                    if (!EnumHelper.TryFromString(s, out T value)) throw new Exception("Invalid string for enum value");
+                    return value;
+                }
+                else throw new Exception("Invalid character for determining enum value");
+            }, JsonDataTypeCategory.Primitive);
+        }
+
+        private void CreateNullableEnumReader<T>(CachedTypeReader cachedTypeReader) where T : struct, Enum
+        {
+            cachedTypeReader.SetTypeReader<T?>(() =>
+            {
+                if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+
                 var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
                 if (valueType == TypeResult.Whitespace)
                 {
@@ -1594,11 +1671,29 @@ namespace FeatureLoom.Serialization
             return c;
         }
 
-        private char? ReadNullableCharValue() => ReadCharValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private char? ReadNullableCharValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadCharValue();
+        }
 
         private DateTime ReadDateTimeValue()
-        {
-            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
+        {            
+            if (!TryReadStringBytes(out var stringBytes))
+            {                
+                if (!settings.strict && TryReadNullValue())
+                {                    
+                    return default;
+                }
+                else throw new Exception("Failed reading DateTime (not a string)");
+            }
+
+            if (stringBytes.Count == 0 && !settings.strict)
+            {
+                return default;
+            }            
+
             DateTime result;
 #if NET5_0_OR_GREATER
             Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
@@ -1633,7 +1728,69 @@ namespace FeatureLoom.Serialization
             return result;
         }
 
-        private DateTime? ReadNullableDateTimeValue() => ReadDateTimeValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private DateTime? ReadNullableDateTimeValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadDateTimeValue();
+        }
+
+        private TimeSpan ReadTimeSpanValue()
+        {
+            if (!TryReadStringBytes(out var stringBytes))
+            {
+                if (!settings.strict && TryReadNullValue())
+                {
+                    return default;
+                }
+                else throw new Exception("Failed reading TimeSpan (not a string)");
+            }
+
+            if (stringBytes.Count == 0 && !settings.strict)
+            {
+                return default;
+            }
+
+            TimeSpan result;
+#if NET5_0_OR_GREATER
+            Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
+            ReadOnlySpan<char> span = new ReadOnlySpan<char>();                        
+            foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+            {
+                if (span.IsEmpty) span = chunk.Span; // First chunk, that is good
+                else
+                {
+                    // second chunk is bad and we need to reset to fall back to copying (This is very unlikely for a TimeSpan string)
+                    span = new ReadOnlySpan<char>();
+                    break;
+                }
+            }
+            if (span.IsEmpty)
+            {
+                var chars = charSlicedBuffer.GetSlice(stringBuilder.Length);
+                stringBuilder.CopyTo(0, chars.Array, chars.Offset, stringBuilder.Length);
+                span = chars;
+                charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
+            }
+            result = TimeSpan.Parse(span);            
+#elif NETSTANDARD2_1_OR_GREATER
+            ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);            
+            result = TimeSpan.Parse(span);            
+            charSlicedBuffer.Reset(true);
+#else
+            string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
+            result = TimeSpan.Parse(str);
+#endif
+            stringBuilder.Clear();
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private TimeSpan? ReadNullableTimeSpanValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadTimeSpanValue();
+        }
 
         private Guid ReadGuidValue()
         {
@@ -1672,7 +1829,12 @@ namespace FeatureLoom.Serialization
             return result;
         }
 
-        private Guid? ReadNullableGuidValue() => ReadGuidValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Guid? ReadNullableGuidValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadGuidValue();
+        }
 
         StringBuilder stringBuilder = new StringBuilder(1024 * 8);
         SlicedBuffer<char> charSlicedBuffer = new SlicedBuffer<char>(1024 * 8);
@@ -1698,6 +1860,7 @@ namespace FeatureLoom.Serialization
             return null;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReadBoolValue()
         {
             if (!TryReadBoolValue(out bool value)) throw new Exception("Failed reading boolean");
@@ -1761,8 +1924,12 @@ namespace FeatureLoom.Serialization
 
 
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool? ReadNullableBoolValue() => ReadBoolValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool? ReadNullableBoolValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadBoolValue();
+        }
 
         private object ReadNumberValueAsObject()
         {
@@ -1809,7 +1976,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long ReadLongValue()
         {
             if (!TryReadSignedIntegerValue(out long value)) throw new Exception("Failed reading integer number");
@@ -1836,10 +2003,14 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public long? ReadNullableLongValue() => ReadLongValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public long? ReadNullableLongValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadLongValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int ReadIntValue()
         {
             long longValue = ReadLongValue();
@@ -1847,10 +2018,14 @@ namespace FeatureLoom.Serialization
             return (int)longValue;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int? ReadNullableIntValue() => ReadIntValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int? ReadNullableIntValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadIntValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public short ReadShortValue()
         {
             long longValue = ReadLongValue();
@@ -1858,10 +2033,14 @@ namespace FeatureLoom.Serialization
             return (short)longValue;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public short? ReadNullableShortValue() => ReadShortValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public short? ReadNullableShortValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadShortValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sbyte ReadSbyteValue()
         {
             long longValue = ReadLongValue();
@@ -1869,10 +2048,14 @@ namespace FeatureLoom.Serialization
             return (sbyte)longValue;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sbyte? ReadNullableSbyteValue() => ReadSbyteValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public sbyte? ReadNullableSbyteValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadSbyteValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadUlongValue()
         {
             if (!TryReadUnsignedIntegerValue(out ulong value)) throw new Exception("Failed reading unsigned integer number");
@@ -1896,10 +2079,14 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong? ReadNullableUlongValue() => ReadUlongValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ulong? ReadNullableUlongValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadUlongValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ReadUintValue()
         {
             ulong longValue = ReadUlongValue();
@@ -1907,10 +2094,14 @@ namespace FeatureLoom.Serialization
             return (uint)longValue;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint? ReadNullableUintValue() => ReadUintValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint? ReadNullableUintValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadUintValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ushort ReadUshortValue()
         {
             ulong longValue = ReadUlongValue();
@@ -1918,10 +2109,14 @@ namespace FeatureLoom.Serialization
             return (ushort)longValue;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ushort? ReadNullableUshortValue() => ReadUshortValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ushort? ReadNullableUshortValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadUshortValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByteValue()
         {
             ulong longValue = ReadUlongValue();
@@ -1929,8 +2124,12 @@ namespace FeatureLoom.Serialization
             return (byte)longValue;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte? ReadNullableByteValue() => ReadByteValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public byte? ReadNullableByteValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadByteValue();
+        }
 
         ByteSegment SPECIAL_NUMBER_NAN = "NaN".ToByteArray();
         ByteSegment SPECIAL_NUMBER_POS_INFINITY = "Infinity".ToByteArray();
@@ -1941,13 +2140,17 @@ namespace FeatureLoom.Serialization
         {
             byte b = SkipWhiteSpaces();
             if (b == (byte)'"')
-            {                
-                if (!TryReadStringBytes(out var str)) throw new Exception("Invalid string found for a number: could not read it");                
-                if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
-                if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
-                if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;
+            {
+                using (var undoHandle = CreateUndoReadHandle(false))
+                {
+                    if (!TryReadStringBytes(out var str)) throw new Exception("Invalid string found for a number: could not read it");
+                    if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
+                    if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
+                    if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;
 
-                throw new Exception($"Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
+                    if (!settings.strict) undoHandle.SetUndoReading(true);                    
+                    else throw new Exception($"Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
+                }
             }
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber)) throw new Exception("Failed reading number");
 
@@ -2006,10 +2209,14 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public double? ReadNullableDoubleValue() => ReadDoubleValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public double? ReadNullableDoubleValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadDoubleValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public decimal ReadDecimalValue()
         {
             double dbl = ReadDoubleValue();
@@ -2017,14 +2224,49 @@ namespace FeatureLoom.Serialization
             return (decimal)dbl;
         }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public decimal? ReadNullableDecimalValue() => (decimal)ReadDecimalValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public decimal? ReadNullableDecimalValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadDecimalValue();
+        }
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float ReadFloatValue() => (float)ReadDoubleValue();
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float? ReadNullableFloatValue() => (float?)ReadDoubleValue();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public float? ReadNullableFloatValue()
+        {
+            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            return ReadFloatValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public JsonFragment ReadJsonFragmentValue()
+        {
+            SkipWhiteSpaces();
+            var rec = buffer.StartRecording();
+            SkipValue();
+            var utf8Bytes = rec.GetRecordedBytes(buffer.IsBufferReadToEnd);
+            string json = DecodeUtf8Bytes(utf8Bytes);
+            JsonFragment fragment = new JsonFragment(json);
+            return fragment;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public JsonFragment? ReadNullableJsonFragmentValue()
+        {
+            var fragment = ReadJsonFragmentValue();
+            return fragment.IsValid ? fragment : null;
+        }
+
+        private string DecodeUtf8Bytes(ArraySegment<byte> bytes)
+        {
+            string str = Utf8Converter.DecodeUtf8ToString(bytes, stringBuilder);
+            stringBuilder.Clear();
+            return str;
+        }
+
 
         CachedTypeReader lastTypeReader = null;
         Type lastTypeReaderType = null;
@@ -2042,7 +2284,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        public void SetDataSource(String json)
+        public void SetDataSource(string json)
         {
             serializerLock.Enter();
             try
@@ -2077,26 +2319,31 @@ namespace FeatureLoom.Serialization
             serializerLock.Enter();
             try
             {
-                ref var map_SkipWhitespaces_ref = ref map_SkipWhitespaces[0];
-                byte b;
-                if (!buffer.IsBufferReadToEnd)
-                {
-                    // Ignore whitespaces and check if any other character is found
-                    b = SkipWhiteSpaces();                  
-                    if (LookupCheck(ref map_SkipWhitespaces_ref, b, FilterResult.Found)) return true;
-                }
-                
-                if (buffer.IsBufferCompletelyFilled) buffer.ResetBuffer(true, false);
-                if (!buffer.TryReadFromStream()) return false;
-
-                // Ignore whitespaces and check if any other character is found
-                b = SkipWhiteSpaces();
-                return LookupCheck(ref map_SkipWhitespaces_ref, b, FilterResult.Found);
+                return IsAnyDataLeftUnlocked();
             }
             finally 
             { 
                 serializerLock.Exit(); 
             }
+        }
+
+        private bool IsAnyDataLeftUnlocked()
+        {
+            ref var map_SkipWhitespaces_ref = ref map_SkipWhitespaces[0];
+            byte b;
+            if (!buffer.IsBufferReadToEnd)
+            {
+                // Ignore whitespaces and check if any other character is found
+                b = SkipWhiteSpaces();
+                if (LookupCheck(ref map_SkipWhitespaces_ref, b, FilterResult.Found)) return true;
+            }
+
+            if (buffer.IsBufferCompletelyFilled) buffer.ResetBuffer(true, false);
+            if (!buffer.TryReadFromStream()) return false;
+
+            // Ignore whitespaces and check if any other character is found
+            b = SkipWhiteSpaces();
+            return LookupCheck(ref map_SkipWhitespaces_ref, b, FilterResult.Found);
         }
 
         private bool TryDeserializeLocked<T>(out T item)
@@ -2141,7 +2388,7 @@ namespace FeatureLoom.Serialization
                     itemInfos.Clear();
                     currentItemInfoIndex = -1;
 
-                    if (!buffer.TryReadFromStream())
+                    if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
                     {
                         item = default;
                         return false;
@@ -2151,7 +2398,7 @@ namespace FeatureLoom.Serialization
                 }
                 catch (Exception e)
                 {
-                    OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                    if (settings.logCatchedExceptions) OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
                     if (settings.rethrowExceptions) throw;
                 }
                 finally
@@ -2207,7 +2454,7 @@ namespace FeatureLoom.Serialization
                     itemInfos.Clear();
                     currentItemInfoIndex = -1;
 
-                    if (!buffer.TryReadFromStream())
+                    if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
                     {
                         item = default;
                         return false;
@@ -2272,7 +2519,7 @@ namespace FeatureLoom.Serialization
                     itemInfos.Clear();
                     currentItemInfoIndex = -1;
 
-                    if (!buffer.TryReadFromStream())
+                    if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
                     {
                         // At this point the item is probably partially populated
                         return false;
@@ -2732,8 +2979,11 @@ namespace FeatureLoom.Serialization
             unsignedInteger     = exponent,
         }
 
+        static readonly ByteSegment zeroAsBytes = new byte[] { (byte)'0' };
         bool TryReadNumberBytes(out bool isNegative, out ByteSegment integerBytes, out ByteSegment decimalBytes, out ByteSegment exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
         {
+            bool stringAsNumberStarted = false;
+
             using(var undoHandle = CreateUndoReadHandle())
             {
                 integerBytes = default;
@@ -2749,8 +2999,27 @@ namespace FeatureLoom.Serialization
                     byte b = buffer.CurrentByte;
                     var result = Lookup(ref map_SkipWhitespacesUntilNumberStarts_ref, b);
                     if (result == FilterResult.Found) break;
-                    else if (result == FilterResult.Skip) { if (!buffer.TryNextByte()) return false; }
-                    else if (result == FilterResult.Unexpected) return false;
+                    else if (result == FilterResult.Skip) 
+                    { 
+                        if (!buffer.TryNextByte()) return false; 
+                    }
+                    else if (result == FilterResult.Unexpected)
+                    {
+                        if (b == '"' && !settings.strict && !stringAsNumberStarted)
+                        {
+                            stringAsNumberStarted = true;
+                            if (!buffer.TryNextByte()) return false;
+                            if (buffer.CurrentByte == '"')
+                            {                                
+                                if (buffer.TryNextByte() && map_IsFieldEnd[buffer.CurrentByte] == FilterResult.Unexpected) return false;
+
+                                integerBytes = zeroAsBytes;
+                                undoHandle.SetUndoReading(false);
+                                return true;
+                            }
+                        }
+                        else return false;
+                    }
                 }
 
                 // Check if negative
@@ -2779,14 +3048,19 @@ namespace FeatureLoom.Serialization
                         }
                     }
                     else if (result == FilterResult.Found) break;
-                    else if (result == FilterResult.Unexpected) return false;
+                    else if (result == FilterResult.Unexpected)
+                    {
+                        if (b == '"' && stringAsNumberStarted) break;
+                        else return false;
+                    }
                 }
 
-                integerBytes = recording.GetRecordedBytes(couldNotSkip);                
+                integerBytes = recording.GetRecordedBytes(couldNotSkip);
+                if (integerBytes.Count == 0 && !settings.strict) integerBytes = zeroAsBytes;
 
                 if (buffer.CurrentByte == '.')
                 {
-                    if (!validComponents.IsFlagSet(ValidNumberComponents.decimalPart)) return false;
+                    if (!validComponents.IsFlagSet(ValidNumberComponents.decimalPart) && settings.strict) return false;
 
                     buffer.TryNextByte();
                     // Read decimal part
@@ -2805,7 +3079,11 @@ namespace FeatureLoom.Serialization
                             }
                         }
                         else if (result == FilterResult.Found) break;
-                        else if (result == FilterResult.Unexpected) return false;
+                        else if (result == FilterResult.Unexpected)
+                        {
+                            if (b == '"' && stringAsNumberStarted) break;
+                            else return false;
+                        }
                     }
                     decimalBytes = recording.GetRecordedBytes(couldNotSkip);
                 }
@@ -2833,9 +3111,22 @@ namespace FeatureLoom.Serialization
                             }
                         }
                         else if (result == FilterResult.Found) break;
-                        else if (result == FilterResult.Unexpected) return false;
+                        else if (result == FilterResult.Unexpected)
+                        {
+                            if (b == '"' && stringAsNumberStarted) break;
+                            else return false;
+                        }
                     }
                     exponentBytes = recording.GetRecordedBytes(couldNotSkip);
+                }
+
+                if (stringAsNumberStarted)
+                {
+                    if (buffer.CurrentByte == '"')
+                    {
+                        if (buffer.TryNextByte() && map_IsFieldEnd[buffer.CurrentByte] == FilterResult.Unexpected) return false;
+                    }
+                    else return false;
                 }
 
                 undoHandle.SetUndoReading(false);
@@ -3229,6 +3520,30 @@ namespace FeatureLoom.Serialization
                     itemRef = compatibleItemRef;
                 }
 
+                return true;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        bool TryReadEmptyStringValue()
+        {
+            using (var undoHandle = CreateUndoReadHandle())
+            {
+                byte b = SkipWhiteSpaces();
+
+                if (b != '\"') return false;
+                if (!buffer.TryNextByte()) return false;
+                b = buffer.CurrentByte;
+                if (b != '\"') return false;
+                // Check for field end
+                if (!buffer.TryNextByte())
+                {
+                    undoHandle.SetUndoReading(false);
+                    return true;
+                }
+                if (!LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) return false;
+
+                undoHandle.SetUndoReading(false);
                 return true;
             }
         }

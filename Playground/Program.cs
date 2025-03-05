@@ -132,13 +132,62 @@ namespace Playground
             public int x;
         }
 
+        public class RecordingInfo
+        {
+             public int dataVersion = 1;
+           public DateTime recordingDate;
+            public Guid id;
+            public string sourceServer = null;
+            public string rootPath;
+            public List<string> namespaces;
+            public TimeSpan length;
+            public int samplesCount;
+            public string name;
+            public string creator;
+            public ItemAccessHelper access = new ItemAccessHelper();
+            
+        }
+
+        public class JsonFragmentTester
+        {
+            public JsonFragment obj;
+        }
+
+        enum Xenum
+        {
+            A,B,C
+        }
 
         private static async Task Main()
         {
-            XXX xxx = new XXX();
-            xxx.mns = new NullableStruct();
 
-            string result1 = JsonHelper.DefaultSerializer.Serialize(xxx);
+            TestStruct ts = new TestStruct()
+            {
+                i = 42,
+                obj = new TestClass()
+            };
+
+            var j = JsonHelper.DefaultSerializer.Serialize(ts);
+
+            JsonHelper.DefaultDeserializer.TryDeserialize<JsonFragmentTester>(j, out var jft);            
+
+            JsonHelper.DefaultDeserializer.TryDeserialize<TestClass>(jft.obj.JsonString, out var tc);
+
+            FeatureJsonDeserializer des = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+            {
+                initialBufferSize = 10, 
+            });
+
+            Stream stream = "xxxxxxxxaaa123".ToStream();
+            des.SetDataSource(stream);
+            des.SkipBufferUntil("aaa", true, out bool found);
+            des.TryDeserialize(out int x);
+
+            string t1 = "";
+            string result1 = JsonHelper.DefaultSerializer.Serialize(t1);
+
+
+            bool success = JsonHelper.DefaultDeserializer.TryDeserialize<Xenum?>("1", out var t2);
 
 
             Log.DefaultConsoleLogger.config.loglevel = Loglevel.TRACE;

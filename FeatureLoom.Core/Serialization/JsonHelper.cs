@@ -6,10 +6,14 @@ namespace FeatureLoom.Serialization;
 
 public static class JsonHelper
 {
-    static FeatureJsonSerializer serializer = new();
+    static FeatureJsonSerializer serializer = new(new()
+    {
+        indent = true
+    });
     static FeatureJsonDeserializer deserializer = new(new()
     {
         enableProposedTypes = true,
+        strict = false,        
     });
 
     public static FeatureJsonSerializer DefaultSerializer => serializer;

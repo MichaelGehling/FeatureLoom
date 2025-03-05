@@ -90,6 +90,7 @@ namespace FeatureLoom.Serialization
             void WriteTypeInfo(string typeName);
             void WriteValueFieldName();
             bool TryPreparePrimitiveWriteDelegate<T>(out Action<T> primitiveWriteDelegate);
+            void WriteRawJsonFragment(string json);
         }
 
         private sealed class JsonUTF8StreamWriter : IWriter
@@ -747,6 +748,16 @@ namespace FeatureLoom.Serialization
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteJsonFragmentValue(JsonFragment json)
+            {
+                if (json.IsValid)                
+                {                    
+                    WriteString(json.JsonString);
+                }
+                else WriteNullValue();
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public ByteSegment WriteStringValueAsStringWithCopy(string str)
             {
                 WriteToBufferWithoutCheck(QUOTES);
@@ -1075,6 +1086,11 @@ namespace FeatureLoom.Serialization
                         }
                     }
                 }
+            }
+
+            public void WriteRawJsonFragment(string json)
+            {
+                WriteString(json);
             }
 
             private void WriteString(string str)
@@ -1700,9 +1716,21 @@ namespace FeatureLoom.Serialization
                 WriteToBufferWithoutCheck((byte)'"');
             }
 
+            private static readonly byte[] zeroDateTimeBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00\"");
             public void WriteDateTimeValue(DateTime dateTime)
             {
-                EnsureFreeBufferSpace(32);
+                if (dateTime == default)
+                {
+                    WriteToBuffer(zeroDateTimeBytes);
+                    return;
+                }
+
+                int fractualSeconds = (int)(dateTime.Ticks % TimeSpan.TicksPerSecond);
+                int bytesToReserve = zeroDateTimeBytes.Length;
+                if (fractualSeconds > 0) bytesToReserve += 8; // .fffffff
+                if (dateTime.Kind == DateTimeKind.Utc) bytesToReserve += 1; // Z
+                else if (dateTime.Kind == DateTimeKind.Local) bytesToReserve += 6; // e.g. +01:00
+                EnsureFreeBufferSpace(bytesToReserve);
 
                 WriteToBufferWithoutCheck((byte)'"');
                 // Write Year
@@ -1722,9 +1750,13 @@ namespace FeatureLoom.Serialization
                 WriteToBufferWithoutCheck((byte)':');
                 // Write Second
                 Write2Digits(dateTime.Second);
-                WriteToBufferWithoutCheck((byte)'.');
-                // Write Fractional second
-                Write7Digits((int)(dateTime.Ticks % TimeSpan.TicksPerSecond));
+
+                // Write Fractional second                
+                if (fractualSeconds > 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'.');
+                    Write7Digits(fractualSeconds);
+                }
 
                 if (dateTime.Kind == DateTimeKind.Utc)
                 {
@@ -1741,6 +1773,53 @@ namespace FeatureLoom.Serialization
                 }
                 WriteToBufferWithoutCheck((byte)'"');
             }
+
+            private static readonly byte[] zeroTimespanBytes = System.Text.Encoding.UTF8.GetBytes("\"00:00:00\"");
+            public void WriteTimeSpanValue(TimeSpan value)
+            {
+                if (value == default)
+                {
+                    WriteToBuffer(zeroTimespanBytes);
+                    return;
+                }
+
+                bool isNegative = value.Ticks < 0;
+                if (isNegative) value = value.Negate(); // Make the TimeSpan positive for easier formatting
+
+                int numDays = value.Days;
+                int numFractualSeconds = (int)(value.Ticks % TimeSpan.TicksPerSecond);
+
+                int bytesToReserve = zeroTimespanBytes.Length; // "hh:mm:ss"
+                if (isNegative) bytesToReserve += 1; // '-' sign
+                if (numDays > 0) bytesToReserve += 11; // e.g. ddd.(max 10 digits + dot)
+                if (numFractualSeconds > 0) bytesToReserve += 8; // .fffffff
+
+                EnsureFreeBufferSpace(bytesToReserve);
+                WriteToBufferWithoutCheck((byte)'"');
+
+                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+
+                if (numDays > 0)
+                {
+                    WriteSignedInteger(numDays);
+                    WriteToBufferWithoutCheck((byte)'.');
+                }
+
+                Write2Digits(value.Hours);
+                WriteToBufferWithoutCheck((byte)':');
+                Write2Digits(value.Minutes);
+                WriteToBufferWithoutCheck((byte)':');
+                Write2Digits(value.Seconds);
+
+                if (numFractualSeconds > 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'.');
+                    Write7Digits(numFractualSeconds);
+                }
+
+                WriteToBufferWithoutCheck((byte)'"');
+            }
+
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
 

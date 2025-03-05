@@ -7,12 +7,18 @@ namespace FeatureLoom.Web
 {
     public static class WebRequestExtensions
     {
+        static FeatureJsonDeserializer jsonDeserializer = new(new FeatureJsonDeserializer.Settings()
+        {
+            rethrowExceptions = false,
+            enableProposedTypes = false,
+        });
+
         public static async Task<(bool, T)> TryGetBodyAsync<T>(this IWebRequest request)
         {
             string body = await request.ReadAsync();
             if (body.EmptyOrNull()) return (false, default(T));
             if (body is T bodyStr) return (true, bodyStr);
-            if (JsonHelper.DefaultDeserializer.TryDeserialize(body, out T result)) return (true, result);
+            if (jsonDeserializer.TryDeserialize(body, out T result)) return (true, result);
             return (false, default(T));
         }
 
@@ -20,7 +26,7 @@ namespace FeatureLoom.Web
         {
             if (request.TryGetQueryItem(key, out string strItem))
             {
-                if (JsonHelper.DefaultDeserializer.TryDeserialize(strItem, out item)) return true;
+                if (jsonDeserializer.TryDeserialize(strItem, out item)) return true;
             }
 
             item = default;
@@ -31,7 +37,7 @@ namespace FeatureLoom.Web
         {
             if (request.TryGetCookie(key, out string strCookie))
             {
-                if (JsonHelper.DefaultDeserializer.TryDeserialize(strCookie, out cookie)) return true;
+                if (jsonDeserializer.TryDeserialize(strCookie, out cookie)) return true;
             }
 
             cookie = default;

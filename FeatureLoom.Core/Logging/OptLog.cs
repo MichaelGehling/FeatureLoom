@@ -7,6 +7,7 @@ namespace FeatureLoom.Logging;
 public static class OptLog
 {
     public static string LogContext { get => Service<OptLogService>.Instance.LogContext; set => Service<OptLogService>.Instance.LogContext = value; }
+    public static Loglevel GlobalLoglevel => Service<OptLogService>.Instance.GlobalLoglevel;
 
     public static void AddBlackListFilter(OptLogService.LogFilterSettings logFilterSettings) => Service<OptLogService>.Instance.AddBlackListFilter(logFilterSettings);
     public static void AddWhiteListFilter(OptLogService.LogFilterSettings logFilterSettings) => Service<OptLogService>.Instance.AddWhiteListFilter(logFilterSettings);

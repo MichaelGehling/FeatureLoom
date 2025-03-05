@@ -66,7 +66,30 @@ namespace FeatureLoom.MessageFlow
         AsyncManualResetEvent closeEvent = new AsyncManualResetEvent(false);
         bool useConnectionMetaDataForMessages;
 
-        public WebSocketEndpoint(WebSocket webSocket, Type deserializationType = null, bool useConnectionMetaDataForMessages = true, int readBufferSize = 4096) 
+        
+        static FeatureJsonDeserializer.Settings defaultDeserializerSettings = new()
+        {
+            enableProposedTypes = false,
+            enableReferenceResolution = false,
+            dataAccess = FeatureJsonDeserializer.DataAccess.PublicAndPrivateFields,
+            rethrowExceptions = false,
+            strict = false,
+            tryCastArraysOfUnknownValues = true            
+        };
+
+        static FeatureJsonSerializer.Settings defaultSerializerSettings = new()
+        {
+            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+            dataSelection = FeatureJsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
+            enumAsString = true,            
+        };
+
+        static FeatureJsonDeserializer defaultDeserializer = new(defaultDeserializerSettings);
+        static FeatureJsonSerializer defaultSerializer = new(defaultSerializerSettings);
+        FeatureJsonDeserializer deserializer;
+        FeatureJsonSerializer serializer;
+
+        public WebSocketEndpoint(WebSocket webSocket, Type deserializationType = null, bool useConnectionMetaDataForMessages = true, int readBufferSize = 4096, FeatureJsonSerializer serializer = null, FeatureJsonDeserializer deserializer = null) 
         { 
             endpointHandle = this.GetHandle();
 
@@ -75,6 +98,9 @@ namespace FeatureLoom.MessageFlow
             this.readBufferSize = readBufferSize;
             this.webSocket = webSocket;
             this.useConnectionMetaDataForMessages = useConnectionMetaDataForMessages;
+
+            this.serializer = serializer ?? defaultSerializer;
+            this.deserializer = deserializer ?? defaultDeserializer;
 
             StartListeningAsync();
         }
@@ -137,7 +163,7 @@ namespace FeatureLoom.MessageFlow
                         object message;
                         if (deserializationType != null)
                         {
-                            while(JsonHelper.DefaultDeserializer.TryDeserialize(ms, deserializationType, out message))
+                            while(deserializer.TryDeserialize(ms, deserializationType, out message))
                             {
                                 if (useConnectionMetaDataForMessages) message.SetMetaData(META_DATA_CONNECTION_KEY, this.endpointHandle);
                                 _ = sourceHelper.ForwardAsync(message);
@@ -223,7 +249,7 @@ namespace FeatureLoom.MessageFlow
 
             using (await writeLock.LockAsync())
             {                
-                JsonHelper.DefaultSerializer.Serialize(writeBuffer, message);
+                serializer.Serialize(writeBuffer, message);
                 await webSocket.SendAsync(new ArraySegment<byte>(writeBuffer.GetBuffer(), 0, (int)writeBuffer.Length), WebSocketMessageType.Text, true, cts.Token);
                 writeBuffer.Position = 0;
                 writeBuffer.SetLength(0);
