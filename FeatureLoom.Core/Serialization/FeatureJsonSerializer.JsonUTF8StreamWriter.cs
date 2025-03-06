@@ -10,14 +10,14 @@ using System.Linq;
 using System.Globalization;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.Serialization
+namespace FeatureLoom.Serialization;
+
+public sealed partial class FeatureJsonSerializer
 {
-    public sealed partial class FeatureJsonSerializer
+    public interface IWriter
     {
-        public interface IWriter
-        {
-            byte[] Buffer { get; }
-            int BufferCount { get; }
+        byte[] Buffer { get; }
+        int BufferCount { get; }
 
             void CloseArray();
             void CloseObject();
@@ -93,659 +93,659 @@ namespace FeatureLoom.Serialization
             void WriteRawJsonFragment(string json);
         }
 
-        private sealed class JsonUTF8StreamWriter : IWriter
+    private sealed class JsonUTF8StreamWriter : IWriter
+    {
+        public Stream stream;
+        private byte[] localBuffer;
+        private byte[] mainBuffer;
+        private int mainBufferCount;
+        private int mainBufferLimit;
+        private SlicedBuffer<byte> tempSlicedBuffer;
+        private CompiledSettings settings;
+        private readonly bool indent;
+        private int currentIndentionDepth = 0;
+        private readonly int maxIndentationDepth;
+        private readonly byte[][] indentationLookup;
+
+        public JsonUTF8StreamWriter(CompiledSettings settings)
         {
-            public Stream stream;
-            private byte[] localBuffer;
-            private byte[] mainBuffer;
-            private int mainBufferCount;
-            private int mainBufferLimit;
-            private SlicedBuffer<byte> tempSlicedBuffer;
-            private CompiledSettings settings;
-            private readonly bool indent;
-            private int currentIndentionDepth = 0;
-            private readonly int maxIndentationDepth;
-            private readonly byte[][] indentationLookup;
+            mainBufferLimit = settings.writeBufferChunkSize;
+            localBuffer = new byte[128];
+            // We give some extra bytes in order to not always check remaining space
+            mainBuffer = new byte[mainBufferLimit + 64];
+            // Used for temporarily needed names e.g. Dictionary
+            tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, 128);
+            this.settings = settings;
 
-            public JsonUTF8StreamWriter(CompiledSettings settings)
-            {
-                mainBufferLimit = settings.writeBufferChunkSize;
-                localBuffer = new byte[128];
-                // We give some extra bytes in order to not always check remaining space
-                mainBuffer = new byte[mainBufferLimit + 64];
-                // Used for temporarily needed names e.g. Dictionary
-                tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, 128);
-                this.settings = settings;
+            indent = settings.indent;
+            maxIndentationDepth = settings.maxIndentationDepth;
+            indentationLookup = new byte[maxIndentationDepth][];
+            InitIndentationLookup();
+        }
+       
+        private void InitIndentationLookup()
+        {                
+            if (!indent) return;                
 
-                indent = settings.indent;
-                maxIndentationDepth = settings.maxIndentationDepth;
-                indentationLookup = new byte[maxIndentationDepth][];
-                InitIndentationLookup();
+            List<byte> indentationBytes = new List<byte>();
+            indentationBytes.Add((byte)'\n');
+            for (int i = 0; i < settings.maxIndentationDepth; i++)
+            {                                        
+                indentationLookup[i] = indentationBytes.ToArray();
+                for (int j = 0; j < settings.indentationFactor; j++) indentationBytes.Add((byte)' ');
             }
-           
-            private void InitIndentationLookup()
-            {                
-                if (!indent) return;                
+        }
 
-                List<byte> indentationBytes = new List<byte>();
-                indentationBytes.Add((byte)'\n');
-                for (int i = 0; i < settings.maxIndentationDepth; i++)
-                {                                        
-                    indentationLookup[i] = indentationBytes.ToArray();
-                    for (int j = 0; j < settings.indentationFactor; j++) indentationBytes.Add((byte)' ');
-                }
-            }
+        private void WriteNextLine()
+        {
+            var indentationBytes = indentationLookup[Math.Min(currentIndentionDepth,maxIndentationDepth)];
+            WriteToBuffer(indentationBytes);
+        }
 
-            private void WriteNextLine()
+
+        public byte[] Buffer => mainBuffer;
+        public int BufferCount
+        {
+            get => mainBufferCount;
+            set => mainBufferCount = value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteBufferToStream()
+        {
+            try
             {
-                var indentationBytes = indentationLookup[Math.Min(currentIndentionDepth,maxIndentationDepth)];
-                WriteToBuffer(indentationBytes);
-            }
-
-
-            public byte[] Buffer => mainBuffer;
-            public int BufferCount
-            {
-                get => mainBufferCount;
-                set => mainBufferCount = value;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteBufferToStream()
-            {
-                try
-                {
-                    stream.Write(mainBuffer, 0, mainBufferCount);
-                    mainBufferCount = 0;
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception("Failed writing to stream", ex);
-                }
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public async Task WriteBufferToStreamAsync()
-            {
-                try
-                {
-                    await stream.WriteAsync(mainBuffer, 0, mainBufferCount);
-                    mainBufferCount = 0;
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception("Failed writing to stream", ex);
-                }
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void ResetBuffer()
-            {
+                stream.Write(mainBuffer, 0, mainBufferCount);
                 mainBufferCount = 0;
-                tempSlicedBuffer.Reset(true);
-                currentIndentionDepth = 0;
             }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBuffer(byte[] data, int offset, int count)
+            catch (Exception ex)
             {
-                if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
-                Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
-                mainBufferCount += count;
+                throw new Exception("Failed writing to stream", ex);
             }
+        }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBuffer(byte[] data, int count)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public async Task WriteBufferToStreamAsync()
+        {
+            try
             {
-                WriteToBuffer(data, 0, count);
+                await stream.WriteAsync(mainBuffer, 0, mainBufferCount);
+                mainBufferCount = 0;
             }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBuffer(byte[] data)
+            catch (Exception ex)
             {
-                WriteToBuffer(data, 0, data.Length);
+                throw new Exception("Failed writing to stream", ex);
             }
+        }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBuffer(ByteSegment data)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ResetBuffer()
+        {
+            mainBufferCount = 0;
+            tempSlicedBuffer.Reset(true);
+            currentIndentionDepth = 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBuffer(byte[] data, int offset, int count)
+        {
+            if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
+            Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
+            mainBufferCount += count;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBuffer(byte[] data, int count)
+        {
+            WriteToBuffer(data, 0, count);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBuffer(byte[] data)
+        {
+            WriteToBuffer(data, 0, data.Length);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBuffer(ByteSegment data)
+        {
+            if (mainBufferCount + data.Count > mainBufferLimit) WriteBufferToStream();
+            data.AsArraySegment.CopyTo(mainBuffer, mainBufferCount);
+            mainBufferCount += data.Count;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBuffer(byte data)
+        {
+            if (mainBufferCount >= mainBufferLimit) WriteBufferToStream();
+            mainBuffer[mainBufferCount++] = data;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
+        {
+            Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
+            mainBufferCount += count;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBufferWithoutCheck(byte[] data, int count)
+        {
+            WriteToBufferWithoutCheck(data, 0, count);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBufferWithoutCheck(byte[] data)
+        {
+            WriteToBufferWithoutCheck(data, 0, data.Length);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteToBufferWithoutCheck(byte data)
+        {
+            mainBuffer[mainBufferCount++] = data;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnsureFreeBufferSpace(int freeBytes)
+        {
+            if (mainBufferCount + freeBytes >= mainBufferLimit) WriteBufferToStream();
+        }
+
+        static Dictionary<Type, string> typeMap = new Dictionary<Type, string>
+        {
+            { typeof(sbyte), "WriteSbyteValue" },
+            { typeof(byte), "WriteByteValue" },
+            { typeof(short), "WriteShortValue" },
+            { typeof(ushort), "WriteUshortValue" },
+            { typeof(int), "WriteIntValue" },
+            { typeof(uint), "WriteUintValue" },
+            { typeof(long), "WriteLongValue" },
+            { typeof(ulong), "WriteUlongValue" },
+            { typeof(float), "WriteFloatValue" },
+            { typeof(double), "WriteDoubleValue" },
+            { typeof(decimal), "WriteDecimalValue" },
+            { typeof(char), "WriteCharValue" },
+            { typeof(bool), "WriteBoolValue" },
+            { typeof(string), "WriteStringValue" }
+        };
+
+        public bool TryPreparePrimitiveWriteDelegate<T>(out Action<T> primitiveWriteDelegate)
+        {
+            Type type = typeof(T);
+            primitiveWriteDelegate = null;
+            if (settings.itemHandlerCreators.Any(creator => creator.SupportsType(type))) return false;
+            
+
+            if (typeMap.TryGetValue(type, out string methodName))
             {
-                if (mainBufferCount + data.Count > mainBufferLimit) WriteBufferToStream();
-                data.AsArraySegment.CopyTo(mainBuffer, mainBufferCount);
-                mainBufferCount += data.Count;
-            }
+                MethodInfo methodInfo = GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBuffer(byte data)
-            {
-                if (mainBufferCount >= mainBufferLimit) WriteBufferToStream();
-                mainBuffer[mainBufferCount++] = data;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
-            {
-                Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
-                mainBufferCount += count;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBufferWithoutCheck(byte[] data, int count)
-            {
-                WriteToBufferWithoutCheck(data, 0, count);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBufferWithoutCheck(byte[] data)
-            {
-                WriteToBufferWithoutCheck(data, 0, data.Length);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteToBufferWithoutCheck(byte data)
-            {
-                mainBuffer[mainBufferCount++] = data;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void EnsureFreeBufferSpace(int freeBytes)
-            {
-                if (mainBufferCount + freeBytes >= mainBufferLimit) WriteBufferToStream();
-            }
-
-            static Dictionary<Type, string> typeMap = new Dictionary<Type, string>
-            {
-                { typeof(sbyte), "WriteSbyteValue" },
-                { typeof(byte), "WriteByteValue" },
-                { typeof(short), "WriteShortValue" },
-                { typeof(ushort), "WriteUshortValue" },
-                { typeof(int), "WriteIntValue" },
-                { typeof(uint), "WriteUintValue" },
-                { typeof(long), "WriteLongValue" },
-                { typeof(ulong), "WriteUlongValue" },
-                { typeof(float), "WriteFloatValue" },
-                { typeof(double), "WriteDoubleValue" },
-                { typeof(decimal), "WriteDecimalValue" },
-                { typeof(char), "WriteCharValue" },
-                { typeof(bool), "WriteBoolValue" },
-                { typeof(string), "WriteStringValue" }
-            };
-
-            public bool TryPreparePrimitiveWriteDelegate<T>(out Action<T> primitiveWriteDelegate)
-            {
-                Type type = typeof(T);
-                primitiveWriteDelegate = null;
-                if (settings.itemHandlerCreators.Any(creator => creator.SupportsType(type))) return false;
-                
-
-                if (typeMap.TryGetValue(type, out string methodName))
+                if (methodInfo != null)
                 {
-                    MethodInfo methodInfo = GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
-
-                    if (methodInfo != null)
+                    try
                     {
-                        try
-                        {
-                            primitiveWriteDelegate = (Action<T>)Delegate.CreateDelegate(typeof(Action<T>), this, methodInfo);
-                            return true;
-                        }
-                        catch (ArgumentException)
-                        {
-                            // This catch block is here in case the delegate creation fails due to a mismatch,
-                            // which should not happen if the methods are correctly defined and matched.
-                            throw new Exception($"Method {methodName} not found!");
-                        }
+                        primitiveWriteDelegate = (Action<T>)Delegate.CreateDelegate(typeof(Action<T>), this, methodInfo);
+                        return true;
+                    }
+                    catch (ArgumentException)
+                    {
+                        // This catch block is here in case the delegate creation fails due to a mismatch,
+                        // which should not happen if the methods are correctly defined and matched.
+                        throw new Exception($"Method {methodName} not found!");
                     }
                 }
-
-                return false;
             }
 
-            static readonly byte[] NULL = "null".ToByteArray();
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteNullValue() => WriteToBuffer(NULL);
+            return false;
+        }
 
-            static readonly byte OPEN_OBJECT = (byte)'{';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void OpenObject()
+        static readonly byte[] NULL = "null".ToByteArray();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteNullValue() => WriteToBuffer(NULL);
+
+        static readonly byte OPEN_OBJECT = (byte)'{';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OpenObject()
+        {
+            WriteToBufferWithoutCheck(OPEN_OBJECT);
+            if (indent)
             {
-                WriteToBufferWithoutCheck(OPEN_OBJECT);
-                if (indent)
-                {
-                    currentIndentionDepth++;
-                    WriteNextLine();
-                }
+                currentIndentionDepth++;
+                WriteNextLine();
             }
+        }
 
-            static readonly byte CLOSE_OBJECT = (byte)'}';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void CloseObject()
+        static readonly byte CLOSE_OBJECT = (byte)'}';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CloseObject()
+        {
+            if (indent)
             {
-                if (indent)
-                {
-                    currentIndentionDepth--;
-                    WriteNextLine();
-                }
-                WriteToBufferWithoutCheck(CLOSE_OBJECT);
+                currentIndentionDepth--;
+                WriteNextLine();
             }
+            WriteToBufferWithoutCheck(CLOSE_OBJECT);
+        }
 
-            static readonly byte[] TYPEINFO_PRE = "\"$type\":\"".ToByteArray();
-            static readonly byte TYPEINFO_POST = (byte)'\"';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteTypeInfo(string typeName)
+        static readonly byte[] TYPEINFO_PRE = "\"$type\":\"".ToByteArray();
+        static readonly byte TYPEINFO_POST = (byte)'\"';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteTypeInfo(string typeName)
+        {
+            WriteToBuffer(TYPEINFO_PRE);
+            WriteString(typeName);
+            WriteToBufferWithoutCheck(TYPEINFO_POST);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public byte[] PrepareTypeInfo(string typeName)
+        {
+            return $"\"$type\":\"{typeName}\"".ToByteArray();
+        }
+
+        static readonly byte[] VALUEFIELDNAME = "\"$value\":".ToByteArray();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteValueFieldName() => WriteToBuffer(VALUEFIELDNAME);
+
+        static readonly byte FIELDNAME_PRE = (byte)'\"';
+        static readonly byte[] FIELDNAME_POST = "\":".ToByteArray();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteFieldName(string fieldName)
+        {
+            WriteToBufferWithoutCheck(FIELDNAME_PRE);
+            WriteString(fieldName);
+            WriteToBufferWithoutCheck(FIELDNAME_POST);
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static byte[] PreparePrimitiveToBytes<T>(T value)
+        {
+            return Encoding.UTF8.GetBytes(value.ToString()); // TODO optimize
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteLongValue(long value)
+        {
+            WriteSignedInteger(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteIntPtrValue(IntPtr value)
+        {
+            WriteSignedInteger((long)value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUintPtrValue(UIntPtr value)
+        {
+            if ((long)value <= long.MaxValue) WriteUnsignedInteger((long)value);
+            else WriteString(value.ToString());
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteLongValueAsStringWithCopy(long value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteSignedInteger(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteLongValueAsString(long value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteSignedInteger(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUlongValue(ulong value)
+        {
+            if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+            else WriteString(value.ToString());
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteUlongValueAsStringWithCopy(ulong value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+            else WriteString(value.ToString());
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUlongValueAsString(ulong value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
+            else WriteString(value.ToString());
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteIntValue(int value)
+        {
+            WriteSignedInteger(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteIntValueAsStringWithCopy(int value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteSignedInteger(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteIntValueAsString(int value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteSignedInteger(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUintValue(uint value)
+        {
+            WriteUnsignedInteger(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteUintValueAsStringWithCopy(uint value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteUnsignedInteger(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUintValueAsString(uint value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteUnsignedInteger(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteValue(byte value)
+        {
+            WriteUnsignedInteger(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteByteValueAsStringWithCopy(byte value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteUnsignedInteger(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteAsStringValue(byte value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteUnsignedInteger(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteSbyteValue(sbyte value)
+        {
+            WriteSignedInteger(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteSbyteValueAsStringWithCopy(sbyte value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteSignedInteger(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteSbyteValueAsString(sbyte value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteSignedInteger(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteShortValue(short value)
+        {
+            WriteSignedInteger(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteShortValueAsStringWithCopy(short value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteSignedInteger(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteShortValueAsString(short value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteSignedInteger(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUshortValue(ushort value)
+        {
+            WriteUnsignedInteger(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteUshortValueAsStringWithCopy(ushort value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteUnsignedInteger(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUshortValueAsString(ushort value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteUnsignedInteger(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteFloatValue(float value)
+        {
+            WriteFloat(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteFloatValueAsStringWithCopy(float value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteFloat(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteFloatValueAsString(float value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteFloat(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteDoubleValue(double value)
+        {
+            WriteDouble(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteDecimalValue(decimal value)
+        {
+            WriteDouble((double)value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteDoubleValueAsStringWithCopy(double value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteDouble(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteDoubleValueAsString(double value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteDouble(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        static readonly byte[] BOOLVALUE_TRUE = "true".ToByteArray();
+        static readonly byte[] BOOLVALUE_FALSE = "false".ToByteArray();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteBoolValue(bool value)
+        {
+            var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
+            WriteToBuffer(bytes);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteBoolValueAsStringWithCopy(bool value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
+            WriteToBuffer(bytes);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteBoolAsStringValue(bool value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
+            WriteToBuffer(bytes);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        static readonly byte QUOTES = (byte)'\"';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteStringValue(string str)
+        {
+            if (str != null)
             {
-                WriteToBuffer(TYPEINFO_PRE);
-                WriteString(typeName);
-                WriteToBufferWithoutCheck(TYPEINFO_POST);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte[] PrepareTypeInfo(string typeName)
-            {
-                return $"\"$type\":\"{typeName}\"".ToByteArray();
-            }
-
-            static readonly byte[] VALUEFIELDNAME = "\"$value\":".ToByteArray();
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteValueFieldName() => WriteToBuffer(VALUEFIELDNAME);
-
-            static readonly byte FIELDNAME_PRE = (byte)'\"';
-            static readonly byte[] FIELDNAME_POST = "\":".ToByteArray();
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteFieldName(string fieldName)
-            {
-                WriteToBufferWithoutCheck(FIELDNAME_PRE);
-                WriteString(fieldName);
-                WriteToBufferWithoutCheck(FIELDNAME_POST);
-            }
-
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static byte[] PreparePrimitiveToBytes<T>(T value)
-            {
-                return Encoding.UTF8.GetBytes(value.ToString()); // TODO optimize
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteLongValue(long value)
-            {
-                WriteSignedInteger(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteIntPtrValue(IntPtr value)
-            {
-                WriteSignedInteger((long)value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUintPtrValue(UIntPtr value)
-            {
-                if ((long)value <= long.MaxValue) WriteUnsignedInteger((long)value);
-                else WriteString(value.ToString());
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteLongValueAsStringWithCopy(long value)
-            {
                 WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteSignedInteger(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteLongValueAsString(long value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteSignedInteger(value);
+                WriteEscapedString(str);
                 WriteToBufferWithoutCheck(QUOTES);
             }
-
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUlongValue(ulong value)
-            {
-                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
-                else WriteString(value.ToString());
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteUlongValueAsStringWithCopy(ulong value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
-                else WriteString(value.ToString());
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUlongValueAsString(ulong value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
-                else WriteString(value.ToString());
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteIntValue(int value)
-            {
-                WriteSignedInteger(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteIntValueAsStringWithCopy(int value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteSignedInteger(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteIntValueAsString(int value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteSignedInteger(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUintValue(uint value)
-            {
-                WriteUnsignedInteger(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteUintValueAsStringWithCopy(uint value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteUnsignedInteger(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUintValueAsString(uint value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteUnsignedInteger(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteByteValue(byte value)
-            {
-                WriteUnsignedInteger(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteByteValueAsStringWithCopy(byte value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteUnsignedInteger(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteByteAsStringValue(byte value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteUnsignedInteger(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteSbyteValue(sbyte value)
-            {
-                WriteSignedInteger(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteSbyteValueAsStringWithCopy(sbyte value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteSignedInteger(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteSbyteValueAsString(sbyte value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteSignedInteger(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteShortValue(short value)
-            {
-                WriteSignedInteger(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteShortValueAsStringWithCopy(short value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteSignedInteger(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteShortValueAsString(short value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteSignedInteger(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUshortValue(ushort value)
-            {
-                WriteUnsignedInteger(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteUshortValueAsStringWithCopy(ushort value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteUnsignedInteger(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteUshortValueAsString(ushort value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteUnsignedInteger(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteFloatValue(float value)
-            {
-                WriteFloat(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteFloatValueAsStringWithCopy(float value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteFloat(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteFloatValueAsString(float value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteFloat(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteDoubleValue(double value)
-            {
-                WriteDouble(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteDecimalValue(decimal value)
-            {
-                WriteDouble((double)value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteDoubleValueAsStringWithCopy(double value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteDouble(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteDoubleValueAsString(double value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteDouble(value);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            static readonly byte[] BOOLVALUE_TRUE = "true".ToByteArray();
-            static readonly byte[] BOOLVALUE_FALSE = "false".ToByteArray();
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteBoolValue(bool value)
-            {
-                var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
-                WriteToBuffer(bytes);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteBoolValueAsStringWithCopy(bool value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
-                WriteToBuffer(bytes);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteBoolAsStringValue(bool value)
-            {
-                WriteToBufferWithoutCheck(QUOTES);
-                var bytes = value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE;
-                WriteToBuffer(bytes);
-                WriteToBufferWithoutCheck(QUOTES);
-            }
-
-            static readonly byte QUOTES = (byte)'\"';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteStringValue(string str)
-            {
-                if (str != null)
-                {
-                    WriteToBufferWithoutCheck(QUOTES);
-                    WriteEscapedString(str);
-                    WriteToBufferWithoutCheck(QUOTES);
-                }
-                else WriteNullValue();
-            }
+            else WriteNullValue();
+        }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void WriteJsonFragmentValue(JsonFragment json)
@@ -764,329 +764,395 @@ namespace FeatureLoom.Serialization
                 EnsureFreeBufferSpace(64);
                 var countBefore = mainBufferCount;
 
-                WriteEscapedString(str);
+            WriteEscapedString(str);
 
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WritePrimitiveValueAsString(string str)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteEscapedString(str);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteCharValue(char value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteChar(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteCharValueAsStringWithCopy(char value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteChar(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteCharValueAsString(char value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteChar(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteSegmentValueAsBase64(ByteSegment value)
+        {
+            if (value.IsValid) WriteBase64(value);
+            else WriteNullValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteArrayValueAsBase64(byte[] value)
+        {
+            if (value != null) WriteBase64(value);
+            else WriteNullValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteArraySegmentValueAsBase64(ArraySegment<byte> value)
+        {
+            if (value != null) WriteBase64(value);
+            else WriteNullValue();
+        }
+
+
+        private static readonly byte[] Base64Chars = System.Text.Encoding.ASCII.GetBytes("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+        private void WriteBase64(ByteSegment bytes)
+        {
+            int numInputBytes = bytes.Count;            
+            int fullBlocks = numInputBytes / 3;                        
+            int bytesToReserve = 2 + (fullBlocks+1) * 4;
+            EnsureFreeBufferSpace(bytesToReserve);
+
+            WriteToBufferWithoutCheck((byte)'"');
+
+            int inputIndex = 0;            
+            for (int i = 0; i < fullBlocks; i++)
+            {
+                int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
+                bufferValue |= (bytes[inputIndex++] << 8);
+                bufferValue |= bytes[inputIndex++];
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 18) & 0x3F]);
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 12) & 0x3F]);
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 6) & 0x3F]);
+                WriteToBufferWithoutCheck(Base64Chars[bufferValue & 0x3F]);
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WritePrimitiveValueAsString(string str)
+            int remainingBytes = numInputBytes - inputIndex;
+            if (remainingBytes == 1)
             {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteEscapedString(str);
-                WriteToBufferWithoutCheck(QUOTES);
+                int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 18) & 0x3F]);
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 12) & 0x3F]);
+                WriteToBufferWithoutCheck((byte)'=');
+                WriteToBufferWithoutCheck((byte)'=');
+            }
+            else if(remainingBytes == 2)
+            {
+                int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
+                bufferValue |= (bytes[inputIndex++] << 8);
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 18) & 0x3F]);
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 12) & 0x3F]);
+                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 6) & 0x3F]);
+                WriteToBufferWithoutCheck((byte)'=');
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteCharValue(char value)
+            WriteToBufferWithoutCheck((byte)'"');
+        }
+
+        static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();
+        static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();
+        Stack<ItemInfo> reverseItemInfoStack = new Stack<ItemInfo>();
+        public void WriteRefObject(ItemInfo itemInfo)
+        {
+            while (itemInfo != null)
             {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteChar(value);
-                WriteToBufferWithoutCheck(QUOTES);
+                reverseItemInfoStack.Push(itemInfo);
+                itemInfo = itemInfo.parentInfo;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteCharValueAsStringWithCopy(char value)
+            WriteToBuffer(REFOBJECT_PRE);
+
+            if (reverseItemInfoStack.TryPop(out itemInfo))
             {
-                WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
-
-                WriteChar(value);
-
-                var writtenBytes = mainBufferCount - countBefore;
-                var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-                slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-                WriteToBufferWithoutCheck(QUOTES);
-                return slice;
+                var name = itemInfo.ItemName;
+                WriteToBuffer(itemInfo.ItemName);
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteCharValueAsString(char value)
+            while (reverseItemInfoStack.TryPop(out itemInfo))
             {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteChar(value);
-                WriteToBufferWithoutCheck(QUOTES);
+                var name = itemInfo.ItemName;
+                if (name.Get(0) != OPENARRAY) WriteDot();
+                WriteToBuffer(name);
             }
+            WriteToBuffer(REFOBJECT_POST);
+        }
 
-            static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();
-            static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();
-            Stack<ItemInfo> reverseItemInfoStack = new Stack<ItemInfo>();
-            public void WriteRefObject(ItemInfo itemInfo)
+        static readonly byte OPENARRAY = (byte)'[';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void OpenArray()
+        {
+            WriteToBufferWithoutCheck(OPENARRAY);
+            if (indent)
             {
-                while (itemInfo != null)
+                currentIndentionDepth++;
+                WriteNextLine();
+            }
+        }
+
+        static readonly byte CLOSEARRAY = (byte)']';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CloseArray()
+        {
+            if (indent)
+            {
+                currentIndentionDepth--;
+                WriteNextLine();
+            }
+            WriteToBufferWithoutCheck(CLOSEARRAY);
+        }
+
+        static readonly byte COMMA = (byte)',';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteComma()
+        {
+            WriteToBufferWithoutCheck(COMMA);
+            if (indent) WriteNextLine();                
+        }
+
+        static readonly byte DOT = (byte)'.';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteDot() => WriteToBufferWithoutCheck(DOT);
+
+        static readonly byte COLON = (byte)':';
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteColon() => WriteToBufferWithoutCheck(COLON);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public byte[] PrepareFieldNameBytes(string fieldname)
+        {
+            return Encoding.UTF8.GetBytes($"\"{fieldname}\":");
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public byte[] PrepareStringToBytes(string str)
+        {
+            return Encoding.UTF8.GetBytes(str);
+        }
+
+        public static readonly byte[] ROOT = "$".ToByteArray();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public byte[] PrepareRootName() => ROOT;
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public byte[] PrepareTextToBytes(string enumText)
+        {
+            return Encoding.UTF8.GetBytes($"\"{enumText}\"");
+        }
+
+        List<ByteSegment> indexNameList = new List<ByteSegment>();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment GetCollectionIndexName(int index)
+        {
+            if (!settings.requiresItemNames) return default;
+
+            if (index >= indexNameList.Count)
+            {
+                for (int i = indexNameList.Count; i <= index; i++)
                 {
-                    reverseItemInfoStack.Push(itemInfo);
-                    itemInfo = itemInfo.parentInfo;
+                    indexNameList.Add(default);
                 }
+            }
+            if (!indexNameList[index].IsValid) indexNameList[index] = new ByteSegment($"[{index}]");
+            return indexNameList[index];
+        }
 
-                WriteToBuffer(REFOBJECT_PRE);
+        private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
+        private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
+        private static readonly byte[] Int32MinValueBytes = int.MinValue.ToString().ToByteArray();
+        private static readonly byte[] Int64MinValueBytes = long.MinValue.ToString().ToByteArray();
 
-                if (reverseItemInfoStack.TryPop(out itemInfo))
+        private static byte[][] InitNumberBytesLookup(bool negative, int size)
+        {
+            byte[][] lookup = new byte[size][];
+            int factor = negative ? -1 : 1;
+
+            for (int i = 0; i < size; i++)
+            {
+                lookup[i] = Encoding.ASCII.GetBytes((i * factor).ToString());
+            }
+
+            return lookup;
+        }
+
+        private static readonly byte[] BackSlashEscapeBytes = "\\\\".ToByteArray();
+        private static readonly byte[][] EscapeByteLookup = InitEscapeByteLookup();
+        private static byte[][] InitEscapeByteLookup()
+        {
+            byte[][] lookup = new byte[35][]; // '\\' is the highest escape char
+            string escapeChars = "\"\b\f\n\r\t"; ; //  '\\' Is checked extra
+            for (int i = 0; i < escapeChars.Length; i++)
+            {
+                char c = escapeChars[i];
+                lookup[c] = new byte[] { (byte)'\\', (byte)escapeChars[i] };
+            }
+
+            // Special handling for characters that don't map directly to their escape sequence
+            lookup['\b'] = new byte[] { (byte)'\\', (byte)'b' };
+            lookup['\f'] = new byte[] { (byte)'\\', (byte)'f' };
+            lookup['\n'] = new byte[] { (byte)'\\', (byte)'n' };
+            lookup['\r'] = new byte[] { (byte)'\\', (byte)'r' };
+            lookup['\t'] = new byte[] { (byte)'\\', (byte)'t' };
+
+            // Handling for control characters
+            for (int i = 0; i < 0x20; i++)
+            {
+                if (lookup[i] == null) // If not already set by the escape sequences above
                 {
-                    var name = itemInfo.ItemName;
-                    WriteToBuffer(itemInfo.ItemName);
+                    string unicodeEscape = "\\u" + i.ToString("X4");
+                    lookup[i] = Encoding.ASCII.GetBytes(unicodeEscape);
                 }
+            }
 
-                while (reverseItemInfoStack.TryPop(out itemInfo))
+            return lookup;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static byte[] GetEscapeBytes(char c)
+        {
+            if (c == '\\') return BackSlashEscapeBytes;
+            if (c < EscapeByteLookup.Length) return EscapeByteLookup[c];
+            return null;
+        }
+
+        private void WriteChar(char c)
+        {
+            // Check if the character is in the EscapeByteLookup table
+            byte[] escapeBytes = GetEscapeBytes(c);
+            if (escapeBytes != null)
+            {
+                WriteToBuffer(escapeBytes, 0, escapeBytes.Length);
+                return;
+            }
+
+            int codepoint = c;
+
+            if (codepoint <= 0x7F)
+            {
+                // 1-byte sequence
+                WriteToBuffer((byte)codepoint);
+            }
+            else if (codepoint <= 0x7FF)
+            {
+                // 2-byte sequence
+                EnsureFreeBufferSpace(2);
+                WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+            }
+            else if (!char.IsSurrogate(c))
+            {
+                // 3-byte sequence
+                EnsureFreeBufferSpace(3);
+                WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+            }
+            else
+            {
+                // Handle surrogate by writing it as a Unicode escape sequence
+                WriteString("\\u" + ((int)c).ToString("X4"));
+            }
+        }
+
+        private void WriteEscapedString(string str)
+        {
+            int charIndex = 0;
+            const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
+
+            while (charIndex < str.Length)
+            {
+                EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
+                int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
+                int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
+
+                for (; charIndex < charIndexLimit; charIndex++)
                 {
-                    var name = itemInfo.ItemName;
-                    if (name.Get(0) != OPENARRAY) WriteDot();
-                    WriteToBuffer(name);
-                }
-                WriteToBuffer(REFOBJECT_POST);
-            }
+                    var c = str[charIndex];
 
-            static readonly byte OPENARRAY = (byte)'[';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void OpenArray()
-            {
-                WriteToBufferWithoutCheck(OPENARRAY);
-                if (indent)
-                {
-                    currentIndentionDepth++;
-                    WriteNextLine();
-                }
-            }
-
-            static readonly byte CLOSEARRAY = (byte)']';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void CloseArray()
-            {
-                if (indent)
-                {
-                    currentIndentionDepth--;
-                    WriteNextLine();
-                }
-                WriteToBufferWithoutCheck(CLOSEARRAY);
-            }
-
-            static readonly byte COMMA = (byte)',';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteComma()
-            {
-                WriteToBufferWithoutCheck(COMMA);
-                if (indent) WriteNextLine();                
-            }
-
-            static readonly byte DOT = (byte)'.';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteDot() => WriteToBufferWithoutCheck(DOT);
-
-            static readonly byte COLON = (byte)':';
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteColon() => WriteToBufferWithoutCheck(COLON);
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte[] PrepareFieldNameBytes(string fieldname)
-            {
-                return Encoding.UTF8.GetBytes($"\"{fieldname}\":");
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte[] PrepareStringToBytes(string str)
-            {
-                return Encoding.UTF8.GetBytes(str);
-            }
-
-            public static readonly byte[] ROOT = "$".ToByteArray();
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte[] PrepareRootName() => ROOT;
-
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte[] PrepareTextToBytes(string enumText)
-            {
-                return Encoding.UTF8.GetBytes($"\"{enumText}\"");
-            }
-
-            List<ByteSegment> indexNameList = new List<ByteSegment>();
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment GetCollectionIndexName(int index)
-            {
-                if (!settings.requiresItemNames) return default;
-
-                if (index >= indexNameList.Count)
-                {
-                    for (int i = indexNameList.Count; i <= index; i++)
+                    // Handle escaped chars and control chars
+                    byte[] escapeBytes = GetEscapeBytes(c);
+                    if (escapeBytes != null)
                     {
-                        indexNameList.Add(default);
+                        WriteToBufferWithoutCheck(escapeBytes);
+                        continue;
                     }
-                }
-                if (!indexNameList[index].IsValid) indexNameList[index] = new ByteSegment($"[{index}]");
-                return indexNameList[index];
-            }
 
-            private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
-            private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
-            private static readonly byte[] Int32MinValueBytes = int.MinValue.ToString().ToByteArray();
-            private static readonly byte[] Int64MinValueBytes = long.MinValue.ToString().ToByteArray();
+                    int codepoint = c;
 
-            private static byte[][] InitNumberBytesLookup(bool negative, int size)
-            {
-                byte[][] lookup = new byte[size][];
-                int factor = negative ? -1 : 1;
-
-                for (int i = 0; i < size; i++)
-                {
-                    lookup[i] = Encoding.ASCII.GetBytes((i * factor).ToString());
-                }
-
-                return lookup;
-            }
-
-            private static readonly byte[] BackSlashEscapeBytes = "\\\\".ToByteArray();
-            private static readonly byte[][] EscapeByteLookup = InitEscapeByteLookup();
-            private static byte[][] InitEscapeByteLookup()
-            {
-                byte[][] lookup = new byte[35][]; // '\\' is the highest escape char
-                string escapeChars = "\"\b\f\n\r\t"; ; //  '\\' Is checked extra
-                for (int i = 0; i < escapeChars.Length; i++)
-                {
-                    char c = escapeChars[i];
-                    lookup[c] = new byte[] { (byte)'\\', (byte)escapeChars[i] };
-                }
-
-                // Special handling for characters that don't map directly to their escape sequence
-                lookup['\b'] = new byte[] { (byte)'\\', (byte)'b' };
-                lookup['\f'] = new byte[] { (byte)'\\', (byte)'f' };
-                lookup['\n'] = new byte[] { (byte)'\\', (byte)'n' };
-                lookup['\r'] = new byte[] { (byte)'\\', (byte)'r' };
-                lookup['\t'] = new byte[] { (byte)'\\', (byte)'t' };
-
-                // Handling for control characters
-                for (int i = 0; i < 0x20; i++)
-                {
-                    if (lookup[i] == null) // If not already set by the escape sequences above
+                    if (codepoint <= 0x7F)
                     {
-                        string unicodeEscape = "\\u" + i.ToString("X4");
-                        lookup[i] = Encoding.ASCII.GetBytes(unicodeEscape);
+                        // 1-byte sequence
+                        WriteToBufferWithoutCheck((byte)codepoint);
                     }
-                }
-
-                return lookup;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static byte[] GetEscapeBytes(char c)
-            {
-                if (c == '\\') return BackSlashEscapeBytes;
-                if (c < EscapeByteLookup.Length) return EscapeByteLookup[c];
-                return null;
-            }
-
-            private void WriteChar(char c)
-            {
-                // Check if the character is in the EscapeByteLookup table
-                byte[] escapeBytes = GetEscapeBytes(c);
-                if (escapeBytes != null)
-                {
-                    WriteToBuffer(escapeBytes, 0, escapeBytes.Length);
-                    return;
-                }
-
-                int codepoint = c;
-
-                if (codepoint <= 0x7F)
-                {
-                    // 1-byte sequence
-                    WriteToBuffer((byte)codepoint);
-                }
-                else if (codepoint <= 0x7FF)
-                {
-                    // 2-byte sequence
-                    EnsureFreeBufferSpace(2);
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                }
-                else if (!char.IsSurrogate(c))
-                {
-                    // 3-byte sequence
-                    EnsureFreeBufferSpace(3);
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                }
-                else
-                {
-                    // Handle surrogate by writing it as a Unicode escape sequence
-                    WriteString("\\u" + ((int)c).ToString("X4"));
-                }
-            }
-
-            private void WriteEscapedString(string str)
-            {
-                int charIndex = 0;
-                const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
-
-                while (charIndex < str.Length)
-                {
-                    EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
-                    int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
-                    int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
-
-                    for (; charIndex < charIndexLimit; charIndex++)
+                    else if (codepoint <= 0x7FF)
                     {
-                        var c = str[charIndex];
+                        // 2-byte sequence
+                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                    }
+                    else if (!char.IsSurrogate(c))
+                    {
+                        // 3-byte sequence
+                        WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                    }
+                    else
+                    {
+                        // Handle surrogate pairs
+                        if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                        {
+                            int highSurrogate = c;
+                            int lowSurrogate = str[charIndex + 1];
+                            int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
-                        // Handle escaped chars and control chars
-                        byte[] escapeBytes = GetEscapeBytes(c);
-                        if (escapeBytes != null)
-                        {
-                            WriteToBufferWithoutCheck(escapeBytes);
-                            continue;
-                        }
+                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
 
-                        int codepoint = c;
-
-                        if (codepoint <= 0x7F)
-                        {
-                            // 1-byte sequence
-                            WriteToBufferWithoutCheck((byte)codepoint);
-                        }
-                        else if (codepoint <= 0x7FF)
-                        {
-                            // 2-byte sequence
-                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                        }
-                        else if (!char.IsSurrogate(c))
-                        {
-                            // 3-byte sequence
-                            WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                            charIndex++; // Skip next character, it was part of the surrogate pair
                         }
                         else
                         {
-                            // Handle surrogate pairs
-                            if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
-                            {
-                                int highSurrogate = c;
-                                int lowSurrogate = str[charIndex + 1];
-                                int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-
-                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
-                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
-                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
-                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
-
-                                charIndex++; // Skip next character, it was part of the surrogate pair
-                            }
-                            else
-                            {
-                                throw new ArgumentException("Invalid surrogate pair in string.");
-                            }
+                            throw new ArgumentException("Invalid surrogate pair in string.");
                         }
                     }
                 }
             }
+        }
 
             public void WriteRawJsonFragment(string json)
             {
@@ -1103,618 +1169,618 @@ namespace FeatureLoom.Serialization
                     int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
                     int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
 
-                    for (; charIndex < charIndexLimit; charIndex++)
+                for (; charIndex < charIndexLimit; charIndex++)
+                {
+                    var c = str[charIndex];
+                    int codepoint = c;
+
+                    if (codepoint <= 0x7F)
                     {
-                        var c = str[charIndex];
-                        int codepoint = c;
-
-                        if (codepoint <= 0x7F)
-                        {
-                            // 1-byte sequence
-                            WriteToBufferWithoutCheck((byte)codepoint);
-                        }
-                        else if (codepoint <= 0x7FF)
-                        {
-                            // 2-byte sequence
-                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                        }
-                        else if (!char.IsSurrogate(c))
-                        {
-                            // 3-byte sequence
-                            WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                            WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                            WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                        }
-                        else
-                        {
-                            // Handle surrogate pairs
-                            if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
-                            {
-                                int highSurrogate = c;
-                                int lowSurrogate = str[charIndex + 1];
-                                int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-
-                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
-                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
-                                WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
-                                WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
-
-                                charIndex++; // Skip next character, it was part of the surrogate pair
-                            }
-                            else
-                            {
-                                throw new ArgumentException("Invalid surrogate pair in string.");
-                            }
-                        }
+                        // 1-byte sequence
+                        WriteToBufferWithoutCheck((byte)codepoint);
                     }
-                }
-            }
-
-            private void WriteSignedInteger(long inputValue)
-            {
-                var value = inputValue;
-                bool isNegative = value < 0;
-                if (isNegative)
-                {
-                    value = -value;
-                    if (value < NegativeNumberBytesLookup.Length)
+                    else if (codepoint <= 0x7FF)
                     {
-                        // If the value was long.MinValue negating it will cause an overflow and resulting again in long.MinValue,
-                        // so we handle it as a special number
-                        if (value == long.MinValue)
-                        {
-                            WriteToBuffer(Int64MinValueBytes);
-                            return;
-                        }
-                        else
-                        {
-                            var bytes = NegativeNumberBytesLookup[value];
-                            WriteToBuffer(bytes);
-                            return;
-                        }
+                        // 2-byte sequence
+                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                     }
-                }
-                if (value < PositiveNumberBytesLookup.Length)
-                {
-                    var bytes = PositiveNumberBytesLookup[value];
-                    WriteToBuffer(bytes);
-                    return;
-                }
-
-                const int maxDigits = 25;
-                int index = maxDigits;
-                while (value >= 10)
-                {
-                    value = Math.DivRem(value, 10, out long digit);
-                    localBuffer[index--] = (byte)('0' + digit);
-                }
-                if (value > 0) localBuffer[index--] = (byte)('0' + value);
-                if (isNegative) localBuffer[index--] = (byte)'-';
-
-                WriteToBuffer(localBuffer, index + 1, maxDigits - index);
-            }
-
-
-            private void WriteSignedInteger(int inputValue)
-            {
-                var value = inputValue;
-                bool isNegative = value < 0;
-                if (isNegative)
-                {
-                    value = -value;
-                    if (value < NegativeNumberBytesLookup.Length)
+                    else if (!char.IsSurrogate(c))
                     {
-                        // If the value was int.MinValue negating it will cause an overflow and resulting again in int.MinValue,
-                        // so we handle it as a special number
-                        if (value == int.MinValue)
-                        {
-                            WriteToBuffer(Int32MinValueBytes);
-                            return;
-                        }
-                        else
-                        {
-                            var bytes = NegativeNumberBytesLookup[value];
-                            WriteToBuffer(bytes);
-                            return;
-                        }
-                    }
-                }
-                else if (value < PositiveNumberBytesLookup.Length)
-                {
-                    var bytes = PositiveNumberBytesLookup[value];
-                    WriteToBuffer(bytes);
-                    return;
-                }
-
-                const int maxDigits = 25;
-                int index = maxDigits;
-                while (value >= 10)
-                {
-                    value = Math.DivRem(value, 10, out int digit);
-                    localBuffer[index--] = (byte)('0' + digit);
-                }
-                if (value > 0) localBuffer[index--] = (byte)('0' + value);
-                if (isNegative) localBuffer[index--] = (byte)'-';
-
-                WriteToBuffer(localBuffer, index + 1, maxDigits - index);
-            }
-
-            private void WriteUnsignedInteger(long inputValue)
-            {
-                var value = inputValue;
-                if (value < PositiveNumberBytesLookup.Length)
-                {
-                    var bytes = PositiveNumberBytesLookup[value];
-                    WriteToBuffer(bytes, 0, bytes.Length);
-                    return;
-                }
-
-                const int maxDigits = 25;
-                int index = maxDigits;
-                while (value >= 10)
-                {
-                    value = Math.DivRem(value, 10, out long digit);
-                    localBuffer[index--] = (byte)('0' + digit);
-                }
-                if (value > 0) localBuffer[index--] = (byte)('0' + value);
-
-                WriteToBuffer(localBuffer, index + 1, maxDigits - index);
-            }
-
-            //static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
-            static readonly byte ZERO_FLOAT = (byte)'0';
-            static readonly byte[] NAN = "\"NaN\"".ToByteArray();
-            static readonly byte[] POS_INFINITY = "\"Infinity\"".ToByteArray();
-            static readonly byte[] NEG_INFINITY = "\"-Infinity\"".ToByteArray();
-
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private bool IsSpecial(double value)
-            {
-                if (Double.IsNaN(value)) return true;   // NaN
-                long bits = BitConverter.DoubleToInt64Bits(value);
-                const long mask = 0x7FF0000000000000L;  // Mask to isolate the exponent bits for double
-                long maskedBits = bits & mask;
-                if (maskedBits == 0) return true;       // Subnormal
-                if (maskedBits == mask) return true;    // Infinity
-                return false;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private bool IsSpecial(float value)
-            {
-#if NETSTANDARD2_0
-                return IsSpecial((double)value);
-#else
-                if (Single.IsNaN(value)) return true;   // NaN
-                int bits = BitConverter.SingleToInt32Bits(value);
-                const int mask = 0x7F800000;            // Mask to isolate the exponent bits for float
-                int maskedBits = bits & mask;
-                if (maskedBits == 0) return true;       // Subnormal
-                if (maskedBits == mask) return true;    // Infinity
-                return false;
-#endif
-            }
-
-            private void WriteFloat(float inputValue)
-            {
-                var value = inputValue;
-                if (HandleSpecialCases(value)) return;
-
-                EnsureFreeBufferSpace(100);
-
-                bool isNegative = value < 0;
-                if (isNegative) value = -value;
-
-                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
-                if (failed)
-                {
-                    WriteString(inputValue.ToString(CultureInfo.InvariantCulture));
-                    return;
-                }
-
-                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
-
-                float integralPart = (float)Math.Floor(value);
-                float fractionalPart = value - integralPart;
-
-                WriteIntegralPart(numIntegralDigits, integralPart);
-
-                if (fractionalPart > 0)
-                {
-                    WriteToBufferWithoutCheck((byte)'.');
-                    WriteFractionalPart(numFractionalDigits, fractionalPart);
-                }
-
-                if (printExponent)
-                {
-                    WriteToBuffer((byte)'E');
-                    WriteSignedInteger(exponent);
-                }
-
-                // Local Functions
-
-                bool HandleSpecialCases(float value)
-                {
-                    if (value == 0)
-                    {
-                        WriteToBuffer(ZERO_FLOAT);
-                        return true;
-                    }
-                    if (IsSpecial(value))
-                    {
-                        if (Single.IsNaN(value)) WriteToBuffer(NAN);
-                        else if (Single.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
-                        else if (Single.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
-                        else WriteString(value.ToString(CultureInfo.InvariantCulture)); // Then it must be subnormal
-                        return true;
-                    }
-
-                    return false;
-                }                
-
-                void WriteIntegralPart(int numIntegralDigits, float integralPart)
-                {
-                    if (integralPart == 0)
-                    {
-                        WriteToBufferWithoutCheck((byte)'0');
+                        // 3-byte sequence
+                        WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
                     }
                     else
                     {
-
-                        int integralInt = (int)integralPart;
-                        int index = numIntegralDigits;
-                        int numLeadingZeros = 0;
-
-                        for (int i = 0; i < numIntegralDigits; i++)
+                        // Handle surrogate pairs
+                        if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
                         {
-                            integralInt = (int)Math.DivRem(integralInt, 10, out long digitLong);
-                            localBuffer[index--] = (byte)('0' + (byte)digitLong);
-                            if (digitLong == 0) numLeadingZeros++;
-                            else numLeadingZeros = 0;
+                            int highSurrogate = c;
+                            int lowSurrogate = str[charIndex + 1];
+                            int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
+
+                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
+
+                            charIndex++; // Skip next character, it was part of the surrogate pair
                         }
-                        index += numLeadingZeros;
-                        WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
+                        else
+                        {
+                            throw new ArgumentException("Invalid surrogate pair in string.");
+                        }
                     }
                 }
-
-                void WriteFractionalPart(int numFractionalDigits, float fractionalPart)
-                {
-                    if (numFractionalDigits == 0)
-                    {
-                        if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
-                        else WriteToBufferWithoutCheck((byte)'0');
-                        return;
-                    }
-
-                    int firstFractionalDigitIndex = mainBufferCount;
-                    for (int i = 0; i <= numFractionalDigits; i++)
-                    {
-                        fractionalPart *= 10;
-                        byte digit = (byte)fractionalPart;
-                        fractionalPart -= digit;
-                        WriteToBufferWithoutCheck((byte)('0' + digit));
-                    }
-
-                    int correctionIndex = mainBufferCount - 1;
-                    while (mainBuffer[correctionIndex] == '0' && correctionIndex > firstFractionalDigitIndex)
-                    {
-                        correctionIndex--;
-                    }
-                    int oldMainBufferCount = mainBufferCount;
-                    mainBufferCount = correctionIndex + 1;
-                    if (oldMainBufferCount != mainBufferCount)
-                    {
-                        return;
-                    }
-
-                    while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
-                    {
-                        correctionIndex--;
-                    }
-
-                    if (mainBuffer[correctionIndex] < '9')
-                    {
-                        mainBuffer[correctionIndex] += 1;
-                        mainBufferCount = correctionIndex + 1;
-                        return;
-                    }
-                }
-
             }
+        }
 
-            float CalculateNumDigits(float value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed)
+        private void WriteSignedInteger(long inputValue)
+        {
+            var value = inputValue;
+            bool isNegative = value < 0;
+            if (isNegative)
             {
-
-#if NETSTANDARD2_0
-                return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent, out failed);
-#else
-                const int MAX_SIGNIFICANT_DIGITS = 7;
-                const int POS_EXPONENT_LIMIT = 7;
-                const int NEG_EXPONENT_LIMIT = -5;
-
-                int bits = BitConverter.SingleToInt32Bits(value);
-                int binaryExponent = ((bits >> 23) & 0xFF) - 127;
-                exponent = (int)(binaryExponent * 0.34f);
-                numIntegralDigits = Math.Max(0, exponent + 1);
-                numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
-                printExponent = false;
-
-                failed = false;
-                if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                value = -value;
+                if (value < NegativeNumberBytesLookup.Length)
                 {
-                    printExponent = true;
-                    value = (float)(value * Math.Pow(10, -exponent));
-
-                    if (value == 0 || IsSpecial(value))
+                    // If the value was long.MinValue negating it will cause an overflow and resulting again in long.MinValue,
+                    // so we handle it as a special number
+                    if (value == long.MinValue)
                     {
-                        // In extreme cases, we can't calculate the digits properly.
-                        failed = true;
-                        return value;
-                    }
-
-                    while (value < 1)
-                    {
-                        value *= 10;
-                        exponent -= 1;
-                    }
-                    while (value >= 10)
-                    {
-                        value /= 10;
-                        exponent += 1;
-                    }
-                    numIntegralDigits = 1;
-                    numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 2;
-                }
-
-                return value;
-#endif
-            }
-
-            private void WriteDouble(double inputValue)
-            {
-                var value = inputValue;
-                if (HandleSpecialCases(value)) return;
-
-                EnsureFreeBufferSpace(100);
-
-                bool isNegative = value < 0;
-                if (isNegative) value = -value;                
-
-                value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
-                if (failed)
-                {
-                    WriteString(inputValue.ToString(CultureInfo.InvariantCulture));
-                    return;
-                }
-
-                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
-
-                double integralPart = Math.Floor(value);
-                double fractionalPart = value - integralPart;
-
-                WriteIntegralPart(numIntegralDigits, integralPart);
-
-                if (fractionalPart > 0)
-                {
-                    WriteToBufferWithoutCheck((byte)'.');
-                    WriteFractionalPart(numFractionalDigits, fractionalPart);
-                }
-
-                if (printExponent)
-                {
-                    WriteToBuffer((byte)'E');
-                    WriteSignedInteger(exponent);
-                }
-
-                // Local Functions
-
-                bool HandleSpecialCases(double value)
-                {
-                    if (value == 0)
-                    {
-                        WriteToBuffer(ZERO_FLOAT);
-                        return true;
-                    }
-                    if (IsSpecial(value))
-                    {
-                        if (Double.IsNaN(value)) WriteToBuffer(NAN);
-                        else if (Double.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
-                        else if (Double.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
-                        else WriteString(value.ToString(CultureInfo.InvariantCulture)); // Then it must be subnormal
-                        return true;
-                    }
-
-                    return false;
-                }
-
-                
-
-                void WriteIntegralPart(int numIntegralDigits, double integralPart)
-                {
-                    if (integralPart == 0)
-                    {
-                        WriteToBufferWithoutCheck((byte)'0');
+                        WriteToBuffer(Int64MinValueBytes);
+                        return;
                     }
                     else
                     {
-                        long integralInt = (long)integralPart;
-                        int index = numIntegralDigits;
-                        int numLeadingZeros = 0;
-
-                        for (int i = 0; i < numIntegralDigits; i++)
-                        {
-                            integralInt = Math.DivRem(integralInt, 10, out long digitLong);
-                            localBuffer[index--] = (byte)('0' + (byte)digitLong);
-                            if (digitLong == 0) numLeadingZeros++;
-                            else numLeadingZeros = 0;
-                        }
-                        index += numLeadingZeros;
-                        WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
-                    }
-                }
-
-                void WriteFractionalPart(int numFractionalDigits, double fractionalPart)
-                {
-                    if (numFractionalDigits == 0)
-                    {
-                        if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
-                        else WriteToBufferWithoutCheck((byte)'0');
+                        var bytes = NegativeNumberBytesLookup[value];
+                        WriteToBuffer(bytes);
                         return;
                     }
+                }
+            }
+            if (value < PositiveNumberBytesLookup.Length)
+            {
+                var bytes = PositiveNumberBytesLookup[value];
+                WriteToBuffer(bytes);
+                return;
+            }
 
-                    int firstFractionalDigitIndex = mainBufferCount;
-                    for (int i = 0; i <= numFractionalDigits; i++)
-                    {
-                        fractionalPart *= 10;
-                        byte digit = (byte)fractionalPart;
-                        fractionalPart -= digit;
-                        WriteToBufferWithoutCheck((byte)('0' + digit));
-                    }
+            const int maxDigits = 25;
+            int index = maxDigits;
+            while (value >= 10)
+            {
+                value = Math.DivRem(value, 10, out long digit);
+                localBuffer[index--] = (byte)('0' + digit);
+            }
+            if (value > 0) localBuffer[index--] = (byte)('0' + value);
+            if (isNegative) localBuffer[index--] = (byte)'-';
 
-                    int correctionIndex = mainBufferCount - 1;
-                    while (mainBuffer[correctionIndex] == '0' && correctionIndex > firstFractionalDigitIndex)
+            WriteToBuffer(localBuffer, index + 1, maxDigits - index);
+        }
+
+
+        private void WriteSignedInteger(int inputValue)
+        {
+            var value = inputValue;
+            bool isNegative = value < 0;
+            if (isNegative)
+            {
+                value = -value;
+                if (value < NegativeNumberBytesLookup.Length)
+                {
+                    // If the value was int.MinValue negating it will cause an overflow and resulting again in int.MinValue,
+                    // so we handle it as a special number
+                    if (value == int.MinValue)
                     {
-                        correctionIndex--;
+                        WriteToBuffer(Int32MinValueBytes);
+                        return;
                     }
-                    int oldMainBufferCount = mainBufferCount;
+                    else
+                    {
+                        var bytes = NegativeNumberBytesLookup[value];
+                        WriteToBuffer(bytes);
+                        return;
+                    }
+                }
+            }
+            else if (value < PositiveNumberBytesLookup.Length)
+            {
+                var bytes = PositiveNumberBytesLookup[value];
+                WriteToBuffer(bytes);
+                return;
+            }
+
+            const int maxDigits = 25;
+            int index = maxDigits;
+            while (value >= 10)
+            {
+                value = Math.DivRem(value, 10, out int digit);
+                localBuffer[index--] = (byte)('0' + digit);
+            }
+            if (value > 0) localBuffer[index--] = (byte)('0' + value);
+            if (isNegative) localBuffer[index--] = (byte)'-';
+
+            WriteToBuffer(localBuffer, index + 1, maxDigits - index);
+        }
+
+        private void WriteUnsignedInteger(long inputValue)
+        {
+            var value = inputValue;
+            if (value < PositiveNumberBytesLookup.Length)
+            {
+                var bytes = PositiveNumberBytesLookup[value];
+                WriteToBuffer(bytes, 0, bytes.Length);
+                return;
+            }
+
+            const int maxDigits = 25;
+            int index = maxDigits;
+            while (value >= 10)
+            {
+                value = Math.DivRem(value, 10, out long digit);
+                localBuffer[index--] = (byte)('0' + digit);
+            }
+            if (value > 0) localBuffer[index--] = (byte)('0' + value);
+
+            WriteToBuffer(localBuffer, index + 1, maxDigits - index);
+        }
+
+        //static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
+        static readonly byte ZERO_FLOAT = (byte)'0';
+        static readonly byte[] NAN = "\"NaN\"".ToByteArray();
+        static readonly byte[] POS_INFINITY = "\"Infinity\"".ToByteArray();
+        static readonly byte[] NEG_INFINITY = "\"-Infinity\"".ToByteArray();
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsSpecial(double value)
+        {
+            if (Double.IsNaN(value)) return true;   // NaN
+            long bits = BitConverter.DoubleToInt64Bits(value);
+            const long mask = 0x7FF0000000000000L;  // Mask to isolate the exponent bits for double
+            long maskedBits = bits & mask;
+            if (maskedBits == 0) return true;       // Subnormal
+            if (maskedBits == mask) return true;    // Infinity
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsSpecial(float value)
+        {
+#if NETSTANDARD2_0
+            return IsSpecial((double)value);
+#else
+            if (Single.IsNaN(value)) return true;   // NaN
+            int bits = BitConverter.SingleToInt32Bits(value);
+            const int mask = 0x7F800000;            // Mask to isolate the exponent bits for float
+            int maskedBits = bits & mask;
+            if (maskedBits == 0) return true;       // Subnormal
+            if (maskedBits == mask) return true;    // Infinity
+            return false;
+#endif
+        }
+
+        private void WriteFloat(float inputValue)
+        {
+            var value = inputValue;
+            if (HandleSpecialCases(value)) return;
+
+            EnsureFreeBufferSpace(100);
+
+            bool isNegative = value < 0;
+            if (isNegative) value = -value;
+
+            value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
+            if (failed)
+            {
+                WriteString(inputValue.ToString(CultureInfo.InvariantCulture));
+                return;
+            }
+
+            if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+
+            float integralPart = (float)Math.Floor(value);
+            float fractionalPart = value - integralPart;
+
+            WriteIntegralPart(numIntegralDigits, integralPart);
+
+            if (fractionalPart > 0)
+            {
+                WriteToBufferWithoutCheck((byte)'.');
+                WriteFractionalPart(numFractionalDigits, fractionalPart);
+            }
+
+            if (printExponent)
+            {
+                WriteToBuffer((byte)'E');
+                WriteSignedInteger(exponent);
+            }
+
+            // Local Functions
+
+            bool HandleSpecialCases(float value)
+            {
+                if (value == 0)
+                {
+                    WriteToBuffer(ZERO_FLOAT);
+                    return true;
+                }
+                if (IsSpecial(value))
+                {
+                    if (Single.IsNaN(value)) WriteToBuffer(NAN);
+                    else if (Single.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
+                    else if (Single.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
+                    else WriteString(value.ToString(CultureInfo.InvariantCulture)); // Then it must be subnormal
+                    return true;
+                }
+
+                return false;
+            }                
+
+            void WriteIntegralPart(int numIntegralDigits, float integralPart)
+            {
+                if (integralPart == 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'0');
+                }
+                else
+                {
+
+                    int integralInt = (int)integralPart;
+                    int index = numIntegralDigits;
+                    int numLeadingZeros = 0;
+
+                    for (int i = 0; i < numIntegralDigits; i++)
+                    {
+                        integralInt = (int)Math.DivRem(integralInt, 10, out long digitLong);
+                        localBuffer[index--] = (byte)('0' + (byte)digitLong);
+                        if (digitLong == 0) numLeadingZeros++;
+                        else numLeadingZeros = 0;
+                    }
+                    index += numLeadingZeros;
+                    WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
+                }
+            }
+
+            void WriteFractionalPart(int numFractionalDigits, float fractionalPart)
+            {
+                if (numFractionalDigits == 0)
+                {
+                    if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
+                    else WriteToBufferWithoutCheck((byte)'0');
+                    return;
+                }
+
+                int firstFractionalDigitIndex = mainBufferCount;
+                for (int i = 0; i <= numFractionalDigits; i++)
+                {
+                    fractionalPart *= 10;
+                    byte digit = (byte)fractionalPart;
+                    fractionalPart -= digit;
+                    WriteToBufferWithoutCheck((byte)('0' + digit));
+                }
+
+                int correctionIndex = mainBufferCount - 1;
+                while (mainBuffer[correctionIndex] == '0' && correctionIndex > firstFractionalDigitIndex)
+                {
+                    correctionIndex--;
+                }
+                int oldMainBufferCount = mainBufferCount;
+                mainBufferCount = correctionIndex + 1;
+                if (oldMainBufferCount != mainBufferCount)
+                {
+                    return;
+                }
+
+                while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
+                {
+                    correctionIndex--;
+                }
+
+                if (mainBuffer[correctionIndex] < '9')
+                {
+                    mainBuffer[correctionIndex] += 1;
                     mainBufferCount = correctionIndex + 1;
-                    if (oldMainBufferCount != mainBufferCount)
-                    {
-                        return;
-                    }
-
-                    while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
-                    {
-                        correctionIndex--;
-                    }
-
-                    if (mainBuffer[correctionIndex] < '9')
-                    {
-                        mainBuffer[correctionIndex] += 1;
-                        mainBufferCount = correctionIndex + 1;
-                        return;
-                    }
+                    return;
                 }
-
             }
 
-            double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed)
+        }
+
+        float CalculateNumDigits(float value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed)
+        {
+
+#if NETSTANDARD2_0
+            return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent, out failed);
+#else
+            const int MAX_SIGNIFICANT_DIGITS = 7;
+            const int POS_EXPONENT_LIMIT = 7;
+            const int NEG_EXPONENT_LIMIT = -5;
+
+            int bits = BitConverter.SingleToInt32Bits(value);
+            int binaryExponent = ((bits >> 23) & 0xFF) - 127;
+            exponent = (int)(binaryExponent * 0.34f);
+            numIntegralDigits = Math.Max(0, exponent + 1);
+            numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+            printExponent = false;
+
+            failed = false;
+            if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
             {
-                const int MAX_SIGNIFICANT_DIGITS = 16;
-                const int POS_EXPONENT_LIMIT = 13;
-                const int NEG_EXPONENT_LIMIT = -5;
+                printExponent = true;
+                value = (float)(value * Math.Pow(10, -exponent));
 
-                failed = false;
-                long bits = BitConverter.DoubleToInt64Bits(value);
-                int binaryExponent = (int)((bits >> 52) & 0x7FF) - 1023;
-                exponent = (int)(binaryExponent * 0.34f);
-                numIntegralDigits = Math.Max(0, exponent + 1);
-                numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
-                printExponent = false;
-
-                if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+                if (value == 0 || IsSpecial(value))
                 {
-                    printExponent = true;
-                    value = (value * Math.Pow(10, -exponent));
-
-                    if (value == 0 || IsSpecial(value))
-                    {
-                        // In extreme cases, we can't calculate the digits properly.
-                        failed = true;
-                        return value;
-                    }
-
-                    while (value < 1)
-                    {
-                        value *= 10;
-                        exponent -= 1;
-                    }
-                    while (value >= 10)
-                    {
-                        value /= 10;
-                        exponent += 1;
-                    }
-                    numIntegralDigits = 1;
-                    numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 3;
+                    // In extreme cases, we can't calculate the digits properly.
+                    failed = true;
+                    return value;
                 }
 
-                return value;
+                while (value < 1)
+                {
+                    value *= 10;
+                    exponent -= 1;
+                }
+                while (value >= 10)
+                {
+                    value /= 10;
+                    exponent += 1;
+                }
+                numIntegralDigits = 1;
+                numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 2;
             }
 
-            /*
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static bool IsSubnormal(double value)
-            {
-#if NETSTANDARD2_0
-                long bits = BitConverter.DoubleToInt64Bits(value);
-                const long exponentMask = 0x7FF0000000000000L;  // Exponent bits
-                const long fractionMask = 0x000FFFFFFFFFFFFFL;  // Fraction bits
-
-                long exponent = bits & exponentMask;
-                long fraction = bits & fractionMask;
-
-                // Subnormal numbers have an exponent of 0 but a non-zero fraction
-                return exponent == 0 && fraction != 0;
-#else
-                return Double.IsSubnormal(value);                
+            return value;
 #endif
-            }
-            */
+        }
 
+        private void WriteDouble(double inputValue)
+        {
+            var value = inputValue;
+            if (HandleSpecialCases(value)) return;
 
-            private static readonly byte[] HexMap = System.Text.Encoding.UTF8.GetBytes("0123456789abcdef");
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteByteAsHexWithoutCheck(byte value)
+            EnsureFreeBufferSpace(100);
+
+            bool isNegative = value < 0;
+            if (isNegative) value = -value;                
+
+            value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
+            if (failed)
             {
-                WriteToBufferWithoutCheck(HexMap[value >> 4]);
-                WriteToBufferWithoutCheck(HexMap[value & 0xF]);
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteByteAsHex(byte value)
-            {
-                EnsureFreeBufferSpace(2);
-                WriteToBufferWithoutCheck(HexMap[value >> 4]);
-                WriteToBufferWithoutCheck(HexMap[value & 0xF]);
+                WriteString(inputValue.ToString(CultureInfo.InvariantCulture));
+                return;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteGuidValue(Guid guid)
+            if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+
+            double integralPart = Math.Floor(value);
+            double fractionalPart = value - integralPart;
+
+            WriteIntegralPart(numIntegralDigits, integralPart);
+
+            if (fractionalPart > 0)
             {
-                EnsureFreeBufferSpace(38);  // GUID string length + 4 hyphens + 2 "
+                WriteToBufferWithoutCheck((byte)'.');
+                WriteFractionalPart(numFractionalDigits, fractionalPart);
+            }
+
+            if (printExponent)
+            {
+                WriteToBuffer((byte)'E');
+                WriteSignedInteger(exponent);
+            }
+
+            // Local Functions
+
+            bool HandleSpecialCases(double value)
+            {
+                if (value == 0)
+                {
+                    WriteToBuffer(ZERO_FLOAT);
+                    return true;
+                }
+                if (IsSpecial(value))
+                {
+                    if (Double.IsNaN(value)) WriteToBuffer(NAN);
+                    else if (Double.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
+                    else if (Double.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
+                    else WriteString(value.ToString(CultureInfo.InvariantCulture)); // Then it must be subnormal
+                    return true;
+                }
+
+                return false;
+            }
+
+            
+
+            void WriteIntegralPart(int numIntegralDigits, double integralPart)
+            {
+                if (integralPart == 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'0');
+                }
+                else
+                {
+                    long integralInt = (long)integralPart;
+                    int index = numIntegralDigits;
+                    int numLeadingZeros = 0;
+
+                    for (int i = 0; i < numIntegralDigits; i++)
+                    {
+                        integralInt = Math.DivRem(integralInt, 10, out long digitLong);
+                        localBuffer[index--] = (byte)('0' + (byte)digitLong);
+                        if (digitLong == 0) numLeadingZeros++;
+                        else numLeadingZeros = 0;
+                    }
+                    index += numLeadingZeros;
+                    WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
+                }
+            }
+
+            void WriteFractionalPart(int numFractionalDigits, double fractionalPart)
+            {
+                if (numFractionalDigits == 0)
+                {
+                    if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
+                    else WriteToBufferWithoutCheck((byte)'0');
+                    return;
+                }
+
+                int firstFractionalDigitIndex = mainBufferCount;
+                for (int i = 0; i <= numFractionalDigits; i++)
+                {
+                    fractionalPart *= 10;
+                    byte digit = (byte)fractionalPart;
+                    fractionalPart -= digit;
+                    WriteToBufferWithoutCheck((byte)('0' + digit));
+                }
+
+                int correctionIndex = mainBufferCount - 1;
+                while (mainBuffer[correctionIndex] == '0' && correctionIndex > firstFractionalDigitIndex)
+                {
+                    correctionIndex--;
+                }
+                int oldMainBufferCount = mainBufferCount;
+                mainBufferCount = correctionIndex + 1;
+                if (oldMainBufferCount != mainBufferCount)
+                {
+                    return;
+                }
+
+                while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
+                {
+                    correctionIndex--;
+                }
+
+                if (mainBuffer[correctionIndex] < '9')
+                {
+                    mainBuffer[correctionIndex] += 1;
+                    mainBufferCount = correctionIndex + 1;
+                    return;
+                }
+            }
+
+        }
+
+        double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed)
+        {
+            const int MAX_SIGNIFICANT_DIGITS = 16;
+            const int POS_EXPONENT_LIMIT = 13;
+            const int NEG_EXPONENT_LIMIT = -5;
+
+            failed = false;
+            long bits = BitConverter.DoubleToInt64Bits(value);
+            int binaryExponent = (int)((bits >> 52) & 0x7FF) - 1023;
+            exponent = (int)(binaryExponent * 0.34f);
+            numIntegralDigits = Math.Max(0, exponent + 1);
+            numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+            printExponent = false;
+
+            if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+            {
+                printExponent = true;
+                value = (value * Math.Pow(10, -exponent));
+
+                if (value == 0 || IsSpecial(value))
+                {
+                    // In extreme cases, we can't calculate the digits properly.
+                    failed = true;
+                    return value;
+                }
+
+                while (value < 1)
+                {
+                    value *= 10;
+                    exponent -= 1;
+                }
+                while (value >= 10)
+                {
+                    value /= 10;
+                    exponent += 1;
+                }
+                numIntegralDigits = 1;
+                numFractionalDigits = MAX_SIGNIFICANT_DIGITS - 3;
+            }
+
+            return value;
+        }
+
+        /*
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool IsSubnormal(double value)
+        {
 #if NETSTANDARD2_0
-                // Fallback for .NET Standard 2.0 using ToByteArray and manual byte processing
-                byte[] guidBytes = guid.ToByteArray();
+            long bits = BitConverter.DoubleToInt64Bits(value);
+            const long exponentMask = 0x7FF0000000000000L;  // Exponent bits
+            const long fractionMask = 0x000FFFFFFFFFFFFFL;  // Fraction bits
+
+            long exponent = bits & exponentMask;
+            long fraction = bits & fractionMask;
+
+            // Subnormal numbers have an exponent of 0 but a non-zero fraction
+            return exponent == 0 && fraction != 0;
 #else
-                // Default case for .NET Standard 2.1+ and other frameworks supporting Span<T>
-                Span<byte> guidBytesSpan = new Span<byte>(localBuffer, 0, 16);
-                guid.TryWriteBytes(guidBytesSpan); // loacalBuffer is always bigger than 16 bytes
-                byte[] guidBytes = localBuffer;
+            return Double.IsSubnormal(value);                
 #endif
-                WriteToBufferWithoutCheck((byte)'"');
-                WriteByteAsHexWithoutCheck(guidBytes[3]);
-                WriteByteAsHexWithoutCheck(guidBytes[2]);
-                WriteByteAsHexWithoutCheck(guidBytes[1]);
-                WriteByteAsHexWithoutCheck(guidBytes[0]);
-                WriteToBufferWithoutCheck((byte)'-');
-                WriteByteAsHexWithoutCheck(guidBytes[5]);
-                WriteByteAsHexWithoutCheck(guidBytes[4]);
-                WriteToBufferWithoutCheck((byte)'-');
-                WriteByteAsHexWithoutCheck(guidBytes[7]);
-                WriteByteAsHexWithoutCheck(guidBytes[6]);
-                WriteToBufferWithoutCheck((byte)'-');
-                WriteByteAsHexWithoutCheck(guidBytes[8]);
-                WriteByteAsHexWithoutCheck(guidBytes[9]);
-                WriteToBufferWithoutCheck((byte)'-');
-                WriteByteAsHexWithoutCheck(guidBytes[10]);
-                WriteByteAsHexWithoutCheck(guidBytes[11]);
-                WriteByteAsHexWithoutCheck(guidBytes[12]);
-                WriteByteAsHexWithoutCheck(guidBytes[13]);
-                WriteByteAsHexWithoutCheck(guidBytes[14]);
-                WriteByteAsHexWithoutCheck(guidBytes[15]);
-                WriteToBufferWithoutCheck((byte)'"');
-            }
+        }
+        */
+
+
+        private static readonly byte[] HexMap = System.Text.Encoding.UTF8.GetBytes("0123456789abcdef");
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteAsHexWithoutCheck(byte value)
+        {
+            WriteToBufferWithoutCheck(HexMap[value >> 4]);
+            WriteToBufferWithoutCheck(HexMap[value & 0xF]);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteAsHex(byte value)
+        {
+            EnsureFreeBufferSpace(2);
+            WriteToBufferWithoutCheck(HexMap[value >> 4]);
+            WriteToBufferWithoutCheck(HexMap[value & 0xF]);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteGuidValue(Guid guid)
+        {
+            EnsureFreeBufferSpace(38);  // GUID string length + 4 hyphens + 2 "
+#if NETSTANDARD2_0
+            // Fallback for .NET Standard 2.0 using ToByteArray and manual byte processing
+            byte[] guidBytes = guid.ToByteArray();
+#else
+            // Default case for .NET Standard 2.1+ and other frameworks supporting Span<T>
+            Span<byte> guidBytesSpan = new Span<byte>(localBuffer, 0, 16);
+            guid.TryWriteBytes(guidBytesSpan); // loacalBuffer is always bigger than 16 bytes
+            byte[] guidBytes = localBuffer;
+#endif
+            WriteToBufferWithoutCheck((byte)'"');
+            WriteByteAsHexWithoutCheck(guidBytes[3]);
+            WriteByteAsHexWithoutCheck(guidBytes[2]);
+            WriteByteAsHexWithoutCheck(guidBytes[1]);
+            WriteByteAsHexWithoutCheck(guidBytes[0]);
+            WriteToBufferWithoutCheck((byte)'-');
+            WriteByteAsHexWithoutCheck(guidBytes[5]);
+            WriteByteAsHexWithoutCheck(guidBytes[4]);
+            WriteToBufferWithoutCheck((byte)'-');
+            WriteByteAsHexWithoutCheck(guidBytes[7]);
+            WriteByteAsHexWithoutCheck(guidBytes[6]);
+            WriteToBufferWithoutCheck((byte)'-');
+            WriteByteAsHexWithoutCheck(guidBytes[8]);
+            WriteByteAsHexWithoutCheck(guidBytes[9]);
+            WriteToBufferWithoutCheck((byte)'-');
+            WriteByteAsHexWithoutCheck(guidBytes[10]);
+            WriteByteAsHexWithoutCheck(guidBytes[11]);
+            WriteByteAsHexWithoutCheck(guidBytes[12]);
+            WriteByteAsHexWithoutCheck(guidBytes[13]);
+            WriteByteAsHexWithoutCheck(guidBytes[14]);
+            WriteByteAsHexWithoutCheck(guidBytes[15]);
+            WriteToBufferWithoutCheck((byte)'"');
+        }
 
             private static readonly byte[] zeroDateTimeBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00\"");
             public void WriteDateTimeValue(DateTime dateTime)
@@ -1758,21 +1824,21 @@ namespace FeatureLoom.Serialization
                     Write7Digits(fractualSeconds);
                 }
 
-                if (dateTime.Kind == DateTimeKind.Utc)
-                {
-                    WriteToBufferWithoutCheck((byte)'Z');
-                }
-                else if (dateTime.Kind == DateTimeKind.Local)
-                {
-                    TimeSpan offsetSpan = TimeZoneInfo.Local.GetUtcOffset(dateTime);
-                    bool isNegative = offsetSpan.Ticks < 0;
-                    WriteToBufferWithoutCheck((byte)(isNegative ? '-' : '+'));
-                    Write2Digits(Math.Abs(offsetSpan.Hours));
-                    WriteToBufferWithoutCheck((byte)':');
-                    Write2Digits(Math.Abs(offsetSpan.Minutes));
-                }
-                WriteToBufferWithoutCheck((byte)'"');
+            if (dateTime.Kind == DateTimeKind.Utc)
+            {
+                WriteToBufferWithoutCheck((byte)'Z');
             }
+            else if (dateTime.Kind == DateTimeKind.Local)
+            {
+                TimeSpan offsetSpan = TimeZoneInfo.Local.GetUtcOffset(dateTime);
+                bool isNegative = offsetSpan.Ticks < 0;
+                WriteToBufferWithoutCheck((byte)(isNegative ? '-' : '+'));
+                Write2Digits(Math.Abs(offsetSpan.Hours));
+                WriteToBufferWithoutCheck((byte)':');
+                Write2Digits(Math.Abs(offsetSpan.Minutes));
+            }
+            WriteToBufferWithoutCheck((byte)'"');
+        }
 
             private static readonly byte[] zeroTimespanBytes = System.Text.Encoding.UTF8.GetBytes("\"00:00:00\"");
             public void WriteTimeSpanValue(TimeSpan value)
@@ -1823,67 +1889,66 @@ namespace FeatureLoom.Serialization
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
 
-            private void Write4Digits(int value)
-            {
-                int temp;
-                temp = Math.DivRem(value, 1000, out value);
-                WriteDigit(temp);
+        private void Write4Digits(int value)
+        {
+            int temp;
+            temp = Math.DivRem(value, 1000, out value);
+            WriteDigit(temp);
 
-                temp = Math.DivRem(value, 100, out value);
-                WriteDigit(temp);
+            temp = Math.DivRem(value, 100, out value);
+            WriteDigit(temp);
 
-                temp = Math.DivRem(value, 10, out value);
-                WriteDigit(temp);
-                WriteDigit(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void Write2Digits(int value)
-            {
-                int div;
-                div = Math.DivRem(value, 10, out value);
-                WriteDigit(div);
-                WriteDigit(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void Write7Digits(int value)
-            {
-                // First digit
-                int digit = Math.DivRem(value, 1000000, out value);
-                WriteDigit(digit);
-
-                // Second digit
-                digit = Math.DivRem(value, 100000, out value);
-                WriteDigit(digit);
-
-                // Third digit
-                digit = Math.DivRem(value, 10000, out value);
-                WriteDigit(digit);
-
-                // Fourth digit
-                digit = Math.DivRem(value, 1000, out value);
-                WriteDigit(digit);
-
-                // Fifth digit
-                digit = Math.DivRem(value, 100, out value);
-                WriteDigit(digit);
-
-                // Sixth digit
-                digit = Math.DivRem(value, 10, out value);
-                WriteDigit(digit);
-
-                // Seventh digit
-                WriteDigit(value);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private void WriteDigit(int value)
-            {
-                WriteToBufferWithoutCheck((byte)('0' + value));
-            }
+            temp = Math.DivRem(value, 10, out value);
+            WriteDigit(temp);
+            WriteDigit(value);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Write2Digits(int value)
+        {
+            int div;
+            div = Math.DivRem(value, 10, out value);
+            WriteDigit(div);
+            WriteDigit(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Write7Digits(int value)
+        {
+            // First digit
+            int digit = Math.DivRem(value, 1000000, out value);
+            WriteDigit(digit);
+
+            // Second digit
+            digit = Math.DivRem(value, 100000, out value);
+            WriteDigit(digit);
+
+            // Third digit
+            digit = Math.DivRem(value, 10000, out value);
+            WriteDigit(digit);
+
+            // Fourth digit
+            digit = Math.DivRem(value, 1000, out value);
+            WriteDigit(digit);
+
+            // Fifth digit
+            digit = Math.DivRem(value, 100, out value);
+            WriteDigit(digit);
+
+            // Sixth digit
+            digit = Math.DivRem(value, 10, out value);
+            WriteDigit(digit);
+
+            // Seventh digit
+            WriteDigit(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteDigit(int value)
+        {
+            WriteToBufferWithoutCheck((byte)('0' + value));
+        }
     }
+
 }
 

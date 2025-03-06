@@ -1419,7 +1419,6 @@ namespace FeatureLoom.Serialization
 
         private bool TryCreateEnumerableTypeReader(Type itemType, CachedTypeReader cachedTypeReader)
         {
-
             if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IList<>), out Type elementType))
             {
                 var enumerableType = typeof(IList<>).MakeGenericType(elementType);                
@@ -2496,17 +2495,17 @@ namespace FeatureLoom.Serialization
                     byte b = SkipWhiteSpaces();
                     if (LookupCheck(map_SkipWhitespaces, b, FilterResult.Skip)) return false;
                     
-                    var itemType = typeof(T);
+                    var itemType = item != null ? item.GetType() : typeof(T);
                     if (lastTypeReaderType == itemType)
                     {
-                        item = lastTypeReader.ReadValue<T>(rootName, item);
+                        item = lastTypeReader.ReadValue(rootName, item);
                     }
                     else
                     {
                         var reader = GetCachedTypeReader(itemType);
                         lastTypeReader = reader;
                         lastTypeReaderType = itemType;
-                        item = reader.ReadValue<T>(rootName, item);
+                        item = reader.ReadValue(rootName, item);
                     }
                     return true;
                 }

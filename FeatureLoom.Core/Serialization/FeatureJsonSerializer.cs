@@ -318,6 +318,11 @@ namespace FeatureLoom.Serialization
 
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
             else if (itemType.IsValueType && itemType.IsNullable() && Nullable.GetUnderlyingType(itemType).IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, Nullable.GetUnderlyingType(itemType), nameof(CreateNullableEnumItemHandler), true);
+
+            else if (settings.writeByteArrayAsBase64String && itemType == typeof(ByteSegment)) typeHandler.SetItemHandler_Primitive<ByteSegment>(writer.WriteByteSegmentValueAsBase64);
+            else if (settings.writeByteArrayAsBase64String && itemType == typeof(byte[])) typeHandler.SetItemHandler_Primitive<byte[]>(writer.WriteByteArrayValueAsBase64);
+            else if (settings.writeByteArrayAsBase64String && itemType == typeof(ArraySegment<byte>)) typeHandler.SetItemHandler_Primitive<ArraySegment<byte>>(writer.WriteByteArraySegmentValueAsBase64);
+
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
             else if (TryCreateEnumerableItemHandler(typeHandler, itemType)) /* do nothing */;
