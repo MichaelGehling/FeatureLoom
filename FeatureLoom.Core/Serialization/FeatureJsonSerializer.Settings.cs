@@ -83,7 +83,7 @@ namespace FeatureLoom.Serialization
 
             public readonly bool requiresItemNames;
             public readonly bool requiresItemInfos;
-            public readonly bool writeByteArrayAsBase64String = true;
+            public readonly bool writeByteArrayAsBase64String = false;
 
             public CompiledSettings(Settings settings)
             {
