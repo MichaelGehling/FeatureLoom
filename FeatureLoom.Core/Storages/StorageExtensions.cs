@@ -74,7 +74,7 @@ namespace FeatureLoom.Storages
             return reader.TryCopy(writer, uriConverter, uriFilterPattern);
         }
 
-        public async static Task<(bool, Dictionary<string,T>)> TryReadAllAsync<T>(this IStorageReader reader, string uriPattern = null)
+        public async static Task<(bool success, Dictionary<string,T> items)> TryReadAllAsync<T>(this IStorageReader reader, string uriPattern = null)
         {
             if (!(await reader.TryListUrisAsync(uriPattern).ConfigureAwait(false)).TryOut(out var uris)) return (false, null);
             Dictionary<string, T> dict = new();
@@ -84,6 +84,23 @@ namespace FeatureLoom.Storages
                 dict[uri] = item;
             }
             return (true, dict);
-        }                
+        }
+
+        public async static Task<(bool success, Dictionary<string, bool> deletedUrisInfo)> TryDeleteAllAsync(this IStorageReaderWriter readerWriter, string uriPattern = null)
+        {
+            if (!(await readerWriter.TryListUrisAsync(uriPattern).ConfigureAwait(false)).TryOut(out var uris)) return (false, null);
+            Dictionary<string, bool> dict = new();
+            bool anyFailed = false;
+            foreach (var uri in uris)
+            {
+                if (!(await readerWriter.TryDeleteAsync(uri).ConfigureAwait(false)))
+                {
+                    anyFailed = true;
+                    dict[uri] = false;
+                }
+                else dict[uri] = true;
+            }
+            return (!anyFailed, dict);
+        }
     }
 }
