@@ -106,6 +106,7 @@ namespace FeatureLoom.Security
         List<string> roleNames = new List<string>();
         [JsonIgnore]
         List<IdentityRole> _roles;
+        List<string> individualPermissions = new List<string>();
 
         public Identity(string identityId, StoredCredential credential)
         {
@@ -177,15 +178,17 @@ namespace FeatureLoom.Security
         }
 
         [JsonIgnore]
-        public IEnumerable<string> Permissions => Roles.SelectMany(role => role.Permissions).Distinct();
+        public IEnumerable<string> Permissions => Roles.SelectMany(role => role.Permissions).Concat(individualPermissions).Distinct();
+        [JsonIgnore]
+        public IEnumerable<string> IndividualPermissions => individualPermissions;
 
         public bool HasRole(string roleName) => Roles.Any(role => role.RoleName == roleName);
 
-        public bool HasPermission(string permission) => Roles.Any(role => role.HasPermission(permission));
-        public bool HasAnyPermission() => Roles.Any(role => role.HasAnyPermission());
-        public bool HasAnyPermission(IEnumerable<string> checkedPermissions) => Roles.Any(role => role.HasAnyPermission(checkedPermissions));
-        public bool MatchesAnyPermission(string permissionWildcard) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcard));
-        public bool MatchesAnyPermission(IEnumerable<string> permissionWildcards) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcards));
+        public bool HasPermission(string permission) => Roles.Any(role => role.HasPermission(permission)) || individualPermissions.Contains(permission);
+        public bool HasAnyPermission() => Roles.Any(role => role.HasAnyPermission()) || individualPermissions.Count > 0;
+        public bool HasAnyPermission(IEnumerable<string> checkedPermissions) => Roles.Any(role => role.HasAnyPermission(checkedPermissions)) || individualPermissions.Any(p => checkedPermissions.Contains(p));
+        public bool MatchesAnyPermission(string permissionWildcard) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcard)) || individualPermissions.Any(p => p.MatchesWildcard(permissionWildcard));
+        public bool MatchesAnyPermission(IEnumerable<string> permissionWildcards) => Roles.Any(role => role.MatchesAnyPermission(permissionWildcards)) ||individualPermissions.Any(p => permissionWildcards.Any(pwc => p.MatchesWildcard(pwc)));
 
         public async Task StoreAsync()
         {
@@ -238,6 +241,18 @@ namespace FeatureLoom.Security
 
             if (storeChanges) _ = StoreAsync();
         }
-        
+
+        public void AddIndividualPermission(string permission, bool storeChanges)
+        {
+            if (!individualPermissions.Contains(permission)) individualPermissions.Add(permission);
+            if (storeChanges) _ = StoreAsync();
+        }
+
+        public void RemoveIndividualPermission(string permission, bool storeChanges)
+        {
+            individualPermissions.Remove(permission);
+            if (storeChanges) _ = StoreAsync();
+        }
+
     }
 }
