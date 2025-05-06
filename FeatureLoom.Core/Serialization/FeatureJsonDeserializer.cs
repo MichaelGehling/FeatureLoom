@@ -768,22 +768,8 @@ namespace FeatureLoom.Serialization
             for (int i = 0; i < objectTypeOptions.Length; i++)
             {
                 var typeOption = objectTypeOptions[i];
-                var memberInfos = new List<MemberInfo>();
-                if (settings.dataAccess == DataAccess.PublicFieldsAndProperties)
-                {
-                    memberInfos.AddRange(typeOption.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(prop => prop.SetMethod != null));
-                    memberInfos.AddRange(typeOption.GetFields(BindingFlags.Public | BindingFlags.Instance));
-                }
-                else
-                {
-                    memberInfos.AddRange(typeOption.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance));
-                    Type t = typeOption.BaseType;
-                    while (t != null)
-                    {
-                        memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(baseField => !memberInfos.Any(field => field.Name == baseField.Name)));
-                        t = t.BaseType;
-                    }
-                }
+                var memberInfos = CreateMemberInfosList(typeOption);
+
                 foreach (var memberInfo in memberInfos)
                 {
                     Type fieldType = GetFieldOrPropertyType(memberInfo);
@@ -796,10 +782,11 @@ namespace FeatureLoom.Serialization
                         fieldNameToIsTypeMember[itemFieldName] = indicesList;
                     }
                     indicesList[i] = true;
+                    // TODO: BackingFields are not yet supported for multi options
                 }
 
                 // Mark all fields that are equally available for all types
-                foreach(var pair in fieldNameToIsTypeMember)
+                foreach (var pair in fieldNameToIsTypeMember)
                 {
                     if (pair.Value.All(v => v == true)) fieldNameToIsTypeMember[pair.Key] = null;
                 }
@@ -914,29 +901,9 @@ namespace FeatureLoom.Serialization
                 cachedTypeReader.MakeAbstract<T>(JsonDataTypeCategory.Object);
                 return;
             }
+            List<MemberInfo> memberInfos = CreateMemberInfosList(itemType);
 
-            var memberInfos = new List<MemberInfo>();
-            if (settings.dataAccess == DataAccess.PublicFieldsAndProperties)
-            {
-                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                    .Where(prop => prop.SetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
-                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
-            }
-            else
-            {
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
-                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
-                Type t = itemType.BaseType;
-                while (t != null)
-                {
-                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
-                        .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
-                    t = t.BaseType;
-                }
-            }
-
-            Dictionary<ByteSegment, int> itemFieldWritersIndexLookup= new();
+            Dictionary<ByteSegment, int> itemFieldWritersIndexLookup = new();
             List<(ByteSegment name, Func<T, T> itemFieldWriter)> itemFieldWritersList = new();
             foreach (var memberInfo in memberInfos)
             {
@@ -944,27 +911,35 @@ namespace FeatureLoom.Serialization
                 string name = memberInfo.Name;
                 var itemFieldName = new ByteSegment(name.ToByteArray());
                 var itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, itemFieldName);
+                itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
+                itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
+
                 if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName))
                 {
                     name = backingFieldName;
                     itemFieldName = new ByteSegment(name.ToByteArray());
+                    itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
+                    itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
                 }
-                itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
-                itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
             }
             var constructor = GetConstructor<T>();
 
-            bool TryFindFieldWriter(ByteSegment fieldName, ref int expectedFieldIndex, out Func<T,T> fieldWriter)
+            bool TryFindFieldWriter(ByteSegment fieldName, ref int expectedFieldIndex, out Func<T, T> fieldWriter)
             {
+                if (itemFieldWritersList.Count == 0)
+                {
+                    fieldWriter = null;
+                    return false;
+                }
                 (ByteSegment name, fieldWriter) = itemFieldWritersList[expectedFieldIndex];
                 if (name == fieldName)
                 {
-                    expectedFieldIndex = (expectedFieldIndex+1) % itemFieldWritersList.Count;
+                    expectedFieldIndex = (expectedFieldIndex + 1) % itemFieldWritersList.Count;
                     return true;
                 }
                 if (itemFieldWritersIndexLookup.TryGetValue(fieldName, out int index))
                 {
-                    expectedFieldIndex = (index+1) % itemFieldWritersList.Count;
+                    expectedFieldIndex = (index + 1) % itemFieldWritersList.Count;
                     (_, fieldWriter) = itemFieldWritersList[index];
                     return true;
                 }
@@ -1001,7 +976,7 @@ namespace FeatureLoom.Serialization
 
             cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
 
-            Func<T,T> populatingTypeReader = (itemToPopulate) =>
+            Func<T, T> populatingTypeReader = (itemToPopulate) =>
             {
                 T item = itemToPopulate;
                 int expectedFieldIndex = 0;
@@ -1032,6 +1007,46 @@ namespace FeatureLoom.Serialization
             cachedTypeReader.SetPopulatingTypeReader(populatingTypeReader, JsonDataTypeCategory.Object);
         }
 
+        private List<MemberInfo> CreateMemberInfosList(Type itemType)
+        {
+            var memberInfos = new List<MemberInfo>();
+            if (settings.dataAccess == DataAccess.PublicFieldsAndProperties)
+            {
+                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(prop => prop.SetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
+
+                memberInfos.AddRange(itemType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Where(prop => prop.SetMethod != null && prop.IsDefined(typeof(JsonIncludeAttribute), true)));
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Where(field => field.IsDefined(typeof(JsonIncludeAttribute), true)));
+            }
+            else
+            {
+                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
+                Type t = itemType.BaseType;
+                while (t != null)
+                {
+                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
+                    t = t.BaseType;
+                }
+
+                memberInfos.AddRange(itemType.GetProperties(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(prop => prop.IsDefined(typeof(JsonIncludeAttribute), true)));
+                t = itemType.BaseType;
+                while (t != null)
+                {
+                    memberInfos.AddRange(t.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Where(baseProp => baseProp.IsDefined(typeof(JsonIncludeAttribute), true) && !memberInfos.Any(field => field.Name == baseProp.Name)));
+                    t = t.BaseType;
+                }
+            }
+
+            return memberInfos;
+        }
 
         private Func<C, C> CreateItemFieldWriter<T, V, C>(MemberInfo memberInfo, ByteSegment fieldName) where T : C
         {
