@@ -47,7 +47,8 @@ namespace FeatureLoom.Serialization
         {
             PublicAndPrivateFields = 0,
             PublicAndPrivateFields_CleanBackingFields = 1,
-            PublicFieldsAndProperties = 2,
+            PublicAndPrivateFields_RemoveBackingFields = 2,
+            PublicFieldsAndProperties = 3,
         }
 
         public enum ReferenceCheck

@@ -158,8 +158,41 @@ namespace Playground
             A,B,C
         }
 
+        public class BaseTest
+        {
+            [JsonIgnore]
+            public int base_publicField = 1;
+            [JsonInclude]
+            private int base_privateField = 2;
+
+            [JsonIgnore]
+            public int Base_publicProperty { get; set; } = 3;
+            [JsonInclude]
+            private int Base_privateProperty { get; set; } = 4;
+        }
+
+        public class MainTest: BaseTest
+        {
+            [JsonIgnore]
+            public int main_publicField = 11;
+            [JsonInclude]
+            private int main_privateField = 22;
+            [JsonIgnore]
+            public int Main_publicProperty { get; set; } = 33;
+            [JsonInclude]
+            private int Main_privateProperty { get; set; } = 44;
+        }
+
         private static async Task Main()
         {
+            MainTest mainTest = new MainTest();
+            FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+            {
+                indent = true,
+                dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
+            });
+            var mainTestJson = serializer.Serialize(mainTest);
+
 
             TestStruct ts = new TestStruct()
             {

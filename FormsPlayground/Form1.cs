@@ -10,11 +10,18 @@ using System.Windows.Forms;
 using FeatureLoom.Forms;
 using FeatureLoom.Logging;
 using FeatureLoom.MessageFlow;
+using FeatureLoom.Storages;
 using FeatureLoom.Time;
 using FeatureLoom.Workflows;
 
 namespace FormsPlayground
 {
+
+    public class SerializerTest : Configuration
+    {
+        string str = "Hello";
+        int i = 42;
+    }
 
     public partial class Form1 : Form
     {
@@ -42,9 +49,14 @@ namespace FormsPlayground
                 Log.FORCE($"Event: {msg.Event} Property:{msg.PropertyName}");
             }));
 
+            SerializerTest serializerTest = new SerializerTest();
+
             button1.Click += (o, e) =>
             {
-                wf.Run();                
+
+                serializerTest.TryWriteToStorage();
+                serializerTest.TryUpdateFromStorage(false);
+
             };
             
 

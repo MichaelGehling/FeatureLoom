@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>FeatureLoom.Forms</id>
-    <version>0.4.1.2-alpha</version>
+    <version>0.5.7.1-alpha</version>
     <title>FeatureLoom.Forms</title>
     <authors>Michael Gehling</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -10,11 +10,20 @@
     <projectUrl>https://github.com/MichaelGehling/FeatureLoom</projectUrl>
     <iconUrl>https://github.com/MichaelGehling/FeatureLoom/blob/master/Resources/FeatureLoom_128.png?raw=true</iconUrl>
     <description>A Forms extensions for FeatureLoom framework</description>
-    <releaseNotes>MultiPropertyControl: small bugfixes</releaseNotes>
+    <releaseNotes></releaseNotes>
     <copyright>Copyright (c) 2020 Michael Gehling</copyright>
     <tags>FeatureLoom Forms</tags>
     <dependencies>
-      <dependency id="FeatureLoom.Core" version="0.4.1-alpha" />
+      <group targetFramework=".NETFramework4.8">
+        <dependency id="FeatureLoom.Core" version="0.5.7-alpha" />
+      </group>
     </dependencies>
   </metadata>
+  <files>
+    <file src="bin\Release\FeatureLoom.Forms.dll" target="lib\net48\" />
+    <file src="bin\Release\FeatureLoom.Forms.pdb" target="lib\net48\" />
+    <file src="bin\Release\FeatureLoom.Core.dll" target="lib\net48\" />
+    <file src="bin\Release\FeatureLoom.Core.pdb" target="lib\net48\" />
+    <file src="bin\Release\System.Runtime.CompilerServices.Unsafe.dll" target="lib\net48\" />
+  </files>
 </package>

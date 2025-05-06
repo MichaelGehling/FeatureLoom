@@ -9,5 +9,10 @@ namespace FeatureLoom.Serialization
     public class JsonIgnoreAttribute : Attribute
     {
     }
-   
+
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
+    public class JsonIncludeAttribute : Attribute
+    {
+    }
+
 }

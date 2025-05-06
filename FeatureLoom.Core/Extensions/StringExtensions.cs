@@ -452,15 +452,39 @@ namespace FeatureLoom.Extensions
             int endPos = str.Length;
             if (!startAfter.EmptyOrNull())
             {
-                startPos = str.IndexOf(startAfter) + (removeAlsoSearchStrings ? 0 : startAfter.Length);
+                startPos = str.IndexOf(startAfter);
             }
             if (startPos == -1) return str;
+            if (!removeAlsoSearchStrings) startPos += startAfter.Length;
             if (!endBefore.EmptyOrNull())
             {
                 endPos = str.IndexOf(endBefore, startPos) + (removeAlsoSearchStrings ? endBefore.Length : 0);
             }
             if (endPos == -1) return str;
+            if (removeAlsoSearchStrings) endPos += endBefore.Length;
+
             return str.Substring(0, startPos) + replacement + str.Substring(endPos);
+        }
+
+        public static string ReplaceAllBetween(this string str, string startAfter, string endBefore, string replacement, bool removeAlsoSearchStrings = false)
+        {
+            if (startAfter.EmptyOrNull() || endBefore.EmptyOrNull()) return ReplaceBetween(str, startAfter, endBefore, replacement, removeAlsoSearchStrings);
+            int startPos = 0;
+            bool done = false;
+            while(true)
+            {                
+                startPos = str.IndexOf(startAfter, startPos);
+                if (startPos == -1) return str;
+                if (!removeAlsoSearchStrings) startPos += startAfter.Length;
+                int endPos = str.IndexOf(endBefore, startPos);
+                if (endPos == -1) return str;
+                if (removeAlsoSearchStrings) endPos += endBefore.Length;
+                str = str.Substring(0, startPos) + replacement + str.Substring(endPos);                
+                startPos = removeAlsoSearchStrings ? 
+                    startPos + replacement.Length: 
+                    startPos + replacement.Length + endBefore.Length;
+                if (startPos >= str.Length) return str;
+            }
         }
 
         public static string InsertBefore(this string str, string marker, string insertion, bool backwardSearch = false)

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureLoom.DependencyInversion;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,16 +7,22 @@ namespace FeatureLoom.Serialization;
 
 public static class JsonHelper
 {
-    static FeatureJsonSerializer serializer = new(new()
+    public static FeatureJsonSerializer DefaultSerializer { get => Service<JsonHelperService>.Instance.DefaultSerializer; set => Service<JsonHelperService>.Instance.DefaultSerializer = value; }
+    public static FeatureJsonDeserializer DefaultDeserializer { get => Service<JsonHelperService>.Instance.DefaultDeserializer; set => Service<JsonHelperService>.Instance.DefaultDeserializer = value; }
+}
+
+public class JsonHelperService
+{
+    FeatureJsonSerializer serializer = new(new()
     {
         indent = true
     });
-    static FeatureJsonDeserializer deserializer = new(new()
+    FeatureJsonDeserializer deserializer = new(new()
     {
         enableProposedTypes = true,
-        strict = false,        
+        strict = false,
     });
 
-    public static FeatureJsonSerializer DefaultSerializer => serializer;
-    public static FeatureJsonDeserializer DefaultDeserializer => deserializer;
+    public FeatureJsonSerializer DefaultSerializer { get => serializer; set => serializer = value; }
+    public FeatureJsonDeserializer DefaultDeserializer { get => deserializer; set => deserializer = value; }
 }
