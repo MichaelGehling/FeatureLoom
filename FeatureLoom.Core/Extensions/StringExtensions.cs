@@ -458,7 +458,7 @@ namespace FeatureLoom.Extensions
             if (!removeAlsoSearchStrings) startPos += startAfter.Length;
             if (!endBefore.EmptyOrNull())
             {
-                endPos = str.IndexOf(endBefore, startPos) + (removeAlsoSearchStrings ? endBefore.Length : 0);
+                endPos = str.IndexOf(endBefore, startPos);
             }
             if (endPos == -1) return str;
             if (removeAlsoSearchStrings) endPos += endBefore.Length;

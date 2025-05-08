@@ -5,6 +5,7 @@ using FeatureLoom.Time;
 using FeatureLoom.Workflows;
 using System;
 using System.Windows.Forms;
+using System.Threading;
 
 namespace FeatureLoom.Forms
 {
@@ -15,9 +16,12 @@ namespace FeatureLoom.Forms
         {
             private Workflow workflow;
             private IWorkflowRunner runner;
+            SynchronizationContext uiContext = null;
 
             public WorkflowApplicationContext(Workflow workflow, IWorkflowRunner runner = null)
             {
+                uiContext = SynchronizationContext.Current;
+
                 this.workflow = workflow;
                 this.workflow.PrioritizeUiOverWorkflow();
 
@@ -47,7 +51,7 @@ namespace FeatureLoom.Forms
                         {
                             throw new Exception($"Failed to stop all workflows!\n{runner.RunningWorkflows.AllItemsToString()}");
                         }
-                        Application.ExitThread();
+                        uiContext.Post(_ => this.ExitThread(), null);
                     }
                 }));
             }

@@ -185,6 +185,15 @@ namespace Playground
 
         private static async Task Main()
         {
+
+            string testString = "<>";
+            var result = testString.ReplaceBetween("<", ">", "123");
+            var result1 = testString.ReplaceBetween("<", ">", "");
+            var result2 = testString.ReplaceBetween("<", ">", "", true);
+            var result3 = testString.ReplaceBetween("<", ">", "123", true);
+
+
+
             MainTest mainTest = new MainTest();
             FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
@@ -217,7 +226,7 @@ namespace Playground
             des.TryDeserialize(out int x);
 
             string t1 = "";
-            string result1 = JsonHelper.DefaultSerializer.Serialize(t1);
+            string result154 = JsonHelper.DefaultSerializer.Serialize(t1);
 
 
             bool success = JsonHelper.DefaultDeserializer.TryDeserialize<Xenum?>("1", out var t2);

@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>FeatureLoom.Forms</id>
-    <version>0.5.7.1-alpha</version>
+    <version>0.5.9.5-alpha</version>
     <title>FeatureLoom.Forms</title>
     <authors>Michael Gehling</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -15,7 +15,7 @@
     <tags>FeatureLoom Forms</tags>
     <dependencies>
       <group targetFramework=".NETFramework4.8">
-        <dependency id="FeatureLoom.Core" version="0.5.7-alpha" />
+        <dependency id="FeatureLoom.Core" version="0.5.9-alpha" />
       </group>
     </dependencies>
   </metadata>
