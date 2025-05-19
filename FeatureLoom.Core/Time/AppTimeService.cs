@@ -109,7 +109,7 @@ namespace FeatureLoom.Time
 
         /// <summary>
         /// A very quick and cheap way (~5-8% cost of DateTime.UtcNow) to get the current UTC time, but it may deviate between -16 to +16 milliseconds from actual UTC time (roughly in a gaussian normal distribution).
-        /// Note: Every second, the coarse time will be reset by calling DateTime.UtcNow. Calling AppTime.Now will also reset the CoarseTime to the actual time.
+        /// Note: Every second, the coarse time will be reset by calling DateTime.UtcNow to avoid drift. Calling AppTime.Now will also reset the CoarseTime to the actual time.
         /// </summary>
         public DateTime CoarseNow
         {

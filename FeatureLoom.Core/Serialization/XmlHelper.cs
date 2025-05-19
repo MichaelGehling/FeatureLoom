@@ -1,13 +1,14 @@
-﻿using System;
+﻿using FeatureLoom.Extensions;
+using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Xml.Schema;
-using System.Xml;
-using System.Xml.Serialization;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Xml;
+using System.Xml.Schema;
+using System.Xml.Serialization;
 
 namespace FeatureLoom.Serialization;
 
@@ -116,7 +117,7 @@ public static class XmlHelper
         }
     }
 
-    public static bool TryCreateXmlSchema(Type type, out XmlSchema schema, out string xsd)
+    public static bool TryCreateXmlSchema(Type rootType, out XmlSchema schema, out string xsd)
     {
         schema = null;
         xsd = null;
@@ -125,7 +126,7 @@ public static class XmlHelper
             XmlSchemas xmlSchemas = new XmlSchemas();
             XmlSchemaExporter exporter = new XmlSchemaExporter(xmlSchemas);
             XmlReflectionImporter importer = new XmlReflectionImporter();
-            XmlTypeMapping mapping = importer.ImportTypeMapping(type);
+            XmlTypeMapping mapping = importer.ImportTypeMapping(rootType);
 
             exporter.ExportTypeMapping(mapping);
 
@@ -133,26 +134,117 @@ public static class XmlHelper
             schema = xmlSchemas.Count > 0 ? xmlSchemas[0] : null;
             if (schema == null) return false;
 
-            // Ensure required and optional elements are correctly set
-            foreach (XmlSchemaElement element in schema.Items.OfType<XmlSchemaElement>())
+            // Collect all CLR types in object graph (props + fields)
+            var allTypes = new HashSet<Type>();
+            void Collect(Type t)
             {
-                var prop = type.GetProperty(element.Name);
-                if (prop != null)
-                {
-                    var xmlElementAttr = prop.GetCustomAttribute<XmlElementAttribute>();
-                    bool isRequired = xmlElementAttr != null && !xmlElementAttr.IsNullable;
-                    bool hasDefault = prop.GetCustomAttribute<DefaultValueAttribute>() != null;
+                if (t == null || t == typeof(string) || t.IsPrimitive)
+                    return;
+                if (!allTypes.Add(t))
+                    return;
 
-                    if (isRequired)
-                    {
-                        element.MinOccurs = 1; // Make it mandatory
-                    }
-                    else if (hasDefault)
-                    {
-                        element.MinOccurs = 0; // Make it optional
-                    }
+                // PROPERTIES
+                foreach (var p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                                   .Where(p => p.GetCustomAttribute<XmlIgnoreAttribute>() == null))
+                {
+                    var pt = p.PropertyType;
+
+                    // Also scan XmlArrayItem attributes for concrete types
+                    foreach (var arrayItem in p.GetCustomAttributes<XmlArrayItemAttribute>())
+                        if (arrayItem.Type != null)
+                            Collect(arrayItem.Type);
+
+                    if (pt.IsArray) pt = pt.GetElementType();
+                    else if (pt.IsGenericType &&
+                             pt.GetInterfaces().Any(i =>
+                                 i.IsGenericType &&
+                                 i.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
+                        pt = pt.GetGenericArguments()[0];
+
+                    Collect(pt);
+                }
+
+                // FIELDS
+                foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                                   .Where(f => f.GetCustomAttribute<XmlIgnoreAttribute>() == null))
+                {
+                    var ft = f.FieldType;
+
+                    // Also scan XmlArrayItem attributes for concrete types
+                    foreach (var arrayItem in f.GetCustomAttributes<XmlArrayItemAttribute>())
+                        if (arrayItem.Type != null)
+                            Collect(arrayItem.Type);
+
+                    if (ft.IsArray) ft = ft.GetElementType();
+                    else if (ft.IsGenericType &&
+                             ft.GetInterfaces().Any(i =>
+                                 i.IsGenericType &&
+                                 i.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
+                        ft = ft.GetGenericArguments()[0];
+
+                    Collect(ft);
                 }
             }
+            Collect(rootType);
+
+            // map XML typeName -> CLR type
+            var nameMap = allTypes.ToDictionary(
+                t => {
+                    var xt = t.GetCustomAttribute<XmlTypeAttribute>();
+                    return !string.IsNullOrEmpty(xt?.TypeName)
+                         ? xt.TypeName
+                         : t.Name;
+                },
+                t => t);
+
+            // Patch each complexType for [XmlText] or [XmlAttribute] on props + fields
+            foreach (XmlSchemaComplexType ct in schema.Items.OfType<XmlSchemaComplexType>())
+            {
+                if (string.IsNullOrEmpty(ct.Name))
+                    continue;
+                if (!nameMap.TryGetValue(ct.Name, out var clrType))
+                    continue;
+
+                // find XmlText on property or field
+                var textMember = clrType
+                  .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+                  .FirstOrDefault(m => m.GetCustomAttribute<XmlTextAttribute>() != null);
+                if (textMember == null)
+                    continue;
+
+                // build simpleContent/extension(base=xs:string)
+                var simple = new XmlSchemaSimpleContent();
+                var ext = new XmlSchemaSimpleContentExtension
+                {
+                    BaseTypeName = new XmlQualifiedName("string", XmlSchema.Namespace)
+                };
+
+                // carry over any XmlAttribute on props or fields
+                var attributeMembers = clrType
+                    .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(m => m.GetCustomAttribute<XmlAttributeAttribute>() != null);
+
+                foreach (var member in attributeMembers)
+                {
+                    var xa = member.GetCustomAttribute<XmlAttributeAttribute>();
+                    Type memberType = (member is PropertyInfo pi)
+                        ? pi.PropertyType
+                        : ((FieldInfo)member).FieldType;
+
+                    var schemaAttr = new XmlSchemaAttribute
+                    {
+                        Name = xa.AttributeName.EmptyOrNull() ? member.Name : xa.AttributeName,
+                        SchemaTypeName = GetXsdTypeName(memberType)
+                    };
+                    ext.Attributes.Add(schemaAttr);
+                }
+
+                simple.Content = ext;
+                ct.ContentModel = simple;
+                ct.Particle = null;  // drop previous sequence
+            }
+
+
 
             using (StringWriter stringWriter = new StringWriter())
             using (XmlTextWriter xmlWriter = new XmlTextWriter(stringWriter))
@@ -166,6 +258,28 @@ public static class XmlHelper
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Map CLR types to the corresponding XSD built‑in simple type QName.
+    /// Extend this dictionary as you need more mappings.
+    /// </summary>
+    private static XmlQualifiedName GetXsdTypeName(Type clrType)
+    {
+        var ns = XmlSchema.Namespace;  // "http://www.w3.org/2001/XMLSchema"
+        if (clrType == typeof(string)) return new XmlQualifiedName("string", ns);
+        if (clrType == typeof(int)) return new XmlQualifiedName("int", ns);
+        if (clrType == typeof(bool)) return new XmlQualifiedName("boolean", ns);
+        if (clrType == typeof(decimal)) return new XmlQualifiedName("decimal", ns);
+        if (clrType == typeof(double)) return new XmlQualifiedName("double", ns);
+        if (clrType == typeof(float)) return new XmlQualifiedName("float", ns);
+        if (clrType == typeof(long)) return new XmlQualifiedName("long", ns);
+        if (clrType == typeof(short)) return new XmlQualifiedName("short", ns);
+        if (clrType == typeof(byte)) return new XmlQualifiedName("byte", ns);
+        if (clrType == typeof(DateTime)) return new XmlQualifiedName("dateTime", ns);
+
+        // fallback
+        return new XmlQualifiedName("string", ns);
     }
 
     public static bool ValidateXml(this string xmlString, XmlSchema schema, out string[] errors)
