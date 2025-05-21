@@ -186,21 +186,15 @@ namespace Playground
         private static async Task Main()
         {
 
-            string testString = "<>";
-            var result = testString.ReplaceBetween("<", ">", "123");
-            var result1 = testString.ReplaceBetween("<", ">", "");
-            var result2 = testString.ReplaceBetween("<", ">", "", true);
-            var result3 = testString.ReplaceBetween("<", ">", "123", true);
-
-
-
-            MainTest mainTest = new MainTest();
+            byte[] bytes = RandomGenerator.Bytes(30);
             FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
                 indent = true,
                 dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                writeByteArrayAsBase64String = false
             });
-            var mainTestJson = serializer.Serialize(mainTest);
+            var bytesJson = serializer.Serialize(bytes);
+            JsonHelper.DefaultDeserializer.TryDeserialize<byte[]>(bytesJson, out var bytesOut);
 
 
             TestStruct ts = new TestStruct()

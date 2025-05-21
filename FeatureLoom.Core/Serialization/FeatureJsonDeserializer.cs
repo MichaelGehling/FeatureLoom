@@ -21,6 +21,10 @@ using FeatureLoom.Serialization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using FeatureLoom.Logging;
+#if !NETSTANDARD2_0
+using System.Buffers.Text;
+using System.Buffers;
+#endif
 
 namespace FeatureLoom.Serialization
 {
@@ -181,7 +185,7 @@ namespace FeatureLoom.Serialization
                 cachedTypeReader.InvokeGenericMethod(nameof(CachedTypeReader.SetCustomTypeReader), itemType.ToSingleEntryArray(), customReaderObj);
                 return cachedTypeReader;
             }
-
+            
             if (itemType.IsArray) CreateArrayTypeReader(itemType, cachedTypeReader);
             else if (itemType == typeof(string)) cachedTypeReader.SetTypeReader(ReadStringValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(long)) cachedTypeReader.SetTypeReader(ReadLongValue, JsonDataTypeCategory.Primitive);
@@ -217,7 +221,8 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(Guid)) cachedTypeReader.SetTypeReader(ReadGuidValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(Guid?)) cachedTypeReader.SetTypeReader(ReadNullableGuidValue, JsonDataTypeCategory.Primitive);
             else if (itemType == typeof(JsonFragment)) cachedTypeReader.SetTypeReader(ReadJsonFragmentValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive);
+            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive);  
+            // TODO ByteSegment + ArraySegment<byte>
             // TODO IntPtr + UIntPtr
             else if (itemType.IsEnum || (Nullable.GetUnderlyingType(itemType)?.IsEnum ?? false))
             {
@@ -230,6 +235,42 @@ namespace FeatureLoom.Serialization
             else this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { itemType }, cachedTypeReader, true);
 
             return cachedTypeReader;
+        }
+
+        private void CreateByteArrayTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+
+            cachedTypeReader.SetTypeReader<byte[]>(() =>
+            {
+                SkipWhiteSpaces();
+                byte b = buffer.CurrentByte;
+                if (b == '"')
+                {
+                    if (!TryReadStringBytes(out ByteSegment base64Uft8)) throw new Exception("Expected base64 encoded byte array, but failed on reading the string");
+
+#if NETSTANDARD2_0
+                    string base64String = Encoding.UTF8.GetString(base64Uft8.AsArraySegment.Array, base64Uft8.AsArraySegment.Offset, base64Uft8.AsArraySegment.Count);
+                    return Convert.FromBase64String(base64String);
+#else
+                    ReadOnlySpan<byte> utf8Base64 = base64Uft8.AsArraySegment.AsSpan();
+                    int maxDecodedLength = Base64.GetMaxDecodedFromUtf8Length(utf8Base64.Length);
+                    byte[] bytes = new byte[maxDecodedLength];
+                    Span<byte> decodedSpan = bytes;
+                    OperationStatus status = Base64.DecodeFromUtf8(utf8Base64, decodedSpan, out int bytesConsumed, out int bytesWritten);
+                    if (status != OperationStatus.Done) throw new FormatException($"Invalid Base64 sequence (status = {status}).");
+                    if (bytesWritten != bytes.Length) Array.Resize(ref bytes, bytesWritten);
+                    return bytes;
+#endif
+                }
+                else if (b == '[')
+                {
+                    return byteArrayReader.ReadItem<byte[]>();
+                }
+
+                throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
+            }, JsonDataTypeCategory.Array);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1408,7 +1449,14 @@ namespace FeatureLoom.Serialization
 
         private void CreateArrayTypeReader(Type arrayType, CachedTypeReader cachedTypeReader)
         {
-            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { arrayType.GetElementType() }, cachedTypeReader);
+            if (arrayType == typeof(byte[]))
+            {
+                CreateByteArrayTypeReader(cachedTypeReader);
+            }
+            else 
+            {
+                this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { arrayType.GetElementType() }, cachedTypeReader);
+            }
         }
 
         private void CreateGenericArrayTypeReader<E>(CachedTypeReader cachedTypeReader)
