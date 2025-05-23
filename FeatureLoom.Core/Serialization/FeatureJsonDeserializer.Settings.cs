@@ -25,6 +25,7 @@ namespace FeatureLoom.Serialization
             public bool rethrowExceptions = true;
             public bool logCatchedExceptions = true;
             public bool strict = false;
+            public bool populateExistingMembers = false;
 
             public Settings()
             {

@@ -168,7 +168,9 @@ namespace FeatureLoom.Serialization
 
             public T ReadValue<T>(ByteSegment itemName, T itemToPopulate)
             {
-                if ((this.populatingItemReader == null && !isAbstract) || itemToPopulate == null) return ReadValue<T>(itemName);
+                if (!deserializer.isPopulating ||
+                    itemToPopulate == null ||
+                    (this.populatingItemReader == null && !isAbstract)) return ReadValue<T>(itemName);
 
                 if (category == JsonDataTypeCategory.Primitive)
                 {

@@ -38,6 +38,7 @@ namespace FeatureLoom.Serialization
         ByteSegment currentItemName = "$".ToByteArray();
         int currentItemInfoIndex = -1;
         List<ItemInfo> itemInfos = new List<ItemInfo>();
+        bool isPopulating = false;
 
         ExtensionApi extensionApi;
 
@@ -96,11 +97,13 @@ namespace FeatureLoom.Serialization
             this.settings = settings ?? new Settings();            
             buffer.Init(this.settings.initialBufferSize);            
             extensionApi = new ExtensionApi(this);
+            isPopulating = settings.populateExistingMembers;
         }
 
         private void Reset()
         {
             buffer.ResetAfterReading();
+            isPopulating = settings.populateExistingMembers;
 
             if (settings.enableReferenceResolution)
             {
@@ -2546,6 +2549,7 @@ namespace FeatureLoom.Serialization
             bool retry = false;
             do
             {
+                isPopulating = true;
                 retry = false;
                 try
                 {
