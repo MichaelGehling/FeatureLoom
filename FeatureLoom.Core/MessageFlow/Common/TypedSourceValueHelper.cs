@@ -39,6 +39,18 @@ namespace FeatureLoom.MessageFlow
             return resultList.ToArray();
         }
 
+        public bool IsConnected(IMessageSink sink)
+        {
+            if (sink == null) return false;
+            var currentSinks = this.sinks;
+            if (currentSinks == null) return false;
+            for (int i = 0; i < currentSinks.Length; i++)
+            {
+                if (currentSinks[i].TryGetTarget(out IMessageSink target) && target == sink) return true;
+            }
+            return false;
+        }
+
         public int CountConnectedSinks
         {
             get

@@ -42,6 +42,11 @@ namespace FeatureLoom.MessageFlow
             return sourceHelper.GetConnectedSinks();
         }
 
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
+
         public void Forward(in T message)
         {
             sourceHelper.Forward(in message);

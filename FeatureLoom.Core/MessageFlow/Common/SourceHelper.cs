@@ -52,5 +52,10 @@ namespace FeatureLoom.MessageFlow
         {
             return sourceHelper.ForwardAsync<M>(message);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
     }
 }

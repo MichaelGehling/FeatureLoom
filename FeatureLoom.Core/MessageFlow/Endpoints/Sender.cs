@@ -50,6 +50,11 @@ namespace FeatureLoom.MessageFlow
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
     }
 
     /// <summary> Used to send messages of a specific type to all connected sinks. It is thread safe. <summary>
@@ -84,6 +89,11 @@ namespace FeatureLoom.MessageFlow
         public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
+        }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
         }
 
         public void Send(in T message)

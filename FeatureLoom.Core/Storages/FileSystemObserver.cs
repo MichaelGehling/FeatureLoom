@@ -121,6 +121,11 @@ namespace FeatureLoom.Storages
             return forwarder.ConnectTo(sink, weakReference);
         }
 
+        public bool IsConnected(IMessageSink sink)
+        {
+            return forwarder.IsConnected(sink);
+        }
+
         public readonly struct ChangeNotification
         {
             public readonly WatcherChangeTypes changeType;

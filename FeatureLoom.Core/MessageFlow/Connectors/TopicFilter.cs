@@ -45,6 +45,11 @@ namespace FeatureLoom.MessageFlow
             return forwarder.GetConnectedSinks();
         }
 
+        public bool IsConnected(IMessageSink sink)
+        {
+            return forwarder.IsConnected(sink);
+        }
+
         public void Post<M>(in M message)
         {
             if (message is ITopicMessage topicMessage)
@@ -124,6 +129,11 @@ namespace FeatureLoom.MessageFlow
         public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
+        }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
         }
 
         public void Post<M>(in M message)

@@ -234,5 +234,10 @@ namespace FeatureLoom.TCP
             this.ConnectTo(replier, weakReference);
             replier.ConnectTo(this, weakReference);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return readForwarder.IsConnected(sink);
+        }
     }
 }

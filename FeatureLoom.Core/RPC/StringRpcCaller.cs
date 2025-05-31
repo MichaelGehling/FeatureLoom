@@ -233,5 +233,10 @@ namespace FeatureLoom.RPC
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
     }
 }

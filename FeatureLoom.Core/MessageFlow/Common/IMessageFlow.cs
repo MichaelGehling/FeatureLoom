@@ -27,6 +27,8 @@ namespace FeatureLoom.MessageFlow
         int CountConnectedSinks { get; }
 
         IMessageSink[] GetConnectedSinks();
+
+        bool IsConnected(IMessageSink sink);
     }
 
 

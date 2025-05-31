@@ -201,4 +201,9 @@ public class Batcher<T> : IMessageSink<T>, IMessageSource, IMessageFlowConnectio
     {
         return sourceHelper.GetConnectedSinks();
     }
+
+    public bool IsConnected(IMessageSink sink)
+    {
+        return sourceHelper.IsConnected(sink);
+    }
 }

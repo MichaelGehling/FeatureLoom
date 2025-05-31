@@ -112,5 +112,10 @@ namespace FeatureLoom.Web
         {
             ((IRequester)rpcCaller).ConnectToAndBack(replier, weakReference);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return ((IMessageSource)rpcCaller).IsConnected(sink);
+        }
     }
 }

@@ -51,6 +51,11 @@ namespace FeatureLoom.MessageFlow
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
     }
 
 
@@ -89,6 +94,11 @@ namespace FeatureLoom.MessageFlow
         public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
+        }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
         }
 
         public void Post<M>(in M message)

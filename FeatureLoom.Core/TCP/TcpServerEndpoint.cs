@@ -315,6 +315,11 @@ namespace FeatureLoom.TCP
             replier.ConnectTo(this, weakReference);
         }
 
+        public bool IsConnected(IMessageSink sink)
+        {
+            return ReceivingFromTcpSource.IsConnected(sink);
+        }
+
         public enum ConnectionEvents
         {
             FirstConnected,

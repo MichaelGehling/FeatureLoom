@@ -286,5 +286,10 @@ namespace FeatureLoom.MessageFlow
             webSocket.Dispose();
             writeBuffer.Dispose();
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
     }
 }

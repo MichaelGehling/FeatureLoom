@@ -173,5 +173,10 @@ namespace FeatureLoom.TCP
         {
             Stop();
         }
+
+        bool IMessageSource.IsConnected(IMessageSink sink)
+        {
+            return readForwarder.IsConnected(sink);
+        }
     }
 }

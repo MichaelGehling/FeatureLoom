@@ -87,5 +87,10 @@ namespace FeatureLoom.MessageFlow
         {
             return ((IMessageSource)sourceHelper).GetConnectedSinks();
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return ((IMessageSource)sourceHelper).IsConnected(sink);
+        }
     }
 }

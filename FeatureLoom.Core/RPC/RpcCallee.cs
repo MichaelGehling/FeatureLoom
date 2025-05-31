@@ -166,5 +166,10 @@ namespace FeatureLoom.RPC
         {
             return sender.ConnectTo(sink, weakReference);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sender.IsConnected(sink);
+        }
     }
 }

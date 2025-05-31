@@ -84,5 +84,10 @@ namespace FeatureLoom.Web
         {
             return sourceHelper.ConnectTo(sink, weakReference);
         }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
     }
 }

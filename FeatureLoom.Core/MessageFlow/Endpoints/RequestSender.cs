@@ -217,6 +217,11 @@ namespace FeatureLoom.MessageFlow
             return Task.CompletedTask;
         }
 
+        public bool IsConnected(IMessageSink sink)
+        {
+            return sourceHelper.IsConnected(sink);
+        }
+
         public readonly struct ResponseHandler
         {
             public readonly DateTime requestTime;
