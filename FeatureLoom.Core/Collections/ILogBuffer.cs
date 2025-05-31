@@ -14,7 +14,7 @@ namespace FeatureLoom.Collections
     public interface IWriteLogBuffer<T>
     {
         long Add(T item);
-        long AddRange<IEnum>(IEnum items) where IEnum : IEnumerable<T>;
+        void AddRange<IEnum>(IEnum items) where IEnum : IEnumerable<T>;
         void Reset();
     }
 
@@ -31,8 +31,6 @@ namespace FeatureLoom.Collections
         T GetLatest();
         bool TryGetFromId(long number, out T result);        
 
-        Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default);
-        Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default);
         Task WaitForIdAsync(long number, CancellationToken ct = default);
     }
 }

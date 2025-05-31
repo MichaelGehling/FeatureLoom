@@ -39,9 +39,9 @@ namespace FeatureLoom.MessageFlow
             return ((ILogBuffer<T>)buffer).Add(item);
         }
 
-        public long AddRange<IEnum>(IEnum items) where IEnum : IEnumerable<T>
+        public void AddRange<IEnum>(IEnum items) where IEnum : IEnumerable<T>
         {
-            return ((ILogBuffer<T>)buffer).AddRange(items);
+            ((ILogBuffer<T>)buffer).AddRange(items);
         }
 
         public T[] GetAllAvailable(long firstRequestedId, int maxItems, out long firstProvidedId, out long lastProvidedId)
@@ -52,16 +52,6 @@ namespace FeatureLoom.MessageFlow
         public T[] GetAllAvailable(long firstRequestedId, out long firstProvidedId, out long lastProvidedId)
         {
             return ((ILogBuffer<T>)buffer).GetAllAvailable(firstRequestedId, out firstProvidedId, out lastProvidedId);
-        }
-
-        public Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, int maxItems, CancellationToken ct = default)
-        {
-            return ((IReadLogBuffer<T>)buffer).GetAllAvailableAsync(firstRequestedId, maxItems, ct);
-        }
-
-        public Task<(T[] result, long firstProvidedId, long lastProvidedId)> GetAllAvailableAsync(long firstRequestedId, CancellationToken ct = default)
-        {
-            return ((IReadLogBuffer<T>)buffer).GetAllAvailableAsync(firstRequestedId, ct);
         }
 
         public T GetLatest()
