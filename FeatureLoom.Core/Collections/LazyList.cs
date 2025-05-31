@@ -77,7 +77,7 @@ namespace FeatureLoom.Collections
 
         public void RemoveAt(int index)
         {
-            if (!list.Exists) throw new ArgumentOutOfRangeException();
+            if (!list.Exists) throw new IndexOutOfRangeException();
             list.Obj.RemoveAt(index);
         }
 
