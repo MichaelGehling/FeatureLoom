@@ -19,7 +19,7 @@ namespace FeatureRpcClient
         public int errorCode = 0;
         private string rpcCall;
         private bool multiCall = false;
-        private TcpClientEndpoint.Config tcpConfig = new TcpClientEndpoint.Config();
+        private TcpClientEndpoint2.Settings tcpConfig = new TcpClientEndpoint2.Settings();
 
         public FeatureRpcClient(string rpcCall)
         {
@@ -27,7 +27,7 @@ namespace FeatureRpcClient
             if (rpcCall.EmptyOrNull()) multiCall = true;
         }
 
-        private TcpClientEndpoint tcpClient;
+        private TcpClientEndpoint2 tcpClient;
         private StringRpcCaller rpcCaller;
         private Task<string> rpcCallFuture;
 
@@ -62,7 +62,7 @@ namespace FeatureRpcClient
 
         private static async Task<string> ClosingConnection(FeatureRpcClient c)
         {
-            c.tcpClient.DisconnectFromTcpServer();
+            c.tcpClient.Stop();
             return "";
         }
 
@@ -84,12 +84,12 @@ namespace FeatureRpcClient
         private static async Task<string> Setup(FeatureRpcClient c, CancellationToken token)
         {
             if (!Storage.GetReader(c.tcpConfig.ConfigCategory).Exists(c.tcpConfig.Uri)) await c.tcpConfig.TryWriteToStorageAsync();
-            c.tcpClient = new TcpClientEndpoint();
+            c.tcpClient = new TcpClientEndpoint2();
             c.rpcCaller = new StringRpcCaller(1.Seconds());
             c.rpcCaller.ConnectTo(c.tcpClient);
             c.tcpClient.ConnectTo(c.rpcCaller);
             await c.tcpClient.ConnectionWaitHandle.WaitAsync(1.Seconds(), token);
-            if (!c.tcpClient.IsConnectedToServer) return nameof(ConnectionFailed);
+            if (!c.tcpClient.IsConnected) return nameof(ConnectionFailed);
             return nameof(Calling);
         }
     }
