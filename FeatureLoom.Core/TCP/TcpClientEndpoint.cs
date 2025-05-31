@@ -14,7 +14,7 @@ using System.Threading;
 
 namespace FeatureLoom.TCP
 {
-    public sealed class TcpClientEndpoint2 : IMessageSink, IMessageSource, IRequester, IReplier, IDisposable
+    public sealed class TcpClientEndpoint : IMessageSink, IMessageSource, IRequester, IReplier, IDisposable
     {
         public class Settings : Configuration
         {
@@ -30,7 +30,7 @@ namespace FeatureLoom.TCP
         }
 
         Settings settings;
-        TcpConnection2 connection;
+        TcpConnection connection;
         QueueForwarder<object> writeForwarder = new QueueForwarder<object>();
         QueueForwarder<object> readForwarder = new QueueForwarder<object>();
         CancellationTokenSource cts;
@@ -45,7 +45,7 @@ namespace FeatureLoom.TCP
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
         public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent;
 
-        public TcpClientEndpoint2(Settings settings = null, bool autoStart = true, Func<IGeneralMessageStreamReader> createStreamReaderAction = null, Func<IGeneralMessageStreamWriter> createStreamWriterAction = null)
+        public TcpClientEndpoint(Settings settings = null, bool autoStart = true, Func<IGeneralMessageStreamReader> createStreamReaderAction = null, Func<IGeneralMessageStreamWriter> createStreamWriterAction = null)
         {
             this.settings = settings;
             if (this.settings == null) this.settings = new Settings();
@@ -102,7 +102,7 @@ namespace FeatureLoom.TCP
                     IStreamUpgrader sslUpgrader = null;
                     if (settings.serverCertificateName != null) sslUpgrader = new ClientSslStreamUpgrader(settings.serverCertificateName, settings.ignoreFailedServerAuthentication);
 
-                    connection = new TcpConnection2(newClient, reader, writer, settings.useConnectionMetaDataForMessages, sslUpgrader);
+                    connection = new TcpConnection(newClient, reader, writer, settings.useConnectionMetaDataForMessages, sslUpgrader);
                     connection.ReceivedMessages.ConnectTo(readForwarder);
                     writeForwarder.ConnectTo(connection.MessagesToSend, true);
                 }

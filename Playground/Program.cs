@@ -370,11 +370,11 @@ namespace Playground
 
             Console.ReadKey();
 
-            TcpClientEndpoint2 client = new TcpClientEndpoint2(null, true,
+            TcpClientEndpoint client = new TcpClientEndpoint(null, true,
                                                                () => new VariantStreamReader(null, new TypedJsonMessageStreamReader()),
                                                                () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter()));
 
-            TcpServerEndpoint2 server = new TcpServerEndpoint2(null, true,
+            TcpServerEndpoint server = new TcpServerEndpoint(null, true,
                                                                () => new VariantStreamReader(null, new TypedJsonMessageStreamReader()),
                                                                () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter()));
 

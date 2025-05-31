@@ -16,7 +16,7 @@ using FeatureLoom.Time;
 
 namespace FeatureLoom.TCP
 {
-    public sealed class TcpServerEndpoint2 : IMessageSink, IMessageSource, IRequester, IReplier, IDisposable
+    public sealed class TcpServerEndpoint : IMessageSink, IMessageSource, IRequester, IReplier, IDisposable
     {
         public class Settings : Configuration
         {
@@ -31,7 +31,7 @@ namespace FeatureLoom.TCP
         Settings settings;
         private TcpListener listner;
         private X509Certificate2 serverCertificate = null;
-        List<TcpConnection2> connections = new List<TcpConnection2>();
+        List<TcpConnection> connections = new List<TcpConnection>();
         FeatureLock connectionsLock = new FeatureLock();
         Func<IGeneralMessageStreamReader> createStreamReader = () => new VariantStreamReader(null, new TypedJsonMessageStreamReader());
         Func<IGeneralMessageStreamWriter> createStreamWriter = () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter());
@@ -43,7 +43,7 @@ namespace FeatureLoom.TCP
         public int CountConnectedClients => connections.Count;
         public int CountConnectedSinks => readForwarder.CountConnectedSinks;
 
-        public TcpServerEndpoint2(Settings settings = null, bool autoStart = true, Func<IGeneralMessageStreamReader> createStreamReaderAction = null, Func<IGeneralMessageStreamWriter> createStreamWriterAction = null)
+        public TcpServerEndpoint(Settings settings = null, bool autoStart = true, Func<IGeneralMessageStreamReader> createStreamReaderAction = null, Func<IGeneralMessageStreamWriter> createStreamWriterAction = null)
         {
             this.settings = settings;
             if (this.settings == null) this.settings = new Settings();
@@ -72,7 +72,7 @@ namespace FeatureLoom.TCP
             listner = null;            
         }
 
-        public bool TryCloseConnection(TcpConnection2 connection)
+        public bool TryCloseConnection(TcpConnection connection)
         {
             using (connectionsLock.Lock())
             {
@@ -88,7 +88,7 @@ namespace FeatureLoom.TCP
 
         public bool TryCloseConnection(ObjectHandle connectionHandle)
         {
-            if (!connectionHandle.TryGetObject(out TcpConnection2 connection)) return false;
+            if (!connectionHandle.TryGetObject(out TcpConnection connection)) return false;
             return TryCloseConnection(connection);
         }
 
@@ -158,7 +158,7 @@ namespace FeatureLoom.TCP
         {
             IStreamUpgrader sslUpgrader = null;
             if (serverCertificate != null) sslUpgrader = new ServerSslStreamUpgrader(serverCertificate);
-            TcpConnection2 connection = new TcpConnection2(client, createStreamReader(), createStreamWriter(), settings.useConnectionMetaDataForMessages, sslUpgrader);
+            TcpConnection connection = new TcpConnection(client, createStreamReader(), createStreamWriter(), settings.useConnectionMetaDataForMessages, sslUpgrader);
             connection.ReceivedMessages.ConnectTo(readForwarder);
             writeForwarder.ConnectTo(connection.MessagesToSend);
             using(connectionsLock.Lock())

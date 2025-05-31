@@ -13,7 +13,7 @@ using FeatureLoom.Time;
 
 namespace FeatureLoom.TCP
 {
-    public sealed class TcpConnection2 : IDisposable
+    public sealed class TcpConnection : IDisposable
     {
         private readonly TcpClient client;
         private Stream stream;
@@ -33,7 +33,7 @@ namespace FeatureLoom.TCP
         public IMessageSource ReceivedMessages => receivedMessageSender;
         public IMessageSink MessagesToSend => messageWriter;
 
-        public TcpConnection2(TcpClient client, IGeneralMessageStreamReader reader, IGeneralMessageStreamWriter writer, bool useConnectionMetaDataForMessages, IStreamUpgrader streamUpgrader = null)
+        public TcpConnection(TcpClient client, IGeneralMessageStreamReader reader, IGeneralMessageStreamWriter writer, bool useConnectionMetaDataForMessages, IStreamUpgrader streamUpgrader = null)
         {
             handle = this.GetHandle();
 

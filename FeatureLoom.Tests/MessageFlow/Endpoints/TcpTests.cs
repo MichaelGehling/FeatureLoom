@@ -17,11 +17,11 @@ namespace FeatureLoom.TCP
             TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
-            var server = new TcpServerEndpoint2(new TcpServerEndpoint2.Settings()
+            var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()
             {
                 port = testPort
             });
-            var client = new TcpClientEndpoint2(new TcpClientEndpoint2.Settings()
+            var client = new TcpClientEndpoint(new TcpClientEndpoint.Settings()
             {
                 port = testPort
             });
@@ -56,11 +56,11 @@ namespace FeatureLoom.TCP
         {
             TestHelper.PrepareTestContext();
 
-            int testPort = Interlocked.Increment(ref TcpTests.testPortCounter); var server = new TcpServerEndpoint2(new TcpServerEndpoint2.Settings()
+            int testPort = Interlocked.Increment(ref TcpTests.testPortCounter); var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()
             {
                 port = testPort
             });
-            var client = new TcpClientEndpoint2(new TcpClientEndpoint2.Settings()
+            var client = new TcpClientEndpoint(new TcpClientEndpoint.Settings()
             {
                 port = testPort
             });
@@ -96,11 +96,11 @@ namespace FeatureLoom.TCP
             TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
-            var server = new TcpServerEndpoint2(new TcpServerEndpoint2.Settings()
+            var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()
             {
                 port = testPort
             });
-            var client = new TcpClientEndpoint2(new TcpClientEndpoint2.Settings()
+            var client = new TcpClientEndpoint(new TcpClientEndpoint.Settings()
             {
                 port = testPort
             });
@@ -137,11 +137,11 @@ namespace FeatureLoom.TCP
             TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
-            var server = new TcpServerEndpoint2(new TcpServerEndpoint2.Settings()
+            var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()
             {
                 port = testPort
             });
-            var client = new TcpClientEndpoint2(new TcpClientEndpoint2.Settings()
+            var client = new TcpClientEndpoint(new TcpClientEndpoint.Settings()
             {
                 port = testPort
             });
