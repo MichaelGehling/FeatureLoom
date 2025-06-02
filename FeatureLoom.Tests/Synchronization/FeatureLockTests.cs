@@ -142,7 +142,7 @@ namespace FeatureLoom.Synchronization
         }
 
         [Fact]
-        public async void ReadLockEntersWhileLockInReadUseAsync()
+        public async Task ReadLockEntersWhileLockInReadUseAsync()
         {
             var myLock = new FeatureLock();
             bool secondLockEntered = false;
@@ -181,7 +181,7 @@ namespace FeatureLoom.Synchronization
         }
 
         [Fact]
-        public async void CanTryLockReentrantAsync()
+        public async Task CanTryLockReentrantAsync()
         {
             FeatureLock myLock = new FeatureLock();
 
@@ -200,7 +200,7 @@ namespace FeatureLoom.Synchronization
         }
 
         [Fact]
-        public async void CanTryLockReadOnlyReentrantAsync()
+        public async Task CanTryLockReadOnlyReentrantAsync()
         {
             FeatureLock myLock = new FeatureLock();
 
@@ -225,7 +225,7 @@ namespace FeatureLoom.Synchronization
         }
 
         [Fact]
-        public async void CanTryLockReadOnlyAsync()
+        public async Task CanTryLockReadOnlyAsync()
         {
             FeatureLock myLock = new FeatureLock();
 
