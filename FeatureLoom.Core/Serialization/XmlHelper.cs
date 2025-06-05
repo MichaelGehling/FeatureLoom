@@ -62,6 +62,58 @@ public static class XmlHelper
         }
     }
 
+    public static bool TryExtractXmlNode(string xmlString, string xPath, out string xmlNode)
+    {               
+        if (TryExtractXmlNode(xmlString, xPath, out XmlNode node))
+        {
+            xmlNode = node.OuterXml;
+            return true;
+        }   
+        
+        xmlNode = null;
+        return false;
+    }
+
+    public static bool TryExtractXmlNode(string xmlString, string xPath, out XmlNode xmlNode)
+    {
+        try
+        {
+            var doc = new XmlDocument();
+            doc.LoadXml(xmlString);
+            xmlNode = doc.SelectSingleNode(xPath);
+            return xmlNode != null;
+        }
+        catch
+        {
+            xmlNode = null;
+            return false;
+        }
+    }
+
+    public static bool TryDeserializeXmlElement<T>(string xmlString, string xPath, out T xmlObject)
+    {
+        try
+        {
+            xmlObject = default!;
+            if (!TryExtractXmlNode(xmlString, xPath, out string targetXml)) return false;
+
+            // Deserialize the target node
+            XmlSerializer serializer = new XmlSerializer(typeof(T));
+            using (StringReader stringReader = new StringReader(targetXml))
+            using (XmlReader reader = XmlReader.Create(stringReader))
+            {
+                xmlObject = (T)serializer.Deserialize(reader)!;
+            }
+
+            return true;
+        }
+        catch
+        {
+            xmlObject = default!;
+            return false;
+        }
+    }
+
     public static bool TrySerializeToXmlElement<T>(T obj, out XmlElement xmlElement)
     {
         try
