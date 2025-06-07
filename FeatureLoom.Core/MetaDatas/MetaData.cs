@@ -14,18 +14,18 @@ namespace FeatureLoom.MetaDatas
         private static Dictionary<long, WeakReference<MetaData>> handles = new Dictionary<long, WeakReference<MetaData>>();
         private static FeatureLock handlesLock = new FeatureLock();
         private static long handleIdCounter = 0;
-        private static LazyValue<Sender<ObjectHandleInfo>> updateSender;
+        private static LazyValue<Sender<ObjectHandleInfo>> globalUpdateSender;
 
         private readonly ObjectHandle handle;
         private LazyValue<Dictionary<string, object>> data;
         private readonly WeakReference<object> objRef;
         private MicroLock objLock = new MicroLock();
-        private LazyValue<Sender<MetaDataUpdateInfo>> metaDataUpdateSender;
+        private LazyValue<Sender> metaDataUpdateSender;
 
-        public static Sender<ObjectHandleInfo> UpdateSender => updateSender.Obj;
-        public Sender<MetaDataUpdateInfo> MetaDataUpdateSender => metaDataUpdateSender.Obj;
+        public static Sender<ObjectHandleInfo> UpdateSender => globalUpdateSender.Obj;
+        public Sender MetaDataUpdateSender => metaDataUpdateSender.Obj;
 
-        public MetaData(object obj)
+        protected MetaData(object obj)
         {
             objRef = new WeakReference<object>(obj);
             handle = new ObjectHandle(Interlocked.Increment(ref handleIdCounter));
@@ -35,7 +35,8 @@ namespace FeatureLoom.MetaDatas
         {
             using (handlesLock.Lock())
             {
-                updateSender.ObjIfExists?.Send(new ObjectHandleInfo(handle, true));
+                globalUpdateSender.ObjIfExists?.Send(new ObjectHandleInfo(handle, true));
+                metaDataUpdateSender.ObjIfExists?.Send(new DestructionInfo());
 
                 handles.Remove(handle.id);
             }
@@ -92,6 +93,11 @@ namespace FeatureLoom.MetaDatas
             }
         }
 
+        public readonly struct DestructionInfo
+        {
+
+        }
+
         protected bool TryGetObjectType(out Type type)
         {
             type = default;
@@ -100,7 +106,7 @@ namespace FeatureLoom.MetaDatas
             return true;
         }
 
-        protected static MetaData GetOrCreate(object obj)
+        public static MetaData GetOrCreate(object obj)
         {
             if (objects.TryGetValue(obj, out MetaData metaData)) return metaData;
             else
@@ -109,7 +115,7 @@ namespace FeatureLoom.MetaDatas
                 objects.Add(obj, metaData);
                 using (handlesLock.Lock()) handles[metaData.handle.id] = new WeakReference<MetaData>(metaData);
 
-                updateSender.ObjIfExists?.Send(new ObjectHandleInfo(metaData.handle, false));
+                globalUpdateSender.ObjIfExists?.Send(new ObjectHandleInfo(metaData.handle, false));
 
                 return metaData;
             }
