@@ -8,11 +8,24 @@ using System.Text;
 
 namespace FeatureLoom.Helpers;
 
+/// <summary>
+/// Provides methods to determine the most specific common type or base type among a set of objects or types.
+/// Utilizes caching and thread-safe locking for performance in concurrent scenarios.
+/// </summary>
 public static class CommonTypeFinder
 {
+    // Caches results of type comparisons to avoid redundant computation.
     private static readonly Dictionary<(Type, Type), Type> typeCache = new();
     private static FeatureLock cacheLock = new FeatureLock();
 
+    /// <summary>
+    /// Determines the most specific common type for a collection of objects.
+    /// If all objects are of the same type, returns that type.
+    /// If types differ, finds the closest common base type or most derived common interface.
+    /// Returns typeof(object) if no commonality is found or the collection is empty.
+    /// </summary>
+    /// <param name="objects">The collection of objects to analyze.</param>
+    /// <returns>The most specific common type, or typeof(object) if none found.</returns>
     public static Type GetCommonType(this IEnumerable objects)
     {
         if (objects.EmptyOrNull())
@@ -20,32 +33,55 @@ public static class CommonTypeFinder
             return typeof(object);
         }
 
-        // Get the types of all objects in the list without creating a new list
         var types = objects.Select(obj => obj?.GetType()).Distinct();
 
-        // If all objects are of the same type
         if (types.Skip(1).Any())
-        {            
+        {
             var lockHandle = cacheLock.LockReadOnly();
             try
             {
-                // If more than one type, proceed to find the common base type
-                bool nullFound = false;
-                bool notNullableTypeFound = false;
-                Type commonBaseType = types.First(); // Get the first type
-                foreach (var type in types.Skip(1))
+                var enumerator = types.GetEnumerator();
+                if (!enumerator.MoveNext())
+                    return typeof(object);
+
+                Type firstType = enumerator.Current;
+                bool nullFound = firstType == null;
+                bool notNullableTypeFound = firstType != null && !firstType.IsNullable();
+                Type commonBaseType = firstType;
+
+                while (enumerator.MoveNext())
                 {
+                    var type = enumerator.Current;
                     if (type == null)
                     {
                         nullFound = true;
+                        if (notNullableTypeFound)
+                        {
+                            if (commonBaseType == null) commonBaseType = type;
+                            commonBaseType = typeof(Nullable<>).MakeGenericType(commonBaseType);
+                            notNullableTypeFound = false; // Reset for next iteration
+                        }
                         continue;
                     }
-                    if (!type.IsNullable()) notNullableTypeFound |= true;
-                    if (nullFound && notNullableTypeFound) return typeof(object);
+                    if (!type.IsNullable()) notNullableTypeFound = true;
+                    if (nullFound && notNullableTypeFound)
+                    {
+                        if (commonBaseType == null) commonBaseType = type;
+                        commonBaseType = typeof(Nullable<>).MakeGenericType(commonBaseType);
+                        notNullableTypeFound = false; // Reset for next iteration
+                    }
 
-                    commonBaseType = GetCommonBaseType(commonBaseType, type, ref lockHandle);
-                    if (commonBaseType == null) return typeof(object);                    
+                    if (commonBaseType == null)
+                    {
+                        commonBaseType = type;
+                    }
+                    else
+                    {
+                        commonBaseType = GetCommonBaseType(commonBaseType, type, ref lockHandle);
+                        if (commonBaseType == null) return typeof(object);
+                    }
                 }
+                if (commonBaseType == null) return typeof(object);
                 return commonBaseType;
             }
             finally
@@ -55,13 +91,19 @@ public static class CommonTypeFinder
         }
         else
         {
-            // If there is only one type
-            Type type = types.First(); // All types are the same
+            Type type = types.First();
             if (type == null) type = typeof(object);
             return type;
         }
     }
 
+    /// <summary>
+    /// Determines the most specific common base type or most derived common interface between two types.
+    /// Returns typeof(object) if no commonality is found.
+    /// </summary>
+    /// <param name="type1">The first type.</param>
+    /// <param name="type2">The second type.</param>
+    /// <returns>The most specific common type, or typeof(object) if none found.</returns>
     public static Type GetCommonBaseType(Type type1, Type type2)
     {
         var lockHandle = cacheLock.LockReadOnly();
@@ -77,59 +119,85 @@ public static class CommonTypeFinder
         }
     }
 
+    /// <summary>
+    /// Internal method to determine the most specific common base type or most derived common interface between two types.
+    /// Uses a cache for performance and is thread-safe.
+    /// </summary>
     private static Type GetCommonBaseType(Type type1, Type type2, ref FeatureLock.LockHandle lockHandle)
     {        
-        // Check if the result is already cached
-        if (typeCache.TryGetValue((type1, type2), out var cachedType))
+        var normalizedKey = NormalizeKey(type1, type2);
+        if (typeCache.TryGetValue(normalizedKey, out var cachedType))
         {
             return cachedType;
         }
 
-        // Check if type1 is assignable from type2 or vice versa
+        // If one type is assignable from the other, return the more general type
         if (type1.IsAssignableFrom(type2))
         {
             lockHandle.UpgradeToWriteMode();
-            typeCache[(type1, type2)] = type1; // Cache the result
+            typeCache[normalizedKey] = type1;
             return type1;
         }
 
         if (type2.IsAssignableFrom(type1))
         {
             lockHandle.UpgradeToWriteMode();
-            typeCache[(type1, type2)] = type2; // Cache the result
+            typeCache[normalizedKey] = type2;
             return type2;
         }
 
-        // Check for common interfaces
+        // Find the most derived common interface, if any
         var interfaces1 = type1.GetInterfaces();
         var interfaces2 = type2.GetInterfaces();
-
-        foreach (var interface1 in interfaces1)
+        var mostDerived = FindMostDerivedCommonInterface(interfaces1, interfaces2);
+        if (mostDerived != null)
         {
-            if (interfaces2.Contains(interface1))
-            {
-                lockHandle.UpgradeToWriteMode();
-                typeCache[(type1, type2)] = interface1; // Cache the result
-                return interface1;
-            }
+            lockHandle.UpgradeToWriteMode();
+            typeCache[normalizedKey] = mostDerived;
+            return mostDerived;
         }
 
-        // Find the closest common base type
+        // Find the closest common base type (excluding object)
         Type baseType1 = type1;
         while (baseType1 != null && baseType1 != typeof(object))
         {
             if (baseType1.IsAssignableFrom(type2))
             {
                 lockHandle.UpgradeToWriteMode();
-                typeCache[(type1, type2)] = baseType1; // Cache the result
+                typeCache[normalizedKey] = baseType1;
                 return baseType1;
             }
             baseType1 = baseType1.BaseType;
         }
 
-        // No common base type found, cache the result
+        // No common base type found, cache the result as null
         lockHandle.UpgradeToWriteMode();
-        typeCache[(type1, type2)] = null;
+        typeCache[normalizedKey] = null;
         return null;
+    }
+
+    /// <summary>
+    /// Finds the most derived (i.e., most specific) common interface between two sets of interfaces.
+    /// If multiple interfaces are shared, the one that inherits from all others is chosen.
+    /// Returns null if there is no common interface.
+    /// </summary>
+    private static Type FindMostDerivedCommonInterface(Type[] interfaces1, Type[] interfaces2)
+    {
+        var common = interfaces1.Intersect(interfaces2).ToList();
+        if (common.Count == 0) return null;
+        // Remove interfaces that are base interfaces of others in the set
+        return common
+            .Where(i => !common.Any(other => other != i && i.IsAssignableFrom(other)))
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Normalizes the cache key so that (A, B) and (B, A) are treated the same.
+    /// </summary>
+    private static (Type, Type) NormalizeKey(Type type1, Type type2)
+    {
+        return StringComparer.Ordinal.Compare(type1?.FullName, type2?.FullName) <= 0
+            ? (type1, type2)
+            : (type2, type1);
     }
 }

@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Linq;
 using System.Globalization;
 using System.Threading.Tasks;
+using FeatureLoom.Collections;
 
 namespace FeatureLoom.Serialization;
 

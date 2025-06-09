@@ -4,7 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using FeatureLoom.Extensions;
-using FeatureLoom.Helpers;
+using FeatureLoom.Collections;
 
 namespace FeatureLoom.Serialization
 {

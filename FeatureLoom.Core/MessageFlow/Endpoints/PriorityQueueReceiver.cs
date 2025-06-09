@@ -109,7 +109,7 @@ namespace FeatureLoom.MessageFlow
             bool success = false;            
             using (queueLock.Lock())
             {
-                success = queue.TryDequeue(out message);
+                success = queue.TryDequeue(out message, true);
             }
             if (IsEmpty) readerWakeEvent.Reset();
             if (!IsFull) writerWakeEvent.Set();
@@ -143,7 +143,7 @@ namespace FeatureLoom.MessageFlow
                     numElementsReturned = items.Length;
                     for (int i = 0; i < items.Length; i++)
                     {
-                        items[i] = queue.Dequeue();
+                        items[i] = queue.Dequeue(true);
                     }
                 }
             }
@@ -189,7 +189,7 @@ namespace FeatureLoom.MessageFlow
             using (queueLock.Lock())
             {
                 if (IsEmpty) return false;
-                nextItem = queue.Peek();
+                nextItem = queue.Peek(true);
                 return true;
             }
         }

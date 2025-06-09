@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.Helpers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
