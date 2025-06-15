@@ -18,7 +18,7 @@ namespace FeatureLoom.Serialization
     public sealed partial class FeatureJsonSerializer
     {
         MicroValueLock serializerLock = new MicroValueLock();        
-        LazyValue<MemoryStream> memoryStream = new();
+        LazyUnsafeValue<MemoryStream> memoryStream = new();
         JsonUTF8StreamWriter writer;
         readonly CompiledSettings settings;
         Dictionary<Type, CachedTypeHandler> typeHandlerCache = new();

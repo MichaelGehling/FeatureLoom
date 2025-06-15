@@ -31,7 +31,7 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
     public CircularLogBuffer(int bufferSize, bool threadSafe = true)
     {
         buffer = new T[bufferSize];
-        this.threadSafe = threadSafe;
+        this.threadSafe = threadSafe;        
     }
 
     /// <summary>

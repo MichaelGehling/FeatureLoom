@@ -39,7 +39,7 @@ namespace FeatureLoom.Synchronization
         }
 
         [Fact]
-        public async void LockAttemptBlocksWhileLockInUseAsync()
+        public async Task LockAttemptBlocksWhileLockInUseAsync()
         {
             var myLock = new FeatureLock();
             bool secondLockEntered = false;
@@ -92,7 +92,7 @@ namespace FeatureLoom.Synchronization
         }
 
         [Fact]
-        public async void ReadLockAttemptBlocksWhileLockInWriteUseAsync()
+        public async Task ReadLockAttemptBlocksWhileLockInWriteUseAsync()
         {
             var myLock = new FeatureLock();
             bool secondLockEntered = false;
@@ -165,7 +165,7 @@ namespace FeatureLoom.Synchronization
         }
 
         [Fact]
-        public async void CanTryLockAsync()
+        public async Task CanTryLockAsync()
         {
             FeatureLock myLock = new FeatureLock();
 
@@ -195,6 +195,25 @@ namespace FeatureLoom.Synchronization
                     innerLock.Exit();
                     Assert.True(myLock.IsWriteLocked);
                 }
+            Assert.False(myLock.IsLocked);
+            Assert.False(myLock.HasValidReentrancyContext);
+        }
+
+        [Fact]
+        public async Task CanLockReentrantAsync()
+        {
+            FeatureLock myLock = new FeatureLock();
+
+            using (var outerLockHandle = await myLock.LockReentrantAsync())
+            {
+                Assert.True(outerLockHandle.IsActive);
+                using (var innerLockHandle = await myLock.LockReentrantAsync())
+                {
+                    Assert.True(innerLockHandle.IsActive);
+                    Assert.True(myLock.IsWriteLocked);
+                }
+                Assert.True(myLock.IsWriteLocked);
+            }
             Assert.False(myLock.IsLocked);
             Assert.False(myLock.HasValidReentrancyContext);
         }

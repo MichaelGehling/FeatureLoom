@@ -292,4 +292,189 @@ public class DeepComparerTests
         // present in the runtime type (B).
         Assert.True(DeepComparer.AreEqual(a, b, strictTypeCheck: false));
     }
+
+    #region Null Handling
+
+    [Fact]
+    public void BothNull_ShouldReturnTrue()
+    {
+        object a = null;
+        object b = null;
+        Assert.True(DeepComparer.AreEqual(a, b));
+    }
+
+    [Fact]
+    public void NullVsNonNull_ShouldReturnFalse()
+    {
+        object a = null;
+        object b = new object();
+        Assert.False(DeepComparer.AreEqual(a, b));
+        Assert.False(DeepComparer.AreEqual(b, a));
+    }
+
+    #endregion
+
+    #region Nullable Value Types
+
+    [Fact]
+    public void NullableValueTypes_EqualValues_ShouldReturnTrue()
+    {
+        int? a = 5;
+        int? b = 5;
+        Assert.True(DeepComparer.AreEqual(a, b));
+    }
+
+    [Fact]
+    public void NullableValueTypes_OneNull_ShouldReturnFalse()
+    {
+        int? a = null;
+        int? b = 5;
+        Assert.False(DeepComparer.AreEqual(a, b));
+        Assert.False(DeepComparer.AreEqual(b, a));
+    }
+
+    [Fact]
+    public void NullableValueTypes_BothNull_ShouldReturnTrue()
+    {
+        int? a = null;
+        int? b = null;
+        Assert.True(DeepComparer.AreEqual(a, b));
+    }
+
+    #endregion
+
+    #region Empty Collections
+
+    [Fact]
+    public void EmptyLists_ShouldReturnTrue()
+    {
+        var list1 = new List<int>();
+        var list2 = new List<int>();
+        Assert.True(DeepComparer.AreEqual(list1, list2));
+    }
+
+    [Fact]
+    public void EmptyVsNonEmptyList_ShouldReturnFalse()
+    {
+        var list1 = new List<int>();
+        var list2 = new List<int> { 1 };
+        Assert.False(DeepComparer.AreEqual(list1, list2));
+    }
+
+    [Fact]
+    public void EmptyDictionaries_ShouldReturnTrue()
+    {
+        var dict1 = new Dictionary<string, int>();
+        var dict2 = new Dictionary<string, int>();
+        Assert.True(DeepComparer.AreEqual(dict1, dict2));
+    }
+
+    [Fact]
+    public void EmptyVsNonEmptyDictionary_ShouldReturnFalse()
+    {
+        var dict1 = new Dictionary<string, int>();
+        var dict2 = new Dictionary<string, int> { { "a", 1 } };
+        Assert.False(DeepComparer.AreEqual(dict1, dict2));
+    }
+
+    #endregion
+
+    #region Collections with Reference Types
+
+    private class RefType
+    {
+        public int X;
+        public RefType(int x) { X = x; }
+    }
+
+    [Fact]
+    public void ListOfReferenceTypes_Equal_ShouldReturnTrue()
+    {
+        var list1 = new List<RefType> { new RefType(1), new RefType(2) };
+        var list2 = new List<RefType> { new RefType(1), new RefType(2) };
+        Assert.True(DeepComparer.AreEqual(list1, list2));
+    }
+
+    [Fact]
+    public void ListOfReferenceTypes_NotEqual_ShouldReturnFalse()
+    {
+        var list1 = new List<RefType> { new RefType(1), new RefType(2) };
+        var list2 = new List<RefType> { new RefType(1), new RefType(3) };
+        Assert.False(DeepComparer.AreEqual(list1, list2));
+    }
+
+    #endregion
+
+    #region Dictionaries with Complex Keys
+
+    private class KeyType
+    {
+        public int Id;
+        public KeyType(int id) { Id = id; }
+    }
+
+    [Fact]
+    public void DictionaryWithComplexKeys_Equal_ShouldReturnTrue()
+    {
+        var dict1 = new Dictionary<KeyType, string>
+        {
+            { new KeyType(1), "a" },
+            { new KeyType(2), "b" }
+        };
+        var dict2 = new Dictionary<KeyType, string>
+        {
+            { new KeyType(2), "b" },
+            { new KeyType(1), "a" }
+        };
+        Assert.True(DeepComparer.AreEqual(dict1, dict2));
+    }
+
+    [Fact]
+    public void DictionaryWithComplexKeys_NotEqual_ShouldReturnFalse()
+    {
+        var dict1 = new Dictionary<KeyType, string>
+        {
+            { new KeyType(1), "a" },
+            { new KeyType(2), "b" }
+        };
+        var dict2 = new Dictionary<KeyType, string>
+        {
+            { new KeyType(1), "a" },
+            { new KeyType(2), "c" }
+        };
+        Assert.False(DeepComparer.AreEqual(dict1, dict2));
+    }
+
+    #endregion
+
+    #region Deeply Nested Structures
+
+    private class Nested
+    {
+        public Nested Child;
+        public int Value;
+        public Nested(int value, Nested child = null)
+        {
+            Value = value;
+            Child = child;
+        }
+    }
+
+    [Fact]
+    public void DeeplyNestedObjects_Equal_ShouldReturnTrue()
+    {
+        var n1 = new Nested(1, new Nested(2, new Nested(3)));
+        var n2 = new Nested(1, new Nested(2, new Nested(3)));
+        Assert.True(DeepComparer.AreEqual(n1, n2));
+    }
+
+    [Fact]
+    public void DeeplyNestedObjects_NotEqual_ShouldReturnFalse()
+    {
+        var n1 = new Nested(1, new Nested(2, new Nested(3)));
+        var n2 = new Nested(1, new Nested(2, new Nested(4)));
+        Assert.False(DeepComparer.AreEqual(n1, n2));
+    }
+
+    #endregion
 }

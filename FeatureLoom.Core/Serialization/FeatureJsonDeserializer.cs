@@ -1662,7 +1662,7 @@ namespace FeatureLoom.Serialization
             IEnumerator IEnumerable.GetEnumerator() => this;
         }
 
-        ListCaster listCaster = new ListCaster();
+        CollectionCaster listCaster = new CollectionCaster();
 
         CachedTypeReader cachedObjectListReader = null;
         // [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1672,7 +1672,7 @@ namespace FeatureLoom.Serialization
             var objectsList = cachedObjectListReader.ReadItem<List<object>>();
             if (!settings.tryCastArraysOfUnknownValues || objectsList.Count == 0) return objectsList;
             
-            var castedList = listCaster.CastListToCommonType(objectsList, out _);
+            var castedList = listCaster.CastToCommonTypeList(objectsList, out _);
             return castedList;
         }
 

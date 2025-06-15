@@ -153,7 +153,7 @@ namespace Playground
             public JsonFragment obj;
         }
 
-        enum Xenum
+        enum Xenum : short
         {
             A,B,C
         }
@@ -185,6 +185,42 @@ namespace Playground
 
         private static async Task Main()
         {
+
+            var tk = AppTime.TimeKeeper;
+            numIterations = 10_000_000;
+            Xenum enumValue = Xenum.B;
+
+            while (true)
+            {
+                tk.Restart();
+                for (int i = 0; i < numIterations; i++)
+                {
+                    int intValue = Convert.ToInt32(enumValue);
+                }
+                Console.WriteLine($"Convert.ToInt32: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
+
+                tk.Restart();
+                for (int i = 0; i < numIterations; i++)
+                {
+                    int intValue = (int)enumValue;
+                }
+                Console.WriteLine($"(int) cast: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
+
+                tk.Restart();
+                for (int i = 0; i < numIterations; i++)
+                {
+                    int intValue = Unsafe.As<Xenum, int>(ref enumValue);
+                }
+                Console.WriteLine($"Unsafe.As<Xenum, int>: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
+
+                tk.Restart();
+                for (int i = 0; i < numIterations; i++)
+                {
+                    int intValue = EqualityComparer<Xenum>.Default.GetHashCode();
+                }
+                Console.WriteLine($"EqualityComparer<Xenum>.Default.GetHashCode: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
+            }
+
 
             byte[] bytes = RandomGenerator.Bytes(30);
             FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()

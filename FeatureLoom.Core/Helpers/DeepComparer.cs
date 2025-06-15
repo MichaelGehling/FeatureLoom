@@ -10,11 +10,23 @@ using FeatureLoom.Extensions;
 
 namespace FeatureLoom.Helpers
 {
+    /// <summary>
+    /// Provides deep structural equality comparison for arbitrary object graphs, including support for cycles, collections, and dictionaries.
+    /// </summary>
     public static class DeepComparer
     {
         /// <summary>
-        /// Public API: compares two objects deeply for equality.
+        /// Compares two objects deeply for structural equality.
+        /// Handles nested objects, collections, dictionaries, and cyclic references.
         /// </summary>
+        /// <typeparam name="T">Type of the objects to compare.</typeparam>
+        /// <param name="x">First object to compare.</param>
+        /// <param name="y">Second object to compare.</param>
+        /// <param name="strictTypeCheck">
+        /// If true, objects must be of exactly the same runtime type to be considered equal.
+        /// If false, allows comparison of objects with compatible types.
+        /// </param>
+        /// <returns>True if the objects are deeply equal; otherwise, false.</returns>
         public static bool AreEqual<T>(T x, T y, bool strictTypeCheck = true)
         {
             if (strictTypeCheck && x != null && y != null && x.GetType() != y.GetType())
@@ -24,15 +36,26 @@ namespace FeatureLoom.Helpers
         }
 
         /// <summary>
-        /// Extension method version.
+        /// Extension method for deep structural equality comparison.
+        /// Equivalent to <see cref="AreEqual{T}(T, T, bool)"/> with default strict type check.
         /// </summary>
+        /// <typeparam name="T">Type of the objects to compare.</typeparam>
+        /// <param name="x">First object to compare.</param>
+        /// <param name="y">Second object to compare.</param>
+        /// <returns>True if the objects are deeply equal; otherwise, false.</returns>
         public static bool EqualsDeep<T>(this T x, T y) => AreEqual(x, y);
 
         #region Internal Comparison Methods
 
         /// <summary>
-        /// Main entry point for deep comparison.
+        /// Recursively compares two objects for deep structural equality.
+        /// Uses a visited set to avoid infinite recursion on cyclic graphs.
         /// </summary>
+        /// <typeparam name="T">Type of the objects to compare.</typeparam>
+        /// <param name="x">First object to compare.</param>
+        /// <param name="y">Second object to compare.</param>
+        /// <param name="visited">Set of already compared object pairs for cycle detection.</param>
+        /// <returns>True if the objects are deeply equal; otherwise, false.</returns>
         internal static bool InternalDeepEquals<T>(T x, T y, ISet<ReferencePair> visited)
         {
             // Check for reference equality or both null.
@@ -57,8 +80,13 @@ namespace FeatureLoom.Helpers
         }
 
         /// <summary>
-        /// Compares two IEnumerable instances element–by–element.
+        /// Compares two <see cref="IEnumerable"/> instances element-by-element for deep equality.
+        /// Handles collections of arbitrary types and supports nested structures.
         /// </summary>
+        /// <param name="a">First enumerable to compare.</param>
+        /// <param name="b">Second enumerable to compare.</param>
+        /// <param name="visited">Set of already compared object pairs for cycle detection.</param>
+        /// <returns>True if the enumerables are deeply equal; otherwise, false.</returns>
         internal static bool CompareEnumerables(IEnumerable a, IEnumerable b, ISet<ReferencePair> visited)
         {
             if (a == null || b == null)
@@ -85,9 +113,14 @@ namespace FeatureLoom.Helpers
         }
 
         /// <summary>
-        /// Optimized helper for comparing two IList&lt;TItem&gt; instances.
-        /// Compares Count first, then iterates by index.
+        /// Optimized helper for comparing two <see cref="IList{T}"/> instances.
+        /// Compares count first, then iterates by index for deep equality.
         /// </summary>
+        /// <typeparam name="TItem">Type of the list elements.</typeparam>
+        /// <param name="a">First list to compare.</param>
+        /// <param name="b">Second list to compare.</param>
+        /// <param name="visited">Set of already compared object pairs for cycle detection.</param>
+        /// <returns>True if the lists are deeply equal; otherwise, false.</returns>
         internal static bool CompareLists<TItem>(IList<TItem> a, IList<TItem> b, ISet<ReferencePair> visited)
         {
             if (a == null || b == null)
@@ -105,8 +138,15 @@ namespace FeatureLoom.Helpers
         }
 
         /// <summary>
-        /// Optimized helper for comparing two IDictionary&lt;TKey, TValue&gt; instances in an order–independent manner.
+        /// Optimized helper for comparing two <see cref="IDictionary{TKey, TValue}"/> instances in an order-independent manner.
+        /// Keys are compared deeply, not just by reference or default equality.
         /// </summary>
+        /// <typeparam name="TKey">Type of the dictionary keys.</typeparam>
+        /// <typeparam name="TValue">Type of the dictionary values.</typeparam>
+        /// <param name="a">First dictionary to compare.</param>
+        /// <param name="b">Second dictionary to compare.</param>
+        /// <param name="visited">Set of already compared object pairs for cycle detection.</param>
+        /// <returns>True if the dictionaries are deeply equal; otherwise, false.</returns>
         internal static bool CompareDictionaries<TKey, TValue>(IDictionary<TKey, TValue> a, IDictionary<TKey, TValue> b, ISet<ReferencePair> visited)
         {
             if (a == null || b == null)
@@ -146,8 +186,11 @@ namespace FeatureLoom.Helpers
         #region Primitive & Reflection Helpers
 
         /// <summary>
-        /// Returns true if the type is considered “primitive” for deep comparison purposes.
+        /// Determines whether the specified type is considered "primitive" for deep comparison purposes.
+        /// This includes built-in primitives, enums, strings, decimals, date/time types, GUIDs, URIs, and nullable primitives.
         /// </summary>
+        /// <param name="type">Type to check.</param>
+        /// <returns>True if the type is treated as primitive; otherwise, false.</returns>
         private static bool IsPrimitive(Type type)
         {
             return type.IsPrimitive ||
@@ -164,12 +207,17 @@ namespace FeatureLoom.Helpers
         }
 
         /// <summary>
-        /// Caches all instance fields (public, non–public, inherited) for a given type.
+        /// Caches all instance fields (public, non-public, and inherited) for a given type to optimize reflection.
         /// </summary>
         internal static class ReflectionCache
         {
             private static readonly ConcurrentDictionary<Type, FieldInfo[]> Cache = new();
 
+            /// <summary>
+            /// Gets all instance fields for the specified type, including inherited and non-public fields.
+            /// </summary>
+            /// <param name="type">Type whose fields to retrieve.</param>
+            /// <returns>Array of <see cref="FieldInfo"/> representing all instance fields.</returns>
             public static FieldInfo[] GetAllFields(Type type)
             {
                 return Cache.GetOrAdd(type, t =>
@@ -191,18 +239,26 @@ namespace FeatureLoom.Helpers
         #region Delegate Cache
 
         /// <summary>
-        /// Caches a compiled delegate for comparing two objects of type T.
+        /// Caches a compiled delegate for comparing two objects of type <typeparamref name="T"/> for deep equality.
+        /// Uses expression trees for efficient repeated comparisons.
         /// </summary>
+        /// <typeparam name="T">Type to compare.</typeparam>
         internal static class ComparerCache<T>
         {
             // Delegate signature: (T x, T y, ISet<ReferencePair> visited) => bool.
             internal static readonly Func<T, T, ISet<ReferencePair>, bool> Comparer = CreateComparer();
 
+            /// <summary>
+            /// Gets the cached or newly created comparer delegate for type <typeparamref name="T"/>.
+            /// </summary>
+            /// <returns>A delegate that deeply compares two objects of type <typeparamref name="T"/>.</returns>
             internal static Func<T, T, ISet<ReferencePair>, bool> GetOrCreateComparer() => Comparer;
 
             /// <summary>
-            /// Builds an expression tree to compare two objects of type T.
+            /// Builds an expression tree to compare two objects of type <typeparamref name="T"/> for deep equality.
+            /// Handles primitives, collections, dictionaries, and nested objects.
             /// </summary>
+            /// <returns>A compiled delegate for deep comparison.</returns>
             private static Func<T, T, ISet<ReferencePair>, bool> CreateComparer()
             {
                 var type = typeof(T);
@@ -373,13 +429,26 @@ namespace FeatureLoom.Helpers
         #region Cycle Detection Helper
 
         /// <summary>
-        /// Records a pair of objects that have been compared to avoid infinite recursion.
+        /// Represents a pair of object references that have been compared, used for cycle detection.
+        /// Ensures that the same object pair is not compared more than once, preventing infinite recursion.
         /// </summary>
         internal readonly struct ReferencePair
         {
+            /// <summary>
+            /// The first object in the pair.
+            /// </summary>
             public object First { get; }
+            /// <summary>
+            /// The second object in the pair.
+            /// </summary>
             public object Second { get; }
 
+            /// <summary>
+            /// Initializes a new instance of the <see cref="ReferencePair"/> struct.
+            /// Orders the pair by reference hash code to ensure symmetry.
+            /// </summary>
+            /// <param name="a">First object.</param>
+            /// <param name="b">Second object.</param>
             public ReferencePair(object a, object b)
             {
                 // Order the pair to ensure symmetry.
@@ -395,6 +464,7 @@ namespace FeatureLoom.Helpers
                 }
             }
 
+            /// <inheritdoc/>
             public override bool Equals(object obj)
             {
                 if (obj is ReferencePair other)
@@ -404,6 +474,7 @@ namespace FeatureLoom.Helpers
                 return false;
             }
 
+            /// <inheritdoc/>
             public override int GetHashCode()
             {
                 unchecked
@@ -414,6 +485,9 @@ namespace FeatureLoom.Helpers
                 }
             }
 
+            /// <summary>
+            /// Gets an equality comparer for <see cref="ReferencePair"/> that compares by reference.
+            /// </summary>
             public static IEqualityComparer<ReferencePair> Comparer { get; } = new ReferencePairComparer();
 
             private class ReferencePairComparer : IEqualityComparer<ReferencePair>

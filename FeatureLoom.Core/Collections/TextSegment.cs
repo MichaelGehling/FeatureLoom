@@ -168,8 +168,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
 
     /// <summary>
     /// Enumerator for splitting a <see cref="TextSegment"/> by a separator character.
+    /// Implements both IEnumerator and IEnumerable for single-use enumeration.
     /// </summary>
-    public struct SplitEnumerator : IEnumerator<TextSegment>
+    public struct SplitEnumerator : IEnumerator<TextSegment>, IEnumerable<TextSegment>
     {
         TextSegment original;
         TextSegment remaining;
@@ -239,17 +240,25 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
             remaining = original;
             finished = false;
         }
+
+        /// <summary>
+        /// Returns an enumerator that iterates through the segments.
+        /// </summary>
+        public IEnumerator<TextSegment> GetEnumerator() => this;
+
+        IEnumerator IEnumerable.GetEnumerator() => this;
     }
 
     /// <summary>
     /// Enumerates the segment by splitting it at each occurrence of a separator character.
+    /// Returns a single-use enumerable.
     /// </summary>
     /// <param name="separator">The character to split on.</param>
     /// <param name="skipEmpty">Whether to skip empty segments.</param>
     /// <returns>An enumerable of <see cref="TextSegment"/>.</returns>
-    public EnumerableHelper<TextSegment, SplitEnumerator> Split(char separator, bool skipEmpty = false)
+    public SplitEnumerator Split(char separator, bool skipEmpty = false)
     {
-        return new EnumerableHelper<TextSegment, SplitEnumerator>(new SplitEnumerator(this, separator, skipEmpty));
+        return new SplitEnumerator(this, separator, skipEmpty);
     }
 
     /// <summary>

@@ -26,7 +26,7 @@ namespace FeatureLoom.Collections;
 /// </summary>
 public struct LazyDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 {
-    private LazyValue<Dictionary<TKey, TValue>> dict;
+    private LazyUnsafeValue<Dictionary<TKey, TValue>> dict;
 
     public Dictionary<TKey, TValue> GetDictionary()
     {

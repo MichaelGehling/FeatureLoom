@@ -182,15 +182,12 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     /// <param name="separator">The byte to split on.</param>
     /// <param name="skipEmpty">Whether to skip empty segments.</param>
     /// <returns>An enumerable of <see cref="ByteSegment"/>.</returns>
-    public EnumerableHelper<ByteSegment, SplitEnumerator> Split(byte separator, bool skipEmpty = false)
-    {
-        return new EnumerableHelper<ByteSegment, SplitEnumerator>(new SplitEnumerator(this, separator, skipEmpty));
-    }
+    public SplitEnumerator Split(byte separator, bool skipEmpty = false) => new SplitEnumerator(this, separator, skipEmpty);    
 
     /// <summary>
     /// Enumerator for splitting a <see cref="ByteSegment"/> by a separator byte.
     /// </summary>
-    public struct SplitEnumerator : IEnumerator<ByteSegment>
+    public struct SplitEnumerator : IEnumerator<ByteSegment>, IEnumerable<ByteSegment>
     {
         ByteSegment original;
         ByteSegment remaining;
@@ -257,6 +254,13 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
             remaining = original;
             finished = false;
         }
+
+        /// <summary>
+        /// Returns an enumerator that iterates through the segments.
+        /// </summary>
+        public IEnumerator<ByteSegment> GetEnumerator() => this;
+
+        IEnumerator IEnumerable.GetEnumerator() => this;
     }
 
     /// <summary>

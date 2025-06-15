@@ -1,15 +1,14 @@
-﻿using System;
-using System.Threading;
+using System;
 
 namespace FeatureLoom.Helpers;
 
 /// <summary>
-/// Provides a zero-allocation, thread-safe lazy initializer for reference types with a parameterless constructor.
+/// Provides a zero-allocation, non-thread-safe lazy initializer for reference types with a parameterless constructor.
 /// <para>
 /// <b>Features:</b>
 /// <list type="bullet">
+/// <item>No thread safety: not safe for concurrent access from multiple threads.</item>
 /// <item>Does not allocate memory for the wrapper itself (struct-based).</item>
-/// <item>Thread-safe initialization using <see cref="Interlocked.CompareExchange(ref object, object, object)"/>.</item>
 /// <item>Only supports reference types with a public parameterless constructor.</item>
 /// <item>Does not cache exceptions thrown during construction; each access retries construction if it failed.</item>
 /// <item>Allows resetting the value via <see cref="RemoveObj"/>, enabling re-initialization on next access.</item>
@@ -17,7 +16,7 @@ namespace FeatureLoom.Helpers;
 /// </para>
 /// </summary>
 /// <typeparam name="T">Reference type with a public parameterless constructor.</typeparam>
-public struct LazyValue<T> where T : class, new()
+public struct LazyUnsafeValue<T> where T : class, new()
 {
     private T obj;
 
@@ -25,7 +24,7 @@ public struct LazyValue<T> where T : class, new()
     /// Initializes the lazy value with an existing instance.
     /// </summary>
     /// <param name="obj">The initial value.</param>
-    public LazyValue(T obj)
+    public LazyUnsafeValue(T obj)
     {
         this.obj = obj;
     }
@@ -59,19 +58,19 @@ public struct LazyValue<T> where T : class, new()
 
     private T Create()
     {
-        Interlocked.CompareExchange(ref obj, new T(), null);
+        if (obj == null) obj = new T();
         return obj;
     }
 
     /// <summary>
-    /// Implicitly converts the <see cref="LazyValue{T}"/> to its underlying value.
+    /// Implicitly converts the <see cref="LazyUnsafeValue{T}"/> to its underlying value.
     /// </summary>
-    /// <param name="lazy">The <see cref="LazyValue{T}"/> instance.</param>
-    public static implicit operator T(LazyValue<T> lazy) => lazy.Obj;
+    /// <param name="lazy">The <see cref="LazyUnsafeValue{T}"/> instance.</param>
+    public static implicit operator T(LazyUnsafeValue<T> lazy) => lazy.Obj;
 
     /// <summary>
-    /// Implicitly creates a <see cref="LazyValue{T}"/> from an existing value.
+    /// Implicitly creates a <see cref="LazyUnsafeValue{T}"/> from an existing value.
     /// </summary>
     /// <param name="obj">The value to wrap.</param>
-    public static implicit operator LazyValue<T>(T obj) => new LazyValue<T>(obj);
+    public static implicit operator LazyUnsafeValue<T>(T obj) => new LazyUnsafeValue<T>(obj);
 }

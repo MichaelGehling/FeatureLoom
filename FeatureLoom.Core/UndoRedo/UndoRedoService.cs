@@ -188,19 +188,6 @@ namespace FeatureLoom.UndoRedo
             }, description);
         }
 
-        /*
-        public async Task DoWithUndoAsync(Func<Task> doAction, Func<Task> undoAction)
-        {
-            await doAction.Invoke().ConfigureAwait(false);
-
-            AddUndo(() =>
-            {
-                undoAction.Invoke();
-                DoWithUndo(undoAction, doAction);
-            });
-        }
-        */
-
         public void Clear()
         {
             using (myLock.LockReentrant())

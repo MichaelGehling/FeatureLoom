@@ -41,10 +41,10 @@ namespace FeatureLoom.Web
         private FeatureLock myLock = new FeatureLock();
         private bool running = false;
         private IWebHost webserver;
-        private byte[] favicon;        
+        private byte[] favicon;
 
         // Invert comparer, so that when one route is the start of the second, the second will come first, so the more specifc before the less specific 
-        static readonly IComparer<IWebRequestHandler> routeComparer = new GenericComparer<IWebRequestHandler>((handler1, handler2) => -handler1.Route.CompareTo(handler2.Route));
+        static readonly IComparer<IWebRequestHandler> routeComparer = Comparer<IWebRequestHandler>.Create((handler1, handler2) => -handler1.Route.CompareTo(handler2.Route));
         private List<IWebRequestHandler> requestHandlers = new List<IWebRequestHandler>();
         private List<IWebRequestInterceptor> requestInterceptors = new List<IWebRequestInterceptor>();
         private List<IWebExceptionHandler> exceptionHandlers = new List<IWebExceptionHandler>();

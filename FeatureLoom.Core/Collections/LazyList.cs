@@ -27,7 +27,7 @@ namespace FeatureLoom.Collections
     public struct LazyList<T> : IList<T>
     {
         // Underlying lazy value holding the list instance.
-        LazyValue<List<T>> list;
+        LazyUnsafeValue<List<T>> list;
 
         /// <summary>
         /// Gets the underlying <see cref="List{T}"/> instance, allocating it if necessary.

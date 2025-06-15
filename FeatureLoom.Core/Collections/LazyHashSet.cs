@@ -26,7 +26,7 @@ namespace FeatureLoom.Collections;
 /// </summary>
 public struct LazyHashSet<T> : ISet<T>
 {
-    private LazyValue<HashSet<T>> set;
+    private LazyUnsafeValue<HashSet<T>> set;
 
     /// <summary>
     /// Gets the underlying <see cref="HashSet{T}"/> instance, allocating it if necessary.
