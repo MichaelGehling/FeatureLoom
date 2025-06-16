@@ -16,7 +16,6 @@ namespace FeatureLoom.Serialization
             public TypeInfoHandling typeInfoHandling = TypeInfoHandling.AddDeviatingTypeInfo;
             public DataSelection dataSelection = DataSelection.PublicAndPrivateFields_CleanBackingFields;
             public ReferenceCheck referenceCheck = ReferenceCheck.NoRefCheck;
-            public int bufferSize = -1;
             public bool enumAsString = false;
             public bool treatEnumerablesAsCollections = true;
             public int writeBufferChunkSize = 64 * 1024;
@@ -72,7 +71,6 @@ namespace FeatureLoom.Serialization
             public readonly TypeInfoHandling typeInfoHandling;
             public readonly DataSelection dataSelection;
             public readonly ReferenceCheck referenceCheck;
-            public readonly int bufferSize;
             public readonly bool enumAsString;
             public readonly bool treatEnumerablesAsCollections;
             public readonly int writeBufferChunkSize;
@@ -91,7 +89,6 @@ namespace FeatureLoom.Serialization
                 typeInfoHandling = settings.typeInfoHandling;
                 dataSelection = settings.dataSelection;
                 referenceCheck = settings.referenceCheck;
-                bufferSize = settings.bufferSize;
                 enumAsString = settings.enumAsString;
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
                 writeBufferChunkSize = settings.writeBufferChunkSize;
