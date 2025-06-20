@@ -23,12 +23,13 @@ namespace FeatureLoom.Serialization
             {
                 CachedTypeHandler elementHandler = GetCachedTypeHandler(elementType);
 
-                MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
+                Type enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
+                MethodInfo getEnumeratorMethod = enumerableType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
 
                 string methodName = nameof(CreateGenericEnumerableItemHandler);
                 MethodInfo createMethod = typeof(FeatureJsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, elementType, getEnumeratorMethod.ReturnType);
-                genericCreateMethod.Invoke(this, new object[] { typeHandler, elementHandler });
+                genericCreateMethod.Invoke(this, new object[] { getEnumeratorMethod, typeHandler, elementHandler });
             }
             else
             {
@@ -41,10 +42,10 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        private void CreateGenericEnumerableItemHandler<T, E, ENUM>(CachedTypeHandler typeHandler, CachedTypeHandler defaultElementHandler) where T : IEnumerable<E> where ENUM : IEnumerator<E>
+        private void CreateGenericEnumerableItemHandler<T, E, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeHandler typeHandler, CachedTypeHandler defaultElementHandler) where T : IEnumerable<E> where ENUM : IEnumerator<E>
         {
             Type itemType = typeof(T);
-            MethodInfo getEnumeratorMethod = itemType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
+
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
             Type expectedElementType = typeof(E);

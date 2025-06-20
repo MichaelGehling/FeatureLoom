@@ -97,7 +97,7 @@ public sealed partial class FeatureJsonSerializer
     private sealed class JsonUTF8StreamWriter : IWriter
     {
         public Stream stream;
-        private byte[] localBuffer;
+        private byte[] tempBuffer;
         private byte[] mainBuffer;
         private int mainBufferCount;
         private int mainBufferLimit;
@@ -110,10 +110,11 @@ public sealed partial class FeatureJsonSerializer
 
         public JsonUTF8StreamWriter(CompiledSettings settings)
         {
-            mainBufferLimit = settings.writeBufferChunkSize;
-            localBuffer = new byte[128];
-            // We give some extra bytes in order to not always check remaining space
-            mainBuffer = new byte[mainBufferLimit + 64];
+            // We lower the limit by a small margin in order to not always check remaining space
+            mainBufferLimit = settings.writeBufferChunkSize - 64;            
+            mainBuffer = new byte[settings.writeBufferChunkSize];
+            // Small temporary buffer for writing primitive values
+            tempBuffer = new byte[128];
             // Used for temporarily needed names e.g. Dictionary
             tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, 128);
             this.settings = settings;
@@ -1254,12 +1255,12 @@ public sealed partial class FeatureJsonSerializer
             while (value >= 10)
             {
                 value = Math.DivRem(value, 10, out long digit);
-                localBuffer[index--] = (byte)('0' + digit);
+                tempBuffer[index--] = (byte)('0' + digit);
             }
-            if (value > 0) localBuffer[index--] = (byte)('0' + value);
-            if (isNegative) localBuffer[index--] = (byte)'-';
+            if (value > 0) tempBuffer[index--] = (byte)('0' + value);
+            if (isNegative) tempBuffer[index--] = (byte)'-';
 
-            WriteToBuffer(localBuffer, index + 1, maxDigits - index);
+            WriteToBuffer(tempBuffer, index + 1, maxDigits - index);
         }
 
 
@@ -1299,12 +1300,12 @@ public sealed partial class FeatureJsonSerializer
             while (value >= 10)
             {
                 value = Math.DivRem(value, 10, out int digit);
-                localBuffer[index--] = (byte)('0' + digit);
+                tempBuffer[index--] = (byte)('0' + digit);
             }
-            if (value > 0) localBuffer[index--] = (byte)('0' + value);
-            if (isNegative) localBuffer[index--] = (byte)'-';
+            if (value > 0) tempBuffer[index--] = (byte)('0' + value);
+            if (isNegative) tempBuffer[index--] = (byte)'-';
 
-            WriteToBuffer(localBuffer, index + 1, maxDigits - index);
+            WriteToBuffer(tempBuffer, index + 1, maxDigits - index);
         }
 
         private void WriteUnsignedInteger(long inputValue)
@@ -1322,11 +1323,11 @@ public sealed partial class FeatureJsonSerializer
             while (value >= 10)
             {
                 value = Math.DivRem(value, 10, out long digit);
-                localBuffer[index--] = (byte)('0' + digit);
+                tempBuffer[index--] = (byte)('0' + digit);
             }
-            if (value > 0) localBuffer[index--] = (byte)('0' + value);
+            if (value > 0) tempBuffer[index--] = (byte)('0' + value);
 
-            WriteToBuffer(localBuffer, index + 1, maxDigits - index);
+            WriteToBuffer(tempBuffer, index + 1, maxDigits - index);
         }
 
         //static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
@@ -1437,12 +1438,12 @@ public sealed partial class FeatureJsonSerializer
                     for (int i = 0; i < numIntegralDigits; i++)
                     {
                         integralInt = (int)Math.DivRem(integralInt, 10, out long digitLong);
-                        localBuffer[index--] = (byte)('0' + (byte)digitLong);
+                        tempBuffer[index--] = (byte)('0' + (byte)digitLong);
                         if (digitLong == 0) numLeadingZeros++;
                         else numLeadingZeros = 0;
                     }
                     index += numLeadingZeros;
-                    WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
+                    WriteToBufferWithoutCheck(tempBuffer, index + 1, numIntegralDigits - index);
                 }
             }
 
@@ -1613,12 +1614,12 @@ public sealed partial class FeatureJsonSerializer
                     for (int i = 0; i < numIntegralDigits; i++)
                     {
                         integralInt = Math.DivRem(integralInt, 10, out long digitLong);
-                        localBuffer[index--] = (byte)('0' + (byte)digitLong);
+                        tempBuffer[index--] = (byte)('0' + (byte)digitLong);
                         if (digitLong == 0) numLeadingZeros++;
                         else numLeadingZeros = 0;
                     }
                     index += numLeadingZeros;
-                    WriteToBufferWithoutCheck(localBuffer, index + 1, numIntegralDigits - index);
+                    WriteToBufferWithoutCheck(tempBuffer, index + 1, numIntegralDigits - index);
                 }
             }
 
@@ -1755,9 +1756,9 @@ public sealed partial class FeatureJsonSerializer
             byte[] guidBytes = guid.ToByteArray();
 #else
             // Default case for .NET Standard 2.1+ and other frameworks supporting Span<T>
-            Span<byte> guidBytesSpan = new Span<byte>(localBuffer, 0, 16);
+            Span<byte> guidBytesSpan = new Span<byte>(tempBuffer, 0, 16);
             guid.TryWriteBytes(guidBytesSpan); // loacalBuffer is always bigger than 16 bytes
-            byte[] guidBytes = localBuffer;
+            byte[] guidBytes = tempBuffer;
 #endif
             WriteToBufferWithoutCheck((byte)'"');
             WriteByteAsHexWithoutCheck(guidBytes[3]);

@@ -30,6 +30,8 @@ namespace FeatureLoom.Serialization
             public Settings()
             {
                 AddTypeMapping(typeof(IEnumerable), typeof(List<object>));
+                AddTypeMapping(typeof(ICollection), typeof(List<object>));
+                AddTypeMapping(typeof(IList), typeof(List<object>));                
                 AddGenericTypeMapping(typeof(IEnumerable<>), typeof(List<>));
                 AddGenericTypeMapping(typeof(ICollection<>), typeof(List<>));
                 AddGenericTypeMapping(typeof(IReadOnlyCollection<>), typeof(List<>));
