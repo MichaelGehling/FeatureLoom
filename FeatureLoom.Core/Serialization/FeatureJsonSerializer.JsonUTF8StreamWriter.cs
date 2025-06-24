@@ -107,11 +107,12 @@ public sealed partial class FeatureJsonSerializer
         private int currentIndentionDepth = 0;
         private readonly int maxIndentationDepth;
         private readonly byte[][] indentationLookup;
+        const int BUFFER_LIMIT_MARGIN = 64; // Margin to avoid frequent buffer checks
 
         public JsonUTF8StreamWriter(CompiledSettings settings)
         {
             // We lower the limit by a small margin in order to not always check remaining space
-            mainBufferLimit = settings.writeBufferChunkSize - 64;            
+            mainBufferLimit = settings.writeBufferChunkSize - BUFFER_LIMIT_MARGIN;            
             mainBuffer = new byte[settings.writeBufferChunkSize];
             // Small temporary buffer for writing primitive values
             tempBuffer = new byte[128];
@@ -124,7 +125,18 @@ public sealed partial class FeatureJsonSerializer
             indentationLookup = new byte[maxIndentationDepth][];
             InitIndentationLookup();
         }
-       
+
+        private void ExtendBufferLimit(int newLimit)
+        {
+            if (newLimit <= mainBufferLimit) return; // No need to extend
+
+            mainBufferLimit = newLimit;
+
+            int newSize= newLimit + BUFFER_LIMIT_MARGIN;            
+            if (mainBufferCount == 0) mainBuffer = new byte[newSize];
+            else Array.Resize(ref mainBuffer, newLimit + BUFFER_LIMIT_MARGIN);            
+        }
+
         private void InitIndentationLookup()
         {                
             if (!indent) return;                
@@ -252,6 +264,7 @@ public sealed partial class FeatureJsonSerializer
         public void EnsureFreeBufferSpace(int freeBytes)
         {
             if (mainBufferCount + freeBytes >= mainBufferLimit) WriteBufferToStream();
+            if (mainBufferCount + freeBytes >= mainBuffer.Length) ExtendBufferLimit(mainBufferCount + freeBytes);
         }
 
         static Dictionary<Type, string> typeMap = new Dictionary<Type, string>
