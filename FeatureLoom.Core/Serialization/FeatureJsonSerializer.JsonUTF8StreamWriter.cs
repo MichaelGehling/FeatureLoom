@@ -116,7 +116,7 @@ public sealed partial class FeatureJsonSerializer
             // Small temporary buffer for writing primitive values
             tempBuffer = new byte[128];
             // Used for temporarily needed names e.g. Dictionary
-            tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, 128);
+            tempSlicedBuffer = new SlicedBuffer<byte>(settings.tempBufferSize, settings.tempBufferSize * 64, 4, true, false);
             this.settings = settings;
 
             indent = settings.indent;

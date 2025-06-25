@@ -114,9 +114,8 @@ public class InMemoryCacheTests
         var cache = new InMemoryCache<string, int>(SizeOfInt, settings);
 
         cache.Add("old", 1);
-        await Task.Delay(10); // Ensure time passes
-        cache.StartCleanUp();
-        await Task.Delay(50); // Wait for cleanup to run
+        await Task.Delay(50); // Ensure time passes
+        await cache.StartCleanUp();        
 
         Assert.False(cache.Contains("old"));
     }

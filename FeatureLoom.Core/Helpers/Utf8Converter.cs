@@ -8,8 +8,7 @@ namespace FeatureLoom.Helpers;
 
 public static class Utf8Converter
 {
-    static SlicedBuffer<char> sharedSlicedBuffer = new SlicedBuffer<char>(1024, 1024);
-    static MicroLock sharedBufferLock = new MicroLock();
+    static SlicedBuffer<char> sharedSlicedBuffer = new SlicedBuffer<char>(1024, 1024*128, 4, true, true);
     static Pool<StringBuilder> stringBuilderPool = new Pool<StringBuilder>(() => new StringBuilder(1024), sb => sb.Clear());        
 
     public static void DecodeUtf8ToStringBuilder(ArraySegment<byte> bytes, StringBuilder stringBuilder)
@@ -109,10 +108,7 @@ public static class Utf8Converter
         ArraySegment<char> chars;
         if (slicedBuffer == null)
         {
-            using (sharedBufferLock.Lock())
-            {
-                chars = sharedSlicedBuffer.GetSlice(stringBuilder.Length);
-            }
+            chars = sharedSlicedBuffer.GetSlice(stringBuilder.Length);
         }
         else
         {

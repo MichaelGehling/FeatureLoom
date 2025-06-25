@@ -1903,7 +1903,7 @@ namespace FeatureLoom.Serialization
         }
 
         StringBuilder stringBuilder = new StringBuilder(1024 * 8);
-        SlicedBuffer<char> charSlicedBuffer = new SlicedBuffer<char>(1024 * 8);
+        SlicedBuffer<char> charSlicedBuffer = new SlicedBuffer<char>(1024 * 4, 1024 * 16, 2, true, false);
 
         private object ReadNullValue()
         {
