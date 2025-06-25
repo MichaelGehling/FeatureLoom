@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var forwarder = new BufferingForwarder<object>(10);
@@ -25,7 +25,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void BuffersForwardedDataAndSendsItOnConnection()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<int>();
             var forwarder = new BufferingForwarder<int>(10);

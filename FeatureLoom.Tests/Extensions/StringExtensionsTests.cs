@@ -16,7 +16,7 @@ namespace FeatureLoom.Extensions
         [Fact]
         public void TrimStartCanRemoveMultipleFragments()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             Assert.Equal("XyzAbc", "XyzAbc".TrimStart("Abc"));
             Assert.Equal("Xyz", "AbcXyz".TrimStart("Abc"));
@@ -28,7 +28,7 @@ namespace FeatureLoom.Extensions
         [Fact]
         public void TrimEndCanRemoveMultipleFragments()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             Assert.Equal("XyzAbc", "XyzAbc".TrimEnd("Xyz"));
             Assert.Equal("Abc", "AbcXyz".TrimEnd("Xyz"));
@@ -40,7 +40,7 @@ namespace FeatureLoom.Extensions
         [Fact]
         public void TrimStartCanRemoveWholeString()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             Assert.Equal("", "Abc".TrimStart("Abc"));            
 
@@ -50,7 +50,7 @@ namespace FeatureLoom.Extensions
         [Fact]
         public void TrimEndCanRemoveWholeString()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             Assert.Equal("", "Abc".TrimEnd("Abc"));
 

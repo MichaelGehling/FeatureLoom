@@ -13,7 +13,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void CanBeAwaitedSyncAndAsync()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             AsyncManualResetEvent mre = new AsyncManualResetEvent(true);
 
@@ -84,7 +84,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void WaitingCanTimeOut()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
 
@@ -118,7 +118,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void WaitingCanBeCancelled()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
             CancellationTokenSource cts = new CancellationTokenSource();
@@ -156,7 +156,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void CanConvertToWaitHandle()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
             Assert.True(mre.TryConvertToWaitHandle(out WaitHandle waitHandle));
@@ -179,7 +179,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void PulseAllWillAwakeAll()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
             List<Thread> threads = new List<Thread>();
@@ -215,7 +215,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void PulseAllRepeatetlyWillAwakeAll()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             AsyncManualResetEvent mre = new AsyncManualResetEvent();
             List<Thread> threads = new List<Thread>();

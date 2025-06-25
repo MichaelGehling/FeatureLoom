@@ -12,7 +12,7 @@ namespace FeatureLoom.Diagnostics
         [InlineData("test string")]
         public void CanReceiveObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var sink = new LatestMessageReceiver<T>();

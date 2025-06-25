@@ -13,7 +13,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var forwarder = new AsyncForwarder();
@@ -27,7 +27,7 @@ namespace FeatureLoom.MessageFlow
         [Fact(Skip = "Fails on GitHub test server.")]
         public void ForwardsMessagesToMultipleSinksAsynchronously()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var delay = 50.Milliseconds();
             var sender = new Sender();

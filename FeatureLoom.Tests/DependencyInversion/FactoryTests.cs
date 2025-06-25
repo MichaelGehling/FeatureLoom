@@ -5,6 +5,7 @@ using FeatureLoom.Synchronization;
 using System;
 using System.Threading.Tasks;
 using Xunit;
+using System.Linq;
 
 namespace FeatureLoom.DependencyInversion;
 
@@ -41,7 +42,7 @@ public class FactoryTests
     [Fact]
     public void FactoryCanBeOverriden()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         ITest testObj = Factory.Create<ITest>(() => new A());
         Assert.NotNull(testObj);
@@ -58,7 +59,7 @@ public class FactoryTests
     [Fact]
     public void FactoryCanUseDefaultConstructor()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         B testObj = Factory.Create<B>();
         Assert.NotNull(testObj);
@@ -75,7 +76,7 @@ public class FactoryTests
     [Fact]
     public void OverrideCanBeRemoved()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         Factory.Override<ITest>(() => new B());
         ITest testObj = Factory.Create<ITest>(() => new A());
@@ -93,7 +94,7 @@ public class FactoryTests
     [Fact]
     public void TryCreateFromType_CreatesInstance()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         bool result = Factory.TryCreateFromType(typeof(B), out object instance);
         Assert.True(result);
@@ -107,7 +108,7 @@ public class FactoryTests
     [Fact]
     public void TryCreateFromType_WithSimplifiedName_CreatesInstance()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         string typeName = typeof(B).FullName;
         bool result = Factory.TryCreateFromType(typeName, out object instance);
@@ -121,7 +122,7 @@ public class FactoryTests
     [Fact]
     public void Override_WithNull_RemovesOverride()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         Factory.Override<ITest>(() => new B());
         ITest testObj = Factory.Create<ITest>(() => new A());

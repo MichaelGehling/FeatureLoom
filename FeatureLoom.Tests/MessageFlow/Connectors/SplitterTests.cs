@@ -9,7 +9,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanSplitMessageIntoMultiple()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var splitter = new Splitter<string>(str => str.ToCharArray());

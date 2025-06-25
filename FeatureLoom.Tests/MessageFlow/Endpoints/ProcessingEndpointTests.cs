@@ -13,7 +13,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanProcessMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             bool processed = false;
             var sender = new Sender();
@@ -26,7 +26,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanProcessMessageAsync()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             bool processed = false;
             var sender = new Sender();

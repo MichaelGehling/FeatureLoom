@@ -16,7 +16,7 @@ namespace FeatureLoom.UndoRedo
         [Fact]
         public void CanUndosAndRedosCanHaveDescriptions()        
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
             
             var undoRedo = new UndoRedoService();
             string data = "Init";
@@ -48,7 +48,7 @@ namespace FeatureLoom.UndoRedo
         [Fact]
         public void CanUndoAndRedoMultipleSteps()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var undoRedo = new UndoRedoService();
             string data = "Init";
@@ -76,7 +76,7 @@ namespace FeatureLoom.UndoRedo
         [Fact]
         public void CanPerformDoWithUndo()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var undoRedo = new UndoRedoService();
             string data = "Init";
@@ -106,7 +106,7 @@ namespace FeatureLoom.UndoRedo
         [Fact]
         public void CanCombineUndoSteps()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var undoRedo = new UndoRedoService();
             string data = "Init";
@@ -131,7 +131,7 @@ namespace FeatureLoom.UndoRedo
         [Fact]
         public void CanUseTransaction()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var undoRedo = new UndoRedoService();
             string data = "Init";
@@ -157,7 +157,7 @@ namespace FeatureLoom.UndoRedo
         [Fact]
         public void CanClearUndoRedoSteps()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var undoRedo = new UndoRedoService();
             string data = "Init";

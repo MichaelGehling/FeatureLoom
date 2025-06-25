@@ -14,7 +14,7 @@ namespace FeatureLoom.TCP
         [Fact]
         public void CanTransferByteArray2()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
             var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()
@@ -54,7 +54,7 @@ namespace FeatureLoom.TCP
         [Fact]
         public void CanTransferString2()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter); var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()
             {
@@ -93,7 +93,7 @@ namespace FeatureLoom.TCP
         [Fact]
         public void CanTransferByteArray()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
             var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()
@@ -134,7 +134,7 @@ namespace FeatureLoom.TCP
         [Fact]
         public void CanTransferString()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             int testPort = Interlocked.Increment(ref TcpTests.testPortCounter);
             var server = new TcpServerEndpoint(new TcpServerEndpoint.Settings()

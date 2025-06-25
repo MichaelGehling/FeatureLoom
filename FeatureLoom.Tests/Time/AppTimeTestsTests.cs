@@ -13,7 +13,7 @@ namespace FeatureLoom.Time
         [Fact]
         public void CoarseTimeIsInLimits()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             Assert.True((DateTime.UtcNow - AppTime.CoarseNow).Duration() < 20.Milliseconds());
         }
@@ -21,7 +21,7 @@ namespace FeatureLoom.Time
         [Fact]
         public void WaitTimeIsCorrect()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var tk = AppTime.TimeKeeper;
             AppTime.WaitPrecisely(5.Milliseconds());            
@@ -38,7 +38,7 @@ namespace FeatureLoom.Time
         [Fact]
         public void WaitAsyncTimeIsCorrect()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var tk = AppTime.TimeKeeper;
             AppTime.WaitPreciselyAsync(5.Milliseconds()).WaitFor();

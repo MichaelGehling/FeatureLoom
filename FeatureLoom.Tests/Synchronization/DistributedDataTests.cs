@@ -10,7 +10,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void ChangedDataWillBePublishedToConnectedDistributedData()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
             DistributedData<int> distributedData1 = new DistributedData<int>("myData");
             DistributedData<int> distributedData2 = new DistributedData<int>("myData");
             distributedData1.UpdateSender.ConnectTo(distributedData2.UpdateReceiver);

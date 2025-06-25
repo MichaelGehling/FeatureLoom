@@ -11,7 +11,7 @@ namespace FeatureLoom.MesssageFlow.Endpoints
         [Fact]
         public void ProvidesSingleMessageWithHighestPriority()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new PriorityMessageReceiver<int>(Comparer<int>.Create((oldMsg, newMsg) => oldMsg - newMsg));
@@ -29,7 +29,7 @@ namespace FeatureLoom.MesssageFlow.Endpoints
         [Fact]
         public void SignalsFilledQueue()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new PriorityMessageReceiver<int>(Comparer<int>.Create((oldMsg, newMsg) => oldMsg - newMsg));

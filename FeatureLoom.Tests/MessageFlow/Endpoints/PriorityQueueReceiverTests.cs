@@ -16,7 +16,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanReceiveObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var receiver = new PriorityQueueReceiver<T>(Comparer<T>.Default);
@@ -33,7 +33,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData(20, 10)]
         public void CanLimitQueueSize(int numMessages, int limit)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Create((a, b) => a == b ? 0 : a < b ? -1 : 1), limit, default);
@@ -63,7 +63,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData(false)]
         public void CanBlockOnFullQueue(bool sendAsync)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             TimeSpan blockTime = 100.Milliseconds();
             int limit = 5;
@@ -99,7 +99,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void SignalsFilledQueue()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);

@@ -9,7 +9,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanConvertMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<string>();
             var converter = new MessageConverter<string, int>(str => int.Parse(str));
