@@ -12,7 +12,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var selector = new Selector<T>();
@@ -28,7 +28,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void RoutesMessagesToMatchingOptions()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var selector = new Selector<int>(true);

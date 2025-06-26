@@ -10,7 +10,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void ResponsesCanBeReceived()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var requestSender = new RequestSender<string, string>();            
             var receiver = new LatestMessageReceiver<IRequestMessage<string>>();

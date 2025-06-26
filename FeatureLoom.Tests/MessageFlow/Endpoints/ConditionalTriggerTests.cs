@@ -9,7 +9,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void IsOnlySetWhenReceivedValidMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var trigger = new ConditionalTrigger<int, int>(m => m >= 42, null);
             Assert.False(trigger.IsTriggered());
@@ -26,7 +26,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void IsResetWhenReceivedValidMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var trigger = new ConditionalTrigger<int, int>(m => m > 42, m => m < 42);
             Assert.False(trigger.IsTriggered());

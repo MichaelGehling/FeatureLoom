@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanSendObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var sink = new LatestMessageReceiver<T>();
@@ -24,7 +24,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanConnectToMultipleSinks()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var sinkInt1 = new LatestMessageReceiver<int>();
@@ -50,7 +50,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanDisconnectSinks()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var sinkInt1 = new LatestMessageReceiver<int>();
@@ -72,7 +72,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void ProvidesConnectedSinks()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var sinkInt1 = new LatestMessageReceiver<int>();

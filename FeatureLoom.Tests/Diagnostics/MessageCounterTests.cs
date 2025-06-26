@@ -12,7 +12,7 @@ namespace FeatureLoom.Diagnostics
         [Fact]
         public void CountsTheMessages()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var forwarder = new MessageCounter();            
@@ -28,7 +28,7 @@ namespace FeatureLoom.Diagnostics
         [Fact]
         public void CanWaitForANumberOfMessages()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var forwarder = new MessageCounter();

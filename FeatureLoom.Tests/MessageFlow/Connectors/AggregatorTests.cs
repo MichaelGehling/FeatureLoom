@@ -84,7 +84,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanSendAggregationMessageAfterTimeout()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
@@ -110,7 +110,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanAggregateComplementMessagesToASingleMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
@@ -139,7 +139,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void ForwardsUnusedMessagesToAlternativeOutput()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(false));
@@ -156,7 +156,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanAggregateComplementMessagesToAMultipleMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var aggregator = new Aggregator<(string key, string val), string>(new FullNameAggregationData(true));

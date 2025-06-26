@@ -28,7 +28,7 @@ public class ServiceTests
     [Fact]
     public void NamedAndUnnamedServicesWorkIndependently()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         TestService unnamed = Service<TestService>.Get();
         unnamed.i = 123;
@@ -94,7 +94,7 @@ public class ServiceTests
     [Fact(Skip = "Cant run in parallel")]
     public void ServicesWithDefaultConstructorDontNeedInit()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         ServiceRegistry.AllowToSearchAssembly = false;            
         Assert.Throws<Exception>(() => Service<ITestService>.Instance);
@@ -115,7 +115,7 @@ public class ServiceTests
     [Fact]
     public void ResetRemovesAllInstances()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         Service<TestService>.Init(_ => new TestService());
         var instance1 = Service<TestService>.Get();
@@ -136,7 +136,7 @@ public class ServiceTests
     [Fact]
     public void SetAndGetWorkForNamedAndUnnamed()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         var unnamed = new TestService { i = 10 };
         var named = new TestService { i = 20 };
@@ -152,7 +152,7 @@ public class ServiceTests
     [Fact]
     public void DeleteRemovesService()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         var instance1 = new TestService { i = 5 };
         Service<TestService>.Set(instance1);
@@ -166,7 +166,7 @@ public class ServiceTests
     [Fact]
     public void DeleteNamedRemovesOnlyNamedService()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         var namedInstance1 = new TestService { i = 7 };
         Service<TestService>.Set("Y", namedInstance1);
@@ -180,7 +180,7 @@ public class ServiceTests
     [Fact]
     public void MultipleNamedInstancesAreIndependent()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         Service<TestService>.Set("A", new TestService { i = 1 });
         Service<TestService>.Set("B", new TestService { i = 2 });
@@ -194,7 +194,7 @@ public class ServiceTests
     [Fact]
     public void SettingConcreteForInterfaceWorks()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         var concrete = new TestService { i = 42 };
         Service<ITestService>.Set(concrete);
@@ -206,7 +206,7 @@ public class ServiceTests
     [Fact]
     public void ThreadSafetyWithParallelAccess()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         Service<TestService>.Init(_ => new TestService());
         var results = new System.Collections.Concurrent.ConcurrentBag<int>();
@@ -251,7 +251,7 @@ public class ServiceDisposalTests
     [Fact(Skip = "Cant run in parallel")]
     public void ServiceInstance_IsAutomaticallyDisposed_WhenUnreferenced()
     {
-        TestHelper.PrepareTestContext();
+        using var testContext = TestHelper.PrepareTestContext();
 
         // Arrange
         DisposableTestService.DisposeCount = 0;

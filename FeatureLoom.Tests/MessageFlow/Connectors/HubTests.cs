@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var hub = new Hub();
@@ -29,7 +29,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void MessagesAreForwardedToAllButSendingSocket()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var senderA = new Sender();
             var senderB = new Sender();

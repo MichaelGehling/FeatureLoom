@@ -85,13 +85,13 @@ namespace FeatureLoom.Extensions
             return fileName;
         }
 
-        public static string MakeValidFilePath(this string fielPath, char replacementChar = '_')
+        public static string MakeValidFilePath(this string filePath, char replacementChar = '_')
         {            
             foreach (char c in Path.GetInvalidPathChars())
             {
-                fielPath = fielPath.Replace(c, replacementChar);
+                filePath = filePath.Replace(c, replacementChar);
             }
-            return fielPath;
+            return filePath;
         }
 
         public static string TextWrap(this string input, int maxCharsPerLine, string nextLine)
@@ -150,86 +150,32 @@ namespace FeatureLoom.Extensions
 
         public static string TrimChar(this string str, char trimChar)
         {
-            if (str.Length == 0) return str;
-            if (str.Length == 1 && str[0] == trimChar) return "";
-            if (str.Length >= 2)
-            {
-                int numTrimStart = 0;
-                for(int i=0; i < str.Length; i++)
-                {
-                    if (str[i] == trimChar) numTrimStart++;
-                    else break;
-                }
-                if (numTrimStart == str.Length) return "";
-                int numTrimEnd = 0;
-                for(int i=str.Length-1; i >= numTrimStart; i--)
-                {
-                    if (str[i] == trimChar) numTrimEnd++;
-                    else break;
-                }                
-                return str.Substring(numTrimStart, str.Length - numTrimStart - numTrimEnd);
-            }
-            return str;
+            TextSegment segment = str;
+            return segment.Trim(trimChar).ToString();
         }
 
         public static string TrimCharStart(this string str, char trimChar)
         {
-            if (str.Length == 0) return str;
-            if (str.Length == 1 && str[0] == trimChar) return "";
-            if (str.Length >= 2)
-            {
-                int numTrimStart = 0;
-                for (int i = 0; i < str.Length; i++)
-                {
-                    if (str[i] == trimChar) numTrimStart++;
-                    else break;
-                }
-                return str.Substring(numTrimStart, str.Length - numTrimStart);
-            }
-            return str;
+            TextSegment segment = str;
+            return segment.TrimStart(trimChar).ToString();
         }
 
         public static string TrimCharEnd(this string str, char trimChar)
         {
-            if (str.Length == 0) return str;
-            if (str.Length == 1 && str[0] == trimChar) return "";
-            if (str.Length >= 2)
-            { 
-                int numTrimEnd = 0;
-                for (int i = str.Length - 1; i >= 0; i--)
-                {
-                    if (str[i] == trimChar) numTrimEnd++;
-                    else break;
-                }
-                return str.Substring(0, str.Length - numTrimEnd);
-            }
-            return str;
+            TextSegment segment = str;
+            return segment.TrimEnd(trimChar).ToString();
         }
 
         public static string TrimEnd(this string str, string trimStr)
         {
-            int pos;
-            for (pos = str.Length-trimStr.Length; pos >= 0; pos -= trimStr.Length)
-            {                
-                for (int i=0; i < trimStr.Length; i++)
-                {
-                    if (str[pos + i] != trimStr[i]) return str.Substring(0, pos + trimStr.Length);
-                }
-            }
-            return str.Substring(0, pos + trimStr.Length);
+            TextSegment segment = str;
+            return segment.TrimEnd(trimStr).ToString();
         }
 
         public static string TrimStart(this string str, string trimStr)
         {
-            int pos;
-            for (pos = 0; pos < str.Length; pos += trimStr.Length)
-            {
-                for (int i = 0; i < trimStr.Length; i++)
-                {
-                    if (str[pos + i] != trimStr[i]) return str.Substring(pos);
-                }
-            }
-            return str.Substring(pos);
+            TextSegment segment = str;
+            return segment.TrimStart(trimStr).ToString();
         }
 
         private static InMemoryCache<string, PatternExtractor> extractionPatternCache = new InMemoryCache<string, PatternExtractor>(p => 50 + p.Size*25, 
@@ -386,64 +332,19 @@ namespace FeatureLoom.Extensions
         /// <returns></returns>
         public static bool TryExtract<T>(this string str, int startIndex, string startExtractAfter, string endExtractBefore, out T extract, out int restStartIndex, bool includeSearchStrings = false) where T : IConvertible
         {
-            extract = default;
-            bool success = true;
-
-            string substring = str.Substring(startIndex, startExtractAfter, endExtractBefore, out restStartIndex, includeSearchStrings);
-            if (substring != null)
-            {
-                if (substring is T extractedStr)
-                {
-                    extract = extractedStr;
-                }
-                else
-                {
-                    try
-                    {
-                        extract = substring.ConvertTo<T>();
-                    }
-                    catch
-                    {
-                        success = false;
-                    }
-                }
-            }
-            else success = false;
-
-            return success;
+            TextSegment segment = str;
+            return segment.TryExtract(startIndex, startExtractAfter ?? TextSegment.Empty, endExtractBefore ?? TextSegment.Empty, out extract, out restStartIndex, includeSearchStrings);
         }
 
         public static string Substring(this string str, string startAfter, string endBefore = null)
         {
-            return str.Substring(0, startAfter, endBefore, out _);
+            return str.Substring(0, startAfter ?? TextSegment.Empty, endBefore ?? TextSegment.Empty, out _);
         }
 
         public static string Substring(this string str, int startIndex, string startAfter, string endBefore, out int restStartIndex, bool includeSearchStrings = false)
         {
-            int startPos = startIndex;
-            restStartIndex = startPos;
-            int endPos = str.Length;
-            bool abort = false;
-
-            if (!startAfter.EmptyOrNull())
-            {
-                startPos = str.IndexOf(startAfter, startIndex);
-                abort = startPos == -1;
-                startPos += startAfter.Length;
-            }
-            if (abort) return null;
-
-            if (!endBefore.EmptyOrNull())
-            {
-                endPos = str.IndexOf(endBefore, startPos);
-                abort = endPos == -1;
-                endPos += (includeSearchStrings ? endBefore.Length : 0);
-            }
-            if (abort) return null;
-
-            restStartIndex = endPos;
-            if (includeSearchStrings) startPos -= startAfter.Length;
-            return str.Substring(startPos, endPos - startPos);
+            TextSegment segment = str;
+            return segment.SubSegment(startIndex, startAfter ?? TextSegment.Empty, endBefore ?? TextSegment.Empty, out restStartIndex, includeSearchStrings);            
         }
 
         public static string ReplaceBetween(this string str, string startAfter, string endBefore, string replacement, bool removeAlsoSearchStrings = false)
@@ -522,11 +423,13 @@ namespace FeatureLoom.Extensions
 
         /// <summary>
         /// Conveerts a string to an convertible type.
-        /// Note: Uses the current threads culture for conversions
+        /// Note: Uses the current threads culture for conversions if no provider is specified.
         /// </summary>
-        public static T ConvertTo<T>(this string str) where T : IConvertible
+        public static T ConvertTo<T>(this string str, IFormatProvider provider = null) where T : IConvertible
         {            
-            return (T)Convert.ChangeType(str, typeof(T));
+            TextSegment segment = str;
+            if (segment.TryToType<T>(out T result, provider)) return result;
+            throw new InvalidCastException($"Cannot convert string '{str}' to type {typeof(T).Name}.");
         }
 
         public static string GetStringAndClear(this StringBuilder sb)

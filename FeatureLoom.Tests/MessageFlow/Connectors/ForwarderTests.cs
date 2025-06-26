@@ -12,7 +12,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var forwarder = new Forwarder();
@@ -26,7 +26,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void TypedForwarderFailsWhenConnectedToWrongType()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             Forwarder<int> intForwarder = new Forwarder<int>();
             Forwarder<int> intForwarder2 = new Forwarder<int>();

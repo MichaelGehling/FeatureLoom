@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanReceiveObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var receiver = new LatestMessageReceiver<T>();
@@ -24,7 +24,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void OnlyProvidesLatestMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new LatestMessageReceiver<int>();
@@ -38,7 +38,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void SignalsFilledQueue()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new LatestMessageReceiver<int>();

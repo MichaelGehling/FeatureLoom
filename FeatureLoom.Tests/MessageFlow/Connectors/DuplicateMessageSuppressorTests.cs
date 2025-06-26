@@ -14,7 +14,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var suppressor = new DuplicateMessageSuppressor(100.Milliseconds());
@@ -28,7 +28,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void SuppressesIdenticalMessagesWithinTimeFrame()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var suppressionTime = 100.Milliseconds();
             var sender = new Sender();
@@ -58,7 +58,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void SupportsCustomIdentityCheck()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var suppressionTime = 100.Milliseconds();
             var sender = new Sender();

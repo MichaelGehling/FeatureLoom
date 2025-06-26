@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var filter = new Filter<T>(msg => true);
@@ -25,7 +25,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanFilterMessages()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var filter = new Filter<int>(msg => msg <= 10);

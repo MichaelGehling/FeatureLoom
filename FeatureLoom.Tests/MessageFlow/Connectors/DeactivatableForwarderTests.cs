@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var forwarder = new DeactivatableForwarder();
@@ -25,7 +25,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanDeactivateForwarding()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<int>();
             var forwarder = new DeactivatableForwarder();
@@ -45,7 +45,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanDeactivateForwardingViaDelegate()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
             bool active = false;
             var sender = new Sender<int>();
             var forwarder = new DeactivatableForwarder(() => active);

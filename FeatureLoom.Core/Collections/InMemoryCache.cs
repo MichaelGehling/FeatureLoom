@@ -153,7 +153,7 @@ public sealed class InMemoryCache<K,V> : ISchedule
             }
         }
 
-        if (totalSize > settings.targetCacheSizeInByte + settings.cacheSizeMarginInByte) StartCleanUp();
+        if (totalSize > settings.targetCacheSizeInByte + settings.cacheSizeMarginInByte) _ = StartCleanUp();
     }
 
     /// <summary>
@@ -228,11 +228,11 @@ public sealed class InMemoryCache<K,V> : ISchedule
     /// Starts the cleanup process to evict items from the cache based on the eviction policy.
     /// Only one cleanup can run at a time.
     /// </summary>
-    public void StartCleanUp()
+    public Task StartCleanUp()
     {
-        if (!cleanUpLock.TryLock(out var lockHandle)) return;
+        if (!cleanUpLock.TryLock(out var lockHandle)) return Task.CompletedTask;
          
-        Task.Run(() =>
+        return Task.Run(() =>
         {
             using (lockHandle)
             {
@@ -294,7 +294,7 @@ public sealed class InMemoryCache<K,V> : ISchedule
         TimeSpan remaining = now - (lastCleanUp + settings.cleanUpPeriodeInSeconds.Seconds());
         if (remaining < 1.Seconds())
         {
-            StartCleanUp();
+            _ = StartCleanUp();
             return new TimeFrame(now, cleanUpDelay);                
         }
         return new TimeFrame(now, remaining);

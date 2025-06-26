@@ -12,7 +12,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanForwardObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var forwarder = new DelayingForwarder(1.Milliseconds());
@@ -32,7 +32,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData(0, 5)]
         public void CanDelayOnForward(int delay, int maxDuration)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var forwarder = new DelayingForwarder(delay.Milliseconds());

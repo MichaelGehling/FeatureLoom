@@ -17,7 +17,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData("test string")]
         public void CanReceiveObjectsAndValues<T>(T message)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
             var receiver = new QueueReceiver<T>();
@@ -38,7 +38,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData(20, 10, false)]
         public void CanLimitQueueSize(int numMessages, int limit, bool dropLatestMessageOnFullQueue)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new QueueReceiver<int>(limit, default, dropLatestMessageOnFullQueue);
@@ -66,7 +66,7 @@ namespace FeatureLoom.MessageFlow
         [InlineData(false)]
         public void CanBlockOnFullQueue(bool sendAsync)
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             TimeSpan blockTime = 100.Milliseconds();
             int limit = 5;
@@ -102,7 +102,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void SignalsFilledQueue()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender();
             var receiver = new QueueReceiver<int>();
@@ -117,7 +117,7 @@ namespace FeatureLoom.MessageFlow
         [Fact(Skip = "Unstable when run with other tests.")]
         public void MultipleThreadsCanReceiveConcurrently()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             int numMessages = 1000;
             int numThreads = 2;

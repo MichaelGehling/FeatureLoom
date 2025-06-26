@@ -13,7 +13,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void PreventsConcurrentWriteAccess()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             SharedData<int> sharedData = new SharedData<int>(42);
             Task task;
@@ -41,7 +41,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void AllowsConcurrentReadAccess()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             SharedData<int> sharedData = new SharedData<int>(42);
             Task task;
@@ -64,7 +64,7 @@ namespace FeatureLoom.Synchronization
         [Fact]
         public void NotifiesAfterWriteAccessIfNotSuppressed()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             SharedData<int> sharedData = new SharedData<int>(42);
             LatestMessageReceiver<SharedDataUpdateNotification> receiver = new LatestMessageReceiver<SharedDataUpdateNotification>();

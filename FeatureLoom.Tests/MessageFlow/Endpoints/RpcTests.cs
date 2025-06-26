@@ -12,7 +12,7 @@ namespace FeatureLoom.RPC
         [Fact]
         public void CanCallMethodViaMessageFlow()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var callee = new RpcCallee();
             var caller = new RpcCaller(1.Seconds());
@@ -27,7 +27,7 @@ namespace FeatureLoom.RPC
         [Fact]
         public void CanCallMethodWithSeveralParameters()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var callee = new RpcCallee();
             var caller = new RpcCaller(1.Seconds());
@@ -47,7 +47,7 @@ namespace FeatureLoom.RPC
         [Fact]
         public void CanCallMethodAndIgnoringResponse()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var callee = new RpcCallee();
             var caller = new RpcCaller(1.Seconds());
@@ -75,7 +75,7 @@ namespace FeatureLoom.RPC
         [Fact]
         public void CanCallMethodWithSeveralParametersFromString()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var callee = new RpcCallee();
             var caller = new StringRpcCaller(1.Seconds());
@@ -105,7 +105,7 @@ namespace FeatureLoom.RPC
         [Fact]
         public void CanCallMethodOnMultipleCalleesAndReceiveAllResults()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var caller = new RpcCaller(1.Seconds());
             var calleeA = new RpcCallee();
@@ -126,7 +126,7 @@ namespace FeatureLoom.RPC
         [Fact]
         public void CanCallMethodOnMultipleCalleesAndReceiveAllResultsFromString()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var caller = new StringRpcCaller(1.Seconds());
             var calleeA = new RpcCallee();
@@ -147,7 +147,7 @@ namespace FeatureLoom.RPC
         [Fact]
         public void RpcRequestsCanBeQueuedAndHandledLater()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             var callee = new QueuingRpcCallee();
             var caller = new RpcCaller(1.Seconds());

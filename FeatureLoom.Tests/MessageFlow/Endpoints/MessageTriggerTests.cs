@@ -9,7 +9,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void IsSetToTriggeredWhenReceivesAnyMessage()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             MessageTrigger trigger = new MessageTrigger(MessageTrigger.Mode.Default);
             Assert.False(trigger.IsTriggered());
@@ -24,7 +24,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanToggleStatusWhenReceivingMultipleMessages()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             MessageTrigger trigger = new MessageTrigger(MessageTrigger.Mode.Toggle);
             Assert.False(trigger.IsTriggered());
@@ -39,7 +39,7 @@ namespace FeatureLoom.MessageFlow
         [Fact]
         public void CanAutoResetTriggerStatus()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             MessageTrigger trigger = new MessageTrigger(MessageTrigger.Mode.InstantReset);
             Assert.False(trigger.IsTriggered());

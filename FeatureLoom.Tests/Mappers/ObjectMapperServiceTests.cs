@@ -12,7 +12,7 @@ namespace FeatureLoom.Mappers
         [Fact]
         public void CanConvertMessagesOfDifferentTypes()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             ObjectMapperService mapperService = new ObjectMapperService();
             mapperService.AddConversion((int i) => i.ToString());
@@ -35,7 +35,7 @@ namespace FeatureLoom.Mappers
         [Fact]
         public void LaterAddingOrRemovingConversionIsAffective()
         {
-            TestHelper.PrepareTestContext();
+            using var testContext = TestHelper.PrepareTestContext();
 
             ObjectMapperService mapperService = new ObjectMapperService();            
 
