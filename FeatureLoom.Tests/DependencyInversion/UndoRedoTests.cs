@@ -18,7 +18,7 @@ namespace FeatureLoom.UndoRedo
         {
             using var testContext = TestHelper.PrepareTestContext();
             
-            var undoRedo = new UndoRedoService();
+            var undoRedo = new Helpers.UndoRedo();
             string data = "Init";
             undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
             undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");            
@@ -50,7 +50,7 @@ namespace FeatureLoom.UndoRedo
         {
             using var testContext = TestHelper.PrepareTestContext();
 
-            var undoRedo = new UndoRedoService();
+            var undoRedo = new Helpers.UndoRedo();
             string data = "Init";
             undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
             undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
@@ -78,7 +78,7 @@ namespace FeatureLoom.UndoRedo
         {
             using var testContext = TestHelper.PrepareTestContext();
 
-            var undoRedo = new UndoRedoService();
+            var undoRedo = new Helpers.UndoRedo();
             string data = "Init";
 
             undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
@@ -108,7 +108,7 @@ namespace FeatureLoom.UndoRedo
         {
             using var testContext = TestHelper.PrepareTestContext();
 
-            var undoRedo = new UndoRedoService();
+            var undoRedo = new Helpers.UndoRedo();
             string data = "Init";
             undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
             undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");
@@ -133,7 +133,7 @@ namespace FeatureLoom.UndoRedo
         {
             using var testContext = TestHelper.PrepareTestContext();
 
-            var undoRedo = new UndoRedoService();
+            var undoRedo = new Helpers.UndoRedo();
             string data = "Init";
             using (undoRedo.StartTransaction())
             {
@@ -159,7 +159,7 @@ namespace FeatureLoom.UndoRedo
         {
             using var testContext = TestHelper.PrepareTestContext();
 
-            var undoRedo = new UndoRedoService();
+            var undoRedo = new Helpers.UndoRedo();
             string data = "Init";
             undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
             undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");

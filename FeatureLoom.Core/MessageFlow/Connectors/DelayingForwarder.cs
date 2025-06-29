@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.MessageFlow;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
 using System.Threading;
@@ -64,16 +65,16 @@ namespace FeatureLoom.MessageFlow
         {
             if (blocking)
             {
-                await AppTime.WaitAsync(minDelay, maxDelay).ConfigureAwait(false);
-                await sourceHelper.ForwardAsync(message).ConfigureAwait(false);
+                await AppTime.WaitAsync(minDelay, maxDelay).ConfiguredAwait();
+                await sourceHelper.ForwardAsync(message).ConfiguredAwait();
             }
             else
             {
                 var tk = AppTime.TimeKeeper;
                 _ = Task.Run(async () =>
                 {
-                    await AppTime.WaitAsync(minDelay - tk.Elapsed, maxDelay - tk.LastElapsed).ConfigureAwait(false);
-                    await sourceHelper.ForwardAsync(message).ConfigureAwait(false);
+                    await AppTime.WaitAsync(minDelay - tk.Elapsed, maxDelay - tk.LastElapsed).ConfiguredAwait();
+                    await sourceHelper.ForwardAsync(message).ConfiguredAwait();
                 });
             }            
         }

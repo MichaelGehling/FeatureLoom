@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.Synchronization;
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -182,7 +183,7 @@ namespace FeatureLoom.Time
                 // we wait at least minTimeout
                 try
                 {
-                    await Task.Delay(minTimeout.ClampHigh(maxTimeout-lowerAsyncSleepLimit).ClampLow(1.Milliseconds()), cancellationToken).ConfigureAwait(false);                    
+                    await Task.Delay(minTimeout.ClampHigh(maxTimeout-lowerAsyncSleepLimit).ClampLow(1.Milliseconds()), cancellationToken).ConfiguredAwait();                    
                     
                 }
                 catch (TaskCanceledException)

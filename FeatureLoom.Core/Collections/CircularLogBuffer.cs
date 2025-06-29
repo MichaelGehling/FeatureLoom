@@ -273,7 +273,7 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
     {
         while (number > LatestId && !ct.IsCancellationRequested)
         {
-            if (!myLock.IsLocked) await newEntryEvent.Obj.WaitAsync(ct).ConfigureAwait(false);
+            if (!myLock.IsLocked) await newEntryEvent.Obj.WaitAsync(ct).ConfiguredAwait();
         }
     }
 

@@ -55,7 +55,7 @@ namespace FeatureLoom.Workflows
 
                 tasks.Add(wf.WaitUntilAsync(info => info.executionPhase != Workflow.ExecutionPhase.Running && info.executionPhase != Workflow.ExecutionPhase.Waiting));
             }
-            await Task.WhenAll(tasks.ToArray()).ConfigureAwait(false);
+            await Task.WhenAll(tasks.ToArray()).ConfiguredAwait();
         }
 
         protected void RemoveFromRunningWorkflows(Workflow workflow)

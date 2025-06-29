@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Storages;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,13 +14,13 @@ namespace FeatureLoom.Security
     {        
         public static async Task<IEnumerable<IdentityGroup>> GetMemberGroups(this Identity identity, bool forceUpdateCache)
         {
-            var groups = await IdentityGroup.GetAllGroupsAsync(forceUpdateCache).ConfigureAwait(false);
+            var groups = await IdentityGroup.GetAllGroupsAsync(forceUpdateCache).ConfiguredAwait();
             return groups.Where(group => group.IsMember(identity.IdentityId));
         }
 
         public static async Task<IEnumerable<IdentityGroup>> GetOwnedGroups(this Identity identity, bool forceUpdateCache)
         {
-            var groups = await IdentityGroup.GetAllGroupsAsync(forceUpdateCache).ConfigureAwait(false);
+            var groups = await IdentityGroup.GetAllGroupsAsync(forceUpdateCache).ConfiguredAwait();
             return groups.Where(group => group.IsOwner(identity.IdentityId));
         }
 
@@ -28,7 +29,7 @@ namespace FeatureLoom.Security
             if (item.HasIdentityPermission(permission, identity.IdentityId)) return true;
             if (ignoreGroups) return false;
 
-            var groups = await identity.GetMemberGroups(forceUpdateCache).ConfigureAwait(false);
+            var groups = await identity.GetMemberGroups(forceUpdateCache).ConfiguredAwait();
             return groups.Any(group => item.HasGroupPermission(permission, group.GroupId));
         }
     }

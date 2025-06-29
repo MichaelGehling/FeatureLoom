@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Time;
+﻿using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
@@ -29,7 +30,7 @@ namespace FeatureLoom.Workflows
                 do
                 {
                     var executionState = workflow.CurrentExecutionState;
-                    if (isAsyncMap[executionState.stateIndex][executionState.stepIndex]) running = await workflow.ExecuteNextStepAsync(executionController).ConfigureAwait(false);
+                    if (isAsyncMap[executionState.stateIndex][executionState.stepIndex]) running = await workflow.ExecuteNextStepAsync(executionController).ConfiguredAwait();
                     else running = workflow.ExecuteNextStep(executionController);
                 }
                 while (running);

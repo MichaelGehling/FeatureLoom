@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.MessageFlow;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -24,8 +25,8 @@ namespace FeatureLoom.Storages
             bool success = true;
             success &= await reader.TryReadAsync(sourceUri, async stream =>
             {
-                success &= await writer.TryWriteAsync(targetUri, stream).ConfigureAwait(false);                
-            }).ConfigureAwait(false);
+                success &= await writer.TryWriteAsync(targetUri, stream).ConfiguredAwait();                
+            }).ConfiguredAwait();
             return success;
         }
 
@@ -38,11 +39,11 @@ namespace FeatureLoom.Storages
         
         public static async Task<bool> TryCopy(this IStorageReader reader, IStorageWriter writer, string uriFilterPattern = null)
         {
-            if (!(await reader.TryListUrisAsync(uriFilterPattern).ConfigureAwait(false)).TryOut(out var uris)) return false;
+            if (!(await reader.TryListUrisAsync(uriFilterPattern).ConfiguredAwait()).TryOut(out var uris)) return false;
             bool success = true;
             foreach(var uri in uris)
             {
-                success &= await TryCopy(reader, uri, writer, uri).ConfigureAwait(false);
+                success &= await TryCopy(reader, uri, writer, uri).ConfiguredAwait();
             }
             return success;
         }
@@ -56,13 +57,13 @@ namespace FeatureLoom.Storages
 
         public static async Task<bool> TryCopy(this IStorageReader reader, IStorageWriter writer, Func<string,string> uriConverter, string uriFilterPattern = null)
         {
-            if (!(await reader.TryListUrisAsync(uriFilterPattern).ConfigureAwait(false)).TryOut(out var uris)) return false;
+            if (!(await reader.TryListUrisAsync(uriFilterPattern).ConfiguredAwait()).TryOut(out var uris)) return false;
             bool success = true;
             foreach (var uri in uris)
             {
                 var targetUri = uriConverter(uri);
                 if (targetUri == null) continue;
-                success &= await TryCopy(reader, uri, writer, targetUri).ConfigureAwait(false);
+                success &= await TryCopy(reader, uri, writer, targetUri).ConfiguredAwait();
             }
             return success;
         }
@@ -76,11 +77,11 @@ namespace FeatureLoom.Storages
 
         public async static Task<(bool success, Dictionary<string,T> items)> TryReadAllAsync<T>(this IStorageReader reader, string uriPattern = null)
         {
-            if (!(await reader.TryListUrisAsync(uriPattern).ConfigureAwait(false)).TryOut(out var uris)) return (false, null);
+            if (!(await reader.TryListUrisAsync(uriPattern).ConfiguredAwait()).TryOut(out var uris)) return (false, null);
             Dictionary<string, T> dict = new();
             foreach(var uri in uris)
             {
-                if (!(await reader.TryReadAsync<T>(uri).ConfigureAwait(false)).TryOut(out var item)) return (false, null);
+                if (!(await reader.TryReadAsync<T>(uri).ConfiguredAwait()).TryOut(out var item)) return (false, null);
                 dict[uri] = item;
             }
             return (true, dict);
@@ -88,12 +89,12 @@ namespace FeatureLoom.Storages
 
         public async static Task<(bool success, Dictionary<string, bool> deletedUrisInfo)> TryDeleteAllAsync(this IStorageReaderWriter readerWriter, string uriPattern = null)
         {
-            if (!(await readerWriter.TryListUrisAsync(uriPattern).ConfigureAwait(false)).TryOut(out var uris)) return (false, null);
+            if (!(await readerWriter.TryListUrisAsync(uriPattern).ConfiguredAwait()).TryOut(out var uris)) return (false, null);
             Dictionary<string, bool> dict = new();
             bool anyFailed = false;
             foreach (var uri in uris)
             {
-                if (!(await readerWriter.TryDeleteAsync(uri).ConfigureAwait(false)))
+                if (!(await readerWriter.TryDeleteAsync(uri).ConfiguredAwait()))
                 {
                     anyFailed = true;
                     dict[uri] = false;

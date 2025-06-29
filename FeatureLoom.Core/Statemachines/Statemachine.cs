@@ -2,6 +2,7 @@
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MessageFlow;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
@@ -192,7 +193,7 @@ namespace FeatureLoom.Statemachines
 
                 try
                 {
-                    job.CurrentStateName = await state.action(job.Context, job.CancellationToken).ConfigureAwait(false);
+                    job.CurrentStateName = await state.action(job.Context, job.CancellationToken).ConfiguredAwait();
 
                     if (job.CurrentStateName.EmptyOrNull()) job.ExecutionState = ExecutionState.Finished;
                     else if (job.CancellationToken.IsCancellationRequested) job.ExecutionState = ExecutionState.Interrupted;

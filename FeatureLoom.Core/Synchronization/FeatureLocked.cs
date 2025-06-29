@@ -92,7 +92,7 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple containing the lock handle and the locked object.</returns>
         public async Task<(FeatureLock.LockHandle Handle, T LockedObj)> UseWriteLockedAsync()
         {
-            var handle = await objLock.LockAsync().ConfigureAwait(false);
+            var handle = await objLock.LockAsync().ConfiguredAwait();
             return (handle, this.lazy);
         }
 
@@ -102,7 +102,7 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple containing the lock handle and the locked object.</returns>
         public async Task<(FeatureLock.LockHandle Handle, T LockedObj)> UseReadLockedAsync()
         {
-            var handle = await objLock.LockReadOnlyAsync().ConfigureAwait(false);
+            var handle = await objLock.LockReadOnlyAsync().ConfiguredAwait();
             return (handle, this.lazy);
         }
 
@@ -189,7 +189,7 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple indicating success, the lock handle, and the locked object.</returns>
         public async Task<(bool Success, FeatureLock.LockHandle Handle, T LockedObj)> TryUseWriteLockedAsync(TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
                 return (true, handle, this.lazy);
@@ -204,7 +204,7 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple indicating success, the lock handle, and the locked object.</returns>
         public async Task<(bool Success, FeatureLock.LockHandle Handle, T LockedObj)> TryUseReadLockedAsync(TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockReadOnlyAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockReadOnlyAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
                 return (true, handle, this.lazy);
@@ -624,10 +624,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>True if the lock was acquired and the action was executed; otherwise, false.</returns>
         public async Task<bool> TryUseLockedAsync(Func<T, Task> action, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) await action(lazy).ConfigureAwait(false);
+                using (handle) await action(lazy).ConfiguredAwait();
                 return true;
             }
             return false;
@@ -642,10 +642,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple indicating success and the result of the function.</returns>
         public async Task<(bool Success, TResult Result)> TryUseLockedAsync<TResult>(Func<T, Task<TResult>> func, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) return (true, await func(lazy).ConfigureAwait(false));
+                using (handle) return (true, await func(lazy).ConfiguredAwait());
             }
             return (false, default);
         }
@@ -658,10 +658,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>True if the lock was acquired and the action was executed; otherwise, false.</returns>
         public async Task<bool> TryUseReadLockedAsync(Func<T, Task> action, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockReadOnlyAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockReadOnlyAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) await action(lazy).ConfigureAwait(false);
+                using (handle) await action(lazy).ConfiguredAwait();
                 return true;
             }
             return false;
@@ -676,10 +676,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple indicating success and the result of the function.</returns>
         public async Task<(bool Success, TResult Result)> TryUseReadLockedAsync<TResult>(Func<T, Task<TResult>> func, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockReadOnlyAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockReadOnlyAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) return (true, await func(lazy).ConfigureAwait(false));
+                using (handle) return (true, await func(lazy).ConfiguredAwait());
             }
             return (false, default);
         }
@@ -692,10 +692,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>True if the lock was acquired and the action was executed; otherwise, false.</returns>
         public async Task<bool> TryUseReentrantReadLockedAsync(Func<T, Task> action, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockReentrantReadOnlyAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockReentrantReadOnlyAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) await action(lazy).ConfigureAwait(false);
+                using (handle) await action(lazy).ConfiguredAwait();
                 return true;
             }
             return false;
@@ -710,10 +710,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple indicating success and the result of the function.</returns>
         public async Task<(bool Success, TResult Result)> TryUseReentrantReadLockedAsync<TResult>(Func<T, Task<TResult>> func, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockReentrantReadOnlyAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockReentrantReadOnlyAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) return (true, await func(lazy).ConfigureAwait(false));
+                using (handle) return (true, await func(lazy).ConfiguredAwait());
             }
             return (false, default);
         }
@@ -726,10 +726,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>True if the lock was acquired and the action was executed; otherwise, false.</returns>
         public async Task<bool> TryUseReentrantWriteLockedAsync(Func<T, Task> action, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockReentrantAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockReentrantAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) await action(lazy).ConfigureAwait(false);
+                using (handle) await action(lazy).ConfiguredAwait();
                 return true;
             }
             return false;
@@ -744,10 +744,10 @@ namespace FeatureLoom.Synchronization
         /// <returns>A tuple indicating success and the result of the function.</returns>
         public async Task<(bool Success, TResult Result)> TryUseReentrantWriteLockedAsync<TResult>(Func<T, Task<TResult>> func, TimeSpan timeout)
         {
-            var attempt = await objLock.TryLockReentrantAsync(timeout).ConfigureAwait(false);
+            var attempt = await objLock.TryLockReentrantAsync(timeout).ConfiguredAwait();
             if (attempt.Succeeded(out var handle))
             {
-                using (handle) return (true, await func(lazy).ConfigureAwait(false));
+                using (handle) return (true, await func(lazy).ConfiguredAwait());
             }
             return (false, default);
         }
@@ -760,9 +760,9 @@ namespace FeatureLoom.Synchronization
         /// <param name="action">The async action to execute with the locked object.</param>
         public async Task UseLockedAsync(Func<T, Task> action)
         {
-            using (await objLock.LockAsync().ConfigureAwait(false))
+            using (await objLock.LockAsync().ConfiguredAwait())
             {
-                await action(lazy).ConfigureAwait(false);
+                await action(lazy).ConfiguredAwait();
             }
         }
 
@@ -774,9 +774,9 @@ namespace FeatureLoom.Synchronization
         /// <returns>The result of the function.</returns>
         public async Task<TResult> UseLockedAsync<TResult>(Func<T, Task<TResult>> func)
         {
-            using (await objLock.LockAsync().ConfigureAwait(false))
+            using (await objLock.LockAsync().ConfiguredAwait())
             {
-                return await func(lazy).ConfigureAwait(false);
+                return await func(lazy).ConfiguredAwait();
             }
         }
 
@@ -786,9 +786,9 @@ namespace FeatureLoom.Synchronization
         /// <param name="action">The async action to execute with the locked object.</param>
         public async Task UseReadLockedAsync(Func<T, Task> action)
         {
-            using (await objLock.LockReadOnlyAsync().ConfigureAwait(false))
+            using (await objLock.LockReadOnlyAsync().ConfiguredAwait())
             {
-                await action(lazy).ConfigureAwait(false);
+                await action(lazy).ConfiguredAwait();
             }
         }
 
@@ -800,9 +800,9 @@ namespace FeatureLoom.Synchronization
         /// <returns>The result of the function.</returns>
         public async Task<TResult> UseReadLockedAsync<TResult>(Func<T, Task<TResult>> func)
         {
-            using (await objLock.LockReadOnlyAsync().ConfigureAwait(false))
+            using (await objLock.LockReadOnlyAsync().ConfiguredAwait())
             {
-                return await func(lazy).ConfigureAwait(false);
+                return await func(lazy).ConfiguredAwait();
             }
         }
 
@@ -812,9 +812,9 @@ namespace FeatureLoom.Synchronization
         /// <param name="action">The async action to execute with the locked object.</param>
         public async Task UseWriteLockedAsync(Func<T, Task> action)
         {
-            using (await objLock.LockAsync().ConfigureAwait(false))
+            using (await objLock.LockAsync().ConfiguredAwait())
             {
-                await action(lazy).ConfigureAwait(false);
+                await action(lazy).ConfiguredAwait();
             }
         }
 
@@ -826,9 +826,9 @@ namespace FeatureLoom.Synchronization
         /// <returns>The result of the function.</returns>
         public async Task<TResult> UseWriteLockedAsync<TResult>(Func<T, Task<TResult>> func)
         {
-            using (await objLock.LockAsync().ConfigureAwait(false))
+            using (await objLock.LockAsync().ConfiguredAwait())
             {
-                return await func(lazy).ConfigureAwait(false);
+                return await func(lazy).ConfiguredAwait();
             }
         }
 
@@ -838,9 +838,9 @@ namespace FeatureLoom.Synchronization
         /// <param name="action">The async action to execute with the locked object.</param>
         public async Task UseReentrantReadLockedAsync(Func<T, Task> action)
         {
-            using (await objLock.LockReentrantReadOnlyAsync().ConfigureAwait(false))
+            using (await objLock.LockReentrantReadOnlyAsync().ConfiguredAwait())
             {
-                await action(lazy).ConfigureAwait(false);
+                await action(lazy).ConfiguredAwait();
             }
         }
 
@@ -852,9 +852,9 @@ namespace FeatureLoom.Synchronization
         /// <returns>The result of the function.</returns>
         public async Task<TResult> UseReentrantReadLockedAsync<TResult>(Func<T, Task<TResult>> func)
         {
-            using (await objLock.LockReentrantReadOnlyAsync().ConfigureAwait(false))
+            using (await objLock.LockReentrantReadOnlyAsync().ConfiguredAwait())
             {
-                return await func(lazy).ConfigureAwait(false);
+                return await func(lazy).ConfiguredAwait();
             }
         }
 
@@ -864,9 +864,9 @@ namespace FeatureLoom.Synchronization
         /// <param name="action">The async action to execute with the locked object.</param>
         public async Task UseReentrantWriteLockedAsync(Func<T, Task> action)
         {
-            using (await objLock.LockReentrantAsync().ConfigureAwait(false))
+            using (await objLock.LockReentrantAsync().ConfiguredAwait())
             {
-                await action(lazy).ConfigureAwait(false);
+                await action(lazy).ConfiguredAwait();
             }
         }
 
@@ -878,9 +878,9 @@ namespace FeatureLoom.Synchronization
         /// <returns>The result of the function.</returns>
         public async Task<TResult> UseReentrantWriteLockedAsync<TResult>(Func<T, Task<TResult>> func)
         {
-            using (await objLock.LockReentrantAsync().ConfigureAwait(false))
+            using (await objLock.LockReentrantAsync().ConfiguredAwait())
             {
-                return await func(lazy).ConfigureAwait(false);
+                return await func(lazy).ConfiguredAwait();
             }
         }
 

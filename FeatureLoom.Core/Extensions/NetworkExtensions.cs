@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using FeatureLoom.Synchronization;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.Extensions
@@ -10,7 +11,7 @@ namespace FeatureLoom.Extensions
             IPAddress ipAddress;
             if (useDns)
             {
-                var hostEntry = await Dns.GetHostEntryAsync(str).ConfigureAwait(false);
+                var hostEntry = await Dns.GetHostEntryAsync(str).ConfiguredAwait();
                 ipAddress = hostEntry.AddressList[0];
             }
             else

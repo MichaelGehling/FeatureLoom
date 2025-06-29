@@ -81,7 +81,7 @@ namespace FeatureLoom.Workflows
             {
                 tasks.Add(runner.PauseAllWorkflows(tryCancelWaitingStep));
             }
-            await Task.WhenAll(tasks.ToArray()).ConfigureAwait(false);
+            await Task.WhenAll(tasks.ToArray()).ConfiguredAwait();
         }
 
     }

@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Helpers;
 using FeatureLoom.MessageFlow;
+using FeatureLoom.Synchronization;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,7 +49,7 @@ namespace FeatureLoom.Statemachines
 
             public void OnCompleted(Action continuation)
             {
-                ExecutionTask.ConfigureAwait(false).GetAwaiter().OnCompleted(continuation);
+                ExecutionTask.ConfiguredAwait().GetAwaiter().OnCompleted(continuation);
             }            
 
             public IStatemachineJob GetAwaiter() => this;

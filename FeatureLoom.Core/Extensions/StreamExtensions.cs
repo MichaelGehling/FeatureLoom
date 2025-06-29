@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureLoom.Synchronization;
+using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -34,7 +35,7 @@ namespace FeatureLoom.Extensions
 
             do
             {
-                bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+                bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length).ConfiguredAwait();
                 if (bytesRead < buffer.Length) finished = true;
                 if (bytesRead > 0)
                 {

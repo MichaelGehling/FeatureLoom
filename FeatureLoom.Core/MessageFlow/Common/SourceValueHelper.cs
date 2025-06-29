@@ -120,7 +120,7 @@ namespace FeatureLoom.MessageFlow
             bool anyInvalid = false;
             for (int i = currentSinks.Length - 1; i >= 0; i--)
             {
-                if (currentSinks[i].TryGetTarget(out IMessageSink target)) await target.PostAsync(message).ConfigureAwait(false);                
+                if (currentSinks[i].TryGetTarget(out IMessageSink target)) await target.PostAsync(message).ConfiguredAwait();                
                 else anyInvalid = true;                
             }
             if (anyInvalid) LockAndRemoveInvalidReferences();            

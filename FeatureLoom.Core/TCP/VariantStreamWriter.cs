@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
+using FeatureLoom.Synchronization;
 using FeatureLoom.TCP;
 using System;
 using System.Collections.Generic;
@@ -81,14 +82,14 @@ namespace FeatureLoom.TCP
             long lengthPos = memoryStream.Length;
             binaryWriter.Write((uint)0);
             long messagePos = memoryStream.Length;
-            await writer.WriteMessage(message, memoryStream, cancellationToken).ConfigureAwait(false);
+            await writer.WriteMessage(message, memoryStream, cancellationToken).ConfiguredAwait();
             long messageLength = memoryStream.Length - messagePos;
             memoryStream.Position = lengthPos;
             binaryWriter.Write((int)messageLength);
 
             memoryStream.Position = 0;
-            await memoryStream.CopyToAsync(stream, (int)memoryStream.Length.ClampHigh(settings.maxStreamCopyBufferSize), cancellationToken).ConfigureAwait(false);
-            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await memoryStream.CopyToAsync(stream, (int)memoryStream.Length.ClampHigh(settings.maxStreamCopyBufferSize), cancellationToken).ConfiguredAwait();
+            await stream.FlushAsync(cancellationToken).ConfiguredAwait();
 
             // Reset
             memoryStream.SetLength(0);

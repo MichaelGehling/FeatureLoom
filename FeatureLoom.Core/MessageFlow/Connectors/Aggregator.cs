@@ -120,12 +120,12 @@ namespace FeatureLoom.MessageFlow
             bool alternative = true;
             if (message is I typedMessage)
             {
-                using (await dataLock.LockAsync().ConfigureAwait(false))
+                using (await dataLock.LockAsync().ConfiguredAwait())
                 {
                     alternative = !aggregationData.AddMessage(typedMessage);
                     while (aggregationData.TryGetAggregatedMessage(false, out O aggregatedMessage))
                     {
-                        await sourceHelper.ForwardAsync(aggregatedMessage).ConfigureAwait(false);
+                        await sourceHelper.ForwardAsync(aggregatedMessage).ConfiguredAwait();
                     }
                     SetTimeout();
                 }

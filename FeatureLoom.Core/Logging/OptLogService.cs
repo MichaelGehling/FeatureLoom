@@ -287,13 +287,13 @@ public class OptLogService
     {
         switch (loglevel)
         {
-            case Loglevel.TRACE: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_TRACE, whiteListFilters_TRACE, loglevel_TRACE, logContext); break;
-            case Loglevel.DEBUG: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_DEBUG, whiteListFilters_DEBUG, loglevel_DEBUG, logContext); break;
-            case Loglevel.INFO: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_INFO, whiteListFilters_INFO, loglevel_INFO, logContext); break;
-            case Loglevel.WARNING: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_WARNING, whiteListFilters_WARNING, loglevel_WARNING, logContext); break;
-            case Loglevel.ERROR: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_ERROR, whiteListFilters_ERROR, loglevel_ERROR, logContext); break;
-            case Loglevel.CRITICAL: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_CRITICAL, whiteListFilters_CRITICAL, loglevel_CRITICAL, logContext); break;
-            case Loglevel.IMPORTANT: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_IMPORTANT, whiteListFilters_IMPORTANT, loglevel_IMPORTANT, logContext); break;
+            case Loglevel.TRACE: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_TRACE, whiteListFilters_TRACE, loglevel_TRACE, logContext);
+            case Loglevel.DEBUG: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_DEBUG, whiteListFilters_DEBUG, loglevel_DEBUG, logContext);
+            case Loglevel.INFO: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_INFO, whiteListFilters_INFO, loglevel_INFO, logContext);
+            case Loglevel.WARNING: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_WARNING, whiteListFilters_WARNING, loglevel_WARNING, logContext);
+            case Loglevel.ERROR: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_ERROR, whiteListFilters_ERROR, loglevel_ERROR, logContext);
+            case Loglevel.CRITICAL: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_CRITICAL, whiteListFilters_CRITICAL, loglevel_CRITICAL, logContext);
+            case Loglevel.IMPORTANT: return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_IMPORTANT, whiteListFilters_IMPORTANT, loglevel_IMPORTANT, logContext);
             default: return null;
         }        
     }

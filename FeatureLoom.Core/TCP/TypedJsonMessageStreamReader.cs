@@ -5,7 +5,6 @@ using System.Threading;
 using FeatureLoom.Serialization;
 using FeatureLoom.TCP;
 using FeatureLoom.Extensions;
-using FeatureLoom.Serialization;
 
 namespace FeatureLoom.TCP
 {

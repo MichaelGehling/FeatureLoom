@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
@@ -159,13 +160,13 @@ namespace FeatureLoom.MessageFlow
         private async Task ForwardingLoop()
         {
             var timeout = maxIdleMilliseconds.Milliseconds();
-            while ((await receiver.TryReceiveAsync(timeout).ConfigureAwait(false)).TryOut(out ForwardingMessage forwardingMessage))
+            while ((await receiver.TryReceiveAsync(timeout).ConfiguredAwait()).TryOut(out ForwardingMessage forwardingMessage))
             {
                 try
                 {
                     if (forwardingMessage.forwardingMethod == ForwardingMethod.Synchronous) sourceHelper.Forward(forwardingMessage.message);
                     else if (forwardingMessage.forwardingMethod == ForwardingMethod.SynchronousByRef) sourceHelper.Forward(in forwardingMessage.message);
-                    else if (forwardingMessage.forwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(forwardingMessage.message).ConfigureAwait(false);
+                    else if (forwardingMessage.forwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(forwardingMessage.message).ConfiguredAwait();
                 }
                 catch (Exception e)
                 {
