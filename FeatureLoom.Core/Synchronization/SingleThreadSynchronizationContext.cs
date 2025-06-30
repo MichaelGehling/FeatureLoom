@@ -11,6 +11,29 @@ namespace FeatureLoom.Synchronization;
 /// <summary>
 /// A SynchronizationContext that processes all posted work items on a single dedicated thread.
 /// Ensures that all callbacks are executed sequentially on the same thread, similar to a UI message loop.
+///
+/// <para>Example usage:</para>
+/// <code>
+/// using FeatureLoom.Synchronization;
+/// using System;
+/// using System.Threading;
+/// using System.Threading.Tasks;
+///
+/// // Create and set the context
+/// using var context = new SingleThreadSynchronizationContext();
+/// SynchronizationContext.SetSynchronizationContext(context);
+///
+/// // Post work to the context
+/// context.Post(_ => Console.WriteLine($"Hello from thread {Thread.CurrentThread.ManagedThreadId}"), null);
+///
+/// // Run an async method on the context
+/// context.Post(async _ =>
+/// {
+///     Console.WriteLine($"Before await, thread {Thread.CurrentThread.ManagedThreadId}");
+///     await Task.Delay(100);
+///     Console.WriteLine($"After await, thread {Thread.CurrentThread.ManagedThreadId}");
+/// }, null);
+/// </code>
 /// </summary>
 public sealed class SingleThreadSynchronizationContext : SynchronizationContext, IDisposable
 {

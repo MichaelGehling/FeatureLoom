@@ -30,7 +30,7 @@ namespace FeatureLoom.Logging
                 [Loglevel.TRACE] = ConsoleColor.DarkGray,
             };
             public ConsoleColor backgroundColor = ConsoleColor.Black;
-            public bool omitLoggingWithoutConsole = true;
+            public bool omitLoggingWithoutConsole = false;
         }
 
         public Config config = new Config();
@@ -57,7 +57,7 @@ namespace FeatureLoom.Logging
                     ConsoleColor? bgColor = config.backgroundColor;
                     if (config.loglevelColors != null && config.loglevelColors.TryGetValue(logMessage.level, out var color)) fgColor = color;
 
-                    if (logMessage.level == Loglevel.ERROR) ConsoleHelper.WriteLineToError(strMsg, fgColor, bgColor);
+                    if (logMessage.level == Loglevel.ERROR || logMessage.level == Loglevel.CRITICAL) ConsoleHelper.WriteLineToError(strMsg, fgColor, bgColor);
                     else ConsoleHelper.WriteLine(strMsg, fgColor, bgColor);
                 }
             }

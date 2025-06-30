@@ -422,7 +422,7 @@ namespace FeatureLoom.Extensions
         }
 
         /// <summary>
-        /// Conveerts a string to an convertible type.
+        /// Converts a string to an convertible type.
         /// Note: Uses the current threads culture for conversions if no provider is specified.
         /// </summary>
         public static T ConvertTo<T>(this string str, IFormatProvider provider = null) where T : IConvertible
