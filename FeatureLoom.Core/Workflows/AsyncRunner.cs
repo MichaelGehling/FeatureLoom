@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using FeatureLoom.Synchronization;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Workflows
 {
@@ -9,7 +10,7 @@ namespace FeatureLoom.Workflows
             AddToRunningWorkflows(workflow);
             try
             {                
-                while (await workflow.ExecuteNextStepAsync(executionController).ConfigureAwait(false)) ;
+                while (await workflow.ExecuteNextStepAsync(executionController).ConfiguredAwait()) ;
             }
             finally
             {

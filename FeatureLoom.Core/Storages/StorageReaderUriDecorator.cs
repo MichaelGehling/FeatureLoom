@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.MessageFlow;
+using FeatureLoom.Synchronization;
 using System;
 using System.IO;
 using System.Linq;
@@ -59,7 +60,7 @@ namespace FeatureLoom.Storages
         {
             uriPattern = transformUri(uriPattern);
             if (uriPattern == null) return (false, default);
-            if (!(await reader.TryListUrisAsync(uriPattern).ConfigureAwait(false)).TryOut(out string[] uris)) return (false, default);
+            if (!(await reader.TryListUrisAsync(uriPattern).ConfiguredAwait()).TryOut(out string[] uris)) return (false, default);
             uris = uris.Select(uri => retransformUri(uri)).Where(uri => uri != null).ToArray();
             return (true, uris);
         }

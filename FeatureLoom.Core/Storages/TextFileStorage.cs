@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.InteropServices;
+using FeatureLoom.Synchronization;
 
 namespace FeatureLoom.Storages
 {
@@ -99,7 +100,7 @@ namespace FeatureLoom.Storages
                     }
                     else return m1.Equals(m2);
                 });
-                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(async msg => await ProcessChangeNotification(msg).ConfigureAwait(false));
+                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(async msg => await ProcessChangeNotification(msg).ConfiguredAwait());
                 fileObserver.ConnectTo(duplicateMessageSuppressor).ConnectTo(fileChangeProcessor);
                 fileSystemObservationActive = true;
             }
@@ -120,7 +121,7 @@ namespace FeatureLoom.Storages
                 ActivateFileSystemObservation(false);
             }
 
-            await Task.Delay(config.fileChangeNotificationDelay).ConfigureAwait(false);
+            await Task.Delay(config.fileChangeNotificationDelay).ConfiguredAwait();
 
             if (notification.changeType.IsFlagSet(WatcherChangeTypes.Deleted))
             {
@@ -464,7 +465,7 @@ namespace FeatureLoom.Storages
                     using (var stream = fileInfo.OpenText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.ReadTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        var fileContent = await stream.ReadToEndAsync().ConfigureAwait(false);
+                        var fileContent = await stream.ReadToEndAsync().ConfiguredAwait();
 
                         success = TryDeserialize(fileContent, out data);
 
@@ -492,7 +493,7 @@ namespace FeatureLoom.Storages
                 if (cache != null && cache.TryGet(uri, out string cacheString))
                 {
                     var stream = new MemoryStream(Encoding.UTF8.GetBytes(cacheString));
-                    await consumer(stream).ConfigureAwait(false);
+                    await consumer(stream).ConfiguredAwait();
                     return true;
                 }
 
@@ -509,17 +510,17 @@ namespace FeatureLoom.Storages
                             using (var memoryStream = new MemoryStream())
                             using (var textReader = new StreamReader(memoryStream))
                             {
-                                await stream.CopyToAsync(memoryStream).ConfigureAwait(false);
+                                await stream.CopyToAsync(memoryStream).ConfiguredAwait();
                                 memoryStream.Position = 0;
-                                await consumer(memoryStream).ConfigureAwait(false);
+                                await consumer(memoryStream).ConfiguredAwait();
                                 memoryStream.Position = 0;
-                                string fileContent = await textReader.ReadToEndAsync().ConfigureAwait(false);
+                                string fileContent = await textReader.ReadToEndAsync().ConfiguredAwait();
                                 cache?.Add(uri, fileContent);
                             }
                         }
                         else
                         {
-                            await consumer(stream).ConfigureAwait(false);
+                            await consumer(stream).ConfiguredAwait();
                         }
 
                         return true;
@@ -559,7 +560,7 @@ namespace FeatureLoom.Storages
                     using (var stream = fileInfo.CreateText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        await stream.WriteAsync(fileContent).ConfigureAwait(false);
+                        await stream.WriteAsync(fileContent).ConfiguredAwait();
                         lock (fileSet)
                         {
                             fileSet.Add(fileInfo.FullName);
@@ -598,7 +599,7 @@ namespace FeatureLoom.Storages
                     if (!sourceStream.CanSeek)
                     {
                         MemoryStream memoryStream = new MemoryStream();
-                        await sourceStream.CopyToAsync(memoryStream).ConfigureAwait(false);
+                        await sourceStream.CopyToAsync(memoryStream).ConfiguredAwait();
                         sourceStream = memoryStream;
                         sourceStream.Position = 0;
                         disposeStream = true;
@@ -607,7 +608,7 @@ namespace FeatureLoom.Storages
                     var origPosition = sourceStream.Position;
                     // Without using, otherwise the streamreader would dispose the stream already here!
                     var textReader = new StreamReader(sourceStream);
-                    fileContent = await textReader.ReadToEndAsync().ConfigureAwait(false);
+                    fileContent = await textReader.ReadToEndAsync().ConfiguredAwait();
                     sourceStream.Position = origPosition;
                     cache?.Add(uri, fileContent);                                        
                 }
@@ -622,7 +623,7 @@ namespace FeatureLoom.Storages
                 {
                     if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.SetLength(0);
-                    await sourceStream.CopyToAsync(stream).ConfigureAwait(false);                    
+                    await sourceStream.CopyToAsync(stream).ConfiguredAwait();                    
 
                     lock (fileSet)
                     {
@@ -663,7 +664,7 @@ namespace FeatureLoom.Storages
                     using (var stream = fileInfo.AppendText())
                     {
                         if (config.timeout > TimeSpan.Zero) stream.BaseStream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
-                        await stream.WriteAsync(fileContent).ConfigureAwait(false);
+                        await stream.WriteAsync(fileContent).ConfiguredAwait();
                         return true;
                     }
 
@@ -691,7 +692,7 @@ namespace FeatureLoom.Storages
                 {
                     if (config.timeout > TimeSpan.Zero) stream.WriteTimeout = config.timeout.TotalMilliseconds.ToIntTruncated();
                     stream.Seek(0, SeekOrigin.End);
-                    await sourceStream.CopyToAsync(stream).ConfigureAwait(false);
+                    await sourceStream.CopyToAsync(stream).ConfiguredAwait();
                     return true;
                 }
             }

@@ -52,7 +52,7 @@ public sealed partial class FeatureJsonDeserializer
             {
                 bufferFillLevel = Encoding.UTF8.GetBytes(str, 0, str.Length, buffer, 0);
             }
-            catch (ArgumentException ex)
+            catch
             {
                 int maxRequiredSize = str.Length * 2;
                 ResetBuffer(false, true, maxRequiredSize);
@@ -107,7 +107,7 @@ public sealed partial class FeatureJsonDeserializer
                 bufferFillLevel += bytesRead;                    
                 return bytesRead > 0;
             }
-            catch (Exception e)
+            catch
             {
                 return false;
             }

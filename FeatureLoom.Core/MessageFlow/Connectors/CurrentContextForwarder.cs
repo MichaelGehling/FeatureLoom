@@ -1,5 +1,6 @@
 ﻿using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
+using FeatureLoom.Synchronization;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -87,14 +88,14 @@ namespace FeatureLoom.MessageFlow
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await receiver.WaitAsync().ConfigureAwait(false);
+                await receiver.WaitAsync().ConfiguredAwait();
                 while (receiver.TryReceive(out ForwardingMessage forwardingMessage))
                 {
                     try
                     {
                         if (forwardingMessage.forwardingMethod == ForwardingMethod.Synchronous) sourceHelper.Forward(forwardingMessage.message);
                         else if (forwardingMessage.forwardingMethod == ForwardingMethod.SynchronousByRef) sourceHelper.Forward(in forwardingMessage.message);
-                        else if (forwardingMessage.forwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(forwardingMessage.message).ConfigureAwait(false);
+                        else if (forwardingMessage.forwardingMethod == ForwardingMethod.Asynchronous) await sourceHelper.ForwardAsync(forwardingMessage.message).ConfiguredAwait();
                     }
                     catch (Exception e)
                     {

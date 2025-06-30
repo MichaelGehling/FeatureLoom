@@ -40,9 +40,9 @@ namespace FeatureLoom.Storages
         {
             var writer = Storage.GetWriter(defaultCategory);
             var reader = Storage.GetReader(defaultCategory);
-            if ((await reader.TryListUrisAsync().ConfigureAwait(false)).TryOut(out string[] uris))
+            if ((await reader.TryListUrisAsync().ConfiguredAwait()).TryOut(out string[] uris))
             {
-                foreach (var uri in uris) await writer.TryDeleteAsync(uri).ConfigureAwait(false);
+                foreach (var uri in uris) await writer.TryDeleteAsync(uri).ConfiguredAwait();
             }
         }
 
@@ -142,7 +142,7 @@ namespace FeatureLoom.Storages
                 {
                     if (!subscriptionReceiver.Exists)
                     {
-                        success = (await Reader.TryReadAsync<string>(this.Uri).ConfigureAwait(false)).TryOut(out json);
+                        success = (await Reader.TryReadAsync<string>(this.Uri).ConfiguredAwait()).TryOut(out json);
                         StartSubscription();
                     }
                     else
@@ -156,7 +156,7 @@ namespace FeatureLoom.Storages
                 }
                 else
                 {
-                    success = (await Reader.TryReadAsync<string>(this.Uri).ConfigureAwait(false)).TryOut(out json);
+                    success = (await Reader.TryReadAsync<string>(this.Uri).ConfiguredAwait()).TryOut(out json);
                 }
 
                 if (success)
@@ -222,9 +222,9 @@ namespace FeatureLoom.Storages
     {
         public static async Task TryUpdateFromStorageOrWriteAsync(this Configuration config, bool useSubscription)
         {
-            if (!await config.TryUpdateFromStorageAsync(useSubscription).ConfigureAwait(false))
+            if (!await config.TryUpdateFromStorageAsync(useSubscription).ConfiguredAwait())
             {
-                await config.TryWriteToStorageAsync().ConfigureAwait(false);
+                await config.TryWriteToStorageAsync().ConfiguredAwait();
             }
         }
 
@@ -234,7 +234,7 @@ namespace FeatureLoom.Storages
             await config.SubscriptionWaitHandle.OnEvent(cfg =>
             {
                 if (cfg.TryUpdateFromStorage(true)) action(cfg);
-            }, config, true, cancellationToken).ConfigureAwait(false);
+            }, config, true, cancellationToken).ConfiguredAwait();
         }
 
         public static async Task OnUpdateFromStorageApplyAndDo<T>(this T config, Func<T, Task> action, CancellationToken cancellationToken = default) where T : Configuration
@@ -242,8 +242,8 @@ namespace FeatureLoom.Storages
             config.StartSubscription();
             await config.SubscriptionWaitHandle.OnEvent(async cfg =>
             {
-                if (cfg.TryUpdateFromStorage(true)) await action(cfg).ConfigureAwait(false);
-            }, config, true, cancellationToken).ConfigureAwait(false);
+                if (cfg.TryUpdateFromStorage(true)) await action(cfg).ConfiguredAwait();
+            }, config, true, cancellationToken).ConfiguredAwait();
         }
 
         public static void UpdateFromEnvironment<T>(this T config, string envVarPrefix = null) where T : Configuration

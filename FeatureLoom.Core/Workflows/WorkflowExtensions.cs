@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.MessageFlow;
+using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
 using System.Threading.Tasks;
@@ -21,8 +22,8 @@ namespace FeatureLoom.Workflows
             if (!ignoreCurrentState) trigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
-            if (timeout == default) await trigger.WaitAsync().ConfigureAwait(false);
-            else success = await trigger.WaitAsync(timeout).ConfigureAwait(false);
+            if (timeout == default) await trigger.WaitAsync().ConfiguredAwait();
+            else success = await trigger.WaitAsync(timeout).ConfiguredAwait();
 
             workflow.ExecutionInfoSource.DisconnectFrom(trigger);
             return success;
@@ -53,12 +54,12 @@ namespace FeatureLoom.Workflows
             startTrigger.Post(workflow.CreateExecutionInfo());
 
             bool success = true;
-            if (timeout == default) await startTrigger.WaitAsync().ConfigureAwait(false);
+            if (timeout == default) await startTrigger.WaitAsync().ConfiguredAwait();
             else
             {
                 DateTime now = AppTime.Now;
                 timeFrame = new TimeFrame(now, timeout);
-                success = await startTrigger.WaitAsync(timeFrame.Remaining(now)).ConfigureAwait(false);
+                success = await startTrigger.WaitAsync(timeFrame.Remaining(now)).ConfiguredAwait();
             }
 
             workflow.ExecutionInfoSource.DisconnectFrom(startTrigger);
@@ -70,8 +71,8 @@ namespace FeatureLoom.Workflows
                 workflow.ExecutionInfoSource.ConnectTo(endTrigger);
                 endTrigger.Post(workflow.CreateExecutionInfo());
 
-                if (timeout == default) await endTrigger.WaitAsync().ConfigureAwait(false);
-                else success = await endTrigger.WaitAsync(timeFrame.Remaining()).ConfigureAwait(false);
+                if (timeout == default) await endTrigger.WaitAsync().ConfiguredAwait();
+                else success = await endTrigger.WaitAsync(timeFrame.Remaining()).ConfiguredAwait();
 
                 workflow.ExecutionInfoSource.DisconnectFrom(endTrigger);
             }

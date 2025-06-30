@@ -55,7 +55,7 @@ namespace FeatureLoom.Synchronization
             if (task.IsCanceled || task.IsFaulted) return false;
             else if (task.IsCompleted) return true;
 
-            await task.ConfigureAwait(false);
+            await task.ConfiguredAwait();
 
             if (task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -68,7 +68,7 @@ namespace FeatureLoom.Synchronization
 #if NET8_0_OR_GREATER
             try
             {
-                await task.WaitAsync(timeout).ConfigureAwait(false);
+                await task.WaitAsync(timeout).ConfiguredAwait();
             }
             catch
             {
@@ -78,7 +78,7 @@ namespace FeatureLoom.Synchronization
 #else
 
 
-            await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
+            await Task.WhenAny(task, Task.Delay(timeout)).ConfiguredAwait();
 
             if (task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -121,7 +121,7 @@ namespace FeatureLoom.Synchronization
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-            await tcs.Task.ConfigureAwait(false);
+            await tcs.Task.ConfiguredAwait();
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -137,7 +137,7 @@ namespace FeatureLoom.Synchronization
 #if NET8_0_OR_GREATER
             try
             {
-                await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await task.WaitAsync(cancellationToken).ConfiguredAwait();
             }
             catch
             {
@@ -149,7 +149,7 @@ namespace FeatureLoom.Synchronization
             {
                 using(var cancelRegistration = cancellationToken.Register(() => throw new TaskCanceledException(task), true))
                 {
-                    await task.ConfigureAwait(false);
+                    await task.ConfiguredAwait();
                 }
             }
             catch(TaskCanceledException)
@@ -194,7 +194,7 @@ namespace FeatureLoom.Synchronization
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-            await tcs.Task.ConfigureAwait(false);
+            await tcs.Task.ConfiguredAwait();
 
             if (task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;
@@ -210,7 +210,7 @@ namespace FeatureLoom.Synchronization
 #if NET8_0_OR_GREATER
             try
             {
-                await task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+                await task.WaitAsync(timeout, cancellationToken).ConfiguredAwait();
             }
             catch
             {
@@ -221,7 +221,7 @@ namespace FeatureLoom.Synchronization
 
             try
             {
-                await Task.WhenAny(task, Task.Delay(timeout, cancellationToken)).ConfigureAwait(false);
+                await Task.WhenAny(task, Task.Delay(timeout, cancellationToken)).ConfiguredAwait();
             }
             catch (TaskCanceledException)
             {
@@ -269,7 +269,7 @@ namespace FeatureLoom.Synchronization
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-            await tcs.Task.ConfigureAwait(false);
+            await tcs.Task.ConfiguredAwait();
 
             if(task.IsCanceled || task.IsFaulted || !task.IsCompleted) return false;
             else return true;

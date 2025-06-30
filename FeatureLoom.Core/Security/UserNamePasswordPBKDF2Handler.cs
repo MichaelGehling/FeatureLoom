@@ -11,9 +11,9 @@ namespace FeatureLoom.Security
     public class UserNamePasswordPBKDF2Handler : ICredentialHandler<UsernamePassword>
     {
         public string CredentialType => "UsernamePasswordPBKDF2";
-        public int saltLength = 24;
-        public int hashLength = 24;
-        public int iterations = 10_000;
+        public int saltLength = 32;
+        public int hashLength = 32;
+        public int iterations = 100_000;
 
         public StoredCredential GenerateStoredCredential(UsernamePassword credential)
         {

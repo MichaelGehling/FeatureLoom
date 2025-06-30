@@ -58,13 +58,13 @@ namespace FeatureLoom.Security
                     var reader = Storage.GetReader(storageCategory);
                     var writer = Storage.GetWriter(storageCategory);
 
-                    if ((await reader.TryListUrisAsync().ConfigureAwait(false)).TryOut(out var uris))
+                    if ((await reader.TryListUrisAsync().ConfiguredAwait()).TryOut(out var uris))
                     {
                         foreach (string uri in uris)
                         {
-                            if ((await reader.TryReadAsync<Session>(uri).ConfigureAwait(false)).TryOut(out Session session))
+                            if ((await reader.TryReadAsync<Session>(uri).ConfiguredAwait()).TryOut(out Session session))
                             {
-                                if (session.LifeTime.Elapsed()) await writer.TryDeleteAsync(uri).ConfigureAwait(false);
+                                if (session.LifeTime.Elapsed()) await writer.TryDeleteAsync(uri).ConfiguredAwait();
                             }
                         }
                     }                    

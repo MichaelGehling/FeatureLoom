@@ -279,7 +279,7 @@ namespace FeatureLoom.Extensions
         {
             if (!featureLock.IsLocked) return;
 
-            using (await featureLock.LockAsync(true).ConfigureAwait(false)) 
+            using (await featureLock.LockAsync(true).ConfiguredAwait()) 
             {
                 // Just lock with priority so we know when the lock was exited by previous owner 
             };

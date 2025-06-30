@@ -32,7 +32,7 @@ namespace FeatureLoom.Synchronization
                 tokenRegistration = cancellationToken.Register(
                     myTcs => ((TaskCompletionSource<bool>)myTcs).TrySetCanceled(),
                     tcs);
-                result = await tcs.Task.ConfigureAwait(false);
+                result = await tcs.Task.ConfiguredAwait();
             }
             catch (Exception e)
             {
@@ -49,13 +49,13 @@ namespace FeatureLoom.Synchronization
 
         public static Task<bool> WaitOneAsync(this WaitHandle handle, TimeSpan timeout, CancellationToken cancellationToken)
         {
-            //return await handle.WaitOneAsync(timeout.TotalMilliseconds.ToIntTruncated(), cancellationToken).ConfigureAwait(false);
+            //return await handle.WaitOneAsync(timeout.TotalMilliseconds.ToIntTruncated(), cancellationToken).ConfiguredAwait();
             return Task.Run(() => WaitHandle.WaitAny(new[] { handle, cancellationToken.WaitHandle }, timeout) == 0);
         }
 
         public static Task<bool> WaitOneAsync(this WaitHandle handle, CancellationToken cancellationToken)
         {
-            //return await handle.WaitOneAsync(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            //return await handle.WaitOneAsync(Timeout.Infinite, cancellationToken).ConfiguredAwait();
             return Task.Run(() => WaitHandle.WaitAny(new[] { handle, cancellationToken.WaitHandle }) == 0);
         }
 
@@ -68,7 +68,7 @@ namespace FeatureLoom.Synchronization
             {
                 tasks[i] = handles[i].WaitOneAsync(timeout, cancellationToken);
             }
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            await Task.WhenAll(tasks).ConfiguredAwait();
 
             return completed;
         }
@@ -81,7 +81,7 @@ namespace FeatureLoom.Synchronization
             {
                 tasks[i] = handles[i].WaitOneAsync(timeout, cancellationToken);
             }
-            await Task.WhenAny(tasks).ConfigureAwait(false);
+            await Task.WhenAny(tasks).ConfiguredAwait();
             return completed;
         }
 
@@ -93,7 +93,7 @@ namespace FeatureLoom.Synchronization
             {
                 tasks[i] = handles[i].WaitOneAsync(cancellationToken);
             }
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            await Task.WhenAll(tasks).ConfiguredAwait();
             return completed;
         }
 
@@ -105,7 +105,7 @@ namespace FeatureLoom.Synchronization
             {
                 tasks[i] = handles[i].WaitOneAsync(cancellationToken);
             }
-            await Task.WhenAny(tasks).ConfigureAwait(false);
+            await Task.WhenAny(tasks).ConfiguredAwait();
             return completed;
         }
     }

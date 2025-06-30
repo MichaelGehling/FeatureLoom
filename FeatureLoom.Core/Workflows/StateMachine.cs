@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using FeatureLoom.MetaDatas;
+using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -132,7 +133,7 @@ namespace FeatureLoom.Workflows
             if (step != null)
             {
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepStarted);
-                await controller.ExecuteStepAsync(context, step).ConfigureAwait(false);
+                await controller.ExecuteStepAsync(context, step).ConfiguredAwait();
                 context.SendExecutionInfoEvent(Workflow.ExecutionEventList.StepFinished, executionState, executionPhase);
                 return EvaluteExecutionStateAfterExecution(context);
             }

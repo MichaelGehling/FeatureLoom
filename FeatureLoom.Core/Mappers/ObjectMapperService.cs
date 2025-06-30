@@ -128,7 +128,7 @@ namespace FeatureLoom.Mappers
                 if (!(message is Tin convertable)) return false;
 
                 Tout converted = convertFunc(convertable);
-                await sink.ForwardAsync(converted).ConfigureAwait(false);
+                await sink.ForwardAsync(converted).ConfiguredAwait();
                 return true;
             }
         }
@@ -204,9 +204,9 @@ namespace FeatureLoom.Mappers
                 var currentConverters = converters;
                 for (int i = 0; i < currentConverters.Length; i++)
                 {
-                    if (await currentConverters[i].TryConvertAndForwardMessageAsync(message, sourceHelper).ConfigureAwait(false)) return;
+                    if (await currentConverters[i].TryConvertAndForwardMessageAsync(message, sourceHelper).ConfiguredAwait()) return;
                 }
-                if (forwardUnmappedMessages) await sourceHelper.ForwardAsync(message).ConfigureAwait(false);
+                if (forwardUnmappedMessages) await sourceHelper.ForwardAsync(message).ConfiguredAwait();
             }
 
             public int CountConnectedSinks => ((IMessageSource)sourceHelper).CountConnectedSinks;
