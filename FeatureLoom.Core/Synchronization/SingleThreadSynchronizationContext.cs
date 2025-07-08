@@ -40,13 +40,13 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     // The latest work item posted from the own thread.
     private (SendOrPostCallback, object)? currentWorkItem;
     // Queue for pending work items posted from other threads or while a callback is running.
-    private readonly Queue<(SendOrPostCallback, object)> workItems = new();
+    private Queue<(SendOrPostCallback, object)> workItems = new();
     // Lock to protect access to the workItems queue.
-    private readonly MicroLock workItemsLock = new MicroLock();
+    private MicroLock workItemsLock = new MicroLock();
     // The dedicated thread that processes all work items.
-    private readonly Thread thread;
+    private Thread thread;
     // Event used to signal the worker thread when new work is available.
-    private readonly AsyncManualResetEvent workItemsWaitHandle = new(false);
+    private AsyncManualResetEvent workItemsWaitHandle = new(false);
     // Indicates whether the context has been disposed and should stop processing.
     private volatile bool disposed;
 
@@ -162,11 +162,13 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
                 // If there are queued items, process the next one.
                 else if (workItems.Count > 0)
                 {
+                    SendOrPostCallback callback;
+                    object state;
                     using (workItemsLock.Lock())
                     {
-                        var (callback, state) = workItems.Dequeue();
-                        callback(state);
+                        (callback, state) = workItems.Dequeue();                        
                     }
+                    callback(state);
                 }
                 // If no work is available, wait for new work to be posted.
                 else

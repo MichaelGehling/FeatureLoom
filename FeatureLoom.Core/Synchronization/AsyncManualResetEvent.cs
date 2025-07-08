@@ -69,11 +69,10 @@ namespace FeatureLoom.Synchronization
             get
             {
                 if (isSet) return storedResult_true;
-
                 anyAsyncWaiter = true;
-                var task = tcs.Task;
+                Thread.MemoryBarrier();
+                var task = tcs.Task;                
                 if (isSet) return storedResult_true;
-
                 return task;
             }
         }
