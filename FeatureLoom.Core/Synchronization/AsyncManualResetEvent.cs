@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Extensions;
+using FeatureLoom.MessageFlow;
 using FeatureLoom.Time;
 using System;
 using System.Runtime.CompilerServices;
@@ -14,17 +15,21 @@ namespace FeatureLoom.Synchronization
     /// With an actually waiting thread, performance is comparable to ManualResetEventSlim, setting/resetting 
     /// without any waiting thread and waiting in already set state is significantly faster than ManualResetEventSlim.
     /// </summary>
-    public sealed class AsyncManualResetEvent : IAsyncWaitHandle
+    public sealed class AsyncManualResetEvent : IAsyncWaitHandle, IMessageSource<bool>
     {
         private static Task<bool> storedResult_true = Task.FromResult(true);
         private static Task<bool> storedResult_false = Task.FromResult(false);
 
-        private MicroValueLock myLock = new MicroValueLock();
+        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private object monitorObj = new object();
+        private EventWaitHandle eventWaitHandle = null;
+        private SourceValueHelper notifier = new SourceValueHelper();
 
+        private MicroValueLock myLock = new MicroValueLock();
         private volatile bool isSet = false;
         private volatile bool anyAsyncWaiter = false;
         private volatile bool anySyncWaiter = false;
-        private volatile byte setCounter = 0;
+        private volatile byte setCounter = 0;        
 
         /// <summary>
         /// Before actually going to sleep, the waiting thread may yield some cycles.
@@ -36,13 +41,8 @@ namespace FeatureLoom.Synchronization
         /// We don't use spinning to reduce CPU load and it rarely makes a difference.
         /// NOTE: Yielding the thread contradicts the idea of async computation, and yielding the task is too slow, so the default is 0.
         /// </summary>
-        public ushort YieldCyclesForAsyncWait { get; set; } = 0;
-
-
-        private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private object monitorObj = new object();
-        private EventWaitHandle eventWaitHandle = null;
-
+        public ushort YieldCyclesForAsyncWait { get; set; } = 0;                        
+        
         /// <summary>
         /// AsyncManualResetEvent allows status based waiting (sync/async) and signalling between multiple threads.
         /// Initial state is not set.
@@ -76,6 +76,10 @@ namespace FeatureLoom.Synchronization
                 return task;
             }
         }
+
+        public int CountConnectedSinks => notifier.CountConnectedSinks;
+
+        public Type SentMessageType => typeof(bool);
 
         /// <summary>
         /// Waits until state is set. If already set, the call returns immediatly.
@@ -368,6 +372,7 @@ namespace FeatureLoom.Synchronization
             }
 
             myLock.Exit();
+            notifier.Forward(true);
             return true;
         }
 
@@ -387,6 +392,7 @@ namespace FeatureLoom.Synchronization
                 eventWaitHandle.Reset();
             }
             
+            notifier.Forward(false);
             return true;
         }
 
@@ -428,7 +434,7 @@ namespace FeatureLoom.Synchronization
             if (eventWaitHandle != null)
             {
                 eventWaitHandle.Set();
-            }
+            }            
 
             //RESET
             Thread.MemoryBarrier();
@@ -443,6 +449,9 @@ namespace FeatureLoom.Synchronization
             // If threads are waiting and PulseAll is called rapidly in a row it might happen that not all waiters will wake up.
             // Calling yield at the end will avoid this problem.
             if (yield) Thread.Yield();
+
+            notifier.Forward(true);
+            notifier.Forward(false);
         }
 
         /// <summary>
@@ -478,6 +487,36 @@ namespace FeatureLoom.Synchronization
             var waitHandle = eventWaitHandle;
             eventWaitHandle = null;
             waitHandle?.Dispose();
+        }
+
+        public void ConnectTo(IMessageSink sink, bool weakReference = false)
+        {
+            notifier.ConnectTo(sink, weakReference);
+        }
+
+        public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
+        {
+            return notifier.ConnectTo(sink, weakReference);
+        }
+
+        public void DisconnectFrom(IMessageSink sink)
+        {
+            notifier.DisconnectFrom(sink);
+        }
+
+        public void DisconnectAll()
+        {
+            notifier.DisconnectAll();
+        }
+
+        public IMessageSink[] GetConnectedSinks()
+        {
+            return notifier.GetConnectedSinks();
+        }
+
+        public bool IsConnected(IMessageSink sink)
+        {
+            return notifier.IsConnected(sink);
         }
     }
 }
