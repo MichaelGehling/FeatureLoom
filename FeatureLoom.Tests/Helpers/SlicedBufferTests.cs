@@ -56,9 +56,10 @@ public class SlicedBufferTests
         var buffer = new SlicedBuffer<byte>(64, 256, 4, false, false);
         var slice1 = buffer.GetSlice(16);
         var slice2 = buffer.GetSlice(16);
+        var slice2Copy = slice2;
         buffer.FreeSlice(ref slice2);
         var slice3 = buffer.GetSlice(16);
-        Assert.Equal(slice2.Offset, slice3.Offset);
+        Assert.Equal(slice2Copy.Offset, slice3.Offset);
     }
 
     [Fact]

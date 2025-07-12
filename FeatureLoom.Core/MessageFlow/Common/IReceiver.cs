@@ -11,13 +11,14 @@ namespace FeatureLoom.MessageFlow
         bool IsFull { get; }
         int Count { get; }
         IAsyncWaitHandle WaitHandle { get; }
+        IMessageSource<bool> Notifier { get; }
 
         bool TryReceive(out T message);
 
         bool TryPeek(out T nextItem);
 
-        int ReceiveMany(ref T[] items);
+        ArraySegment<T> ReceiveMany(int maxItems = 0, SlicedBuffer<T> buffer = null);
 
-        int PeekMany(ref T[] items);
+        ArraySegment<T> PeekMany(int maxItems = 0, SlicedBuffer<T> buffer = null);
     }
 }

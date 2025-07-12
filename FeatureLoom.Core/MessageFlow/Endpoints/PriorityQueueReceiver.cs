@@ -19,7 +19,7 @@ namespace FeatureLoom.MessageFlow
     /// Uses a normal queue plus locking instead of a concurrent queue because of better performance
     /// in usual scenarios.
     /// <typeparam name="T"> The expected message type </typeparam>
-    public sealed class PriorityQueueReceiver<T> : IMessageQueue, IReceiver<T>, IAsyncWaitHandle, IMessageSink<T>
+    public sealed class PriorityQueueReceiver<T> : IReceiver<T>, IAsyncWaitHandle, IMessageSink<T>
     {
         private PriorityQueue<T> queue;
         private MicroLock queueLock = new MicroLock();
@@ -49,6 +49,7 @@ namespace FeatureLoom.MessageFlow
         public bool IsFull => queue.Count >= maxQueueSize;
         public int Count => queue.Count;
         public IAsyncWaitHandle WaitHandle => readerWakeEvent;
+        public IMessageSource<bool> Notifier => readerWakeEvent;
 
         public void Post<M>(in M message)
         {
@@ -116,69 +117,60 @@ namespace FeatureLoom.MessageFlow
             return success;
         }
 
-
-
-        public int ReceiveMany(ref T[] items)
+        public ArraySegment<T> ReceiveMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
         {
-            if (IsEmpty) return 0;
-            int numElementsReturned = 0;
+            if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+            ArraySegment<T> items;
             using (queueLock.Lock(true))
             {
-                if (items.EmptyOrNull()) items = new T[queue.Count];
-                if (queue.Count == items.Length)
+                if (IsEmpty) return new ArraySegment<T>();
+
+                if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
+                var numItems = maxItems.ClampHigh(Count);
+                items = slicedBuffer.GetSlice(numItems);
+
+                if (Count == numItems)
                 {
-                    numElementsReturned = queue.Count;
-                    queue.CopyTo(items, 0);
-                    queue.Clear();
-                }
-                else if (queue.Count < items.Length)
-                {
-                    numElementsReturned = queue.Count;
-                    queue.CopyTo(items, 0);
-                    Array.Clear(items, queue.Count, items.Length - queue.Count);
+                    queue.CopyTo(items.Array, items.Offset);
                     queue.Clear();
                 }
                 else
                 {
-                    numElementsReturned = items.Length;
-                    for (int i = 0; i < items.Length; i++)
+                    for (int i = 0; i < numItems; i++)
                     {
-                        items[i] = queue.Dequeue(true);
+                        items.Array[i + items.Offset] = queue.Dequeue(true);
                     }
                 }
             }
             if (IsEmpty) readerWakeEvent.Reset();
             if (!IsFull) writerWakeEvent.Set();
-            return numElementsReturned;
+            return items;
         }
 
-        public int PeekMany(ref T[] items)
+        public ArraySegment<T> PeekMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
         {
-            if (IsEmpty) return 0;
-            int numElementsReturned = 0;
-            using (queueLock.Lock(true))
+            if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+            ArraySegment<T> items;
+            using (queueLock.LockReadOnly(true))
             {
-                if (items.EmptyOrNull()) items = new T[queue.Count];
-                if (queue.Count == items.Length)
+                if (IsEmpty) return new ArraySegment<T>();
+
+                if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
+                var numItems = maxItems.ClampHigh(Count);
+                items = slicedBuffer.GetSlice(numItems);
+
+                if (queue.Count == numItems)
                 {
-                    numElementsReturned = queue.Count;
-                    queue.CopyTo(items, 0);
-                }
-                else if (queue.Count < items.Length)
-                {
-                    numElementsReturned = queue.Count;
-                    queue.CopyTo(items, 0);
-                    Array.Clear(items, queue.Count, items.Length - queue.Count);
+                    queue.CopyTo(items.Array, items.Offset);
                 }
                 else
                 {
-                    queue.CopyToArray(items, items.Length);
-                    Array.Clear(items, queue.Count, items.Length - queue.Count);
+                    queue.CopyToArray(items.Array, numItems, items.Offset);
                 }
             }
             if (IsEmpty) readerWakeEvent.Reset();
             if (!IsFull) writerWakeEvent.Set();
-            return numElementsReturned;
+            return items;
         }
 
         public bool TryPeek(out T nextItem)

@@ -76,13 +76,6 @@ namespace FeatureLoom.MessageFlow
         void ConnectToAndBack(IReplier replier, bool weakReference = false);
     };
 
-    public interface IMessageQueue : IMessageSink
-    {
-        int Count { get; }
-
-        object[] GetQueuedMesssages();
-    }
-
     public interface IRequestMessage<T>
     {
         public long RequestId { get; set; }

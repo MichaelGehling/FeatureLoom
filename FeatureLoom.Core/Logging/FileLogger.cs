@@ -36,7 +36,8 @@ namespace FeatureLoom.Logging
 
         public Config config;
 
-        private QueueReceiver<LogMessage> receiver = new QueueReceiver<LogMessage>();
+        private QueueReceiver<LogMessage> innerReceiver = null;
+        private ReceiverBuffer<LogMessage> receiver = null;
         private StringBuilder stringBuilder = new StringBuilder();
         private AsyncManualResetEvent delayBypass = new AsyncManualResetEvent(false);
 
@@ -64,7 +65,10 @@ namespace FeatureLoom.Logging
 
         public FileLogger(Config config = null)
         {
-            this.config = config ?? new Config();            
+            config = config ?? new Config();
+            this.config = config;
+            innerReceiver = new QueueReceiver<LogMessage>(config.maxQueueSize);
+            receiver = new ReceiverBuffer<LogMessage>(innerReceiver);
             Task.Run(Run);
         }
 
@@ -80,7 +84,7 @@ namespace FeatureLoom.Logging
             while(true)
             {
                 await UpdateConfigAsync().ConfiguredAwait();
-                await receiver.WaitAsync().ConfiguredAwait();
+                await receiver.WaitHandle.WaitAsync().ConfiguredAwait();
                 try
                 {
                     await WriteToLogFileAsync().ConfiguredAwait();
@@ -107,7 +111,7 @@ namespace FeatureLoom.Logging
         private async Task UpdateConfigAsync()
         {
             await config.TryUpdateFromStorageAsync(true).ConfiguredAwait();
-            receiver.maxQueueSize = config.maxQueueSize;
+            innerReceiver.maxQueueSize = config.maxQueueSize;
         }
 
         private float GetLogFileSize()
@@ -132,15 +136,11 @@ namespace FeatureLoom.Logging
                 if (updateCreationTime) logFileInfo.CreationTime = AppTime.CoarseNow;
                 if (receiver.IsFull) await writer.WriteLineAsync(new LogMessage(Loglevel.WARNING, "LOGGING QUEUE OVERFLOW: Some log messages might be lost!").PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear()).ConfiguredAwait();
 
-                while (!receiver.IsEmpty)
+                while (receiver.TryReceive(out var logMsg))
                 {
-                    var messages = receiver.ReceiveAll();
-                    foreach (var logMsg in messages)
+                    if (logMsg.level <= config.logFileLoglevel)
                     {
-                        if (logMsg.level <= config.logFileLoglevel)
-                        {
-                            await writer.WriteLineAsync(logMsg.PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear()).ConfiguredAwait();
-                        }
+                        await writer.WriteLineAsync(logMsg.PrintToStringBuilder(stringBuilder, config.logFileLogFormat).GetStringAndClear()).ConfiguredAwait();
                     }
                 }
             }

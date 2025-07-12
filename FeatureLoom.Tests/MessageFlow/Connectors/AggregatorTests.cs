@@ -171,7 +171,7 @@ namespace FeatureLoom.MessageFlow
             Assert.Equal(0, sink.Count);
             sender.Send(("lastName", "Doe"));
             Assert.Equal(2, sink.Count);
-            var results = sink.ReceiveAll();
+            var results = sink.ReceiveAll().ToArray();
             Assert.Equal("John Doe", results[0]);
             Assert.Equal("Doe, John", results[1]);
         }

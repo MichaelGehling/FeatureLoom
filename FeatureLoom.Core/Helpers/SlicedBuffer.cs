@@ -27,9 +27,21 @@ namespace FeatureLoom.Helpers;
 /// - Reduces memory allocations and GC overhead by reusing buffer space and the number of objects on the heap.<br/>
 /// - Especially useful when the allocation and release order of slices is predictable (LIFO), allowing efficient buffer space reuse.
 /// </para>
+/// <para>
+/// <b>Size and Heap Allocation Behavior:</b><br/>
+/// - The <see cref="SlicedBuffer{T}"/> object itself is always a small object and is allocated on the Small Object Heap (SOH).
+/// - The internal buffer (<c>T[] buffer</c>) is a separate array object. Its size determines whether it is allocated on the SOH or the Large Object Heap (LOH).
+/// - In .NET, arrays of 85,000 bytes or more are allocated on the LOH, which can lead to increased memory fragmentation and less frequent garbage collection.
+/// - By default, <c>maxCapacity</c> is set so that the buffer size stays below 85,000 bytes, ensuring the array remains on the SOH for any type <c>T</c>.
+/// - If you explicitly set <c>maxCapacity</c> to a value that results in an array of 85,000 bytes or more, the buffer will be allocated on the LOH.
+/// </para>
 /// </summary>
 public class SlicedBuffer<T>
-{    
+{
+    [ThreadStatic]
+    static LazyValue<SlicedBuffer<T>> shared;
+    public static SlicedBuffer<T> Shared => shared.Obj;
+
     T[] buffer;
     int capacity;
     int position;
@@ -43,16 +55,17 @@ public class SlicedBuffer<T>
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SlicedBuffer{T}"/> class with default settings.
-    /// By default, the buffer is thread-safe, starts with a capacity of 1024 elements, a max capacity of 64*1024,
-    /// a minimum of 4 slices per buffer, and enables sliceLimit growth.
+    /// By default, the buffer is thread-safe, starts with a capacity of 1024 elements, and a max capacity that ensures the internal buffer stays below the Large Object Heap (LOH) threshold (85,000 bytes).
+    /// This helps avoid LOH allocations and their associated GC costs. The minimum number of slices per buffer is 4, and sliceLimit growth is enabled, that means the maximum slice size grows with the buffer size.
     /// </summary>
     public SlicedBuffer()
-    {        
-        this.capacity = 1024;
+    {
+        int maxElements = 84999 / Unsafe.SizeOf<T>();
+        this.capacity = 1024.ClampHigh(maxElements);
         this.initCapacity = this.capacity;
         this.buffer = new T[capacity];
-        this.position = 0;
-        this.maxCapacity = 64 * 1024;
+        this.position = 0;        
+        this.maxCapacity = maxElements;
         this.threadSafe = true;
         this.minSlicesPerBuffer = 4;
         this.growSliceLimit = true;
@@ -60,19 +73,31 @@ public class SlicedBuffer<T>
     }
     /// <summary>
     /// Initializes a new instance of the <see cref="SlicedBuffer{T}"/> class with custom settings.
+    /// <para>
+    /// <b>Heap allocation note:</b> If <paramref name="maxCapacity"/> is not specified or is less than or equal to zero, it is set so that the internal buffer stays below 84,999 bytes,
+    /// avoiding LOH allocation for value types. If you specify a larger <paramref name="maxCapacity"/>, the buffer may be allocated on the LOH.
+    /// </para>
     /// </summary>
-    /// <param name="capacity">Initial buffer capacity (minimum 64 bytes).</param>
-    /// <param name="maxCapacity">Maximum buffer capacity (minimum <paramref name="capacity"/>).</param>
+    /// <param name="capacity">Initial buffer capacity (minimum 64 elements).</param>
+    /// <param name="maxCapacity">Maximum buffer capacity (minimum <paramref name="capacity"/>). If not specified (or <= 0), defaults to a value that keeps the buffer below the LOH threshold.</param>
     /// <param name="minSlicesPerBuffer">Minimum number of slices per buffer (clamped between 2 and initCapacity/8).</param>
     /// <param name="growSliceLimit">If true, the maximum slice size grows with the buffer; otherwise, it remains fixed.</param>
     /// <param name="threadSafe">If true, enables thread safety for all buffer operations.</param>
     public SlicedBuffer(int capacity, int maxCapacity = 0, int minSlicesPerBuffer = 4, bool growSliceLimit = false, bool threadSafe = false)
-    {                
+    {
         this.capacity = capacity.ClampLow(64);
         this.initCapacity = this.capacity;
         this.buffer = new T[capacity];
         this.position = 0;
-        this.maxCapacity = maxCapacity.ClampLow(capacity);
+        if (maxCapacity <= 0) 
+        {
+            int maxElements = 84999 / Unsafe.SizeOf<T>();
+            this.maxCapacity = maxElements.ClampLow(capacity);
+        }
+        else
+        {
+            this.maxCapacity = maxCapacity.ClampLow(capacity);
+        }
         this.threadSafe = threadSafe;
         this.minSlicesPerBuffer = minSlicesPerBuffer.Clamp(2, initCapacity / 8);
         this.sliceLimit = initCapacity / minSlicesPerBuffer;
@@ -259,6 +284,15 @@ public class SlicedBuffer<T>
                 newSlice.CopyFrom(slice);
                 slice = newSlice;
             }
+        }
+        else if (newSize == 0)
+        {
+            if (slice.Array == this.buffer && 
+                slice.Offset + slice.Count == this.position)
+            {
+                position = slice.Offset; // Reset position to the start of the slice                
+            }            
+            slice = new ArraySegment<T>();
         }
         else
         {

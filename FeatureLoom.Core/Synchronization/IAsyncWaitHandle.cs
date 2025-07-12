@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.Synchronization
 {
-    public interface IAsyncWaitHandle
+    public interface IAsyncWaitHandle 
     {
         /// <summary>
         /// A task that will be completed when wait handle is signalled. May become cancelled or failed, due to some external interruption.

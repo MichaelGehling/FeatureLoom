@@ -154,24 +154,18 @@ namespace FeatureLoom.Extensions
             return sb.ToString();
         }
 
-        public static void CopyToArray<T>(this IEnumerable<T> source, T[] targetArray, int count)
+        public static void CopyToArray<T>(this IEnumerable<T> source, T[] targetArray, int count, int targetOffset = 0)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
             if (targetArray == null) throw new ArgumentNullException(nameof(targetArray));
-            if (count < 0 || count > targetArray.Length) throw new ArgumentOutOfRangeException(nameof(count));
+            if (count < 0 || count > targetArray.Length + targetOffset) throw new ArgumentOutOfRangeException(nameof(count));
 
             using (var enumerator = source.GetEnumerator())
             {
                 int i = 0;
                 while (i < count && enumerator.MoveNext())
                 {
-                    targetArray[i++] = enumerator.Current;
-                }
-
-                // Optional: Clear the remaining elements in the target array if count is less than targetArray.Length
-                if (i < targetArray.Length)
-                {
-                    Array.Clear(targetArray, i, targetArray.Length - i);
+                    targetArray[targetOffset + i++] = enumerator.Current;
                 }
             }
         }

@@ -224,18 +224,14 @@ namespace FeatureLoom.MessageFlow
             return (true, message);
         }
 
-        public static T[] ReceiveAll<T>(this IReceiver<T> receiver) 
+        public static ArraySegment<T> ReceiveAll<T>(this IReceiver<T> receiver) 
         {
-            T[] result = null;
-            if(receiver.ReceiveMany(ref result) > 0) return result;
-            else return Array.Empty<T>();            
+            return receiver.ReceiveMany(int.MaxValue, null);
         }
 
-        public static T[] PeekAll<T>(this IReceiver<T> receiver)
+        public static ArraySegment<T> PeekAll<T>(this IReceiver<T> receiver)
         {
-            T[] result = null;
-            if (receiver.PeekMany(ref result) > 0) return result;
-            else return Array.Empty<T>();
+            return receiver.PeekMany(int.MaxValue, null);
         }
 
     }

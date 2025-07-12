@@ -51,7 +51,7 @@ namespace FeatureLoom.MessageFlow
             }
             Assert.Equal(limit.ClampHigh(numMessages), receiver.Count);
             var receivedMessages = receiver.ReceiveAll();
-            Assert.Equal(limit.ClampHigh(numMessages), receivedMessages.Length);
+            Assert.Equal(limit.ClampHigh(numMessages), receivedMessages.Count);
 
             int offset = dropLatestMessageOnFullQueue ? 0 : (numMessages - limit).ClampLow(0);
 

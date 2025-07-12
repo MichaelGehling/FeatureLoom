@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    public sealed class LatestMessageReceiver<T> : IMessageQueue, IMessageSink<T>, IReceiver<T>, IAlternativeMessageSource, IAsyncWaitHandle
+    public sealed class LatestMessageReceiver<T> : IMessageSink<T>, IReceiver<T>, IAlternativeMessageSource, IAsyncWaitHandle
     {
         private AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
         private MicroLock myLock = new MicroLock();
@@ -18,6 +18,7 @@ namespace FeatureLoom.MessageFlow
         public bool IsFull => false;
         public int Count => IsEmpty ? 0 : 1;
         public IAsyncWaitHandle WaitHandle => readerWakeEvent;
+        public IMessageSource<bool> Notifier => readerWakeEvent;
 
         public bool HasMessage => !IsEmpty;
         public T LatestMessageOrDefault => receivedMessage;
@@ -80,31 +81,31 @@ namespace FeatureLoom.MessageFlow
         }
 
 
-        public int ReceiveMany(ref T[] items)
+        public ArraySegment<T> ReceiveMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
         {
-            if (IsEmpty) return 0;
+            if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
             using (myLock.Lock(true))
             {
-                if (IsEmpty) return 0;
-                T message = receivedMessage;
-                receivedMessage = default;
-                if (items.EmptyOrNull()) items = message.ToSingleEntryArray();
-                else items[0] = message;
+                if (IsEmpty) return new ArraySegment<T>();
+                if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
+                ArraySegment<T> items = slicedBuffer.GetSlice(1);
+                items.Array[items.Offset] = receivedMessage;
+                receivedMessage = default;                
                 readerWakeEvent.Reset();
-                return 1;
+                return items;
             }
         }
 
-        public int PeekMany(ref T[] items)
+        public ArraySegment<T> PeekMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
         {
-            if (IsEmpty) return 0;
+            if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
             using (myLock.Lock(true))
             {
-                if (IsEmpty) return 0;
-                T message = receivedMessage;
-                if (items.EmptyOrNull()) items = message.ToSingleEntryArray();
-                else items[0] = message;
-                return 1;
+                if (IsEmpty) return new ArraySegment<T>();
+                if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
+                ArraySegment<T> items = slicedBuffer.GetSlice(1);
+                items.Array[items.Offset] = receivedMessage;
+                return items;
             }
         }
 
