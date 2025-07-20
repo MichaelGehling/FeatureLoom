@@ -323,9 +323,9 @@ namespace FeatureLoom.Serialization
             else if (settings.writeByteArrayAsBase64String && itemType == typeof(byte[])) typeHandler.SetItemHandler_Primitive<byte[]>(writer.WriteByteArrayValueAsBase64);
             else if (settings.writeByteArrayAsBase64String && itemType == typeof(ArraySegment<byte>)) typeHandler.SetItemHandler_Primitive<ArraySegment<byte>>(writer.WriteByteArraySegmentValueAsBase64);
 
-            else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) /* do nothing */;
-            else if (TryCreateListItemHandler(typeHandler, itemType)) /* do nothing */;
-            else if (TryCreateEnumerableItemHandler(typeHandler, itemType)) /* do nothing */;
+            else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) {/* do nothing */}
+            else if (TryCreateListItemHandler(typeHandler, itemType)) {/* do nothing */}
+            else if (TryCreateEnumerableItemHandler(typeHandler, itemType)) {/* do nothing */}
             else CreateComplexItemHandler(typeHandler, itemType);           
             
             return typeHandler;

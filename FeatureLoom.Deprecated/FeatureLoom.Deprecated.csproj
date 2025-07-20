@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+	  <LangVersion>12.0</LangVersion>
+	  <ApplicationIcon>favicon.ico</ApplicationIcon>
+	  <Version>0.6.0-alpha</Version>
+	  <Description>Contains deprecated parts that were removed from FeatureLoom.Core in order to keep compatibility to projects that use those parts.</Description>
+	  <PackageProjectUrl>https://github.com/MichaelGehling/FeatureLoom</PackageProjectUrl>
+	  <RepositoryUrl>https://github.com/MichaelGehling/FeatureLoom</RepositoryUrl>
+	  <PackageReleaseNotes>
+		  Use only if you have legacy code that depends on deprecated parts of FeatureLoom.Core.
+	  </PackageReleaseNotes>
+	  <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	  <IncludeSymbols>true</IncludeSymbols>
+	  <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	  <NeutralLanguage>en</NeutralLanguage>
+	  <PackageLicenseFile>LICENSE</PackageLicenseFile>
+	  <PackageIcon>FeatureLoom_128.png</PackageIcon>
+	  <Authors>Michael Gehling</Authors>
+	  <Product>FeatureLoom</Product>
+  </PropertyGroup>
+	
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Link="LICENSE">
+      <PackagePath></PackagePath>
+      <Pack>True</Pack>
+    </None>
+    <None Include="..\Resources\FeatureLoom_128.png" Link="FeatureLoom_128.png">
+      <PackagePath></PackagePath>
+      <Pack>True</Pack>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj" />
+  </ItemGroup>
+
+</Project>

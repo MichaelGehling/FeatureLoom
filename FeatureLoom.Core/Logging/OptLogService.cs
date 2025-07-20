@@ -1,4 +1,6 @@
-﻿using FeatureLoom.Collections;
+﻿#nullable enable
+
+using FeatureLoom.Collections;
 using FeatureLoom.DependencyInversion;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
@@ -31,7 +33,7 @@ public class OptLogService
     internal Settings settings = new Settings();
 
     Pool<FilteredLogger> loggerPool;
-    LazyValue<AsyncLocal<string>> roamingContext;
+    LazyValue<AsyncLocal<string?>> roamingContext;
     LogFilter[] whiteListFilters_IMPORTANT = [];
     LogFilter[] blackListFilters_IMPORTANT = [];
     LogFilter[] whiteListFilters_CRITICAL = [];
@@ -71,7 +73,7 @@ public class OptLogService
 
     internal void ReturnLoggerToPool(FilteredLogger logger) => loggerPool.Return(logger);
 
-    public void ApplySettings(Settings settings)
+    public void ApplySettings(Settings? settings)
     {
         if (settings == null) settings = new Settings();
         this.settings = settings;
@@ -98,7 +100,7 @@ public class OptLogService
         }
     }
 
-    public string LogContext
+    public string? LogContext
     {
         get => roamingContext.Exists ? roamingContext.Obj.Value : null;
         set
@@ -151,7 +153,7 @@ public class OptLogService
         public string? methodMask = null;
         public int? minLine;
         public int? maxLine;
-        public string contextMask;
+        public string? contextMask;
     }
 
     class LogFilter
@@ -173,7 +175,7 @@ public class OptLogService
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Check(string method, string sourceFile, int sourceLine, ref string logContext)
+        public bool Check(string method, string sourceFile, int sourceLine, ref string? logContext)
         {
             if (settings.sourceFileMask != null && !sourceFile.MatchesWildcard(settings.sourceFileMask)) return false;
             if (settings.methodMask != null && !method.MatchesWildcard(settings.methodMask)) return false;
@@ -203,9 +205,9 @@ public class OptLogService
     {
         internal OptLogService parent;
         internal int logLevelValue;
-        string logContext;
-        string method;
-        string sourceFile;
+        string? logContext;
+        string method = "";
+        string sourceFile = "";
         int sourceLine;
 
         public FilteredLogger(OptLogService parent)
@@ -219,7 +221,7 @@ public class OptLogService
             parent.ReturnLoggerToPool(this);
         }
 
-        internal void Prepare(int logLevelValue, string logContext, string method, string sourceFile, int sourceLine)
+        internal void Prepare(int logLevelValue, string? logContext, string method, string sourceFile, int sourceLine)
         {
             this.logLevelValue = logLevelValue;
             this.logContext = logContext;
@@ -228,7 +230,7 @@ public class OptLogService
             this.sourceLine = sourceLine;
         }
 
-        internal void ActuallyBuild(string message, string detailText, Loglevel loglevel)
+        internal void ActuallyBuild(string message, string? detailText, Loglevel loglevel)
         {                        
             var logMessage = new LogMessage(loglevel, message, detailText, logContext, method, sourceFile, sourceLine);
             Service<LogService>.Instance.SendLogMessage(in logMessage);
@@ -241,49 +243,49 @@ public class OptLogService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger IMPORTANT(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? IMPORTANT(string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_IMPORTANT, whiteListFilters_IMPORTANT, loglevel_IMPORTANT, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger CRITICAL(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? CRITICAL(string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_CRITICAL, whiteListFilters_CRITICAL, loglevel_CRITICAL, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger ERROR(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? ERROR(string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_ERROR, whiteListFilters_ERROR, loglevel_ERROR, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger WARNING(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? WARNING(string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_WARNING, whiteListFilters_WARNING, loglevel_WARNING, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger INFO(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? INFO(string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_INFO, whiteListFilters_INFO, loglevel_INFO, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger DEBUG(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? DEBUG(string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_DEBUG, whiteListFilters_DEBUG, loglevel_DEBUG, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger TRACE(string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? TRACE(string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         return LoggerIfPassed(method, sourceFile, sourceLine, blackListFilters_TRACE, whiteListFilters_TRACE, loglevel_TRACE, logContext);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public FilteredLogger WithLevel(Loglevel loglevel, string logContext = default, [CallerMemberName] string method = null, [CallerFilePath] string sourceFile = null, [CallerLineNumber] int sourceLine = -1)
+    public FilteredLogger? WithLevel(Loglevel loglevel, string? logContext = default, [CallerMemberName] string method = "", [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = -1)
     {
         switch (loglevel)
         {
@@ -299,7 +301,7 @@ public class OptLogService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private FilteredLogger LoggerIfPassed(string method, string sourceFile, int sourceLine, LogFilter[] blackListFilters, LogFilter[] whiteListFilters, int logLevel, string logContext)
+    private FilteredLogger? LoggerIfPassed(string method, string sourceFile, int sourceLine, LogFilter[] blackListFilters, LogFilter[] whiteListFilters, int logLevel, string? logContext)
     {
         if (globalLogLevel >= logLevel)
         {
@@ -319,7 +321,7 @@ public class OptLogService
         }
     }    
 
-    private FilteredLogger PrepareLogger(int logLevel, string logContext, string method, string sourceFile, int sourceLine)
+    private FilteredLogger PrepareLogger(int logLevel, string? logContext, string method, string sourceFile, int sourceLine)
     {
         if (logContext == null && roamingContext.Exists)
         {
@@ -335,7 +337,7 @@ public class OptLogService
 public static class FilteredLoggerExtension
 {
 
-    private static void BuildHelper(OptLogService.FilteredLogger logger, string message, string detailText, bool addStackTrace)
+    private static void BuildHelper(OptLogService.FilteredLogger logger, string message, string? detailText, bool addStackTrace)
     {
         EnumHelper.TryFromInt(logger.logLevelValue, out Loglevel loglevel);
         if (!addStackTrace) addStackTrace = logger.parent.settings.logLevelsToAddStackTrace.Contains(loglevel);
@@ -392,7 +394,7 @@ public static class FilteredLoggerExtension
         else
         {
             Exception e = exception.InnerOrSelf();
-            string exStackTrace = e.StackTrace;
+            string exStackTrace = e.StackTrace ?? "";
             if (exStackTrace != null)
             {
                 string detailText = $"ExceptionMessage: {e.Message} \n ExceptionStackTrace:\n{e.StackTrace}";

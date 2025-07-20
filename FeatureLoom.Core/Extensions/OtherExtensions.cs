@@ -305,7 +305,7 @@ namespace FeatureLoom.Extensions
 
         public static Task AwaitCancellation(this CancellationToken cancellationToken)
         {
-            var tcs = new TaskCompletionSource<object?>();
+            var tcs = new TaskCompletionSource<object>();
             cancellationToken.Register(() => tcs.TrySetResult(null));
             return tcs.Task;
         }

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System;
 using System.Runtime.CompilerServices;
-using FeatureLoom.Workflows;
 
 namespace FeatureLoom.Extensions
 {

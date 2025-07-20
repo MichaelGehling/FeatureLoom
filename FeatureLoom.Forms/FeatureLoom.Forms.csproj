@@ -91,6 +91,10 @@
       <Project>{c567871f-12f0-4145-8297-acb2523b569a}</Project>
       <Name>FeatureLoom.Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\FeatureLoom.Deprecated\FeatureLoom.Deprecated.csproj">
+      <Project>{aaa93a74-c05d-4047-a067-7af503ebbee9}</Project>
+      <Name>FeatureLoom.Deprecated</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

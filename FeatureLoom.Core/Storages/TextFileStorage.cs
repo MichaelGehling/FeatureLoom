@@ -412,16 +412,23 @@ namespace FeatureLoom.Storages
                 {
                     if (!rootDir.RefreshAnd().Exists) return (true, Array.Empty<string>());
 
-                    var uris = new List<string>();
-                    var files = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*"+ config.fileSuffix));
-                    foreach (var file in files)
+                    // Offload synchronous file enumeration to a background thread
+                    var uris = await Task.Run(() =>
                     {
-                        string uri = FilePathToUri(file.FullName);
-                        if (pattern == null || uri.MatchesWildcard(pattern))
+                        var result = new List<string>();
+                        var files = rootDir.EnumerateFiles("*", SearchOption.AllDirectories)
+                            .Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
+                        foreach (var file in files)
                         {
-                            uris.Add(uri);
+                            string uri = FilePathToUri(file.FullName);
+                            if (pattern == null || uri.MatchesWildcard(pattern))
+                            {
+                                result.Add(uri);
+                            }
                         }
-                    }
+                        return result;
+                    }).ConfiguredAwait();
+
                     return (true, uris.ToArray());
                 }
             }

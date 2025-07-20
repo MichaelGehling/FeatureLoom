@@ -371,7 +371,6 @@ namespace FeatureLoom.Extensions
         {
             if (startAfter.EmptyOrNull() || endBefore.EmptyOrNull()) return ReplaceBetween(str, startAfter, endBefore, replacement, removeAlsoSearchStrings);
             int startPos = 0;
-            bool done = false;
             while(true)
             {                
                 startPos = str.IndexOf(startAfter, startPos);
