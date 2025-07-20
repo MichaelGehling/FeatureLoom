@@ -11,10 +11,6 @@ using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.Helpers
 {
-    /// <summary>
-    /// Not supported are 
-    /// - open constructed types (typeof(List<>)) 
-    /// </summary>
     public static class TypeNameHelper
     {
         public static List<string> SupplementaryAssemblies { get; } = new List<string>();

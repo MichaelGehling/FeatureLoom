@@ -102,7 +102,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
 
 #if !NETSTANDARD2_0
     /// <summary>
-    /// Returns the segment as a <see cref="ReadOnlySpan{char}"/> (only available on supported frameworks).
+    /// Returns the segment as a <see cref="ReadOnlySpan{T}"/> (only available on supported frameworks).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<char> AsSpan() => text.AsSpan(startIndex, length);       
@@ -271,6 +271,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// Tries to find the index of the first occurrence of another <see cref="TextSegment"/> within this segment.
     /// </summary>
     /// <param name="other">The segment to search for.</param>
+    /// <param name="firstIndex">The index where to start from</param>
     /// <param name="index">The index of the first occurrence, if found.</param>
     /// <returns>True if found; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -313,6 +314,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// Tries to find the index of the first occurrence of a character within this segment.
     /// </summary>
     /// <param name="c">The character to search for.</param>
+    /// <param name="firstIndex">The index where to start from</param>
     /// <param name="index">The index of the first occurrence, if found.</param>
     /// <returns>True if found; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -459,6 +461,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         return TryExtract(0, startExtractAfter, endExtractBefore, out extract, out restStartIndex);
     }
 
+    /// <summary>
+    /// Returns a new <see cref="TextSegment"/> with all leading or trailing whitespaces removed.
+    /// </summary>
     public TextSegment Trim()
     {
         if (IsEmptyOrInvalid) return this;
@@ -484,6 +489,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         return new TextSegment(text, newStart, newLength);
     }
 
+    /// <summary>
+    /// Returns a new <see cref="TextSegment"/> with all leading characters equal to <paramref name="trimChars"/> removed.
+    /// </summary>
     public TextSegment Trim(params char[] trimChars)
     {
         if (IsEmptyOrInvalid || trimChars == null || trimChars.Length == 0) return this;
@@ -509,6 +517,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         return new TextSegment(text, newStart, newLength);
     }
 
+    /// <summary>
+    /// Returns a new <see cref="TextSegment"/> with all leading or trailing characters equal to <paramref name="trimChar"/> removed.
+    /// </summary>
     public TextSegment Trim(char trimChar)
     {
         if (IsEmptyOrInvalid) return this;
@@ -577,7 +588,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     }
 
     /// <summary>
-    /// Returns a new <see cref="TextSegment"/> with all leading characters equal to <paramref name="trimChar"/> removed.
+    /// Returns a new <see cref="TextSegment"/> with all leading whitespaces removed.
     /// </summary>
     public TextSegment TrimStart()
     {
@@ -598,7 +609,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     }
 
     /// <summary>
-    /// Returns a new <see cref="TextSegment"/> with all trailing characters equal to <paramref name="trimChar"/> removed.
+    /// Returns a new <see cref="TextSegment"/> with all trailing whitespaces removed.
     /// </summary>
     public TextSegment TrimEnd()
     {
@@ -618,6 +629,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         return new TextSegment(text, newStart, newLength);
     }
 
+    /// <summary>
+    /// Returns a new <see cref="TextSegment"/> with all leading characters equal to <paramref name="trimChars"/> removed.
+    /// </summary>
     public TextSegment TrimStart(params char[] trimChars)
     {
         if (IsEmptyOrInvalid || trimChars == null || trimChars.Length == 0) return this;
@@ -637,6 +651,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         return new TextSegment(text, newStart, newLength);
     }
 
+    /// <summary>
+    /// Returns a new <see cref="TextSegment"/> with all trailing characters equal to <paramref name="trimChars"/> removed.
+    /// </summary>
     public TextSegment TrimEnd(params char[] trimChars)
     {
         if (IsEmptyOrInvalid || trimChars == null || trimChars.Length == 0) return this;

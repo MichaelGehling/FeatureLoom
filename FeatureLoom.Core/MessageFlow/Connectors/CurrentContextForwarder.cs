@@ -10,7 +10,7 @@ namespace FeatureLoom.MessageFlow
     /// <summary>
     /// Assures that incoming messages are forwarded within the synchronization context where this CurrentContextForwarder is instantiated.
     /// This can be used, e.g. to process a message in a ProcessingEndpoint within a UI-Thread, though the message was send from some other thread!
-    /// Note: structs will be boxed. If you only have one message type, you can use the typed CurrentContextForwarder<T> to avoid boxing.
+    /// Note: structs will be boxed. If you only have one message type, you can use the typed CurrentContextForwarder of T to avoid boxing.
     /// </summary>
     public class CurrentContextForwarder : CurrentContextForwarder<object>
     {

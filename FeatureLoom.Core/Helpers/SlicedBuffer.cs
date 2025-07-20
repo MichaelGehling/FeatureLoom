@@ -79,7 +79,7 @@ public class SlicedBuffer<T>
     /// </para>
     /// </summary>
     /// <param name="capacity">Initial buffer capacity (minimum 64 elements).</param>
-    /// <param name="maxCapacity">Maximum buffer capacity (minimum <paramref name="capacity"/>). If not specified (or <= 0), defaults to a value that keeps the buffer below the LOH threshold.</param>
+    /// <param name="maxCapacity">Maximum buffer capacity (minimum <paramref name="capacity"/>). If not specified (or smaller or equal to 0), defaults to a value that keeps the buffer below the LOH threshold.</param>
     /// <param name="minSlicesPerBuffer">Minimum number of slices per buffer (clamped between 2 and initCapacity/8).</param>
     /// <param name="growSliceLimit">If true, the maximum slice size grows with the buffer; otherwise, it remains fixed.</param>
     /// <param name="threadSafe">If true, enables thread safety for all buffer operations.</param>

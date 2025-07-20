@@ -10,7 +10,8 @@ namespace FeatureLoom.MessageFlow
     /// <summary> Can replace SourceHelper in situations where memory consumption and garbage must be minimized.
     /// WARNING: SourceValueHelper is a mutable struct and so there is a danger to cause severe bugs when not used
     /// properly (e.g. when boxing happens). Therefore, it doesn't implement IMessageSource.
-    /// If you are unsure, better use the normal SourceHelper!<summary>
+    /// If you are unsure, better use the normal SourceHelper!
+    /// </summary>
     public struct TypedSourceValueHelper<T>
     {
         [JsonIgnore]

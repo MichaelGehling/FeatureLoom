@@ -42,4 +42,8 @@ Some features are in a ready to release state, some are still in a prototype sta
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.0" />
   </ItemGroup>
 
+    <PropertyGroup>
+	    <NoWarn>$(NoWarn);1591</NoWarn>
+    </PropertyGroup>
+
 </Project>

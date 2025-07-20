@@ -318,18 +318,6 @@ namespace FeatureLoom.Extensions
             return str.TryExtract(0, startExtractAfter, endExtractBefore, out extract, out restStartIndex);
         }
 
-        /// <summary>
-        /// Extracts a part of a string and converts it to the specified (convertible) type.
-        /// Note: Uses the current threads culture for conversions
-        /// </summary>
-        /// <typeparam name="T">The convertible type the extracted part is converted to</typeparam>
-        /// <param name="str">The input string</param>
-        /// <param name="startIndex">The index where the search for the startmarker starts</param>
-        /// <param name="startExtractAfter"></param>
-        /// <param name="endExtractBefore"></param>
-        /// <param name="extract"></param>
-        /// <param name="restStartIndex"></param>
-        /// <returns></returns>
         public static bool TryExtract<T>(this string str, int startIndex, string startExtractAfter, string endExtractBefore, out T extract, out int restStartIndex, bool includeSearchStrings = false) where T : IConvertible
         {
             TextSegment segment = str;

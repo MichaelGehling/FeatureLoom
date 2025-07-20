@@ -17,7 +17,7 @@ namespace FeatureLoom.Helpers;
 /// The pool can be cleared with <see cref="Clear"/> and the current count of pooled objects is available via <see cref="Count"/>.
 /// </para>
 /// <para>
-/// <b>Thread Safety:</b> If <paramref name="threadSafe"/> is true (default), all pool operations are protected by a <see cref="MicroLock"/>.
+/// <b>Thread Safety:</b> If threadSafe is true (default), all pool operations are protected by a <see cref="MicroLock"/>.
 /// If false, no locking is performed and the pool is not safe for concurrent use.
 /// </para>
 /// </summary>

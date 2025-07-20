@@ -96,6 +96,7 @@ namespace FeatureLoom.Synchronization
         /// Extracts the tasks from an array of AsyncWaitHandles and adds one extra Task to the resulting array.
         /// </summary>
         /// <param name="waitHandles"></param>
+        /// <param name="extraTask"></param>
         /// <returns>The resulting array of tasks</returns>
         public static Task[] GetWaitingTasks(this IAsyncWaitHandle[] waitHandles, Task extraTask)
         {

@@ -10,18 +10,18 @@ namespace FeatureLoom.Collections;
 /// <summary>
 /// Represents a segment of a byte array, providing efficient, non-allocating operations and equality comparison.
 /// </summary>
-public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byte>>, IEquatable<byte[]>, IReadOnlyList<byte>
+public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegment<byte>>, IEquatable<byte[]>, IReadOnlyList<byte>
 {
     /// <summary>
-    /// An empty <see cref="ByteSegment"/> instance.
+    /// An empty <see cref="FeatureLoom.Collections.ByteSegment"/> instance.
     /// </summary>
     public static readonly ByteSegment Empty = new ByteSegment(Array.Empty<byte>());
 
     private readonly ArraySegment<byte> segment;
-    private int? hashCode;        
+    private int? hashCode;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ByteSegment"/> struct from an <see cref="ArraySegment{byte}"/>.
+    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from an <see cref="System.ArraySegment{T}"/>.
     /// </summary>
     public ByteSegment(ArraySegment<byte> segment)
     {
@@ -29,15 +29,15 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ByteSegment"/> struct from a byte array, offset, and count.
+    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from a byte array, offset, and count.
     /// </summary>
-    public ByteSegment(byte[] array, int offset, int count)
+    public ByteSegment(byte[] array, int offset, int count) 
     {
         segment = new ArraySegment<byte>(array, offset, count);
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ByteSegment"/> struct from a byte array.
+    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from a byte array.
     /// </summary>
     public ByteSegment(byte[] array)
     {
@@ -45,7 +45,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ByteSegment"/> struct from a string, using UTF-8 encoding.
+    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from a string, using UTF-8 encoding.
     /// </summary>
     public ByteSegment(string str)
     {
@@ -53,7 +53,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Implicit conversion from <see cref="ArraySegment{byte}"/> to <see cref="ByteSegment"/>.
+    /// Implicit conversion from <see cref="System.ArraySegment{T}"/> to <see cref="FeatureLoom.Collections.ByteSegment"/>.
     /// </summary>
     public static implicit operator ByteSegment(ArraySegment<byte> segment)
     {
@@ -61,7 +61,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Implicit conversion from <see cref="byte[]"/> to <see cref="ByteSegment"/>.
+    /// Implicit conversion from <see cref="byte"/>[] to <see cref="FeatureLoom.Collections.ByteSegment"/>.
     /// </summary>
     public static implicit operator ByteSegment(byte[] byteArray)
     {
@@ -69,7 +69,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Implicit conversion from <see cref="ByteSegment"/> to <see cref="ArraySegment{byte}"/>.
+    /// Implicit conversion from <see cref="FeatureLoom.Collections.ByteSegment"/> to <see cref="System.ArraySegment{T}"/>.
     /// </summary>
     public static implicit operator ArraySegment<byte>(ByteSegment wrapper)
     {
@@ -77,7 +77,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Implicit conversion from <see cref="ByteSegment"/> to <see cref="byte[]"/>.
+    /// Implicit conversion from <see cref="FeatureLoom.Collections.ByteSegment"/> to <see cref="byte"/>[].
     /// Always returns a copy of the segment as a new array.
     /// </summary>
     public static implicit operator byte[](ByteSegment wrapper)
@@ -87,7 +87,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
 
 #if !NETSTANDARD2_0
     /// <summary>
-    /// Returns the segment as a <see cref="Span{byte}"/> (only available on supported frameworks).
+    /// Returns the segment as a <see cref="System.Span{T}"/> (only available on supported frameworks).
     /// </summary>
     public Span<byte> AsSpan() => segment.AsSpan();        
 #endif
@@ -110,7 +110,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     public ByteSegment SubSegment(int startIndex, int length) => new ByteSegment(segment.Array, startIndex + segment.Offset, length);
 
     /// <summary>
-    /// Tries to find the index of the first occurrence of another <see cref="ByteSegment"/> within this segment.
+    /// Tries to find the index of the first occurrence of another <see cref="FeatureLoom.Collections.ByteSegment"/> within this segment.
     /// </summary>
     /// <param name="other">The segment to search for.</param>
     /// <param name="index">The index of the first occurrence, if found.</param>
@@ -167,7 +167,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     public bool IsEmptyOrInvalid => !IsValid || segment.Count == 0;
 
     /// <summary>
-    /// Gets the underlying <see cref="ArraySegment{byte}"/>.
+    /// Gets the underlying <see cref="System.ArraySegment{T}"/>.
     /// </summary>
     public ArraySegment<byte> AsArraySegment => segment;
 
@@ -181,13 +181,13 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     /// </summary>
     /// <param name="separator">The byte to split on.</param>
     /// <param name="skipEmpty">Whether to skip empty segments.</param>
-    /// <returns>An enumerable of <see cref="ByteSegment"/>.</returns>
+    /// <returns>An enumerable of <see cref="FeatureLoom.Collections.ByteSegment"/>.</returns>
     public SplitEnumerator Split(byte separator, bool skipEmpty = false) => new SplitEnumerator(this, separator, skipEmpty);    
 
     /// <summary>
-    /// Enumerator for splitting a <see cref="ByteSegment"/> by a separator byte.
+    /// Enumerator for splitting a <see cref="FeatureLoom.Collections.ByteSegment"/> by a separator byte.
     /// </summary>
-    public struct SplitEnumerator : IEnumerator<ByteSegment>, IEnumerable<ByteSegment>
+    public struct SplitEnumerator : IEnumerator<FeatureLoom.Collections.ByteSegment>, IEnumerable<FeatureLoom.Collections.ByteSegment>
     {
         ByteSegment original;
         ByteSegment remaining;
@@ -197,7 +197,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
         bool finished;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="SplitEnumerator"/> struct.
+        /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment.SplitEnumerator"/> struct.
         /// </summary>
         public SplitEnumerator(ByteSegment original, byte seperator, bool skipEmpty)
         {
@@ -210,12 +210,16 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
         }
 
         /// <summary>
-        /// Gets the current <see cref="ByteSegment"/>.
+        /// Gets the current <see cref="FeatureLoom.Collections.ByteSegment"/>.
         /// </summary>
         public ByteSegment Current => current;
 
         object IEnumerator.Current => current;
 
+
+        /// <summary>
+        /// Doesn't do anything, as this enumerator does not hold any unmanaged resources.
+        /// </summary>
         public void Dispose() { }
 
         /// <summary>
@@ -258,13 +262,13 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
         /// <summary>
         /// Returns an enumerator that iterates through the segments.
         /// </summary>
-        public IEnumerator<ByteSegment> GetEnumerator() => this;
+        public IEnumerator<FeatureLoom.Collections.ByteSegment> GetEnumerator() => this;
 
         IEnumerator IEnumerable.GetEnumerator() => this;
     }
 
     /// <summary>
-    /// Determines whether this segment is equal to another <see cref="ByteSegment"/>.
+    /// Determines whether this segment is equal to another <see cref="FeatureLoom.Collections.ByteSegment"/>.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ByteSegment other)
@@ -282,7 +286,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Determines whether this segment is equal to an <see cref="ArraySegment{byte}"/>.
+    /// Determines whether this segment is equal to an <see cref="System.ArraySegment{T}"/>.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ArraySegment<byte> other)
@@ -291,7 +295,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Determines whether this segment is equal to an <see cref="byte[]"/>.
+    /// Determines whether this segment is equal to a <see cref="byte"/>[].
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(byte[] other)
@@ -309,12 +313,12 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Determines whether two <see cref="ByteSegment"/> instances are equal.
+    /// Determines whether two <see cref="FeatureLoom.Collections.ByteSegment"/> instances are equal.
     /// </summary>
     public static bool operator ==(ByteSegment left, ByteSegment right) => left.Equals(right);        
 
     /// <summary>
-    /// Determines whether two <see cref="ByteSegment"/> instances are not equal.
+    /// Determines whether two <see cref="FeatureLoom.Collections.ByteSegment"/> instances are not equal.
     /// </summary>
     public static bool operator !=(ByteSegment left, ByteSegment right) => !left.Equals(right);
 
@@ -330,7 +334,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<ArraySegment<byt
     }
 
     /// <summary>
-    /// Computes a hash code for the given <see cref="ArraySegment{byte}"/>.
+    /// Computes a hash code for the given <see cref="System.ArraySegment{T}"/>.
     /// </summary>
     private static int ComputeHashCode(ArraySegment<byte> segment)
     {

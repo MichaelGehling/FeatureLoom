@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
 {
-    /// <summary> Used to send messages of any type wrapped as topic messages to all connected sinks. It is thread safe. <summary>
+    /// <summary> Used to send messages of any type wrapped as topic messages to all connected sinks. It is thread safe. </summary>
     public sealed class TopicSender : IMessageSource, ISender
     {
         SourceValueHelper sourceHelper;
@@ -67,7 +67,7 @@ namespace FeatureLoom.MessageFlow
         }
     }
 
-    /// <summary> Used to send messages of a specific type wrapped as topic messages to all connected sinks. It is thread safe. <summary>
+    /// <summary> Used to send messages of a specific type wrapped as topic messages to all connected sinks. It is thread safe. </summary>
     public sealed class TopicSender<T> : ISender<T>, IMessageSource<TopicMessage<T>>
     {
         TypedSourceValueHelper<TopicMessage<T>> sourceHelper;

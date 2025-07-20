@@ -7,7 +7,8 @@ namespace FeatureLoom.MessageFlow
     /// block if used concurrently. Anyway, changing the list of connected sinks
     /// (connecting/disconnecting) uses a lock and blocks a short time. Sinks can optionally be stored as weak references
     /// and will then not be kept from being garbage-collected, so it is not necessary to disconnect
-    /// sinks that are not needed any more. <summary>
+    /// sinks that are not needed any more. 
+    /// </summary>
     public sealed class SourceHelper : IMessageSource
     {
         private SourceValueHelper sourceHelper;

@@ -58,6 +58,7 @@ namespace FeatureLoom.Scheduling
         /// Creates a new schedule based on a lamda function, adds it to the scheduler and returns it.
         /// NOTE: The scheduler only keeps a weak reference to the schedule. If the schedule is not kept in another reference, it will be garbage collected.
         /// </summary>
+        /// <param name="scheduler">The scheduler service to start the schedule on</param>
         /// <param name="name">The name of the new schedule</param>
         /// <param name="triggerAction">The function takes the current time as input parameter and returns a timeframe:
         /// If the timeframe is invalid the schedule is finished, otherwise the timeframe defines when the trigger method is called next. </param>
@@ -86,12 +87,13 @@ namespace FeatureLoom.Scheduling
         /// <summary>
         /// Creates a new schedule based on a lamda function, adds it to the scheduler and returns it.
         /// NOTE: The scheduler only keeps a weak reference to the schedule. If the schedule is not kept in another reference, it will be garbage collected.
-        /// </summary>
+        /// <param name="scheduler">The scheduler service to start the schedule on</param>
         /// <param name="name">The name of the new schedule</param>
         /// <param name="triggerAction">The action that will be executed. It takes the current time as input parameter</param>
         /// <param name="triggerTime">The time between the trigger action is called (with a tolerance of +15ms)</param>
         /// <param name="ct">Can be used to cancel the action from outside.</param>
         /// <returns>The created schedule.</returns>
+        /// </summary>
         public static ActionSchedule ScheduleAction(this SchedulerService scheduler, string name, Action<DateTime> triggerAction, TimeSpan triggerTime, CancellationToken ct = default)
         {
             return ScheduleAction(scheduler, name, now =>
@@ -106,6 +108,7 @@ namespace FeatureLoom.Scheduling
         /// Creates a new schedule based on a lamda function, adds it to the scheduler and returns it.
         /// NOTE: The scheduler only keeps a weak reference to the schedule. If the schedule is not kept in another reference, it will be garbage collected.
         /// </summary>
+        /// <param name="scheduler">The scheduler service to start the schedule on</param>
         /// <param name="name">The name of the new schedule</param>
         /// <param name="triggerAction">The action that will be executed</param>
         /// <param name="triggerTime">The time between the trigger action is called (with a tolerance of +15ms)</param>

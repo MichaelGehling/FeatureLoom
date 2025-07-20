@@ -10,7 +10,7 @@ namespace FeatureLoom.Collections;
 /// A lightweight, allocation-on-demand dictionary wrapper that implements <see cref="IDictionary{TKey, TValue}"/>.
 /// <para>
 /// <b>LazyDictionary&lt;TKey, TValue&gt;</b> only allocates the underlying <see cref="Dictionary{TKey, TValue}"/>
-/// when a write operation (such as <see cref="Add"/>, indexer set, or <see cref="Remove"/>) is performed.
+/// when a write operation (such as Add, indexer set, or Remove) is performed.
 /// Read operations (such as <see cref="Count"/>, <see cref="ContainsKey"/>, or enumeration) are safe and return sensible
 /// defaults (e.g., 0, false, or an empty enumerator) if the dictionary has not been created.
 /// </para>
