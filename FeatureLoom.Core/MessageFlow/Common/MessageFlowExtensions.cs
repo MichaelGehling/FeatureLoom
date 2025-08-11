@@ -156,10 +156,29 @@ namespace FeatureLoom.MessageFlow
             return true;
         }
 
+        public static bool TryPeek<T>(this IReceiver<T> receiver, out T message, CancellationToken token)
+        {
+            while (!receiver.TryPeek(out message))
+            {
+                if (!receiver.WaitHandle.Wait(token)) return false;
+            }
+            return true;
+        }
+
         public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, CancellationToken token)
         {
             T message = default;
             while (!receiver.TryReceive(out message))
+            {
+                if (!(await receiver.WaitHandle.WaitAsync(token).ConfiguredAwait())) return (false, message);
+            }
+            return (true, message);
+        }
+
+        public static async Task<(bool, T)> TryPeekAsync<T>(this IReceiver<T> receiver, CancellationToken token)
+        {
+            T message = default;
+            while (!receiver.TryPeek(out message))
             {
                 if (!(await receiver.WaitHandle.WaitAsync(token).ConfiguredAwait())) return (false, message);
             }
@@ -180,6 +199,20 @@ namespace FeatureLoom.MessageFlow
             return true;
         }
 
+        public static bool TryPeek<T>(this IReceiver<T> receiver, out T message, TimeSpan timeout)
+        {
+            if (receiver.TryPeek(out message)) return true;
+
+            TimeFrame timer = new TimeFrame(timeout);
+            do
+            {
+                if (!receiver.WaitHandle.Wait(timer.Remaining(timer.LastTimeSample))) return false;
+            }
+            while (!receiver.TryPeek(out message) && !timer.Elapsed());
+
+            return true;
+        }
+
         public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout)
         {
             T message = default;
@@ -191,6 +224,21 @@ namespace FeatureLoom.MessageFlow
                 if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample)).ConfiguredAwait())) return (false, message);
             }
             while (!receiver.TryReceive(out message) && !timer.Elapsed());
+
+            return (true, message);
+        }
+
+        public static async Task<(bool, T)> TryPeekAsync<T>(this IReceiver<T> receiver, TimeSpan timeout)
+        {
+            T message = default;
+            if (receiver.TryPeek(out message)) return (true, message);
+
+            TimeFrame timer = new TimeFrame(timeout);
+            do
+            {
+                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample)).ConfiguredAwait())) return (false, message);
+            }
+            while (!receiver.TryPeek(out message) && !timer.Elapsed());
 
             return (true, message);
         }
@@ -209,6 +257,20 @@ namespace FeatureLoom.MessageFlow
             return true;
         }
 
+        public static bool TryPeek<T>(this IReceiver<T> receiver, out T message, TimeSpan timeout, CancellationToken token)
+        {
+            if (!receiver.TryPeek(out message)) return true;
+
+            TimeFrame timer = new TimeFrame(timeout);
+            do
+            {
+                if (!receiver.WaitHandle.Wait(timer.Remaining(timer.LastTimeSample), token)) return false;
+            }
+            while (!receiver.TryPeek(out message) && !timer.Elapsed());
+
+            return true;
+        }
+
         public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout, CancellationToken token)
         {
             T message = default;
@@ -220,6 +282,21 @@ namespace FeatureLoom.MessageFlow
                 if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample), token).ConfiguredAwait())) return (false, message);
             }
             while (!receiver.TryReceive(out message) && !timer.Elapsed());
+
+            return (true, message);
+        }
+
+        public static async Task<(bool, T)> TryPeekAsync<T>(this IReceiver<T> receiver, TimeSpan timeout, CancellationToken token)
+        {
+            T message = default;
+            if (!receiver.TryPeek(out message)) return (true, message);
+
+            TimeFrame timer = new TimeFrame(timeout);
+            do
+            {
+                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample), token).ConfiguredAwait())) return (false, message);
+            }
+            while (!receiver.TryPeek(out message) && !timer.Elapsed());
 
             return (true, message);
         }
