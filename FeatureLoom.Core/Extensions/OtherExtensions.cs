@@ -33,7 +33,7 @@ namespace FeatureLoom.Extensions
 
         public static Exception InnerOrSelf(this Exception e)
         {
-            while (e.InnerException != null) e = e.InnerException;
+            while (e.InnerException != null) e = e.InnerException.InnerOrSelf();
             return e;
         }
 
