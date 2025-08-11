@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Xunit;
 using FeatureLoom.Helpers;
 
-namespace FeatureLoom.MesssageFlow.Endpoints
+namespace FeatureLoom.MesssageFlow
 {
     public class PriorityMessageReceiverTests
     {

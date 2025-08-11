@@ -85,9 +85,14 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     public bool IsEmptyOrInvalid => !IsValid || length == 0;
 
     /// <summary>
-    /// Gets the start index of the segment within the original string.
+    /// Gets the start index of the segment within the underlying string.
     /// </summary>
-    public int StartIndex => startIndex;
+    public int Offset => startIndex;
+
+    /// <summary>
+    /// Gets the underlying string value.
+    /// </summary>
+    public string UnderlyingString => text;
 
     /// <summary>
     /// Returns the string represented by this segment.

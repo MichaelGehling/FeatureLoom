@@ -60,7 +60,7 @@ public class SlicedBuffer<T>
     /// </summary>
     public SlicedBuffer()
     {
-        int maxElements = 84999 / Unsafe.SizeOf<T>();
+        int maxElements = 84900 / Unsafe.SizeOf<T>();
         this.capacity = 1024.ClampHigh(maxElements);
         this.initCapacity = this.capacity;
         this.buffer = new T[capacity];
@@ -91,7 +91,7 @@ public class SlicedBuffer<T>
         this.position = 0;
         if (maxCapacity <= 0) 
         {
-            int maxElements = 84999 / Unsafe.SizeOf<T>();
+            int maxElements = 84900 / Unsafe.SizeOf<T>();
             this.maxCapacity = maxElements.ClampLow(capacity);
         }
         else
