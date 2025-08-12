@@ -50,7 +50,7 @@ namespace FeatureLoom.Web
                     var identity = new Identity(usernamePassword.username, credentialHandler.GenerateStoredCredential(usernamePassword));
                     if (defaultRole != null) identity.AddRole(defaultRole, false);                        
 
-                    if (!TryHelper.Try(async ()=> await identity.StoreAsync()))
+                    if (!await TryHelper.TryAsync(async ()=> await identity.StoreAsync()))
                     {
                         OptLog.ERROR()?.Build($"Failed storing new identity {usernamePassword.username}");
                         return HandlerResult.Handled_InternalServerError();

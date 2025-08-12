@@ -48,8 +48,8 @@ public class UndoRedo
     bool redoing = false;
 
     // Stacks to hold undo and redo actions.
-    Stack<UndoRedoAction> undos = new Stack<UndoRedoAction>();
-    Stack<UndoRedoAction> redos = new Stack<UndoRedoAction>();
+    UndoRedoStack undos;
+    UndoRedoStack redos;
 
     // Used to notify listeners about undo/redo state changes.
     Sender<Notification> updateSender = new Sender<Notification>();
@@ -57,25 +57,51 @@ public class UndoRedo
 
     // Tracks the number of active transactions.
     volatile int transactionCounter = 0;
+    private readonly int historyLimit;
 
     /// <summary>
     /// Initializes a new instance of the UndoRedo class.
     /// </summary>
-    public UndoRedo()
+    /// <param name="historyLimit">The maximum number of undo actions to keep. A value <= 0 means no limit. The default is 0.</param>
+    public UndoRedo(int historyLimit = 0)
     {
+        this.historyLimit = historyLimit;
+        this.undos = new UndoRedoStack(historyLimit);
+        this.redos = new UndoRedoStack(historyLimit);
         // Only forward notifications when not inside a transaction.
         updateSender.ConnectTo(new DeactivatableForwarder(() => this.transactionCounter == 0)).ConnectTo(updateForwarder);
     }
+
+    /// <summary>
+    /// Gets the maximum number of undo actions that will be stored.
+    /// A value of 0 or less means the history is unlimited.
+    /// </summary>
+    public int HistoryLimit => historyLimit;
 
     /// <summary>
     /// Types of notifications sent when undo/redo state changes.
     /// </summary>
     public enum Notification
     {
+        /// <summary>
+        /// An undo operation was successfully performed.
+        /// </summary>
         UndoPerformed,
+        /// <summary>
+        /// A redo operation was successfully performed.
+        /// </summary>
         RedoPerformed,
+        /// <summary>
+        /// A new undo action was added to the stack.
+        /// </summary>
         UndoJobAdded,
+        /// <summary>
+        /// A new redo action was added to the stack (typically during an undo operation).
+        /// </summary>
         RedoJobAdded,
+        /// <summary>
+        /// The undo and redo stacks have been cleared.
+        /// </summary>
         Cleared
     }
 
@@ -87,12 +113,22 @@ public class UndoRedo
         readonly object action;
         readonly string description;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UndoRedoAction"/> struct for an asynchronous action.
+        /// </summary>
+        /// <param name="asyncAction">The asynchronous action to execute.</param>
+        /// <param name="description">A description of the action.</param>
         public UndoRedoAction(Func<Task> asyncAction, string description) : this()
         {
             this.action = asyncAction;
             this.description = description;                
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UndoRedoAction"/> struct for a synchronous action.
+        /// </summary>
+        /// <param name="action">The synchronous action to execute.</param>
+        /// <param name="description">A description of the action.</param>
         public UndoRedoAction(Action action, string description) : this()
         {
             this.action = action;
@@ -100,7 +136,7 @@ public class UndoRedo
         }
 
         /// <summary>
-        /// Executes the action synchronously.
+        /// Executes the action synchronously. If the action is async, it will be awaited blocking the current thread.
         /// </summary>
         public void Execute()
         {
@@ -109,8 +145,9 @@ public class UndoRedo
         }
 
         /// <summary>
-        /// Executes the action asynchronously.
+        /// Executes the action asynchronously. If the action is sync, it will be executed synchronously.
         /// </summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public Task ExecuteAsync()
         {
             if (action is Action syncAction) syncAction();
@@ -125,9 +162,57 @@ public class UndoRedo
         public string Description => description;
     }
 
+    private class UndoRedoStack
+    {
+        private readonly LinkedList<UndoRedoAction> actions = new LinkedList<UndoRedoAction>();
+        private readonly int historyLimit;
+
+        public UndoRedoStack(int historyLimit)
+        {
+            this.historyLimit = historyLimit;
+        }
+
+        public int Count => actions.Count;
+
+        public IEnumerable<string> Descriptions => actions.Reverse().Select(action => action.Description);
+
+        public void Push(UndoRedoAction action)
+        {
+            actions.AddLast(action);
+            if (historyLimit > 0 && actions.Count > historyLimit)
+            {
+                RemoveOldest();
+            }
+        }
+
+        public UndoRedoAction Pop()
+        {
+            if (actions.Count == 0) throw new InvalidOperationException("The stack is empty.");
+            var action = actions.Last.Value;
+            actions.RemoveLast();
+            return action;
+        }
+
+        public void Clear() => actions.Clear();
+
+        private void RemoveOldest() => actions.RemoveFirst();
+    }
+
     /// <summary>
     /// Represents a transaction that groups multiple undo actions into a single combined action.
+    /// When the transaction is disposed, all undo actions registered during its lifetime are merged.
+    /// This is useful for complex operations that consist of multiple smaller steps, which should be undone as a single unit.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// using (undoRedo.StartTransaction("Complex Edit"))
+    /// {
+    ///     // Multiple operations with individual undo actions
+    ///     undoRedo.DoWithUndo(() => data.Add(1), () => data.Remove(1));
+    ///     undoRedo.DoWithUndo(() => data.Add(2), () => data.Remove(2));
+    /// } // All undos are now combined into one "Complex Edit" undo action.
+    /// </code>
+    /// </example>
     public struct Transaction : IDisposable
     {
         UndoRedo serviceInstance;
@@ -137,7 +222,11 @@ public class UndoRedo
 
         /// <summary>
         /// Begins a new transaction, acquiring the lock and incrementing the transaction counter.
+        /// This constructor is intended for internal use. Use <see cref="UndoRedo.StartTransaction"/> to create a transaction.
         /// </summary>
+        /// <param name="serviceInstance">The <see cref="UndoRedo"/> instance.</param>
+        /// <param name="lockHandle">The lock handle to ensure thread safety.</param>
+        /// <param name="description">The description for the combined undo action.</param>
         public Transaction(UndoRedo serviceInstance, FeatureLock.LockHandle lockHandle, string description)
         {
             this.serviceInstance = serviceInstance;
@@ -149,6 +238,7 @@ public class UndoRedo
 
         /// <summary>
         /// Ends the transaction, combining all undo actions performed during the transaction into one.
+        /// It then releases the lock.
         /// </summary>
         public void Dispose()
         {
@@ -160,52 +250,60 @@ public class UndoRedo
     }
 
     /// <summary>
-    /// Number of available undo actions.
+    /// Gets the number of available undo actions.
     /// </summary>
     public int NumUndos => undos.Count;
 
     /// <summary>
-    /// Number of available redo actions.
+    /// Gets the number of available redo actions.
     /// </summary>
     public int NumRedos => redos.Count;
 
     /// <summary>
-    /// True if an undo operation is currently in progress.
+    /// Gets a value indicating whether an undo operation is currently in progress.
+    /// This is useful to prevent re-entrant calls or to update UI elements.
     /// </summary>
     public bool CurrentlyUndoing => undoing;
 
     /// <summary>
-    /// True if a redo operation is currently in progress.
+    /// Gets a value indicating whether a redo operation is currently in progress.
+    /// This is useful to prevent re-entrant calls or to update UI elements.
     /// </summary>
     public bool CurrentlyRedoing => redoing;
 
     /// <summary>
-    /// Starts a new transaction for grouping undo actions.
+    /// Starts a new transaction for grouping undo actions. Use with a `using` statement to ensure it's properly disposed.
     /// </summary>
+    /// <param name="description">An optional description for the combined undo action. If null, a description will be generated from the combined actions.</param>
+    /// <returns>A <see cref="Transaction"/> object that should be disposed to end the transaction.</returns>
     public Transaction StartTransaction(string description = null) => new Transaction(this, myLock.LockReentrant(), description);
 
     /// <summary>
-    /// Starts a new transaction asynchronously for grouping undo actions.
+    /// Starts a new asynchronous transaction for grouping undo actions. Use with a `using` statement to ensure it's properly disposed.
     /// </summary>
+    /// <param name="description">An optional description for the combined undo action. If null, a description will be generated from the combined actions.</param>
+    /// <returns>A task that resolves to a <see cref="Transaction"/> object that should be disposed to end the transaction.</returns>
     public async Task<Transaction> StartTransactionAsync(string description = null) => new Transaction(this, await myLock.LockReentrantAsync().ConfiguredAwait(), description);
 
     /// <summary>
-    /// Source for receiving undo/redo state change notifications.
+    /// Gets the source for receiving undo/redo state change notifications.
+    /// Connect a message sink to this source to be notified of events like <see cref="Notification.UndoPerformed"/> or <see cref="Notification.UndoJobAdded"/>.
     /// </summary>
     public IMessageSource<Notification> UpdateNotificationSource => updateForwarder;
 
     /// <summary>
-    /// Descriptions of all available undo actions.
+    /// Gets the descriptions of all available undo actions, from most recent to oldest.
     /// </summary>
-    public IEnumerable<string> UndoDescriptions => undos.Select(action => action.Description);
+    public IEnumerable<string> UndoDescriptions => undos.Descriptions;
 
     /// <summary>
-    /// Descriptions of all available redo actions.
+    /// Gets the descriptions of all available redo actions, from most recent to oldest.
     /// </summary>
-    public IEnumerable<string> RedoDescriptions => redos.Select(action => action.Description);
+    public IEnumerable<string> RedoDescriptions => redos.Descriptions;
 
     /// <summary>
     /// Performs the most recent undo action, if available.
+    /// The corresponding redo action is automatically added to the redo stack.
     /// </summary>
     public void PerformUndo()
     {
@@ -230,7 +328,9 @@ public class UndoRedo
 
     /// <summary>
     /// Asynchronously performs the most recent undo action, if available.
+    /// The corresponding redo action is automatically added to the redo stack.
     /// </summary>
+    /// <returns>A task that completes when the undo operation is finished.</returns>
     public async Task PerformUndoAsync()
     {
         if (undos.Count == 0) return;
@@ -254,6 +354,7 @@ public class UndoRedo
 
     /// <summary>
     /// Performs the most recent redo action, if available.
+    /// The corresponding undo action is automatically added back to the undo stack.
     /// </summary>
     public void PerformRedo()
     {
@@ -278,7 +379,9 @@ public class UndoRedo
 
     /// <summary>
     /// Asynchronously performs the most recent redo action, if available.
+    /// The corresponding undo action is automatically added back to the undo stack.
     /// </summary>
+    /// <returns>A task that completes when the redo operation is finished.</returns>
     public async Task PerformRedoAsync()
     {
         if (redos.Count == 0) return;
@@ -301,8 +404,10 @@ public class UndoRedo
     }
 
     /// <summary>
-    /// Adds a synchronous undo action to the stack.
+    /// Adds a synchronous undo action to the stack. When a new action is added, the redo stack is cleared unless a redo is in progress.
     /// </summary>
+    /// <param name="undo">The synchronous action that will reverse a change.</param>
+    /// <param name="description">An optional description of what this action undoes.</param>
     public void AddUndo(Action undo, string description = null)
     {
         using (myLock.LockReentrant())
@@ -330,8 +435,10 @@ public class UndoRedo
     }
 
     /// <summary>
-    /// Adds an asynchronous undo action to the stack.
+    /// Adds an asynchronous undo action to the stack. When a new action is added, the redo stack is cleared unless a redo is in progress.
     /// </summary>
+    /// <param name="undo">The asynchronous action that will reverse a change.</param>
+    /// <param name="description">An optional description of what this action undoes.</param>
     public void AddUndo(Func<Task> undo, string description = null)
     {
         using (myLock.LockReentrant())
@@ -359,8 +466,13 @@ public class UndoRedo
     }
 
     /// <summary>
-    /// Executes an action and registers its undo action for reversal.
+    /// Executes a synchronous action and registers its corresponding undo action.
+    /// This method simplifies the common pattern of performing an operation and immediately adding its inverse to the undo stack.
+    /// When the undo action is performed, it will call this method again with the actions swapped, enabling redo functionality.
     /// </summary>
+    /// <param name="doAction">The synchronous action to execute.</param>
+    /// <param name="undoAction">The synchronous action that will undo the `doAction`.</param>
+    /// <param name="description">An optional description for the undo action.</param>
     public void DoWithUndo(Action doAction, Action undoAction, string description = null)
     {
         doAction.Invoke();
@@ -372,8 +484,14 @@ public class UndoRedo
     }
 
     /// <summary>
-    /// Asynchronously executes an action and registers its undo action for reversal.
+    /// Asynchronously executes an action and registers its corresponding undo action.
+    /// This method simplifies the common pattern of performing an async operation and immediately adding its inverse to the undo stack.
+    /// When the undo action is performed, it will call this method again with the actions swapped, enabling redo functionality.
     /// </summary>
+    /// <param name="doAction">The asynchronous action to execute.</param>
+    /// <param name="undoAction">The asynchronous action that will undo the `doAction`.</param>
+    /// <param name="description">An optional description for the undo action.</param>
+    /// <returns>A task that completes when the `doAction` has finished.</returns>
     public async Task DoWithUndoAsync(Func<Task> doAction, Func<Task> undoAction, string description = null)
     {
         await doAction().ConfiguredAwait();
@@ -385,7 +503,7 @@ public class UndoRedo
     }
 
     /// <summary>
-    /// Clears all undo and redo actions.
+    /// Clears all undo and redo actions from their respective stacks. This cannot be undone.
     /// </summary>
     public void Clear()
     {
@@ -400,11 +518,14 @@ public class UndoRedo
     }
 
     /// <summary>
-    /// Combines the last N undo or redo actions into a single action.
+    /// Combines the last N undo actions on the current stack into a single composite action.
+    /// If an undo operation is in progress (<see cref="CurrentlyUndoing"/> is true), it combines actions from the redo stack.
+    /// Otherwise, it combines actions from the undo stack.
+    /// This is useful for grouping a series of operations into a single undo/redo step, for example in a transaction.
     /// </summary>
-    /// <param name="numUndosToCombine">Number of actions to combine.</param>
-    /// <param name="description">Optional description for the combined action.</param>
-    /// <returns>True if the actions were combined; otherwise, false.</returns>
+    /// <param name="numUndosToCombine">The number of actions to combine from the top of the stack. Must be 2 or more.</param>
+    /// <param name="description">An optional description for the new combined action. If null, a description is generated by joining the descriptions of the combined actions.</param>
+    /// <returns><c>true</c> if the actions were successfully combined; otherwise, <c>false</c> (e.g., if there are not enough actions to combine).</returns>
     public bool TryCombineLastUndos(int numUndosToCombine = 2, string description = null)
     {
         using (myLock.LockReentrant())

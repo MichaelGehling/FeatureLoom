@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Helpers;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -101,5 +102,58 @@ public class UndoRedoTests
 
         Assert.Contains("First", ur.UndoDescriptions);
         Assert.Contains("Second", ur.UndoDescriptions);
+    }
+
+    [Fact]
+    public void UndoRedo_HistoryLimit_IsRespected()
+    {
+        var ur = new UndoRedo(historyLimit: 3);
+        int value = 0;
+
+        ur.DoWithUndo(() => value = 1, () => value = 0, "Set to 1");
+        ur.DoWithUndo(() => value = 2, () => value = 1, "Set to 2");
+        ur.DoWithUndo(() => value = 3, () => value = 2, "Set to 3");
+        ur.DoWithUndo(() => value = 4, () => value = 3, "Set to 4");
+        ur.DoWithUndo(() => value = 5, () => value = 4, "Set to 5");
+
+        Assert.Equal(3, ur.NumUndos);
+        Assert.DoesNotContain("Set to 1", ur.UndoDescriptions);
+        Assert.DoesNotContain("Set to 2", ur.UndoDescriptions);
+        Assert.Contains("Set to 3", ur.UndoDescriptions);
+        Assert.Contains("Set to 4", ur.UndoDescriptions);
+        Assert.Contains("Set to 5", ur.UndoDescriptions);
+
+        ur.PerformUndo();
+        Assert.Equal(4, value);
+        ur.PerformUndo();
+        Assert.Equal(3, value);
+        ur.PerformUndo();
+        Assert.Equal(2, value);
+
+        Assert.Equal(0, ur.NumUndos);
+        ur.PerformUndo();
+        Assert.Equal(2, value);
+    }
+
+    [Fact]
+    public void UndoRedo_UnlimitedHistory_Works()
+    {
+        var ur = new UndoRedo(historyLimit: 0);
+        int value = 0;
+
+        for (int i = 1; i <= 100; i++)
+        {
+            int prev = i - 1;
+            int current = i;
+            ur.DoWithUndo(() => value = current, () => value = prev, $"Set to {i}");
+        }
+
+        Assert.Equal(100, ur.NumUndos);
+        Assert.Equal(100, value);
+
+        ur.PerformUndo();
+        Assert.Equal(99, value);
+        Assert.Equal(99, ur.NumUndos);
+        Assert.Equal(1, ur.NumRedos);
     }
 }
