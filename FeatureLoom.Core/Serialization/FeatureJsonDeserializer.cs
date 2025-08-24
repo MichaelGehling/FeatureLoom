@@ -293,7 +293,7 @@ namespace FeatureLoom.Serialization
             else if (type.IsValueType) return () => default;
             else if (!TryCompileConstructor<T>(out constructor, derivedType))
             {
-                throw new Exception($"No default constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)}.");
+                throw new Exception($"No default constructor for type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)}.");
             }
             
             if (!type.IsValueType && settings.enableReferenceResolution)
@@ -315,8 +315,8 @@ namespace FeatureLoom.Serialization
             if (settings.constructorsWithParam.TryGetValue((type, typeof(P)), out object c) && c is Func<P, T> typedConstructor) constructor = typedConstructor;
             else if (!TryCompileConstructor(out constructor))
             {
-                throw new Exception($"No constructor for type {TypeNameHelper.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
-            }            
+                throw new Exception($"No constructor for type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
+            }
 
             if (!type.IsValueType && settings.enableReferenceResolution)
             {
@@ -3404,7 +3404,7 @@ namespace FeatureLoom.Serialization
 
             // 2. get proposedTypeReader, if possible
             string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
-            Type proposedType = TypeNameHelper.GetTypeFromSimplifiedName(proposedTypename);
+            Type proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
             if (proposedType != null && proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);
 
             // 3. look if next is $value field

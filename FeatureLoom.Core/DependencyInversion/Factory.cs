@@ -34,7 +34,7 @@ namespace FeatureLoom.DependencyInversion
         /// <returns>True if the instance was created successfully; otherwise, false.</returns>
         public static bool TryCreateFromType(string simplifiedTypeName, out object instance)
         {
-            var type = TypeNameHelper.GetTypeFromSimplifiedName(simplifiedTypeName);
+            var type = TypeNameHelper.Shared.GetTypeFromSimplifiedName(simplifiedTypeName);
             return TryCreateFromType(type, out instance);
         }
 

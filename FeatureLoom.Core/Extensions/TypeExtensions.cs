@@ -7,7 +7,7 @@ namespace FeatureLoom.Extensions
 {
     public static class TypeExtensions
     {
-        public static string GetSimplifiedTypeName(this Type type) => TypeNameHelper.GetSimplifiedTypeName(type);
+        public static string GetSimplifiedTypeName(this Type type) => TypeNameHelper.Shared.GetSimplifiedTypeName(type);
 
         public static bool IsNullable(this Type type) => !type.IsValueType || Nullable.GetUnderlyingType(type) != null;
 

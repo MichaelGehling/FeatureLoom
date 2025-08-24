@@ -47,12 +47,12 @@ namespace FeatureLoom.Serialization
             public void AddConstructorWithParameter<T, P>(Func<P, T> constructor) => constructorsWithParam[(typeof(T), typeof(P))] = constructor;
             public void AddTypeMapping(Type baseType, Type mappedType)
             {
-                if (!mappedType.IsAssignableTo(baseType)) throw new Exception($"{TypeNameHelper.GetSimplifiedTypeName(baseType)} is not implemented by {TypeNameHelper.GetSimplifiedTypeName(mappedType)}");
+                if (!mappedType.IsAssignableTo(baseType)) throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(baseType)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(mappedType)}");
                 typeMapping[baseType] = mappedType;
             }
             public void AddGenericTypeMapping(Type genericBaseType, Type genericImplType)
             {
-                if (!genericImplType.IsOfGenericType(genericBaseType)) throw new Exception($"{TypeNameHelper.GetSimplifiedTypeName(genericBaseType)} is not implemented by {TypeNameHelper.GetSimplifiedTypeName(genericImplType)}");
+                if (!genericImplType.IsOfGenericType(genericBaseType)) throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(genericBaseType)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(genericImplType)}");
                 genericTypeMapping[genericBaseType] = genericImplType;
             }
 
@@ -60,7 +60,7 @@ namespace FeatureLoom.Serialization
             {
                 foreach(var typeOption in typeOptions)
                 {
-                    if (!typeOption.IsAssignableTo(baseType)) throw new Exception($"{TypeNameHelper.GetSimplifiedTypeName(baseType)} is not implemented by {TypeNameHelper.GetSimplifiedTypeName(typeOption)}");
+                    if (!typeOption.IsAssignableTo(baseType)) throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(baseType)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(typeOption)}");
                 }
                 multiOptionTypeMapping[baseType] = typeOptions;
             }

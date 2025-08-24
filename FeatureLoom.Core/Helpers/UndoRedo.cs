@@ -62,7 +62,7 @@ public class UndoRedo
     /// <summary>
     /// Initializes a new instance of the UndoRedo class.
     /// </summary>
-    /// <param name="historyLimit">The maximum number of undo actions to keep. A value <= 0 means no limit. The default is 0.</param>
+    /// <param name="historyLimit">The maximum number of undo actions to keep. A value of smaller or equal to 0 means no limit. The default is 0.</param>
     public UndoRedo(int historyLimit = 0)
     {
         this.historyLimit = historyLimit;

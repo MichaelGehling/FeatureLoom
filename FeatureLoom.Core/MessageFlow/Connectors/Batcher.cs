@@ -51,7 +51,7 @@ public class Batcher<T> : IMessageSink<T>, IMessageSource, IMessageFlowConnectio
 
         if (timerSchedule == null)
         {
-            timerSchedule = Service<SchedulerService>.Instance.ScheduleAction($"Batcher<{TypeNameHelper.GetSimplifiedTypeName(typeof(T))}>", now =>
+            timerSchedule = Service<SchedulerService>.Instance.ScheduleAction($"Batcher<{TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(T))}>", now =>
             {
                 if (timer.IsValid && timer.Elapsed(now))
                 {
