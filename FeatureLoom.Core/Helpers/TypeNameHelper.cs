@@ -20,10 +20,27 @@ namespace FeatureLoom.Helpers
 
 
         private Dictionary<Type, string> typeToName = new Dictionary<Type, string>();
-        private FeatureLock typeToNameLock = new FeatureLock();
+        private FeatureLock typeToNameLock = null;
 
         private Dictionary<string, Type> nameToType = new Dictionary<string, Type>();
-        private FeatureLock nameToTypeLock = new FeatureLock();
+        private FeatureLock nameToTypeLock = null;
+
+        
+        public TypeNameHelper(bool threadSafe)
+        {
+            if (threadSafe)
+            {
+                typeToNameLock = new();
+                nameToTypeLock = new();
+            }
+        }
+        
+
+        public TypeNameHelper()
+        {
+            typeToNameLock = new();
+            nameToTypeLock = new();
+        }
 
         /// <summary>
         /// Creates a simplified, human-readable type name string from a <see cref="Type"/> object.
@@ -41,6 +58,12 @@ namespace FeatureLoom.Helpers
         /// <returns>A simplified type name string.</returns>
         public string GetSimplifiedTypeName(Type type)
         {
+            if (typeToNameLock == null)
+            {
+                if (typeToName.TryGetValue(type, out string typeName)) return typeName;
+                return LockedGetSimplifiedTypeName(type);
+            }
+
             using (var lockHandle = typeToNameLock.LockReadOnly())
             {
                 if (typeToName.TryGetValue(type, out string typeName)) return typeName;
@@ -66,6 +89,12 @@ namespace FeatureLoom.Helpers
         /// <returns>The resolved <see cref="Type"/> object, or null if the type could not be found.</returns>
         public Type GetTypeFromSimplifiedName(string typeName)
         {
+            if (nameToTypeLock == null)
+            {
+                if (nameToType.TryGetValue(typeName, out Type type)) return type;
+                return LockedGetTypeFromSimplifiedName(typeName);
+            }
+
             using (var lockHandle = nameToTypeLock.LockReadOnly())
             {
                 if (nameToType.TryGetValue(typeName, out Type type)) return type;
