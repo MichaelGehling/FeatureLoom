@@ -94,7 +94,7 @@ namespace FeatureLoom.Storages
                 foreach (var file in files)
                 {
                     string uri = file.FullName.Substring(basePathLength, file.FullName.Length - basePathLength - config.fileSuffix.Length);
-                    if (pattern == null || uri.MatchesWildcard(pattern))
+                    if (pattern == null || uri.MatchesWildcardPattern(pattern))
                     {
                         uris.Add(uri);
                     }

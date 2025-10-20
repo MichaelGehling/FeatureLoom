@@ -46,8 +46,8 @@ namespace FeatureLoom.Security
         public bool HasPermission(string permission) => permissions.Contains(permission);
         public bool HasAnyPermission(IEnumerable<string> checkedPermissions) => permissions.Intersect(checkedPermissions).Any();
         public bool HasAnyPermission() => permissions.Count > 0;
-        public bool MatchesAnyPermission(string permissionWildcard) => permissions.Any(permission => permission.MatchesWildcard(permissionWildcard));
-        public bool MatchesAnyPermission(IEnumerable<string> permissionWildcards) => permissions.Any(permission => permissionWildcards.Any(wildcard => permission.MatchesWildcard(wildcard)));
+        public bool MatchesAnyPermission(string permissionWildcard) => permissions.Any(permission => permission.MatchesWildcardPattern(permissionWildcard));
+        public bool MatchesAnyPermission(IEnumerable<string> permissionWildcards) => permissions.Any(permission => permissionWildcards.Any(wildcard => permission.MatchesWildcardPattern(wildcard)));
 
         public Task<bool> TryStoreAsync()
         {

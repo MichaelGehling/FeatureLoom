@@ -177,14 +177,14 @@ public class OptLogService
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Check(string method, string sourceFile, int sourceLine, ref string? logContext)
         {
-            if (settings.sourceFileMask != null && !sourceFile.MatchesWildcard(settings.sourceFileMask)) return false;
-            if (settings.methodMask != null && !method.MatchesWildcard(settings.methodMask)) return false;
+            if (settings.sourceFileMask != null && !sourceFile.MatchesWildcardPattern(settings.sourceFileMask)) return false;
+            if (settings.methodMask != null && !method.MatchesWildcardPattern(settings.methodMask)) return false;
             if (settings.minLine.HasValue && settings.maxLine.HasValue && (sourceLine < settings.minLine || sourceLine > settings.maxLine)) return false;
             if (settings.contextMask != null)
             {
                 if (logContext != null)
                 {
-                    if (!logContext.MatchesWildcard(settings.contextMask)) return false;
+                    if (!logContext.MatchesWildcardPattern(settings.contextMask)) return false;
                 }
                 else if (parent.roamingContext.Exists)
                 {
@@ -192,7 +192,7 @@ public class OptLogService
                     if (roamingContext != null)
                     {
                         logContext = roamingContext;
-                        if (!logContext.MatchesWildcard(settings.contextMask)) return false;
+                        if (!logContext.MatchesWildcardPattern(settings.contextMask)) return false;
                     }
                 }
             }

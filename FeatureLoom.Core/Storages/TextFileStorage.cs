@@ -147,7 +147,7 @@ namespace FeatureLoom.Storages
         {
             if (notification.changeType.IsFlagSet(WatcherChangeTypes.Created))
             {
-                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
+                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcardPattern("*" + config.fileSuffix));
                 foreach (var fileInfo in addedFileInfos)
                 {
                     lock (fileSet)
@@ -162,7 +162,7 @@ namespace FeatureLoom.Storages
             {
                 UpdateOnRemovedDir();
 
-                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
+                var addedFileInfos = directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcardPattern("*" + config.fileSuffix));
                 foreach (var fileInfo in addedFileInfos)
                 {
                     lock (fileSet)
@@ -288,7 +288,7 @@ namespace FeatureLoom.Storages
         {
             if (!rootDir.RefreshAnd().Exists) return new HashSet<string>();
 
-            var fileInfos = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
+            var fileInfos = rootDir.EnumerateFiles("*", SearchOption.AllDirectories).Where(fileInfo => fileInfo.FullName.MatchesWildcardPattern("*" + config.fileSuffix));
             var newFileSet = new HashSet<string>();
             foreach (var info in fileInfos)
             {
@@ -400,7 +400,7 @@ namespace FeatureLoom.Storages
                         foreach (var fileName in fileSet)
                         {
                             string uri = FilePathToUri(fileName);
-                            if (pattern == null || uri.MatchesWildcard(pattern))
+                            if (pattern == null || uri.MatchesWildcardPattern(pattern))
                             {
                                 uris.Add(uri);
                             }
@@ -417,11 +417,11 @@ namespace FeatureLoom.Storages
                     {
                         var result = new List<string>();
                         var files = rootDir.EnumerateFiles("*", SearchOption.AllDirectories)
-                            .Where(fileInfo => fileInfo.FullName.MatchesWildcard("*" + config.fileSuffix));
+                            .Where(fileInfo => fileInfo.FullName.MatchesWildcardPattern("*" + config.fileSuffix));
                         foreach (var file in files)
                         {
                             string uri = FilePathToUri(file.FullName);
-                            if (pattern == null || uri.MatchesWildcard(pattern))
+                            if (pattern == null || uri.MatchesWildcardPattern(pattern))
                             {
                                 result.Add(uri);
                             }

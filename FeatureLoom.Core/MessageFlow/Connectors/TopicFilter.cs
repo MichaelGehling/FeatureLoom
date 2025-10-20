@@ -56,7 +56,7 @@ namespace FeatureLoom.MessageFlow
             {
                 if (includesWildcards)
                 {
-                    if (topicMessage.Topic.MatchesWildcard(topic)) topicMessage.ForwardMessageByRef(forwarder);
+                    if (topicMessage.Topic.MatchesWildcardPattern(topic)) topicMessage.ForwardMessageByRef(forwarder);
                 }
                 else if (topicMessage.Topic == topic) topicMessage.ForwardMessageByRef(forwarder);
             }
@@ -68,7 +68,7 @@ namespace FeatureLoom.MessageFlow
             {
                 if (includesWildcards)
                 {
-                    if (topicMessage.Topic.MatchesWildcard(topic)) topicMessage.ForwardMessage(forwarder);
+                    if (topicMessage.Topic.MatchesWildcardPattern(topic)) topicMessage.ForwardMessage(forwarder);
                 }
                 else if (topicMessage.Topic == topic) topicMessage.ForwardMessage(forwarder);
             }
@@ -80,7 +80,7 @@ namespace FeatureLoom.MessageFlow
             {
                 if (includesWildcards)
                 {
-                    if (topicMessage.Topic.MatchesWildcard(topic)) return topicMessage.ForwardMessageAsync(forwarder);
+                    if (topicMessage.Topic.MatchesWildcardPattern(topic)) return topicMessage.ForwardMessageAsync(forwarder);
                 }
                 else if (topicMessage.Topic == topic) return topicMessage.ForwardMessageAsync(forwarder);
             }
@@ -143,7 +143,7 @@ namespace FeatureLoom.MessageFlow
                 T typedMesage = topicMessage.Message;
                 if (includesWildcards)
                 {
-                    if (topicMessage.Topic.MatchesWildcard(topic)) sourceHelper.Forward(in typedMesage);
+                    if (topicMessage.Topic.MatchesWildcardPattern(topic)) sourceHelper.Forward(in typedMesage);
                 }
                 else if (topicMessage.Topic == topic) sourceHelper.Forward(in typedMesage);
             }
@@ -155,7 +155,7 @@ namespace FeatureLoom.MessageFlow
             {                
                 if (includesWildcards)
                 {
-                    if (topicMessage.Topic.MatchesWildcard(topic)) sourceHelper.Forward(topicMessage.Message);
+                    if (topicMessage.Topic.MatchesWildcardPattern(topic)) sourceHelper.Forward(topicMessage.Message);
                 }
                 else if (topicMessage.Topic == topic) sourceHelper.Forward(topicMessage.Message);
             }
@@ -167,7 +167,7 @@ namespace FeatureLoom.MessageFlow
             {
                 if (includesWildcards)
                 {
-                    if (topicMessage.Topic.MatchesWildcard(topic)) return sourceHelper.ForwardAsync(topicMessage.Message);
+                    if (topicMessage.Topic.MatchesWildcardPattern(topic)) return sourceHelper.ForwardAsync(topicMessage.Message);
                 }
                 else if (topicMessage.Topic == topic) return sourceHelper.ForwardAsync(topicMessage.Message);
             }

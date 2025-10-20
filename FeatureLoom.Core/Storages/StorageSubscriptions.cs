@@ -47,7 +47,7 @@ namespace FeatureLoom.Storages
                     }
                     else
                     {
-                        if (uri.MatchesWildcard(subscription.uriPattern))
+                        if (uri.MatchesWildcardPattern(subscription.uriPattern))
                         {
                             var changeNotification = new ChangeNotification(category, uri, updateEvent, AppTime.Now);
                             subscription.sender.Send(changeNotification);

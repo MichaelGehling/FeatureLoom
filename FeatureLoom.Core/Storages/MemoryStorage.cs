@@ -118,7 +118,7 @@ namespace FeatureLoom.Storages
             {
                 if (!pattern.EmptyOrNull())
                 {
-                    var uris = dataSet.Keys.Where(uri => uri.MatchesWildcard(pattern)).ToArray();
+                    var uris = dataSet.Keys.Where(uri => uri.MatchesWildcardPattern(pattern)).ToArray();
                     return (true, uris);
                 }
                 else return (true, dataSet.Keys.ToArray());

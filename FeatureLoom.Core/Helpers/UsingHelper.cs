@@ -3,8 +3,8 @@
 namespace FeatureLoom.Helpers
 {
     /// <summary>
-    /// Lightweight helper that executes an optional <paramref name="before"/> action immediately
-    /// and an optional <paramref name="after"/> action when disposed (e.g. by a using statement).
+    /// Lightweight helper that executes an optional before action immediately
+    /// and an optional after action when disposed (e.g. by a using statement).
     /// </summary>
     /// <remarks>
     /// Typical usage:
