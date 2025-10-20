@@ -138,7 +138,7 @@ namespace FeatureLoom.Extensions
         /// </summary>
         private struct VariableTextSection
         {
-            public static readonly VariableTextSection Empty = new VariableTextSection(""));
+            public static readonly VariableTextSection Empty = new VariableTextSection("");
 
             string text;
             int startIndex;
