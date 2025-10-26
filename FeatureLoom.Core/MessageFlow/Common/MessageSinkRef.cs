@@ -17,12 +17,18 @@ namespace FeatureLoom.MessageFlow
 
         public MessageSinkRef(IMessageSink sink, bool weakReference)
         {
-            weakRefSink = weakReference ? new WeakReference<IMessageSink>(sink) : null;
-            strongRefSink = weakReference ? null : sink;
+            if (weakReference)
+            {
+                weakRefSink = new WeakReference<IMessageSink>(sink);
+            }
+            else
+            {
+                strongRefSink = sink;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetTarget(out IMessageSink sink)
+        public readonly bool TryGetTarget(out IMessageSink sink)
         {
             sink = strongRefSink;
             if (sink != null) return true;
@@ -30,6 +36,15 @@ namespace FeatureLoom.MessageFlow
             return false;
         }
 
-        public bool IsValid => strongRefSink != null || (weakRefSink?.TryGetTarget(out _) ?? false);
+        public bool IsValid
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if (strongRefSink != null) return true;
+                if (weakRefSink == null) return false;
+                return weakRefSink.TryGetTarget(out _);
+            }
+        }
     }
 }
