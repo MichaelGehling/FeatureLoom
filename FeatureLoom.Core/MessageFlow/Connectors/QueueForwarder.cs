@@ -46,6 +46,9 @@ namespace FeatureLoom.MessageFlow
         public Type SentMessageType => typeof(T);
         public Type ConsumedMessageType => typeof(T);
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
+
         /// <summary>
         ///     Creates an active forwarder that queues incoming messages and forwards them in
         ///     threads from the ThreadPool. The number of threads is scaled dynamically based on

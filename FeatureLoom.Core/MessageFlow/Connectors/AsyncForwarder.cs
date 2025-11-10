@@ -25,6 +25,9 @@ namespace FeatureLoom.MessageFlow
         /// </summary>
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NoConnectedSinks;
+
         /// <summary>
         /// Connects this forwarder to a sink.
         /// </summary>
@@ -113,7 +116,7 @@ namespace FeatureLoom.MessageFlow
         /// </remarks>
         public Task PostAsync<M>(M message)
         {
-            if (sourceHelper.NotConnected) return Task.CompletedTask;
+            if (sourceHelper.NoConnectedSinks) return Task.CompletedTask;
             _ = Task.Run(async () =>
             {
                 try

@@ -89,6 +89,9 @@ namespace FeatureLoom.Storages
 
         public int CountConnectedSinks => forwarder.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => forwarder.NoConnectedSinks;
+
         public Type SentMessageType => typeof(ChangeNotification);
 
         public void DisconnectAll()

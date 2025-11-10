@@ -6,11 +6,13 @@ namespace FeatureLoom.MessageFlow
     /// <summary>
     ///     Just forwards messages without processing it. It is thread-safe.
     /// </summary>
-    public sealed class Forwarder : IMessageSource, IMessageFlowConnection
+    public sealed class Forwarder : IMessageFlowConnection
     {
         SourceValueHelper sourceHelper;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
 
         public IMessageSink[] GetConnectedSinks()
         {
@@ -70,6 +72,8 @@ namespace FeatureLoom.MessageFlow
         public Type ConsumedMessageType => typeof(T);
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {

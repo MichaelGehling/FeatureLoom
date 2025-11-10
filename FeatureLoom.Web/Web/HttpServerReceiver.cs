@@ -27,6 +27,9 @@ namespace FeatureLoom.Web
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
+
         public string Route => route;
 
         string[] supportedMethods = { "POST" };

@@ -43,6 +43,9 @@ namespace FeatureLoom.TCP
         public int CountConnectedClients => connections.Count;
         public int CountConnectedSinks => readForwarder.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => readForwarder.NoConnectedSinks;
+
         public TcpServerEndpoint(Settings settings = null, bool autoStart = true, Func<IGeneralMessageStreamReader> createStreamReaderAction = null, Func<IGeneralMessageStreamWriter> createStreamWriterAction = null)
         {
             this.settings = settings;

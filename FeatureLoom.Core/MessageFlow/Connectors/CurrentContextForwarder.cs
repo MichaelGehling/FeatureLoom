@@ -104,6 +104,9 @@ namespace FeatureLoom.MessageFlow
         /// </summary>
         public Type ConsumedMessageType => typeof(T);
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
+
         /// <summary>
         /// Initializes a new instance and captures the current <see cref="SynchronizationContext"/> for forwarding.
         /// </summary>

@@ -20,6 +20,9 @@ namespace FeatureLoom.MessageFlow
         Task executionTask = Task.CompletedTask;
         ForwardingMethod ForwardingMethod { get; set; }
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NoConnectedSinks;
+
 
         public MessageLogReader(IReadLogBuffer<T> messageSource, ForwardingMethod forwardingMethod = ForwardingMethod.Synchronous)
         {

@@ -159,6 +159,9 @@ namespace FeatureLoom.MessageFlow
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
+
         public Type ConsumedMessageType => typeof(IResponseMessage<RESP>);
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)

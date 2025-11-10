@@ -38,6 +38,10 @@ namespace FeatureLoom.TCP
         public IMessageSink ReceivedMessages => readForwarder;
 
         public int CountConnectedSinks => readForwarder.CountConnectedSinks;
+
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => readForwarder.NoConnectedSinks;
+
         public bool IsConnected => connection != null && connection.IsConnected;
         Func<IGeneralMessageStreamReader> createStreamReader = () => new VariantStreamReader(null, new TypedJsonMessageStreamReader());
         Func<IGeneralMessageStreamWriter> createStreamWriter = () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter());

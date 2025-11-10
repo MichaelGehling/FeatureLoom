@@ -79,6 +79,9 @@ namespace FeatureLoom.Synchronization
 
         public int CountConnectedSinks => notifier.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => notifier.NotConnected;
+
         public Type SentMessageType => typeof(bool);
 
         /// <summary>

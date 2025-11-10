@@ -25,7 +25,7 @@ namespace FeatureLoom.MessageFlow
         /// <summary>
         /// Gets a value indicating whether there are no connected sinks.
         /// </summary>
-        public bool NotConnected => sourceHelper.NotConnected;
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
 
         /// <summary>The static message type this helper forwards.</summary>
         public Type SentMessageType => typeof(T);

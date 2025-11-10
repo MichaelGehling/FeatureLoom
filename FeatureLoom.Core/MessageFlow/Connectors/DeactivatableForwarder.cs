@@ -17,6 +17,9 @@ namespace FeatureLoom.MessageFlow
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
+
         public bool Active { get => active; set => active = value; }
 
         public DeactivatableForwarder(Func<bool> autoActivationCondition = null)

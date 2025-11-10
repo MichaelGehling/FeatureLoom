@@ -29,6 +29,9 @@ namespace FeatureLoom.Web
 
         public int CountConnectedSinks => ((IRequester)rpcCaller).CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => rpcCaller.NoConnectedSinks;
+
         string[] supportedMethods = { "POST" };
 
         public string[] SupportedMethods => supportedMethods;

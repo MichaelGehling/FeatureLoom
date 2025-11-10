@@ -140,6 +140,9 @@ namespace FeatureLoom.Mappers
             IMappingConverter[] converters;
             SourceHelper sourceHelper = new SourceHelper();
 
+            /// <summary> Indicates whether there are no connected sinks. </summary>
+            public bool NoConnectedSinks => sourceHelper.NoConnectedSinks;
+
             internal DynamicMultiMappingConverter(Type[] inputTypes, bool forwardUnmappedMessages, IMappingConverter[] converters)
             {
                 this.inputTypes = inputTypes;

@@ -11,6 +11,9 @@ namespace FeatureLoom.MessageFlow
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
+
         public IMessageSink[] GetConnectedSinks()
         {
             return sourceHelper.GetConnectedSinks();
@@ -65,6 +68,9 @@ namespace FeatureLoom.MessageFlow
         public Type SentMessageType => sourceHelper.SentMessageType;
 
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sourceHelper.NotConnected;
 
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {

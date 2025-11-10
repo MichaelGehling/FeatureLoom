@@ -71,6 +71,11 @@ namespace FeatureLoom.MessageFlow
         int CountConnectedSinks { get; }
 
         /// <summary>
+        /// True if there are no connected sinks.
+        /// </summary>
+        bool NoConnectedSinks { get; }
+
+        /// <summary>
         /// Returns the currently connected sinks (invalid weak refs are pruned lazily).
         /// </summary>
         IMessageSink[] GetConnectedSinks();

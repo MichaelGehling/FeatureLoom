@@ -75,6 +75,9 @@ namespace FeatureLoom.RPC
 
         public int CountConnectedSinks => sender.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sender.NoConnectedSinks;
+
         public void DisconnectAll()
         {
             sender.DisconnectAll();

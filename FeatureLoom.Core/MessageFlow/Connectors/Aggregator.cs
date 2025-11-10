@@ -171,6 +171,9 @@ namespace FeatureLoom.MessageFlow
         /// <summary>Number of currently connected sinks (excluding already collected weak refs).</summary>
         public int CountConnectedSinks => sender.CountConnectedSinks;
 
+        /// <summary> Indicates whether there are no connected sinks. </summary>
+        public bool NoConnectedSinks => sender.NoConnectedSinks;
+
         /// <summary>
         /// Connects this source to a sink. When <paramref name="weakReference"/> is true, the sink is held weakly (GC can collect it).
         /// </summary>
@@ -330,6 +333,9 @@ namespace FeatureLoom.MessageFlow
 
             /// <summary>Number of currently connected sinks (excluding already collected weak refs).</summary>
             public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
+
+            /// <summary> Indicates whether there are no connected sinks. </summary>
+            public bool NoConnectedSinks => sourceHelper.NoConnectedSinks;
 
             /// <inheritdoc/>
             public void ConnectTo(IMessageSink sink, bool weakReference = false)
