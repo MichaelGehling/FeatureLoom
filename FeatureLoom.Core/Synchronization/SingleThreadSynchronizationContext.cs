@@ -51,6 +51,11 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     private volatile bool disposed;
 
     /// <summary>
+    /// The dedicated thread used by this SynchronizationContext.
+    /// </summary>
+    public Thread Thread => thread;
+
+    /// <summary>
     /// Initializes a new instance and starts the dedicated thread.
     /// </summary>
     /// <param name="threadName">Optional name for the dedicated thread.</param>
