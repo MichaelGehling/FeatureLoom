@@ -3,6 +3,7 @@ using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -133,12 +134,9 @@ namespace FeatureLoom.MessageFlow
         /// <typeparam name="T">Input message type.</typeparam>
         /// <param name="source">The source to connect from.</param>
         /// <param name="maxBatchSize">Maximum number of items per batch. When reached, a batch is emitted immediately.</param>
-        /// <param name="maxCollectionTime">Maximum time to collect before emitting the current batch (if not empty).</param>
-        /// <param name="tolerance">Scheduling tolerance for timer firing; zero means exact scheduling. Recommended is 20 ms</param>
+        /// <param name="maxCollectionTime">Maximum time to collect before emitting the current batch (if not empty). 
+        /// If <paramref name="maxCollectionTime"/> is zero or negative, the batch will only be flushed based on <paramref name="maxBatchSize"/>.</param>
         /// <param name="sendSingleMessagesAsArray">If true, even single items are sent as a T[] of length 1; if false, a single T is forwarded.</param>
-        /// <param name="maxUnusedTimerCycles">
-        /// Internal optimization: number of idle timer cycles before the scheduler entry is removed when no items arrive.
-        /// </param>
         /// <returns>
         /// The connected message source (the batcher as a source). Note: output is untyped and may be either T or T[] depending on <paramref name="sendSingleMessagesAsArray"/>.
         /// </returns>
@@ -146,30 +144,49 @@ namespace FeatureLoom.MessageFlow
             this IMessageSource source,
             int maxBatchSize,
             TimeSpan maxCollectionTime,
-            TimeSpan tolerance,
-            bool sendSingleMessagesAsArray = true,
-            int maxUnusedTimerCycles = 10)
+            bool sendSingleMessagesAsArray = true)
         {
-            var batcher = new Batcher<T>(maxBatchSize, maxCollectionTime, tolerance, sendSingleMessagesAsArray, maxUnusedTimerCycles);
-            return source.ConnectTo(batcher);
-        }
+            if (maxBatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(maxBatchSize));
 
-        /// <summary>
-        /// Connects a batching connector with sensible defaults: 20ms timer scheduling and single messages emitted as arrays.
-        /// </summary>
-        /// <typeparam name="T">Input message type.</typeparam>
-        /// <param name="source">The source to connect from.</param>
-        /// <param name="maxBatchSize">Maximum number of items per batch.</param>
-        /// <param name="maxCollectionTime">Maximum time to collect before emitting the current batch.</param>
-        /// <returns>
-        /// The connected message source (the batcher as a source). Output will be T[] for any batch size, including 1.
-        /// </returns>
-        public static IMessageSource BatchMessages<T>(
-            this IMessageSource source,
-            int maxBatchSize,
-            TimeSpan maxCollectionTime)
-        {
-            return source.BatchMessages<T>(maxBatchSize, maxCollectionTime, tolerance: 20.Milliseconds(), sendSingleMessagesAsArray: true);
+            var buffer = new List<T>(Math.Max(4, maxBatchSize));
+
+            void Flush(ISender s)
+            {
+                if (buffer.Count == 0) return;
+
+                if (buffer.Count == 1 && !sendSingleMessagesAsArray)
+                {
+                    var item = buffer[0];
+                    buffer.Clear();
+                    s.Send(item);
+                }
+                else
+                {
+                    var arr = buffer.ToArray();
+                    buffer.Clear();
+                    s.Send(arr);
+                }
+            }
+
+            // Use inactivity-based timer so the window is relative to the last received message.
+            var useTimeout = maxCollectionTime > TimeSpan.Zero;
+
+            var batcher = new Aggregator<T>(
+                onMessage: (msg, s) =>
+                {
+                    buffer.Add(msg);
+                    if (buffer.Count >= maxBatchSize)
+                    {
+                        Flush(s);
+                    }
+                },
+                onTimeout: useTimeout ? new Action<ISender>(s => Flush(s)) : null,
+                timeout: useTimeout ? maxCollectionTime : default,
+                resetTimeoutOnMessage: false,
+                autoLock: true
+            );
+
+            return source.ConnectTo(batcher);
         }
 
         /// <summary>
@@ -668,6 +685,6 @@ namespace FeatureLoom.MessageFlow
         public static ArraySegment<T> PeekAll<T>(this IReceiver<T> receiver, SlicedBuffer<T> buffer)
         {
             return receiver.PeekMany(int.MaxValue, buffer);
-        }
+        }        
     }
 }

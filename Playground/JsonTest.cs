@@ -452,16 +452,16 @@ namespace Playground
             dataLeft = featureJsonDeserializer.IsAnyDataLeft();
             featureJsonDeserializer.TryDeserialize<object>(out var result7);
             dataLeft = featureJsonDeserializer.IsAnyDataLeft();
+        }
 
-
-
-
+        public static async Task Run2()
+        {
 
             var opt = new JsonSerializerOptions()
             {
                 IncludeFields = true,
                 //ReferenceHandler = ReferenceHandler.Preserve
-                //WriteIndented = true
+                WriteIndented = true
 
             };
 
@@ -665,10 +665,7 @@ namespace Playground
                 afterCollection = GC.GetTotalMemory(false);
                 Console.WriteLine($"Text.Json:       {elapsed} / {(beforeCollection - afterCollection)} bytes");
                 AppTime.Wait(0.5.Seconds());
-
-             
-     
-                
+  
             }
 
             //var result = JsonSerializer.Deserialize<TestDto>(json);

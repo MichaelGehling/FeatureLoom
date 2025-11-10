@@ -22,6 +22,7 @@ namespace FeatureLoom.Serialization
         JsonUTF8StreamWriter writer;
         readonly CompiledSettings settings;
         Dictionary<Type, CachedTypeHandler> typeHandlerCache = new();
+        readonly CachedTypeHandler[] typeHandlerLookup;
         Dictionary<Type, CachedKeyWriter> keyWriterCache = new();
         Dictionary<object, ItemInfo> objToItemInfo = new();
         ItemInfoRecycler itemInfoRecycler;
@@ -37,6 +38,7 @@ namespace FeatureLoom.Serialization
             writer = new JsonUTF8StreamWriter(this.settings);
             itemInfoRecycler = new ItemInfoRecycler(this.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef);
             rootName = new ByteSegment(writer.PrepareRootName());
+            typeHandlerLookup = CreateTypeHandlerLookup();
             this.extensionApi = new ExtensionApi(this);
         }
 
@@ -253,9 +255,39 @@ namespace FeatureLoom.Serialization
             return stringValueWriter.HasMethod;
         }
 
+        private CachedTypeHandler[] CreateTypeHandlerLookup()
+        {
+            var values = Enum.GetValues(typeof(TypeCode)).OfType<TypeCode>();
+            int count = values.Max(v => (int)v) + 1;
+
+            List<CachedTypeHandler> handlers = new();            
+            for(int i = 0; i < count; i++)
+            {
+                if (!EnumHelper.TryFromInt<TypeCode>(i, out TypeCode typeCode))
+                {
+                    handlers.Add(null);
+                    continue;
+                }
+
+                Type type = typeCode.GetTypeFromTypeCode();
+                if (type == null || type == typeof(object))
+                {
+                    handlers.Add(null);
+                }
+                else
+                {
+                    handlers.Add(CreateCachedTypeHandler(type));
+                }
+            }
+            return handlers.ToArray();
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private CachedTypeHandler GetCachedTypeHandler(Type itemType)
-        {
+        {            
+            int typeCode = (int)Type.GetTypeCode(itemType);
+            CachedTypeHandler handler = typeHandlerLookup[typeCode];
+            if (handler != null) return handler;            
             return typeHandlerCache.TryGetValue(itemType, out var cachedTypeHandler) ? cachedTypeHandler : CreateCachedTypeHandler(itemType);
         }
 

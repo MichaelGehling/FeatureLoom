@@ -22,6 +22,11 @@ namespace FeatureLoom.MessageFlow
         /// <summary>Number of currently connected sinks (excluding already collected weak refs).</summary>
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
+        /// <summary>
+        /// Gets a value indicating whether there are no connected sinks.
+        /// </summary>
+        public bool NotConnected => sourceHelper.NotConnected;
+
         /// <summary>The static message type this helper forwards.</summary>
         public Type SentMessageType => typeof(T);
 

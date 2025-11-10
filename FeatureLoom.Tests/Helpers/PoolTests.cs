@@ -10,7 +10,7 @@ public class PoolTests
 {
     private class TestObject
     {
-        public int Value;
+        public int Value = 0;
     }
 
     [Fact]

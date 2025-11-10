@@ -186,6 +186,8 @@ namespace Playground
         private static async Task Main()
         {
 
+            await JsonTest.Run2();
+
             var tk = AppTime.TimeKeeper;
             numIterations = 10_000_000;
             Xenum enumValue = Xenum.B;

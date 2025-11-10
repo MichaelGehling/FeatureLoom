@@ -14,7 +14,6 @@ public class MessageFlowExtensions_Batcher_Overload_Tests
         var batched = source.BatchMessages<int>(
             maxBatchSize: 10,
             maxCollectionTime: TimeSpan.FromMilliseconds(120),
-            tolerance: TimeSpan.FromMilliseconds(5),
             sendSingleMessagesAsArray: false);
 
         var recv = new QueueReceiver<object>();

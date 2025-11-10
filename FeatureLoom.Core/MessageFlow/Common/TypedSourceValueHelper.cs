@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using FeatureLoom.Extensions;
 
 namespace FeatureLoom.MessageFlow
 {
@@ -105,6 +106,11 @@ namespace FeatureLoom.MessageFlow
                 return count;
             }
         }
+
+        /// <summary>
+        /// Gets a value indicating whether there are no connected sinks.
+        /// </summary>
+        public bool NotConnected => sinks.EmptyOrNull();
 
         /// <summary>
         /// Ensures the given message type is compatible with this typed helper (throws otherwise).

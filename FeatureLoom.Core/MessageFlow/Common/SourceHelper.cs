@@ -21,6 +21,11 @@ namespace FeatureLoom.MessageFlow
         public int CountConnectedSinks => sourceHelper.CountConnectedSinks;
 
         /// <summary>
+        /// Gets a value indicating whether there are no connected sinks.
+        /// </summary>
+        public bool NotConnected => sourceHelper.NotConnected;
+
+        /// <summary>
         /// Connects this source to a sink. When <paramref name="weakReference"/> is true, the sink is held weakly (GC can collect it).
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -18,7 +18,7 @@ namespace FeatureLoom.Helpers
         [Fact]
         public void TryFunc_ReturnsFalseAndDefault_OnException()
         {
-            bool success = TryHelper.Try(() => { throw new InvalidOperationException(); return 0; }, out int result);
+            bool success = TryHelper.Try(() => { throw new InvalidOperationException(); }, out int result);
             Assert.False(success);
             Assert.Equal(default, result);
         }
@@ -36,7 +36,7 @@ namespace FeatureLoom.Helpers
         public void TryFuncWithException_ReturnsFalseAndException_OnException()
         {
             var exception = new InvalidOperationException("Test");
-            bool success = TryHelper.Try(() => { throw exception; return 0; }, out int result, out Exception ex);
+            bool success = TryHelper.Try(() => { throw exception; }, out int result, out Exception ex);
             Assert.False(success);
             Assert.Equal(default, result);
             Assert.Same(exception, ex);

@@ -82,10 +82,9 @@ public class UndoRedoTests
     public void UndoRedo_Clear_RemovesAll()
     {
         var ur = new UndoRedo();
-        int value = 0;
 
-        ur.DoWithUndo(() => value = 1, () => value = 0, "Set to 1");
-        ur.DoWithUndo(() => value = 2, () => value = 1, "Set to 2");
+        ur.DoWithUndo(() => { }, () => { }, "Set to 1");
+        ur.DoWithUndo(() => { }, () => { }, "Set to 2");
 
         Assert.Equal(2, ur.NumUndos);
         ur.Clear();

@@ -19,9 +19,8 @@ namespace FeatureLoom.UndoRedo
             using var testContext = TestHelper.PrepareTestContext();
             
             var undoRedo = new Helpers.UndoRedo();
-            string data = "Init";
-            undoRedo.DoWithUndo(() => data = "Changed1", () => data = "Init", "Init->Changed1");
-            undoRedo.DoWithUndo(() => data = "Changed2", () => data = "Changed1", "Changed1->Changed2");            
+            undoRedo.DoWithUndo(() => { }, () => { }, "Init->Changed1");
+            undoRedo.DoWithUndo(() => { }, () => { }, "Changed1->Changed2");            
 
             Assert.Contains("Init->Changed1", undoRedo.UndoDescriptions);
             Assert.Contains("Changed1->Changed2", undoRedo.UndoDescriptions);
