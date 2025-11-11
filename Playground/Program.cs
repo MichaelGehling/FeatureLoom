@@ -186,6 +186,49 @@ namespace Playground
         private static async Task Main()
         {
 
+            ValueWrappingQueueReceiver rec = new();
+
+            int numValues = 1000;
+
+            AsyncManualResetEvent syncHandle = new AsyncManualResetEvent(false);
+
+            var readerContext = new SingleThreadSynchronizationContext("reader");
+            readerContext.Post(async _ =>
+            {
+                while (true)
+                {
+                    if ((await rec.TryReceiveAsync(CancellationToken.None)).TryOut(out object msg))
+                    {
+                        if (msg is ValueWrapper<int> wrapper)
+                        {
+                            int value = wrapper.UnwrapAndDispose();
+                            Console.WriteLine($"Received wrapped value: {value}");
+                            if (value == numValues)
+                            {
+                                Console.WriteLine($"Finished ValueWrapper test (reader). Global:{SharedPool<ValueWrapper<int>>.GlobalCount} Local:{SharedPool<ValueWrapper<int>>.LocalCount}");
+                                syncHandle.Set();
+                                break;
+                            }                            
+                        }
+                    }
+                }
+            }, null);
+
+
+            var writerContext = new SingleThreadSynchronizationContext("writerContext");
+            writerContext.Post(async _ =>
+            {
+                for (int i = 1; i <= numValues; i++)
+                {
+                    Console.WriteLine($"Sending wrapped value: {i}");
+                    rec.Post(i);                    
+                }
+                Console.WriteLine($"Finished ValueWrapper test (writer). Global:{SharedPool<ValueWrapper<int>>.GlobalCount} Local:{SharedPool<ValueWrapper<int>>.LocalCount}");
+            }, null);
+
+            await syncHandle.WaitingTask;
+            
+
             await JsonTest.Run2();
 
             var tk = AppTime.TimeKeeper;

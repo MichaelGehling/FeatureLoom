@@ -100,13 +100,13 @@ namespace FeatureLoom.Helpers
         public static bool TryInit(Func<T> onCreate, Action<T> onReset, Action<T> onDiscard = null,
             int globalCapacity = 1000, int localCapacity = 50, int fetchOnEmpty = 40, int keepOnFull = 10)
         {
+            if (initialized) return false;
+
             if (onCreate == null) throw new ArgumentNullException(nameof(onCreate));
             if (onDiscard == null && typeof(IDisposable).IsAssignableFrom(typeof(T)))
             {
                 onDiscard = item => ((IDisposable)item).Dispose();
-            }
-
-            if (initialized) return false;
+            }            
 
             using (initLock.Lock())
             {
