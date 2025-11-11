@@ -31,8 +31,7 @@ public class OptLogService
         public bool logOnWrongUsage = true;
     }
     internal Settings settings = new Settings();
-
-    Pool<FilteredLogger> loggerPool;
+    
     LazyValue<AsyncLocal<string?>> roamingContext;
     LogFilter[] whiteListFilters_IMPORTANT = [];
     LogFilter[] blackListFilters_IMPORTANT = [];
@@ -61,17 +60,15 @@ public class OptLogService
 
     public OptLogService(Settings settings)
     {
-        ApplySettings(settings);
-        loggerPool = new(() => new FilteredLogger(this));
+        ApplySettings(settings);        
+        SharedPool<FilteredLogger>.TryInit(() => new FilteredLogger(), logger => logger.Reset());
     }
 
     public OptLogService()
     {
         ApplySettings(null);
-        loggerPool = new(() => new FilteredLogger(this));
+        SharedPool<FilteredLogger>.TryInit(() => new FilteredLogger(), logger => logger.Reset());
     }
-
-    internal void ReturnLoggerToPool(FilteredLogger logger) => loggerPool.Return(logger);
 
     public void ApplySettings(Settings? settings)
     {
@@ -203,26 +200,32 @@ public class OptLogService
 
     public class FilteredLogger : IDisposable
     {
-        internal OptLogService parent;
+        internal OptLogService? parent;
         internal int logLevelValue;
         string? logContext;
         string method = "";
         string sourceFile = "";
         int sourceLine;
 
-        public FilteredLogger(OptLogService parent)
-        {
-            this.parent = parent;
-        }
-
         public void Dispose()
         {
             logContext = default;
-            parent.ReturnLoggerToPool(this);
+            parent = default;
+            if (SharedPool<FilteredLogger>.IsInitialized) SharedPool<FilteredLogger>.Return(this);
         }
 
-        internal void Prepare(int logLevelValue, string? logContext, string method, string sourceFile, int sourceLine)
+        internal void Reset()
         {
+            parent = default;
+            logContext = default;
+            method = "";
+            sourceFile = "";
+            sourceLine = 0;
+        }
+
+        internal void Prepare(OptLogService parent, int logLevelValue, string? logContext, string method, string sourceFile, int sourceLine)
+        {
+            this.parent = parent;
             this.logLevelValue = logLevelValue;
             this.logContext = logContext;
             this.method = method;
@@ -328,8 +331,8 @@ public class OptLogService
             var temp = roamingContext.Obj.Value;
             if (temp != null) logContext = temp;
         }
-        var logger = loggerPool.Take();
-        logger.Prepare(logLevel, logContext, method, sourceFile, sourceLine);
+        var logger = SharedPool<FilteredLogger>.Take();
+        logger.Prepare(this, logLevel, logContext, method, sourceFile, sourceLine);
         return logger;
     }
 }
@@ -340,7 +343,7 @@ public static class FilteredLoggerExtension
     private static void BuildHelper(OptLogService.FilteredLogger logger, string message, string? detailText, bool addStackTrace)
     {
         EnumHelper.TryFromInt(logger.logLevelValue, out Loglevel loglevel);
-        if (!addStackTrace) addStackTrace = logger.parent.settings.logLevelsToAddStackTrace.Contains(loglevel);
+        if (!addStackTrace) addStackTrace = logger.parent?.settings.logLevelsToAddStackTrace.Contains(loglevel) ?? false;
         if (addStackTrace)
         {            
             string stackTrace = Environment.StackTrace;
@@ -356,6 +359,7 @@ public static class FilteredLoggerExtension
             else detailText = $"{detailText}\n LogStacktrace:\n{stackTrace}";
         }
         logger.ActuallyBuild(message, detailText, loglevel);
+        logger.Dispose();
     }
 
     public static void Build(this OptLogService.FilteredLogger? logger, string message, bool addStackTrace, string detailText)
