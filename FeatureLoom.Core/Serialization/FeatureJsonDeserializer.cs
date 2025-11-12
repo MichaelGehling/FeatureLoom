@@ -98,7 +98,7 @@ namespace FeatureLoom.Serialization
             this.settings = settings ?? new Settings();            
             buffer.Init(this.settings.initialBufferSize);            
             extensionApi = new ExtensionApi(this);
-            isPopulating = settings.populateExistingMembers;
+            isPopulating = this.settings.populateExistingMembers;
         }
 
         private void Reset()
@@ -191,41 +191,41 @@ namespace FeatureLoom.Serialization
             }
             
             if (itemType.IsArray) CreateArrayTypeReader(itemType, cachedTypeReader);
-            else if (itemType == typeof(string)) cachedTypeReader.SetTypeReader(ReadStringValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(long)) cachedTypeReader.SetTypeReader(ReadLongValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(long?)) cachedTypeReader.SetTypeReader(ReadNullableLongValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(int)) cachedTypeReader.SetTypeReader(ReadIntValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(int?)) cachedTypeReader.SetTypeReader(ReadNullableIntValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(short)) cachedTypeReader.SetTypeReader(ReadShortValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(short?)) cachedTypeReader.SetTypeReader(ReadNullableShortValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(sbyte)) cachedTypeReader.SetTypeReader(ReadSbyteValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(sbyte?)) cachedTypeReader.SetTypeReader(ReadNullableSbyteValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(ulong)) cachedTypeReader.SetTypeReader(ReadUlongValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(ulong?)) cachedTypeReader.SetTypeReader(ReadNullableUlongValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(uint)) cachedTypeReader.SetTypeReader(ReadUintValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(uint?)) cachedTypeReader.SetTypeReader(ReadNullableUintValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(ushort)) cachedTypeReader.SetTypeReader(ReadUshortValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(ushort?)) cachedTypeReader.SetTypeReader(ReadNullableUshortValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(byte)) cachedTypeReader.SetTypeReader(ReadByteValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(byte?)) cachedTypeReader.SetTypeReader(ReadNullableByteValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(double)) cachedTypeReader.SetTypeReader(ReadDoubleValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(double?)) cachedTypeReader.SetTypeReader(ReadNullableDoubleValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(float)) cachedTypeReader.SetTypeReader(ReadFloatValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(float?)) cachedTypeReader.SetTypeReader(ReadNullableFloatValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(decimal)) cachedTypeReader.SetTypeReader(ReadDecimalValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(decimal?)) cachedTypeReader.SetTypeReader(ReadNullableDecimalValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(bool)) cachedTypeReader.SetTypeReader(ReadBoolValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(bool?)) cachedTypeReader.SetTypeReader(ReadNullableBoolValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(char)) cachedTypeReader.SetTypeReader(ReadCharValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(char?)) cachedTypeReader.SetTypeReader(ReadNullableCharValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(DateTime)) cachedTypeReader.SetTypeReader(ReadDateTimeValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(DateTime?)) cachedTypeReader.SetTypeReader(ReadNullableDateTimeValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(TimeSpan)) cachedTypeReader.SetTypeReader(ReadTimeSpanValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(TimeSpan?)) cachedTypeReader.SetTypeReader(ReadNullableTimeSpanValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(Guid)) cachedTypeReader.SetTypeReader(ReadGuidValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(Guid?)) cachedTypeReader.SetTypeReader(ReadNullableGuidValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(JsonFragment)) cachedTypeReader.SetTypeReader(ReadJsonFragmentValue, JsonDataTypeCategory.Primitive);
-            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive);  
+            else if (itemType == typeof(string)) cachedTypeReader.SetTypeReader(ReadStringValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(long)) cachedTypeReader.SetTypeReader(ReadLongValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(long?)) cachedTypeReader.SetTypeReader(ReadNullableLongValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(int)) cachedTypeReader.SetTypeReader(ReadIntValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(int?)) cachedTypeReader.SetTypeReader(ReadNullableIntValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(short)) cachedTypeReader.SetTypeReader(ReadShortValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(short?)) cachedTypeReader.SetTypeReader(ReadNullableShortValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(sbyte)) cachedTypeReader.SetTypeReader(ReadSbyteValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(sbyte?)) cachedTypeReader.SetTypeReader(ReadNullableSbyteValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(ulong)) cachedTypeReader.SetTypeReader(ReadUlongValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(ulong?)) cachedTypeReader.SetTypeReader(ReadNullableUlongValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(uint)) cachedTypeReader.SetTypeReader(ReadUintValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(uint?)) cachedTypeReader.SetTypeReader(ReadNullableUintValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(ushort)) cachedTypeReader.SetTypeReader(ReadUshortValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(ushort?)) cachedTypeReader.SetTypeReader(ReadNullableUshortValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(byte)) cachedTypeReader.SetTypeReader(ReadByteValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(byte?)) cachedTypeReader.SetTypeReader(ReadNullableByteValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(double)) cachedTypeReader.SetTypeReader(ReadDoubleValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(double?)) cachedTypeReader.SetTypeReader(ReadNullableDoubleValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(float)) cachedTypeReader.SetTypeReader(ReadFloatValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(float?)) cachedTypeReader.SetTypeReader(ReadNullableFloatValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(decimal)) cachedTypeReader.SetTypeReader(ReadDecimalValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(decimal?)) cachedTypeReader.SetTypeReader(ReadNullableDecimalValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(bool)) cachedTypeReader.SetTypeReader(ReadBoolValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(bool?)) cachedTypeReader.SetTypeReader(ReadNullableBoolValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(char)) cachedTypeReader.SetTypeReader(ReadCharValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(char?)) cachedTypeReader.SetTypeReader(ReadNullableCharValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(DateTime)) cachedTypeReader.SetTypeReader(ReadDateTimeValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(DateTime?)) cachedTypeReader.SetTypeReader(ReadNullableDateTimeValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(TimeSpan)) cachedTypeReader.SetTypeReader(ReadTimeSpanValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(TimeSpan?)) cachedTypeReader.SetTypeReader(ReadNullableTimeSpanValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(Guid)) cachedTypeReader.SetTypeReader(ReadGuidValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(Guid?)) cachedTypeReader.SetTypeReader(ReadNullableGuidValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+            else if (itemType == typeof(JsonFragment)) cachedTypeReader.SetTypeReader(ReadJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
+            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);  
             // TODO ByteSegment + ArraySegment<byte>
             // TODO IntPtr + UIntPtr
             else if (itemType.IsEnum || (Nullable.GetUnderlyingType(itemType)?.IsEnum ?? false))
@@ -274,7 +274,7 @@ namespace FeatureLoom.Serialization
                 }
 
                 throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
-            }, JsonDataTypeCategory.Array);
+            }, JsonDataTypeCategory.Array, StringRepresentation.No);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -432,7 +432,7 @@ namespace FeatureLoom.Serialization
                     return value;
                 }
                 else throw new Exception("Invalid character for determining enum value");
-            }, JsonDataTypeCategory.Primitive);
+            }, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
         }
 
         private void CreateNullableEnumReader<T>(CachedTypeReader cachedTypeReader) where T : struct, Enum
@@ -461,7 +461,7 @@ namespace FeatureLoom.Serialization
                     return value;
                 }
                 else throw new Exception("Invalid character for determining enum value");
-            }, JsonDataTypeCategory.Primitive);
+            }, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
         }
 
         private object ReadUnknownValue()
@@ -574,7 +574,7 @@ namespace FeatureLoom.Serialization
                 else throw new Exception("Failed reading Dictionary");
 
                 return dict;
-            }, JsonDataTypeCategory.Object);
+            }, JsonDataTypeCategory.Object, StringRepresentation.No);
 
             if (canValueBePopulated)
             {
@@ -724,7 +724,7 @@ namespace FeatureLoom.Serialization
         {
             if (!settings.multiOptionTypeMapping.TryGetValue(typeof(object), out var typeOptions))
             {
-                cachedTypeReader.SetTypeReader(ReadUnknownValue, JsonDataTypeCategory.Object);
+                cachedTypeReader.SetTypeReader(ReadUnknownValue, JsonDataTypeCategory.Object, StringRepresentation.No);
                 return;
             }
 
@@ -745,7 +745,7 @@ namespace FeatureLoom.Serialization
 
             if (arrayTypeOption == null && objectTypeOptions.Count == 0)
             {
-                cachedTypeReader.SetTypeReader(ReadUnknownValue, JsonDataTypeCategory.Object);
+                cachedTypeReader.SetTypeReader(ReadUnknownValue, JsonDataTypeCategory.Object, StringRepresentation.No);
                 return;
             }
 
@@ -777,7 +777,7 @@ namespace FeatureLoom.Serialization
                 }
             };
 
-            cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
+            cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object, StringRepresentation.No);
 
         }
 
@@ -927,7 +927,7 @@ namespace FeatureLoom.Serialization
                 return objectTypeReaders[selectionIndex].ReadItem<T>();
             };
 
-            cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
+            cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object, StringRepresentation.No);
         }        
 
         private void CreateComplexTypeReader<T>(CachedTypeReader cachedTypeReader, bool checkForMultiOptions)
@@ -1019,7 +1019,7 @@ namespace FeatureLoom.Serialization
                 return item;
             };
 
-            cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object);
+            cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object, StringRepresentation.No);
 
             Func<T, T> populatingTypeReader = (itemToPopulate) =>
             {
@@ -1480,7 +1480,7 @@ namespace FeatureLoom.Serialization
                 if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
                 buffer.TryNextByte();
                 return item;
-            }, JsonDataTypeCategory.Array);
+            }, JsonDataTypeCategory.Array, StringRepresentation.No);
 
         }
 
@@ -1535,7 +1535,7 @@ namespace FeatureLoom.Serialization
                 if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
                 buffer.TryNextByte();
                 return item;
-            }, JsonDataTypeCategory.Array);
+            }, JsonDataTypeCategory.Array, StringRepresentation.No);
         }
 
         private void CreateGenericEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
@@ -1563,7 +1563,7 @@ namespace FeatureLoom.Serialization
                 if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
                 buffer.TryNextByte();
                 return item;
-            }, JsonDataTypeCategory.Array);
+            }, JsonDataTypeCategory.Array, StringRepresentation.No);
         }
 
         private void CreateEnumerableTypeReader<T>(CachedTypeReader cachedTypeReader)
@@ -1590,7 +1590,7 @@ namespace FeatureLoom.Serialization
                 if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
                 buffer.TryNextByte();
                 return item;
-            }, JsonDataTypeCategory.Array);
+            }, JsonDataTypeCategory.Array, StringRepresentation.No);
         }
 
         List<ByteSegment> arrayElementNameCache = new List<ByteSegment>();
@@ -3791,7 +3791,7 @@ namespace FeatureLoom.Serialization
             for (int i = 0; i < map.Length; i++)
             {
                 if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
-                else if (i == ',' || i == ']' || i == '}') map[i] = FilterResult.Found;
+                else if (i == ',' || i == ']' || i == '}' || i == ':') map[i] = FilterResult.Found;
                 else map[i] = FilterResult.Unexpected;
             }
             return map;

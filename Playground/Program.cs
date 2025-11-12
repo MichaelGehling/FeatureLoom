@@ -185,7 +185,19 @@ namespace Playground
 
         private static async Task Main()
         {
+            {
+                Dictionary<int, string> intToStringMap;
 
+                string jsonIntToStringMap = @"{
+                ""1"": ""One"",
+                ""2"": ""Two"",
+                ""3"": ""Three""
+            }";
+
+                FeatureJsonDeserializer des = new FeatureJsonDeserializer();
+                bool success = des.TryDeserialize(jsonIntToStringMap, out intToStringMap);
+
+            }
             ValueWrappingQueueReceiver rec = new();
 
             int numValues = 1000;
@@ -266,46 +278,47 @@ namespace Playground
                 Console.WriteLine($"EqualityComparer<Xenum>.Default.GetHashCode: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
             }
 
-
-            byte[] bytes = RandomGenerator.Bytes(30);
-            FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
             {
-                indent = true,
-                dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                writeByteArrayAsBase64String = false
-            });
-            var bytesJson = serializer.Serialize(bytes);
-            JsonHelper.DefaultDeserializer.TryDeserialize<byte[]>(bytesJson, out var bytesOut);
+
+                byte[] bytes = RandomGenerator.Bytes(30);
+                FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+                {
+                    indent = true,
+                    dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                    writeByteArrayAsBase64String = false
+                });
+                var bytesJson = serializer.Serialize(bytes);
+                JsonHelper.DefaultDeserializer.TryDeserialize<byte[]>(bytesJson, out var bytesOut);
 
 
-            TestStruct ts = new TestStruct()
-            {
-                i = 42,
-                obj = new TestClass()
-            };
+                TestStruct ts = new TestStruct()
+                {
+                    i = 42,
+                    obj = new TestClass()
+                };
 
-            var j = JsonHelper.DefaultSerializer.Serialize(ts);
+                var j = JsonHelper.DefaultSerializer.Serialize(ts);
 
-            JsonHelper.DefaultDeserializer.TryDeserialize<JsonFragmentTester>(j, out var jft);            
+                JsonHelper.DefaultDeserializer.TryDeserialize<JsonFragmentTester>(j, out var jft);
 
-            JsonHelper.DefaultDeserializer.TryDeserialize<TestClass>(jft.obj.JsonString, out var tc);
+                JsonHelper.DefaultDeserializer.TryDeserialize<TestClass>(jft.obj.JsonString, out var tc);
 
-            FeatureJsonDeserializer des = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
-            {
-                initialBufferSize = 10, 
-            });
+                FeatureJsonDeserializer des = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+                {
+                    initialBufferSize = 10,
+                });
 
-            Stream stream = "xxxxxxxxaaa123".ToStream();
-            des.SetDataSource(stream);
-            des.SkipBufferUntil("aaa", true, out bool found);
-            des.TryDeserialize(out int x);
+                Stream stream = "xxxxxxxxaaa123".ToStream();
+                des.SetDataSource(stream);
+                des.SkipBufferUntil("aaa", true, out bool found);
+                des.TryDeserialize(out int x);
 
-            string t1 = "";
-            string result154 = JsonHelper.DefaultSerializer.Serialize(t1);
+                string t1 = "";
+                string result154 = JsonHelper.DefaultSerializer.Serialize(t1);
 
 
-            bool success = JsonHelper.DefaultDeserializer.TryDeserialize<Xenum?>("1", out var t2);
-
+                bool success = JsonHelper.DefaultDeserializer.TryDeserialize<Xenum?>("1", out var t2);
+            }
 
             Log.DefaultConsoleLogger.config.loglevel = Loglevel.TRACE;
             Log.DefaultConsoleLogger.config.format = "";

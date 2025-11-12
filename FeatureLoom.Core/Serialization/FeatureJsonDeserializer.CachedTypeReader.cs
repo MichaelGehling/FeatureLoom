@@ -20,6 +20,7 @@ public sealed partial class FeatureJsonDeserializer
         private readonly bool enableReferenceResolution;
         private readonly bool enableProposedTypes;
         private bool isAbstract = false;
+        private StringRepresentation stringRepresentation;
 
         public JsonDataTypeCategory JsonTypeCategory => category;
 
@@ -43,15 +44,17 @@ public sealed partial class FeatureJsonDeserializer
 
         public void SetCustomTypeReader<T>(ICustomTypeReader<T> customTypeReader)
         {
-            SetTypeReader<T>(() => customTypeReader.ReadValue(deserializer.extensionApi), customTypeReader.JsonTypeCategory);
+            SetTypeReader<T>(() => customTypeReader.ReadValue(deserializer.extensionApi), customTypeReader.JsonTypeCategory, customTypeReader.StringRepresentation);
         }
 
-        public void SetTypeReader<T>(Func<T> typeReader, JsonDataTypeCategory category)
+        public void SetTypeReader<T>(Func<T> typeReader, JsonDataTypeCategory category, StringRepresentation stringRepresentation)
         {
             this.readerType = typeof(T);
             this.category = category;
             this.isRefType = !readerType.IsValueType;
             bool isNullable = readerType.IsNullable();
+            this.stringRepresentation = stringRepresentation;
+
             Func<T> temp;
             if (isNullable)
             {
