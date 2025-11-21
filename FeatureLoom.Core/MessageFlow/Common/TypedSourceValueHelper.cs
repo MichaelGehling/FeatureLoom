@@ -113,15 +113,6 @@ namespace FeatureLoom.MessageFlow
         public bool NotConnected => sinks.EmptyOrNull();
 
         /// <summary>
-        /// Ensures the given message type is compatible with this typed helper (throws otherwise).
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ValidateMessageType<M>(in M message)
-        {
-            if (message is not T) throw new Exception($"It is not allowed to send a message of type {typeof(M)} via this MessageFlow element, which is restricted to {typeof(T)}!");
-        }
-
-        /// <summary>
         /// Forwards a message by reference to all currently connected sinks (0..N-1).
         /// Lock-free for readers; lazily prunes invalid sinks after the send, if encountered.
         /// Allocation-free on the hot path.

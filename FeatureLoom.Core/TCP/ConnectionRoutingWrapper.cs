@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.MessageFlow;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.TCP
 {
@@ -20,6 +21,21 @@ namespace FeatureLoom.TCP
         {
             this.connectionId = default;
             this.message = message;
+        }
+
+        public void UnwrapAndSend(ISender sender)
+        {
+            sender.Send(message);
+        }
+
+        public void UnwrapAndSendByRef(ISender sender)
+        {
+            sender.Send(in message);
+        }
+
+        public Task UnwrapAndSendAsync(ISender sender)
+        {
+            return sender.SendAsync(message);
         }
     }
 }

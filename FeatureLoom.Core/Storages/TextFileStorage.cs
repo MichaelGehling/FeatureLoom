@@ -48,7 +48,7 @@ namespace FeatureLoom.Storages
         private bool fileSystemObservationActive = false;
         private FileSystemObserver fileObserver;
         private ProcessingEndpoint<FileSystemObserver.ChangeNotification> fileChangeProcessor;
-        private DuplicateMessageSuppressor duplicateMessageSuppressor;
+        private DuplicateMessageSuppressor<FileSystemObserver.ChangeNotification> duplicateMessageSuppressor;
 
         private bool useWindowsPaths = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
         private string validPathSeperator = "/";
@@ -88,19 +88,14 @@ namespace FeatureLoom.Storages
             if (activate && !fileSystemObservationActive)
             {
                 fileObserver = new FileSystemObserver(rootDir.FullName, "*" + config.fileSuffix, true);
-                duplicateMessageSuppressor = new DuplicateMessageSuppressor(config.duplicateFileEventSuppressionTime, (m1, m2) =>
+
+                duplicateMessageSuppressor = new(config.duplicateFileEventSuppressionTime, (m1, m2) =>
                 {
-                    if (m1 is FileSystemObserver.ChangeNotification notification1 &&
-                        m2 is FileSystemObserver.ChangeNotification notification2 &&
-                        notification1.changeType == WatcherChangeTypes.Created &&
-                        notification2.changeType == WatcherChangeTypes.Changed &&
-                        notification1.path == notification2.path)
-                    {
-                        return true;
-                    }
-                    else return m1.Equals(m2);
+                    return (m1.changeType == WatcherChangeTypes.Created &&
+                            m2.changeType == WatcherChangeTypes.Changed &&
+                            m1.path == m2.path);
                 });
-                fileChangeProcessor = new ProcessingEndpoint<FileSystemObserver.ChangeNotification>(async msg => await ProcessChangeNotification(msg).ConfiguredAwait());
+                fileChangeProcessor = new(async msg => await ProcessChangeNotification(msg).ConfiguredAwait());
                 fileObserver.ConnectTo(duplicateMessageSuppressor).ConnectTo(fileChangeProcessor);
                 fileSystemObservationActive = true;
             }
@@ -121,7 +116,7 @@ namespace FeatureLoom.Storages
                 ActivateFileSystemObservation(false);
             }
 
-            await Task.Delay(config.fileChangeNotificationDelay).ConfiguredAwait();
+            await AppTime.WaitAsync(config.fileChangeNotificationDelay).ConfiguredAwait();
 
             if (notification.changeType.IsFlagSet(WatcherChangeTypes.Deleted))
             {

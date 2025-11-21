@@ -193,4 +193,14 @@ namespace FeatureLoom.MessageFlow
         /// <summary>Payload of the response.</summary>
         public T Content { get; }
     }
+
+    /// <summary>
+    /// Represents a message associated with a specific topic.
+    /// </summary>
+    /// <remarks>This interface is typically used in messaging systems where messages are categorized by
+    /// topics. Implementations of this interface should provide the topic name associated with the message.</remarks>
+    public interface ITopicMessage
+    {
+        string Topic { get; }
+    }    
 }

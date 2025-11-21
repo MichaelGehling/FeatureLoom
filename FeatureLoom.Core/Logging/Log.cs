@@ -16,7 +16,7 @@ namespace FeatureLoom.Logging
 
         public static IMessageSink<LogMessage> LogSink => Service<LogService>.Instance.LogSink;
 
-        public static IMessageSource<LogMessage> QueuedLogSource => Service<LogService>.Instance.QueuedLogSource;
+        public static IMessageSource QueuedLogSource => Service<LogService>.Instance.QueuedLogSource;
 
         public static LogService.Config Settings => Service<LogService>.Instance.Settings;
 

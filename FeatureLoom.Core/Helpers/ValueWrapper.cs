@@ -74,7 +74,7 @@ public sealed class ValueWrapper<T>
     private ValueWrapper() { }
 
     /// <summary>
-    /// Gets the type of the wrapped value (<see cref="T"/>).
+    /// Gets the type of the wrapped value.
     /// </summary>
     public Type WrappedType => typeof(T);
 

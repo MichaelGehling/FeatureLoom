@@ -14,7 +14,7 @@ namespace FeatureLoom.MessageFlow
     /// - Per-send sink order (0..N-1) is preserved by the underlying async forwarding; however, ordering across multiple concurrent sends is not guaranteed.
     /// - Exceptions thrown by downstream sinks are observed and logged via <see cref="OptLog"/>, and are not propagated to the caller.
     /// - When no sinks are connected, posts are ignored without scheduling any work.
-    /// If strict ordering across sends is required, use <see cref="QueueForwarder{T}"/>.
+    /// If strict ordering across sends is required, use <see cref="QueueForwarder"/>.
     /// </remarks>
     public sealed class AsyncForwarder : IMessageFlowConnection
     {

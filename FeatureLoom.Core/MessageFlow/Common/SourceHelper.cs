@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow
@@ -23,7 +24,7 @@ namespace FeatureLoom.MessageFlow
         /// <summary>
         /// Gets a value indicating whether there are no connected sinks.
         /// </summary>
-        public bool NoConnectedSinks => sourceHelper.NotConnected;
+        public bool NoConnectedSinks => sourceHelper.NoConnectedSinks;
 
         /// <summary>
         /// Connects this source to a sink. When <paramref name="weakReference"/> is true, the sink is held weakly (GC can collect it).

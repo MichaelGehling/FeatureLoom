@@ -35,8 +35,8 @@ namespace FeatureLoom.TCP
         FeatureLock connectionsLock = new FeatureLock();
         Func<IGeneralMessageStreamReader> createStreamReader = () => new VariantStreamReader(null, new TypedJsonMessageStreamReader());
         Func<IGeneralMessageStreamWriter> createStreamWriter = () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter());
-        QueueForwarder<object> writeForwarder = new QueueForwarder<object>();
-        QueueForwarder<object> readForwarder = new QueueForwarder<object>();
+        QueueForwarder writeForwarder = new QueueForwarder();
+        QueueForwarder readForwarder = new QueueForwarder();
         CancellationTokenSource cts;
         private AsyncManualResetEvent connectionWaitEvent = new AsyncManualResetEvent(false);
         public IAsyncWaitHandle ConnectionWaitHandle => connectionWaitEvent;

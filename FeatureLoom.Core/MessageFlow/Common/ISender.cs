@@ -58,5 +58,5 @@ namespace FeatureLoom.MessageFlow
         /// </summary>
         /// <param name="message">The message to send.</param>
         Task SendAsync(T message);
-    }
+    }    
 }

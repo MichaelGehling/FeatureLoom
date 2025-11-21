@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
@@ -23,6 +24,17 @@ namespace FeatureLoom.MessageFlow
         /// <param name="source">The source to connect from.</param>
         /// <param name="action">The processing action invoked for each message.</param>
         public static void ProcessMessage<T>(this IMessageSource source, Action<T> action)
+        {
+            source.ConnectTo(new ProcessingEndpoint<T>(action));
+        }
+
+        /// <summary>
+        /// Connects a processing endpoint that executes the provided async action for messages of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The message type to process.</typeparam>
+        /// <param name="source">The source to connect from.</param>
+        /// <param name="action">The async processing action invoked for each message.</param>
+        public static void ProcessMessage<T>(this IMessageSource source, Func<T, Task> action)
         {
             source.ConnectTo(new ProcessingEndpoint<T>(action));
         }
@@ -83,22 +95,25 @@ namespace FeatureLoom.MessageFlow
         /// <typeparam name="OUT">Output message type.</typeparam>
         /// <param name="source">The source to connect from.</param>
         /// <param name="convert">Conversion function from <typeparamref name="IN"/> to <typeparamref name="OUT"/>.</param>
+        /// <param name="forwardOtherMessages">True to forward messages that are not of type <typeparamref name="IN"/>.</param>
         /// <returns>The connected message source (the converter as a source).</returns>
-        public static IMessageSource ConvertMessage<IN, OUT>(this IMessageSource source, Func<IN, OUT> convert)
+        public static IMessageSource ConvertMessage<IN, OUT>(this IMessageSource source, Func<IN, OUT> convert, bool forwardOtherMessages = true)
         {
-            return source.ConnectTo(new MessageConverter<IN, OUT>(convert));
+            return source.ConnectTo(new MessageConverter<IN, OUT>(convert, forwardOtherMessages));
         }
 
         /// <summary>
-        /// Connects a splitter that splits an incoming message of type <typeparamref name="T"/> into multiple messages.
+        /// Connects a splitter that splits an incoming message of type <typeparamref name="IN"/> into multiple messages.
         /// </summary>
-        /// <typeparam name="T">Input message type.</typeparam>
+        /// <typeparam name="IN">Input message type.</typeparam>
+        /// <typeparam name="OUT">Output message type.</typeparam>
         /// <param name="source">The source to connect from.</param>
-        /// <param name="split">Function that splits a message into an <see cref="ICollection"/> of items to forward.</param>
+        /// <param name="split">Function that splits a message into a collection of items to forward.</param>
+        /// <param name="forwardOtherMessages">True to forward messages that are not of type <typeparamref name="IN"/>.</param>
         /// <returns>The connected message source (the splitter as a source).</returns>
-        public static IMessageSource SplitMessage<T>(this IMessageSource source, Func<T, ICollection> split)
+        public static IMessageSource SplitMessage<IN, OUT>(this IMessageSource source, Func<IN, IEnumerable<OUT>> split, bool forwardOtherMessages = true)
         {
-            return source.ConnectTo(new Splitter<T>(split));
+            return source.ConnectTo(new Splitter<IN, OUT>(split, forwardOtherMessages));
         }
 
         /// <summary>
@@ -106,11 +121,12 @@ namespace FeatureLoom.MessageFlow
         /// </summary>
         /// <typeparam name="T">Input message type to be filtered.</typeparam>
         /// <param name="source">The source to connect from.</param>
-        /// <param name="filter">Predicate that determines whether to forward a message.</param>
+        /// <param name="filter">Predicate that determines whether to forward a message. If null all messages of type <typeparamref name="T"/> are forwarded.</param>
+        /// <param name="forwardOtherMessages">True to forward messages that are not of type <typeparamref name="T"/>.</param>
         /// <returns>The connected message source (the filter as a source).</returns>
-        public static IMessageSource FilterMessage<T>(this IMessageSource source, Predicate<T> filter)
+        public static IMessageSource FilterMessage<T>(this IMessageSource source, Predicate<T> filter = null, bool forwardOtherMessages = false)
         {
-            return source.ConnectTo(new Filter<T>(filter));
+            return source.ConnectTo(new Filter<T>(filter, forwardOtherMessages));
         }
 
         /// <summary>
@@ -120,12 +136,105 @@ namespace FeatureLoom.MessageFlow
         /// <param name="source">The source to connect from.</param>
         /// <param name="filter">Predicate that determines whether to forward a message.</param>
         /// <param name="elseSource">Alternative source that receives declined messages.</param>
+        /// <param name="forwardOtherMessages">True to forward messages that are not of type <typeparamref name="T"/>.</param>
         /// <returns>The connected message source (the filter as a source).</returns>
-        public static IMessageSource FilterMessage<T>(this IMessageSource source, Predicate<T> filter, out IMessageSource elseSource)
+        public static IMessageSource FilterMessage<T>(this IMessageSource source, Predicate<T> filter, out IMessageSource elseSource, bool forwardOtherMessages = true)
         {
-            var sink = new Filter<T>(filter);
+            var sink = new Filter<T>(filter, forwardOtherMessages);
             elseSource = sink.Else;
             return source.ConnectTo(sink);
+        }
+
+        /// <summary>
+        /// Connects a forwarder that delays forwarding of all messages by a fixed duration.
+        /// </summary>
+        /// <param name="source">The source to connect from.</param>
+        /// <param name="delay">The fixed delay applied before forwarding. Must be non-negative.</param>
+        /// <param name="delayPrecisely">True to use precise waiting APIs (higher CPU cost, higher accuracy).</param>
+        /// <param name="blocking">
+        /// True to block the caller until the delay elapsed. In this mode, asynchronous posts complete after the delay
+        /// and forwarding finished (if sinks existed at call time).
+        /// </param>
+        /// <returns>The connected message source (the forwarder as a source) to continue the flow.</returns>
+        /// <remarks>
+        /// - The delay is always performed for consistency, regardless of whether sinks are currently connected.
+        /// - Only messages for which at least one sink was connected at call time are forwarded after the delay.
+        /// - In non-blocking mode, asynchronous posts return immediately after scheduling background work; completion does not represent forwarding.
+        /// - See <see cref="DelayingForwarder"/> for detailed behavior and performance characteristics and cancellation support.
+        /// </remarks>
+        public static IMessageSource DelayMessage(this IMessageSource source, TimeSpan delay, bool delayPrecisely = false, bool blocking = false)
+        {
+            return source.ConnectTo(new DelayingForwarder(delay, delayPrecisely, blocking));
+        }
+
+        /// <summary>
+        /// Connects a suppressor that filters out duplicate messages of type <typeparamref name="T"/> seen within a configurable time window.
+        /// Messages of other types are forwarded unchanged.
+        /// </summary>
+        /// <typeparam name="T">Message type to check for duplicates.</typeparam>
+        /// <param name="source">The source to connect from.</param>
+        /// <param name="suppressionTimeWindow">
+        /// Duration a seen message suppresses identical subsequent ones. Must be greater than zero.
+        /// </param>
+        /// <param name="isDuplicate">
+        /// Optional predicate that decides whether two messages are duplicates. Defaults to <c>a.Equals(b)</c>.
+        /// </param>
+        /// <param name="preciseTime">
+        /// True to use <see cref="AppTime.Now"/> for higher precision; otherwise uses <see cref="AppTime.CoarseNow"/> for lower overhead.
+        /// </param>
+        /// <returns>The connected message source (the suppressor as a source) to continue the flow.</returns>
+        /// <remarks>
+        /// Internally uses <see cref="DuplicateMessageSuppressor{T}"/>. Duplicate checks are an O(n) scan over the tracked window.
+        /// Choose a short suppression window and/or a specialized predicate for better performance.
+        /// </remarks>
+        public static IMessageSource SuppressDuplicateMessages<T>(this IMessageSource source, TimeSpan suppressionTimeWindow, Func<T, T, bool> isDuplicate = null, bool preciseTime = false)
+        {
+            return source.ConnectTo(new DuplicateMessageSuppressor<T>(suppressionTimeWindow, isDuplicate, preciseTime));
+        }
+
+        /// <summary>
+        /// Filters messages <see cref="ITopicMessage"/> from the source based on the specified topic or topic pattern.
+        /// </summary>
+        /// <remarks>If the <paramref name="topicFilter"/> contains wildcard characters (<c>*</c> or
+        /// <c>?</c>),  the filter will use pattern matching to determine whether a message's topic matches the filter. 
+        /// Otherwise, an exact match is required.</remarks>
+        /// <param name="source">The source of messages to filter.</param>
+        /// <param name="topicFilter">The topic or wildcard pattern to filter messages by. Wildcard characters such as  <c>*</c> and <c>?</c> can
+        /// be used to match multiple topics.</param>
+        /// <param name="forwardOtherMessages">A value indicating whether messages that are not of type <see cref="ITopicMessage"/> should be forwarded  
+        /// to the next connected component. The default is false.</param>
+        /// <returns>A new <see cref="IMessageSource"/> that emits only the messages matching the specified  topic or pattern.</returns>
+        public static IMessageSource FilterByTopic(this IMessageSource source, string topicFilter, bool unwrap = false, bool forwardOtherMessages = false)
+        {
+            bool isPattern = topicFilter.Contains("*") || topicFilter.Contains("?");
+            IMessageFlowConnection filter = new Filter<ITopicMessage>(msg => isPattern ? msg.Topic.MatchesWildcardPattern(topicFilter) : msg.Topic == topicFilter, 
+                                                   forwardOtherMessages);
+            source.ConnectTo(filter);
+            return unwrap ? filter.UnwrapMessage() : filter;
+        }
+
+        /// <summary>
+        /// Unwraps a message from the specified <see cref="IMessageSource"/> and forwards it to a new message source.
+        /// </summary>
+        /// <remarks>This method processes the message from the provided <paramref name="source"/> by
+        /// unwrapping it using an <see cref="IMessageWrapper"/> and forwarding the unwrapped content to a new message
+        /// source. The returned <see cref="IMessageSource"/> can then be used to access the unwrapped
+        /// message.</remarks>
+        /// <param name="source">The source of the message to be unwrapped. Cannot be <see langword="null"/>.</param>
+        /// <returns>A new <see cref="IMessageSource"/> containing the unwrapped message.</returns>
+        public static IMessageSource UnwrapMessage(this IMessageSource source)
+        {
+            var typeFilter = new Filter<IMessageWrapper>(null, false);
+            var unwrapper = new Aggregator<IMessageWrapper>(
+                onMessage: (msg, sender) => msg.UnwrapAndSend(sender),
+                autoLock: false
+            );            
+            var forwarder = new Forwarder();
+
+            source.ConnectTo(typeFilter).ConnectTo(unwrapper).ConnectTo(forwarder);
+            typeFilter.Else.ConnectTo(forwarder);            
+
+            return forwarder;
         }
 
         /// <summary>
@@ -187,7 +296,7 @@ namespace FeatureLoom.MessageFlow
             );
 
             return source.ConnectTo(batcher);
-        }
+        }        
 
         /// <summary>
         /// Convenience wrapper to post a message to a sink.
@@ -223,468 +332,5 @@ namespace FeatureLoom.MessageFlow
             return sink.PostAsync(message);
         }
 
-        /// <summary>
-        /// Tries to receive a request message and extract its payload and request id.
-        /// </summary>
-        /// <typeparam name="T">Type of the request payload.</typeparam>
-        /// <param name="receiver">Receiver of request messages.</param>
-        /// <param name="message">Outputs the request payload if successful; otherwise default.</param>
-        /// <param name="requestId">Outputs the request id if successful; otherwise default.</param>
-        /// <returns>True if a request was received; otherwise false.</returns>
-        public static bool TryReceiveRequest<T>(this IReceiver<IRequestMessage<T>> receiver, out T message, out long requestId)
-        {
-            if (receiver.TryReceive(out IRequestMessage<T> request))
-            {
-                requestId = request.RequestId;
-                message = request.Content;
-                return true;
-            }
-            else
-            {
-                message = default;
-                requestId = default;
-                return false;
-            }
-        }
-
-        // Response helpers (untyped sender)
-
-        /// <summary>
-        /// Sends a response message constructed from payload and request id.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The sender to emit the response.</param>
-        /// <param name="message">Response payload.</param>
-        /// <param name="requestId">The correlating request id.</param>
-        public static void SendResponse<T>(this ISender sender, T message, long requestId)
-        {
-            var response = new ResponseMessage<T>(message, requestId);
-            sender.Send(response);
-        }
-
-        /// <summary>
-        /// Sends an already wrapped response without modification.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The sender to emit the response.</param>
-        /// <param name="response">The wrapped response.</param>
-        public static void SendResponse<T>(this ISender sender, IResponseMessage<T> response)
-        {
-            sender.Send(response);
-        }
-
-        /// <summary>
-        /// Sends a response asynchronously, constructed from payload and request id.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The sender to emit the response.</param>
-        /// <param name="message">Response payload.</param>
-        /// <param name="requestId">The correlating request id.</param>
-        /// <returns>A task that completes when the message was sent asynchronously.</returns>
-        public static Task SendResponseAsync<T>(this ISender sender, T message, long requestId)
-        {
-            var response = new ResponseMessage<T>(message, requestId);
-            return sender.SendAsync(response);
-        }
-
-        /// <summary>
-        /// Sends an already wrapped response asynchronously without modification.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The sender to emit the response.</param>
-        /// <param name="response">The wrapped response.</param>
-        /// <returns>A task that completes when the message was sent asynchronously.</returns>
-        public static Task SendResponseAsync<T>(this ISender sender, IResponseMessage<T> response)
-        {
-            return sender.SendAsync(response);
-        }
-
-        // Response helpers (typed sender)
-
-        /// <summary>
-        /// Sends a response message constructed from payload and request id to a typed response sender.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The typed sender to emit the response.</param>
-        /// <param name="message">Response payload.</param>
-        /// <param name="requestId">The correlating request id.</param>
-        public static void SendResponse<T>(this ISender<IResponseMessage<T>> sender, T message, long requestId)
-        {
-            var response = new ResponseMessage<T>(message, requestId);
-            sender.Send(response);
-        }
-
-        /// <summary>
-        /// Sends an already wrapped response without modification to a typed response sender.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The typed sender to emit the response.</param>
-        /// <param name="response">The wrapped response.</param>
-        public static void SendResponse<T>(this ISender<IResponseMessage<T>> sender, IResponseMessage<T> response)
-        {
-            sender.Send(response);
-        }
-
-        /// <summary>
-        /// Sends a response message asynchronously, constructed from payload and request id, to a typed response sender.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The typed sender to emit the response.</param>
-        /// <param name="message">Response payload.</param>
-        /// <param name="requestId">The correlating request id.</param>
-        /// <returns>A task that completes when the message was sent asynchronously.</returns>
-        public static Task SendResponseAsync<T>(this ISender<IResponseMessage<T>> sender, T message, long requestId)
-        {
-            var response = new ResponseMessage<T>(message, requestId);
-            return sender.SendAsync(response);
-        }
-
-        /// <summary>
-        /// Sends an already wrapped response asynchronously without modification to a typed response sender.
-        /// </summary>
-        /// <typeparam name="T">Type of the response payload.</typeparam>
-        /// <param name="sender">The typed sender to emit the response.</param>
-        /// <param name="response">The wrapped response.</param>
-        /// <returns>A task that completes when the message was sent asynchronously.</returns>
-        public static Task SendResponseAsync<T>(this ISender<IResponseMessage<T>> sender, IResponseMessage<T> response)
-        {
-            return sender.SendAsync(response);
-        }
-
-        // Blocking/async receive helpers with cancellation
-
-        /// <summary>
-        /// Repeatedly waits (with cancellation) until a message can be received without blocking.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <param name="message">Outputs the received message if successful; otherwise default.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>True if a message was received; false if cancelled.</returns>
-        public static bool TryReceive<T>(this IReceiver<T> receiver, out T message, CancellationToken token)
-        {
-            while (!receiver.TryReceive(out message))
-            {
-                if (!receiver.WaitHandle.Wait(token)) return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Repeatedly waits (with cancellation) until a message is available to peek without removing it.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <param name="message">Outputs the next message if successful; otherwise default.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>True if a message was available to peek; false if cancelled.</returns>
-        public static bool TryPeek<T>(this IReceiver<T> receiver, out T message, CancellationToken token)
-        {
-            while (!receiver.TryPeek(out message))
-            {
-                if (!receiver.WaitHandle.Wait(token)) return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Asynchronously waits (with cancellation) until a message can be received without blocking.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>
-        /// A tuple where Item1 indicates success and Item2 is the received message (or default if cancelled).
-        /// </returns>
-        public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, CancellationToken token)
-        {
-            T message = default;
-            while (!receiver.TryReceive(out message))
-            {
-                if (!(await receiver.WaitHandle.WaitAsync(token).ConfiguredAwait())) return (false, message);
-            }
-            return (true, message);
-        }
-
-        /// <summary>
-        /// Asynchronously waits (with cancellation) until a message is available to peek without removing it.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>
-        /// A tuple where Item1 indicates success and Item2 is the peeked message (or default if cancelled).
-        /// </returns>
-        public static async Task<(bool, T)> TryPeekAsync<T>(this IReceiver<T> receiver, CancellationToken token)
-        {
-            T message = default;
-            while (!receiver.TryPeek(out message))
-            {
-                if (!(await receiver.WaitHandle.WaitAsync(token).ConfiguredAwait())) return (false, message);
-            }
-            return (true, message);
-        }
-
-        // Robust timeout loops (never return true without a message)
-
-        /// <summary>
-        /// Attempts to receive a message within the specified timeout.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <param name="message">Outputs the received message if successful; otherwise default.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <returns>True if a message was received before the timeout; otherwise false.</returns>
-        public static bool TryReceive<T>(this IReceiver<T> receiver, out T message, TimeSpan timeout)
-        {
-            if (receiver.TryReceive(out message)) return true;
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!receiver.WaitHandle.Wait(timer.Remaining(timer.LastTimeSample))) return false;
-                if (receiver.TryReceive(out message)) return true;
-            }
-            while (!timer.Elapsed());
-
-            message = default;
-            return false;
-        }
-
-        /// <summary>
-        /// Attempts to peek a message within the specified timeout.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <param name="message">Outputs the peeked message if successful; otherwise default.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <returns>True if a message was available before the timeout; otherwise false.</returns>
-        public static bool TryPeek<T>(this IReceiver<T> receiver, out T message, TimeSpan timeout)
-        {
-            if (receiver.TryPeek(out message)) return true;
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!receiver.WaitHandle.Wait(timer.Remaining(timer.LastTimeSample))) return false;
-                if (receiver.TryPeek(out message)) return true;
-            }
-            while (!timer.Elapsed());
-
-            message = default;
-            return false;
-        }
-
-        /// <summary>
-        /// Asynchronously attempts to receive a message within the specified timeout.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <returns>
-        /// A tuple where Item1 indicates success and Item2 is the received message (or default if timed out).
-        /// </returns>
-        public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout)
-        {
-            T message;
-            if (receiver.TryReceive(out message)) return (true, message);
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample)).ConfiguredAwait())) return (false, default);
-                if (receiver.TryReceive(out message)) return (true, message);
-            }
-            while (!timer.Elapsed());
-
-            return (false, default);
-        }
-
-        /// <summary>
-        /// Asynchronously attempts to peek a message within the specified timeout.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <returns>
-        /// A tuple where Item1 indicates success and Item2 is the peeked message (or default if timed out).
-        /// </returns>
-        public static async Task<(bool, T)> TryPeekAsync<T>(this IReceiver<T> receiver, TimeSpan timeout)
-        {
-            T message;
-            if (receiver.TryPeek(out message)) return (true, message);
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample)).ConfiguredAwait())) return (false, default);
-                if (receiver.TryPeek(out message)) return (true, message);
-            }
-            while (!timer.Elapsed());
-
-            return (false, default);
-        }
-
-        /// <summary>
-        /// Attempts to receive a message within the specified timeout or until cancelled.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <param name="message">Outputs the received message if successful; otherwise default.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>True if a message was received before the timeout or cancellation; otherwise false.</returns>
-        public static bool TryReceive<T>(this IReceiver<T> receiver, out T message, TimeSpan timeout, CancellationToken token)
-        {
-            if (receiver.TryReceive(out message)) return true;
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!receiver.WaitHandle.Wait(timer.Remaining(timer.LastTimeSample), token)) return false;
-                if (receiver.TryReceive(out message)) return true;
-            }
-            while (!timer.Elapsed());
-
-            message = default;
-            return false;
-        }
-
-        /// <summary>
-        /// Attempts to peek a message within the specified timeout or until cancelled.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <param name="message">Outputs the peeked message if successful; otherwise default.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>True if a message was available before the timeout or cancellation; otherwise false.</returns>
-        public static bool TryPeek<T>(this IReceiver<T> receiver, out T message, TimeSpan timeout, CancellationToken token)
-        {
-            if (receiver.TryPeek(out message)) return true;
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!receiver.WaitHandle.Wait(timer.Remaining(timer.LastTimeSample), token)) return false;
-                if (receiver.TryPeek(out message)) return true;
-            }
-            while (!timer.Elapsed());
-
-            message = default;
-            return false;
-        }
-
-        /// <summary>
-        /// Asynchronously attempts to receive a message within the specified timeout or until cancelled.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>
-        /// A tuple where Item1 indicates success and Item2 is the received message (or default if timed out or cancelled).
-        /// </returns>
-        public static async Task<(bool, T)> TryReceiveAsync<T>(this IReceiver<T> receiver, TimeSpan timeout, CancellationToken token)
-        {
-            T message;
-            if (receiver.TryReceive(out message)) return (true, message);
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample), token).ConfiguredAwait())) return (false, default);
-                if (receiver.TryReceive(out message)) return (true, message);
-            }
-            while (!timer.Elapsed());
-
-            return (false, default);
-        }
-
-        /// <summary>
-        /// Asynchronously attempts to peek a message within the specified timeout or until cancelled.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <param name="timeout">Maximum time to wait.</param>
-        /// <param name="token">Cancellation token to abort waiting.</param>
-        /// <returns>
-        /// A tuple where Item1 indicates success and Item2 is the peeked message (or default if timed out or cancelled).
-        /// </returns>
-        public static async Task<(bool, T)> TryPeekAsync<T>(this IReceiver<T> receiver, TimeSpan timeout, CancellationToken token)
-        {
-            T message;
-            if (receiver.TryPeek(out message)) return (true, message);
-
-            TimeFrame timer = new TimeFrame(timeout);
-            do
-            {
-                if (!(await receiver.WaitHandle.WaitAsync(timer.Remaining(timer.LastTimeSample), token).ConfiguredAwait())) return (false, default);
-                if (receiver.TryPeek(out message)) return (true, message);
-            }
-            while (!timer.Elapsed());
-
-            return (false, default);
-        }
-
-        /// <summary>
-        /// Receives all currently available items by requesting a very large batch.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <returns>An <see cref="ArraySegment{T}"/> containing up to all currently available items.</returns>
-        /// <remarks>
-        /// Implementations may use a shared buffer if no explicit buffer is supplied internally.
-        /// Do not hold onto the returned slice longer than necessary to avoid memory retention of the entire buffer.
-        /// </remarks>
-        public static ArraySegment<T> ReceiveAll<T>(this IReceiver<T> receiver)
-        {
-            return receiver.ReceiveMany(int.MaxValue, null);
-        }
-
-        /// <summary>
-        /// Receives all currently available items into the provided buffer by requesting a very large batch.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to read from.</param>
-        /// <param name="buffer">
-        /// A reusable <see cref="SlicedBuffer{T}"/> to control slice lifetime and avoid retaining a shared buffer longer than necessary.
-        /// After processing, consider freeing the slice (e.g., <c>buffer.FreeSlice(ref slice)</c>) if appropriate.
-        /// </param>
-        /// <returns>An <see cref="ArraySegment{T}"/> containing up to all currently available items.</returns>
-        public static ArraySegment<T> ReceiveAll<T>(this IReceiver<T> receiver, SlicedBuffer<T> buffer)
-        {
-            return receiver.ReceiveMany(int.MaxValue, buffer);
-        }
-
-        /// <summary>
-        /// Peeks all currently available items by requesting a very large batch without removing them.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <returns>An <see cref="ArraySegment{T}"/> containing up to all currently available items.</returns>
-        /// <remarks>
-        /// Implementations may use a shared buffer if no explicit buffer is supplied internally.
-        /// Do not hold onto the returned slice longer than necessary to avoid memory retention of the entire buffer.
-        /// </remarks>
-        public static ArraySegment<T> PeekAll<T>(this IReceiver<T> receiver)
-        {
-            return receiver.PeekMany(int.MaxValue, null);
-        }
-
-        /// <summary>
-        /// Peeks all currently available items into the provided buffer by requesting a very large batch, without removing them.
-        /// </summary>
-        /// <typeparam name="T">Message type.</typeparam>
-        /// <param name="receiver">The receiver to peek from.</param>
-        /// <param name="buffer">
-        /// A reusable <see cref="SlicedBuffer{T}"/> to control slice lifetime and avoid retaining a shared buffer longer than necessary.
-        /// After processing, consider freeing the slice (e.g., <c>buffer.FreeSlice(ref slice)</c>) if appropriate.
-        /// </param>
-        /// <returns>An <see cref="ArraySegment{T}"/> containing up to all currently available items.</returns>
-        public static ArraySegment<T> PeekAll<T>(this IReceiver<T> receiver, SlicedBuffer<T> buffer)
-        {
-            return receiver.PeekMany(int.MaxValue, buffer);
-        }        
     }
 }

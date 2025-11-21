@@ -8,7 +8,11 @@ using FeatureLoom.Helpers;
 namespace FeatureLoom.Collections;
 
 /// <summary>
-/// Represents a segment of a byte array, providing efficient, non-allocating operations and equality comparison.
+/// Represents a non-allocating value-type view over a segment of a byte array.
+/// - Equality is optimized: first by length, then (when available) by cached hash code for an O(1) early-out,
+///   and finally by a fast byte comparison (Span.SequenceEqual on modern targets or a tight loop on .NET Standard 2.0).
+/// - Hash code generation is implicit and cached on first use (lazy); use <see cref="EnsureHashCode"/> to precompute
+///   when the segment will be used as a key.
 /// </summary>
 public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegment<byte>>, IEquatable<byte[]>, IReadOnlyList<byte>
 {
@@ -21,35 +25,49 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     private int? hashCode;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from an <see cref="System.ArraySegment{T}"/>.
+    /// Initializes a new instance from an <see cref="System.ArraySegment{T}"/>.
     /// </summary>
-    public ByteSegment(ArraySegment<byte> segment)
+    /// <param name="segment">The underlying byte segment.</param>
+    /// <param name="initHash">If true, precompute and cache the hash code eagerly (useful for dictionary keys).</param>
+    public ByteSegment(ArraySegment<byte> segment, bool initHash = false)
     {
         this.segment = segment;
+        if (initHash) EnsureHashCode();
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from a byte array, offset, and count.
+    /// Initializes a new instance from a byte array, offset, and count.
     /// </summary>
-    public ByteSegment(byte[] array, int offset, int count) 
+    /// <param name="array">Source array.</param>
+    /// <param name="offset">Start offset in the array.</param>
+    /// <param name="count">Number of bytes.</param>
+    /// <param name="initHash">If true, precompute and cache the hash code eagerly (useful for dictionary keys).</param>
+    public ByteSegment(byte[] array, int offset, int count, bool initHash = false) 
     {
         segment = new ArraySegment<byte>(array, offset, count);
+        if (initHash) EnsureHashCode();
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from a byte array.
+    /// Initializes a new instance from a byte array.
     /// </summary>
-    public ByteSegment(byte[] array)
+    /// <param name="array">Source array.</param>
+    /// <param name="initHash">If true, precompute and cache the hash code eagerly (useful for dictionary keys).</param>
+    public ByteSegment(byte[] array, bool initHash = false)
     {
         segment = new ArraySegment<byte>(array);
+        if (initHash) EnsureHashCode();
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="FeatureLoom.Collections.ByteSegment"/> struct from a string, using UTF-8 encoding.
+    /// Initializes a new instance from a string, using UTF-8 encoding.
     /// </summary>
-    public ByteSegment(string str)
+    /// <param name="str">The source string.</param>
+    /// <param name="initHash">If true, precompute and cache the hash code eagerly (useful for dictionary keys).</param>
+    public ByteSegment(string str, bool initHash = false)
     {
         segment = new ArraySegment<byte>(str.ToByteArray());
+        if (initHash) EnsureHashCode();
     }
 
     /// <summary>
@@ -178,6 +196,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
 
     /// <summary>
     /// Enumerates the segment by splitting it at each occurrence of a separator byte.
+    /// Allocation-free, forward-only enumerator intended for single-use iteration.
     /// </summary>
     /// <param name="separator">The byte to split on.</param>
     /// <param name="skipEmpty">Whether to skip empty segments.</param>
@@ -186,6 +205,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
 
     /// <summary>
     /// Enumerator for splitting a <see cref="FeatureLoom.Collections.ByteSegment"/> by a separator byte.
+    /// Allocation-free and forward-only.
     /// </summary>
     public struct SplitEnumerator : IEnumerator<FeatureLoom.Collections.ByteSegment>, IEnumerable<FeatureLoom.Collections.ByteSegment>
     {
@@ -218,7 +238,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
 
 
         /// <summary>
-        /// Doesn't do anything, as this enumerator does not hold any unmanaged resources.
+        /// No-op. This enumerator does not hold unmanaged resources.
         /// </summary>
         public void Dispose() { }
 
@@ -269,24 +289,31 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
 
     /// <summary>
     /// Determines whether this segment is equal to another <see cref="FeatureLoom.Collections.ByteSegment"/>.
+    /// Fast path: returns false immediately when both sides have cached hash codes that differ.
+    /// Otherwise, compares lengths and then performs a bytewise comparison (using <c>Span.SequenceEqual</c> when available).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ByteSegment other)
     {
         if (segment.Count != other.segment.Count) return false;            
-        if (GetHashCode() != other.GetHashCode()) return false;            
-
+        if (HasHashCode() && other.HasHashCode() && GetHashCode() != other.GetHashCode()) return false;
+#if NETSTANDARD2_0
         for (int i = 0; i < segment.Count; i++)
         {
             if (segment.Array[segment.Offset + i] != other.segment.Array[other.segment.Offset + i])
                 return false;
         }
-
-        return true;
+        return false;
+#else
+        var span1 = segment.AsSpan();
+        var span2 = other.segment.AsSpan();
+        return span1.SequenceEqual(span2);        
+#endif
     }
 
     /// <summary>
     /// Determines whether this segment is equal to an <see cref="System.ArraySegment{T}"/>.
+    /// No allocations; wraps the other segment and uses the same fast comparison path.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ArraySegment<byte> other)
@@ -296,6 +323,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
 
     /// <summary>
     /// Determines whether this segment is equal to a <see cref="byte"/>[].
+    /// No allocations; wraps the array and uses the same fast comparison path.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(byte[] other)
@@ -323,7 +351,9 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     public static bool operator !=(ByteSegment left, ByteSegment right) => !left.Equals(right);
 
     /// <summary>
-    /// Returns a hash code for this segment. The hash code is cached after the first calculation.
+    /// Returns a hash code for this segment.
+    /// The hash is computed once on first use (implicit, lazy) and cached thereafter. Call <see cref="EnsureHashCode"/>
+    /// to precompute eagerly when the instance will be used as a dictionary key or stored in a set.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override int GetHashCode()
@@ -334,10 +364,36 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     }
 
     /// <summary>
-    /// Computes a hash code for the given <see cref="System.ArraySegment{T}"/>.
+    /// Ensures the hash code is computed and cached without changing semantics.
+    /// Idempotent; safe to call multiple times.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void EnsureHashCode()
+    {
+        if (!hashCode.HasValue) hashCode = ComputeHashCode(AsArraySegment);
+    }
+
+    /// <summary>
+    /// Indicates whether the hash code has already been computed and cached.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool HasHashCode()
+    {
+        return hashCode.HasValue;
+    }
+
+    /// <summary>
+    /// Computes a non-cryptographic, order-sensitive hash code for the given segment.
+    /// Linear time, unchecked arithmetic, using a common 17/23 mixing pattern.
+    /// Uses <see cref="Unsafe.Add{T}(ref T, int)"/> to iterate efficiently without bounds checks.
     /// </summary>
     private static int ComputeHashCode(ArraySegment<byte> segment)
     {
+#if NET8_0_OR_GREATER
+        var h = new HashCode();
+        h.AddBytes(segment.AsSpan());
+        return h.ToHashCode();
+#else
         unchecked // Overflow is fine, just wrap
         {                
             int hash = 17;
@@ -351,10 +407,12 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
             }
             return hash;
         }
+#endif
     }
 
     /// <summary>
-    /// Returns a string representation of the segment, decoding as UTF-8 if possible, otherwise as Base64.
+    /// Returns a string representation of the segment.
+    /// Attempts UTF-8 decoding; if that fails, falls back to Base64. Returns null if the segment is invalid.
     /// </summary>
     public override string ToString()
     {

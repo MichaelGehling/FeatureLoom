@@ -17,7 +17,7 @@ namespace FeatureLoom.MessageFlow
             using var testContext = TestHelper.PrepareTestContext();
 
             var sender = new Sender<T>();
-            var suppressor = new DuplicateMessageSuppressor(100.Milliseconds());
+            var suppressor = new DuplicateMessageSuppressor<T>(100.Milliseconds());
             var sink = new LatestMessageReceiver<T>();
             sender.ConnectTo(suppressor).ConnectTo(sink);
             sender.Send(message);
@@ -32,7 +32,7 @@ namespace FeatureLoom.MessageFlow
 
             var suppressionTime = 100.Milliseconds();
             var sender = new Sender();
-            var suppressor = new DuplicateMessageSuppressor(suppressionTime);
+            var suppressor = new DuplicateMessageSuppressor<int>(suppressionTime, null, true);
             var counter = new MessageCounter();
             sender.ConnectTo(suppressor).ConnectTo(counter);
 
@@ -62,13 +62,9 @@ namespace FeatureLoom.MessageFlow
 
             var suppressionTime = 100.Milliseconds();
             var sender = new Sender();
-            var suppressor = new DuplicateMessageSuppressor(suppressionTime, (a, b) =>
+            var suppressor = new DuplicateMessageSuppressor<int>(suppressionTime, (a, b) =>
                 {
-                    if (a is int intA && b is int intB)
-                    {
-                        return Math.Abs(intA - intB) <= 1;
-                    }
-                    return a == b;
+                    return Math.Abs(a - b) <= 1;
                 });
             var counter = new MessageCounter();
             sender.ConnectTo(suppressor).ConnectTo(counter);

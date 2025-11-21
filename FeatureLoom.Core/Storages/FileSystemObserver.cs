@@ -9,7 +9,7 @@ namespace FeatureLoom.Storages
 {
     public class FileSystemObserver : IMessageSource<FileSystemObserver.ChangeNotification>, IDisposable
     {
-        private IMessageFlowConnection<ChangeNotification> forwarder;
+        private IMessageFlowConnection forwarder;
         private FileSystemWatcher fileWatcher;
         private FileSystemWatcher dirWatcher;
         private readonly string path;
@@ -33,7 +33,7 @@ namespace FeatureLoom.Storages
             this.path = path;
             this.filter = filter;
             this.notifyFilters = notifyFilters;
-            if (useQueueForwarder) forwarder = new QueueForwarder<ChangeNotification>();
+            if (useQueueForwarder) forwarder = new QueueForwarder();
             else forwarder = new Forwarder<ChangeNotification>();
             InitWatchers();
         }

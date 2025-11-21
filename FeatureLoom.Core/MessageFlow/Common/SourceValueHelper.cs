@@ -112,7 +112,7 @@ namespace FeatureLoom.MessageFlow
         /// <summary>
         /// Gets a value indicating whether there are no connected sinks.
         /// </summary>
-        public bool NotConnected => this.sinks.EmptyOrNull();
+        public bool NoConnectedSinks => this.sinks.EmptyOrNull();
 
         /// <summary>
         /// Forwards a message by reference to all currently connected sinks (0..N-1).

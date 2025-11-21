@@ -23,7 +23,7 @@ namespace FeatureLoom.Helpers
     /// </summary>
     /// <typeparam name="T">
     /// The pooled reference type. If <typeparamref name="T"/> implements <see cref="IDisposable"/>, discarded instances
-    /// are automatically disposed unless a custom <paramref name="onDiscard"/> is supplied.
+    /// are automatically disposed unless a custom onDiscard is supplied.
     /// </typeparam>
     public static class SharedPool<T> where T : class
     {

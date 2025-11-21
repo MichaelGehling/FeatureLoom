@@ -31,8 +31,8 @@ namespace FeatureLoom.TCP
 
         Settings settings;
         TcpConnection connection;
-        QueueForwarder<object> writeForwarder = new QueueForwarder<object>();
-        QueueForwarder<object> readForwarder = new QueueForwarder<object>();
+        QueueForwarder writeForwarder = new QueueForwarder();
+        QueueForwarder readForwarder = new QueueForwarder();
         CancellationTokenSource cts;
         public IMessageSink MessagesToSend => writeForwarder;
         public IMessageSink ReceivedMessages => readForwarder;

@@ -15,6 +15,8 @@ namespace FeatureLoom.Helpers
     /// </summary>
     public static class DeepComparer
     {
+        static Pool<HashSet<ReferencePair>> visitedPool = new Pool<HashSet<ReferencePair>>(() => new HashSet<ReferencePair>(ReferencePair.Comparer), h => h.Clear(), 100, true);
+
         /// <summary>
         /// Compares two objects deeply for structural equality.
         /// Handles nested objects, collections, dictionaries, and cyclic references.
@@ -29,10 +31,15 @@ namespace FeatureLoom.Helpers
         /// <returns>True if the objects are deeply equal; otherwise, false.</returns>
         public static bool AreEqual<T>(T x, T y, bool strictTypeCheck = true)
         {
-            if (strictTypeCheck && x != null && y != null && x.GetType() != y.GetType())
-                return false;
-            var visited = new HashSet<ReferencePair>(ReferencePair.Comparer);
-            return InternalDeepEquals(x, y, visited);
+            if (strictTypeCheck && x != null && y != null && x.GetType() != y.GetType()) return false;
+
+            bool? result = BasicChecks(x, y);
+            if (result.HasValue) return result.Value;
+
+            var visited = visitedPool.Take();
+            result = InternalDeepEquals(x, y, visited);
+            visitedPool.Return(visited);
+            return result.Value;
         }
 
         /// <summary>
@@ -58,25 +65,27 @@ namespace FeatureLoom.Helpers
         /// <returns>True if the objects are deeply equal; otherwise, false.</returns>
         internal static bool InternalDeepEquals<T>(T x, T y, ISet<ReferencePair> visited)
         {
-            // Check for reference equality or both null.
-            if (ReferenceEquals(x, y))
-                return true;
-            if (x is null || y is null)
-                return false;
-
-            // For primitive (or value–like) types, use their Equals.
-            var type = typeof(T);
-            if (IsPrimitive(type))
-                return x.Equals(y);
+            bool? result = BasicChecks(x, y);
+            if (result.HasValue) return result.Value;       
 
             // Cycle detection: record the current pair (by reference).
             var pair = new ReferencePair(x, y);
-            if (!visited.Add(pair))
-                return true; // already compared this pair
+            if (!visited.Add(pair)) return true; // already compared this pair
 
             // Retrieve or create a compiled delegate for type T.
             var comparer = ComparerCache<T>.GetOrCreateComparer();
             return comparer(x, y, visited);
+        }
+
+        private static bool? BasicChecks<T>(T x, T y)
+        {
+            // Check for reference equality or both null.
+            if (ReferenceEquals(x, y)) return true;
+            if (x is null || y is null) return false;
+
+            // For primitive (or value–like) types, use their Equals.
+            if (IsPrimitive(typeof(T))) return x.Equals(y);
+            return null;
         }
 
         /// <summary>

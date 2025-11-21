@@ -69,7 +69,7 @@ public class UndoRedo
         this.undos = new UndoRedoStack(historyLimit);
         this.redos = new UndoRedoStack(historyLimit);
         // Only forward notifications when not inside a transaction.
-        updateSender.ConnectTo(new DeactivatableForwarder(() => this.transactionCounter == 0)).ConnectTo(updateForwarder);
+        updateSender.ConnectTo(new DeactivatableForwarder(_ => this.transactionCounter == 0)).ConnectTo(updateForwarder);
     }
 
     /// <summary>

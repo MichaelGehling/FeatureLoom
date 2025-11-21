@@ -13,7 +13,7 @@ namespace FeatureLoom.Logging
         public FileLogger DefaultFileLogger { get; set; }
 
         readonly Forwarder<LogMessage> logSink = new Forwarder<LogMessage>();
-        readonly QueueForwarder<LogMessage> queueLogForwarder = new QueueForwarder<LogMessage>(1, 1000, 10, 10000, TimeSpan.Zero, true);
+        readonly QueueForwarder queueLogForwarder = new QueueForwarder(1, 1000, 10, 10000, TimeSpan.Zero, true);
         readonly Forwarder<LogMessage> syncLogForwarder = new Forwarder<LogMessage>();
         readonly Config settings = new Config();
 
@@ -28,7 +28,7 @@ namespace FeatureLoom.Logging
             syncLogForwarder.ConnectTo(DefaultFileLogger);
         }
 
-        public IMessageSource<LogMessage> QueuedLogSource => queueLogForwarder;
+        public IMessageSource QueuedLogSource => queueLogForwarder;
         public IMessageSource<LogMessage> SyncLogSource => syncLogForwarder;
         public IMessageSink<LogMessage> LogSink => logSink;
         public Config Settings => settings;

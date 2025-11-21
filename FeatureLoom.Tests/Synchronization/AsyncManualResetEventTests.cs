@@ -214,6 +214,8 @@ public class AsyncManualResetEventTests
         Assert.Equal(threads.Count, countEnd);
     }
 
+
+    volatile bool stop = false;
     [Fact]
     public void PulseAllRepeatetlyWillAwakeAll()
     {
@@ -224,8 +226,7 @@ public class AsyncManualResetEventTests
         int syncStarted = 0;
         int syncEnded = 0;
         int asyncStarted = 0;
-        int asyncEnded = 0;
-        bool stop = false;
+        int asyncEnded = 0;        
         int numThreads = 10;
 
         for (int i = 0; i < numThreads; i++)
@@ -267,6 +268,7 @@ public class AsyncManualResetEventTests
         {
             mre.PulseAll();
         }
+        Thread.Sleep(100);
 
         stop = true;            
         mre.PulseAll();            

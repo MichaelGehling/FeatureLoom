@@ -51,8 +51,10 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
 
     /// <summary>
     /// Gets the ID of the oldest available item in the buffer.
+    /// Inclusive of the actual oldest element when any items are present.
+    /// Returns -1 when the buffer is empty.
     /// </summary>
-    public long OldestAvailableId => LatestId - CurrentSize;
+    public long OldestAvailableId => CurrentSize == 0 ? -1 : counter - CurrentSize;
 
     /// <summary>
     /// Gets an async wait handle that is signaled when a new entry is added.
@@ -194,12 +196,15 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
     /// <returns>True if the item was found; otherwise, false.</returns>
     public bool TryGetFromId(long number, out T result)
     {
-        if (threadSafe) myLock.EnterReadOnly(true);
+        result = default;
+        if (number < 0) return false;
+
+        if (threadSafe) myLock.EnterReadOnly(true);        
         try
-        {
-            result = default;
+        {            
             if (number > LatestId || number < OldestAvailableId) return false;
 
+            // offset = (LatestId - number) + 1, bounded by [1..CurrentSize] when number is valid
             int offset = (int)(counter - number);
             int index = (nextIndex - offset + buffer.Length) % buffer.Length;
             result = buffer[index];

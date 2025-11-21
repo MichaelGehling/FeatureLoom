@@ -76,7 +76,7 @@ public class MessageFlowExtensions_Process_Filter_Convert_Split_Tests
     public void SplitMessage_splits_matched_and_forwards_rest()
     {
         var source = new Sender();
-        var split = source.SplitMessage<int>(i => (ICollection)new[] { i, i + 1 });
+        var split = source.SplitMessage<int, int>(i => new[] { i, i + 1 });
 
         var recv = new QueueReceiver<object>();
         split.ConnectTo(recv);
