@@ -300,6 +300,7 @@ namespace Playground
         private static async Task Main()
         {
 
+            if (false)
             {
                 int numInitSegaments = 50_000;
                 int numSegments = 1_000_000;
@@ -422,7 +423,16 @@ namespace Playground
             }
 
 
+            
+            { 
+                Xenum xenum = Xenum.B;
+                FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+                {
 
+                });
+
+                string json = serializer.Serialize(xenum);
+            }
 
 
 

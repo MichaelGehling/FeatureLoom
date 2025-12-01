@@ -285,9 +285,12 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private CachedTypeHandler GetCachedTypeHandler(Type itemType)
         {            
-            int typeCode = (int)Type.GetTypeCode(itemType);
-            CachedTypeHandler handler = typeHandlerLookup[typeCode];
-            if (handler != null) return handler;            
+            if (!itemType.IsClass && !itemType.IsEnum)
+            {
+                int typeCode = (int)Type.GetTypeCode(itemType);
+                var handler = typeHandlerLookup[typeCode];
+                if (handler != null) return handler;
+            }
             return typeHandlerCache.TryGetValue(itemType, out var cachedTypeHandler) ? cachedTypeHandler : CreateCachedTypeHandler(itemType);
         }
 

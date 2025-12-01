@@ -22,6 +22,7 @@ public sealed partial class FeatureJsonDeserializer
         int bufferFillLevel = 0;
         long totalBytesRead = 0;
         Stream stream;
+        long lastStreamPosition = -1;
 
         public byte CurrentByte => buffer[bufferPos];
         public int BufferPos => bufferPos;
@@ -34,10 +35,11 @@ public sealed partial class FeatureJsonDeserializer
 
         public void SetSource(Stream stream)
         {
-            if (stream == this.stream) return;
+            if (stream == this.stream && lastStreamPosition == stream.Position) return;
 
             ResetBuffer(false, false);
             this.stream = stream;
+            lastStreamPosition = stream.Position;
         }
 
         public void SetSource(string str)
@@ -104,7 +106,8 @@ public sealed partial class FeatureJsonDeserializer
             {
                 int bytesRead = stream.Read(buffer, bufferFillLevel, bufferSizeLeft);
                 totalBytesRead += bytesRead;
-                bufferFillLevel += bytesRead;                    
+                bufferFillLevel += bytesRead;   
+                lastStreamPosition = stream.Position;
                 return bytesRead > 0;
             }
             catch
