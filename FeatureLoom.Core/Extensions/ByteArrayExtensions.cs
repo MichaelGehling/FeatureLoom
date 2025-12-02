@@ -176,13 +176,23 @@ namespace FeatureLoom.Extensions
             return result;
         }
 
-        public static byte Get(this ArraySegment<byte> segment, int index)
+        public static T Get<T>(this ArraySegment<T> segment, int index)
         {
 #if NETSTANDARD2_0
             if (segment.Array == null) throw new InvalidOperationException("The underlying array is null.");
             return segment.Array[segment.Offset + index];
 #else
             return segment[index];
+#endif
+        }
+
+        public static void Set<T>(this ArraySegment<T> segment, int index, T value)
+        {
+#if NETSTANDARD2_0
+            if (segment.Array == null) throw new InvalidOperationException("The underlying array is null.");
+            segment.Array[segment.Offset + index] = value;
+#else
+            segment[index] = value;
 #endif
         }
 
