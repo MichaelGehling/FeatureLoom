@@ -257,6 +257,7 @@ namespace FeatureLoom.MessageFlow
             /// <returns>
             /// A task that completes when all receivers have finished their asynchronous forwarding.
             /// Returns a completed task immediately if there are no other sockets.
+            /// </returns>
             public async Task PostAsync<M>(M message)
             {
                 // No owner-check on the sender side; removal will be observed on receiver side.

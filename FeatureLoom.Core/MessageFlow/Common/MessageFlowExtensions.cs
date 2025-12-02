@@ -201,6 +201,7 @@ namespace FeatureLoom.MessageFlow
         /// <param name="source">The source of messages to filter.</param>
         /// <param name="topicFilter">The topic or wildcard pattern to filter messages by. Wildcard characters such as  <c>*</c> and <c>?</c> can
         /// be used to match multiple topics.</param>
+        /// <param name="unwrap">A value indicating whether the message should be unwrapped before being forwarded. The default is false.</param>
         /// <param name="forwardOtherMessages">A value indicating whether messages that are not of type <see cref="ITopicMessage"/> should be forwarded  
         /// to the next connected component. The default is false.</param>
         /// <returns>A new <see cref="IMessageSource"/> that emits only the messages matching the specified  topic or pattern.</returns>
