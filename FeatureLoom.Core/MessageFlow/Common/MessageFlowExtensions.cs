@@ -54,6 +54,20 @@ namespace FeatureLoom.MessageFlow
         }
 
         /// <summary>
+        /// Connects a processing endpoint that executes the provided async action for messages of type <typeparamref name="T"/>, and returns the alternative message route.
+        /// </summary>
+        /// <typeparam name="T">The message type to process.</typeparam>
+        /// <param name="source">The source to connect from.</param>
+        /// <param name="action">The async processing action invoked for each message. Return true to accept; return false to route to elseSource.</param>
+        /// <param name="elseSource">The alternative source that receives messages when the processing returns false or receives messages of an unexpected type.</param>
+        public static void ProcessMessage<T>(this IMessageSource source, Func<T, Task<bool>> action, out IMessageSource elseSource)
+        {
+            var sink = new ProcessingEndpoint<T>(action);
+            elseSource = sink.Else;
+            source.ConnectTo(sink);
+        }
+
+        /// <summary>
         /// Registers a responder: on incoming requests of type <typeparamref name="REQ"/>, uses <paramref name="handler"/> to compute a response of type <typeparamref name="RESP"/> and sends it with the same request id.
         /// </summary>
         /// <typeparam name="REQ">The incoming request payload type.</typeparam>
