@@ -11,7 +11,7 @@ namespace FeatureLoom.MessageFlow;
 /// A typed message log that buffers messages in a circular buffer and exposes read and write operations.
 /// </summary>
 /// <typeparam name="T">The message type to store.</typeparam>
-public class MessageLog<T> : IMessageSink<T>, ILogBuffer<T>
+public sealed class MessageLog<T> : IMessageSink<T>, ILogBuffer<T>
 {
     /// <summary>
     /// The underlying circular log buffer storing messages.

@@ -14,7 +14,7 @@ namespace FeatureLoom.MessageFlow;
 /// in ascending log-id order and forwards them to connected sinks according to the configured <see cref="ForwardingMethod"/>.
 /// </summary>
 /// <typeparam name="T">The message type.</typeparam>
-public class MessageLogReader<T> : IMessageSource<T>
+public sealed class MessageLogReader<T> : IMessageSource<T>
 {
     /// <summary>
     /// Helper that implements typed source forwarding and sink management.

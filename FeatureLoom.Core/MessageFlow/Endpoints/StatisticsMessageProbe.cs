@@ -7,162 +7,161 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace FeatureLoom.MessageFlow
+namespace FeatureLoom.MessageFlow;
+
+public sealed class StatisticsMessageProbe<T1, T2> : IMessageSink
 {
-    public sealed class StatisticsMessageProbe<T1, T2> : IMessageSink
+    private FeatureLock myLock = new FeatureLock();
+    private readonly string name;
+    private readonly Predicate<T1> filter;
+    private readonly Func<T1, T2> convert;
+    private readonly TimeSpan timeSliceSize;
+    private TimeSliceCounter currentTimeSlice;
+    private LazyValue<AsyncManualResetEvent> manualResetEvent;
+
+    private long counter;
+    private CircularLogBuffer<(DateTime timestamp, T2 message)> messageBuffer;
+    private CircularLogBuffer<DateTime> timestampBuffer;
+    private CircularLogBuffer<TimeSliceCounter> timeSliceCounterBuffer;
+
+    public StatisticsMessageProbe(string name, Predicate<T1> filter = null, Func<T1, T2> converter = null, int messageBufferSize = 0, TimeSpan timeSliceSize = default, int maxTimeSlices = 0)
     {
-        private FeatureLock myLock = new FeatureLock();
-        private readonly string name;
-        private readonly Predicate<T1> filter;
-        private readonly Func<T1, T2> convert;
-        private readonly TimeSpan timeSliceSize;
-        private TimeSliceCounter currentTimeSlice;
-        private LazyValue<AsyncManualResetEvent> manualResetEvent;
-
-        private long counter;
-        private CircularLogBuffer<(DateTime timestamp, T2 message)> messageBuffer;
-        private CircularLogBuffer<DateTime> timestampBuffer;
-        private CircularLogBuffer<TimeSliceCounter> timeSliceCounterBuffer;
-
-        public StatisticsMessageProbe(string name, Predicate<T1> filter = null, Func<T1, T2> converter = null, int messageBufferSize = 0, TimeSpan timeSliceSize = default, int maxTimeSlices = 0)
+        this.name = name;
+        this.filter = filter;
+        this.convert = converter;
+        this.timeSliceSize = timeSliceSize;
+        if (convert != null && messageBufferSize > 0) messageBuffer = new CircularLogBuffer<(DateTime timestamp, T2 message)>(messageBufferSize, false);
+        else if (messageBufferSize > 0) timestampBuffer = new CircularLogBuffer<DateTime>(messageBufferSize, false);
+        if (maxTimeSlices > 0)
         {
-            this.name = name;
-            this.filter = filter;
-            this.convert = converter;
-            this.timeSliceSize = timeSliceSize;
-            if (convert != null && messageBufferSize > 0) messageBuffer = new CircularLogBuffer<(DateTime timestamp, T2 message)>(messageBufferSize, false);
-            else if (messageBufferSize > 0) timestampBuffer = new CircularLogBuffer<DateTime>(messageBufferSize, false);
-            if (maxTimeSlices > 0)
-            {
-                timeSliceCounterBuffer = new CircularLogBuffer<TimeSliceCounter>(maxTimeSlices, false);
-                currentTimeSlice = new TimeSliceCounter(timeSliceSize);
-            }
+            timeSliceCounterBuffer = new CircularLogBuffer<TimeSliceCounter>(maxTimeSlices, false);
+            currentTimeSlice = new TimeSliceCounter(timeSliceSize);
         }
+    }
 
-        public long Counter => counter;
-        public TimeSliceCounter CurrentTimeSlize => currentTimeSlice;
-        public IAsyncWaitHandle WaitHandle => messageBuffer?.WaitHandle ?? timestampBuffer?.WaitHandle ?? timeSliceCounterBuffer?.WaitHandle ?? manualResetEvent.Obj;
+    public long Counter => counter;
+    public TimeSliceCounter CurrentTimeSlize => currentTimeSlice;
+    public IAsyncWaitHandle WaitHandle => messageBuffer?.WaitHandle ?? timestampBuffer?.WaitHandle ?? timeSliceCounterBuffer?.WaitHandle ?? manualResetEvent.Obj;
 
-        public (DateTime timestamp, T2 message)[] GetBufferedMessages(ref long bufferPosition)
-        {
-            if (messageBuffer != null)
-            {
-                using (myLock.LockReadOnly())
-                {
-                    var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
-                    return result;
-                }
-            }
-            else
-            {
-                bufferPosition = 0;
-                return Array.Empty<(DateTime timestamp, T2 message)>();
-            }
-        }
-
-        public DateTime[] GetBufferedTimestamps(ref long bufferPosition)
+    public (DateTime timestamp, T2 message)[] GetBufferedMessages(ref long bufferPosition)
+    {
+        if (messageBuffer != null)
         {
             using (myLock.LockReadOnly())
             {
-                if (timestampBuffer != null)
-                {
-                    var result = timestampBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
-                    return result;
-                }
-                else if (messageBuffer != null)
-                {
-                    var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition).Select(set => set.timestamp).ToArray();
-                    return result;
-                }
-                else
-                {
-                    bufferPosition = 0;
-                    return Array.Empty<DateTime>();
-                }
+                var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
+                return result;
             }
         }
-
-        public TimeSliceCounter[] GetBufferedTimeSlices(ref long bufferPosition)
+        else
         {
-            if (timeSliceCounterBuffer != null)
+            bufferPosition = 0;
+            return Array.Empty<(DateTime timestamp, T2 message)>();
+        }
+    }
+
+    public DateTime[] GetBufferedTimestamps(ref long bufferPosition)
+    {
+        using (myLock.LockReadOnly())
+        {
+            if (timestampBuffer != null)
             {
-                using (myLock.LockReadOnly())
-                {
-                    var result = timeSliceCounterBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
-                    return result;
-                }
+                var result = timestampBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
+                return result;
+            }
+            else if (messageBuffer != null)
+            {
+                var result = messageBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition).Select(set => set.timestamp).ToArray();
+                return result;
             }
             else
             {
                 bufferPosition = 0;
-                return Array.Empty<TimeSliceCounter>();
+                return Array.Empty<DateTime>();
             }
         }
+    }
 
-        public void Post<M>(in M message)
+    public TimeSliceCounter[] GetBufferedTimeSlices(ref long bufferPosition)
+    {
+        if (timeSliceCounterBuffer != null)
         {
-            if (!(message is T1 msgT1)) return;
-            if (!(filter?.Invoke(msgT1) ?? true)) return;
-            T2 msgT2 = convert == null ? default : convert(msgT1);
-            using (myLock.Lock())
+            using (myLock.LockReadOnly())
             {
-                counter++;
-                messageBuffer?.Add((AppTime.Now, msgT2));
-                timestampBuffer?.Add(AppTime.Now);
-                if (timeSliceCounterBuffer != null)
+                var result = timeSliceCounterBuffer.GetAllAvailable(bufferPosition, out _, out bufferPosition);
+                return result;
+            }
+        }
+        else
+        {
+            bufferPosition = 0;
+            return Array.Empty<TimeSliceCounter>();
+        }
+    }
+
+    public void Post<M>(in M message)
+    {
+        if (!(message is T1 msgT1)) return;
+        if (!(filter?.Invoke(msgT1) ?? true)) return;
+        T2 msgT2 = convert == null ? default : convert(msgT1);
+        using (myLock.Lock())
+        {
+            counter++;
+            messageBuffer?.Add((AppTime.Now, msgT2));
+            timestampBuffer?.Add(AppTime.Now);
+            if (timeSliceCounterBuffer != null)
+            {
+                if (currentTimeSlice.timeFrame.Elapsed())
                 {
-                    if (currentTimeSlice.timeFrame.Elapsed())
-                    {
-                        timeSliceCounterBuffer.Add(currentTimeSlice);
-                        currentTimeSlice = new TimeSliceCounter(timeSliceSize);
-                    }
-                    currentTimeSlice.counter++;
+                    timeSliceCounterBuffer.Add(currentTimeSlice);
+                    currentTimeSlice = new TimeSliceCounter(timeSliceSize);
                 }
+                currentTimeSlice.counter++;
             }
-            manualResetEvent.ObjIfExists?.Set();
-            manualResetEvent.ObjIfExists?.Reset();
         }
+        manualResetEvent.ObjIfExists?.Set();
+        manualResetEvent.ObjIfExists?.Reset();
+    }
 
-        public void Post<M>(M message)
+    public void Post<M>(M message)
+    {
+        if (!(message is T1 msgT1)) return;
+        if (!(filter?.Invoke(msgT1) ?? true)) return;
+        T2 msgT2 = convert == null ? default : convert(msgT1);
+        using (myLock.Lock())
         {
-            if (!(message is T1 msgT1)) return;
-            if (!(filter?.Invoke(msgT1) ?? true)) return;
-            T2 msgT2 = convert == null ? default : convert(msgT1);
-            using (myLock.Lock())
+            counter++;
+            messageBuffer?.Add((AppTime.Now, msgT2));
+            timestampBuffer?.Add(AppTime.Now);
+            if (timeSliceCounterBuffer != null)
             {
-                counter++;
-                messageBuffer?.Add((AppTime.Now, msgT2));
-                timestampBuffer?.Add(AppTime.Now);
-                if (timeSliceCounterBuffer != null)
+                if (currentTimeSlice.timeFrame.Elapsed())
                 {
-                    if (currentTimeSlice.timeFrame.Elapsed())
-                    {
-                        timeSliceCounterBuffer.Add(currentTimeSlice);
-                        currentTimeSlice = new TimeSliceCounter(timeSliceSize);
-                    }
-                    currentTimeSlice.counter++;
+                    timeSliceCounterBuffer.Add(currentTimeSlice);
+                    currentTimeSlice = new TimeSliceCounter(timeSliceSize);
                 }
+                currentTimeSlice.counter++;
             }
-            manualResetEvent.ObjIfExists?.Set();
-            manualResetEvent.ObjIfExists?.Reset();
         }
+        manualResetEvent.ObjIfExists?.Set();
+        manualResetEvent.ObjIfExists?.Reset();
+    }
 
-        public Task PostAsync<M>(M message)
+    public Task PostAsync<M>(M message)
+    {
+        Post(message);
+        return Task.CompletedTask;
+    }
+
+    public struct TimeSliceCounter
+    {
+        public TimeFrame timeFrame;
+        public long counter;
+
+        public TimeSliceCounter(TimeSpan timeSliceSize)
         {
-            Post(message);
-            return Task.CompletedTask;
-        }
-
-        public struct TimeSliceCounter
-        {
-            public TimeFrame timeFrame;
-            public long counter;
-
-            public TimeSliceCounter(TimeSpan timeSliceSize)
-            {
-                this.timeFrame = new TimeFrame(timeSliceSize);
-                this.counter = 0;
-            }
+            this.timeFrame = new TimeFrame(timeSliceSize);
+            this.counter = 0;
         }
     }
 }

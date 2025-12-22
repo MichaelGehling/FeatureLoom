@@ -29,10 +29,6 @@ namespace FeatureLoom.MessageFlow
     /// Performance:
     /// - Wrapper creation uses a pooled object to reduce allocation pressure versus boxing which is always an allocation for structs.
     /// - Fast type check (<c>typeof(M).IsValueType</c>) determines wrapping path.
-    ///
-    /// Usage recommendation:
-    /// - If most messages are reference types, overhead is minimal.
-    /// - If consuming code frequently handles structs, consider adding helper code to unwrap and dispose automatically.
     /// </remarks>
     public class ValueWrappingQueueReceiver : IReceiver<object>, IAlternativeMessageSource, IAsyncWaitHandle, IMessageSink
     {
