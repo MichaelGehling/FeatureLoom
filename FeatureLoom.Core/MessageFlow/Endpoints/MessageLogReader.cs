@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace FeatureLoom.MessageFlow;
 
 /// <summary>
-/// Reads messages from an <see cref="IReadLogBuffer{T}"/> like the <see cref="cref="MessageLog{T}"/>
+/// Reads messages from an <see cref="IReadLogBuffer{T}"/> like the <see cref="MessageLog{T}"/>
 /// in ascending log-id order and forwards them to connected sinks according to the configured <see cref="ForwardingMethod"/>.
 /// </summary>
 /// <typeparam name="T">The message type.</typeparam>

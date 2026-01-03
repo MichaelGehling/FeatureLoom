@@ -1,34 +1,109 @@
 ﻿using FeatureLoom.Diagnostics;
 using FeatureLoom.Helpers;
+using FeatureLoom.Time;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow
 {
     public class RequestSenderTests
     {
-
         [Fact]
-        public void ResponsesCanBeReceived()
+        public async Task Async_forward_is_awaited_before_response_is_returned()
         {
             using var testContext = TestHelper.PrepareTestContext();
 
-            var requestSender = new RequestSender<string, string>();            
-            var receiver = new LatestMessageReceiver<IRequestMessage<string>>();
-            var responseSender = new Sender<IResponseMessage<string>>();
-            requestSender.ConnectTo(receiver);
-            responseSender.ConnectTo(requestSender);
+            var requester = new RequestSender<int, string>();
+            var responder = new AsyncResponder(requester);
+            requester.ConnectTo(responder);
 
-            var task = requestSender.SendRequestAsync("ABC");
-            Assert.True(receiver.TryReceiveRequest(out string request, out long requestId));
-            Assert.False(task.IsCompleted);
+            var sendTask = requester.SendRequestAsync(7);
 
-            responseSender.SendResponse(request + "!", requestId);
-            Assert.True(task.IsCompleted);
-            Assert.Equal("ABC!", task.Result);
+            Assert.False(sendTask.IsCompleted); // awaiting responder.PostAsync
 
-            requestSender.ProcessMessage<IRequestMessage<string>>(req => responseSender.SendResponse(req.Content + "?", req.RequestId));
-            Assert.Equal("XYZ?", requestSender.SendRequest("XYZ"));
+            responder.CompletePending(); // finishes PostAsync
+
+            var result = await sendTask;
+            Assert.Equal("R7", result);
         }
 
+        [Fact]
+        public async Task Times_out_when_no_response_arrives()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var requester = new RequestSender<int, int>(timeout: 50.Milliseconds());
+
+            var task = requester.SendRequestAsync(1);
+
+            var ex = await Assert.ThrowsAsync<TaskCanceledException>(() => task);
+            Assert.IsType<TaskCanceledException>(ex);
+        }
+
+        [Fact]
+        public async Task Correlates_multiple_inflight_requests_out_of_order()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var requester = new RequestSender<int, string>();
+            var receiver = new QueueReceiver<IRequestMessage<int>>();
+            var responseSender = new Sender<IResponseMessage<string>>();
+
+            requester.ConnectTo(receiver);
+            responseSender.ConnectTo(requester);
+
+            var t1 = requester.SendRequestAsync(1);
+            var t2 = requester.SendRequestAsync(2);
+
+            Assert.True(receiver.TryReceive(out var first));
+            Assert.True(receiver.TryReceive(out var second));
+
+            // Respond out of order
+            responseSender.SendResponse("B", second.RequestId);
+
+            Assert.Equal("B", await t2);
+            Assert.False(t1.IsCompleted);
+
+            responseSender.SendResponse("A", first.RequestId);
+
+            Assert.Equal("A", await t1);
+        }
+
+        private sealed class AsyncResponder : IMessageSink
+        {
+            private readonly RequestSender<int, string> requester;
+            private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            private long pendingRequestId;
+
+            public AsyncResponder(RequestSender<int, string> requester)
+            {
+                this.requester = requester;
+            }
+
+            public void Post<M>(in M message)
+            {
+                Post(message);
+            }
+
+            public void Post<M>(M message)
+            {
+                if (message is IRequestMessage<int> req)
+                {
+                    pendingRequestId = req.RequestId;
+                    requester.Post(new ResponseMessage<string>($"R{req.Content}", req.RequestId));
+                }
+            }
+
+            public Task PostAsync<M>(M message)
+            {
+                Post(message);
+                return completion.Task;
+            }
+
+            public void CompletePending()
+            {
+                completion.TrySetResult(true);
+            }
+        }
     }
 }
