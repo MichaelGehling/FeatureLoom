@@ -151,7 +151,7 @@ public sealed class LatestMessageReceiver<T> : IMessageSink<T>, IReceiver<T>, IA
     /// Receives up to one item into the provided or shared sliced buffer.
     /// Returns an empty segment when no message is available or <paramref name="maxItems"/> ≤ 0.
     /// </summary>
-    public ArraySegment<T> ReceiveMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
+    public ArraySegment<T> ReceiveMany(int maxItems = int.MaxValue, SlicedBuffer<T> slicedBuffer = null)
     {
         if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
         using (myLock.Lock(true))
@@ -171,7 +171,7 @@ public sealed class LatestMessageReceiver<T> : IMessageSink<T>, IReceiver<T>, IA
     /// Peeks up to one item into the provided or shared sliced buffer without clearing it.
     /// Returns an empty segment when no message is available or <paramref name="maxItems"/> ≤ 0.
     /// </summary>
-    public ArraySegment<T> PeekMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
+    public ArraySegment<T> PeekMany(int maxItems = int.MaxValue, SlicedBuffer<T> slicedBuffer = null)
     {
         if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
         using (myLock.Lock(true))

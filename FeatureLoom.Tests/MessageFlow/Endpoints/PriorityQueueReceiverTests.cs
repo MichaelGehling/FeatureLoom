@@ -110,5 +110,50 @@ namespace FeatureLoom.MessageFlow
             sender.Send(42);
             Assert.True(waitHandle.WaitingTask.IsCompleted);
         }
+
+        [Fact]
+        public void PeekManyReturnsPriorityOrderWithoutDequeuing()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var sender = new Sender();
+            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);
+            sender.ConnectTo(receiver);
+
+            sender.Send(1);
+            sender.Send(5);
+            sender.Send(3);
+
+            var peeked = receiver.PeekMany(2);
+            Assert.Equal(3, receiver.Count);
+            Assert.Equal(5, peeked.Array[peeked.Offset + 0]);
+            Assert.Equal(3, peeked.Array[peeked.Offset + 1]);
+        }
+
+        [Fact]
+        public void PostAsyncWaitsUntilSpaceIsAvailable()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            int limit = 2;
+            var sender = new Sender();
+            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default, limit, 1.Seconds());
+            sender.ConnectTo(receiver);
+
+            sender.Send(1);
+            sender.Send(2);
+            Assert.True(receiver.IsFull);
+
+            var sendTask = sender.SendAsync(99);
+            Assert.False(sendTask.IsCompleted);
+
+            Assert.True(receiver.TryReceive(out _));
+            sendTask.WaitFor();
+            Assert.True(sendTask.IsCompletedSuccessfully);
+
+            var remaining = receiver.ReceiveAll();
+            Assert.Equal(limit, remaining.Count);
+            Assert.Equal(99, remaining[0]);
+        }
     }
 }

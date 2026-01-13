@@ -10,7 +10,7 @@
     /// - An implicit conversion to <typeparamref name="T"/> is provided for convenience; it does not carry the <see cref="RequestId"/>.
     /// </remarks>
     /// <typeparam name="T">The payload type carried by the response.</typeparam>
-    public class ResponseMessage<T> : IResponseMessage<T>
+    public sealed class ResponseMessage<T> : IResponseMessage<T>
     {
         private T content;
         private long requestId;

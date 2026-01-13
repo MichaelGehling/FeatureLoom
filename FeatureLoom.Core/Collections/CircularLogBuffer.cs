@@ -199,12 +199,11 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
         result = default;
         if (number < 0) return false;
 
-        if (threadSafe) myLock.EnterReadOnly(true);        
+        if (threadSafe) myLock.EnterReadOnly(true);
         try
-        {            
+        {
             if (number > LatestId || number < OldestAvailableId) return false;
 
-            // offset = (LatestId - number) + 1, bounded by [1..CurrentSize] when number is valid
             int offset = (int)(counter - number);
             int index = (nextIndex - offset + buffer.Length) % buffer.Length;
             result = buffer[index];
@@ -252,14 +251,15 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
                 return Array.Empty<T>();
             }
 
-            if (firstRequestedId < OldestAvailableId) firstProvidedId = OldestAvailableId;
-            else firstProvidedId = firstRequestedId;
+            firstProvidedId = firstRequestedId < OldestAvailableId ? OldestAvailableId : firstRequestedId;
 
-            int numberToCopy = (int)(counter - firstRequestedId).ClampHigh(maxItems).ClampHigh(CurrentSize);
-            lastProvidedId = firstRequestedId + numberToCopy;
+            int availableFromFirst = (int)(counter - firstProvidedId);
+            int numberToCopy = availableFromFirst.ClampHigh(maxItems).ClampHigh(CurrentSize);
+            lastProvidedId = firstProvidedId + numberToCopy;
 
+            int skipCount = (int)(firstProvidedId - OldestAvailableId);
             T[] result = new T[numberToCopy];
-            CopyToInternal(result, 0, numberToCopy);
+            CopyToInternal(result, 0, numberToCopy, skipCount);
             return result;
         }
         finally
@@ -293,7 +293,9 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
         try
         {
             var leftSpace = array.Length - arrayIndex;
-            CopyToInternal(array, arrayIndex, leftSpace > CurrentSize ? CurrentSize : leftSpace);
+            int copyLength = leftSpace > CurrentSize ? CurrentSize : leftSpace;
+            int skipCount = CurrentSize - copyLength; // preserve previous semantics: newest 'copyLength' items
+            CopyToInternal(array, arrayIndex, copyLength, skipCount);
         }
         finally
         {
@@ -312,7 +314,8 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
         if (threadSafe) myLock.EnterReadOnly(true);
         try
         {
-            CopyToInternal(array, arrayIndex, copyLength);
+            int skipCount = CurrentSize - copyLength; // previous semantics (tail)
+            CopyToInternal(array, arrayIndex, copyLength, skipCount);
         }
         finally
         {
@@ -321,40 +324,51 @@ public sealed class CircularLogBuffer<T> : ILogBuffer<T>
     }
 
     /// <summary>
-    /// Internal helper to copy items from the buffer to an array, handling wrap-around logic.
+    /// Copies a logical slice of the buffer into the destination array.
+    /// Items are copied in chronological (oldest -> newest) order starting after skipping <paramref name="skipCount"/> oldest elements.
     /// </summary>
-    /// <param name="array">The destination array.</param>
-    /// <param name="arrayIndex">The starting index in the destination array.</param>
-    /// <param name="copyLength">The number of items to copy.</param>
-    private void CopyToInternal(T[] array, int arrayIndex, int copyLength)
+    /// <param name="array">Destination array.</param>
+    /// <param name="arrayIndex">Starting index in destination.</param>
+    /// <param name="copyLength">Number of elements to copy.</param>
+    /// <param name="skipCount">Number of oldest elements to skip before copying.</param>
+    private void CopyToInternal(T[] array, int arrayIndex, int copyLength, int skipCount)
     {
-        // Calculate how much space is left in the destination array from the starting index.
         var leftSpace = array.Length - arrayIndex;
-        // Validate that there is enough space in the destination array and that we don't try to copy more than available.
-        if (leftSpace < copyLength || copyLength > CurrentSize) throw new ArgumentOutOfRangeException();
+        if (leftSpace < copyLength ||
+            copyLength < 0 ||
+            skipCount < 0 ||
+            skipCount + copyLength > CurrentSize) throw new ArgumentOutOfRangeException();
 
-        // The buffer is logically split into two parts:
-        // - The "back buffer" (oldest items, after wrap-around)
-        // - The "front buffer" (newest items, before wrap-around)
-        int frontBufferSize = nextIndex; // Number of items in the front buffer (from index 0 to nextIndex-1)
-        int backBufferSize = CurrentSize - nextIndex; // Number of items in the back buffer (from nextIndex to end)
+        // Fast path when not cycled: physical order matches logical order.
+        if (!cycled)
+        {
+            // Oldest is buffer[0]
+            Array.Copy(buffer, skipCount, array, arrayIndex, copyLength);
+            return;
+        }
 
-        // Determine how many items to copy from the front buffer (newest items).
-        // If we want more than the front buffer holds, we take all of it; otherwise, just what we need.
-        int copyFromFrontBuffer = copyLength >= frontBufferSize ? frontBufferSize : copyLength;
-        // The starting index in the front buffer for copying.
-        int frontBufferStartIndex = frontBufferSize - copyFromFrontBuffer;
+        // When cycled, logical oldest starts at nextIndex.
+        int backBufferSize = buffer.Length - nextIndex; // oldest segment length
+        int logicalStart = skipCount;
+        int remaining = copyLength;
+        int writePos = arrayIndex;
 
-        // The remaining items to copy must come from the back buffer (oldest items).
-        int copyFromBackbuffer = copyLength - copyFromFrontBuffer;
-        // The starting index in the back buffer for copying.
-        int backBufferStartIndex = nextIndex + backBufferSize - copyFromBackbuffer;
+        // Portion in back (oldest) segment
+        if (logicalStart < backBufferSize)
+        {
+            int takeFromBack = Math.Min(backBufferSize - logicalStart, remaining);
+            int backStart = nextIndex + logicalStart;
+            Array.Copy(buffer, backStart, array, writePos, takeFromBack);
+            writePos += takeFromBack;
+            remaining -= takeFromBack;
+            logicalStart += takeFromBack;
+        }
 
-        // If we need to copy from the back buffer (i.e., the buffer has wrapped around), do so first.
-        if (copyFromBackbuffer > 0)
-            Array.Copy(buffer, backBufferStartIndex, array, arrayIndex, copyFromBackbuffer);
-
-        // Then copy from the front buffer (the most recent items).
-        Array.Copy(buffer, frontBufferStartIndex, array, arrayIndex + copyFromBackbuffer, copyFromFrontBuffer);
+        // Portion in front (newest) segment
+        if (remaining > 0)
+        {
+            int frontOffset = logicalStart - backBufferSize;
+            Array.Copy(buffer, frontOffset, array, writePos, remaining);
+        }
     }
 }

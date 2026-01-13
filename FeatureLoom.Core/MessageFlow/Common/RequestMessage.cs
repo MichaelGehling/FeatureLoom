@@ -13,7 +13,7 @@ namespace FeatureLoom.MessageFlow
     /// - The parameterless constructor exists primarily for serializers.
     /// </remarks>
     /// <typeparam name="T">The payload type carried by the request.</typeparam>
-    public class RequestMessage<T> : IRequestMessage<T>
+    public sealed class RequestMessage<T> : IRequestMessage<T>
     {
         T content;
         long requestId;
