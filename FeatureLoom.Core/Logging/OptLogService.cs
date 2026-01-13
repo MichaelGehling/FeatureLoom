@@ -401,9 +401,8 @@ public static class FilteredLoggerExtension
             string exStackTrace = e.StackTrace ?? "";
             if (exStackTrace != null)
             {
-                string detailText = $"ExceptionMessage: {e.Message} \n ExceptionStackTrace:\n{e.StackTrace}";
-                EnumHelper.TryFromInt(logger.logLevelValue, out Loglevel loglevel);
-                logger.ActuallyBuild(message, detailText, loglevel);
+                string detailText = $"ExceptionMessage: {e.Message} \n ExceptionStackTrace:\n{e.StackTrace}";                
+                BuildHelper(logger, message, detailText, false);
             }
             else
             {
