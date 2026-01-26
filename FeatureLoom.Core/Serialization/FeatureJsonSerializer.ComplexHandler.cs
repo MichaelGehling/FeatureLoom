@@ -211,7 +211,7 @@ namespace FeatureLoom.Serialization
                     primitiveWriteDelegate(value);
                 };
             }
-            else if (!fieldTypeHandler.HandlerType.IsNullable())
+            else if (!fieldTypeHandler.HandlerType?.IsNullable() ?? false)
             {
                 return (parentItem) =>
                 {

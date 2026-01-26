@@ -297,7 +297,7 @@ namespace FeatureLoom.Serialization
 
         private CachedTypeHandler CreateCachedTypeHandler(Type itemType)
         {
-            CachedTypeHandler typeHandler = new CachedTypeHandler(this);
+            CachedTypeHandler typeHandler = new CachedTypeHandler(this, itemType);            
             typeHandlerCache[itemType] = typeHandler; // Typehandler must be added first for the case of recursion (type contains same type)
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
