@@ -199,6 +199,7 @@ namespace FeatureLoom.MessageFlow
         /// <c>?</c>),  the filter will use pattern matching to determine whether a message's topic matches the filter. 
         /// Otherwise, an exact match is required.</remarks>
         /// <param name="source">The source of messages to filter.</param>
+        /// <param name="unwrap">If true ITopicMessage the contained message will be unwrapped before forwarded, otherwise the ITopicMessage will be forwarded</param>
         /// <param name="topicFilter">The topic or wildcard pattern to filter messages by. Wildcard characters such as  <c>*</c> and <c>?</c> can
         /// be used to match multiple topics.</param>
         /// <param name="forwardOtherMessages">A value indicating whether messages that are not of type <see cref="ITopicMessage"/> should be forwarded  
