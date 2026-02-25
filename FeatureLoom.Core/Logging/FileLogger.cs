@@ -1,6 +1,5 @@
 ﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Extensions;
-using FeatureLoom.MetaDatas;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;

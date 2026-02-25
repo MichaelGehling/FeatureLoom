@@ -4,7 +4,6 @@ using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using FeatureLoom.MessageFlow;
-using FeatureLoom.MetaDatas;
 using FeatureLoom.Scheduling;
 using FeatureLoom.Security;
 using FeatureLoom.Serialization;

@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
-using FeatureLoom.MetaDatas;
 using FeatureLoom.Logging;
 
 namespace FeatureLoom.DependencyInversion
