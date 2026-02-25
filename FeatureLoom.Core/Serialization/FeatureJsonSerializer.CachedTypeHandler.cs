@@ -26,10 +26,11 @@ namespace FeatureLoom.Serialization
             private bool noRefTypes;
             public byte[] preparedTypeInfo;
 
-            public CachedTypeHandler(FeatureJsonSerializer serializer)
+            public CachedTypeHandler(FeatureJsonSerializer serializer, Type handlerType)
             {
                 this.serializer = serializer;
                 this.writer = serializer.writer;                
+                this.handlerType = handlerType;
             }
 
             public bool IsPrimitive => isPrimitive;

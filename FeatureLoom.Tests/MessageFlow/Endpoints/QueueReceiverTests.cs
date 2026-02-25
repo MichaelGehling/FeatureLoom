@@ -5,6 +5,7 @@ using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -114,6 +115,73 @@ namespace FeatureLoom.MessageFlow
             Assert.True(waitHandle.WaitingTask.IsCompleted);
         }
 
+        [Fact]
+        public void DropLatestForwardsNewestMessageToAlternativeSource()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var receiver = new QueueReceiver<int>(1, TimeSpan.Zero, dropLatestMessageOnFullQueue: true);
+            var altSink = new RecordingSink<int>();
+            receiver.Else.ConnectTo(altSink);
+
+            receiver.Post(1); // fills queue
+            receiver.Post(2); // forwarded instead of enqueued
+
+            Assert.True(receiver.TryPeek(out var queued));
+            Assert.Equal(1, queued);
+
+            var forwarded = altSink.Received.ToArray();
+            Assert.Single(forwarded);
+            Assert.Equal(2, forwarded[0]);
+        }
+
+        [Fact]
+        public void DropOldestForwardsRemovedMessageToAlternativeSource()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var receiver = new QueueReceiver<int>(2, TimeSpan.Zero, dropLatestMessageOnFullQueue: false);
+            var altSink = new RecordingSink<int>();
+            receiver.Else.ConnectTo(altSink);
+
+            receiver.Post(1);
+            receiver.Post(2);
+            receiver.Post(3); // drops 1
+
+            Assert.Equal(2, receiver.Count);
+
+            var forwarded = altSink.Received.ToArray();
+            Assert.Single(forwarded);
+            Assert.Equal(1, forwarded[0]);
+
+            Assert.True(receiver.TryReceive(out var first));
+            Assert.Equal(2, first);
+            Assert.True(receiver.TryReceive(out var second));
+            Assert.Equal(3, second);
+        }
+
+        [Fact]
+        public async Task PostAsyncWaitsUntilSpaceIsAvailableWhenBlockingIsEnabled()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var receiver = new QueueReceiver<int>(1, 2.Seconds());
+            receiver.Post(1);
+
+            var postTask = receiver.PostAsync(2);
+            Assert.False(postTask.IsCompleted);
+
+            Assert.True(receiver.TryReceive(out var first));
+            Assert.Equal(1, first);
+
+            var completed = await Task.WhenAny(postTask, Task.Delay(1.Seconds()));
+            Assert.Same(postTask, completed);
+            await postTask;
+
+            Assert.True(receiver.TryPeek(out var queued));
+            Assert.Equal(2, queued);
+        }
+
         [Fact(Skip = "Unstable when run with other tests.")]
         public void MultipleThreadsCanReceiveConcurrently()
         {
@@ -152,6 +220,35 @@ namespace FeatureLoom.MessageFlow
             for (int i = 0; i < numThreads; i++)
             {
                 Assert.InRange(threadCounters[i], minReceived, maxReceived);
+            }
+        }
+
+        private sealed class RecordingSink<T> : IMessageSink
+        {
+            private readonly List<T> received = new List<T>();
+
+            public IReadOnlyList<T> Received
+            {
+                get
+                {
+                    lock (received) return received.ToArray();
+                }
+            }
+
+            public void Post<M>(in M message)
+            {
+                if (message is T typed) lock (received) received.Add(typed);
+            }
+
+            public void Post<M>(M message)
+            {
+                if (message is T typed) lock (received) received.Add(typed);
+            }
+
+            public Task PostAsync<M>(M message)
+            {
+                Post(message);
+                return Task.CompletedTask;
             }
         }
     }

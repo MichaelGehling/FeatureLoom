@@ -55,7 +55,7 @@ namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
             });
 
             subject.Wait2();
-            //AppTime.WaitPrecisely(0.Milliseconds());
+            AppTime.WaitPrecisely(1.Milliseconds());
         }
 
         AsyncManualResetEventSubjects asyncManualResetEventSubjects = new AsyncManualResetEventSubjects();

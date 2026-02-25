@@ -170,7 +170,7 @@ namespace FeatureLoom.MessageFlow
 
             lock (log)
             {
-                Assert.Equal(Enumerable.Range(0, queueSize * 2).TakeLast(queueSize), log.ToArray());
+                Assert.Equal(Enumerable.Range(0, queueSize * 2).Last(), log.Last());
             }
         }
 

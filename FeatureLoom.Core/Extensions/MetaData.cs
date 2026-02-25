@@ -5,8 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using FeatureLoom.Collections;
 
-namespace FeatureLoom.MetaDatas
+namespace FeatureLoom.Extensions
 {
     public class MetaData
     {
@@ -17,7 +18,7 @@ namespace FeatureLoom.MetaDatas
         private static LazyValue<Sender<ObjectHandleInfo>> globalUpdateSender;
 
         private readonly ObjectHandle handle;
-        private LazyValue<Dictionary<string, object>> data;
+        private LazyDictionary<string, object> data;
         private readonly WeakReference<object> objRef;
         private MicroLock objLock = new MicroLock();
         private LazyValue<Sender> metaDataUpdateSender;
@@ -144,7 +145,7 @@ namespace FeatureLoom.MetaDatas
         public static void SetMetaData<D>(object obj, string key, D data)
         {
             var metaData = GetOrCreate(obj);
-            using (metaData.objLock.Lock()) metaData.data.Obj[key] = data;
+            using (metaData.objLock.Lock()) metaData.data[key] = data;
 
             metaData.metaDataUpdateSender.ObjIfExists?.Send(new MetaDataUpdateInfo(metaData.handle, key));
         }
@@ -155,8 +156,7 @@ namespace FeatureLoom.MetaDatas
             if (!objects.TryGetValue(obj, out MetaData metaData)) return false;
             using (metaData.objLock.LockReadOnly())
             {
-                if (!metaData.data.Exists) return false;
-                if (!metaData.data.Obj.TryGetValue(key, out object untypedData)) return false;
+                if (!metaData.data.TryGetValue(key, out object untypedData)) return false;
                 if (!(untypedData is D typedData)) return false;
                 
                 data = typedData;

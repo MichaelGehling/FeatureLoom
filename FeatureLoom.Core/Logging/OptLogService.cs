@@ -5,7 +5,6 @@ using FeatureLoom.DependencyInversion;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
-using FeatureLoom.MetaDatas;
 using FeatureLoom.Serialization;
 using FeatureLoom.Storages;
 using FeatureLoom.Synchronization;
@@ -401,13 +400,35 @@ public static class FilteredLoggerExtension
             string exStackTrace = e.StackTrace ?? "";
             if (exStackTrace != null)
             {
-                string detailText = $"ExceptionMessage: {e.Message} \n ExceptionStackTrace:\n{e.StackTrace}";
-                EnumHelper.TryFromInt(logger.logLevelValue, out Loglevel loglevel);
-                logger.ActuallyBuild(message, detailText, loglevel);
+                string detailText = $"ExceptionMessage: {e.Message} \n ExceptionStackTrace:\n{e.StackTrace}";                
+                BuildHelper(logger, message, detailText, false);
             }
             else
             {
                 BuildHelper(logger, message, $"ExceptionMessage: {e.Message} \n ExceptionStackTrace: n/a", false);
+            }
+        }
+    }
+
+    public static void Build(this OptLogService.FilteredLogger? logger, string message, bool addStackTrace, Exception exception)
+    {
+        if (logger == null)
+        {
+            if (Service<OptLogService>.Instance.settings.logOnWrongUsage) Log.WARNING("OptLog is not used correctly. To improve performance use it with a null check, e.g. OptLog.ERROR()?.Build(\"My log message\")", "", true);
+            return;
+        }
+        else
+        {
+            Exception e = exception.InnerOrSelf();
+            string exStackTrace = e.StackTrace ?? "";
+            if (exStackTrace != null)
+            {
+                string detailText = $"ExceptionMessage: {e.Message} \n ExceptionStackTrace:\n{e.StackTrace}";
+                BuildHelper(logger, message, detailText, addStackTrace);
+            }
+            else
+            {
+                BuildHelper(logger, message, $"ExceptionMessage: {e.Message} \n ExceptionStackTrace: n/a", addStackTrace);
             }
         }
     }

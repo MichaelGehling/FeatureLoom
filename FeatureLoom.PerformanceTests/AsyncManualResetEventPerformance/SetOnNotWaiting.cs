@@ -1,8 +1,8 @@
 ﻿using BenchmarkDotNet.Attributes;
+using FeatureLoom.Time;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureLoom.Synchronization;
-using FeatureLoom.Time;
 
 namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
 {
@@ -12,7 +12,7 @@ namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
     [CsvMeasurementsExporter]
     //[RPlotExporter]
     [HtmlExporter]
-    public class SetOnWaitingAsyncTest
+    public class SetOnNotWaitingTest
     {
         void RunTest(IMreSubject subject)
         {
@@ -48,15 +48,6 @@ namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
             subject.Reset1();
             subject.Reset2();
 
-            var job = Task.Run(async () =>
-            {
-                Task task1 = subject.WaitAsync1();
-                subject.Set2();
-                await task1;
-            });
-
-            subject.Wait2();
-            AppTime.WaitPrecisely(1.Milliseconds());
         }
 
         AsyncManualResetEventSubjects asyncManualResetEventSubjects = new AsyncManualResetEventSubjects();
@@ -65,7 +56,7 @@ namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
         ManualResetEventSubjects manualResetEventSubjects = new ManualResetEventSubjects();
 
         [Benchmark]
-        public void AsyncManualResetEvent0() => RunTest(asyncManualResetEventSubjects);
+        public void AsyncManualResetEvent0() => RunTest(asyncManualResetEventSubjects);        
 
         [Benchmark]
         public void AsyncExManualResetEvent() => RunTest(asyncExManualResetEventSubjects);
