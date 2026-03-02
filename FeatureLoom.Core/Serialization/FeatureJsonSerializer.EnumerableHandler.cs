@@ -50,7 +50,7 @@ namespace FeatureLoom.Serialization
 
             Type expectedElementType = typeof(E);
             
-            if (!defaultElementHandler.HandlerType.IsNullable())
+            if (!defaultElementHandler.HandlerType.IsNullable() || defaultElementHandler.HandlerType.IsValueType)
             {
                 ItemHandler<T> itemHandler = (collection) =>
                 {

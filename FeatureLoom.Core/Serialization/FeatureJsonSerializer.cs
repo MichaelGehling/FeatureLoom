@@ -77,7 +77,7 @@ namespace FeatureLoom.Serialization
                     return "null";
                 }
 
-                Type itemType = item.GetType();
+                Type itemType = GetItemTypeForSerialization(item);
 
                 if (lastTypeHandlerType == itemType)
                 {                    
@@ -109,6 +109,23 @@ namespace FeatureLoom.Serialization
                 serializerLock.Exit();
             }
             
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Type GetItemTypeForSerialization<T>(T item)
+        {
+            Type callType = typeof(T);
+            if (!callType.IsValueType) return item.GetType();
+            if (!callType.IsGenericType) return callType;
+
+            Type itemType = item.GetType();
+            if (callType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                Type underlyingType = Nullable.GetUnderlyingType(callType);
+                if (underlyingType == itemType) return callType;
+            }
+
+            return itemType;
         }
 
 
@@ -146,7 +163,7 @@ namespace FeatureLoom.Serialization
                     return;
                 }
 
-                Type itemType = item.GetType();
+                Type itemType = GetItemTypeForSerialization(item);
 
                 if (lastTypeHandlerType == itemType)
                 {                    
@@ -186,7 +203,7 @@ namespace FeatureLoom.Serialization
                     return;
                 }
 
-                Type itemType = item.GetType();
+                Type itemType = GetItemTypeForSerialization(item);
 
                 if (lastTypeHandlerType == itemType)
                 {
@@ -330,6 +347,7 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler_Primitive<DateTime>(writer.WriteDateTimeValue);
             else if (itemType == typeof(TimeSpan)) typeHandler.SetItemHandler_Primitive<TimeSpan>(writer.WriteTimeSpanValue);
             else if (itemType == typeof(JsonFragment)) typeHandler.SetItemHandler_Primitive<JsonFragment>(writer.WriteJsonFragmentValue);
+            else if (itemType == typeof(TextSegment)) typeHandler.SetItemHandler_Primitive<TextSegment>(writer.WriteTextSegmentValue);
 
             else if (itemType == typeof(int?)) typeHandler.SetItemHandler_Primitive<int?>(v => { if (v.HasValue) writer.WriteIntValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(uint?)) typeHandler.SetItemHandler_Primitive<uint?>(v => { if (v.HasValue) writer.WriteUintValue(v.Value); else writer.WriteNullValue(); });
@@ -350,6 +368,7 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(DateTime?)) typeHandler.SetItemHandler_Primitive<DateTime?>(v => { if (v.HasValue) writer.WriteDateTimeValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(TimeSpan?)) typeHandler.SetItemHandler_Primitive<TimeSpan?>(v => { if (v.HasValue) writer.WriteTimeSpanValue(v.Value); else writer.WriteNullValue(); });
             else if (itemType == typeof(JsonFragment?)) typeHandler.SetItemHandler_Primitive<JsonFragment?>(v => { if (v.HasValue) writer.WriteJsonFragmentValue(v.Value); else writer.WriteNullValue(); });
+            else if (itemType == typeof(TextSegment?)) typeHandler.SetItemHandler_Primitive<TextSegment?>(v => { if (v.HasValue) writer.WriteTextSegmentValue(v.Value); else writer.WriteNullValue(); });
 
             else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
             else if (itemType.IsValueType && itemType.IsNullable() && Nullable.GetUnderlyingType(itemType).IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, Nullable.GetUnderlyingType(itemType), nameof(CreateNullableEnumItemHandler), true);

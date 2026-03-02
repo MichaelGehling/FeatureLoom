@@ -122,7 +122,7 @@ public sealed partial class FeatureJsonSerializer
 
             indent = settings.indent;
             maxIndentationDepth = settings.maxIndentationDepth;
-            indentationLookup = new byte[maxIndentationDepth][];
+            indentationLookup = new byte[maxIndentationDepth+1][];
             InitIndentationLookup();
         }
 
@@ -143,7 +143,7 @@ public sealed partial class FeatureJsonSerializer
 
             List<byte> indentationBytes = new List<byte>();
             indentationBytes.Add((byte)'\n');
-            for (int i = 0; i < settings.maxIndentationDepth; i++)
+            for (int i = 0; i <= settings.maxIndentationDepth; i++)
             {                                        
                 indentationLookup[i] = indentationBytes.ToArray();
                 for (int j = 0; j < settings.indentationFactor; j++) indentationBytes.Add((byte)' ');
@@ -762,31 +762,43 @@ public sealed partial class FeatureJsonSerializer
             else WriteNullValue();
         }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void WriteJsonFragmentValue(JsonFragment json)
-            {
-                if (json.IsValid)                
-                {                    
-                    WriteString(json.JsonString);
-                }
-                else WriteNullValue();
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment WriteStringValueAsStringWithCopy(string str)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteTextSegmentValue(TextSegment textSegment)
+        {
+            if (textSegment.IsValid)
             {
                 WriteToBufferWithoutCheck(QUOTES);
-                EnsureFreeBufferSpace(64);
-                var countBefore = mainBufferCount;
+                WriteEscapedString(textSegment.UnderlyingString, textSegment.Offset, textSegment.Count);
+                WriteToBufferWithoutCheck(QUOTES);
+            }
+            else WriteNullValue();
+        }
 
-            WriteEscapedString(str);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteJsonFragmentValue(JsonFragment json)
+        {
+            if (json.IsValid)                
+            {                    
+                WriteString(json.JsonString);
+            }
+            else WriteNullValue();
+        }
 
-            var writtenBytes = mainBufferCount - countBefore;
-            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteStringValueAsStringWithCopy(string str)
+        {
             WriteToBufferWithoutCheck(QUOTES);
-            return slice;
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+        WriteEscapedString(str);
+
+        var writtenBytes = mainBufferCount - countBefore;
+        var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+        slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+        WriteToBufferWithoutCheck(QUOTES);
+        return slice;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1101,16 +1113,18 @@ public sealed partial class FeatureJsonSerializer
             }
         }
 
-        private void WriteEscapedString(string str)
+        private void WriteEscapedString(string str, int startIndex = 0, int length = -1)
         {
-            int charIndex = 0;
+            int charIndex = startIndex;
+            int numChars = length >= 0 ? length : str.Length - startIndex;
+            int endIndex = startIndex + numChars;
             const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
 
-            while (charIndex < str.Length)
+            while (charIndex < endIndex)
             {
-                EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
+                EnsureFreeBufferSpace((endIndex - charIndex) * MAX_CHAR_LENGTH);
                 int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
-                int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
+                int charIndexLimit = Math.Min(endIndex, charIndex + guaranteedCharSpace);
 
                 for (; charIndex < charIndexLimit; charIndex++)
                 {

@@ -206,7 +206,7 @@ public sealed partial class FeatureJsonDeserializer
         public int CountSizeLeft => buffer.Length - bufferFillLevel;
 
         public bool IsBufferCompletelyFilled => bufferFillLevel == buffer.Length;
-        public bool IsBufferReadToEnd => bufferPos >= bufferFillLevel;
+        public bool IsBufferReadToEnd => bufferFillLevel == 0 || bufferPos >= bufferFillLevel - 1;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Recording StartRecording(bool skipCurrent = false) => new Recording(this, skipCurrent);            

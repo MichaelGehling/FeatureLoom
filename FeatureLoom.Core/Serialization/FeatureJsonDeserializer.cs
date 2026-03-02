@@ -21,6 +21,7 @@ using FeatureLoom.Serialization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using FeatureLoom.Logging;
+using System.Globalization;
 
 #if !NETSTANDARD2_0
 using System.Buffers.Text;
@@ -189,7 +190,7 @@ namespace FeatureLoom.Serialization
                 cachedTypeReader.InvokeGenericMethod(nameof(CachedTypeReader.SetCustomTypeReader), itemType.ToSingleEntryArray(), customReaderObj);
                 return cachedTypeReader;
             }
-            
+
             if (itemType.IsArray) CreateArrayTypeReader(itemType, cachedTypeReader);
             else if (itemType == typeof(string)) cachedTypeReader.SetTypeReader(ReadStringValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
             else if (itemType == typeof(long)) cachedTypeReader.SetTypeReader(ReadLongValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
@@ -225,9 +226,14 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(Guid)) cachedTypeReader.SetTypeReader(ReadGuidValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
             else if (itemType == typeof(Guid?)) cachedTypeReader.SetTypeReader(ReadNullableGuidValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
             else if (itemType == typeof(JsonFragment)) cachedTypeReader.SetTypeReader(ReadJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
-            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);  
-            // TODO ByteSegment + ArraySegment<byte>
-            // TODO IntPtr + UIntPtr
+            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
+            else if (itemType == typeof(ByteSegment)) CreateByteSegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(ByteSegment?)) CreateNullableByteSegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(ArraySegment<byte>)) CreateByteArraySegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(ArraySegment<byte>?)) CreateNullableByteArraySegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(IntPtr)) cachedTypeReader.SetTypeReader(ReadIntPtrValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(UIntPtr)) cachedTypeReader.SetTypeReader(ReadUIntPtrValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(TextSegment)) CreateTextSegmentTypeReader(cachedTypeReader);
             else if (itemType.IsEnum || (Nullable.GetUnderlyingType(itemType)?.IsEnum ?? false))
             {
                 if (!itemType.IsNullable()) this.InvokeGenericMethod(nameof(CreateEnumReader), new Type[] { itemType }, cachedTypeReader);
@@ -248,33 +254,123 @@ namespace FeatureLoom.Serialization
 
             cachedTypeReader.SetTypeReader<byte[]>(() =>
             {
-                SkipWhiteSpaces();
-                byte b = buffer.CurrentByte;
-                if (b == '"')
+                return ReadByteArray(byteArrayReader);
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateByteSegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ByteSegment>(() =>
+            {
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ByteSegment>();
+                return new ByteSegment(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateNullableByteSegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ByteSegment?>(() =>
+            {
+                if (TryReadNullValue()) return null;
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ByteSegment>();
+                return new ByteSegment(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateByteArraySegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ArraySegment<byte>>(() =>
+            {
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ArraySegment<byte>>();
+                return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateNullableByteArraySegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ArraySegment<byte>?>(() =>
+            {
+                if (TryReadNullValue()) return null;
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ArraySegment<byte>>();
+                return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateTextSegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader textSegmentObjectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(TextSegment) }, textSegmentObjectReader, false);
+
+            cachedTypeReader.SetTypeReader<TextSegment>(() =>
+            {
+                if (TryReadStringValue(out string s))
                 {
-                    if (!TryReadStringBytes(out ByteSegment base64Uft8)) throw new Exception("Expected base64 encoded byte array, but failed on reading the string");
+                    if (s == null) return default;
+                    return new TextSegment(s);
+                }
+                else if (TryReadNullValue())
+                {
+                    return default;
+                }
+                else
+                {
+                    return textSegmentObjectReader.ReadItem<TextSegment>();
+                }
+            }, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+        }
+
+        private byte[] ReadByteArray(CachedTypeReader byteArrayReader)
+        {
+            SkipWhiteSpaces();
+            byte b = buffer.CurrentByte;
+            if (b == '"')
+            {
+                if (!TryReadStringBytes(out ByteSegment base64Uft8)) throw new Exception("Expected base64 encoded byte array, but failed on reading the string");
 
 #if NETSTANDARD2_0
                     string base64String = Encoding.UTF8.GetString(base64Uft8.AsArraySegment.Array, base64Uft8.AsArraySegment.Offset, base64Uft8.AsArraySegment.Count);
                     return Convert.FromBase64String(base64String);
 #else
-                    ReadOnlySpan<byte> utf8Base64 = base64Uft8.AsArraySegment.AsSpan();
-                    int maxDecodedLength = Base64.GetMaxDecodedFromUtf8Length(utf8Base64.Length);
-                    byte[] bytes = new byte[maxDecodedLength];
-                    Span<byte> decodedSpan = bytes;
-                    OperationStatus status = Base64.DecodeFromUtf8(utf8Base64, decodedSpan, out int bytesConsumed, out int bytesWritten);
-                    if (status != OperationStatus.Done) throw new FormatException($"Invalid Base64 sequence (status = {status}).");
-                    if (bytesWritten != bytes.Length) Array.Resize(ref bytes, bytesWritten);
-                    return bytes;
+                ReadOnlySpan<byte> utf8Base64 = base64Uft8.AsArraySegment.AsSpan();
+                int maxDecodedLength = Base64.GetMaxDecodedFromUtf8Length(utf8Base64.Length);
+                byte[] bytes = new byte[maxDecodedLength];
+                Span<byte> decodedSpan = bytes;
+                OperationStatus status = Base64.DecodeFromUtf8(utf8Base64, decodedSpan, out int bytesConsumed, out int bytesWritten);
+                if (status != OperationStatus.Done) throw new FormatException($"Invalid Base64 sequence (status = {status}).");
+                if (bytesWritten != bytes.Length) Array.Resize(ref bytes, bytesWritten);
+                return bytes;
 #endif
-                }
-                else if (b == '[')
-                {
-                    return byteArrayReader.ReadItem<byte[]>();
-                }
+            }
+            else if (b == '[')
+            {
+                return byteArrayReader.ReadItem<byte[]>();
+            }
 
-                throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
-            }, JsonDataTypeCategory.Array, StringRepresentation.No);
+            throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1781,14 +1877,14 @@ namespace FeatureLoom.Serialization
                 span = chars;
                 charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
             }
-            result = DateTime.Parse(span);            
+            result = DateTime.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);            
 #elif NETSTANDARD2_1_OR_GREATER
             ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);            
-            result = DateTime.Parse(span);            
+            result = DateTime.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);            
             charSlicedBuffer.Reset(true);
 #else
             string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);            
-            result = DateTime.Parse(str);                        
+            result = DateTime.Parse(str, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);                        
 #endif
             stringBuilder.Clear();
             return result;
@@ -1838,14 +1934,14 @@ namespace FeatureLoom.Serialization
                 span = chars;
                 charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
             }
-            result = TimeSpan.Parse(span);            
+            result = TimeSpan.Parse(span, CultureInfo.InvariantCulture);            
 #elif NETSTANDARD2_1_OR_GREATER
             ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);            
-            result = TimeSpan.Parse(span);            
+            result = TimeSpan.Parse(span, CultureInfo.InvariantCulture);            
             charSlicedBuffer.Reset(true);
 #else
             string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
-            result = TimeSpan.Parse(str);
+            result = TimeSpan.Parse(str, CultureInfo.InvariantCulture);
 #endif
             stringBuilder.Clear();
             return result;
@@ -2305,6 +2401,22 @@ namespace FeatureLoom.Serialization
         {
             if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
             return ReadFloatValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private IntPtr ReadIntPtrValue()
+        {
+            long value = ReadLongValue();
+            if (IntPtr.Size == 4 && (value > int.MaxValue || value < int.MinValue)) throw new Exception("Value is out of bounds.");
+            return new IntPtr(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private UIntPtr ReadUIntPtrValue()
+        {
+            ulong value = ReadUlongValue();
+            if (UIntPtr.Size == 4 && value > uint.MaxValue) throw new Exception("Value is out of bounds.");
+            return new UIntPtr(value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
