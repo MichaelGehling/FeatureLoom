@@ -138,7 +138,17 @@ namespace FeatureLoom.Serialization
                     if (bufferBytes.TryFindIndex(delimiterBytes, out int index))
                     {
                         found = true;
-                        buffer.TrySkipBytes(index + (alsoSkipDelimiter ? delimiterBytes.Count : 0));
+                        int bytesToSkip = index + (alsoSkipDelimiter ? delimiterBytes.Count : 0);
+                        if (buffer.CountRemainingBytes == bytesToSkip)
+                        {
+                            //If the delimiter ends exactly at the end of the buffer, the last char will remain in the buffer
+
+                            buffer.TrySkipBytes(1);
+                            bytesToSkip--;
+                            buffer.ResetBufferAfterFullSkip();
+                            buffer.TryReadFromStream();
+                        }
+                        buffer.TrySkipBytes(bytesToSkip);
                         buffer.ResetAfterReading();
                         return;
                     }
@@ -3517,7 +3527,8 @@ namespace FeatureLoom.Serialization
             // 2. get proposedTypeReader, if possible
             string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
             Type proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
-            if (proposedType != null && proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);
+            if (proposedType == null) return false;
+            if (proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);            
 
             // 3. look if next is $value field
             b = SkipWhiteSpaces();

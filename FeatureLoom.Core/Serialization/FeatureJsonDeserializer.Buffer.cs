@@ -23,9 +23,13 @@ public sealed partial class FeatureJsonDeserializer
         long totalBytesRead = 0;
         Stream stream;
         long lastStreamPosition = -1;
+        bool endOfStreamReached = false;
+        bool bufferReadTillEnd = false;
 
         public byte CurrentByte => buffer[bufferPos];
         public int BufferPos => bufferPos;
+        public bool EndOfStreamReached => endOfStreamReached;
+        public bool BufferReadTillEnd => bufferReadTillEnd;
 
         public void Init(int bufferSize)
         {
@@ -39,6 +43,7 @@ public sealed partial class FeatureJsonDeserializer
 
             ResetBuffer(false, false);
             this.stream = stream;
+            endOfStreamReached = false;
             if (stream.CanSeek) lastStreamPosition = stream.Position;
         }
 
@@ -79,6 +84,7 @@ public sealed partial class FeatureJsonDeserializer
         {
             if (++bufferPos < bufferFillLevel) return true;
             if (TryReadFromStream()) return true;
+            bufferReadTillEnd = true;
             bufferPos--;
             return false;
         }
@@ -102,29 +108,40 @@ public sealed partial class FeatureJsonDeserializer
             {
                 throw new BufferExceededException();
             }
+            bool result;
             try
             {
                 int bytesRead = stream.Read(buffer, bufferFillLevel, bufferSizeLeft);
                 totalBytesRead += bytesRead;
                 bufferFillLevel += bytesRead;
                 if (stream.CanSeek) lastStreamPosition = stream.Position;
-                return bytesRead > 0;
+                result = bytesRead > 0;
             }
             catch
             {
-                return false;
+                result = false;
             }
+            if (!result) endOfStreamReached = true;
+            return result;
+        }
+
+        private int EffectiveRemainingCount
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => (bufferFillLevel - bufferPos - (bufferReadTillEnd ? 1 : 0)).ClampLow(0);
         }
 
         public bool TryPrepareDeserialization()
         {
+            if (stream != null && endOfStreamReached && EffectiveRemainingCount == 0) return false;
+
             if (bufferStartPos > bufferResetLevel)
             {
                 ResetBuffer(true, false);
-                bufferPos = bufferStartPos;                    
+                bufferPos = bufferStartPos;
             }
             else if (bufferPos >= bufferFillLevel)
-            {                    
+            {
                 if (!TryReadFromStream())
                 {
                     return false;
@@ -159,6 +176,7 @@ public sealed partial class FeatureJsonDeserializer
                 bufferFillLevel = 0;
             }
             buffer = newBuffer;
+            bufferReadTillEnd = false;
         }
 
         public void ResetAfterReading()
@@ -249,7 +267,7 @@ public sealed partial class FeatureJsonDeserializer
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment GetReadBytes() => new ByteSegment(buffer.buffer, startBufferPos, buffer.bufferPos - startBufferPos);
+            public ByteSegment GetReadBytes() => new ByteSegment(buffer.buffer, startBufferPos, buffer.bufferPos - startBufferPos + (buffer.BufferReadTillEnd ? 1 : 0));
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()

@@ -19,6 +19,18 @@ namespace FeatureLoom.Serialization
             return value;
         }
 
+        private static bool TryDeserialize<T>(string json, out T value)
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+            return deserializer.TryDeserialize(json, out value);
+        }
+
         [Fact]
         public void Deserialize_ProposedType_WithValueField()
         {
@@ -92,6 +104,38 @@ namespace FeatureLoom.Serialization
 
             var set = Assert.IsType<HashSet<int>>(value);
             Assert.True(set.SetEquals(new[] { 1, 2 }));
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_UnknownType_IsHandledAsRegularObject()
+        {
+            const string json = "{\"$type\":\"Unknown.Namespace.UnknownType\",\"$value\":1}";
+
+            object value = Deserialize<object>(json);
+
+            var dict = Assert.IsType<Dictionary<string, object>>(value);
+            Assert.Equal("Unknown.Namespace.UnknownType", dict["$type"]);
+            Assert.Equal(1, dict["$value"]);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_IncompatibleType_ReturnsFalse()
+        {
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(byte));
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":1}}";
+
+            Assert.False(TryDeserialize(json, out BaseType value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_MalformedPayload_ReturnsFalse()
+        {
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(DerivedType));
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":[";
+
+            Assert.False(TryDeserialize(json, out BaseType value));
+            Assert.Null(value);
         }
 
         private class BaseType

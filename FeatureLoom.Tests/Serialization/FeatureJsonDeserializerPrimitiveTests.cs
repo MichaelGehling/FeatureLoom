@@ -492,6 +492,34 @@ namespace FeatureLoom.Serialization
             AssertDeserialized(json, expected);
         }
 
+        [Theory]
+        [InlineData("\"2024-01-02T03:04:05+02:30\"")]
+        [InlineData("\"2024-01-02T03:04:05\"")]
+        [InlineData("\"2024-01-02T03:04:05.1234567Z\"")]
+        public void Deserialize_DateTime_EdgeCases(string json)
+        {
+            var expected = DateTime.Parse(json.Trim('"'), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            AssertDeserialized(json, expected);
+        }
+
+        [Theory]
+        [InlineData("\"2.03:04:05\"", "2.03:04:05")]
+        [InlineData("\"-00:00:01\"", "-00:00:01")]
+        [InlineData("\"00:00:00.1234567\"", "00:00:00.1234567")]
+        public void Deserialize_TimeSpan_EdgeCases(string json, string expectedText)
+        {
+            var expected = TimeSpan.Parse(expectedText, CultureInfo.InvariantCulture);
+            AssertDeserialized(json, expected);
+        }
+
+        [Theory]
+        [InlineData("\"\\u0001\"", '\u0001')]
+        [InlineData("\"\\r\"", '\r')]
+        public void Deserialize_Char_EdgeCases(string json, char expected)
+        {
+            AssertDeserialized(json, expected);
+        }
+
         public enum TestEnum
         {
             Zero = 0,

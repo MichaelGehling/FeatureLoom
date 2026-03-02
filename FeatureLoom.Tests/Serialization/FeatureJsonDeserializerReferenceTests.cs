@@ -17,6 +17,18 @@ namespace FeatureLoom.Serialization
             return value;
         }
 
+        private static bool TryDeserialize<T>(string json, out T value)
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableReferenceResolution = true,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+            return deserializer.TryDeserialize(json, out value);
+        }
+
         [Fact]
         public void Deserialize_ReferenceResolution_SelfReference()
         {
@@ -51,6 +63,22 @@ namespace FeatureLoom.Serialization
             var value = Deserialize<NodeDictionary>(json);
 
             Assert.Same(value.Map["a"], value.Map["b"]);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_InvalidRefPath_ReturnsFalse()
+        {
+            const string json = "{\"Name\":\"root\",\"Next\":{\"$ref\":\"$.Missing\"}}";
+            Assert.False(TryDeserialize(json, out Node value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_MalformedRefPath_ReturnsFalse()
+        {
+            const string json = "{\"Items\":[{\"Name\":\"a\"},{\"$ref\":\"$.Items[x]\"}]}";
+            Assert.False(TryDeserialize(json, out NodeList value));
+            Assert.Null(value);
         }
 
         private class Node
