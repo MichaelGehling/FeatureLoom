@@ -107,15 +107,14 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
-        public void Deserialize_ProposedType_UnknownType_IsHandledAsRegularObject()
+        public void Deserialize_ProposedType_UnknownType_ValueHandledAsUnknownType()
         {
             const string json = "{\"$type\":\"Unknown.Namespace.UnknownType\",\"$value\":1}";
 
             object value = Deserialize<object>(json);
 
-            var dict = Assert.IsType<Dictionary<string, object>>(value);
-            Assert.Equal("Unknown.Namespace.UnknownType", dict["$type"]);
-            Assert.Equal(1, dict["$value"]);
+            var intValue = Assert.IsType<int>(value);
+            Assert.Equal(1, intValue);
         }
 
         [Fact]

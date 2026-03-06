@@ -795,7 +795,7 @@ namespace FeatureLoom.Serialization
                             b = SkipWhiteSpaces();
                             if (b == '}') break;
 
-                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes); // TODO: Check what to do to make integers and other types work as a dictionary key
+                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
                             keysToKeep.Add(fieldName);
                             b = SkipWhiteSpaces();
                             if (b != ':') throw new Exception("Failed reading object to Dictionary");
@@ -3448,7 +3448,10 @@ namespace FeatureLoom.Serialization
             bool foundValueField = false;
             using (var undoHandle = CreateUndoReadHandle())
             {
-                if (!FindProposedType(out proposedTypeReader, typeof(T), out foundValueField)) return false;
+                if (!TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                {
+                    if (!foundValueField) return false;
+                }
                 undoHandle.SetUndoReading(!foundValueField);
             }
 
@@ -3456,17 +3459,16 @@ namespace FeatureLoom.Serialization
             {                
                 // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
                 if (proposedTypeReader != null) item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                else item = originalTypeReader.ReadItem<T>();
-                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
-                return true;
+                else item = originalTypeReader.ReadItemIgnoreProposedType<T>();
+                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");                
             }
             else
             {
-                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.                
-                if (proposedTypeReader == null) return false;
-                item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                return true;
-            }            
+                // we read the object again from the start, because the $type field was embedded in the actual value's object,
+                // the buffer pos was already reset by the undo handle, so we can just read the item again
+                item = proposedTypeReader.ReadItemIgnoreProposedType<T>();                
+            }
+            return true;
         }
 
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, T itemToPopulate, out T item)
@@ -3479,7 +3481,10 @@ namespace FeatureLoom.Serialization
             bool foundValueField = false;
             using (var undoHandle = CreateUndoReadHandle())
             {
-                if (!FindProposedType(out proposedTypeReader, typeof(T), out foundValueField)) return false;
+                if (!TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                {
+                    if (!foundValueField) return false;
+                }
                 undoHandle.SetUndoReading(!foundValueField);
             }
 
@@ -3492,20 +3497,22 @@ namespace FeatureLoom.Serialization
                     else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
                 }
                 else item = originalTypeReader.ReadItem<T>(itemToPopulate);
-                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
-                return true;
+                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");                
             }
             else
             {
-                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.                
-                if (proposedTypeReader == null) return false;
+                // we read the object again from the start, because the $type field was embedded in the actual value's object,
+                // the buffer pos was already reset by the undo handle, so we can just read the item again,
+                // but we have to check if the proposed type is compatible with the item to populate, otherwise we would populate the wrong type of object
                 if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadItemIgnoreProposedType<T>(itemToPopulate);
-                else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                return true;
+                else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();                
             }
+            return true;
         }
 
-        bool FindProposedType(out CachedTypeReader proposedTypeReader, Type expectedType, out bool foundValueField)
+        Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new Dictionary<ByteSegment, CachedTypeReader>();
+
+        bool TryFindProposedType(out CachedTypeReader proposedTypeReader, Type expectedType, out bool foundValueField)
         {
             proposedTypeReader = null;
             foundValueField = false;
@@ -3516,34 +3523,90 @@ namespace FeatureLoom.Serialization
             byte b = SkipWhiteSpaces();
             if (b != (byte)'{') return false;
             buffer.TryNextByte();
-            // TODO compare byte per byte to fail early
-            if (!TryReadStringBytes(out var fieldName)) return false;
-            if (!typeFieldName.Equals(fieldName)) return false;
+
+            // compare byte per byte to fail early
+            b = SkipWhiteSpaces();
+            if (b != (byte)'"') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'$') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'t') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'y') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'p') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'e') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'"') return false;
+            buffer.TryNextByte();
+
             b = SkipWhiteSpaces();
             if (b != (byte)':') return false;
             buffer.TryNextByte();
             if (!TryReadStringBytes(out var proposedTypeBytes)) return false;
 
-            // 2. get proposedTypeReader, if possible
-            string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
-            Type proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
-            if (proposedType == null) return false;
-            if (proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);            
+            // 2. try get proposedTypeReader, if possible from cache, otherwise resolve type and get proposedTypeReader
+            proposedTypeBytes.EnsureHashCode();
+            if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out proposedTypeReader))
+            {
+                proposedTypeReader = null;
+                string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
+                var proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
+                if (proposedType != null && 
+                    proposedType != expectedType && 
+                    proposedType.IsAssignableTo(expectedType))
+                {
+                    proposedTypeReader = GetCachedTypeReader(proposedType);
+                }
+                proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
+            }
+            bool isProposedTypeCompatible = proposedTypeReader != null && proposedTypeReader.ReaderType.IsAssignableTo(expectedType);
 
             // 3. look if next is $value field
             b = SkipWhiteSpaces();
-            if (b != ',') return true;
+            if (b != ',') return isProposedTypeCompatible;
             buffer.TryNextByte();
+
             // TODO compare byte per byte to fail early
-            if (!TryReadStringBytes(out fieldName)) return true;
-            if (!valueFieldName.Equals(fieldName)) return true;
             b = SkipWhiteSpaces();
-            if (b != (byte)':') return true;
+            if (b != (byte)'"') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'$') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'v') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'a') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'l') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'u') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'e') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'"') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+
+            b = SkipWhiteSpaces();
+            if (b != (byte)':') return isProposedTypeCompatible;
             buffer.TryNextByte();
 
             // 4. $value field found
             foundValueField = true;
-            return true;
+            return isProposedTypeCompatible;
         }
 
         private bool TrySkipRemainingFieldsOfObject()
