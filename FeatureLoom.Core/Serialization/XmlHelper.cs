@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Extensions;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.Extensions;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -86,6 +87,48 @@ public static class XmlHelper
         catch
         {
             xmlNode = null;
+            return false;
+        }
+    }
+
+    public static bool TryGetAttribute<T>(this XmlNode node, string attributeName, out T attributeValue)
+    {
+        if (node.Attributes != null)
+        {
+            var attr = node.Attributes[attributeName];
+            if (attr != null && attr.Value != null)
+            {
+                return attr.Value.TryConvertTo(out attributeValue);
+            }
+        }
+        attributeValue = default;
+        return false;
+    }
+
+    public static bool TryGetElements(this XmlNode node, string xPath, out XmlNodeList elements)
+    {
+        try
+        {
+            elements = node.SelectNodes(xPath);
+            return elements != null && elements.Count > 0;
+        }
+        catch
+        {
+            elements = null;
+            return false;
+        }
+    }
+
+    public static bool TryGetElement(this XmlNode node, string xPath, out XmlNode element)
+    {
+        try
+        {
+            element = node.SelectSingleNode(xPath);
+            return element != null;
+        }
+        catch
+        {
+            element = null;
             return false;
         }
     }

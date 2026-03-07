@@ -298,6 +298,7 @@ namespace Playground
 
         private static async Task Main()
         {
+            return;
 
             if (false)
             {
