@@ -521,7 +521,7 @@ namespace FeatureLoom.Serialization
                 {
                     if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                     {
-                        temp = (nullableItem, callType, itemName) =>
+                        temp = (nullableItem, callType, _) =>
                         {
                             if (!nullableItem.HasValue)
                             {
@@ -541,7 +541,7 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        temp = (nullableItem, callType, itemName) =>
+                        temp = (nullableItem, callType, _) =>
                         {
                             if (!nullableItem.HasValue)
                             {

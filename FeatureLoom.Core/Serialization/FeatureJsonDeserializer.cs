@@ -820,7 +820,7 @@ namespace FeatureLoom.Serialization
                     Type fieldType = GetFieldOrPropertyType(memberInfo);
                     string name = memberInfo.Name;
                     if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName)) name = backingFieldName;
-                    var itemFieldName = new ByteSegment(name.ToByteArray());                    
+                    var itemFieldName = new ByteSegment(name.ToByteArray(), true);                    
                     if (!fieldNameToIsTypeMember.TryGetValue(itemFieldName, out var indicesList))
                     {
                         indicesList = Enumerable.Repeat(false, objectTypeOptions.Length).ToList();
@@ -954,7 +954,7 @@ namespace FeatureLoom.Serialization
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
                 string name = memberInfo.Name;
-                var itemFieldName = new ByteSegment(name.ToByteArray());
+                var itemFieldName = new ByteSegment(name.ToByteArray(), true);
                 var itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, itemFieldName);
                 itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
                 itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
@@ -962,7 +962,7 @@ namespace FeatureLoom.Serialization
                 if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName))
                 {
                     name = backingFieldName;
-                    itemFieldName = new ByteSegment(name.ToByteArray());
+                    itemFieldName = new ByteSegment(name.ToByteArray(), true);
                     itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
                     itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
                 }
@@ -971,6 +971,7 @@ namespace FeatureLoom.Serialization
 
             bool TryFindFieldWriter(ByteSegment fieldName, ref int expectedFieldIndex, out Func<T, T> fieldWriter)
             {
+                fieldName.EnsureHashCode();
                 if (itemFieldWritersList.Count == 0)
                 {
                     fieldWriter = null;
@@ -1599,7 +1600,7 @@ namespace FeatureLoom.Serialization
         {
             while (arrayElementNameCache.Count <= index)
             {
-                arrayElementNameCache.Add(new ByteSegment($"[{index}]".ToByteArray()));
+                arrayElementNameCache.Add(new ByteSegment($"[{index}]".ToByteArray(), true));
             }
             return arrayElementNameCache[index];
         }

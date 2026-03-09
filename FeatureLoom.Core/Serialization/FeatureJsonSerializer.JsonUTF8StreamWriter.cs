@@ -1000,7 +1000,7 @@ public sealed partial class FeatureJsonSerializer
                     indexNameList.Add(default);
                 }
             }
-            if (!indexNameList[index].IsValid) indexNameList[index] = new ByteSegment($"[{index}]");
+            if (!indexNameList[index].IsValid) indexNameList[index] = new ByteSegment($"[{index}]",true);
             return indexNameList[index];
         }
 

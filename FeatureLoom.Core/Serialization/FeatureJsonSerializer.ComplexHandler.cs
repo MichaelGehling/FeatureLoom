@@ -189,7 +189,7 @@ namespace FeatureLoom.Serialization
                 fieldName = fieldName.Substring("<", ">");
             }
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
-            var fieldNameBytes = new ByteSegment(JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName));
+            var fieldNameBytes = new ByteSegment(JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName), true);
 
             
             Type itemType = typeof(T);
