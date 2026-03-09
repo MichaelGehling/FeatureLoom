@@ -2,7 +2,6 @@
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
-using FeatureLoom.MetaDatas;
 using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;

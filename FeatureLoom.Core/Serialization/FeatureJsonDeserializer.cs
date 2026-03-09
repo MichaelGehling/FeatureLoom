@@ -21,6 +21,7 @@ using FeatureLoom.Serialization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using FeatureLoom.Logging;
+using System.Globalization;
 
 #if !NETSTANDARD2_0
 using System.Buffers.Text;
@@ -137,7 +138,17 @@ namespace FeatureLoom.Serialization
                     if (bufferBytes.TryFindIndex(delimiterBytes, out int index))
                     {
                         found = true;
-                        buffer.TrySkipBytes(index + (alsoSkipDelimiter ? delimiterBytes.Count : 0));
+                        int bytesToSkip = index + (alsoSkipDelimiter ? delimiterBytes.Count : 0);
+                        if (buffer.CountRemainingBytes == bytesToSkip)
+                        {
+                            //If the delimiter ends exactly at the end of the buffer, the last char will remain in the buffer
+
+                            buffer.TrySkipBytes(1);
+                            bytesToSkip--;
+                            buffer.ResetBufferAfterFullSkip();
+                            buffer.TryReadFromStream();
+                        }
+                        buffer.TrySkipBytes(bytesToSkip);
                         buffer.ResetAfterReading();
                         return;
                     }
@@ -189,7 +200,7 @@ namespace FeatureLoom.Serialization
                 cachedTypeReader.InvokeGenericMethod(nameof(CachedTypeReader.SetCustomTypeReader), itemType.ToSingleEntryArray(), customReaderObj);
                 return cachedTypeReader;
             }
-            
+
             if (itemType.IsArray) CreateArrayTypeReader(itemType, cachedTypeReader);
             else if (itemType == typeof(string)) cachedTypeReader.SetTypeReader(ReadStringValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
             else if (itemType == typeof(long)) cachedTypeReader.SetTypeReader(ReadLongValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
@@ -225,9 +236,14 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(Guid)) cachedTypeReader.SetTypeReader(ReadGuidValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
             else if (itemType == typeof(Guid?)) cachedTypeReader.SetTypeReader(ReadNullableGuidValue, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
             else if (itemType == typeof(JsonFragment)) cachedTypeReader.SetTypeReader(ReadJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
-            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);  
-            // TODO ByteSegment + ArraySegment<byte>
-            // TODO IntPtr + UIntPtr
+            else if (itemType == typeof(JsonFragment?)) cachedTypeReader.SetTypeReader(ReadNullableJsonFragmentValue, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
+            else if (itemType == typeof(ByteSegment)) CreateByteSegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(ByteSegment?)) CreateNullableByteSegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(ArraySegment<byte>)) CreateByteArraySegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(ArraySegment<byte>?)) CreateNullableByteArraySegmentTypeReader(cachedTypeReader);
+            else if (itemType == typeof(IntPtr)) cachedTypeReader.SetTypeReader(ReadIntPtrValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(UIntPtr)) cachedTypeReader.SetTypeReader(ReadUIntPtrValue, JsonDataTypeCategory.Primitive, StringRepresentation.No);
+            else if (itemType == typeof(TextSegment)) CreateTextSegmentTypeReader(cachedTypeReader);
             else if (itemType.IsEnum || (Nullable.GetUnderlyingType(itemType)?.IsEnum ?? false))
             {
                 if (!itemType.IsNullable()) this.InvokeGenericMethod(nameof(CreateEnumReader), new Type[] { itemType }, cachedTypeReader);
@@ -248,33 +264,123 @@ namespace FeatureLoom.Serialization
 
             cachedTypeReader.SetTypeReader<byte[]>(() =>
             {
-                SkipWhiteSpaces();
-                byte b = buffer.CurrentByte;
-                if (b == '"')
+                return ReadByteArray(byteArrayReader);
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateByteSegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ByteSegment>(() =>
+            {
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ByteSegment>();
+                return new ByteSegment(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateNullableByteSegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ByteSegment?>(() =>
+            {
+                if (TryReadNullValue()) return null;
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ByteSegment>();
+                return new ByteSegment(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateByteArraySegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ArraySegment<byte>>(() =>
+            {
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ArraySegment<byte>>();
+                return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateNullableByteArraySegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader byteArrayReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteArrayReader);
+            CachedTypeReader objectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, objectReader, false);
+
+            cachedTypeReader.SetTypeReader<ArraySegment<byte>?>(() =>
+            {
+                if (TryReadNullValue()) return null;
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadItem<ArraySegment<byte>>();
+                return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
+            }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
+        }
+
+        private void CreateTextSegmentTypeReader(CachedTypeReader cachedTypeReader)
+        {
+            CachedTypeReader textSegmentObjectReader = new CachedTypeReader(this);
+            this.InvokeGenericMethod(nameof(CreateComplexTypeReader), new Type[] { typeof(TextSegment) }, textSegmentObjectReader, false);
+
+            cachedTypeReader.SetTypeReader<TextSegment>(() =>
+            {
+                if (TryReadStringValue(out string s))
                 {
-                    if (!TryReadStringBytes(out ByteSegment base64Uft8)) throw new Exception("Expected base64 encoded byte array, but failed on reading the string");
+                    if (s == null) return default;
+                    return new TextSegment(s);
+                }
+                else if (TryReadNullValue())
+                {
+                    return default;
+                }
+                else
+                {
+                    return textSegmentObjectReader.ReadItem<TextSegment>();
+                }
+            }, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
+        }
+
+        private byte[] ReadByteArray(CachedTypeReader byteArrayReader)
+        {
+            SkipWhiteSpaces();
+            byte b = buffer.CurrentByte;
+            if (b == '"')
+            {
+                if (!TryReadStringBytes(out ByteSegment base64Uft8)) throw new Exception("Expected base64 encoded byte array, but failed on reading the string");
 
 #if NETSTANDARD2_0
                     string base64String = Encoding.UTF8.GetString(base64Uft8.AsArraySegment.Array, base64Uft8.AsArraySegment.Offset, base64Uft8.AsArraySegment.Count);
                     return Convert.FromBase64String(base64String);
 #else
-                    ReadOnlySpan<byte> utf8Base64 = base64Uft8.AsArraySegment.AsSpan();
-                    int maxDecodedLength = Base64.GetMaxDecodedFromUtf8Length(utf8Base64.Length);
-                    byte[] bytes = new byte[maxDecodedLength];
-                    Span<byte> decodedSpan = bytes;
-                    OperationStatus status = Base64.DecodeFromUtf8(utf8Base64, decodedSpan, out int bytesConsumed, out int bytesWritten);
-                    if (status != OperationStatus.Done) throw new FormatException($"Invalid Base64 sequence (status = {status}).");
-                    if (bytesWritten != bytes.Length) Array.Resize(ref bytes, bytesWritten);
-                    return bytes;
+                ReadOnlySpan<byte> utf8Base64 = base64Uft8.AsArraySegment.AsSpan();
+                int maxDecodedLength = Base64.GetMaxDecodedFromUtf8Length(utf8Base64.Length);
+                byte[] bytes = new byte[maxDecodedLength];
+                Span<byte> decodedSpan = bytes;
+                OperationStatus status = Base64.DecodeFromUtf8(utf8Base64, decodedSpan, out int bytesConsumed, out int bytesWritten);
+                if (status != OperationStatus.Done) throw new FormatException($"Invalid Base64 sequence (status = {status}).");
+                if (bytesWritten != bytes.Length) Array.Resize(ref bytes, bytesWritten);
+                return bytes;
 #endif
-                }
-                else if (b == '[')
-                {
-                    return byteArrayReader.ReadItem<byte[]>();
-                }
+            }
+            else if (b == '[')
+            {
+                return byteArrayReader.ReadItem<byte[]>();
+            }
 
-                throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
-            }, JsonDataTypeCategory.Array, StringRepresentation.No);
+            throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -689,7 +795,7 @@ namespace FeatureLoom.Serialization
                             b = SkipWhiteSpaces();
                             if (b == '}') break;
 
-                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes); // TODO: Check what to do to make integers and other types work as a dictionary key
+                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
                             keysToKeep.Add(fieldName);
                             b = SkipWhiteSpaces();
                             if (b != ':') throw new Exception("Failed reading object to Dictionary");
@@ -1782,14 +1888,14 @@ namespace FeatureLoom.Serialization
                 span = chars;
                 charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
             }
-            result = DateTime.Parse(span);            
+            result = DateTime.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);            
 #elif NETSTANDARD2_1_OR_GREATER
             ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);            
-            result = DateTime.Parse(span);            
+            result = DateTime.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);            
             charSlicedBuffer.Reset(true);
 #else
             string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);            
-            result = DateTime.Parse(str);                        
+            result = DateTime.Parse(str, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);                        
 #endif
             stringBuilder.Clear();
             return result;
@@ -1839,14 +1945,14 @@ namespace FeatureLoom.Serialization
                 span = chars;
                 charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
             }
-            result = TimeSpan.Parse(span);            
+            result = TimeSpan.Parse(span, CultureInfo.InvariantCulture);            
 #elif NETSTANDARD2_1_OR_GREATER
             ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);            
-            result = TimeSpan.Parse(span);            
+            result = TimeSpan.Parse(span, CultureInfo.InvariantCulture);            
             charSlicedBuffer.Reset(true);
 #else
             string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
-            result = TimeSpan.Parse(str);
+            result = TimeSpan.Parse(str, CultureInfo.InvariantCulture);
 #endif
             stringBuilder.Clear();
             return result;
@@ -2306,6 +2412,22 @@ namespace FeatureLoom.Serialization
         {
             if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
             return ReadFloatValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private IntPtr ReadIntPtrValue()
+        {
+            long value = ReadLongValue();
+            if (IntPtr.Size == 4 && (value > int.MaxValue || value < int.MinValue)) throw new Exception("Value is out of bounds.");
+            return new IntPtr(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private UIntPtr ReadUIntPtrValue()
+        {
+            ulong value = ReadUlongValue();
+            if (UIntPtr.Size == 4 && value > uint.MaxValue) throw new Exception("Value is out of bounds.");
+            return new UIntPtr(value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3327,7 +3449,10 @@ namespace FeatureLoom.Serialization
             bool foundValueField = false;
             using (var undoHandle = CreateUndoReadHandle())
             {
-                if (!FindProposedType(out proposedTypeReader, typeof(T), out foundValueField)) return false;
+                if (!TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                {
+                    if (!foundValueField) return false;
+                }
                 undoHandle.SetUndoReading(!foundValueField);
             }
 
@@ -3335,17 +3460,16 @@ namespace FeatureLoom.Serialization
             {                
                 // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
                 if (proposedTypeReader != null) item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                else item = originalTypeReader.ReadItem<T>();
-                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
-                return true;
+                else item = originalTypeReader.ReadItemIgnoreProposedType<T>();
+                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");                
             }
             else
             {
-                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.                
-                if (proposedTypeReader == null) return false;
-                item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                return true;
-            }            
+                // we read the object again from the start, because the $type field was embedded in the actual value's object,
+                // the buffer pos was already reset by the undo handle, so we can just read the item again
+                item = proposedTypeReader.ReadItemIgnoreProposedType<T>();                
+            }
+            return true;
         }
 
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, T itemToPopulate, out T item)
@@ -3358,7 +3482,10 @@ namespace FeatureLoom.Serialization
             bool foundValueField = false;
             using (var undoHandle = CreateUndoReadHandle())
             {
-                if (!FindProposedType(out proposedTypeReader, typeof(T), out foundValueField)) return false;
+                if (!TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                {
+                    if (!foundValueField) return false;
+                }
                 undoHandle.SetUndoReading(!foundValueField);
             }
 
@@ -3371,20 +3498,22 @@ namespace FeatureLoom.Serialization
                     else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
                 }
                 else item = originalTypeReader.ReadItem<T>(itemToPopulate);
-                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
-                return true;
+                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");                
             }
             else
             {
-                // we need to reset the bufferpos, because the $type field was embedded in the actual value's object, so we read the object again from the start.                
-                if (proposedTypeReader == null) return false;
+                // we read the object again from the start, because the $type field was embedded in the actual value's object,
+                // the buffer pos was already reset by the undo handle, so we can just read the item again,
+                // but we have to check if the proposed type is compatible with the item to populate, otherwise we would populate the wrong type of object
                 if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadItemIgnoreProposedType<T>(itemToPopulate);
-                else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                return true;
+                else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();                
             }
+            return true;
         }
 
-        bool FindProposedType(out CachedTypeReader proposedTypeReader, Type expectedType, out bool foundValueField)
+        Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new Dictionary<ByteSegment, CachedTypeReader>();
+
+        bool TryFindProposedType(out CachedTypeReader proposedTypeReader, Type expectedType, out bool foundValueField)
         {
             proposedTypeReader = null;
             foundValueField = false;
@@ -3395,33 +3524,90 @@ namespace FeatureLoom.Serialization
             byte b = SkipWhiteSpaces();
             if (b != (byte)'{') return false;
             buffer.TryNextByte();
-            // TODO compare byte per byte to fail early
-            if (!TryReadStringBytes(out var fieldName)) return false;
-            if (!typeFieldName.Equals(fieldName)) return false;
+
+            // compare byte per byte to fail early
+            b = SkipWhiteSpaces();
+            if (b != (byte)'"') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'$') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'t') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'y') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'p') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'e') return false;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'"') return false;
+            buffer.TryNextByte();
+
             b = SkipWhiteSpaces();
             if (b != (byte)':') return false;
             buffer.TryNextByte();
             if (!TryReadStringBytes(out var proposedTypeBytes)) return false;
 
-            // 2. get proposedTypeReader, if possible
-            string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
-            Type proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
-            if (proposedType != null && proposedType != expectedType && proposedType.IsAssignableTo(expectedType)) proposedTypeReader = GetCachedTypeReader(proposedType);
+            // 2. try get proposedTypeReader, if possible from cache, otherwise resolve type and get proposedTypeReader
+            proposedTypeBytes.EnsureHashCode();
+            if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out proposedTypeReader))
+            {
+                proposedTypeReader = null;
+                string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
+                var proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
+                if (proposedType != null && 
+                    proposedType != expectedType && 
+                    proposedType.IsAssignableTo(expectedType))
+                {
+                    proposedTypeReader = GetCachedTypeReader(proposedType);
+                }
+                proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
+            }
+            bool isProposedTypeCompatible = proposedTypeReader != null && proposedTypeReader.ReaderType.IsAssignableTo(expectedType);
 
             // 3. look if next is $value field
             b = SkipWhiteSpaces();
-            if (b != ',') return true;
+            if (b != ',') return isProposedTypeCompatible;
             buffer.TryNextByte();
+
             // TODO compare byte per byte to fail early
-            if (!TryReadStringBytes(out fieldName)) return true;
-            if (!valueFieldName.Equals(fieldName)) return true;
             b = SkipWhiteSpaces();
-            if (b != (byte)':') return true;
+            if (b != (byte)'"') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'$') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'v') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'a') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'l') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'u') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'e') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+            b = buffer.CurrentByte;
+            if (b != (byte)'"') return isProposedTypeCompatible;
+            buffer.TryNextByte();
+
+            b = SkipWhiteSpaces();
+            if (b != (byte)':') return isProposedTypeCompatible;
             buffer.TryNextByte();
 
             // 4. $value field found
             foundValueField = true;
-            return true;
+            return isProposedTypeCompatible;
         }
 
         private bool TrySkipRemainingFieldsOfObject()

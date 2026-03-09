@@ -212,7 +212,7 @@ namespace FeatureLoom.MessageFlow
         /// <remarks>If the <paramref name="topicFilter"/> contains wildcard characters (<c>*</c> or
         /// <c>?</c>),  the filter will use pattern matching to determine whether a message's topic matches the filter. 
         /// Otherwise, an exact match is required.</remarks>
-        /// <param name="source">The source of messages to filter.</param>
+        /// <param name="source">The source of messages to filter.</param>        
         /// <param name="topicFilter">The topic or wildcard pattern to filter messages by. Wildcard characters such as  <c>*</c> and <c>?</c> can
         /// be used to match multiple topics.</param>
         /// <param name="unwrap">A value indicating whether the message should be unwrapped before being forwarded. The default is false.</param>

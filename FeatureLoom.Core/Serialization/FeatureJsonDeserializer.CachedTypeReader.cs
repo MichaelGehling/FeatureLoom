@@ -134,7 +134,7 @@ public sealed partial class FeatureJsonDeserializer
                 if (b != '"') throw new Exception("Not a proper field name");                    
                 var recording = deserializer.buffer.StartRecording(true);
 
-                T result = ReadItemIgnoreProposedType<T>(); // TODO: Check what to do to make integers and other types work as a dictionary key
+                T result = ReadItemIgnoreProposedType<T>();
 
                 var bytes = recording.GetRecordedBytes(false);
                 if (bytes[bytes.Count - 1] != '"') throw new Exception("Not a proper field name");

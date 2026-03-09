@@ -2,7 +2,7 @@
 using FeatureLoom.Synchronization;
 using System;
 
-namespace FeatureLoom.MetaDatas
+namespace FeatureLoom.Extensions
 {
     public static class MetaDataExtensions
     {
@@ -38,6 +38,7 @@ namespace FeatureLoom.MetaDatas
         /// <summary>
         /// Gets a <see cref="FeatureLock"/> associated with the given object.
         /// This lock can be used to synchronize access to the object.
+        /// This requires a lookup which is less performant than using a FeatureLock directly.
         /// </summary>
         /// <typeparam name="T">The type of the object.</typeparam>
         /// <param name="obj">The object to get a lock for.</param>

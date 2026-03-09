@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace FeatureLoom.MetaDatas
+namespace FeatureLoom.Extensions
 {
     public readonly struct ObjectHandle : IEquatable<ObjectHandle>
     {

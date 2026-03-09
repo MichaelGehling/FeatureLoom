@@ -281,7 +281,7 @@ namespace Playground
                 }
 
                 JsonDataTypeCategory typeCategory = elementTypeHandler.NoRefTypes ? JsonDataTypeCategory.Array_WithoutRefChildren : JsonDataTypeCategory.Array;
-                cachedTypeHandler.SetItemHandler(itemHandler, typeCategory);
+                cachedTypeHandler.SetItemHandler(itemHandler, typeCategory, typeof(ARG1));
             }
         }
 

@@ -77,8 +77,9 @@ public static class CommonTypeFinder
                     }
                     else
                     {
-                        commonBaseType = GetCommonBaseType(commonBaseType, type, ref lockHandle);
+                        commonBaseType = GetCommonBaseType(commonBaseType, type, ref lockHandle);                        
                         if (commonBaseType == null) return typeof(object);
+                        notNullableTypeFound = !commonBaseType.IsNullable();
                     }
                 }
                 if (commonBaseType == null) return typeof(object);

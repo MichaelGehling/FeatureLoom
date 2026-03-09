@@ -1,7 +1,6 @@
 ﻿using FeatureLoom.MessageFlow;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
-using FeatureLoom.MetaDatas;
 using FeatureLoom.Serialization;
 using FeatureLoom.Synchronization;
 using System.Threading.Tasks;

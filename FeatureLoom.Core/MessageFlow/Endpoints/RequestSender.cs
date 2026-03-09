@@ -29,6 +29,7 @@ public sealed class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<RE
     /// Creates a requester with a custom response timeout.
     /// </summary>
     /// <param name="timeout">Maximum duration to wait for a response before canceling the request.</param>
+    /// <param name="preciseTimeout">Whether to use precise timing for the timeout.</param>
     public RequestSender(TimeSpan timeout, bool preciseTimeout = false)
     {
         this.timeout = timeout;
@@ -319,6 +320,7 @@ public sealed class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<RE
         /// Factory that creates a handler with the current time and an async TCS.
         /// </summary>
         /// <param name="requestId">Correlation id.</param>
+        /// <param name="now">Current timestamp.</param>
         /// <returns>Initialized <see cref="ResponseHandler"/>.</returns>
         public static ResponseHandler Create(long requestId, DateTime now) => new ResponseHandler(requestId, now, new TaskCompletionSource<RESP>(TaskCreationOptions.RunContinuationsAsynchronously));
     }

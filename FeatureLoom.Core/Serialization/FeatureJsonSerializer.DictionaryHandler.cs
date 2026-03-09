@@ -44,7 +44,7 @@ namespace FeatureLoom.Serialization
             Type expectedKeyType = typeof(K);
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
-            if (!valueHandler.HandlerType.IsNullable())
+            if (!valueHandler.HandlerType.IsNullable() || valueHandler.HandlerType.IsValueType)
             {
                 ItemHandler<T> itemHandler = (dict) =>
                 {
@@ -121,7 +121,7 @@ namespace FeatureLoom.Serialization
             Type expectedKeyType = typeof(K);
             var getEnumerator = (Func<T, ENUM>)Delegate.CreateDelegate(typeof(Func<T, ENUM>), getEnumeratorMethod);
 
-            if (!valueHandler.HandlerType.IsNullable())
+            if (!valueHandler.HandlerType.IsNullable() || valueHandler.HandlerType.IsValueType)
             {
                 ItemHandler<T> itemHandler = (dict) =>
                 {

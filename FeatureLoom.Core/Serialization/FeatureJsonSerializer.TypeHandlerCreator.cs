@@ -73,10 +73,10 @@ namespace FeatureLoom.Serialization
                 this.supports = supportsType;
             }
 
-            public void CreateTypeHandler(ExtensionApi api, ICachedTypeHandler cachedTypeHandler, Type _)
+            public void CreateTypeHandler(ExtensionApi api, ICachedTypeHandler cachedTypeHandler, Type itemType)
             {
                 var itemHandler = creator.Invoke(api);
-                cachedTypeHandler.SetItemHandler(itemHandler, category);
+                cachedTypeHandler.SetItemHandler(itemHandler, category, itemType);
             }
 
             public bool SupportsType(Type type)

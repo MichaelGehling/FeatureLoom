@@ -29,7 +29,7 @@ namespace FeatureLoom.Serialization
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
-            if (!elementHandler.HandlerType.IsNullable())
+            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType)
             {
                 ItemHandler<T> itemHandler = (list) =>
                 {
@@ -93,7 +93,7 @@ namespace FeatureLoom.Serialization
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
-            if (!elementHandler.HandlerType.IsNullable())
+            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType)
             {
                 ItemHandler<T> itemHandler = (list) =>
                 {

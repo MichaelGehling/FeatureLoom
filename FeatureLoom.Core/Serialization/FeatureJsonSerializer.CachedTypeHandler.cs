@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Collections;
+using FeatureLoom.Extensions;
 using Microsoft.VisualBasic;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,7 @@ namespace FeatureLoom.Serialization
 
         public interface ICachedTypeHandler
         {
-            void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category);
+            void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category, Type handlerType);
         }
 
         public sealed class CachedTypeHandler : ICachedTypeHandler
@@ -38,7 +39,7 @@ namespace FeatureLoom.Serialization
 
             public Type HandlerType => handlerType;
 
-            public void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category)
+            public void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category, Type handlerType)
             {
                 switch (category)
                 {
@@ -48,6 +49,8 @@ namespace FeatureLoom.Serialization
                     case JsonDataTypeCategory.Object: SetItemHandler_Object(itemHandler, false); break;
                     case JsonDataTypeCategory.Object_WithoutRefChildren: SetItemHandler_Object(itemHandler, true); break;
                 }
+                if (!handlerType.IsAssignableTo(typeof(T))) throw new ArgumentException($"The provided item handler for type {typeof(T).FullName} is not compatible with the actual item type {handlerType.FullName}");
+                this.handlerType = handlerType;
             }
 
             public void SetItemHandler_Primitive<T>(ItemHandler<T> itemHandler)
@@ -465,7 +468,7 @@ namespace FeatureLoom.Serialization
                 Action<Nullable<T>, Type, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
-                    if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
+                    if (serializer.settings.typeInfoHandling != TypeInfoHandling.AddAllTypeInfo)
                     {
                         temp = (nullableItem, callType, itemName) =>
                         {
@@ -519,7 +522,7 @@ namespace FeatureLoom.Serialization
                 }
                 else
                 {
-                    if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
+                    if (serializer.settings.typeInfoHandling != TypeInfoHandling.AddAllTypeInfo)
                     {
                         temp = (nullableItem, callType, _) =>
                         {

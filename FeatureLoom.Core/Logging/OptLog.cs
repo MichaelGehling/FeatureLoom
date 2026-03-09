@@ -1,5 +1,5 @@
 ﻿using FeatureLoom.DependencyInversion;
-using FeatureLoom.MetaDatas;
+using FeatureLoom.Extensions;
 using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.Logging;
