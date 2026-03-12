@@ -44,6 +44,22 @@ namespace Playground
         }
     }
 
+    public abstract class TestBase
+    {
+        public abstract V Take<V>();
+    }
+
+    public class TestClass<T> : TestBase
+    {
+        public T value;
+
+        public override V Take<V>()
+        {
+            if (value is V v) return v;
+            else throw new InvalidCastException($"Cannot cast value of type {typeof(T).FullName} to {typeof(V).FullName}");
+        }
+    }
+
 
     partial class Program
     {

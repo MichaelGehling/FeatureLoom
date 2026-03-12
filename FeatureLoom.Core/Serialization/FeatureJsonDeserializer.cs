@@ -278,7 +278,7 @@ namespace FeatureLoom.Serialization
             cachedTypeReader.SetTypeReader<ByteSegment>(() =>
             {
                 byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadItem<ByteSegment>();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
                 return new ByteSegment(ReadByteArray(byteArrayReader));
             }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
         }
@@ -294,7 +294,7 @@ namespace FeatureLoom.Serialization
             {
                 if (TryReadNullValue()) return null;
                 byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadItem<ByteSegment>();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
                 return new ByteSegment(ReadByteArray(byteArrayReader));
             }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
         }
@@ -309,7 +309,7 @@ namespace FeatureLoom.Serialization
             cachedTypeReader.SetTypeReader<ArraySegment<byte>>(() =>
             {
                 byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadItem<ArraySegment<byte>>();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
                 return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
             }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
         }
@@ -325,7 +325,7 @@ namespace FeatureLoom.Serialization
             {
                 if (TryReadNullValue()) return null;
                 byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadItem<ArraySegment<byte>>();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
                 return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
             }, JsonDataTypeCategory.Array, StringRepresentation.Possible);
         }
@@ -348,7 +348,7 @@ namespace FeatureLoom.Serialization
                 }
                 else
                 {
-                    return textSegmentObjectReader.ReadItem<TextSegment>();
+                    return textSegmentObjectReader.ReadValue_CheckProposed<TextSegment>();
                 }
             }, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
         }
@@ -377,7 +377,7 @@ namespace FeatureLoom.Serialization
             }
             else if (b == '[')
             {
-                return byteArrayReader.ReadItem<byte[]>();
+                return byteArrayReader.ReadValue_CheckProposed<byte[]>();
             }
 
             throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
@@ -597,7 +597,7 @@ namespace FeatureLoom.Serialization
         private Dictionary<string, object> ReadObjectValueAsDictionary()
         {
             if (cachedStringObjectDictionaryReader == null) cachedStringObjectDictionaryReader = CreateCachedTypeReader(typeof(Dictionary<string, object>));
-            return cachedStringObjectDictionaryReader.ReadItem<Dictionary<string, object>>();
+            return cachedStringObjectDictionaryReader.ReadValue_CheckProposed<Dictionary<string, object>>();
         }
 
         private bool TryCreateDictionaryTypeReader(Type itemType, CachedTypeReader cachedTypeReader)
@@ -659,7 +659,7 @@ namespace FeatureLoom.Serialization
                         b = SkipWhiteSpaces();
                         if (b != ':') throw new Exception("Failed reading object to Dictionary");
                         buffer.TryNextByte();
-                        V value = valueReader.ReadValue<V>(fieldNameBytes);
+                        V value = valueReader.ReadFieldValue<V>(fieldNameBytes);
                         dict[fieldName] = value;
                         b = SkipWhiteSpaces();
                         if (b == ',') buffer.TryNextByte();
@@ -704,8 +704,8 @@ namespace FeatureLoom.Serialization
                                 b = SkipWhiteSpaces();
                                 if (b != ':') throw new Exception("Failed reading object to Dictionary");
                                 buffer.TryNextByte();
-                                if (dict.TryGetValue(fieldName, out V value)) value = valueReader.ReadValue<V>(fieldNameBytes, value);                                
-                                else value = valueReader.ReadValue<V>(fieldNameBytes);                                
+                                if (dict.TryGetValue(fieldName, out V value)) value = valueReader.ReadFieldValue<V>(fieldNameBytes, value);                                
+                                else value = valueReader.ReadFieldValue<V>(fieldNameBytes);                                
                                 keyValueList.Add(new KeyValuePair<K, V>(fieldName, value));
                                 b = SkipWhiteSpaces();
                                 if (b == ',') buffer.TryNextByte();
@@ -747,8 +747,8 @@ namespace FeatureLoom.Serialization
                                 if (b != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
                                 buffer.TryNextByte();
                                 // If the field name exists in dictionary, populate its value, otherwise add it as new 
-                                if (dict.TryGetValue(fieldName, out V value)) value = valueReader.ReadValue<V>(fieldNameBytes, value);
-                                else value = valueReader.ReadValue<V>(fieldNameBytes);
+                                if (dict.TryGetValue(fieldName, out V value)) value = valueReader.ReadFieldValue<V>(fieldNameBytes, value);
+                                else value = valueReader.ReadFieldValue<V>(fieldNameBytes);
                                 keyValueList.Add(new KeyValuePair<K, V>(fieldName, value));
                                 
                                 // Look for end of KEyValuePair object
@@ -800,7 +800,7 @@ namespace FeatureLoom.Serialization
                             b = SkipWhiteSpaces();
                             if (b != ':') throw new Exception("Failed reading object to Dictionary");
                             buffer.TryNextByte();
-                            V value = valueReader.ReadValue<V>(fieldNameBytes);
+                            V value = valueReader.ReadFieldValue<V>(fieldNameBytes);
                             dict[fieldName] = value;
                             b = SkipWhiteSpaces();
                             if (b == ',') buffer.TryNextByte();
@@ -874,10 +874,10 @@ namespace FeatureLoom.Serialization
                 switch (valueType)
                 {
                     case TypeResult.String: return ReadStringValue();
-                    case TypeResult.Object: return objectReader.ReadItem<object>();
+                    case TypeResult.Object: return objectReader.ReadValue_CheckProposed<object>();
                     case TypeResult.Bool: return ReadBoolValue();
                     case TypeResult.Null: return ReadNullValue();
-                    case TypeResult.Array: return arrayReader.ReadItem<object>();
+                    case TypeResult.Array: return arrayReader.ReadValue_CheckProposed<object>();
                     case TypeResult.Number: return ReadNumberValueAsObject();
                     default: throw new Exception("Invalid character for determining value");
                 }
@@ -1022,7 +1022,7 @@ namespace FeatureLoom.Serialization
                     }
                     else if (dictTypeReader != null)
                     {
-                        return dictTypeReader.ReadItem<T>();
+                        return dictTypeReader.ReadValue_CheckProposed<T>();
                     }
                     else
                     {
@@ -1030,7 +1030,7 @@ namespace FeatureLoom.Serialization
                         return default;
                     }
                 }
-                return objectTypeReaders[selectionIndex].ReadItem<T>();
+                return objectTypeReaders[selectionIndex].ReadValue_CheckProposed<T>();
             };
 
             cachedTypeReader.SetTypeReader(typeReader, JsonDataTypeCategory.Object, StringRepresentation.No);
@@ -1245,7 +1245,7 @@ namespace FeatureLoom.Serialization
                     return parentItem =>
                     {
                         V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                        value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
                         var boxedItem = (object)parentItem;
                         propertyInfo.SetValue(boxedItem, value);
                         parentItem = (T)boxedItem;
@@ -1256,7 +1256,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        V value = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         var boxedItem = (object)parentItem;
                         propertyInfo.SetValue(boxedItem, value);
                         parentItem = (T)boxedItem;
@@ -1277,7 +1277,7 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                            value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                            value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
                             propertyInfo.SetValue(parentItem, value);
                         }                        
                         return parentItem;
@@ -1287,7 +1287,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        V value = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         propertyInfo.SetValue(parentItem, value);
                         return parentItem;
                     };
@@ -1305,7 +1305,7 @@ namespace FeatureLoom.Serialization
                     return parentItem =>
                     {
                         V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                        value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                        value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
                         var boxedItem = (object)parentItem;
                         fieldInfo.SetValue(boxedItem, value);
                         parentItem = (T)boxedItem;
@@ -1316,7 +1316,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        V value = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         var boxedItem = (object)parentItem;
                         fieldInfo.SetValue(boxedItem, value);
                         parentItem = (T)boxedItem;
@@ -1337,7 +1337,7 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                            value = fieldTypeReader.ReadValue<V>(fieldName, value);
+                            value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
                             fieldInfo.SetValue(parentItem, value);
                         }
                         return parentItem;
@@ -1347,7 +1347,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V value = fieldTypeReader.ReadValue<V>(fieldName);
+                        V value = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         fieldInfo.SetValue(parentItem, value);
                         return parentItem;
                     };
@@ -1402,7 +1402,7 @@ namespace FeatureLoom.Serialization
                     return parentItem =>
                     {
                         V fieldValue = getValue((T)parentItem);
-                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                        fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
                         parentItem = setValueAndReturn((T)parentItem, fieldValue);
                         return parentItem;
                     };
@@ -1411,7 +1411,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        V fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         parentItem = setValueAndReturn((T)parentItem, fieldValue);
                         return parentItem;
                     };
@@ -1436,7 +1436,7 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             V fieldValue = getValue((T)parentItem);
-                            fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                            fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
                             setValue((T)parentItem, fieldValue);
                         }
                         return parentItem;
@@ -1446,7 +1446,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        V fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         setValue((T)parentItem, fieldValue);
                         return parentItem;
                     };
@@ -1487,7 +1487,7 @@ namespace FeatureLoom.Serialization
                     return parentItem =>
                     {
                         V fieldValue = getValue((T)parentItem);
-                        fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                        fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
                         parentItem = setValueAndReturn((T)parentItem, fieldValue);
                         return parentItem;
                     };
@@ -1496,7 +1496,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        V fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         parentItem = setValueAndReturn((T)parentItem, fieldValue);
                         return parentItem;
                     };
@@ -1522,7 +1522,7 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             V fieldValue = getValue((T)parentItem);
-                            fieldValue = fieldTypeReader.ReadValue<V>(fieldName, fieldValue);
+                            fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
                             setValue((T)parentItem, fieldValue);
                         }
                         return parentItem;
@@ -1532,7 +1532,7 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        V fieldValue = fieldTypeReader.ReadValue<V>(fieldName);
+                        V fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName);
                         setValue((T)parentItem, fieldValue);
                         return parentItem;
                     };
@@ -1738,8 +1738,8 @@ namespace FeatureLoom.Serialization
                 {
                     return false;
                 }
-                if (enableReferenceResolution) current = reader.ReadValue<T>(deserializer.GetArrayElementName(++index));
-                else current = reader.ReadItem<T>();
+                if (enableReferenceResolution) current = reader.ReadFieldValue<T>(deserializer.GetArrayElementName(++index));
+                else current = reader.ReadValue_CheckProposed<T>();
                 b = deserializer.SkipWhiteSpaces();
                 if (b == ',') deserializer.buffer.TryNextByte();
                 else if (deserializer.buffer.CurrentByte != ']')
@@ -1776,7 +1776,7 @@ namespace FeatureLoom.Serialization
         private object ReadArrayValueAsList()
         {
             if (cachedObjectListReader == null) cachedObjectListReader = CreateCachedTypeReader(typeof(List<object>));
-            var objectsList = cachedObjectListReader.ReadItem<List<object>>();
+            var objectsList = cachedObjectListReader.ReadValue_CheckProposed<List<object>>();
             if (!settings.tryCastArraysOfUnknownValues || objectsList.Count == 0) return objectsList;
             
             var castedList = listCaster.CastToCommonTypeList(objectsList, out _);
@@ -1790,8 +1790,8 @@ namespace FeatureLoom.Serialization
             {
                 var typeReader = GetCachedTypeReader(typeof(T));                
                 if (typeReader.JsonTypeCategory != JsonDataTypeCategory.Object) return false;
-                if (itemName.IsEmptyOrInvalid) value = typeReader.ReadItem<T>();
-                else value = typeReader.ReadValue<T>(itemName);
+                if (itemName.IsEmptyOrInvalid) value = typeReader.ReadValue_CheckProposed<T>();
+                else value = typeReader.ReadFieldValue<T>(itemName);
             }
             catch
             {
@@ -1807,8 +1807,8 @@ namespace FeatureLoom.Serialization
             {
                 var typeReader = GetCachedTypeReader(typeof(T));
                 if (typeReader.JsonTypeCategory != JsonDataTypeCategory.Array) return false;
-                if (itemName.IsEmptyOrInvalid) value = typeReader.ReadItem<T>();
-                else value = typeReader.ReadValue<T>(itemName);
+                if (itemName.IsEmptyOrInvalid) value = typeReader.ReadValue_CheckProposed<T>();
+                else value = typeReader.ReadFieldValue<T>(itemName);
             }
             catch
             {
@@ -2557,14 +2557,14 @@ namespace FeatureLoom.Serialization
                     var itemType = typeof(T);
                     if (lastTypeReaderType == itemType)
                     {
-                        item = lastTypeReader.ReadValue<T>(rootName);
+                        item = lastTypeReader.ReadFieldValue<T>(rootName);
                     }
                     else
                     {
                         var reader = GetCachedTypeReader(itemType);
                         lastTypeReader = reader;
                         lastTypeReaderType = itemType;
-                        item = reader.ReadValue<T>(rootName);
+                        item = reader.ReadFieldValue<T>(rootName);
                     }
                     return true;
                 }
@@ -2623,14 +2623,14 @@ namespace FeatureLoom.Serialization
 
                     if (lastTypeReaderType == itemType)
                     {
-                        item = lastTypeReader.ReadValue<object>(rootName);
+                        item = lastTypeReader.ReadFieldValue<object>(rootName);
                     }
                     else
                     {
                         var reader = GetCachedTypeReader(itemType);
                         lastTypeReader = reader;
                         lastTypeReaderType = itemType;
-                        item = reader.ReadValue<object>(rootName);
+                        item = reader.ReadFieldValue<object>(rootName);
                     }
                     return true;
                 }
@@ -2689,14 +2689,14 @@ namespace FeatureLoom.Serialization
                     var itemType = item != null ? item.GetType() : typeof(T);
                     if (lastTypeReaderType == itemType)
                     {
-                        item = lastTypeReader.ReadValue(rootName, item);
+                        item = lastTypeReader.ReadFieldValue(rootName, item);
                     }
                     else
                     {
                         var reader = GetCachedTypeReader(itemType);
                         lastTypeReader = reader;
                         lastTypeReaderType = itemType;
-                        item = reader.ReadValue(rootName, item);
+                        item = reader.ReadFieldValue(rootName, item);
                     }
                     return true;
                 }
@@ -3439,77 +3439,6 @@ namespace FeatureLoom.Serialization
         readonly static ByteSegment typeFieldName = "$type".ToByteArray();
         readonly static ByteSegment valueFieldName = "$value".ToByteArray();
 
-        bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
-        {
-            item = default;
-            byte b = SkipWhiteSpaces();
-            if (b != (byte)'{') return false;
-
-            CachedTypeReader proposedTypeReader = null;
-            bool foundValueField = false;
-            using (var undoHandle = CreateUndoReadHandle())
-            {
-                if (!TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
-                {
-                    if (!foundValueField) return false;
-                }
-                undoHandle.SetUndoReading(!foundValueField);
-            }
-
-            if (foundValueField)
-            {                
-                // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
-                if (proposedTypeReader != null) item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                else item = originalTypeReader.ReadItemIgnoreProposedType<T>();
-                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");                
-            }
-            else
-            {
-                // we read the object again from the start, because the $type field was embedded in the actual value's object,
-                // the buffer pos was already reset by the undo handle, so we can just read the item again
-                item = proposedTypeReader.ReadItemIgnoreProposedType<T>();                
-            }
-            return true;
-        }
-
-        bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, T itemToPopulate, out T item)
-        {
-            item = default;
-            byte b = SkipWhiteSpaces();
-            if (b != (byte)'{') return false;
-
-            CachedTypeReader proposedTypeReader = null;
-            bool foundValueField = false;
-            using (var undoHandle = CreateUndoReadHandle())
-            {
-                if (!TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
-                {
-                    if (!foundValueField) return false;
-                }
-                undoHandle.SetUndoReading(!foundValueField);
-            }
-
-            if (foundValueField)
-            {
-                // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
-                if (proposedTypeReader != null)
-                {                    
-                    if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadItemIgnoreProposedType<T>(itemToPopulate);
-                    else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();
-                }
-                else item = originalTypeReader.ReadItem<T>(itemToPopulate);
-                if (!TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");                
-            }
-            else
-            {
-                // we read the object again from the start, because the $type field was embedded in the actual value's object,
-                // the buffer pos was already reset by the undo handle, so we can just read the item again,
-                // but we have to check if the proposed type is compatible with the item to populate, otherwise we would populate the wrong type of object
-                if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadItemIgnoreProposedType<T>(itemToPopulate);
-                else item = proposedTypeReader.ReadItemIgnoreProposedType<T>();                
-            }
-            return true;
-        }
 
         Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new Dictionary<ByteSegment, CachedTypeReader>();
 
