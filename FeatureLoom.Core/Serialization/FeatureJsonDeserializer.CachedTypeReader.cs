@@ -62,7 +62,6 @@ public sealed partial class FeatureJsonDeserializer
                 {
                     temp = () =>
                     {
-                        deserializer.SkipWhiteSpaces();
                         if (deserializer.TryReadNullValue()) return default;
                         if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
                         return typeReader.Invoke();
@@ -72,7 +71,6 @@ public sealed partial class FeatureJsonDeserializer
                 {
                     temp = () =>
                     {
-                        deserializer.SkipWhiteSpaces();
                         if (deserializer.TryReadNullValue()) return default;
                         return typeReader.Invoke();
                     };
@@ -100,7 +98,6 @@ public sealed partial class FeatureJsonDeserializer
                 {
                     temp = (item) =>
                     {
-                        deserializer.SkipWhiteSpaces();
                         if (deserializer.TryReadNullValue()) return default;
                         if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
                         return typeReader.Invoke(item);
@@ -110,7 +107,6 @@ public sealed partial class FeatureJsonDeserializer
                 {
                     temp = (item) =>
                     {
-                        deserializer.SkipWhiteSpaces();
                         if (deserializer.TryReadNullValue()) return default;
                         return typeReader.Invoke(item);
                     };
@@ -125,6 +121,7 @@ public sealed partial class FeatureJsonDeserializer
             this.populatingObjectItemReader = (item) => (object)temp.Invoke((T)item);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T ReadFieldName<T>(out ByteSegment fieldName)
         {
             if (enableReferenceResolution)
@@ -149,6 +146,7 @@ public sealed partial class FeatureJsonDeserializer
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T ReadFieldValue<T>(ByteSegment fieldName)
         {
 
@@ -169,6 +167,7 @@ public sealed partial class FeatureJsonDeserializer
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T ReadFieldValue<T>(ByteSegment fieldName, T itemToPopulate)
         {
             if (!deserializer.isPopulating ||
@@ -314,6 +313,8 @@ public sealed partial class FeatureJsonDeserializer
         {
             item = default;
             byte b = deserializer.SkipWhiteSpaces();
+            // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
+            // so we can skip the rest of this method and just read it as the original type
             if (b != (byte)'{') return false;
 
             CachedTypeReader proposedTypeReader = null;
@@ -335,7 +336,7 @@ public sealed partial class FeatureJsonDeserializer
                     item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
                 }
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>();
-                if (!deserializer.TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
+                deserializer.SkipRemainingFieldsOfObject();
             }
             else
             {
@@ -350,6 +351,7 @@ public sealed partial class FeatureJsonDeserializer
         {
             item = default;
             byte b = deserializer.SkipWhiteSpaces();
+            // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
             if (b != (byte)'{') return false;
 
             CachedTypeReader proposedTypeReader = null;
@@ -372,7 +374,7 @@ public sealed partial class FeatureJsonDeserializer
                     else item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
                 }
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
-                if (!deserializer.TrySkipRemainingFieldsOfObject()) throw new Exception("Failed on SkipRemainingFieldsOfObject");
+                deserializer.SkipRemainingFieldsOfObject();
             }
             else
             {

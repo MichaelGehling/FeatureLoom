@@ -414,7 +414,7 @@ namespace Playground
                 StringRepresentation.Yes,
                 api =>
                 {
-                    if (api.TryReadStringValue(out string xmlString))
+                    if (api.TryReadStringValueOrNull(out string xmlString))
                     {
                         XmlElement xml = XmlHelper.ToXmlElement(xmlString);
                         return xml;

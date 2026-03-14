@@ -143,7 +143,7 @@ namespace FeatureLoom.Serialization
                 StringRepresentation.Yes,
                 api =>
                 {
-                    Assert.True(api.TryReadStringValue(out string text));
+                    Assert.True(api.TryReadStringValueOrNull(out string text));
                     return new CustomReadType { Value = text };
                 });
 

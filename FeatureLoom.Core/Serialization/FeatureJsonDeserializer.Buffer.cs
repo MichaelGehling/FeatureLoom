@@ -17,7 +17,9 @@ public sealed partial class FeatureJsonDeserializer
         byte[] buffer;
         int bufferPos = 0;
         int bufferResetLevel;
+        
         Stack<int> peekStack = new Stack<int>();
+
         int bufferStartPos = 0;
         int bufferFillLevel = 0;
         long totalBytesRead = 0;
@@ -218,6 +220,7 @@ public sealed partial class FeatureJsonDeserializer
             return segment.ToString();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ByteSegment GetRemainingBytes() => new ByteSegment(buffer, bufferPos, bufferFillLevel - bufferPos);
 
         public int CountRemainingBytes => bufferFillLevel - bufferPos;
@@ -274,7 +277,12 @@ public sealed partial class FeatureJsonDeserializer
             {
                 if (undoReading)
                 {
+                    var preRestorePos = buffer.bufferPos;
                     buffer.bufferPos = buffer.peekStack.Pop();
+                    if (preRestorePos > buffer.bufferPos)
+                    {
+                        buffer.bufferReadTillEnd = false;
+                    }
                 }
                 else buffer.peekStack.Pop();
             }

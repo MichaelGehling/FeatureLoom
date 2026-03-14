@@ -102,6 +102,7 @@ namespace FeatureLoom.Serialization
             isPopulating = this.settings.populateExistingMembers;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Reset()
         {
             buffer.ResetAfterReading();
@@ -337,14 +338,10 @@ namespace FeatureLoom.Serialization
 
             cachedTypeReader.SetTypeReader<TextSegment>(() =>
             {
-                if (TryReadStringValue(out string s))
+                if (TryReadStringValueOrNull(out string s))
                 {
                     if (s == null) return default;
                     return new TextSegment(s);
-                }
-                else if (TryReadNullValue())
-                {
-                    return default;
                 }
                 else
                 {
@@ -353,14 +350,14 @@ namespace FeatureLoom.Serialization
             }, JsonDataTypeCategory.Primitive, StringRepresentation.Yes);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private byte[] ReadByteArray(CachedTypeReader byteArrayReader)
         {
             SkipWhiteSpaces();
             byte b = buffer.CurrentByte;
             if (b == '"')
-            {
-                if (!TryReadStringBytes(out ByteSegment base64Uft8)) throw new Exception("Expected base64 encoded byte array, but failed on reading the string");
-
+            {                
+                var base64Uft8 = ReadStringBytes();
 #if NETSTANDARD2_0
                     string base64String = Encoding.UTF8.GetString(base64Uft8.AsArraySegment.Array, base64Uft8.AsArraySegment.Offset, base64Uft8.AsArraySegment.Count);
                     return Convert.FromBase64String(base64String);
@@ -570,6 +567,7 @@ namespace FeatureLoom.Serialization
             }, JsonDataTypeCategory.Primitive, StringRepresentation.Possible);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private object ReadUnknownValue()
         {
             var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
@@ -728,7 +726,7 @@ namespace FeatureLoom.Serialization
                                 buffer.TryNextByte();
 
                                 // Look for field name "Key" and read its value
-                                if (!TryReadStringBytes(out var keyFieldName)) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                var keyFieldName = ReadStringBytes();
                                 if (keyFieldName != keyField && keyFieldName != keyProperty) throw new Exception("Failed reading KeyValuePair for Dictionary");
                                 b = SkipWhiteSpaces();
                                 if (b != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
@@ -741,7 +739,7 @@ namespace FeatureLoom.Serialization
                                 buffer.TryNextByte();
 
                                 // Look for field name "Value"
-                                if (!TryReadStringBytes(out var valueFieldName)) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                                var valueFieldName = ReadStringBytes();
                                 if (valueFieldName != valueField && valueFieldName != valueProperty) throw new Exception("Failed reading KeyValuePair for Dictionary");
                                 b = SkipWhiteSpaces();
                                 if (b != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
@@ -956,6 +954,10 @@ namespace FeatureLoom.Serialization
                 int fallbackIndex = -1;
                 int selectionRating = 0;
 
+                // We always undo the read operations for determining the type,
+                // so that we can read the object again with the correct type reader after determining the type based on the fields.
+                // This is necessary, because we might have read some fields already when we find a field that is only available
+                // in one of the types, but we don't know which type it belongs to until we read the field name.
                 using (CreateUndoReadHandle())
                 {                    
                     buffer.TryNextByte();                    
@@ -965,7 +967,7 @@ namespace FeatureLoom.Serialization
                         b = SkipWhiteSpaces();
                         if (b == '}') break;
 
-                        if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                        var fieldName = ReadStringBytes();
                         if (fieldNameToIsTypeMember.TryGetValue(fieldName, out var typeIndices))
                         {
                             if (typeIndices == null)
@@ -1073,26 +1075,32 @@ namespace FeatureLoom.Serialization
                     itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
                 }
             }
+            int writerCount = itemFieldWritersList.Count;
+            var itemFieldWriters = itemFieldWritersList.ToArray();
+            itemFieldWritersList = null;
             var constructor = GetConstructor<T>();
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]            
             bool TryFindFieldWriter(ByteSegment fieldName, ref int expectedFieldIndex, out Func<T, T> fieldWriter)
-            {
-                fieldName.EnsureHashCode();
-                if (itemFieldWritersList.Count == 0)
+            {                
+                if (writerCount == 0)
                 {
                     fieldWriter = null;
                     return false;
                 }
-                (ByteSegment name, fieldWriter) = itemFieldWritersList[expectedFieldIndex];
+                (ByteSegment name, fieldWriter) = itemFieldWriters[expectedFieldIndex];                
                 if (name == fieldName)
                 {
-                    expectedFieldIndex = (expectedFieldIndex + 1) % itemFieldWritersList.Count;
+                    expectedFieldIndex++;
+                    if (expectedFieldIndex >= writerCount) expectedFieldIndex = 0;
                     return true;
                 }
+                fieldName.EnsureHashCode();
                 if (itemFieldWritersIndexLookup.TryGetValue(fieldName, out int index))
-                {
-                    expectedFieldIndex = (index + 1) % itemFieldWritersList.Count;
-                    (_, fieldWriter) = itemFieldWritersList[index];
+                {                    
+                    (_, fieldWriter) = itemFieldWriters[index];
+                    expectedFieldIndex = index + 1;
+                    if (expectedFieldIndex >= writerCount) expectedFieldIndex = 0;
                     return true;
                 }
                 return false;
@@ -1105,17 +1113,17 @@ namespace FeatureLoom.Serialization
 
                 byte b = SkipWhiteSpaces();
                 if (b != '{') throw new Exception("Failed reading object");
-                buffer.TryNextByte();
+                buffer.TryNextByte();                
 
                 while (true)
                 {
                     b = SkipWhiteSpaces();
                     if (b == '}') break;
 
-                    if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                    var fieldName = ReadStringBytes();
                     b = SkipWhiteSpaces();
                     if (b != ':') throw new Exception("Failed reading object");
-                    buffer.TryNextByte();
+                    buffer.TryNextByte();                    
                     if (TryFindFieldWriter(fieldName, ref expectedFieldIndex, out var fieldWriter)) item = fieldWriter.Invoke(item);
                     else SkipValue();
                     b = SkipWhiteSpaces();
@@ -1135,17 +1143,17 @@ namespace FeatureLoom.Serialization
 
                 byte b = SkipWhiteSpaces();
                 if (b != '{') throw new Exception("Failed reading object");
-                buffer.TryNextByte();
+                buffer.TryNextByte();                
 
                 while (true)
                 {
                     b = SkipWhiteSpaces();
                     if (b == '}') break;
 
-                    if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                    var fieldName = ReadStringBytes();
                     b = SkipWhiteSpaces();
                     if (b != ':') throw new Exception("Failed reading object");
-                    buffer.TryNextByte();
+                    buffer.TryNextByte();                    
                     if (TryFindFieldWriter(fieldName, ref expectedFieldIndex, out var fieldWriter)) item = fieldWriter.Invoke(item);
                     else SkipValue();
                     b = SkipWhiteSpaces();
@@ -1240,7 +1248,7 @@ namespace FeatureLoom.Serialization
             var fieldTypeReader = GetCachedTypeReader(fieldType);
             if (itemType.IsValueType)
             {
-                if (CanTypeBePopulated(itemType) && propertyInfo.CanRead)
+                if (CanTypeBePopulated(fieldType) && propertyInfo.CanRead)
                 {
                     return parentItem =>
                     {
@@ -1266,7 +1274,7 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                if (CanTypeBePopulated(itemType) && propertyInfo.CanRead)
+                if (CanTypeBePopulated(fieldType) && propertyInfo.CanRead)
                 {
                     return parentItem =>
                     {
@@ -1300,7 +1308,7 @@ namespace FeatureLoom.Serialization
             var fieldTypeReader = GetCachedTypeReader(fieldType);
             if (itemType.IsValueType)
             {
-                if (CanTypeBePopulated(itemType))
+                if (CanTypeBePopulated(fieldType))
                 {
                     return parentItem =>
                     {
@@ -1326,7 +1334,7 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                if (CanTypeBePopulated(itemType))
+                if (CanTypeBePopulated(fieldType))
                 {
                     return parentItem =>
                     {
@@ -1819,16 +1827,21 @@ namespace FeatureLoom.Serialization
 
         private string ReadStringValue()
         {
-            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
+            var stringBytes = ReadStringBytes();
             string result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
             stringBuilder.Clear();
             return result;
         }
 
-        private bool TryReadStringValue(out string value)
+        private bool TryReadStringValueOrNull(out string value)
         {
             value = null;
-            if (!TryReadStringBytes(out var stringBytes)) return false;
+            if (!TryReadStringBytesOrNull(out var stringBytes, out var isNull)) return false;
+            if (isNull)
+            {
+                value = null;
+                return true;
+            }
             value = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
             stringBuilder.Clear();
             return true;
@@ -1836,7 +1849,7 @@ namespace FeatureLoom.Serialization
 
         private char ReadCharValue()
         {
-            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading string");
+            var stringBytes = ReadStringBytes();
             Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
             if (stringBuilder.Length == 0) throw new Exception("string for reading char is empty");
             char c = stringBuilder[0];
@@ -1852,15 +1865,8 @@ namespace FeatureLoom.Serialization
         }
 
         private DateTime ReadDateTimeValue()
-        {            
-            if (!TryReadStringBytes(out var stringBytes))
-            {                
-                if (!settings.strict && TryReadNullValue())
-                {                    
-                    return default;
-                }
-                else throw new Exception("Failed reading DateTime (not a string)");
-            }
+        {
+            var stringBytes = ReadStringBytes();
 
             if (stringBytes.Count == 0 && !settings.strict)
             {
@@ -1910,14 +1916,7 @@ namespace FeatureLoom.Serialization
 
         private TimeSpan ReadTimeSpanValue()
         {
-            if (!TryReadStringBytes(out var stringBytes))
-            {
-                if (!settings.strict && TryReadNullValue())
-                {
-                    return default;
-                }
-                else throw new Exception("Failed reading TimeSpan (not a string)");
-            }
+            var stringBytes = ReadStringBytes();
 
             if (stringBytes.Count == 0 && !settings.strict)
             {
@@ -1967,7 +1966,7 @@ namespace FeatureLoom.Serialization
 
         private Guid ReadGuidValue()
         {
-            if (!TryReadStringBytes(out var stringBytes)) throw new Exception("Failed reading DatTime");
+            var stringBytes = ReadStringBytes();
             Guid result;
 #if NET5_0_OR_GREATER
             Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
@@ -2036,20 +2035,58 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ReadBoolValue()
         {
-            if (!TryReadBoolValue(out bool value)) throw new Exception("Failed reading boolean");
-            return value;
+            byte b = SkipWhiteSpaces();
+            b = buffer.CurrentByte;
+            if (b == 't' || b == 'T')
+            {
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
+                b = buffer.CurrentByte;
+                if (b != 'r' && b != 'R') throw new Exception("Failed reading boolean value");
+
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
+                b = buffer.CurrentByte;
+                if (b != 'u' && b != 'U') throw new Exception("Failed reading boolean value");
+
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
+                b = buffer.CurrentByte;
+                if (b != 'e' && b != 'E') throw new Exception("Failed reading boolean value");
+
+                if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading boolean value");                
+                return true;
+            }
+            else if (b == 'f' || b == 'F')
+            {
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
+                b = buffer.CurrentByte;
+                if (b != 'a' && b != 'A') throw new Exception("Failed reading boolean value");
+
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
+                b = buffer.CurrentByte;
+                if (b != 'l' && b != 'L') throw new Exception("Failed reading boolean value");
+
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
+                b = buffer.CurrentByte;
+                if (b != 's' && b != 'S') throw new Exception("Failed reading boolean value");
+
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
+                b = buffer.CurrentByte;
+                if (b != 'e' && b != 'E') throw new Exception("Failed reading boolean value");
+
+                if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading boolean value");
+                return false;
+            }
+            else throw new Exception("Failed reading boolean value");
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryReadBoolValue(out bool value)
         {
-            value = default;            
-            using (var undoHandle = CreateUndoReadHandle())
+            value = default;
+            byte b = SkipWhiteSpaces();
+            b = buffer.CurrentByte;            
+            if (b == 't' || b == 'T')
             {
-                value = default;
-
-                byte b = SkipWhiteSpaces();
-                b = buffer.CurrentByte;
-                if (b == 't' || b == 'T')
+                using (var undoHandle = CreateUndoReadHandle())
                 {
                     if (!buffer.TryNextByte()) return false;
                     b = buffer.CurrentByte;
@@ -2068,7 +2105,10 @@ namespace FeatureLoom.Serialization
                     undoHandle.SetUndoReading(false);
                     return true;
                 }
-                else if (b == 'f' || b == 'F')
+            }
+            else if (b == 'f' || b == 'F')
+            {
+                using (var undoHandle = CreateUndoReadHandle())
                 {
                     if (!buffer.TryNextByte()) return false;
                     b = buffer.CurrentByte;
@@ -2091,8 +2131,8 @@ namespace FeatureLoom.Serialization
                     undoHandle.SetUndoReading(false);
                     return true;
                 }
-                else return false;
             }
+            else return false;
         }
 
 
@@ -2106,7 +2146,7 @@ namespace FeatureLoom.Serialization
 
         private object ReadNumberValueAsObject()
         {
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all)) throw new Exception("Failed reading number");
+            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all);
             if (decimalBytes.IsValid || isExponentNegative)
             {
                 ulong integerPart = integerBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
@@ -2152,10 +2192,30 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long ReadLongValue()
         {
-            if (!TryReadSignedIntegerValue(out long value)) throw new Exception("Failed reading integer number");
+            return ReadSignedIntegerValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public long ReadSignedIntegerValue()
+        {
+            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.signedInteger);
+
+            ulong integerPart = BytesToInteger(integerBytes);
+
+            if (exponentBytes.IsValid)
+            {
+                int exp = (int)BytesToInteger(exponentBytes);
+                if (isExponentNegative) exp = -exp;
+                integerPart = ApplyExponent(integerPart, exp);
+            }
+
+            var value = (long)integerPart;
+            if (isNegative) value *= -1;
+
             return value;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadSignedIntegerValue(out long value)
         {
             value = default;
@@ -2186,7 +2246,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int ReadIntValue()
         {
-            long longValue = ReadLongValue();
+            long longValue = ReadSignedIntegerValue();
             if (longValue > int.MaxValue || longValue < int.MinValue) throw new Exception("Value is out of bounds.");
             return (int)longValue;
         }
@@ -2201,7 +2261,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public short ReadShortValue()
         {
-            long longValue = ReadLongValue();
+            long longValue = ReadSignedIntegerValue();
             if (longValue > short.MaxValue || longValue < short.MinValue) throw new Exception("Value is out of bounds.");
             return (short)longValue;
         }
@@ -2216,7 +2276,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sbyte ReadSbyteValue()
         {
-            long longValue = ReadLongValue();
+            long longValue = ReadSignedIntegerValue();
             if (longValue > sbyte.MaxValue || longValue < sbyte.MinValue) throw new Exception("Value is out of bounds.");
             return (sbyte)longValue;
         }
@@ -2231,10 +2291,27 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadUlongValue()
         {
-            if (!TryReadUnsignedIntegerValue(out ulong value)) throw new Exception("Failed reading unsigned integer number");
+            return ReadUnsignedIntegerValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ulong ReadUnsignedIntegerValue()
+        {
+            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.unsignedInteger);
+
+            var value = BytesToInteger(integerBytes);
+
+            if (exponentBytes.IsValid)
+            {
+                int exp = (int)BytesToInteger(exponentBytes);
+                if (isExponentNegative) exp = -exp;
+                value = ApplyExponent(value, exp);
+            }
+
             return value;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadUnsignedIntegerValue(out ulong value)
         {
             value = default;
@@ -2262,7 +2339,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ReadUintValue()
         {
-            ulong longValue = ReadUlongValue();
+            ulong longValue = ReadUnsignedIntegerValue();
             if (longValue > uint.MaxValue) throw new Exception("Value is out of bounds.");
             return (uint)longValue;
         }
@@ -2277,7 +2354,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ushort ReadUshortValue()
         {
-            ulong longValue = ReadUlongValue();
+            ulong longValue = ReadUnsignedIntegerValue();
             if (longValue > ushort.MaxValue) throw new Exception("Value is out of bounds.");
             return (ushort)longValue;
         }
@@ -2292,7 +2369,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByteValue()
         {
-            ulong longValue = ReadUlongValue();
+            ulong longValue = ReadUnsignedIntegerValue();
             if (longValue > byte.MaxValue) throw new Exception("Value is out of bounds.");
             return (byte)longValue;
         }
@@ -2308,24 +2385,21 @@ namespace FeatureLoom.Serialization
         ByteSegment SPECIAL_NUMBER_POS_INFINITY = "Infinity".ToByteArray();
         ByteSegment SPECIAL_NUMBER_NEG_INFINITY = "-Infinity".ToByteArray();
 
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double ReadDoubleValue()
         {
             byte b = SkipWhiteSpaces();
             if (b == (byte)'"')
             {
-                using (var undoHandle = CreateUndoReadHandle(false))
-                {
-                    if (!TryReadStringBytes(out var str)) throw new Exception("Invalid string found for a number: could not read it");
+                if (settings.strict) throw new Exception("Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
+
+                    var str = ReadStringBytes();
                     if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
                     if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
                     if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;
-
-                    if (!settings.strict) undoHandle.SetUndoReading(true);                    
-                    else throw new Exception($"Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
-                }
+                    throw new Exception($"Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
             }
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber)) throw new Exception("Failed reading number");
+            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber);
 
             ulong integerPart = integerBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
             double decimalPart = decimalBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
@@ -2349,6 +2423,7 @@ namespace FeatureLoom.Serialization
             byte b = SkipWhiteSpaces();
             if (b == (byte)'"')
             {
+                if (settings.strict) return false;
                 using (var undoHandle = CreateUndoReadHandle())
                 {                    
                     bool isValidString = TryReadStringBytes(out var str);
@@ -2417,7 +2492,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private IntPtr ReadIntPtrValue()
         {
-            long value = ReadLongValue();
+            long value = ReadSignedIntegerValue();
             if (IntPtr.Size == 4 && (value > int.MaxValue || value < int.MinValue)) throw new Exception("Value is out of bounds.");
             return new IntPtr(value);
         }
@@ -2425,7 +2500,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private UIntPtr ReadUIntPtrValue()
         {
-            ulong value = ReadUlongValue();
+            ulong value = ReadUnsignedIntegerValue();
             if (UIntPtr.Size == 4 && value > uint.MaxValue) throw new Exception("Value is out of bounds.");
             return new UIntPtr(value);
         }
@@ -2953,6 +3028,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void SkipValue()
         {
             byte b = SkipWhiteSpaces();
@@ -2968,13 +3044,15 @@ namespace FeatureLoom.Serialization
                 case TypeResult.Number: SkipNumber(); break;
                 default: throw new Exception("Invalid character for value");
             }
-        }        
-        
-        private void SkipNumber()
-        {
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all)) throw new Exception("Failed reading number");
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SkipNumber()
+        {
+            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipArray()
         {
             byte b = SkipWhiteSpaces();
@@ -2996,16 +3074,19 @@ namespace FeatureLoom.Serialization
             if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading boolean");
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipNull()
         {
-            if (!TryReadNullValue()) throw new Exception("Failed reading null value");
+            ReadNullValue();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipBool()
         {
             _ = ReadBoolValue();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipObject()
         {
             byte b = SkipWhiteSpaces();
@@ -3017,7 +3098,7 @@ namespace FeatureLoom.Serialization
                 b = SkipWhiteSpaces();
                 if (b == '}') break;
 
-                if (!TryReadStringBytes(out var fieldName)) throw new Exception("Failed reading object");
+                var fieldName = ReadStringBytes();
                 b = SkipWhiteSpaces();
                 if (b != ':') throw new Exception("Failed reading object");
                 buffer.TryNextByte();
@@ -3029,11 +3110,13 @@ namespace FeatureLoom.Serialization
             if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed reading object");
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipString()
         {
-            if (!TryReadStringBytes(out var _)) throw new Exception("Failed reading string");
+            _ = ReadStringBytes();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         double ApplyExponent(double value, int exponent)
         {
             int maxExponentFactorLookup = exponentFactorMap.Length-1;
@@ -3089,6 +3172,7 @@ namespace FeatureLoom.Serialization
             }                   
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         ulong ApplyExponent(ulong value, int exponent)
         {
             int maxExponentFactorLookup = exponentFactorMap.Length - 1;
@@ -3144,6 +3228,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         ulong BytesToInteger(ArraySegment<byte> bytes)
         {
             ulong value = 0;
@@ -3170,6 +3255,155 @@ namespace FeatureLoom.Serialization
         }
 
         static readonly ByteSegment zeroAsBytes = new byte[] { (byte)'0' };
+
+        void ReadNumberBytes(out bool isNegative, out ByteSegment integerBytes, out ByteSegment decimalBytes, out ByteSegment exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
+        {
+            bool stringAsNumberStarted = false;
+
+            integerBytes = default;
+            decimalBytes = default;
+            exponentBytes = default;
+            isNegative = false;
+            isExponentNegative = false;
+
+            // Skip whitespaces until number starts
+            ref var map_SkipWhitespacesUntilNumberStarts_ref = ref map_SkipWhitespacesUntilNumberStarts[0];
+            while (true)
+            {
+                byte b = buffer.CurrentByte;
+                var result = Lookup(ref map_SkipWhitespacesUntilNumberStarts_ref, b);
+                if (result == FilterResult.Found) break;
+                else if (result == FilterResult.Skip)
+                {
+                    if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
+                }
+                else if (result == FilterResult.Unexpected)
+                {
+                    if (b == '"' && !settings.strict && !stringAsNumberStarted)
+                    {
+                        stringAsNumberStarted = true;
+                        if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
+                        // Check if it's an empty string, which we interpret as 0 in non-strict mode
+                        if (buffer.CurrentByte == '"')
+                        {
+                            if (buffer.TryNextByte() && map_IsFieldEnd[buffer.CurrentByte] == FilterResult.Unexpected) throw new Exception("Failed reading number");
+
+                            integerBytes = zeroAsBytes;
+                            return;
+                        }
+                    }
+                    else throw new Exception("Failed reading number");
+                }
+            }
+
+            // Check if negative
+            isNegative = buffer.CurrentByte == '-';
+            if (isNegative)
+            {
+                if (!validComponents.IsFlagSet(ValidNumberComponents.negativeSign)) throw new Exception("Failed reading number");
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
+            }
+
+            var recording = buffer.StartRecording();
+
+            bool couldNotSkip = false;
+            // Read integer part
+            ref var map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds_ref = ref map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds[0];
+            while (true)
+            {
+                byte b = buffer.CurrentByte;
+                FilterResult result = Lookup(ref map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds_ref, b);
+                if (result == FilterResult.Skip)
+                {
+                    if (!buffer.TryNextByte())
+                    {
+                        couldNotSkip = true;
+                        break;
+                    }
+                }
+                else if (result == FilterResult.Found) break;
+                else if (result == FilterResult.Unexpected)
+                {
+                    if (b == '"' && stringAsNumberStarted) break;
+                    else throw new Exception("Failed reading number");
+                }
+            }
+
+            integerBytes = recording.GetRecordedBytes(couldNotSkip);
+            if (integerBytes.Count == 0 && !settings.strict) integerBytes = zeroAsBytes;
+
+            if (buffer.CurrentByte == '.')
+            {
+                if (!validComponents.IsFlagSet(ValidNumberComponents.decimalPart) && settings.strict) throw new Exception("Failed reading number");
+
+                buffer.TryNextByte();
+                // Read decimal part
+                recording = buffer.StartRecording();
+                ref var map_SkipFiguresUntilExponentOrNumberEnds_ref = ref map_SkipFiguresUntilExponentOrNumberEnds[0];
+                while (true)
+                {
+                    byte b = buffer.CurrentByte;
+                    FilterResult result = Lookup(ref map_SkipFiguresUntilExponentOrNumberEnds_ref, b);
+                    if (result == FilterResult.Skip)
+                    {
+                        if (!buffer.TryNextByte())
+                        {
+                            couldNotSkip = true;
+                            break;
+                        }
+                    }
+                    else if (result == FilterResult.Found) break;
+                    else if (result == FilterResult.Unexpected)
+                    {
+                        if (b == '"' && stringAsNumberStarted) break;
+                        else throw new Exception("Failed reading number");
+                    }
+                }
+                decimalBytes = recording.GetRecordedBytes(couldNotSkip);
+            }
+
+            if (buffer.CurrentByte == 'e' || buffer.CurrentByte == 'E')
+            {
+                if (!validComponents.IsFlagSet(ValidNumberComponents.exponent)) throw new Exception("Failed reading number");
+
+                buffer.TryNextByte();
+                // Read exponent part
+                isExponentNegative = buffer.CurrentByte == '-';
+                if (isExponentNegative || buffer.CurrentByte == '+') buffer.TryNextByte();
+                recording = buffer.StartRecording();
+                ref var map_SkipFiguresUntilNumberEnds_ref = ref map_SkipFiguresUntilNumberEnds[0];
+                while (true)
+                {
+                    byte b = buffer.CurrentByte;
+                    FilterResult result = Lookup(ref map_SkipFiguresUntilNumberEnds_ref, b);
+                    if (result == FilterResult.Skip)
+                    {
+                        if (!buffer.TryNextByte())
+                        {
+                            couldNotSkip = true;
+                            break;
+                        }
+                    }
+                    else if (result == FilterResult.Found) break;
+                    else if (result == FilterResult.Unexpected)
+                    {
+                        if (b == '"' && stringAsNumberStarted) break;
+                        else throw new Exception("Failed reading number");
+                    }
+                }
+                exponentBytes = recording.GetRecordedBytes(couldNotSkip);
+            }
+
+            if (stringAsNumberStarted)
+            {
+                if (buffer.CurrentByte == '"')
+                {
+                    if (buffer.TryNextByte() && map_IsFieldEnd[buffer.CurrentByte] == FilterResult.Unexpected) throw new Exception("Failed reading number");
+                }
+                else throw new Exception("Failed reading number");
+            }
+        }
+
         bool TryReadNumberBytes(out bool isNegative, out ByteSegment integerBytes, out ByteSegment decimalBytes, out ByteSegment exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
         {
             bool stringAsNumberStarted = false;
@@ -3324,16 +3558,50 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        ByteSegment ReadStringBytes()
+        {            
+            // Skip whitespaces until string starts
+            byte b = SkipWhiteSpaces();
+
+            if (b != (byte)'"') throw new Exception("Failed reading string value: No starting quote found.");
+
+            var recording = buffer.StartRecording(true);
+
+            // Skip chars until string ends
+            ref var map_SkipCharsUntilStringEndsOrMultiByteChar_ref = ref map_SkipCharsUntilStringEndsOrMultiByteChar[0];
+            while (buffer.TryNextByte())
+            {
+                b = buffer.CurrentByte;
+                FilterResult result = Lookup(ref map_SkipCharsUntilStringEndsOrMultiByteChar_ref, b);
+                if (result == FilterResult.Skip) continue;
+                else if (result == FilterResult.Found)
+                {
+                    if (b == (byte)'"')
+                    {
+                        var stringBytes = recording.GetRecordedBytes(false);
+                        buffer.TryNextByte();
+                        return stringBytes;
+                    }
+                    else HandleSpecialChars(b);
+                }
+                else throw new Exception("Failed reading string value: Invalid character found.");
+            }
+            throw new Exception("Failed reading string value: No ending quote found.");
+        }
+
+        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadStringBytes(out ByteSegment stringBytes)
         {
+            stringBytes = default;            
+            byte b = SkipWhiteSpaces();
+
+            // We check early for a starting quote to avoid the overhead of creating an undo handle and recording if it's not a string.
+            if (b != (byte)'"') return false;
             using (var undoHandle = CreateUndoReadHandle())
-            {
-                stringBytes = default;
-
-                // Skip whitespaces until string starts
-                byte b = SkipWhiteSpaces();
-                if (b != (byte)'"') return false;
-
+            {                                                
                 var recording = buffer.StartRecording(true);
 
                 // Skip chars until string ends
@@ -3358,28 +3626,75 @@ namespace FeatureLoom.Serialization
                 }
                 return false;
             }
+        }
 
-            void HandleSpecialChars(byte b)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        bool TryReadStringBytesOrNull(out ByteSegment stringBytes, out bool isNull)
+        {
+            stringBytes = default;
+            isNull = false;                        
+            byte b = SkipWhiteSpaces();
+
+            // We check early for possible starting characters of a string or null value to avoid the overhead of creating an undo handle and recording if it's neither.
+            // If it's neither, we can directly return false without doing any unnecessary work.
+            // If it's a starting quote, we proceed with trying to read a string. If it's 'n' or 'N', we proceed with trying to read a null value. In any other case, we can directly return false.
+            if (b != (byte)'"' && b != (byte)'n' && b != (byte)'N') return false;
+            using (var undoHandle = CreateUndoReadHandle())
             {
-                if (b == (byte)'\\')
+                if (b != (byte)'"')
                 {
-                    buffer.TryNextByte();
+                    isNull = TryReadNullValue();
+                    return isNull;
                 }
-                else if ((b & 0b11100000) == 0b11000000) // skip 1 byte
+
+                var recording = buffer.StartRecording(true);
+
+                // Skip chars until string ends
+                ref var map_SkipCharsUntilStringEndsOrMultiByteChar_ref = ref map_SkipCharsUntilStringEndsOrMultiByteChar[0];
+                while (buffer.TryNextByte())
                 {
-                    buffer.TryNextByte();
+                    b = buffer.CurrentByte;
+                    FilterResult result = Lookup(ref map_SkipCharsUntilStringEndsOrMultiByteChar_ref, b);
+                    if (result == FilterResult.Skip) continue;
+                    else if (result == FilterResult.Found)
+                    {
+                        if (b == (byte)'"')
+                        {
+                            stringBytes = recording.GetRecordedBytes(false);
+                            buffer.TryNextByte();
+                            undoHandle.SetUndoReading(false);
+                            return true;
+                        }
+                        else HandleSpecialChars(b);
+                    }
+                    else return false;
                 }
-                else if ((b & 0b11110000) == 0b11100000) // skip 2 bytes
-                {
-                    buffer.TryNextByte();
-                    buffer.TryNextByte();
-                }
-                else if ((b & 0b11111000) == 0b11110000) // skip 3 bytes
-                {
-                    buffer.TryNextByte();
-                    buffer.TryNextByte();
-                    buffer.TryNextByte();
-                }
+                return false;
+            }
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void HandleSpecialChars(byte b)
+        {
+            if (b == (byte)'\\')
+            {
+                buffer.TryNextByte();
+            }
+            else if ((b & 0b11100000) == 0b11000000) // skip 1 byte
+            {
+                buffer.TryNextByte();
+            }
+            else if ((b & 0b11110000) == 0b11100000) // skip 2 bytes
+            {
+                buffer.TryNextByte();
+                buffer.TryNextByte();
+            }
+            else if ((b & 0b11111000) == 0b11110000) // skip 3 bytes
+            {
+                buffer.TryNextByte();
+                buffer.TryNextByte();
+                buffer.TryNextByte();
             }
         }
 
@@ -3426,12 +3741,10 @@ namespace FeatureLoom.Serialization
         {
             ref FilterResult map_SkipWhitespaces_ref = ref map_SkipWhitespaces[0];
             byte b = buffer.CurrentByte;
-            if (LookupCheck(ref map_SkipWhitespaces_ref, b, FilterResult.Found)) return b;
-
-            while (buffer.TryNextByte())
+            while (LookupCheck(ref map_SkipWhitespaces_ref, b, FilterResult.Skip))
             {
-                b = buffer.CurrentByte;
-                if (LookupCheck(ref map_SkipWhitespaces_ref, b, FilterResult.Found)) return b;
+                if (!buffer.TryNextByte()) return b;
+                b = buffer.CurrentByte;                
             } 
             return b;
         }
@@ -3480,7 +3793,7 @@ namespace FeatureLoom.Serialization
             b = SkipWhiteSpaces();
             if (b != (byte)':') return false;
             buffer.TryNextByte();
-            if (!TryReadStringBytes(out var proposedTypeBytes)) return false;
+            var proposedTypeBytes = ReadStringBytes();
 
             // 2. try get proposedTypeReader, if possible from cache, otherwise resolve type and get proposedTypeReader
             proposedTypeBytes.EnsureHashCode();
@@ -3539,6 +3852,28 @@ namespace FeatureLoom.Serialization
             return isProposedTypeCompatible;
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void SkipRemainingFieldsOfObject()
+        {
+            byte b = SkipWhiteSpaces();
+            if (b == ',') buffer.TryNextByte();
+            while (true)
+            {
+                b = SkipWhiteSpaces();
+                if (b == '}') break;
+
+                ReadStringBytes();
+                b = SkipWhiteSpaces();
+                if (b != ':') throw new Exception("Failed skipping object: expected ':' after field name");
+                buffer.TryNextByte();
+                SkipValue();
+                b = SkipWhiteSpaces();
+                if (b == ',') buffer.TryNextByte();
+            }
+            if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) throw new Exception("Failed skipping object: expected field end after object end");
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private bool TrySkipRemainingFieldsOfObject()
         {
             byte b = SkipWhiteSpaces();
@@ -3565,6 +3900,13 @@ namespace FeatureLoom.Serialization
 
         bool TryReadRefObject<T>(out bool pathIsValid, out bool typeIsCompatible, out T refObject)
         {
+            pathIsValid = false;
+            typeIsCompatible = false;
+            refObject = default;
+            byte b = SkipWhiteSpaces();
+            // first char must be '{', otherwise it's not an object and we can directly return false
+            // without needing to reset buffer position
+            if (b != (byte)'{') return false;
             using (var undoHandle = CreateUndoReadHandle())
             {
                 bool success = Try(out pathIsValid, out typeIsCompatible, out refObject);                
@@ -3578,10 +3920,7 @@ namespace FeatureLoom.Serialization
                 pathIsValid = false;
                 typeIsCompatible = false;
                 itemRef = default;
-
-                // IMPORTANT: Currently, the ref-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
-                byte b = SkipWhiteSpaces();
-                if (b != (byte)'{') return false;
+                // IMPORTANT: Currently, the ref-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)                                
                 buffer.TryNextByte();
                 // TODO compare byte per byte to fail early
                 if (!TryReadStringBytes(out var fieldName)) return false;
@@ -3710,11 +4049,12 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadEmptyStringValue()
         {
+            byte b = SkipWhiteSpaces();
+            // check for starting quote before creating undo handle, because if it's not '\"',
+            // we can directly return false without needing to reset buffer position
+            if (b != '\"') return false;
             using (var undoHandle = CreateUndoReadHandle())
-            {
-                byte b = SkipWhiteSpaces();
-
-                if (b != '\"') return false;
+            {                
                 if (!buffer.TryNextByte()) return false;
                 b = buffer.CurrentByte;
                 if (b != '\"') return false;
@@ -3733,12 +4073,14 @@ namespace FeatureLoom.Serialization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadNullValue()
-        {            
-            using(var undoHandle = CreateUndoReadHandle())
-            {
-                byte b = SkipWhiteSpaces();
-
-                if (b != 'n' && b != 'N') return false;
+        {
+            byte b = SkipWhiteSpaces();
+            // compare byte per byte to fail early
+            // first char can be checked before creating undo handle,
+            // because if it's not 'n' or 'N', we can directly return false without needing to reset buffer position
+            if (b != 'n' && b != 'N') return false;
+            using (var undoHandle = CreateUndoReadHandle())
+            {                                
                 if (!buffer.TryNextByte()) return false;
                 b = buffer.CurrentByte;
                 if (b != 'u' && b != 'U') return false;
