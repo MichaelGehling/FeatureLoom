@@ -20,18 +20,20 @@ public partial class DeserializeComplexObjectTest
 {
     FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
     {
-        indent = true,
+        //indent = true,
+        dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties
     });
 
     FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024*1024*100,        
+        dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties, 
     });
 
     JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
     {
-        IncludeFields = true,
-        //ReferenceHandler = ReferenceHandler.Preserve
+        IncludeFields = true,        
+        DefaultBufferSize = 1024*1024*100,        
     };
 
     MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 100);
@@ -54,6 +56,16 @@ public partial class DeserializeComplexObjectTest
         iterations = Math.Abs(iterations);
     }
 
+    [Benchmark]
+    public void DeserializeComplexObject_FromStream_Feature()
+    {
+        for (int i = 0; i < iterations; i++)
+        {
+            memoryStream.Position = 0;
+            featureJsonDeserializer.TryDeserialize(memoryStream, out ComplexObject result);
+        }
+    }
+
     [Benchmark(Baseline = true)]
     public void DeserializeComplexObject_FromStream_SystemText()
     {
@@ -64,13 +76,5 @@ public partial class DeserializeComplexObjectTest
         }
     }
 
-    [Benchmark]
-    public void DeserializeComplexObject_FromStream_Feature()
-    {
-        for (int i = 0; i < iterations; i++)
-        {
-            memoryStream.Position = 0;
-            featureJsonDeserializer.TryDeserialize(memoryStream, out ComplexObject result);
-        }
-    }
+    
 }

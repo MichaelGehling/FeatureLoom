@@ -133,6 +133,7 @@ public sealed partial class FeatureJsonDeserializer
             get => (bufferFillLevel - bufferPos - (bufferReadTillEnd ? 1 : 0)).ClampLow(0);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryPrepareDeserialization()
         {
             if (stream != null && endOfStreamReached && EffectiveRemainingCount == 0) return false;

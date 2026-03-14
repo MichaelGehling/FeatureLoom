@@ -36,8 +36,8 @@ namespace FeatureLoom.Serialization
 
         MicroValueLock serializerLock = new MicroValueLock();                        
         
-        ByteSegment rootName = "$".ToByteArray();
-        ByteSegment currentItemName = "$".ToByteArray();
+        static readonly ByteSegment rootName = new ByteSegment("$".ToByteArray(), true);
+        ByteSegment currentItemName = rootName;
         int currentItemInfoIndex = -1;
         List<ItemInfo> itemInfos = new List<ItemInfo>();
         bool isPopulating = false;
@@ -382,7 +382,7 @@ namespace FeatureLoom.Serialization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SetItemRefInCurrentItemInfo(object item)
-        {
+        {            
             var itemInfo = itemInfos[currentItemInfoIndex];
             itemInfo.itemRef = item;
             itemInfos[currentItemInfoIndex] = itemInfo;
@@ -1708,7 +1708,7 @@ namespace FeatureLoom.Serialization
             }, JsonDataTypeCategory.Array, StringRepresentation.No);
         }
 
-        List<ByteSegment> arrayElementNameCache = new List<ByteSegment>();
+        readonly List<ByteSegment> arrayElementNameCache = new List<ByteSegment>();
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ByteSegment GetArrayElementName(int index)
         {
@@ -1744,9 +1744,10 @@ namespace FeatureLoom.Serialization
                 byte b = deserializer.SkipWhiteSpaces();
                 if (b == ']')
                 {
-                    return false;
+                    Reset();
+                    return false;                    
                 }
-                if (enableReferenceResolution) current = reader.ReadFieldValue<T>(deserializer.GetArrayElementName(++index));
+                if (enableReferenceResolution) current = reader.ReadFieldValue<T>(deserializer.GetArrayElementName(++index));                
                 else current = reader.ReadValue_CheckProposed<T>();
                 b = deserializer.SkipWhiteSpaces();
                 if (b == ',') deserializer.buffer.TryNextByte();
@@ -1757,7 +1758,7 @@ namespace FeatureLoom.Serialization
                 return true;
             }
 
-            // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Reset()
             {
                 index = -1;
@@ -1780,7 +1781,7 @@ namespace FeatureLoom.Serialization
         CollectionCaster listCaster = new CollectionCaster();
 
         CachedTypeReader cachedObjectListReader = null;
-        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private object ReadArrayValueAsList()
         {
             if (cachedObjectListReader == null) cachedObjectListReader = CreateCachedTypeReader(typeof(List<object>));
@@ -1791,6 +1792,7 @@ namespace FeatureLoom.Serialization
             return castedList;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryReadObjectValue<T>(out T value, ByteSegment itemName)
         {
             value = default;
@@ -1808,6 +1810,7 @@ namespace FeatureLoom.Serialization
             return true;            
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryReadArrayValue<T>(out T value, ByteSegment itemName) where T : IEnumerable
         {
             value = default;
@@ -1825,6 +1828,7 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private string ReadStringValue()
         {
             var stringBytes = ReadStringBytes();
@@ -1833,6 +1837,7 @@ namespace FeatureLoom.Serialization
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryReadStringValueOrNull(out string value)
         {
             value = null;
@@ -1847,6 +1852,7 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private char ReadCharValue()
         {
             var stringBytes = ReadStringBytes();
@@ -1864,6 +1870,7 @@ namespace FeatureLoom.Serialization
             return ReadCharValue();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DateTime ReadDateTimeValue()
         {
             var stringBytes = ReadStringBytes();
@@ -1914,6 +1921,7 @@ namespace FeatureLoom.Serialization
             return ReadDateTimeValue();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private TimeSpan ReadTimeSpanValue()
         {
             var stringBytes = ReadStringBytes();
@@ -1964,6 +1972,7 @@ namespace FeatureLoom.Serialization
             return ReadTimeSpanValue();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private Guid ReadGuidValue()
         {
             var stringBytes = ReadStringBytes();
@@ -2011,6 +2020,7 @@ namespace FeatureLoom.Serialization
         StringBuilder stringBuilder = new StringBuilder(1024 * 8);
         SlicedBuffer<char> charSlicedBuffer = new SlicedBuffer<char>(1024 * 4, 1024 * 16, 2, true, false);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private object ReadNullValue()
         {
             byte b = SkipWhiteSpaces();
@@ -2144,6 +2154,7 @@ namespace FeatureLoom.Serialization
             return ReadBoolValue();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private object ReadNumberValueAsObject()
         {
             ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all);
@@ -2591,6 +2602,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsAnyDataLeftUnlocked()
         {
             ref var map_SkipWhitespaces_ref = ref map_SkipWhitespaces[0];
@@ -3755,6 +3767,7 @@ namespace FeatureLoom.Serialization
 
         Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new Dictionary<ByteSegment, CachedTypeReader>();
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryFindProposedType(out CachedTypeReader proposedTypeReader, Type expectedType, out bool foundValueField)
         {
             proposedTypeReader = null;
@@ -3895,7 +3908,7 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        ByteSegment refFieldName = "$ref".ToByteArray();
+        static readonly ByteSegment refFieldName = new ByteSegment("$ref".ToByteArray(), true);
         List<ByteSegment> fieldPathSegments = new List<ByteSegment>();
 
         bool TryReadRefObject<T>(out bool pathIsValid, out bool typeIsCompatible, out T refObject)
@@ -4105,14 +4118,14 @@ namespace FeatureLoom.Serialization
         }
 
 
-        enum FilterResult
+        enum FilterResult : byte
         {
             Skip,
             Found,
             Unexpected
         }
 
-        public enum TypeResult
+        public enum TypeResult : byte
         {
             Whitespace,
             Object,
