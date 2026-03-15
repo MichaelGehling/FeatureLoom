@@ -293,7 +293,6 @@ namespace FeatureLoom.Serialization
 
             cachedTypeReader.SetTypeReader<ByteSegment?>(() =>
             {
-                if (TryReadNullValue()) return null;
                 byte b = SkipWhiteSpaces();
                 if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
                 return new ByteSegment(ReadByteArray(byteArrayReader));
@@ -324,7 +323,6 @@ namespace FeatureLoom.Serialization
 
             cachedTypeReader.SetTypeReader<ArraySegment<byte>?>(() =>
             {
-                if (TryReadNullValue()) return null;
                 byte b = SkipWhiteSpaces();
                 if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
                 return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
@@ -542,7 +540,7 @@ namespace FeatureLoom.Serialization
         {
             cachedTypeReader.SetTypeReader<T?>(() =>
             {
-                if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+                if (!settings.strict && TryReadEmptyStringValue()) return null;
 
                 var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
                 if (valueType == TypeResult.Whitespace)
@@ -1278,16 +1276,9 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        if (TryReadNullValue())
-                        {
-                            propertyInfo.SetValue(parentItem, null);
-                        }
-                        else
-                        {
-                            V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                            value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
-                            propertyInfo.SetValue(parentItem, value);
-                        }                        
+                        V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                        value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
+                        propertyInfo.SetValue(parentItem, value);            
                         return parentItem;
                     };
                 }
@@ -1338,16 +1329,9 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        if (TryReadNullValue())
-                        {
-                            fieldInfo.SetValue(parentItem, null);
-                        }
-                        else
-                        {
-                            V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                            value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
-                            fieldInfo.SetValue(parentItem, value);
-                        }
+                        V value = (V)fieldInfo.GetValue(parentItem); // TODO: can be optimized via Expression
+                        value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
+                        fieldInfo.SetValue(parentItem, value);
                         return parentItem;
                     };
                 }
@@ -1437,16 +1421,9 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        if (TryReadNullValue())
-                        {
-                            setValue((T)parentItem, default);
-                        }
-                        else
-                        {
-                            V fieldValue = getValue((T)parentItem);
-                            fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
-                            setValue((T)parentItem, fieldValue);
-                        }
+                        V fieldValue = getValue((T)parentItem);
+                        fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
+                        setValue((T)parentItem, fieldValue);
                         return parentItem;
                     };
                 }
@@ -1523,16 +1500,9 @@ namespace FeatureLoom.Serialization
                 {
                     return parentItem =>
                     {
-                        if (TryReadNullValue())
-                        {
-                            setValue((T)parentItem, default);
-                        }
-                        else
-                        {
-                            V fieldValue = getValue((T)parentItem);
-                            fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
-                            setValue((T)parentItem, fieldValue);
-                        }
+                        V fieldValue = getValue((T)parentItem);
+                        fieldValue = fieldTypeReader.ReadFieldValue<V>(fieldName, fieldValue);
+                        setValue((T)parentItem, fieldValue);
                         return parentItem;
                     };
                 }
@@ -1866,7 +1836,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private char? ReadNullableCharValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadCharValue();
         }
 
@@ -1917,7 +1887,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DateTime? ReadNullableDateTimeValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDateTimeValue();
         }
 
@@ -1968,7 +1938,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private TimeSpan? ReadNullableTimeSpanValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadTimeSpanValue();
         }
 
@@ -2013,7 +1983,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private Guid? ReadNullableGuidValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadGuidValue();
         }
 
@@ -2150,7 +2120,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool? ReadNullableBoolValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadBoolValue();
         }
 
@@ -2250,7 +2220,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long? ReadNullableLongValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadLongValue();
         }
 
@@ -2265,7 +2235,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int? ReadNullableIntValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadIntValue();
         }
 
@@ -2280,7 +2250,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public short? ReadNullableShortValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadShortValue();
         }
 
@@ -2295,7 +2265,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sbyte? ReadNullableSbyteValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadSbyteValue();
         }
 
@@ -2343,7 +2313,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong? ReadNullableUlongValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUlongValue();
         }
 
@@ -2358,7 +2328,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint? ReadNullableUintValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUintValue();
         }
 
@@ -2373,7 +2343,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ushort? ReadNullableUshortValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUshortValue();
         }
 
@@ -2388,7 +2358,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte? ReadNullableByteValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadByteValue();
         }
 
@@ -2471,7 +2441,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double? ReadNullableDoubleValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDoubleValue();
         }
 
@@ -2486,7 +2456,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public decimal? ReadNullableDecimalValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDecimalValue();
         }
 
@@ -2496,7 +2466,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float? ReadNullableFloatValue()
         {
-            if (TryReadNullValue() || (!settings.strict && TryReadEmptyStringValue())) return null;
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadFloatValue();
         }
 
@@ -2529,11 +2499,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public JsonFragment? ReadNullableJsonFragmentValue()
-        {
-            var fragment = ReadJsonFragmentValue();
-            return fragment.IsValid ? fragment : null;
-        }
+        public JsonFragment? ReadNullableJsonFragmentValue() => ReadJsonFragmentValue();
 
         private string DecodeUtf8Bytes(ArraySegment<byte> bytes)
         {
