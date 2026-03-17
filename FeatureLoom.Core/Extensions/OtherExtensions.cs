@@ -160,51 +160,70 @@ namespace FeatureLoom.Extensions
             return false;
         }
 
-        /// <summary>
-        /// Invokes a generic method on the specified object using the provided method name, type arguments, and
-        /// argument values.
-        /// </summary>
-        /// <remarks>This method allows for dynamic invocation of generic methods, enabling flexibility in
-        /// method calls based on runtime type information.</remarks>
-        /// <param name="obj">The object on which the generic method will be invoked.</param>
-        /// <param name="methodName">The name of the method to invoke, which must be a generic method.</param>
-        /// <param name="typeArguments">An array of types that represent the type arguments for the generic method.</param>
-        /// <param name="argumentValues">An array of objects that represent the values to be passed as arguments to the method.</param>
-        /// <exception cref="NotSupportedException">Thrown if no method matching the specified name and type arguments is found.</exception>
-        public static void InvokeGenericMethod(this object obj, string methodName, Type[] typeArguments, params object[] argumentValues)
+        private static MethodInfo FindGenericMethod(object obj, string methodName, Type[] typeArguments, out object invocationTarget)
         {
-            var createMethod = obj.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                    .FirstOrDefault(method => method.Name == methodName && method.GetGenericArguments().Length == typeArguments.Length);
-            if (createMethod == null) throw new NotSupportedException();
-            var genericCreateMethod = createMethod.MakeGenericMethod(typeArguments);
-            genericCreateMethod.Invoke(obj, argumentValues);
+            Type targetType;
+            bool staticOnly;
+
+            if (obj is Type type)
+            {
+                targetType = type;
+                staticOnly = true;
+                invocationTarget = null;
+            }
+            else
+            {
+                targetType = obj.GetType();
+                staticOnly = false;
+                invocationTarget = obj;
+            }
+
+            var method = targetType
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+                .FirstOrDefault(m =>
+                    m.Name == methodName &&
+                    m.IsGenericMethodDefinition &&
+                    m.GetGenericArguments().Length == typeArguments.Length &&
+                    (!staticOnly || m.IsStatic));
+
+            if (method != null && method.IsStatic) invocationTarget = null;
+            return method;
         }
 
         /// <summary>
-        /// Invokes a generic method with the specified name and type arguments on the given object, passing the
+        /// Invokes a generic method on the specified object or type using the provided method name, type arguments, and
+        /// argument values.
+        /// </summary>
+        /// <param name="obj">The object instance to invoke on, or a <see cref="Type"/> to invoke a static method on.</param>
+        /// <param name="methodName">The name of the generic method to invoke.</param>
+        /// <param name="typeArguments">The type arguments to use for the generic method.</param>
+        /// <param name="argumentValues">The argument values to pass to the method.</param>
+        /// <returns>The result of the method invocation cast to the specified return type.</returns>
+        public static void InvokeGenericMethod(this object obj, string methodName, Type[] typeArguments, params object[] argumentValues)
+        {
+            var method = FindGenericMethod(obj, methodName, typeArguments, out object invocationTarget);
+            if (method == null) throw new NotSupportedException();
+
+            var genericMethod = method.MakeGenericMethod(typeArguments);
+            genericMethod.Invoke(invocationTarget, argumentValues);
+        }
+
+        /// <summary>
+        /// Invokes a generic method with the specified name and type arguments on the given object or type, passing the
         /// provided argument values, and returns the result cast to the specified return type.
         /// </summary>
-        /// <remarks>This method uses reflection to locate and invoke a generic method at runtime. It is
-        /// useful when the method to be called and its type arguments are not known at compile time. Performance may be
-        /// affected due to the use of reflection.</remarks>
-        /// <typeparam name="RET">The type to which the result of the invoked method is cast and returned.</typeparam>
-        /// <param name="obj">The object instance on which to invoke the generic method.</param>
-        /// <param name="methodName">The name of the generic method to invoke. The method must exist on the object's type and accept the
-        /// specified number of generic type arguments.</param>
-        /// <param name="typeArguments">An array of types representing the generic type arguments to use when invoking the method. The length must
-        /// match the number of generic parameters expected by the method.</param>
-        /// <param name="argumentValues">An array of arguments to pass to the method when it is invoked. The order and types must match the method's
-        /// parameters.</param>
-        /// <returns>The result of the invoked method, cast to the specified return type.</returns>
-        /// <exception cref="NotSupportedException">Thrown if no method with the specified name and number of generic type arguments is found on the object's
-        /// type.</exception>
+        /// <param name="obj">The object instance to invoke on, or a <see cref="Type"/> to invoke a static method on.</param>
+        /// <param name="methodName">The name of the generic method to invoke.</param>
+        /// <param name="typeArguments">The type arguments to use for the generic method.</param>
+        /// <param name="argumentValues">The argument values to pass to the method.</param>
+        /// <returns>The result of the method invocation cast to the specified return type.</returns>
         public static RET InvokeGenericMethod<RET>(this object obj, string methodName, Type[] typeArguments, params object[] argumentValues)
         {
-            var createMethod = obj.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                    .FirstOrDefault(method => method.Name == methodName && method.GetGenericArguments().Length == typeArguments.Length);
-            if (createMethod == null) throw new NotSupportedException();
-            var genericCreateMethod = createMethod.MakeGenericMethod(typeArguments);
-            return (RET)genericCreateMethod.Invoke(obj, argumentValues);
+            var method = FindGenericMethod(obj, methodName, typeArguments, out object invocationTarget);
+            if (method == null) throw new NotSupportedException();
+
+            var genericMethod = method.MakeGenericMethod(typeArguments);
+            return (RET)genericMethod.Invoke(invocationTarget, argumentValues);
         }
     }
 

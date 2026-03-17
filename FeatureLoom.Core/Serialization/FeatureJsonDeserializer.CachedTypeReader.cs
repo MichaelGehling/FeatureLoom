@@ -6,101 +6,81 @@ using FeatureLoom.Collections;
 namespace FeatureLoom.Serialization;
 
 public sealed partial class FeatureJsonDeserializer
-{
+{    
+    sealed class TypeReaderInitializer
+    {
+        public FeatureJsonDeserializer parent;
+        public Type readerType;
+        public Delegate readingDelegate;
+        public Delegate populatingDelegate;
+        public Func<object, object> readingObjectDelegate;
+        public Func<object, object, object> populatingObjectDelegate;
+        public bool refTypeOrRefTypeChildren;
+        public object delegateContext;
+
+        public static TypeReaderInitializer Create<T>(
+            FeatureJsonDeserializer parent,
+            Func<object, T> readingDelegate, 
+            Func<T, object, T> populatingDelegate, 
+            bool refTypeOrRefTypeChildren,
+            object delegateContext)
+        {
+            return new TypeReaderInitializer
+            {
+                parent = parent,
+                readerType = typeof(T),
+                readingDelegate = readingDelegate,
+                populatingDelegate = populatingDelegate,
+                readingObjectDelegate = readingDelegate != null ? (ctxt) => (object)readingDelegate.Invoke(ctxt) : null,
+                populatingObjectDelegate = populatingDelegate != null ? (obj, ctxt) => (object)populatingDelegate.Invoke((T)obj, ctxt) : null,
+                refTypeOrRefTypeChildren = refTypeOrRefTypeChildren,
+                delegateContext = delegateContext
+            };
+        }
+    }
+
+
     sealed class CachedTypeReader
     {
-        private readonly FeatureJsonDeserializer deserializer;
-        private Delegate itemReader;
-        private Delegate populatingItemReader;
-        private Func<object> objectItemReader;
-        private Func<object, object> populatingObjectItemReader;
-        private Type readerType;
-        private JsonDataTypeCategory category;
-        private readonly bool enableReferenceResolution;
+        private readonly FeatureJsonDeserializer parent;        
+
+        private readonly Type readerType;
+        private readonly bool refTypeOrRefTypeChildren;
         private readonly bool enableProposedTypes;
-        private bool isAbstract = false;
-        private bool isNullable = false;
-        private bool writeRefPath = false;
-        private bool resolveRefPath = false;
-        private StringRepresentation stringRepresentation;
+        private readonly bool isAbstract;
+        private readonly bool isNullable;
+        private readonly bool writeRefPath;
+        private readonly bool resolveRefPath;
+        private readonly bool canBePopulated;
+        
+        private readonly Delegate readingDelegate;
+        private readonly Delegate populatingDelegate;
+        private readonly Func<object, object> readingObjectDelegate;
+        private readonly Func<object, object, object> populatingObjectDelegate;
+        private readonly object delegateContext;
 
-        public JsonDataTypeCategory JsonTypeCategory => category;
-
+        public bool RefTypeOrRefTypeChildren => refTypeOrRefTypeChildren;
         public Type ReaderType => readerType;
-
-        public CachedTypeReader(FeatureJsonDeserializer deserializer)
+        
+        public CachedTypeReader(Func<CachedTypeReader, TypeReaderInitializer> buildInit)
         {
-            this.deserializer = deserializer;
-            enableReferenceResolution = deserializer.settings.enableReferenceResolution;
-            enableProposedTypes = deserializer.settings.enableProposedTypes;
-        }            
+            var init = buildInit(this);
+            parent = init.parent;
 
-        public void MakeAbstract<T>(JsonDataTypeCategory category)
-        {
-            isAbstract = true;
-            this.readerType = typeof(T);
-            this.category = category;
-            bool isNullable = readerType.IsNullable();
-            this.itemReader = (Delegate) new Func<T>(() => throw new Exception($"Can't deserialize abstract type {this.readerType.Name}"));
-            this.populatingItemReader = (Delegate)new Func<T, T>((_) => throw new Exception($"Can't deserialize abstract type {this.readerType.Name}"));
-            this.objectItemReader = () => throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
-            this.populatingObjectItemReader = (_) => throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
-        }
-
-        public void SetCustomTypeReader<T>(ICustomTypeReader<T> customTypeReader)
-        {
-            SetTypeReader<T>(() => customTypeReader.ReadValue(deserializer.extensionApi), customTypeReader.JsonTypeCategory, customTypeReader.StringRepresentation);
-        }
-
-        public void SetTypeReader<T>(Func<T> typeReader, JsonDataTypeCategory category, StringRepresentation stringRepresentation)
-        {
-            this.readerType = typeof(T);
-            this.category = category;
+            readerType = init.readerType;
+            refTypeOrRefTypeChildren = init.refTypeOrRefTypeChildren;
+            isAbstract = readerType.IsAbstract;
             isNullable = readerType.IsNullable();
-            this.stringRepresentation = stringRepresentation;
-            this.writeRefPath = enableReferenceResolution && (!readerType.IsValueType || category == JsonDataTypeCategory.Object || category == JsonDataTypeCategory.Array);
-            this.resolveRefPath = enableReferenceResolution && !readerType.IsValueType;
+            canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;
+            writeRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
+            resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
+            enableProposedTypes = parent.settings.enableProposedTypes;            
 
-            Func<T> temp;
-            if (resolveRefPath)
-            {
-                temp = () =>
-                {
-                    if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
-                    return typeReader.Invoke();
-                };
-            }
-            else
-            {
-                temp = typeReader;
-            }
-            this.itemReader = temp;
-            this.objectItemReader = () => (object)temp.Invoke();
-        }
-
-        public void SetPopulatingTypeReader<T>(Func<T, T> typeReader, JsonDataTypeCategory category)
-        {
-            this.readerType = typeof(T);
-            this.category = category;
-            isNullable = readerType.IsNullable();
-            this.writeRefPath = enableReferenceResolution && (category == JsonDataTypeCategory.Object || category == JsonDataTypeCategory.Array);
-            this.resolveRefPath = enableReferenceResolution && !readerType.IsValueType;
-
-            Func<T,T> temp;
-            if (writeRefPath)
-            {
-                temp = (item) =>
-                {
-                    if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
-                    return typeReader.Invoke(item);
-                };
-            }
-            else
-            {
-                temp = typeReader;
-            }
-            this.populatingItemReader = temp;
-            this.populatingObjectItemReader = (item) => (object)temp.Invoke((T)item);
+            readingDelegate = init.readingDelegate;
+            populatingDelegate = init.populatingDelegate;
+            readingObjectDelegate = init.readingObjectDelegate;
+            populatingObjectDelegate = init.populatingObjectDelegate;            
+            delegateContext = init.delegateContext;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -108,9 +88,9 @@ public sealed partial class FeatureJsonDeserializer
         {
             if (writeRefPath)
             {
-                byte b = deserializer.SkipWhiteSpaces();
+                byte b = parent.SkipWhiteSpaces();
                 if (b != '"') throw new Exception("Not a proper field name");                    
-                var recording = deserializer.buffer.StartRecording(true);
+                var recording = parent.buffer.StartRecording(true);
 
                 T result = ReadValue_IgnoreProposed<T>();
 
@@ -130,20 +110,19 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T ReadFieldValue<T>(ByteSegment fieldName)
         {
-
             if (!writeRefPath)
             {                    
                 return ReadValue_CheckProposed<T>();
             }
             else
             {
-                ItemInfo myItemInfo = new ItemInfo(fieldName, deserializer.currentItemInfoIndex);
-                deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
-                deserializer.itemInfos.Add(myItemInfo);
+                ItemInfo myItemInfo = new ItemInfo(fieldName, parent.currentItemInfoIndex);
+                parent.currentItemInfoIndex = parent.itemInfos.Count;
+                parent.itemInfos.Add(myItemInfo);
 
                 T result = ReadValue_CheckProposed<T>();
 
-                deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
+                parent.currentItemInfoIndex = myItemInfo.parentIndex;
                 return result;
             }
         }
@@ -151,27 +130,19 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T ReadFieldValue<T>(ByteSegment fieldName, T itemToPopulate)
         {
-            if (!deserializer.isPopulating ||
-                itemToPopulate == null ||
-                (this.populatingItemReader == null && !isAbstract)) return ReadFieldValue<T>(fieldName);
-
-            if (category == JsonDataTypeCategory.Primitive)
-            {
-                return ReadValue_CheckProposed<T>();
-            }
-            else if (!writeRefPath)
+            if (!writeRefPath)
             {
                 return ReadValue_CheckProposed<T>(itemToPopulate);
             }
             else
             {
-                ItemInfo myItemInfo = new ItemInfo(fieldName, deserializer.currentItemInfoIndex);
-                deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
-                deserializer.itemInfos.Add(myItemInfo);
+                ItemInfo myItemInfo = new ItemInfo(fieldName, parent.currentItemInfoIndex);
+                parent.currentItemInfoIndex = parent.itemInfos.Count;
+                parent.itemInfos.Add(myItemInfo);
 
                 T result = ReadValue_CheckProposed<T>(itemToPopulate);
 
-                deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
+                parent.currentItemInfoIndex = myItemInfo.parentIndex;
                 return result;
             }
         }
@@ -184,21 +155,22 @@ public sealed partial class FeatureJsonDeserializer
             Type callType = typeof(T);
             T result;                
             if (callType == this.readerType)
-            {
-                if (isNullable && deserializer.TryReadNullValue()) return default;
-                Func<T> typedItemReader = (Func<T>)itemReader;
-                result = typedItemReader.Invoke();
+            {                
+                if (isNullable && parent.TryReadNullValue()) return default;
+                if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;                
+                result = ((Func<object, T>)readingDelegate).Invoke(delegateContext);
             }
             else
             {
                 if (!isAbstract)
-                {
-                    if (isNullable && deserializer.TryReadNullValue()) return default;
-                    result = (T)objectItemReader.Invoke();
+                {                    
+                    if (isNullable && parent.TryReadNullValue()) return default;
+                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    result = (T)readingObjectDelegate.Invoke(delegateContext);
                 }
                 else
                 {
-                    var typedReader = deserializer.GetCachedTypeReader(callType);
+                    var typedReader = parent.GetCachedTypeReader(callType);
                     result = typedReader.ReadValue_CheckProposed<T>();
                 }
             }
@@ -209,8 +181,7 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private T ReadValue_CheckProposed<T>(T itemToPopulate)
         {
-            if (this.populatingItemReader == null || itemToPopulate == null) return ReadValue_CheckProposed<T>();
-
+            if (!canBePopulated || itemToPopulate == null) return ReadValue_CheckProposed<T>();
             if (enableProposedTypes && TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
 
             Type itemType = itemToPopulate.GetType();
@@ -220,19 +191,20 @@ public sealed partial class FeatureJsonDeserializer
                 Type callType = typeof(T);
                 if (callType == this.readerType)
                 {
-                    if (isNullable && deserializer.TryReadNullValue()) return default;
-                    Func<T, T> typedItemReader = (Func<T, T>)populatingItemReader;
-                    result = typedItemReader.Invoke(itemToPopulate);
+                    if (isNullable && parent.TryReadNullValue()) return default;
+                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;                    
+                    result = ((Func<T, object, T>)populatingDelegate).Invoke(itemToPopulate, delegateContext);
                 }
                 else
                 {
-                    if (isNullable && deserializer.TryReadNullValue()) return default;
-                    result = (T)populatingObjectItemReader.Invoke(itemToPopulate);
+                    if (isNullable && parent.TryReadNullValue()) return default;
+                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    result = (T)populatingObjectDelegate.Invoke(itemToPopulate, delegateContext);
                 }
             }
             else
             {
-                var typedReader = deserializer.GetCachedTypeReader(itemType);
+                var typedReader = parent.GetCachedTypeReader(itemType);
                 result = typedReader.ReadValue_CheckProposed(itemToPopulate);
             }
 
@@ -246,20 +218,21 @@ public sealed partial class FeatureJsonDeserializer
             T result;
             if (callType == this.readerType)
             {                
-                if (isNullable && deserializer.TryReadNullValue()) return default;
-                Func<T> typedItemReader = (Func<T>)itemReader;
-                result = typedItemReader.Invoke();
+                if (isNullable && parent.TryReadNullValue()) return default;
+                if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                result = ((Func<object, T>)readingDelegate).Invoke(delegateContext);
             }
             else
             {
                 if (!isAbstract)
                 {
-                    if (isNullable && deserializer.TryReadNullValue()) return default;
-                    result = (T)objectItemReader.Invoke();
+                    if (isNullable && parent.TryReadNullValue()) return default;
+                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    result = (T)readingObjectDelegate.Invoke(delegateContext);
                 }
                 else
                 {
-                    var typedReader = deserializer.GetCachedTypeReader(callType);
+                    var typedReader = parent.GetCachedTypeReader(callType);
                     result = typedReader.ReadValue_IgnoreProposed<T>();
                 }
             }
@@ -270,7 +243,7 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private T ReadValue_IgnoreProposed<T>(T itemToPopulate)
         {
-            if (this.populatingItemReader == null || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
+            if (!canBePopulated || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
 
             Type itemType = itemToPopulate.GetType();
             T result;
@@ -279,19 +252,20 @@ public sealed partial class FeatureJsonDeserializer
                 Type callType = typeof(T);
                 if (callType == this.readerType)
                 {
-                    if (isNullable && deserializer.TryReadNullValue()) return default;
-                    Func<T, T> typedItemReader = (Func<T, T>)populatingItemReader;
-                    result = typedItemReader.Invoke(itemToPopulate);
+                    if (isNullable && parent.TryReadNullValue()) return default;
+                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    result = ((Func<T, object, T>)populatingDelegate).Invoke(itemToPopulate, delegateContext);
                 }
                 else
                 {
-                    if (isNullable && deserializer.TryReadNullValue()) return default;
-                    result = (T)populatingObjectItemReader.Invoke(itemToPopulate);
+                    if (isNullable && parent.TryReadNullValue()) return default;
+                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    result = (T)populatingObjectDelegate.Invoke(itemToPopulate, delegateContext);
                 }
             }
             else
             {
-                var typedReader = deserializer.GetCachedTypeReader(itemType);
+                var typedReader = parent.GetCachedTypeReader(itemType);
                 result = typedReader.ReadValue_IgnoreProposed(itemToPopulate);
             }
 
@@ -301,16 +275,16 @@ public sealed partial class FeatureJsonDeserializer
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
         {
             item = default;
-            byte b = deserializer.SkipWhiteSpaces();
+            byte b = parent.SkipWhiteSpaces();
             // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
             // so we can skip the rest of this method and just read it as the original type
             if (b != (byte)'{') return false;
 
             CachedTypeReader proposedTypeReader = null;
             bool foundValueField = false;
-            using (var undoHandle = deserializer.CreateUndoReadHandle())
+            using (var undoHandle = parent.CreateUndoReadHandle())
             {
-                if (!deserializer.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
                 {
                     if (!foundValueField) return false;
                 }
@@ -325,7 +299,7 @@ public sealed partial class FeatureJsonDeserializer
                     item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
                 }
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>();
-                deserializer.SkipRemainingFieldsOfObject();
+                parent.SkipRemainingFieldsOfObject();
             }
             else
             {
@@ -339,15 +313,15 @@ public sealed partial class FeatureJsonDeserializer
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, T itemToPopulate, out T item)
         {
             item = default;
-            byte b = deserializer.SkipWhiteSpaces();
+            byte b = parent.SkipWhiteSpaces();
             // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
             if (b != (byte)'{') return false;
 
             CachedTypeReader proposedTypeReader = null;
             bool foundValueField = false;
-            using (var undoHandle = deserializer.CreateUndoReadHandle())
+            using (var undoHandle = parent.CreateUndoReadHandle())
             {
-                if (!deserializer.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
                 {
                     if (!foundValueField) return false;
                 }
@@ -363,7 +337,7 @@ public sealed partial class FeatureJsonDeserializer
                     else item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
                 }
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
-                deserializer.SkipRemainingFieldsOfObject();
+                parent.SkipRemainingFieldsOfObject();
             }
             else
             {
