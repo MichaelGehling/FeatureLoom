@@ -15,7 +15,7 @@ public sealed partial class FeatureJsonDeserializer
         public Delegate populatingDelegate;
         public Func<object> readingObjectDelegate;
         public Func<object, object> populatingObjectDelegate;
-        public bool refTypeOrRefTypeChildren;
+        public bool refTypeOrRefTypeChildren;        
 
         public static TypeReaderInitializer Create<T>(
             FeatureJsonDeserializer parent,
@@ -23,14 +23,70 @@ public sealed partial class FeatureJsonDeserializer
             Func<T, T> populatingDelegate, 
             bool refTypeOrRefTypeChildren)
         {
+            var readerType = typeof(T);
+            var isNullable = readerType.IsNullable();
+            var resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
+            var readingDelegate2 = readingDelegate;
+            var populatingDelegate2 = populatingDelegate;
+            if (isNullable && resolveRefPath)
+            {
+                readingDelegate2 = () =>
+                {
+                    if (parent.TryReadNullValue()) return default;
+                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    return readingDelegate.Invoke();
+                };
+                if (populatingDelegate != null)
+                {
+                    populatingDelegate2 = (item) =>
+                    {
+                        if (isNullable && parent.TryReadNullValue()) return default;
+                        if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                        return populatingDelegate.Invoke(item);
+                    };
+                }
+            }
+            else if (isNullable)
+            {
+                readingDelegate2 = () =>
+                {
+                    if (parent.TryReadNullValue()) return default;
+                    return readingDelegate.Invoke();
+                };
+                if (populatingDelegate != null)
+                {
+                    populatingDelegate2 = (item) =>
+                    {
+                        if (isNullable && parent.TryReadNullValue()) return default;
+                        return populatingDelegate.Invoke(item);
+                    };
+                }
+            }
+            else if (resolveRefPath)
+            {
+                readingDelegate2 = () =>
+                {
+                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    return readingDelegate.Invoke();
+                };
+                if (populatingDelegate != null)
+                {
+                    populatingDelegate2 = (item) =>
+                    {
+                        if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                        return populatingDelegate.Invoke(item);
+                    };
+                }
+            }
+
             return new TypeReaderInitializer
             {
                 parent = parent,
                 readerType = typeof(T),
-                readingDelegate = readingDelegate,
-                populatingDelegate = populatingDelegate,
-                readingObjectDelegate = readingDelegate != null ? () => (object)readingDelegate.Invoke() : null,
-                populatingObjectDelegate = populatingDelegate != null ? (obj) => (object)populatingDelegate.Invoke((T)obj) : null,
+                readingDelegate = readingDelegate2,
+                populatingDelegate = populatingDelegate2,
+                readingObjectDelegate = readingDelegate2 != null ? () => (object)readingDelegate2.Invoke() : null,
+                populatingObjectDelegate = populatingDelegate2 != null ? (obj) => (object)populatingDelegate2.Invoke((T)obj) : null,
                 refTypeOrRefTypeChildren = refTypeOrRefTypeChildren
             };
         }
@@ -67,8 +123,7 @@ public sealed partial class FeatureJsonDeserializer
             refTypeOrRefTypeChildren = init.refTypeOrRefTypeChildren;
             isAbstract = readerType.IsAbstract;
             isNullable = readerType.IsNullable();
-            canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;
-            writeRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
+            canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;            
             resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
             enableProposedTypes = parent.settings.enableProposedTypes;            
 
@@ -151,17 +206,13 @@ public sealed partial class FeatureJsonDeserializer
  
             T result;                
             if (callType == this.readerType)
-            {                
-                if (isNullable && parent.TryReadNullValue()) return default;
-                if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;                
+            {                                
                 result = ((Func<T>)readingDelegate).Invoke();
             }
             else
             {
                 if (!isAbstract)
-                {                    
-                    if (isNullable && parent.TryReadNullValue()) return default;
-                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                {                                        
                     result = (T)readingObjectDelegate.Invoke();
                 }
                 else
@@ -186,15 +237,11 @@ public sealed partial class FeatureJsonDeserializer
             {                
                 Type callType = typeof(T);
                 if (callType == this.readerType)
-                {
-                    if (isNullable && parent.TryReadNullValue()) return default;
-                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;                    
+                {                    
                     result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
                 }
                 else
-                {
-                    if (isNullable && parent.TryReadNullValue()) return default;
-                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                {                    
                     result = (T)populatingObjectDelegate.Invoke(itemToPopulate);
                 }
             }
@@ -214,17 +261,13 @@ public sealed partial class FeatureJsonDeserializer
 
             T result;
             if (callType == this.readerType)
-            {                
-                if (isNullable && parent.TryReadNullValue()) return default;
-                if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+            {                                
                 result = ((Func<T>)readingDelegate).Invoke();
             }
             else
             {
                 if (!isAbstract)
-                {
-                    if (isNullable && parent.TryReadNullValue()) return default;
-                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                {                    
                     result = (T)readingObjectDelegate.Invoke();
                 }
                 else
@@ -249,15 +292,11 @@ public sealed partial class FeatureJsonDeserializer
                 Type callType = typeof(T);                
 
                 if (callType == this.readerType)
-                {
-                    if (isNullable && parent.TryReadNullValue()) return default;
-                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                {                    
                     result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
                 }
                 else
-                {
-                    if (isNullable && parent.TryReadNullValue()) return default;
-                    if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                {                    
                     result = (T)populatingObjectDelegate.Invoke(itemToPopulate);
                 }
             }
