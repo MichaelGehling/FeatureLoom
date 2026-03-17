@@ -18,7 +18,7 @@ public class ComplexObject
     public SimpleObject embeddedSimple1 = new SimpleObject() { id = 1, name = "one", value = 1.11 };
     public SimpleObject embeddedSimple2 = new SimpleObject() { id = 2, name = "two", value = 2.22 };
     public SimpleObject embeddedSimple3 = new SimpleObject() { id = 3, name = "three", value = 3.33 };
-
+    
     public ComplexObject() { }
 
     public ComplexObject(int id)

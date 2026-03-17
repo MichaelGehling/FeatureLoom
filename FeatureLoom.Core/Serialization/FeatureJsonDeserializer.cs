@@ -203,43 +203,43 @@ namespace FeatureLoom.Serialization
                 }
 
                 if (itemType.IsArray) return CreateArrayTypeReader(itemType, cachedTypeReader);
-                else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValue, null, false, null);
-                else if (itemType == typeof(long)) return TypeReaderInitializer.Create(this, ReadLongValue, null, false, null);
-                else if (itemType == typeof(long?)) return TypeReaderInitializer.Create(this, ReadNullableLongValue, null, false, null);
-                else if (itemType == typeof(int)) return TypeReaderInitializer.Create(this, ReadIntValue, null, false, null);
-                else if (itemType == typeof(int?)) return TypeReaderInitializer.Create(this, ReadNullableIntValue, null, false, null);
-                else if (itemType == typeof(short)) return TypeReaderInitializer.Create(this, ReadShortValue, null, false, null);
-                else if (itemType == typeof(short?)) return TypeReaderInitializer.Create(this, ReadNullableShortValue, null, false, null);
-                else if (itemType == typeof(sbyte)) return TypeReaderInitializer.Create(this, ReadSbyteValue, null, false, null);
-                else if (itemType == typeof(sbyte?)) return TypeReaderInitializer.Create(this, ReadNullableSbyteValue, null, false, null);
-                else if (itemType == typeof(ulong)) return TypeReaderInitializer.Create(this, ReadUlongValue, null, false, null);
-                else if (itemType == typeof(ulong?)) return TypeReaderInitializer.Create(this, ReadNullableUlongValue, null, false, null);
-                else if (itemType == typeof(uint)) return TypeReaderInitializer.Create(this, ReadUintValue, null, false, null);
-                else if (itemType == typeof(uint?)) return TypeReaderInitializer.Create(this, ReadNullableUintValue, null, false, null);
-                else if (itemType == typeof(ushort)) return TypeReaderInitializer.Create(this, ReadUshortValue, null, false, null);
-                else if (itemType == typeof(ushort?)) return TypeReaderInitializer.Create(this, ReadNullableUshortValue, null, false, null);
-                else if (itemType == typeof(byte)) return TypeReaderInitializer.Create(this, ReadByteValue, null, false, null);
-                else if (itemType == typeof(byte?)) return TypeReaderInitializer.Create(this, ReadNullableByteValue, null, false, null);
-                else if (itemType == typeof(double)) return TypeReaderInitializer.Create(this, ReadDoubleValue, null, false, null);
-                else if (itemType == typeof(double?)) return TypeReaderInitializer.Create(this, ReadNullableDoubleValue, null, false, null);
-                else if (itemType == typeof(float)) return TypeReaderInitializer.Create(this, ReadFloatValue, null, false, null);
-                else if (itemType == typeof(float?)) return TypeReaderInitializer.Create(this, ReadNullableFloatValue, null, false, null);
-                else if (itemType == typeof(decimal)) return TypeReaderInitializer.Create(this, ReadDecimalValue, null, false, null);
-                else if (itemType == typeof(decimal?)) return TypeReaderInitializer.Create(this, ReadNullableDecimalValue, null, false, null);
-                else if (itemType == typeof(bool)) return TypeReaderInitializer.Create(this, ReadBoolValue, null, false, null);
-                else if (itemType == typeof(bool?)) return TypeReaderInitializer.Create(this, ReadNullableBoolValue, null, false, null);
-                else if (itemType == typeof(char)) return TypeReaderInitializer.Create(this, ReadCharValue, null, false, null);
-                else if (itemType == typeof(char?)) return TypeReaderInitializer.Create(this, ReadNullableCharValue, null, false, null);
-                else if (itemType == typeof(DateTime)) return TypeReaderInitializer.Create(this, ReadDateTimeValue, null, false, null);
-                else if (itemType == typeof(DateTime?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeValue, null, false, null);
-                else if (itemType == typeof(TimeSpan)) return TypeReaderInitializer.Create(this, ReadTimeSpanValue, null, false, null);
-                else if (itemType == typeof(TimeSpan?)) return TypeReaderInitializer.Create(this, ReadNullableTimeSpanValue, null, false, null);
-                else if (itemType == typeof(Guid)) return TypeReaderInitializer.Create(this, ReadGuidValue, null, false, null);
-                else if (itemType == typeof(Guid?)) return TypeReaderInitializer.Create(this, ReadNullableGuidValue, null, false, null);
-                else if (itemType == typeof(JsonFragment)) return TypeReaderInitializer.Create(this, ReadJsonFragmentValue, null, false, null);
-                else if (itemType == typeof(JsonFragment?)) return TypeReaderInitializer.Create(this, ReadNullableJsonFragmentValue, null, false, null);
-                else if (itemType == typeof(IntPtr)) return TypeReaderInitializer.Create(this, ReadIntPtrValue, null, false, null);
-                else if (itemType == typeof(UIntPtr)) return TypeReaderInitializer.Create(this, ReadUIntPtrValue, null, false, null);
+                else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValue, null, false);
+                else if (itemType == typeof(long)) return TypeReaderInitializer.Create(this, ReadLongValue, null, false);
+                else if (itemType == typeof(long?)) return TypeReaderInitializer.Create(this, ReadNullableLongValue, null, false);
+                else if (itemType == typeof(int)) return TypeReaderInitializer.Create(this, ReadIntValue, null, false);
+                else if (itemType == typeof(int?)) return TypeReaderInitializer.Create(this, ReadNullableIntValue, null, false);
+                else if (itemType == typeof(short)) return TypeReaderInitializer.Create(this, ReadShortValue, null, false);
+                else if (itemType == typeof(short?)) return TypeReaderInitializer.Create(this, ReadNullableShortValue, null, false);
+                else if (itemType == typeof(sbyte)) return TypeReaderInitializer.Create(this, ReadSbyteValue, null, false);
+                else if (itemType == typeof(sbyte?)) return TypeReaderInitializer.Create(this, ReadNullableSbyteValue, null, false);
+                else if (itemType == typeof(ulong)) return TypeReaderInitializer.Create(this, ReadUlongValue, null, false);
+                else if (itemType == typeof(ulong?)) return TypeReaderInitializer.Create(this, ReadNullableUlongValue, null, false);
+                else if (itemType == typeof(uint)) return TypeReaderInitializer.Create(this, ReadUintValue, null, false);
+                else if (itemType == typeof(uint?)) return TypeReaderInitializer.Create(this, ReadNullableUintValue, null, false);
+                else if (itemType == typeof(ushort)) return TypeReaderInitializer.Create(this, ReadUshortValue, null, false);
+                else if (itemType == typeof(ushort?)) return TypeReaderInitializer.Create(this, ReadNullableUshortValue, null, false);
+                else if (itemType == typeof(byte)) return TypeReaderInitializer.Create(this, ReadByteValue, null, false);
+                else if (itemType == typeof(byte?)) return TypeReaderInitializer.Create(this, ReadNullableByteValue, null, false);
+                else if (itemType == typeof(double)) return TypeReaderInitializer.Create(this, ReadDoubleValue, null, false);
+                else if (itemType == typeof(double?)) return TypeReaderInitializer.Create(this, ReadNullableDoubleValue, null, false);
+                else if (itemType == typeof(float)) return TypeReaderInitializer.Create(this, ReadFloatValue, null, false);
+                else if (itemType == typeof(float?)) return TypeReaderInitializer.Create(this, ReadNullableFloatValue, null, false);
+                else if (itemType == typeof(decimal)) return TypeReaderInitializer.Create(this, ReadDecimalValue, null, false);
+                else if (itemType == typeof(decimal?)) return TypeReaderInitializer.Create(this, ReadNullableDecimalValue, null, false);
+                else if (itemType == typeof(bool)) return TypeReaderInitializer.Create(this, ReadBoolValue, null, false);
+                else if (itemType == typeof(bool?)) return TypeReaderInitializer.Create(this, ReadNullableBoolValue, null, false);
+                else if (itemType == typeof(char)) return TypeReaderInitializer.Create(this, ReadCharValue, null, false);
+                else if (itemType == typeof(char?)) return TypeReaderInitializer.Create(this, ReadNullableCharValue, null, false);
+                else if (itemType == typeof(DateTime)) return TypeReaderInitializer.Create(this, ReadDateTimeValue, null, false);
+                else if (itemType == typeof(DateTime?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeValue, null, false);
+                else if (itemType == typeof(TimeSpan)) return TypeReaderInitializer.Create(this, ReadTimeSpanValue, null, false);
+                else if (itemType == typeof(TimeSpan?)) return TypeReaderInitializer.Create(this, ReadNullableTimeSpanValue, null, false);
+                else if (itemType == typeof(Guid)) return TypeReaderInitializer.Create(this, ReadGuidValue, null, false);
+                else if (itemType == typeof(Guid?)) return TypeReaderInitializer.Create(this, ReadNullableGuidValue, null, false);
+                else if (itemType == typeof(JsonFragment)) return TypeReaderInitializer.Create(this, ReadJsonFragmentValue, null, false);
+                else if (itemType == typeof(JsonFragment?)) return TypeReaderInitializer.Create(this, ReadNullableJsonFragmentValue, null, false);
+                else if (itemType == typeof(IntPtr)) return TypeReaderInitializer.Create(this, ReadIntPtrValue, null, false);
+                else if (itemType == typeof(UIntPtr)) return TypeReaderInitializer.Create(this, ReadUIntPtrValue, null, false);
                 else if (itemType == typeof(ByteSegment)) return CreateByteSegmentTypeReader();
                 else if (itemType == typeof(ByteSegment?)) return CreateNullableByteSegmentTypeReader();
                 else if (itemType == typeof(ArraySegment<byte>)) return CreateByteArraySegmentTypeReader();
@@ -260,11 +260,11 @@ namespace FeatureLoom.Serialization
         TypeReaderInitializer CreateCustomTypeReader<T>(object customReaderObj)
         {
             var customReader = (ICustomTypeReader<T>)customReaderObj;
-            var reader = (object _) =>
+            var reader = () =>
             {
                 return customReader.ReadValue(this.extensionApi);
             };
-            return TypeReaderInitializer.Create(this, reader, null, true, null);
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -280,102 +280,94 @@ namespace FeatureLoom.Serialization
         }
 
         private TypeReaderInitializer CreateByteArrayTypeReader()
-        {            
-
-            var reader = static (object context) =>
-            {
-                var (byteArrayReader, p) = UnwrapContext<(CachedTypeReader byteArrayReader, FeatureJsonDeserializer p)>(context);
-                return p.ReadByteArray(byteArrayReader);
-            };
-            
+        {
             var byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
-            var context = WrapContext((byteArrayReader, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+            var reader = () =>
+            {
+                return ReadByteArray(byteArrayReader);
+            };
+                        
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateByteSegmentTypeReader()
         {
-            var reader = static (object context) =>
-            {
-                var (byteArrayReader, objectReader, p) = UnwrapContext<(CachedTypeReader byteArrayReader, CachedTypeReader objectReader, FeatureJsonDeserializer p)>(context);
-                byte b = p.SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
-                return new ByteSegment(p.ReadByteArray(byteArrayReader));
-            };
-
-            CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));            
+            CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
             CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, false));
-            var context = WrapContext((byteArrayReader, objectReader, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+
+            var reader = () =>
+            {                
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
+                return new ByteSegment(ReadByteArray(byteArrayReader));
+            };            
+
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateNullableByteSegmentTypeReader()
         {
-            var reader = static (object context) =>
-            {
-                var (byteArrayReader, objectReader, p) = UnwrapContext<(CachedTypeReader byteArrayReader, CachedTypeReader objectReader, FeatureJsonDeserializer p)>(context);
-                byte b = p.SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
-                return (ByteSegment?) new ByteSegment(p.ReadByteArray(byteArrayReader));
-            };
-
             CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
             CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, false));
-            var context = WrapContext((byteArrayReader, objectReader, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+
+            var reader = () =>
+            {                
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
+                return (ByteSegment?) new ByteSegment(ReadByteArray(byteArrayReader));
+            };
+            
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateByteArraySegmentTypeReader()
         {
-            var reader = static (object context) =>
-            {
-                var (byteArrayReader, objectReader, p) = UnwrapContext<(CachedTypeReader byteArrayReader, CachedTypeReader objectReader, FeatureJsonDeserializer p)>(context);
-                byte b = p.SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
-                return new ArraySegment<byte>(p.ReadByteArray(byteArrayReader));
-            };
-
-            CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));            
+            CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
             CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false));
-            var context = WrapContext((byteArrayReader, objectReader, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+
+            var reader = () =>
+            {                
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
+                return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
+            };
+                        
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateNullableByteArraySegmentTypeReader()
         {
-            var reader = static (object context) =>
-            {
-                var (byteArrayReader, objectReader, p) = UnwrapContext<(CachedTypeReader byteArrayReader, CachedTypeReader objectReader, FeatureJsonDeserializer p)>(context);
-                byte b = p.SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
-                return (ArraySegment<byte>?) new ArraySegment<byte>(p.ReadByteArray(byteArrayReader));
-            };
-
             CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
             CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false));
-            var context = WrapContext((byteArrayReader, objectReader, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+
+            var reader = () =>
+            {                
+                byte b = SkipWhiteSpaces();
+                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
+                return (ArraySegment<byte>?) new ArraySegment<byte>(ReadByteArray(byteArrayReader));
+            };
+                        
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateTextSegmentTypeReader()
         {
-            var reader = static (object context) =>
-            {
-                var (objectReader, p) = UnwrapContext<(CachedTypeReader objectReader, FeatureJsonDeserializer p)>(context);
-                if (p.TryReadStringValueOrNull(out string s))
+            CachedTypeReader textSegmentObjectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(TextSegment) }, false));
+
+            var reader = () =>
+            {                
+                if (TryReadStringValueOrNull(out string s))
                 {
                     if (s == null) return default;
                     return new TextSegment(s);
                 }
                 else
                 {
-                    return objectReader.ReadValue_CheckProposed<TextSegment>();
+                    return textSegmentObjectReader.ReadValue_CheckProposed<TextSegment>();
                 }
             };
-
-            CachedTypeReader textSegmentObjectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(TextSegment) }, false));
-            var context = WrapContext((textSegmentObjectReader, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+                        
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -541,69 +533,66 @@ namespace FeatureLoom.Serialization
 
         private TypeReaderInitializer CreateEnumReader<T>() where T : struct, Enum
         {
-            var reader = static (object context) =>
+            var reader = () =>
             {
-                var p = (FeatureJsonDeserializer)context;
-                var valueType = Lookup(map_TypeStart, p.buffer.CurrentByte);
+                var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
                 if (valueType == TypeResult.Whitespace)
                 {
-                    byte b = p.SkipWhiteSpaces();
+                    byte b = SkipWhiteSpaces();
                     valueType = Lookup(map_TypeStart, b);
                 }
 
                 if (valueType == TypeResult.Number)
                 {
-                    int i = p.ReadIntValue();
+                    int i = ReadIntValue();
                     if (!EnumHelper.TryFromInt(i, out T value)) throw new Exception("Invalid number for enum value");
                     return value;
                 }
                 else if (valueType == TypeResult.String)
                 {
-                    string s = p.ReadStringValue();
+                    string s = ReadStringValue();
                     if (!EnumHelper.TryFromString(s, out T value)) throw new Exception("Invalid string for enum value");
                     return value;
                 }
                 else throw new Exception("Invalid character for determining enum value");
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true, this);
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateNullableEnumReader<T>() where T : struct, Enum
         {
-            var reader = static (object context) =>
-            {
-                var p = (FeatureJsonDeserializer)context;
+            var reader = () =>
+            {               
+                if (!settings.strict && TryReadEmptyStringValue()) return (T?)null;
 
-                if (!p.settings.strict && p.TryReadEmptyStringValue()) return (T?)null;
-
-                var valueType = Lookup(map_TypeStart, p.buffer.CurrentByte);
+                var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
                 if (valueType == TypeResult.Whitespace)
                 {
-                    byte b = p.SkipWhiteSpaces();
+                    byte b = SkipWhiteSpaces();
                     valueType = Lookup(map_TypeStart, b);
                 }
 
                 if (valueType == TypeResult.Number)
                 {
-                    int i = p.ReadIntValue();
+                    int i = ReadIntValue();
                     if (!EnumHelper.TryFromInt(i, out T value)) throw new Exception("Invalid number for enum value");
                     return (T?)value;
                 }
                 else if (valueType == TypeResult.String)
                 {
-                    string s = p.ReadStringValue();
+                    string s = ReadStringValue();
                     if (!EnumHelper.TryFromString(s, out T value)) throw new Exception("Invalid string for enum value");
                     return (T?)value;
                 }
                 else throw new Exception("Invalid character for determining enum value");
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true, this);
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private object ReadUnknownValue(object _ = null)
+        private object ReadUnknownValue()
         {
             var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
             if (valueType == TypeResult.Whitespace)
@@ -661,7 +650,7 @@ namespace FeatureLoom.Serialization
                 // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
                 // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
                 // use the type mapping or multi option type mapping in the settings.
-                return TypeReaderInitializer.Create<T>(this, null, null, true, null);
+                return TypeReaderInitializer.Create<T>(this, null, null, true);
             }
 
             var constructor = GetConstructor<T>();
@@ -679,7 +668,7 @@ namespace FeatureLoom.Serialization
 
             // We avoid static for now because of the access to so many locals, but we could consider to make the reader static
             // and pass those as context if we want to optimize this further (TODO: Benchmark this against a static reader with context)
-            var reader = (object _) =>
+            var reader = () =>
             {
                 T dict = constructor();
                 byte b = SkipWhiteSpaces();
@@ -718,12 +707,12 @@ namespace FeatureLoom.Serialization
                 return dict;
             };
 
-            Func<T,object,T> populatingReader = null;
+            Func<T,T> populatingReader = null;
 
             if (canValueBePopulated)
             {
                 List<KeyValuePair<K, V>> keyValueList = new();
-                populatingReader = (T itemToPopulate, object _) =>
+                populatingReader = (T itemToPopulate) =>
                 {
                     T dict = itemToPopulate;                    
                     try
@@ -819,7 +808,7 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                populatingReader = (T itemToPopulate, object _) =>
+                populatingReader = (T itemToPopulate) =>
                 {
                     T dict = itemToPopulate;
                     dict.Clear();
@@ -862,14 +851,14 @@ namespace FeatureLoom.Serialization
                 };
             }
 
-            return TypeReaderInitializer.Create(this, reader, populatingReader, true, null);
+            return TypeReaderInitializer.Create(this, reader, populatingReader, true);
         }
 
         private TypeReaderInitializer CreateUnknownObjectReader(CachedTypeReader cachedTypeReader)
         {
             if (!settings.multiOptionTypeMapping.TryGetValue(typeof(object), out var typeOptions))
             {
-                return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true, null);
+                return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true);
             }
 
             List<Type> objectTypeOptions = new List<Type>();
@@ -889,38 +878,37 @@ namespace FeatureLoom.Serialization
 
             if (arrayTypeOption == null && objectTypeOptions.Count == 0)
             {
-                return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true, null);
+                return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true);
             }
 
             if (arrayTypeOption == null) arrayTypeOption = typeof(List<object>);
             objectTypeOptions.Add(typeof(Dictionary<string, object>));
-            
-            var reader = static (object context) =>
-            {
-                var (objectReader, arrayReader, p) = UnwrapContext<(CachedTypeReader objectReader, CachedTypeReader arrayReader, FeatureJsonDeserializer p)>(context);
-                var valueType = Lookup(map_TypeStart, p.buffer.CurrentByte);
+
+            var arrayReader = GetCachedTypeReader(arrayTypeOption);
+            CachedTypeReader objectReader = new CachedTypeReader((_) => CreateMultiOptionComplexTypeReader<object>(objectTypeOptions.ToArray()));
+
+            var reader = () =>
+            {                
+                var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
                 if (valueType == TypeResult.Whitespace)
                 {
-                    byte b = p.SkipWhiteSpaces();
+                    byte b = SkipWhiteSpaces();
                     valueType = Lookup(map_TypeStart, b);
                 }
 
                 switch (valueType)
                 {
-                    case TypeResult.String: return p.ReadStringValue();
+                    case TypeResult.String: return ReadStringValue();
                     case TypeResult.Object: return objectReader.ReadValue_CheckProposed<object>();
-                    case TypeResult.Bool: return p.ReadBoolValue();
-                    case TypeResult.Null: return p.ReadNullValue();
+                    case TypeResult.Bool: return ReadBoolValue();
+                    case TypeResult.Null: return ReadNullValue();
                     case TypeResult.Array: return arrayReader.ReadValue_CheckProposed<object>();
-                    case TypeResult.Number: return p.ReadNumberValueAsObject();
+                    case TypeResult.Number: return ReadNumberValueAsObject();
                     default: throw new Exception("Invalid character for determining value");
                 }
             };
-
-            var arrayReader = GetCachedTypeReader(arrayTypeOption);
-            CachedTypeReader objectReader = new CachedTypeReader((_) => CreateMultiOptionComplexTypeReader<object>(objectTypeOptions.ToArray()));
-            var context = WrapContext((objectReader, arrayReader, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+            
+            return TypeReaderInitializer.Create(this, reader, null, true);
 
         }
 
@@ -983,14 +971,9 @@ namespace FeatureLoom.Serialization
 
             Pool<List<int>> ratingsPool = new Pool<List<int>>(() => new(), l => l.Clear(), 1000, false);
 
-            var reader = static (object context) =>
+            var reader = () =>
             {
-                var (objectTypeReaders, dictTypeReader, numOptions, ratingsPool, fieldNameToIsTypeMember, p) = UnwrapContext<(
-                    CachedTypeReader[] objectTypeReaders, CachedTypeReader dictTypeReader, 
-                    int numOptions, Pool<List<int>> ratingsPool, Dictionary < ByteSegment, List<bool> > fieldNameToIsTypeMember,
-                    FeatureJsonDeserializer p)>(context);
-
-                byte b = p.SkipWhiteSpaces();
+                byte b = SkipWhiteSpaces();
                 var ratings = ratingsPool.Take();
                 ratings.AddRange(Enumerable.Repeat(0, numOptions));
 
@@ -1003,16 +986,16 @@ namespace FeatureLoom.Serialization
                 // so that we can read the object again with the correct type reader after determining the type based on the fields.
                 // This is necessary, because we might have read some fields already when we find a field that is only available
                 // in one of the types, but we don't know which type it belongs to until we read the field name.
-                using (p.CreateUndoReadHandle())
+                using (CreateUndoReadHandle())
                 {                    
-                    p.buffer.TryNextByte();                    
+                    buffer.TryNextByte();                    
 
                     while (true)
                     {
-                        b = p.SkipWhiteSpaces();
+                        b = SkipWhiteSpaces();
                         if (b == '}') break;
 
-                        var fieldName = p.ReadStringBytes();
+                        var fieldName = ReadStringBytes();
                         if (fieldNameToIsTypeMember.TryGetValue(fieldName, out var typeIndices))
                         {
                             if (typeIndices == null)
@@ -1051,12 +1034,12 @@ namespace FeatureLoom.Serialization
 
                         if (selectionIndex != -1) break;
 
-                        b = p.SkipWhiteSpaces();
+                        b = SkipWhiteSpaces();
                         if (b != ':') throw new Exception("Failed reading object");
-                        p.buffer.TryNextByte();
-                        p.SkipValue();
-                        b = p.SkipWhiteSpaces();
-                        if (b == ',') p.buffer.TryNextByte();
+                        buffer.TryNextByte();
+                        SkipValue();
+                        b = SkipWhiteSpaces();
+                        if (b == ',') buffer.TryNextByte();
                     }
                     ratingsPool.Return(ratings);
                 }
@@ -1073,15 +1056,14 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        p.SkipObject();
+                        SkipObject();
                         return default;
                     }
                 }
                 return objectTypeReaders[selectionIndex].ReadValue_CheckProposed<T>();
             };
 
-            var context = WrapContext((objectTypeReaders, dictTypeReader, numOptions, ratingsPool, fieldNameToIsTypeMember, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }        
 
         private TypeReaderInitializer CreateComplexTypeReader<T>(bool checkForMultiOptions)
@@ -1098,7 +1080,7 @@ namespace FeatureLoom.Serialization
                 // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
                 // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
                 // use the type mapping or multi option type mapping in the settings.
-                return TypeReaderInitializer.Create<T>(this, null, null, true, null);
+                return TypeReaderInitializer.Create<T>(this, null, null, true);
             }
             List<MemberInfo> memberInfos = CreateMemberInfosList(itemType);
 
@@ -1153,7 +1135,7 @@ namespace FeatureLoom.Serialization
             }
 
             // Cannot make it static, because it uses the TryFindFieldWriter local function
-            var reader = (object _) =>
+            var reader = () =>
             {
                 T item = constructor();
                 int expectedFieldIndex = 0;
@@ -1182,7 +1164,7 @@ namespace FeatureLoom.Serialization
             };
 
             // Cannot make it static, because it uses the TryFindFieldWriter local function
-            var populatingReader = (T itemToPopulate, object _) =>
+            var populatingReader = (T itemToPopulate) =>
             {
                 T item = itemToPopulate;
                 int expectedFieldIndex = 0;
@@ -1210,7 +1192,7 @@ namespace FeatureLoom.Serialization
                 return item;
             };
 
-            return TypeReaderInitializer.Create(this, reader, populatingReader, true, null);
+            return TypeReaderInitializer.Create(this, reader, populatingReader, true);
         }
 
         private List<MemberInfo> CreateMemberInfosList(Type itemType)
@@ -1598,29 +1580,25 @@ namespace FeatureLoom.Serialization
 
         private TypeReaderInitializer CreateGenericArrayTypeReader<E>()
         {
-            var reader = static (object context) =>
-            {
-                var (elementReader, pool, p) = UnwrapContext<(ElementReader<E>, Pool<List<E>>, FeatureJsonDeserializer)>(context);
+            var elementReader = new ElementReader<E>(this);
+            var pool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 1000, false);
 
-                byte b = p.SkipWhiteSpaces();
+            var reader = () =>
+            {
+                byte b = SkipWhiteSpaces();
                 if (b != '[') throw new Exception("Failed reading Array");
-                if (!p.buffer.TryNextByte()) throw new Exception("Failed reading Array");
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
                 List<E> elementBuffer = pool.Take();
                 elementBuffer.AddRange(elementReader);
                 E[] item = elementBuffer.ToArray();
-                if (p.settings.enableReferenceResolution) p.SetItemRefInCurrentItemInfo(item);
+                if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
                 pool.Return(elementBuffer);
-                if (p.buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
-                p.buffer.TryNextByte();
+                if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
+                buffer.TryNextByte();
                 return item;
             };
-            
-            var context = WrapContext((
-                new ElementReader<E>(this), 
-                new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 1000, false), 
-                this));
 
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private bool TryCreateEnumerableTypeReader(Type itemType, out TypeReaderInitializer initializer)
@@ -1655,13 +1633,14 @@ namespace FeatureLoom.Serialization
                 // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
                 // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
                 // use the type mapping in the settings.
-                return TypeReaderInitializer.Create<T>(this, null, null, true, null);
-            }            
-            
-            var reader = (object context) =>
-            {
-                var (elementReader, constructor, p) = UnwrapContext<(ElementReader<E>, Func<T>, FeatureJsonDeserializer)>(context);
+                return TypeReaderInitializer.Create<T>(this, null, null, true);
+            }
 
+            var elementReader = new ElementReader<E>(this);
+            var constructor = GetConstructor<T>();
+
+            var reader = () =>
+            {
                 byte b = SkipWhiteSpaces();
                 if (b != '[') throw new Exception("Failed reading Array");
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
@@ -1676,11 +1655,8 @@ namespace FeatureLoom.Serialization
                 buffer.TryNextByte();
                 return item;
             };
-
-            var elementReader = new ElementReader<E>(this);
-            var constructor = GetConstructor<T>();
-            var context = WrapContext((elementReader, constructor, this));
-            return TypeReaderInitializer.Create(this, reader, null, true, context);
+            
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateGenericEnumerableTypeReader<T, E>()
@@ -1690,14 +1666,14 @@ namespace FeatureLoom.Serialization
                 // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
                 // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
                 // use the type mapping in the settings.
-                return TypeReaderInitializer.Create<T>(this, null, null, true, null);
+                return TypeReaderInitializer.Create<T>(this, null, null, true);
             }
 
             var constructor = GetConstructor<T, IEnumerable<E>>();
 
             Pool<ElementReader<E>> elementReaderPool = new Pool<ElementReader<E>>(() => new ElementReader<E>(this), l => l.Reset(), 1000, false);
             Pool<List<E>> bufferPool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 1000, false);
-            var reader = (object _) =>
+            var reader = () =>
             {
                 byte b = SkipWhiteSpaces();
                 if (b != '[') throw new Exception("Failed reading Array");
@@ -1712,7 +1688,7 @@ namespace FeatureLoom.Serialization
                 return item;
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true, null);
+            return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
         private TypeReaderInitializer CreateEnumerableTypeReader<T>()
@@ -1722,13 +1698,13 @@ namespace FeatureLoom.Serialization
                 // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
                 // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
                 // use the type mapping in the settings.
-                return TypeReaderInitializer.Create<T>(this, null, null, true, null);
+                return TypeReaderInitializer.Create<T>(this, null, null, true);
             }
 
             Func<IEnumerable, T> constructor = GetConstructor<T, IEnumerable>();
             Pool<ElementReader<object>> elementReaderPool = new Pool<ElementReader<object>>(() => new ElementReader<object>(this), l => l.Reset(), 1000, false);
             Pool<List<object>> pool = new Pool<List<object>>(() => new List<object>(), l => l.Clear(), 1000, false);
-            var reader = (object _) =>
+            var reader = () =>
             {
                 byte b = SkipWhiteSpaces();
                 if (b != '[') throw new Exception("Failed reading Array");
@@ -1743,7 +1719,7 @@ namespace FeatureLoom.Serialization
                 return item;
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true, null);    
+            return TypeReaderInitializer.Create(this, reader, null, true);    
         }
 
         readonly List<ByteSegment> arrayElementNameCache = new List<ByteSegment>();
@@ -1865,7 +1841,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private string ReadStringValue(object _ = null)
+        private string ReadStringValue()
         {
             var stringBytes = ReadStringBytes();
             string result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
@@ -1889,7 +1865,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private char ReadCharValue(object _ = null)
+        private char ReadCharValue()
         {
             var stringBytes = ReadStringBytes();
             Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
@@ -1900,14 +1876,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private char? ReadNullableCharValue(object _ = null)
+        private char? ReadNullableCharValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadCharValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private DateTime ReadDateTimeValue(object _ = null)
+        private DateTime ReadDateTimeValue()
         {
             var stringBytes = ReadStringBytes();
 
@@ -1951,14 +1927,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private DateTime? ReadNullableDateTimeValue(object _ = null)
+        private DateTime? ReadNullableDateTimeValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDateTimeValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private TimeSpan ReadTimeSpanValue(object _ = null)
+        private TimeSpan ReadTimeSpanValue()
         {
             var stringBytes = ReadStringBytes();
 
@@ -2002,14 +1978,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private TimeSpan? ReadNullableTimeSpanValue(object _ = null)
+        private TimeSpan? ReadNullableTimeSpanValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadTimeSpanValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Guid ReadGuidValue(object _ = null)
+        private Guid ReadGuidValue()
         {
             var stringBytes = ReadStringBytes();
             Guid result;
@@ -2047,7 +2023,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Guid? ReadNullableGuidValue(object _ = null)
+        private Guid? ReadNullableGuidValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadGuidValue();
@@ -2079,7 +2055,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool ReadBoolValue(object _ = null)
+        private bool ReadBoolValue()
         {
             byte b = SkipWhiteSpaces();
             b = buffer.CurrentByte;
@@ -2184,7 +2160,7 @@ namespace FeatureLoom.Serialization
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool? ReadNullableBoolValue(object _ = null)
+        private bool? ReadNullableBoolValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadBoolValue();
@@ -2237,7 +2213,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public long ReadLongValue(object _ = null)
+        public long ReadLongValue()
         {
             return ReadSignedIntegerValue();
         }
@@ -2284,14 +2260,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public long? ReadNullableLongValue(object _ = null)
+        public long? ReadNullableLongValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadLongValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int ReadIntValue(object _ = null)
+        public int ReadIntValue()
         {
             long longValue = ReadSignedIntegerValue();
             if (longValue > int.MaxValue || longValue < int.MinValue) throw new Exception("Value is out of bounds.");
@@ -2299,14 +2275,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int? ReadNullableIntValue(object _ = null)
+        public int? ReadNullableIntValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadIntValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public short ReadShortValue(object _ = null)
+        public short ReadShortValue()
         {
             long longValue = ReadSignedIntegerValue();
             if (longValue > short.MaxValue || longValue < short.MinValue) throw new Exception("Value is out of bounds.");
@@ -2314,14 +2290,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public short? ReadNullableShortValue(object _ = null)
+        public short? ReadNullableShortValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadShortValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sbyte ReadSbyteValue(object _ = null)
+        public sbyte ReadSbyteValue()
         {
             long longValue = ReadSignedIntegerValue();
             if (longValue > sbyte.MaxValue || longValue < sbyte.MinValue) throw new Exception("Value is out of bounds.");
@@ -2329,20 +2305,20 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sbyte? ReadNullableSbyteValue(object _ = null)
+        public sbyte? ReadNullableSbyteValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadSbyteValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ReadUlongValue(object _ = null)
+        public ulong ReadUlongValue()
         {
             return ReadUnsignedIntegerValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ReadUnsignedIntegerValue(object _ = null)
+        public ulong ReadUnsignedIntegerValue()
         {
             ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.unsignedInteger);
 
@@ -2377,14 +2353,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong? ReadNullableUlongValue(object _ = null)
+        public ulong? ReadNullableUlongValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUlongValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint ReadUintValue(object _ = null)
+        public uint ReadUintValue()
         {
             ulong longValue = ReadUnsignedIntegerValue();
             if (longValue > uint.MaxValue) throw new Exception("Value is out of bounds.");
@@ -2392,14 +2368,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint? ReadNullableUintValue(object _ = null)
+        public uint? ReadNullableUintValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUintValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ushort ReadUshortValue(object _ = null)
+        public ushort ReadUshortValue()
         {
             ulong longValue = ReadUnsignedIntegerValue();
             if (longValue > ushort.MaxValue) throw new Exception("Value is out of bounds.");
@@ -2407,14 +2383,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ushort? ReadNullableUshortValue(object _ = null)
+        public ushort? ReadNullableUshortValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUshortValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte ReadByteValue(object _ = null)
+        public byte ReadByteValue()
         {
             ulong longValue = ReadUnsignedIntegerValue();
             if (longValue > byte.MaxValue) throw new Exception("Value is out of bounds.");
@@ -2422,7 +2398,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte? ReadNullableByteValue(object _ = null)
+        public byte? ReadNullableByteValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadByteValue();
@@ -2433,7 +2409,7 @@ namespace FeatureLoom.Serialization
         ByteSegment SPECIAL_NUMBER_NEG_INFINITY = "-Infinity".ToByteArray();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public double ReadDoubleValue(object _ = null)
+        public double ReadDoubleValue()
         {
             byte b = SkipWhiteSpaces();
             if (b == (byte)'"')
@@ -2505,14 +2481,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public double? ReadNullableDoubleValue(object _ = null)
+        public double? ReadNullableDoubleValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDoubleValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public decimal ReadDecimalValue(object _ = null)
+        public decimal ReadDecimalValue()
         {
             double dbl = ReadDoubleValue();
             if (double.IsNaN(dbl) || double.IsInfinity(dbl)) throw new Exception("Decimals cannot be NaN or Infinity");
@@ -2520,24 +2496,24 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public decimal? ReadNullableDecimalValue(object _ = null)
+        public decimal? ReadNullableDecimalValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDecimalValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float ReadFloatValue(object _ = null) => (float)ReadDoubleValue();
+        public float ReadFloatValue() => (float)ReadDoubleValue();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float? ReadNullableFloatValue(object _ = null)
+        public float? ReadNullableFloatValue()
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadFloatValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private IntPtr ReadIntPtrValue(object _ = null)
+        private IntPtr ReadIntPtrValue()
         {
             long value = ReadSignedIntegerValue();
             if (IntPtr.Size == 4 && (value > int.MaxValue || value < int.MinValue)) throw new Exception("Value is out of bounds.");
@@ -2545,7 +2521,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private UIntPtr ReadUIntPtrValue(object _ = null)
+        private UIntPtr ReadUIntPtrValue()
         {
             ulong value = ReadUnsignedIntegerValue();
             if (UIntPtr.Size == 4 && value > uint.MaxValue) throw new Exception("Value is out of bounds.");
@@ -2553,7 +2529,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public JsonFragment ReadJsonFragmentValue(object _ = null)
+        public JsonFragment ReadJsonFragmentValue()
         {
             SkipWhiteSpaces();
             var rec = buffer.StartRecording();
@@ -2565,7 +2541,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public JsonFragment? ReadNullableJsonFragmentValue(object _ = null) => ReadJsonFragmentValue();
+        public JsonFragment? ReadNullableJsonFragmentValue() => ReadJsonFragmentValue();
 
         private string DecodeUtf8Bytes(ArraySegment<byte> bytes)
         {
