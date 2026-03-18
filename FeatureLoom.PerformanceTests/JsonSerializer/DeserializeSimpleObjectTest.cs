@@ -20,7 +20,7 @@ public partial class DeserializeSimpleObjectTest
 {
     FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
     {
-        indent = true,
+        //indent = true,
     });
 
     FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
@@ -54,6 +54,16 @@ public partial class DeserializeSimpleObjectTest
         iterations = Math.Abs(iterations);
     }
 
+    [Benchmark]
+    public void DeserializeSimpleObject_FromStream_Feature()
+    {
+        for (int i = 0; i < iterations; i++)
+        {
+            memoryStream.Position = 0;
+            featureJsonDeserializer.TryDeserialize(memoryStream, out SimpleObject result);
+        }
+    }
+
     [Benchmark(Baseline = true)]
     public void DeserializeSimpleObject_FromStream_SystemText()
     {
@@ -64,13 +74,5 @@ public partial class DeserializeSimpleObjectTest
         }
     }
 
-    [Benchmark]
-    public void DeserializeSimpleObject_FromStream_Feature()
-    {
-        for (int i = 0; i < iterations; i++)
-        {
-            memoryStream.Position = 0;
-            featureJsonDeserializer.TryDeserialize(memoryStream, out SimpleObject result);
-        }
-    }
+   
 }

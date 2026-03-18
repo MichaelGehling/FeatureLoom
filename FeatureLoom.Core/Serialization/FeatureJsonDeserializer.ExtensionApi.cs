@@ -65,7 +65,7 @@ public sealed partial class FeatureJsonDeserializer
         public byte SkipWhiteSpaces() => deserializer.SkipWhiteSpaces();
 
         public bool TryReadNullValue() => deserializer.TryReadNullValue();
-        public bool TryReadStringValue(out string value) => deserializer.TryReadStringValue(out value);
+        public bool TryReadStringValueOrNull(out string value) => deserializer.TryReadStringValueOrNull(out value);
         public bool TryReadBoolValue(out bool value) => deserializer.TryReadBoolValue(out value);
         public bool TryReadSignedIntegerValue(out long value) => deserializer.TryReadSignedIntegerValue(out value);
         public bool TryReadUnsignedIntegerValue(out ulong value) => deserializer.TryReadUnsignedIntegerValue(out value);

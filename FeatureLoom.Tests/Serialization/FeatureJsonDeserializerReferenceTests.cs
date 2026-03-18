@@ -81,6 +81,30 @@ namespace FeatureLoom.Serialization
             Assert.Null(value);
         }
 
+        [Fact]
+        public void Deserialize_ReferenceResolution_SharedObjectAcrossStructs_AndSecondStructByRef()
+        {
+            const string json =
+                "{\"First\":{\"Shared\":{\"Name\":\"shared\"},\"Other\":{\"Name\":\"first\"}}," +
+                "\"Second\":{\"Shared\":{\"$ref\":\"$.First.Shared\"},\"Other\":{\"Name\":\"second\"}}";
+
+            var value = Deserialize<StructReferenceContainer>(json);
+
+            // Same object referenced in two different structs
+            Assert.Same(value.First.Shared, value.Second.Shared);        }
+
+        private class StructReferenceContainer
+        {
+            public NodePair First;
+            public NodePair Second;
+        }
+
+        private struct NodePair
+        {
+            public Node Shared;
+            public Node Other;
+        }
+
         private class Node
         {
             public string Name;

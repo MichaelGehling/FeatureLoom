@@ -140,10 +140,9 @@ namespace FeatureLoom.Serialization
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomReadType>(
                 JsonDataTypeCategory.Primitive,
-                StringRepresentation.Yes,
                 api =>
                 {
-                    Assert.True(api.TryReadStringValue(out string text));
+                    Assert.True(api.TryReadStringValueOrNull(out string text));
                     return new CustomReadType { Value = text };
                 });
 
@@ -213,7 +212,6 @@ namespace FeatureLoom.Serialization
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomObjectReadType>(
                 JsonDataTypeCategory.Object,
-                StringRepresentation.No,
                 api =>
                 {
                     Assert.True(api.TryReadRawJsonValue(out string raw));
@@ -232,7 +230,6 @@ namespace FeatureLoom.Serialization
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomArrayReadType>(
                 JsonDataTypeCategory.Array,
-                StringRepresentation.No,
                 api =>
                 {
                     Assert.True(api.TryReadRawJsonValue(out string raw));

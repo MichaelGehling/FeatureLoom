@@ -411,10 +411,9 @@ namespace Playground
 
             deserializerSettings.AddCustomTypeReader<XmlElement>(new FeatureJsonDeserializer.CustomTypeReader<XmlElement>(
                 JsonDataTypeCategory.Primitive,
-                StringRepresentation.Yes,
                 api =>
                 {
-                    if (api.TryReadStringValue(out string xmlString))
+                    if (api.TryReadStringValueOrNull(out string xmlString))
                     {
                         XmlElement xml = XmlHelper.ToXmlElement(xmlString);
                         return xml;

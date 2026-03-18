@@ -43,15 +43,6 @@ public class SerializeComplexObjectTest
         iterations = Math.Abs(iterations);
     }
 
-    [Benchmark(Baseline = true)]
-    public void SerializeComplexObject_ToStream_SystemText()
-    {
-        for (int i = 0; i < iterations; i++)
-        {
-            System.Text.Json.JsonSerializer.Serialize(memoryStream, simpleObject, systemTextJsonSerializerSettings);
-        }
-    }
-
     [Benchmark]
     public void SerializeComplexObject_ToStream_Feature()
     {
@@ -60,6 +51,15 @@ public class SerializeComplexObjectTest
             featureJsonSerializer.Serialize(memoryStream, simpleObject);
         }
     }
+
+    [Benchmark(Baseline = true)]
+    public void SerializeComplexObject_ToStream_SystemText()
+    {
+        for (int i = 0; i < iterations; i++)
+        {
+            System.Text.Json.JsonSerializer.Serialize(memoryStream, simpleObject, systemTextJsonSerializerSettings);
+        }
+    }   
 
 
     /*  [Benchmark]

@@ -6,217 +6,219 @@ using FeatureLoom.Collections;
 namespace FeatureLoom.Serialization;
 
 public sealed partial class FeatureJsonDeserializer
-{
+{    
+    sealed class TypeReaderInitializer
+    {
+        public FeatureJsonDeserializer parent;
+        public Type readerType;
+        public Delegate readingDelegate;
+        public Delegate populatingDelegate;
+        public Func<object> readingObjectDelegate;
+        public Func<object, object> populatingObjectDelegate;
+        public bool refTypeOrRefTypeChildren;        
+
+        public static TypeReaderInitializer Create<T>(
+            FeatureJsonDeserializer parent,
+            Func<T> readingDelegate, 
+            Func<T, T> populatingDelegate, 
+            bool refTypeOrRefTypeChildren)
+        {
+            var readerType = typeof(T);
+            var isNullable = readerType.IsNullable();
+            var resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
+            var readingDelegate2 = readingDelegate;
+            var populatingDelegate2 = populatingDelegate;
+            if (isNullable && resolveRefPath)
+            {
+                readingDelegate2 = () =>
+                {
+                    if (parent.TryReadNullValue()) return default;
+                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    return readingDelegate.Invoke();
+                };
+                if (populatingDelegate != null)
+                {
+                    populatingDelegate2 = (item) =>
+                    {
+                        if (isNullable && parent.TryReadNullValue()) return default;
+                        if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                        return populatingDelegate.Invoke(item);
+                    };
+                }
+            }
+            else if (isNullable)
+            {
+                readingDelegate2 = () =>
+                {
+                    if (parent.TryReadNullValue()) return default;
+                    return readingDelegate.Invoke();
+                };
+                if (populatingDelegate != null)
+                {
+                    populatingDelegate2 = (item) =>
+                    {
+                        if (isNullable && parent.TryReadNullValue()) return default;
+                        return populatingDelegate.Invoke(item);
+                    };
+                }
+            }
+            else if (resolveRefPath)
+            {
+                readingDelegate2 = () =>
+                {
+                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    return readingDelegate.Invoke();
+                };
+                if (populatingDelegate != null)
+                {
+                    populatingDelegate2 = (item) =>
+                    {
+                        if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                        return populatingDelegate.Invoke(item);
+                    };
+                }
+            }
+
+            return new TypeReaderInitializer
+            {
+                parent = parent,
+                readerType = typeof(T),
+                readingDelegate = readingDelegate2,
+                populatingDelegate = populatingDelegate2,
+                readingObjectDelegate = readingDelegate2 != null ? () => (object)readingDelegate2.Invoke() : null,
+                populatingObjectDelegate = populatingDelegate2 != null ? (obj) => (object)populatingDelegate2.Invoke((T)obj) : null,
+                refTypeOrRefTypeChildren = refTypeOrRefTypeChildren
+            };
+        }
+    }
+
+
     sealed class CachedTypeReader
     {
-        private readonly FeatureJsonDeserializer deserializer;
-        private Delegate itemReader;
-        private Delegate populatingItemReader;
-        private Func<object> objectItemReader;
-        private Func<object, object> populatingObjectItemReader;
-        private Type readerType;
-        private bool isRefType;
-        private JsonDataTypeCategory category;
-        private readonly bool enableReferenceResolution;
+        private readonly FeatureJsonDeserializer parent;        
+
+        private readonly Type readerType;
+        private readonly bool refTypeOrRefTypeChildren;
         private readonly bool enableProposedTypes;
-        private bool isAbstract = false;
-        private StringRepresentation stringRepresentation;
+        private readonly bool isAbstract;
+        private readonly bool isNullable;
+        private readonly bool writeRefPath;
+        private readonly bool resolveRefPath;
+        private readonly bool canBePopulated;
+        
+        private readonly Delegate readingDelegate;
+        private readonly Delegate populatingDelegate;
+        private readonly Func<object> readingObjectDelegate;
+        private readonly Func<object, object> populatingObjectDelegate;
 
-        public JsonDataTypeCategory JsonTypeCategory => category;
-
+        public bool RefTypeOrRefTypeChildren => refTypeOrRefTypeChildren;
         public Type ReaderType => readerType;
-
-        public CachedTypeReader(FeatureJsonDeserializer deserializer)
+        
+        public CachedTypeReader(Func<CachedTypeReader, TypeReaderInitializer> buildInit)
         {
-            this.deserializer = deserializer;
-            enableReferenceResolution = deserializer.settings.enableReferenceResolution;
-            enableProposedTypes = deserializer.settings.enableProposedTypes;
-        }            
+            var init = buildInit(this);
+            parent = init.parent;
 
-        public void MakeAbstract<T>(JsonDataTypeCategory category)
-        {
-            isAbstract = true;
-            this.readerType = typeof(T);
-            this.category = category;
-            this.isRefType = !readerType.IsValueType;
-            bool isNullable = readerType.IsNullable();
+            readerType = init.readerType;
+            refTypeOrRefTypeChildren = init.refTypeOrRefTypeChildren;
+            isAbstract = readerType.IsAbstract;
+            isNullable = readerType.IsNullable();
+            canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;            
+            resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
+            enableProposedTypes = parent.settings.enableProposedTypes;            
+
+            readingDelegate = init.readingDelegate;
+            populatingDelegate = init.populatingDelegate;
+            readingObjectDelegate = init.readingObjectDelegate;
+            populatingObjectDelegate = init.populatingObjectDelegate;            
         }
 
-        public void SetCustomTypeReader<T>(ICustomTypeReader<T> customTypeReader)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T ReadFieldName<T>(out ByteSegment fieldName)
         {
-            SetTypeReader<T>(() => customTypeReader.ReadValue(deserializer.extensionApi), customTypeReader.JsonTypeCategory, customTypeReader.StringRepresentation);
-        }
-
-        public void SetTypeReader<T>(Func<T> typeReader, JsonDataTypeCategory category, StringRepresentation stringRepresentation)
-        {
-            this.readerType = typeof(T);
-            this.category = category;
-            this.isRefType = !readerType.IsValueType;
-            bool isNullable = readerType.IsNullable();
-            this.stringRepresentation = stringRepresentation;
-
-            Func<T> temp;
-            if (isNullable)
+            if (writeRefPath)
             {
-                if (isRefType && enableReferenceResolution)
-                {
-                    temp = () =>
-                    {
-                        deserializer.SkipWhiteSpaces();
-                        if (deserializer.TryReadNullValue()) return default;
-                        if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
-                        return typeReader.Invoke();
-                    };
-                }
-                else
-                {
-                    temp = () =>
-                    {
-                        deserializer.SkipWhiteSpaces();
-                        if (deserializer.TryReadNullValue()) return default;
-                        return typeReader.Invoke();
-                    };
-                }
-
-            }
-            else
-            {
-                temp = typeReader;
-            }
-            this.itemReader = temp;
-            this.objectItemReader = () => (object)temp.Invoke();
-        }
-
-        public void SetPopulatingTypeReader<T>(Func<T, T> typeReader, JsonDataTypeCategory category)
-        {
-            this.readerType = typeof(T);
-            this.category = category;
-            this.isRefType = !readerType.IsValueType;
-            bool isNullable = readerType.IsNullable();
-            Func<T,T> temp;
-            if (isNullable)
-            {
-                if (isRefType && enableReferenceResolution)
-                {
-                    temp = (item) =>
-                    {
-                        deserializer.SkipWhiteSpaces();
-                        if (deserializer.TryReadNullValue()) return default;
-                        if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
-                        return typeReader.Invoke(item);
-                    };
-                }
-                else
-                {
-                    temp = (item) =>
-                    {
-                        deserializer.SkipWhiteSpaces();
-                        if (deserializer.TryReadNullValue()) return default;
-                        return typeReader.Invoke(item);
-                    };
-                }
-
-            }
-            else
-            {
-                temp = typeReader;
-            }
-            this.populatingItemReader = temp;
-            this.populatingObjectItemReader = (item) => (object)temp.Invoke((T)item);
-        }
-
-        public T ReadFieldName<T>(out ByteSegment itemName)
-        {
-            if (enableReferenceResolution)
-            {
-
-                byte b = deserializer.SkipWhiteSpaces();
+                byte b = parent.SkipWhiteSpaces();
                 if (b != '"') throw new Exception("Not a proper field name");                    
-                var recording = deserializer.buffer.StartRecording(true);
+                var recording = parent.buffer.StartRecording(true);
 
-                T result = ReadItemIgnoreProposedType<T>();
+                T result = ReadValue_IgnoreProposed<T>();
 
                 var bytes = recording.GetRecordedBytes(false);
                 if (bytes[bytes.Count - 1] != '"') throw new Exception("Not a proper field name");
-                itemName = bytes.SubSegment(0, bytes.Count - 1);
+                fieldName = bytes.SubSegment(0, bytes.Count - 1);
 
                 return result;
             }
             else
             {
-                itemName = default;
-                return ReadItemIgnoreProposedType<T>();
+                fieldName = default;
+                return ReadValue_IgnoreProposed<T>();
             }
         }
 
-        public T ReadValue<T>(ByteSegment itemName)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T ReadFieldValue<T>(ByteSegment fieldName)
         {
-
-            if (!enableReferenceResolution || category == JsonDataTypeCategory.Primitive)
+            if (!writeRefPath)
             {                    
-                return ReadItem<T>();
+                return ReadValue_CheckProposed<T>();
             }
             else
             {
-                ItemInfo myItemInfo = new ItemInfo(itemName, deserializer.currentItemInfoIndex);
-                deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
-                deserializer.itemInfos.Add(myItemInfo);
+                ItemInfo myItemInfo = new ItemInfo(fieldName, parent.currentItemInfoIndex);
+                parent.currentItemInfoIndex = parent.itemInfos.Count;
+                parent.itemInfos.Add(myItemInfo);
 
-                T result = ReadItem<T>();
+                T result = ReadValue_CheckProposed<T>();
 
-                deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
-                return result;
-            }
-        }
-
-        public T ReadValue<T>(ByteSegment itemName, T itemToPopulate)
-        {
-            if (!deserializer.isPopulating ||
-                itemToPopulate == null ||
-                (this.populatingItemReader == null && !isAbstract)) return ReadValue<T>(itemName);
-
-            if (category == JsonDataTypeCategory.Primitive)
-            {
-                return ReadItem<T>();
-            }
-            else if (!enableReferenceResolution)
-            {
-                return ReadItem<T>(itemToPopulate);
-            }
-            else
-            {
-                ItemInfo myItemInfo = new ItemInfo(itemName, deserializer.currentItemInfoIndex);
-                deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
-                deserializer.itemInfos.Add(myItemInfo);
-
-                T result = ReadItem<T>(itemToPopulate);
-
-                deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
+                parent.currentItemInfoIndex = myItemInfo.parentIndex;
                 return result;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T ReadItem<T>()
+        public T ReadFieldValue<T>(ByteSegment fieldName, T itemToPopulate)
         {
-            if (enableProposedTypes && deserializer.TryReadAsProposedType(this, out T item)) return item;
+            if (!writeRefPath)
+            {
+                return ReadValue_CheckProposed<T>(itemToPopulate);
+            }
+            else
+            {
+                ItemInfo myItemInfo = new ItemInfo(fieldName, parent.currentItemInfoIndex);
+                parent.currentItemInfoIndex = parent.itemInfos.Count;
+                parent.itemInfos.Add(myItemInfo);
+
+                T result = ReadValue_CheckProposed<T>(itemToPopulate);
+
+                parent.currentItemInfoIndex = myItemInfo.parentIndex;
+                return result;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T ReadValue_CheckProposed<T>()
+        {
+            if (enableProposedTypes && TryReadAsProposedType(this, out T item)) return item;
 
             Type callType = typeof(T);
+ 
             T result;                
             if (callType == this.readerType)
-            {
-                if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
-
-                Func<T> typedItemReader = (Func<T>)itemReader;
-                result = typedItemReader.Invoke();
+            {                                
+                result = ((Func<T>)readingDelegate).Invoke();
             }
             else
             {
-                if (!isAbstract) result = (T)objectItemReader.Invoke();
+                if (!isAbstract)
+                {                                        
+                    result = (T)readingObjectDelegate.Invoke();
+                }
                 else
                 {
-                    var typedReader = deserializer.GetCachedTypeReader(callType);
-                    result = typedReader.ReadItem<T>();
+                    var typedReader = parent.GetCachedTypeReader(callType);
+                    result = typedReader.ReadValue_CheckProposed<T>();
                 }
             }
 
@@ -224,56 +226,54 @@ public sealed partial class FeatureJsonDeserializer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T ReadItem<T>(T itemToPopulate)
+        private T ReadValue_CheckProposed<T>(T itemToPopulate)
         {
-            if ((this.populatingItemReader == null && !isAbstract) || itemToPopulate == null) return ReadItem<T>();
-
-            if (enableProposedTypes && deserializer.TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
+            if (!canBePopulated || itemToPopulate == null) return ReadValue_CheckProposed<T>();
+            if (enableProposedTypes && TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
 
             Type itemType = itemToPopulate.GetType();
             T result;
             if (itemType == this.readerType)
-            {
-                if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
+            {                
                 Type callType = typeof(T);
                 if (callType == this.readerType)
-                {
-                    Func<T, T> typedItemReader = (Func<T, T>)populatingItemReader;
-                    result = typedItemReader.Invoke(itemToPopulate);
+                {                    
+                    result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
                 }
                 else
-                {
-                    result = (T)populatingObjectItemReader.Invoke(itemToPopulate);
+                {                    
+                    result = (T)populatingObjectDelegate.Invoke(itemToPopulate);
                 }
             }
             else
             {
-                var typedReader = deserializer.GetCachedTypeReader(itemType);
-                result = typedReader.ReadItem(itemToPopulate);
+                var typedReader = parent.GetCachedTypeReader(itemType);
+                result = typedReader.ReadValue_CheckProposed(itemToPopulate);
             }
 
             return result;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T ReadItemIgnoreProposedType<T>()
+        private T ReadValue_IgnoreProposed<T>()
         {
             Type callType = typeof(T);
+
             T result;
             if (callType == this.readerType)
-            {
-                if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
-
-                Func<T> typedItemReader = (Func<T>)itemReader;
-                result = typedItemReader.Invoke();
+            {                                
+                result = ((Func<T>)readingDelegate).Invoke();
             }
             else
-            {                    
-                if (!isAbstract) result = (T)objectItemReader.Invoke();
+            {
+                if (!isAbstract)
+                {                    
+                    result = (T)readingObjectDelegate.Invoke();
+                }
                 else
                 {
-                    var typedReader = deserializer.GetCachedTypeReader(callType);
-                    result = typedReader.ReadItemIgnoreProposedType<T>();
+                    var typedReader = parent.GetCachedTypeReader(callType);
+                    result = typedReader.ReadValue_IgnoreProposed<T>();
                 }
             }
 
@@ -281,33 +281,110 @@ public sealed partial class FeatureJsonDeserializer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T ReadItemIgnoreProposedType<T>(T itemToPopulate)
+        private T ReadValue_IgnoreProposed<T>(T itemToPopulate)
         {
-            if ((this.populatingItemReader == null && !isAbstract) || itemToPopulate == null) return ReadItemIgnoreProposedType<T>();
+            if (!canBePopulated || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
 
             Type itemType = itemToPopulate.GetType();
             T result;
             if (itemType == this.readerType)
-            {
-                if (isAbstract) throw new Exception($"Can't deserialize abstract type {this.readerType.Name}");
-                Type callType = typeof(T);
+            {                
+                Type callType = typeof(T);                
+
                 if (callType == this.readerType)
-                {
-                    Func<T, T> typedItemReader = (Func<T, T>)populatingItemReader;
-                    result = typedItemReader.Invoke(itemToPopulate);
+                {                    
+                    result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
                 }
                 else
-                {
-                    result = (T)populatingObjectItemReader.Invoke(itemToPopulate);
+                {                    
+                    result = (T)populatingObjectDelegate.Invoke(itemToPopulate);
                 }
             }
             else
             {
-                var typedReader = deserializer.GetCachedTypeReader(itemType);
-                result = typedReader.ReadItemIgnoreProposedType(itemToPopulate);
+                var typedReader = parent.GetCachedTypeReader(itemType);
+                result = typedReader.ReadValue_IgnoreProposed(itemToPopulate);
             }
 
             return result;
+        }
+
+        bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
+        {
+            item = default;
+            byte b = parent.SkipWhiteSpaces();
+            // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
+            // so we can skip the rest of this method and just read it as the original type
+            if (b != (byte)'{') return false;
+
+            CachedTypeReader proposedTypeReader = null;
+            bool foundValueField = false;
+            using (var undoHandle = parent.CreateUndoReadHandle())
+            {
+                if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                {
+                    if (!foundValueField) return false;
+                }
+                undoHandle.SetUndoReading(!foundValueField);
+            }
+
+            if (foundValueField)
+            {
+                // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
+                if (proposedTypeReader != null)
+                {
+                    item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+                }
+                else item = originalTypeReader.ReadValue_IgnoreProposed<T>();
+                parent.SkipRemainingFieldsOfObject();
+            }
+            else
+            {
+                // we read the object again from the start, because the $type field was embedded in the actual value's object,
+                // the buffer pos was already reset by the undo handle, so we can just read the item again
+                item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+            }
+            return true;
+        }
+
+        bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, T itemToPopulate, out T item)
+        {
+            item = default;
+            byte b = parent.SkipWhiteSpaces();
+            // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
+            if (b != (byte)'{') return false;
+
+            CachedTypeReader proposedTypeReader = null;
+            bool foundValueField = false;
+            using (var undoHandle = parent.CreateUndoReadHandle())
+            {
+                if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                {
+                    if (!foundValueField) return false;
+                }
+                undoHandle.SetUndoReading(!foundValueField);
+            }
+
+            if (foundValueField)
+            {
+                // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
+                if (proposedTypeReader != null)
+                {
+                    if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
+                    else item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+                }
+                else item = originalTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
+                parent.SkipRemainingFieldsOfObject();
+            }
+            else
+            {
+                // we read the object again from the start, because the $type field was embedded in the actual value's object,
+                // the buffer pos was already reset by the undo handle, so we can just read the item again,
+                // but we have to check if the proposed type is compatible with the item to populate, otherwise we would populate the wrong type of object
+                if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
+                else item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+            }
+            return true;
         }
     }
 }

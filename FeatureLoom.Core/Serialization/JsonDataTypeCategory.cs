@@ -8,11 +8,4 @@
         Array_WithoutRefChildren,
         Object_WithoutRefChildren
     }
-
-    public enum StringRepresentation
-    {
-        Yes,
-        No,        
-        Possible
-    }
 }
