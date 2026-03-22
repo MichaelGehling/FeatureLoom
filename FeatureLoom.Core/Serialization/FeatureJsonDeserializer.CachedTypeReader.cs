@@ -113,7 +113,9 @@ public sealed partial class FeatureJsonDeserializer
 
         public bool RefTypeOrRefTypeChildren => refTypeOrRefTypeChildren;
         public Type ReaderType => readerType;
-        
+        public bool IsNoCheckPossible<T>() => typeof(T) == readerType && !enableProposedTypes && !resolveRefPath && !writeRefPath;
+        public bool CanBePopulated => canBePopulated;
+
         public CachedTypeReader(Func<CachedTypeReader, TypeReaderInitializer> buildInit)
         {
             var init = buildInit(this);
@@ -124,8 +126,9 @@ public sealed partial class FeatureJsonDeserializer
             isAbstract = readerType.IsAbstract;
             isNullable = readerType.IsNullable();
             canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;            
-            resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
-            enableProposedTypes = parent.settings.enableProposedTypes;            
+            resolveRefPath = parent.settings.enableReferenceResolution && !readerType.IsValueType;
+            enableProposedTypes = parent.settings.enableProposedTypes;
+            writeRefPath = parent.settings.enableReferenceResolution && refTypeOrRefTypeChildren;
 
             readingDelegate = init.readingDelegate;
             populatingDelegate = init.populatingDelegate;
@@ -309,6 +312,41 @@ public sealed partial class FeatureJsonDeserializer
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T ReadValue_NoCheck<T>()
+        {
+            return ((Func<T>)readingDelegate).Invoke();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private T ReadValue_NoCheck<T>(T itemToPopulate)
+        {
+            if (!canBePopulated || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
+
+            Type itemType = itemToPopulate.GetType();
+            T result;
+            if (itemType == this.readerType)
+            {
+                Type callType = typeof(T);
+
+                if (callType == this.readerType)
+                {
+                    result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
+                }
+                else
+                {
+                    result = (T)populatingObjectDelegate.Invoke(itemToPopulate);
+                }
+            }
+            else
+            {
+                var typedReader = parent.GetCachedTypeReader(itemType);
+                result = typedReader.ReadValue_IgnoreProposed(itemToPopulate);
+            }
+
+            return result;
+        }
+
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
         {
             item = default;
@@ -319,14 +357,20 @@ public sealed partial class FeatureJsonDeserializer
 
             CachedTypeReader proposedTypeReader = null;
             bool foundValueField = false;
-            using (var undoHandle = parent.CreateUndoReadHandle())
-            {
+
+            var undoHandle = parent.CreateUndoReadHandle();
+            { 
                 if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
                 {
-                    if (!foundValueField) return false;
+                    if (!foundValueField)
+                    {
+                        undoHandle.Dispose();
+                        return false;
+                    }
                 }
                 undoHandle.SetUndoReading(!foundValueField);
             }
+            undoHandle.Dispose();
 
             if (foundValueField)
             {
@@ -356,14 +400,19 @@ public sealed partial class FeatureJsonDeserializer
 
             CachedTypeReader proposedTypeReader = null;
             bool foundValueField = false;
-            using (var undoHandle = parent.CreateUndoReadHandle())
+            var undoHandle = parent.CreateUndoReadHandle();
             {
                 if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
                 {
-                    if (!foundValueField) return false;
+                    if (!foundValueField)
+                    {
+                        undoHandle.Dispose();
+                        return false;
+                    }
                 }
                 undoHandle.SetUndoReading(!foundValueField);
             }
+            undoHandle.Dispose();
 
             if (foundValueField)
             {

@@ -91,12 +91,16 @@ public sealed partial class FeatureJsonDeserializer
             return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TrySkipBytes(int count)
-        {                
+        {
+            if (count <= 0) return true;
+
             int bytesLeft = bufferFillLevel - bufferPos;
             if (count > bytesLeft) return false;
-            bufferPos += count;
-            bufferPos = bufferPos.Clamp(0, bufferFillLevel - 1);
+
+            int target = bufferPos + count;
+            bufferPos = (target < bufferFillLevel) ? target : (bufferFillLevel - 1);
             return true;
         }
 
@@ -223,6 +227,13 @@ public sealed partial class FeatureJsonDeserializer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ByteSegment GetRemainingBytes() => new ByteSegment(buffer, bufferPos, bufferFillLevel - bufferPos);
+#if !NETSTANDARD2_0
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ReadOnlySpan<byte> GetRemainingSpan()
+        {
+            return new ReadOnlySpan<byte>(buffer, bufferPos, bufferFillLevel - bufferPos);
+        }
+#endif
 
         public int CountRemainingBytes => bufferFillLevel - bufferPos;
         public int CountSizeLeft => buffer.Length - bufferFillLevel;
@@ -249,6 +260,13 @@ public sealed partial class FeatureJsonDeserializer
             {
                 int count = buffer.bufferPos - startBufferPos;
                 if (includeCurrentByte) count++;
+                return new ByteSegment(buffer.buffer, startBufferPos, count);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public ByteSegment GetRecordedBytes_WithoutCurrent()
+            {
+                int count = buffer.bufferPos - startBufferPos;
                 return new ByteSegment(buffer.buffer, startBufferPos, count);
             }
         }

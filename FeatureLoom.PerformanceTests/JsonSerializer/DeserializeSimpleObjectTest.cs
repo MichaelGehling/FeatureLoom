@@ -14,27 +14,33 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]    
 [HtmlExporter]
-[MinIterationCount(500)]
+[MinIterationCount(200)]
 [MaxIterationCount(5000)]
 public partial class DeserializeSimpleObjectTest
 {
-    FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+    static FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
     {
         //indent = true,
     });
 
-    FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+    static FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
-        initialBufferSize = 1024*1024*100,
+        initialBufferSize = 1024*1024*10,
     });
 
-    JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
+    static FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+    {
+        initialBufferSize = 1024 * 1024 * 10,
+        useStringCache = true,
+    });
+
+    static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
     {
         IncludeFields = true,
         //ReferenceHandler = ReferenceHandler.Preserve
     };
 
-    MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 100);
+    MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
     SimpleObject obj = new SimpleObject();
 
     [Params(-10000, -1000, -100, -10, -1)]
@@ -54,7 +60,7 @@ public partial class DeserializeSimpleObjectTest
         iterations = Math.Abs(iterations);
     }
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
     public void DeserializeSimpleObject_FromStream_Feature()
     {
         for (int i = 0; i < iterations; i++)
@@ -64,7 +70,17 @@ public partial class DeserializeSimpleObjectTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [Benchmark]
+    public void DeserializeSimpleObject_FromStream_Feature2()
+    {
+        for (int i = 0; i < iterations; i++)
+        {
+            memoryStream.Position = 0;
+            featureJsonDeserializer2.TryDeserialize(memoryStream, out SimpleObject result);
+        }
+    }
+
+    [Benchmark]
     public void DeserializeSimpleObject_FromStream_SystemText()
     {
         for (int i = 0; i < iterations; i++)

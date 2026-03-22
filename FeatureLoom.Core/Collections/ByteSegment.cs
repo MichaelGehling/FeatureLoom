@@ -194,6 +194,14 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     /// </summary>
     public byte[] ToArray() => segment.ToArray();
 
+    public ByteSegment CropArray(bool forceCopy)
+    {
+        if (!forceCopy && segment.Offset == 0 && segment.Count == segment.Array.Length) return this;
+        var cropped = new ByteSegment(segment.ToArray(), false);
+        cropped.hashCode = this.hashCode;
+        return cropped;
+    }
+
     /// <summary>
     /// Enumerates the segment by splitting it at each occurrence of a separator byte.
     /// Allocation-free, forward-only enumerator intended for single-use iteration.
@@ -303,7 +311,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
             if (segment.Array[segment.Offset + i] != other.segment.Array[other.segment.Offset + i])
                 return false;
         }
-        return false;
+        return true;
 #else
         var span1 = segment.AsSpan();
         var span2 = other.segment.AsSpan();
@@ -371,6 +379,15 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     public void EnsureHashCode()
     {
         if (!hashCode.HasValue) hashCode = ComputeHashCode(AsArraySegment);
+    }
+
+    /// <summary>
+    /// Allows explicitly setting the hash code, which can be useful when the hash is computed externally or needs to be overridden for testing.
+    /// </summary>
+    /// <param name="hashCode">The custom hash code to set.</param>
+    public void SetCustomHashCode(int hashCode)
+    {
+        this.hashCode = hashCode;
     }
 
     /// <summary>

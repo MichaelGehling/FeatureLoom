@@ -5,6 +5,9 @@
 - When adding new tests, ensure all referenced helper types (e.g., Node/NodeList) are defined in the same test class or moved to an existing test file where those types already exist.
 - Keep extension classes lightweight and move complex logic into dedicated helper classes.
 - For cloning/deserialization in this codebase, readonly instance fields should be written (do not skip IsInitOnly fields), while static fields should still be ignored.
+- Avoid redundant hash precomputation in `ByteSegment` usage: `GetHashCode()` already computes/caches hash, and `Equals(ByteSegment)` utilizes the cached hash for a fast path.
+- Prioritize runtime performance in all implementations, especially in `ReadStringBytes`, avoiding optimizations that could sacrifice speed.
+- Do not apply `map_IsFieldEnd` ref-based lookup optimization, as call sites are single non-loop lookups and likely not beneficial.
 
 ## General Guidelines
 - Avoid using phrases like "take a deep breath" in responses.

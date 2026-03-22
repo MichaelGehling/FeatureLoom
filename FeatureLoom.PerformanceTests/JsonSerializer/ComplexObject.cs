@@ -9,11 +9,14 @@ public class ComplexObject
 {    
     public int id = 0;
     public string myString = "This is a string";
+    //public string myString2 = "This is a stringThis is a string";
+    //public string myString3 = "This is a stringThis is a stringThis is a string";
+    //public string myString4 = "This is a stringThis is a stringThis is a stringThis is a string";
     public int myInt = -42;
     public int? myNullableInt = null;
     public float myFloat = 123.456f;
     public EmbeddedStruct myEmbeddedStruct = new EmbeddedStruct("Another string", 99);
-    public List<byte> myBytesList = new List<byte> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };    
+    public IList<byte> myBytesList = new List<byte> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };    
     public MyEnum myEnum = MyEnum.Val5;
     public SimpleObject embeddedSimple1 = new SimpleObject() { id = 1, name = "one", value = 1.11 };
     public SimpleObject embeddedSimple2 = new SimpleObject() { id = 2, name = "two", value = 2.22 };
