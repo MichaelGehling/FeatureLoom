@@ -9,9 +9,9 @@ public class ComplexObject
 {    
     public int id = 0;
     public string myString = "This is a string";
-    //public string myString2 = "This is a stringThis is a string";
-    //public string myString3 = "This is a stringThis is a stringThis is a string";
-    //public string myString4 = "This is a stringThis is a stringThis is a stringThis is a string";
+    public string myString2 = "This is a stringThis is a string";
+    public string myString3 = "This is a stringThis is a stringThis is a string";
+    public string myString4 = "This is a stringThis is a stringThis is a stringThis is a string";
     public int myInt = -42;
     public int? myNullableInt = null;
     public float myFloat = 123.456f;

@@ -385,7 +385,7 @@ namespace FeatureLoom.Serialization
             {                
                 var base64Uft8 = ReadStringBytes();
 #if NETSTANDARD2_0
-                    string base64String = Encoding.UTF8.GetString(base64Uft8.AsArraySegment.Array, base64Uft8.AsArraySegment.Offset, base64Uft8.AsArraySegment.Count);
+                    string base64String = Utf8Converter.DecodeUtf8ToString(base64Uft8, stringBuilder);
                     return Convert.FromBase64String(base64String);
 #else
                 ReadOnlySpan<byte> utf8Base64 = base64Uft8.AsArraySegment.AsSpan();
@@ -2587,23 +2587,20 @@ namespace FeatureLoom.Serialization
             return ReadByteValue();
         }
 
-        ByteSegment SPECIAL_NUMBER_NAN = "NaN".ToByteArray();
-        ByteSegment SPECIAL_NUMBER_POS_INFINITY = "Infinity".ToByteArray();
-        ByteSegment SPECIAL_NUMBER_NEG_INFINITY = "-Infinity".ToByteArray();
+        ByteSegment SPECIAL_NUMBER_NAN = new ByteSegment("NaN".ToByteArray(), true);
+        ByteSegment SPECIAL_NUMBER_POS_INFINITY = new ByteSegment("Infinity".ToByteArray(), true);
+        ByteSegment SPECIAL_NUMBER_NEG_INFINITY = new ByteSegment("-Infinity".ToByteArray(), true);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double ReadDoubleValue()
         {
             byte b = SkipWhiteSpaces();
             if (b == (byte)'"')
-            {
-                if (settings.strict) throw new Exception("Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
-
-                    var str = ReadStringBytes();
-                    if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
-                    if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
-                    if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;
-                    throw new Exception($"Invalid string found for a number: only allowed is NaN, Infinity, -Infinity");
+            {                
+                var str = ReadStringBytes();
+                if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
+                if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
+                if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;                
             }
             ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber);
 
@@ -2628,21 +2625,16 @@ namespace FeatureLoom.Serialization
             value = default;
             byte b = SkipWhiteSpaces();
             if (b == (byte)'"')
-            {
-                if (settings.strict) return false;
-                using (var undoHandle = CreateUndoReadHandle())
-                {                    
-                    bool isValidString = TryReadStringBytes(out var str);
-                    if (isValidString)
-                    {
-                        if (SPECIAL_NUMBER_NAN.Equals(str)) value = double.NaN;
-                        else if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) value = double.PositiveInfinity;
-                        else if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) value = double.NegativeInfinity;
-                        else isValidString = false;
-                    }
-                    undoHandle.SetUndoReading(!isValidString);
-                    return isValidString;
+            {                  
+                bool isValidString = TryReadStringBytes(out var str);
+                if (isValidString)
+                {
+                    if (SPECIAL_NUMBER_NAN.Equals(str)) value = double.NaN;
+                    else if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) value = double.PositiveInfinity;
+                    else if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) value = double.NegativeInfinity;
+                    else isValidString = false;
                 }
+                if (isValidString) return true;
             }
 
             if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber)) return false;
