@@ -93,6 +93,35 @@ namespace FeatureLoom.Serialization
             // Same object referenced in two different structs
             Assert.Same(value.First.Shared, value.Second.Shared);        }
 
+        [Fact]
+        public void Deserialize_ReferenceResolution_RefObject_WithAdditionalFields_StillResolves()
+        {
+            const string json = "{\"Items\":[{\"Name\":\"a\"},{\"$ref\":\"$.Items[0]\",\"Meta\":{\"x\":1}}]}";
+            var value = Deserialize<NodeList>(json);
+
+            Assert.Same(value.Items[0], value.Items[1]);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_DeepPath_ArrayAndObjectSegments_Resolves()
+        {
+            const string json =
+                "{\"Groups\":[{\"Items\":[{\"Name\":\"shared\"}]},{\"Items\":[{\"$ref\":\"$.Groups[0].Items[0]\"}]}]}";
+
+            var value = Deserialize<NodeGroups>(json);
+
+            Assert.Same(value.Groups[0].Items[0], value.Groups[1].Items[0]);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_ValidPathButIncompatibleType_ReturnsFalse()
+        {
+            const string json = "{\"Node\":{\"Name\":\"x\"},\"Container\":{\"$ref\":\"$.Node\"}}";
+
+            Assert.False(TryDeserialize(json, out MixedTypeContainer value));
+            Assert.Null(value);
+        }
+
         private class StructReferenceContainer
         {
             public NodePair First;
@@ -125,6 +154,22 @@ namespace FeatureLoom.Serialization
         private class NodeDictionary
         {
             public Dictionary<string, Node> Map = new();
+        }
+
+        private class NodeGroups
+        {
+            public List<Group> Groups = new();
+        }
+
+        private class Group
+        {
+            public List<Node> Items = new();
+        }
+
+        private class MixedTypeContainer
+        {
+            public Node Node;
+            public NodeContainer Container;
         }
     }
 }

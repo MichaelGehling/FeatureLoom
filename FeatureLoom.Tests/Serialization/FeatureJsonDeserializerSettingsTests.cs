@@ -242,6 +242,61 @@ namespace FeatureLoom.Serialization
             Assert.Equal("[1,2,3]", value.Raw);
         }
 
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadBoolValue()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomBoolReadType>(
+                JsonDataTypeCategory.Primitive,
+                api =>
+                {
+                    Assert.True(api.TryReadBoolValue(out bool b));
+                    return new CustomBoolReadType { Value = b };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("true", out CustomBoolReadType value));
+            Assert.True(value.Value);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadSignedIntegerValue()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomLongReadType>(
+                JsonDataTypeCategory.Primitive,
+                api =>
+                {
+                    Assert.True(api.TryReadSignedIntegerValue(out long n));
+                    return new CustomLongReadType { Value = n };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("-123", out CustomLongReadType value));
+            Assert.Equal(-123L, value.Value);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadFloatingPointValue_ForSpecialNumber()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomDoubleReadType>(
+                JsonDataTypeCategory.Primitive,
+                api =>
+                {
+                    Assert.True(api.TryReadFloatingPointValue(out double n));
+                    return new CustomDoubleReadType { Value = n };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("\"NaN\"", out CustomDoubleReadType value));
+            Assert.True(double.IsNaN(value.Value));
+        }
+
+
         private class BufferSample
         {
             public int A;
@@ -303,6 +358,21 @@ namespace FeatureLoom.Serialization
         private class CustomArrayReadType
         {
             public string Raw;
+        }
+
+        private class CustomBoolReadType
+        {
+            public bool Value;
+        }
+
+        private class CustomLongReadType
+        {
+            public long Value;
+        }
+
+        private class CustomDoubleReadType
+        {
+            public double Value;
         }
 
         private interface IMultiOption

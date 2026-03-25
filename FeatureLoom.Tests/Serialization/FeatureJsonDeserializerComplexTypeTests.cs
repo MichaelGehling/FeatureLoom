@@ -162,6 +162,124 @@ namespace FeatureLoom.Serialization
             Assert.Equal("set", value.PublicProp);
         }
 
+        [Fact]
+        public void Deserialize_ReadonlyFields_Class()
+        {
+            const string json = "{\"Id\":10,\"Name\":\"readonly\"}";
+            var value = Deserialize<ReadonlyFieldClass>(json);
+
+            Assert.Equal(10, value.Id);
+            Assert.Equal("readonly", value.Name);
+        }
+
+        [Fact]
+        public void Deserialize_ReadonlyFields_Struct()
+        {
+            const string json = "{\"X\":7,\"Flag\":true}";
+            var value = Deserialize<ReadonlyFieldStruct>(json);
+
+            Assert.Equal(7, value.X);
+            Assert.True(value.Flag);
+        }
+
+        [Fact]
+        public void Deserialize_InitOnlyProperties_Class()
+        {
+            const string json = "{\"Id\":20,\"Name\":\"init\"}";
+            var value = Deserialize<InitOnlyPropertyClass>(json, new FeatureJsonDeserializer.Settings
+            {
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties
+            });
+
+            Assert.Equal(20, value.Id);
+            Assert.Equal("init", value.Name);
+        }
+
+        [Fact]
+        public void Deserialize_InitOnlyProperties_Struct()
+        {
+            const string json = "{\"Id\":30,\"Name\":\"struct-init\"}";
+            var value = Deserialize<InitOnlyPropertyStruct>(json, new FeatureJsonDeserializer.Settings
+            {
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties
+            });
+
+            Assert.Equal(30, value.Id);
+            Assert.Equal("struct-init", value.Name);
+        }
+
+        [Fact]
+        public void Deserialize_PublicInitOnlyProperties_Class()
+        {
+            const string json = "{\"Id\":11,\"Name\":\"alpha\"}";
+            var value = Deserialize<InitOnlyPublicClass>(json, new FeatureJsonDeserializer.Settings
+            {
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties
+            });
+
+            Assert.Equal(11, value.Id);
+            Assert.Equal("alpha", value.Name);
+        }
+
+        [Fact]
+        public void Deserialize_PublicInitOnlyProperties_Struct()
+        {
+            const string json = "{\"Id\":22,\"Name\":\"beta\"}";
+            var value = Deserialize<InitOnlyPublicStruct>(json, new FeatureJsonDeserializer.Settings
+            {
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties
+            });
+
+            Assert.Equal(22, value.Id);
+            Assert.Equal("beta", value.Name);
+        }
+
+        [Fact]
+        public void Deserialize_JsonInclude_PrivateInitOnlyProperty()
+        {
+            const string json = "{\"PrivateInit\":33}";
+            var value = Deserialize<PrivateInitIncludedClass>(json, new FeatureJsonDeserializer.Settings
+            {
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties
+            });
+
+            Assert.Equal(33, value.PrivateInitValue);
+        }
+
+        [Fact]
+        public void Populate_ReadonlyField_WithNestedClass_PopulatesExistingInstance()
+        {
+            var holder = new ReadonlyNestedClassHolder();
+            var originalRef = holder.Node;
+
+            var deserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings
+            {
+                populateExistingMembers = true
+            });
+
+            Assert.True(deserializer.TryPopulate("{\"Node\":{\"A\":10}}", holder));
+
+            Assert.Same(originalRef, holder.Node);
+            Assert.Equal(10, holder.Node.A);
+            Assert.Equal(2, holder.Node.B); // unchanged -> existing object was populated
+        }
+
+        [Fact]
+        public void Populate_ReadonlyField_WithNestedStruct_PopulatesExistingValue()
+        {
+            var holder = new ReadonlyNestedStructHolder();
+
+            var deserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings
+            {
+                populateExistingMembers = true
+            });
+
+            Assert.True(deserializer.TryPopulate("{\"Node\":{\"A\":10}}", holder));
+
+            Assert.Equal(10, holder.Node.A);
+            Assert.Equal(2, holder.Node.B); // unchanged -> existing value was populated
+        }
+
         private class SimpleClass
         {
             public int Id;
@@ -263,7 +381,73 @@ namespace FeatureLoom.Serialization
 
             [JsonIgnore]
             private string propBackingField = "default";
-            public string PublicProp_IgnoredBacking { get{ return propBackingField; } set{ propBackingField = value; } }
+            public string PublicProp_IgnoredBacking { get { return propBackingField; } set { propBackingField = value; } }
+        }
+
+        private class ReadonlyFieldClass
+        {
+            public readonly int Id;
+            public readonly string Name;
+        }
+
+        private struct ReadonlyFieldStruct
+        {
+            public readonly int X;
+            public readonly bool Flag;
+        }
+
+        private class InitOnlyPropertyClass
+        {
+            public int Id { get; init; }
+            public string Name { get; init; }
+        }
+
+        private struct InitOnlyPropertyStruct
+        {
+            public int Id { get; init; }
+            public string Name { get; init; }
+        }
+
+        private class InitOnlyPublicClass
+        {
+            public int Id { get; init; }
+            public string Name { get; init; }
+        }
+
+        private struct InitOnlyPublicStruct
+        {
+            public int Id { get; init; }
+            public string Name { get; init; }
+        }
+
+        private class PrivateInitIncludedClass
+        {
+            [JsonInclude]
+            private int PrivateInit { get; init; }
+
+            public int PrivateInitValue => PrivateInit;
+        }
+
+        private class ReadonlyNestedClassHolder
+        {
+            public readonly MutableNodeClass Node = new MutableNodeClass { A = 1, B = 2 };
+        }
+
+        private class MutableNodeClass
+        {
+            public int A;
+            public int B;
+        }
+
+        private class ReadonlyNestedStructHolder
+        {
+            public readonly MutableNodeStruct Node = new MutableNodeStruct { A = 1, B = 2 };
+        }
+
+        private struct MutableNodeStruct
+        {
+            public int A;
+            public int B;
         }
     }
 }

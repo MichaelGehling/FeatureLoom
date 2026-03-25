@@ -47,14 +47,7 @@ namespace FeatureLoom.Serialization
         Dictionary<Type, CachedTypeReader> typeReaderCache = new();
         Dictionary<Type, object> typeConstructorMap = new();
 
-        //static readonly FilterResult[] map_SkipWhitespaces = CreateFilterMap_SkipWhitespaces();
         static readonly FilterResult[] map_IsFieldEnd = CreateFilterMap_IsFieldEnd();
-        //static readonly FilterResult[] map_SkipCharsUntilStringEndsOrMultiByteChar = CreateFilterMap_SkipCharsUntilStringEndsOrMultiByteChar();
-        //static readonly FilterResult[] map_SkipWhitespacesUntilNumberStarts = CreateFilterMap_SkipWhitespacesUntilNumberStarts();
-        //static readonly FilterResult[] map_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds = CreateFilterMap_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds();
-        //static readonly FilterResult[] map_SkipFiguresUntilExponentOrNumberEnds = CreateFilterMap_SkipFiguresUntilExponentOrNumberEnds();
-        //static readonly FilterResult[] map_SkipFiguresUntilNumberEnds = CreateFilterMap_SkipFiguresUntilNumberEnds();
-        //static readonly FilterResult[] map_SkipWhitespacesUntilObjectStarts = CreateFilterMap_SkipWhitespacesUntilObjectStarts();
         static readonly TypeResult[] map_TypeStart = CreateTypeStartMap();
 
         static ulong[] exponentFactorMap = CreateExponentFactorMap(19);
@@ -1264,19 +1257,25 @@ namespace FeatureLoom.Serialization
             {
                 if (propertyInfo.CanWrite)
                 {
+                    // Includes init-only properties in current runtime behavior:
+                    // init accessors are reported as writable here.
                     // Use expression tree for writable property
                     return CreatePropertyWriterUsingExpression<T, V, C>(propertyInfo, fieldName);
                 }
-                else if (HasInitAccessor(propertyInfo))
-                {
-                    // Handle init-only properties
-                    return CreateFieldWriterForInitOnlyProperties<T, V, C>(fieldName, itemType, fieldType, propertyInfo);
-                }
+                // Intentionally disabled:
+                // In this codebase/runtime context, init-only properties are already covered by CanWrite == true,
+                // so this fallback branch is not expected to be reachable.
+                //
+                // else if (HasInitAccessor(propertyInfo))
+                // {
+                //     return CreateFieldWriterForInitOnlyProperties<T, V, C>(fieldName, itemType, fieldType, propertyInfo);
+                // }
             }
 
             throw new InvalidOperationException("MemberInfo must be a writable field, property, or init-only property.");
         }
 
+        /*
         private Func<C, C> CreateFieldWriterForInitOnlyProperties<T, V, C>(ByteSegment fieldName, Type itemType, Type fieldType, PropertyInfo propertyInfo) where T : C
         {            
             var fieldTypeReader = GetCachedTypeReader(fieldType);
@@ -1329,6 +1328,7 @@ namespace FeatureLoom.Serialization
                 }
             }
         }
+        */
 
         private Func<C, C> CreateFieldWriterForInitOnlyFields<T, V, C>(ByteSegment fieldName, Type itemType, Type fieldType, FieldInfo fieldInfo) where T : C
         {            
@@ -1861,7 +1861,6 @@ namespace FeatureLoom.Serialization
                 byte b = deserializer.SkipWhiteSpaces();
                 if (b == ']')
                 {
-                    Reset();
                     return false;                    
                 }
                 if (enableReferenceResolution) current = reader.ReadFieldValue<T>(deserializer.GetArrayElementName(++index));                
@@ -2801,7 +2800,7 @@ namespace FeatureLoom.Serialization
 
             // Ignore whitespaces and check if any other character is found
             b = SkipWhiteSpaces();
-            return IsWhiteSpace(b);
+            return !IsWhiteSpace(b);
         }
 
         private bool TryDeserializeLocked<T>(out T item)
@@ -4199,6 +4198,12 @@ namespace FeatureLoom.Serialization
                         ByteSegment segment = refPath.AsArraySegment.Slice(startPos, segmentLength);
                         fieldPathSegments.Add(segment);
                         if (pos >= refPathCount) break;
+                        b = refPath.AsArraySegment.Get(pos);
+                        if (b == '.')
+                        {
+                            pos++;
+                            if (pos >= refPathCount) return false;
+                        }
                     }
                     else
                     {
@@ -4312,133 +4317,6 @@ namespace FeatureLoom.Serialization
             Array,
             Invalid
         }
-
-        /*
-        static FilterResult[] CreateFilterMap_SkipWhitespacesUntilObjectStarts()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Skip;
-                else if (i == '{') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-        */
-
-        static FilterResult[] CreateFilterMap_SkipWhitespacesUntilBoolStarts()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Skip;
-                else if (i == 't' || i == 'T' || i == 'f' || i == 'T') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-
-        static FilterResult[] CreateFilterMap_SkipBoolCharsUntilEnds()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if ("trueTRUEfalseFALSE".Contains((char)i)) map[i] = FilterResult.Skip;
-                else if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
-                else if (i == ',' || i == ']' || i == '}') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-
-        /*
-        static FilterResult[] CreateFilterMap_SkipCharsUntilStringEndsOrMultiByteChar()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int b = 0; b < map.Length; b++)
-            {
-                if (b == '\"') map[b] = FilterResult.Found;
-                else if (b == '\\') map[b] = FilterResult.Found;
-                else if ((b & 0b11100000) == 0b11000000) map[b] = FilterResult.Found;
-                else if ((b & 0b11110000) == 0b11100000) map[b] = FilterResult.Found;
-                else if ((b & 0b11111000) == 0b11110000) map[b] = FilterResult.Found;
-                else if ((b & 0b10000000) == 0b00000000) map[b] = FilterResult.Skip;
-                else map[b] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-        */
-
-        /*
-        static FilterResult[] CreateFilterMap_SkipWhitespacesUntilNumberStarts()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Skip;
-                else if (i >= '0' && i <= '9') map[i] = FilterResult.Found;
-                else if (i >= '-') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-        
-
-        static FilterResult[] CreateFilterMap_SkipFiguresUntilDecimalPointOrExponentOrNumberEnds()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i >= '0' && i <= '9') map[i] = FilterResult.Skip;
-                else if (i == '.') map[i] = FilterResult.Found;
-                else if (i == 'e' || i == 'E') map[i] = FilterResult.Found;
-                else if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
-                else if (i == ',' || i == ']' || i == '}') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-
-        static FilterResult[] CreateFilterMap_SkipFiguresUntilExponentOrNumberEnds()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i >= '0' && i <= '9') map[i] = FilterResult.Skip;
-                else if (i == 'e' || i == 'E') map[i] = FilterResult.Found;
-                else if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
-                else if (i == ',' || i == ']' || i == '}') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-        
-
-        static FilterResult[] CreateFilterMap_SkipFiguresUntilNumberEnds()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i >= '0' && i <= '9') map[i] = FilterResult.Skip;
-                else if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
-                else if (i == ',' || i == ']' || i == '}') map[i] = FilterResult.Found;
-                else map[i] = FilterResult.Unexpected;
-            }
-            return map;
-        }
-
-        static FilterResult[] CreateFilterMap_SkipWhitespaces()
-        {
-            FilterResult[] map = new FilterResult[256];
-            for (int i = 0; i < map.Length; i++)
-            {
-                if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Skip;
-                else map[i] = FilterResult.Found;
-            }
-            return map;
-        }
-        */
 
         static bool IsWhiteSpace(byte b)
         {

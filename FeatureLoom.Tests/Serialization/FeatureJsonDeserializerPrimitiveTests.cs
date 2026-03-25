@@ -45,12 +45,35 @@ namespace FeatureLoom.Serialization
         }
 
         [Theory]
+        [InlineData("TRUE", true)]
+        [InlineData("False", false)]
+        public void Deserialize_Bool_CaseInsensitive(string json, bool expected)
+        {
+            AssertDeserialized(json, expected);
+        }
+
+        [Theory]
         [InlineData("null", null)]
         [InlineData("true", true)]
         [InlineData("false", false)]
         public void Deserialize_NullableBool(string json, bool? expected)
         {
             AssertDeserialized(json, expected);
+        }
+
+        [Fact]
+        public void Deserialize_NullReference_CaseInsensitive()
+        {
+            AssertDeserialized<string>("NULL", null);
+            AssertDeserialized<string>("NuLl", null);
+        }
+
+        [Fact]
+        public void Deserialize_Float_SpecialCases()
+        {
+            AssertDeserializedFloatNaN("\"NaN\"");
+            AssertDeserialized("\"Infinity\"", float.PositiveInfinity);
+            AssertDeserialized("\"-Infinity\"", float.NegativeInfinity);
         }
 
         [Theory]
@@ -132,14 +155,6 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Float(string json, float expected)
         {
             AssertDeserialized(json, expected);
-        }
-
-        [Fact]
-        public void Deserialize_Float_SpecialCases()
-        {
-            AssertDeserializedFloatNaN("\"NaN\"");
-            AssertDeserialized("\"Infinity\"", float.PositiveInfinity);
-            AssertDeserialized("\"-Infinity\"", float.NegativeInfinity);
         }
 
         [Theory]
@@ -525,6 +540,50 @@ namespace FeatureLoom.Serialization
             Zero = 0,
             One = 1,
             Two = 2
+        }
+
+        [Fact]
+        public void Deserialize_NullableBool_EmptyString_NonStrict_ReturnsNull()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            Assert.True(deserializer.TryDeserialize("\"\"", out bool? value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_Int_QuotedEmptyString_NonStrict_ReturnsZero()
+        {
+            var deserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings
+            {
+                strict = false
+            });
+
+            Assert.True(deserializer.TryDeserialize("\"\"", out int value));
+            Assert.Equal(0, value);
+        }
+
+        [Fact]
+        public void Deserialize_Double_ExponentWithPlusSign()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            Assert.True(deserializer.TryDeserialize("1E+20", out double value));
+            Assert.Equal(1e20d, value);
+        }
+
+        [Fact]
+        public void Deserialize_NullableDateTime_EmptyString_NonStrict_ReturnsNull()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            Assert.True(deserializer.TryDeserialize("\"\"", out DateTime? value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_NullableTimeSpan_EmptyString_NonStrict_ReturnsNull()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            Assert.True(deserializer.TryDeserialize("\"\"", out TimeSpan? value));
+            Assert.Null(value);
         }
     }
 }
