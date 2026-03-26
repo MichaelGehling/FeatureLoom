@@ -149,6 +149,38 @@ namespace FeatureLoom.Serialization
             Assert.Equal("b", value.Items[1].Name);
         }
 
+        [Fact]
+        public void Deserialize_ReferenceResolution_RefPathTrailingDot_ReturnsFalse()
+        {
+            const string json = "{\"Items\":[{\"Name\":\"a\"},{\"$ref\":\"$.Items[0].\"}]}";
+            Assert.False(TryDeserialize(json, out NodeList value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_RefPathUnclosedIndexer_ReturnsFalse()
+        {
+            const string json = "{\"Items\":[{\"Name\":\"a\"},{\"$ref\":\"$.Items[0\"}]}";
+            Assert.False(TryDeserialize(json, out NodeList value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_RootDotOnlyPath_ReturnsFalse()
+        {
+            const string json = "{\"Name\":\"root\",\"Next\":{\"$ref\":\"$.\"}}";
+            Assert.False(TryDeserialize(json, out Node value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_ForwardReference_ReturnsFalse()
+        {
+            const string json = "{\"Child\":{\"$ref\":\"$.Other\"},\"Other\":{\"Name\":\"x\"}}";
+            Assert.False(TryDeserialize(json, out NodeContainer value));
+            Assert.Null(value);
+        }
+
         private class StructReferenceContainer
         {
             public NodePair First;

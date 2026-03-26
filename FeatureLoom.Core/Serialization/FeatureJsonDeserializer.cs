@@ -4186,7 +4186,7 @@ namespace FeatureLoom.Serialization
                         while (true)
                         {
                             pos++;
-                            if (pos >= refPathCount) return false;
+                            if (pos >= refPathCount) return true;
                             b = refPath.AsArraySegment.Get(pos);
                             if (b == ']')
                             {
@@ -4202,7 +4202,7 @@ namespace FeatureLoom.Serialization
                         if (b == '.')
                         {
                             pos++;
-                            if (pos >= refPathCount) return false;
+                            if (pos >= refPathCount) return true;
                         }
                     }
                     else
@@ -4231,7 +4231,11 @@ namespace FeatureLoom.Serialization
                         }
                         ByteSegment segment = refPath.AsArraySegment.Slice(startPos, segmentLength);
                         fieldPathSegments.Add(segment);
-                        if (pos >= refPathCount) break;
+                        if (pos >= refPathCount)
+                        {
+                            if (b == '.' || b == '[') return true;
+                            break;
+                        }
                     }
                     startPos = pos;
                     b = refPath.AsArraySegment.Get(pos);

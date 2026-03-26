@@ -9,7 +9,7 @@
 - Avoid redundant hash precomputation in `ByteSegment` usage: `GetHashCode()` already computes/caches hash, and `Equals(ByteSegment)` utilizes the cached hash for a fast path.
 - Prioritize runtime performance in all implementations, especially in `ReadStringBytes`, avoiding optimizations that could sacrifice speed.
 - Do not apply `map_IsFieldEnd` ref-based lookup optimization, as call sites are single non-loop lookups and likely not beneficial.
-- For coverage work, prefer tests-only changes (no production code changes) and prioritize low-hanging-fruit coverage first across related files.
+- For coverage work, prefer tests-only changes (no production code changes) and prioritize low-hanging-fruit coverage first across related files. Stop `ArraySegmentBuilder` topics and continue with `FeatureJsonDeserializer` tests only.
 - When validating reference-resolution tests, treat assignment to `object` as type-compatible; use a truly incompatible target type for negative compatibility cases.
 - In this codebase, `Deserialize_*_FromArrayOfKeyValuePairs_PublicFieldsAndProperties` should not be expected to pass because `KeyValuePair<TKey,TValue>` properties are not writable in `PublicFieldsAndProperties` mode.
 - For `Settings_AddCustomTypeReader_UsesTryReadNullValue`, use a struct (`CustomNullReadType`) so `api.TryReadNullValue()` can be asserted meaningfully; a class result may be `null` before custom-reader state is observable.

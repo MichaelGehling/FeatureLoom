@@ -482,6 +482,7 @@ namespace FeatureLoom.Serialization
 
             var item = new ProposedDerivedSample { A = 1, B = 2 };
             var originalRef = item;
+
             string typeName = typeof(ProposedDerivedSample).FullName;
             string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":7,\"B\":8}}}}";
 
@@ -520,6 +521,7 @@ namespace FeatureLoom.Serialization
             var deserializer = new FeatureJsonDeserializer(settings);
 
             var item = new ProposedBaseSample { A = 3, B = 4 };
+
             string typeName = typeof(ProposedDerivedSample).FullName;
             string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":100,\"B\":200}}}}";
 
