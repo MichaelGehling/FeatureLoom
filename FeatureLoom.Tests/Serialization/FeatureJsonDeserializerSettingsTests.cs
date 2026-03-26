@@ -1,3 +1,4 @@
+using FeatureLoom.Collections;
 using FeatureLoom.Serialization;
 using System.Collections;
 using System.Collections.Generic;
@@ -139,7 +140,6 @@ namespace FeatureLoom.Serialization
         {
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomReadType>(
-                JsonDataTypeCategory.Primitive,
                 api =>
                 {
                     Assert.True(api.TryReadStringValueOrNull(out string text));
@@ -211,7 +211,6 @@ namespace FeatureLoom.Serialization
         {
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomObjectReadType>(
-                JsonDataTypeCategory.Object,
                 api =>
                 {
                     Assert.True(api.TryReadRawJsonValue(out string raw));
@@ -229,7 +228,6 @@ namespace FeatureLoom.Serialization
         {
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomArrayReadType>(
-                JsonDataTypeCategory.Array,
                 api =>
                 {
                     Assert.True(api.TryReadRawJsonValue(out string raw));
@@ -247,7 +245,6 @@ namespace FeatureLoom.Serialization
         {
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomBoolReadType>(
-                JsonDataTypeCategory.Primitive,
                 api =>
                 {
                     Assert.True(api.TryReadBoolValue(out bool b));
@@ -265,7 +262,6 @@ namespace FeatureLoom.Serialization
         {
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomLongReadType>(
-                JsonDataTypeCategory.Primitive,
                 api =>
                 {
                     Assert.True(api.TryReadSignedIntegerValue(out long n));
@@ -283,7 +279,6 @@ namespace FeatureLoom.Serialization
         {
             var settings = new FeatureJsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomDoubleReadType>(
-                JsonDataTypeCategory.Primitive,
                 api =>
                 {
                     Assert.True(api.TryReadFloatingPointValue(out double n));
@@ -294,6 +289,137 @@ namespace FeatureLoom.Serialization
 
             Assert.True(deserializer.TryDeserialize("\"NaN\"", out CustomDoubleReadType value));
             Assert.True(double.IsNaN(value.Value));
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadUnsignedIntegerValue()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomUlongReadType>(
+                api =>
+                {
+                    Assert.True(api.TryReadUnsignedIntegerValue(out ulong n));
+                    return new CustomUlongReadType { Success = true, Value = n };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("123", out CustomUlongReadType value));
+            Assert.True(value.Success);
+            Assert.Equal(123UL, value.Value);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_TryReadUnsignedIntegerValue_FailsForNegative()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomUlongReadType>(
+                api =>
+                {
+                    bool success = api.TryReadUnsignedIntegerValue(out ulong n);
+                    return new CustomUlongReadType { Success = success, Value = n };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("-1", out CustomUlongReadType value));
+            Assert.False(value.Success);
+            Assert.Equal(0UL, value.Value);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadNullValue()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomNullReadType>(
+                api => new CustomNullReadType { IsNull = api.TryReadNullValue() });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("null", out CustomNullReadType value));
+            Assert.True(value.IsNull);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadRawJsonValue_ByteSegment_ForObject()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomRawBytesReadType>(
+                api =>
+                {
+                    Assert.True(api.TryReadRawJsonValue(out ByteSegment rawBytes));
+                    return new CustomRawBytesReadType { Raw = api.DecodeUtf8Bytes(rawBytes.AsArraySegment) };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"a\":1}", out CustomRawBytesReadType value));
+            Assert.Equal("{\"a\":1}", value.Raw);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadRawJsonValue_ByteSegment_ForArray()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomRawBytesReadType>(
+                api =>
+                {
+                    Assert.True(api.TryReadRawJsonValue(out ByteSegment rawBytes));
+                    return new CustomRawBytesReadType { Raw = api.DecodeUtf8Bytes(rawBytes.AsArraySegment) };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("[1,2,3]", out CustomRawBytesReadType value));
+            Assert.Equal("[1,2,3]", value.Raw);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadObjectValue_DictionaryOverload()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomObjectValueReadType>(
+                api =>
+                {
+                    bool success = api.TryReadObjectValue(out Dictionary<string, object> obj, default);
+                    return new CustomObjectValueReadType
+                    {
+                        Success = success,
+                        Count = success ? obj.Count : 0,
+                        A = success ? (int)obj["A"] : 0
+                    };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"A\":7,\"B\":\"x\"}", out CustomObjectValueReadType value));
+            Assert.True(value.Success);
+            Assert.Equal(2, value.Count);
+            Assert.Equal(7, value.A);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryReadArrayValue_ListObjectOverload()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomArrayValueReadType>(
+                api =>
+                {
+                    bool success = api.TryReadArrayValue(out List<object> array, default);
+                    return new CustomArrayValueReadType
+                    {
+                        Success = success,
+                        Count = success ? array.Count : 0,
+                        First = success ? (int)array[0] : 0
+                    };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("[5,\"x\",null]", out CustomArrayValueReadType value));
+            Assert.True(value.Success);
+            Assert.Equal(3, value.Count);
+            Assert.Equal(5, value.First);
         }
 
 
@@ -375,6 +501,22 @@ namespace FeatureLoom.Serialization
             public double Value;
         }
 
+        private class CustomUlongReadType
+        {
+            public bool Success;
+            public ulong Value;
+        }
+
+        private struct CustomNullReadType
+        {
+            public bool IsNull;
+        }
+
+        private class CustomRawBytesReadType
+        {
+            public string Raw;
+        }
+
         private interface IMultiOption
         {
         }
@@ -392,5 +534,19 @@ namespace FeatureLoom.Serialization
         private class MultiOptionDict : Dictionary<string, object>, IMultiOption
         {
         }
+        private class CustomObjectValueReadType
+        {
+            public bool Success;
+            public int Count;
+            public int A;
+        }
+
+        private class CustomArrayValueReadType
+        {
+            public bool Success;
+            public int Count;
+            public int First;
+        }
+
     }
 }

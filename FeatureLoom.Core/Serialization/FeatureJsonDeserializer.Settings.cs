@@ -73,9 +73,9 @@ namespace FeatureLoom.Serialization
                 customTypeReaders[typeof(T)] = customTypeReader;
             }
 
-            public void AddCustomTypeReader<T>(JsonDataTypeCategory category, Func<ExtensionApi, T> readType)
+            public void AddCustomTypeReader<T>(Func<ExtensionApi, T> readType)
             {
-                AddCustomTypeReader<T>(new CustomTypeReader<T>(category, readType));
+                AddCustomTypeReader<T>(new CustomTypeReader<T>(readType));
             }
 
         }

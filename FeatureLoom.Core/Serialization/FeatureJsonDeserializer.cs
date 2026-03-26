@@ -2586,9 +2586,9 @@ namespace FeatureLoom.Serialization
             return ReadByteValue();
         }
 
-        ByteSegment SPECIAL_NUMBER_NAN = new ByteSegment("NaN".ToByteArray(), true);
-        ByteSegment SPECIAL_NUMBER_POS_INFINITY = new ByteSegment("Infinity".ToByteArray(), true);
-        ByteSegment SPECIAL_NUMBER_NEG_INFINITY = new ByteSegment("-Infinity".ToByteArray(), true);
+        static ByteSegment SPECIAL_NUMBER_NAN = new ByteSegment("NaN".ToByteArray(), true);
+        static ByteSegment SPECIAL_NUMBER_POS_INFINITY = new ByteSegment("Infinity".ToByteArray(), true);
+        static ByteSegment SPECIAL_NUMBER_NEG_INFINITY = new ByteSegment("-Infinity".ToByteArray(), true);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double ReadDoubleValue()
@@ -4130,10 +4130,10 @@ namespace FeatureLoom.Serialization
             if (b != (byte)'{') return false;
             using (var undoHandle = CreateUndoReadHandle())
             {
-                bool success = Try(out pathIsValid, out typeIsCompatible, out refObject);                
-                undoHandle.SetUndoReading(!success);
+                bool refAttributeFound = Try(out pathIsValid, out typeIsCompatible, out refObject);                
+                undoHandle.SetUndoReading(!refAttributeFound);
                 fieldPathSegments.Clear();
-                return success;
+                return refAttributeFound;
             }
 
             bool Try(out bool pathIsValid, out bool typeIsCompatible, out T itemRef)
@@ -4172,7 +4172,7 @@ namespace FeatureLoom.Serialization
 
 
                 // TODO find object
-                if (refPath.Count <= 0) return false;
+                if (refPath.Count <= 0) return true;
                 int pos = 0;
                 int startPos = 0;
                 int segmentLength = 0;

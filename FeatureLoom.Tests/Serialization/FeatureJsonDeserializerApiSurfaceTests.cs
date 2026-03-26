@@ -134,6 +134,58 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
+        public void TryDeserialize_TypeOverload_WithSetDataSource_SequentialValues()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            deserializer.SetDataSource("1 2");
+
+            Assert.True(deserializer.TryDeserialize(typeof(int), out object firstObj));
+            Assert.True(deserializer.TryDeserialize(typeof(int), out object secondObj));
+            Assert.False(deserializer.TryDeserialize(typeof(int), out object noMore));
+
+            Assert.Equal(1, Assert.IsType<int>(firstObj));
+            Assert.Equal(2, Assert.IsType<int>(secondObj));
+            Assert.Null(noMore);
+        }
+
+        [Fact]
+        public void TryDeserialize_Stream_TypeOverload_WhitespaceOnly_ReturnsFalse()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            using var stream = Utf8Stream("   \t\r\n  ");
+
+            Assert.False(deserializer.TryDeserialize(stream, typeof(int), out object value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void IsAnyDataLeft_ByteSegment_TracksConsumption()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            var bytes = new ByteSegment(Encoding.UTF8.GetBytes("   9   "), true);
+
+            deserializer.SetDataSource(bytes);
+
+            Assert.True(deserializer.IsAnyDataLeft());
+            Assert.True(deserializer.TryDeserialize(out int value));
+            Assert.Equal(9, value);
+            Assert.False(deserializer.IsAnyDataLeft());
+        }
+
+        [Fact]
+        public void IsAnyDataLeft_ByteSegment_WhitespaceOnly_ReturnsFalse()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            var bytes = new ByteSegment(Encoding.UTF8.GetBytes("   \t\r\n  "), true);
+
+            deserializer.SetDataSource(bytes);
+
+            Assert.False(deserializer.IsAnyDataLeft());
+            Assert.False(deserializer.TryDeserialize(out int value));
+            Assert.Equal(default, value);
+        }
+
+        [Fact]
         public void TryDeserialize_Stream_TypeOverload_Works_ForComplexType()
         {
             var deserializer = new FeatureJsonDeserializer();
@@ -283,6 +335,50 @@ namespace FeatureLoom.Serialization
             Assert.True(found);
             Assert.False(deserializer.TryDeserialize(out int value));
             Assert.Equal(default, value);
+        }
+
+        [Fact]
+        public void TryDeserialize_TypeOverload_WhitespaceOnly_ReturnsFalse()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            deserializer.SetDataSource("   \t\r\n  ");
+
+            Assert.False(deserializer.TryDeserialize(typeof(int), out object value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void TryDeserialize_TypeOverload_ByteSegmentWhitespaceOnly_ReturnsFalse()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            var bytes = new ByteSegment(Encoding.UTF8.GetBytes("   \t\r\n  "), true);
+
+            Assert.False(deserializer.TryDeserialize(bytes, typeof(int), out object value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void TryPopulate_Class_WhitespaceOnly_ReturnsFalse_AndKeepsValues()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            var item = new ComplexValue { A = 10, B = "keep" };
+
+            Assert.False(deserializer.TryPopulate("   \t\r\n  ", item));
+
+            Assert.Equal(10, item.A);
+            Assert.Equal("keep", item.B);
+        }
+
+        [Fact]
+        public void TryPopulate_Struct_WhitespaceOnly_ReturnsFalse_AndKeepsValues()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            var item = new ValueStruct { A = 3, B = 4 };
+
+            Assert.False(deserializer.TryPopulate("   \t\r\n  ", ref item));
+
+            Assert.Equal(3, item.A);
+            Assert.Equal(4, item.B);
         }
 
         private static MemoryStream Utf8Stream(string json) => new MemoryStream(Encoding.UTF8.GetBytes(json));

@@ -378,5 +378,61 @@ namespace FeatureLoom.Serialization
             Assert.True(deserializer.TryDeserialize(out int value));
             Assert.Equal(789, value);
         }
+
+        [Fact]
+        public void Deserialize_Stream_WhitespaceOnly_ReturnsFalse()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            using var stream = Utf8Stream("   \t\r\n  ");
+
+            Assert.False(deserializer.TryDeserialize(stream, out int value));
+            Assert.Equal(default, value);
+        }
+
+        [Fact]
+        public void Deserialize_Stream_TypeOverload_WhitespaceOnly_ReturnsFalse()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            using var stream = Utf8Stream("   \t\r\n  ");
+
+            Assert.False(deserializer.TryDeserialize(stream, typeof(int), out object value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Populate_Stream_Class_WhitespaceOnly_ReturnsFalse_AndKeepsValues()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                populateExistingMembers = true
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+            using var stream = Utf8Stream("   \t\r\n  ");
+
+            var item = new StreamSample
+            {
+                A = 7,
+                B = "keep"
+            };
+
+            Assert.False(deserializer.TryPopulate(stream, item));
+            Assert.Equal(7, item.A);
+            Assert.Equal("keep", item.B);
+        }
+
+        [Fact]
+        public void Deserialize_Stream_InvalidJson_ReturnsFalse_WhenRethrowDisabled()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+            using var stream = Utf8Stream("{");
+
+            Assert.False(deserializer.TryDeserialize(stream, out int value));
+            Assert.Equal(default, value);
+        }
     }
 }

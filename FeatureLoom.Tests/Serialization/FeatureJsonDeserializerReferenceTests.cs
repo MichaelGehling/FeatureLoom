@@ -122,6 +122,33 @@ namespace FeatureLoom.Serialization
             Assert.Null(value);
         }
 
+        [Fact]
+        public void Deserialize_ReferenceResolution_EmptyRefPath_ReturnsFalse()
+        {
+            const string json = "{\"Name\":\"root\",\"Next\":{\"$ref\":\"\"}}";
+            Assert.False(TryDeserialize(json, out Node value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_RefPathWithoutRootPrefix_ReturnsFalse()
+        {
+            const string json = "{\"Items\":[{\"Name\":\"a\"},{\"$ref\":\"Items[0]\"}]}";
+            Assert.False(TryDeserialize(json, out NodeList value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ReferenceResolution_RefObject_NotFirstField_IsTreatedAsNormalObject()
+        {
+            const string json = "{\"Items\":[{\"Name\":\"a\"},{\"Name\":\"b\",\"$ref\":\"$.Items[0]\"}]}";
+            var value = Deserialize<NodeList>(json);
+
+            Assert.NotSame(value.Items[0], value.Items[1]);
+            Assert.Equal("a", value.Items[0].Name);
+            Assert.Equal("b", value.Items[1].Name);
+        }
+
         private class StructReferenceContainer
         {
             public NodePair First;

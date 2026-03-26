@@ -410,7 +410,6 @@ namespace Playground
             //featureJsonDeserializer.TryDeserialize<int[][]>(jsonString.ToStream(), out var result);
 
             deserializerSettings.AddCustomTypeReader<XmlElement>(new FeatureJsonDeserializer.CustomTypeReader<XmlElement>(
-                JsonDataTypeCategory.Primitive,
                 api =>
                 {
                     if (api.TryReadStringValueOrNull(out string xmlString))

@@ -25,12 +25,10 @@ public sealed partial class FeatureJsonDeserializer
         long totalBytesRead = 0;
         Stream stream;
         long lastStreamPosition = -1;
-        bool endOfStreamReached = false;
         bool bufferReadTillEnd = false;
 
         public byte CurrentByte => buffer[bufferPos];
         public int BufferPos => bufferPos;
-        public bool EndOfStreamReached => endOfStreamReached;
         public bool BufferReadTillEnd => bufferReadTillEnd;
 
         public void Init(int bufferSize)
@@ -45,7 +43,6 @@ public sealed partial class FeatureJsonDeserializer
 
             ResetBuffer(false, false);
             this.stream = stream;
-            endOfStreamReached = false;
             if (stream.CanSeek) lastStreamPosition = stream.Position;
         }
 
@@ -127,7 +124,6 @@ public sealed partial class FeatureJsonDeserializer
             {
                 result = false;
             }
-            if (!result) endOfStreamReached = true;
             return result;
         }
 
@@ -140,7 +136,7 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryPrepareDeserialization()
         {
-            if (stream != null && endOfStreamReached && EffectiveRemainingCount == 0) return false;
+            if (bufferReadTillEnd) return false;
 
             if (bufferStartPos > bufferResetLevel)
             {

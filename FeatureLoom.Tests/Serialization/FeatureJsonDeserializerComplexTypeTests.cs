@@ -280,6 +280,255 @@ namespace FeatureLoom.Serialization
             Assert.Equal(2, holder.Node.B); // unchanged -> existing value was populated
         }
 
+        [Fact]
+        public void Deserialize_AbstractType_WithoutMapping_ReturnsFalse()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("{\"Value\":1}", out AbstractSample value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ClassWithoutDefaultConstructor_ReturnsFalse()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("{\"X\":5}", out NoDefaultCtorSample value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ClassWithoutDefaultConstructor_WithConfiguredConstructor_Works()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddConstructor(() => new NoDefaultCtorSample(42));
+
+            var value = Deserialize<NoDefaultCtorSample>("{\"X\":5}", settings);
+
+            Assert.Equal(5, value.X);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_WithValueWrapper_UsesDerivedType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":1,\"B\":2}}}}";
+
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var derived = Assert.IsType<ProposedDerivedSample>(value);
+            Assert.Equal(1, derived.A);
+            Assert.Equal(2, derived.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_WithValueWrapper_AndTrailingFields_SkipsRemainingTypeObjectFields()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":3,\"B\":4}},\"Ignored\":99}}";
+
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var derived = Assert.IsType<ProposedDerivedSample>(value);
+            Assert.Equal(3, derived.A);
+            Assert.Equal(4, derived.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_NotFirstField_IsIgnored()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"A\":5,\"$type\":\"{typeName}\",\"B\":6}}";
+
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var baseValue = Assert.IsType<ProposedBaseSample>(value);
+            Assert.Equal(5, baseValue.A);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_WithUnknownTypeName_AndValueWrapper_FallsBackToOriginalType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+
+            const string json = "{\"$type\":\"Does.Not.Exist\",\"$value\":{\"A\":10,\"B\":20}}";
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var typed = Assert.IsType<ProposedBaseSample>(value);
+            Assert.Equal(10, typed.A);
+            Assert.Equal(20, typed.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_WithIncompatibleType_AndValueWrapper_FallsBackToOriginalType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+
+            const string json = "{\"$type\":\"System.String\",\"$value\":{\"A\":11,\"B\":22}}";
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var typed = Assert.IsType<ProposedBaseSample>(value);
+            Assert.Equal(11, typed.A);
+            Assert.Equal(22, typed.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_FirstFieldIncompatibleWithoutValue_FallsBackToNormalObjectRead()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+
+            const string json = "{\"$type\":\"System.String\",\"A\":12,\"B\":23}";
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var typed = Assert.IsType<ProposedBaseSample>(value);
+            Assert.Equal(12, typed.A);
+            Assert.Equal(23, typed.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_WithoutValueWrapper_UsesDerivedType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"A\":13,\"B\":24}}";
+
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var derived = Assert.IsType<ProposedDerivedSample>(value);
+            Assert.Equal(13, derived.A);
+            Assert.Equal(24, derived.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_Disabled_IgnoresTypeAndValueWrapper()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = false
+            };
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":1,\"B\":2}}}}";
+
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            var typed = Assert.IsType<ProposedBaseSample>(value);
+            Assert.Equal(0, typed.A);
+            Assert.Equal(0, typed.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_Disabled_ParsesNormalFields()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = false
+            };
+
+            const string json = "{\"A\":31,\"B\":42}";
+            var value = Deserialize<ProposedBaseSample>(json, settings);
+
+            Assert.Equal(31, value.A);
+            Assert.Equal(42, value.B);
+        }
+
+        [Fact]
+        public void Populate_ProposedType_WithValueWrapper_CompatibleType_PopulatesExistingInstance()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            var item = new ProposedDerivedSample { A = 1, B = 2 };
+            var originalRef = item;
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":7,\"B\":8}}}}";
+
+            Assert.True(deserializer.TryPopulate(json, item));
+
+            Assert.Same(originalRef, item);
+            Assert.Equal(7, item.A);
+            Assert.Equal(8, item.B);
+        }
+
+        [Fact]
+        public void Populate_ProposedType_WithIncompatibleTypeAndValueWrapper_FallsBackToOriginalTypePopulate()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            var item = new ProposedBaseSample { A = 1, B = 2 };
+            const string json = "{\"$type\":\"System.String\",\"$value\":{\"A\":11,\"B\":22}}";
+
+            Assert.True(deserializer.TryPopulate(json, item));
+
+            Assert.Equal(11, item.A);
+            Assert.Equal(22, item.B);
+        }
+
+        [Fact]
+        public void Populate_ProposedType_Disabled_IgnoresTypeWrapper_AndKeepsExistingValues()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            var item = new ProposedBaseSample { A = 3, B = 4 };
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":100,\"B\":200}}}}";
+
+            Assert.True(deserializer.TryPopulate(json, item));
+
+            Assert.Equal(3, item.A);
+            Assert.Equal(4, item.B);
+        }
+
         private class SimpleClass
         {
             public int Id;
@@ -448,6 +697,31 @@ namespace FeatureLoom.Serialization
         {
             public int A;
             public int B;
+        }
+
+        private abstract class AbstractSample
+        {
+            public int Value;
+        }
+
+        private class NoDefaultCtorSample
+        {
+            public int X { get; }
+
+            public NoDefaultCtorSample(int x)
+            {
+                X = x;
+            }
+        }
+
+        private class ProposedBaseSample
+        {
+            public int A;
+            public int B;
+        }
+
+        private class ProposedDerivedSample : ProposedBaseSample
+        {
         }
     }
 }

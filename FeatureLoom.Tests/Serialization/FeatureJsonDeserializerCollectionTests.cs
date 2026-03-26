@@ -16,6 +16,13 @@ namespace FeatureLoom.Serialization
             return value;
         }
 
+        private static T Deserialize<T>(string json, FeatureJsonDeserializer.Settings settings)
+        {
+            var deserializer = new FeatureJsonDeserializer(settings);
+            Assert.True(deserializer.TryDeserialize(json, out T value));
+            return value;
+        }
+
         [Fact]
         public void Deserialize_IntArray()
         {
@@ -111,5 +118,72 @@ namespace FeatureLoom.Serialization
             var value = Deserialize<byte[]>("[1,2,3,4]");
             Assert.Equal(new byte[] { 1, 2, 3, 4 }, value);
         }
+
+        [Fact]
+        public void Deserialize_IDictionary_String_Int()
+        {
+            var value = Deserialize<IDictionary<string, int>>("{\"a\":1,\"b\":2}");
+            Assert.Equal(1, value["a"]);
+            Assert.Equal(2, value["b"]);
+        }
+
+        [Fact]
+        public void Deserialize_Dictionary_String_Int_FromArrayOfKeyValuePairs()
+        {
+            const string json = "[{\"key\":\"a\",\"value\":1},{\"key\":\"b\",\"value\":2}]";
+
+            var value = Deserialize<Dictionary<string, int>>(json);
+
+            Assert.Equal(2, value.Count);
+            Assert.Equal(1, value["a"]);
+            Assert.Equal(2, value["b"]);
+        }
+
+        [Fact]
+        public void Deserialize_IReadOnlyDictionary_String_Int_FromArrayOfKeyValuePairs()
+        {
+            const string json = "[{\"key\":\"a\",\"value\":1},{\"key\":\"b\",\"value\":2}]";
+
+            var value = Deserialize<IReadOnlyDictionary<string, int>>(json);
+
+            Assert.Equal(2, value.Count);
+            Assert.Equal(1, value["a"]);
+            Assert.Equal(2, value["b"]);
+        }
+
+        [Fact]
+        public void Deserialize_Dictionary_String_Int_FromArrayOfKeyValuePairs_PublicFieldsAndProperties_ReturnsFalse()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            const string json = "[{\"Key\":\"a\",\"Value\":1},{\"Key\":\"b\",\"Value\":2}]";
+
+            Assert.False(deserializer.TryDeserialize(json, out Dictionary<string, int> value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_IReadOnlyDictionary_String_Int_FromArrayOfKeyValuePairs_PublicFieldsAndProperties_ReturnsFalse()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            const string json = "[{\"Key\":\"a\",\"Value\":1},{\"Key\":\"b\",\"Value\":2}]";
+
+            Assert.False(deserializer.TryDeserialize(json, out IReadOnlyDictionary<string, int> value));
+            Assert.Null(value);
+        }
+
     }
 }
