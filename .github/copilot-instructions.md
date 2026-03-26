@@ -17,3 +17,4 @@
 ## General Guidelines
 - Avoid using phrases like "take a deep breath" in responses.
 - When evaluating parser buffer helpers, explicitly distinguish normal state from EOF rollback state (e.g., BufferReadTillEnd) to avoid contradictory guidance.
+- Prefer direct in-file code edits in responses instead of git patch format when asking to change uncommitted code.
