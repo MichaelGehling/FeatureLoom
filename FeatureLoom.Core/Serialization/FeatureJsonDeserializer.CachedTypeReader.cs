@@ -111,6 +111,9 @@ public sealed partial class FeatureJsonDeserializer
         private readonly Func<object> readingObjectDelegate;
         private readonly Func<object, object> populatingObjectDelegate;
 
+        private ByteSegment lastProposedTypeName = default;
+        private CachedTypeReader lastProposedTypeReader = null;
+
         public bool RefTypeOrRefTypeChildren => refTypeOrRefTypeChildren;
         public Type ReaderType => readerType;
         public bool IsNoCheckPossible<T>() => typeof(T) == readerType && !enableProposedTypes && !resolveRefPath && !writeRefPath;
@@ -355,18 +358,16 @@ public sealed partial class FeatureJsonDeserializer
             // so we can skip the rest of this method and just read it as the original type
             if (b != (byte)'{') return false;
 
-            CachedTypeReader proposedTypeReader = null;
+            bool foundProposedReader = false;
             bool foundValueField = false;
 
             var undoHandle = parent.CreateUndoReadHandle();
-            { 
-                if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+            {
+                foundProposedReader = parent.TryFindProposedType(ref lastProposedTypeReader, ref lastProposedTypeName, typeof(T), out foundValueField);
+                if (!foundProposedReader && !foundValueField)
                 {
-                    if (!foundValueField)
-                    {
-                        undoHandle.Dispose();
-                        return false;
-                    }
+                    undoHandle.Dispose();
+                    return false;                    
                 }
                 undoHandle.SetUndoReading(!foundValueField);
             }
@@ -375,9 +376,9 @@ public sealed partial class FeatureJsonDeserializer
             if (foundValueField)
             {
                 // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
-                if (proposedTypeReader != null)
+                if (foundProposedReader)
                 {
-                    item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+                    item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>();
                 }
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>();
                 parent.SkipRemainingFieldsOfObject();
@@ -386,7 +387,7 @@ public sealed partial class FeatureJsonDeserializer
             {
                 // we read the object again from the start, because the $type field was embedded in the actual value's object,
                 // the buffer pos was already reset by the undo handle, so we can just read the item again
-                item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+                item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>();
             }
             return true;
         }
@@ -398,17 +399,16 @@ public sealed partial class FeatureJsonDeserializer
             // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
             if (b != (byte)'{') return false;
 
-            CachedTypeReader proposedTypeReader = null;
+            bool foundProposedReader = false;
             bool foundValueField = false;
+
             var undoHandle = parent.CreateUndoReadHandle();
             {
-                if (!parent.TryFindProposedType(out proposedTypeReader, typeof(T), out foundValueField))
+                foundProposedReader = parent.TryFindProposedType(ref lastProposedTypeReader, ref lastProposedTypeName, typeof(T), out foundValueField);
+                if (!foundProposedReader && !foundValueField)
                 {
-                    if (!foundValueField)
-                    {
-                        undoHandle.Dispose();
-                        return false;
-                    }
+                    undoHandle.Dispose();
+                    return false;
                 }
                 undoHandle.SetUndoReading(!foundValueField);
             }
@@ -417,10 +417,10 @@ public sealed partial class FeatureJsonDeserializer
             if (foundValueField)
             {
                 // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
-                if (proposedTypeReader != null)
+                if (foundProposedReader)
                 {
-                    if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
-                    else item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+                    if (itemToPopulate.GetType().IsAssignableTo(lastProposedTypeReader.ReaderType)) item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
+                    else item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>();
                 }
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
                 parent.SkipRemainingFieldsOfObject();
@@ -430,8 +430,8 @@ public sealed partial class FeatureJsonDeserializer
                 // we read the object again from the start, because the $type field was embedded in the actual value's object,
                 // the buffer pos was already reset by the undo handle, so we can just read the item again,
                 // but we have to check if the proposed type is compatible with the item to populate, otherwise we would populate the wrong type of object
-                if (itemToPopulate.GetType().IsAssignableTo(proposedTypeReader.ReaderType)) item = proposedTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
-                else item = proposedTypeReader.ReadValue_IgnoreProposed<T>();
+                if (itemToPopulate.GetType().IsAssignableTo(lastProposedTypeReader.ReaderType)) item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
+                else item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>();
             }
             return true;
         }

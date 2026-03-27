@@ -548,5 +548,115 @@ namespace FeatureLoom.Serialization
             public int First;
         }
 
+        private class CustomCursorReadType
+        {
+            public byte FirstByte;
+            public byte FirstNonWhitespaceByte;
+            public bool BoolValue;
+        }
+
+        private class CustomTryNextByteReadType
+        {
+            public byte First;
+            public byte Second;
+            public bool Moved;
+        }
+
+        private class CustomSkipValueReadType
+        {
+            public bool TailBool;
+        }
+
+        private class CustomRawTryResultType
+        {
+            public bool Success;
+            public string Raw;
+        }
+
+        private class CustomStringTryResultType
+        {
+            public bool Success;
+            public string Text;
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesTryNextByte()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomTryNextByteReadType>(
+                api =>
+                {
+                    byte first = api.GetCurrentByte();
+                    bool moved = api.TryNextByte();
+                    byte second = api.GetCurrentByte();
+                    return new CustomTryNextByteReadType
+                    {
+                        First = first,
+                        Moved = moved,
+                        Second = second
+                    };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("12", out CustomTryNextByteReadType value));
+            Assert.Equal((byte)'1', value.First);
+            Assert.True(value.Moved);
+            Assert.Equal((byte)'2', value.Second);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_UsesSkipNextValue()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomSkipValueReadType>(
+                api =>
+                {
+                    api.SkipNextValue();
+                    Assert.True(api.TryReadBoolValue(out bool b));
+                    return new CustomSkipValueReadType { TailBool = b };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("[1,2] false", out CustomSkipValueReadType value));
+            Assert.False(value.TailBool);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_TryReadRawJsonValue_FailurePath_ReturnsFalse()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomRawTryResultType>(
+                api =>
+                {
+                    bool success = api.TryReadRawJsonValue(out string raw);
+                    return new CustomRawTryResultType { Success = success, Raw = raw };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{", out CustomRawTryResultType value));
+            Assert.False(value.Success);
+            Assert.Null(value.Raw);
+        }
+
+        [Fact]
+        public void Settings_AddCustomTypeReader_TryReadStringValueOrNull_FailsOnNumber()
+        {
+            var settings = new FeatureJsonDeserializer.Settings();
+            settings.AddCustomTypeReader<CustomStringTryResultType>(
+                api =>
+                {
+                    bool success = api.TryReadStringValueOrNull(out string text);
+                    return new CustomStringTryResultType { Success = success, Text = text };
+                });
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("123", out CustomStringTryResultType value));
+            Assert.False(value.Success);
+            Assert.Null(value.Text);
+        }
     }
 }

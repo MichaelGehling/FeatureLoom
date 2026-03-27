@@ -3976,9 +3976,8 @@ namespace FeatureLoom.Serialization
         Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new Dictionary<ByteSegment, CachedTypeReader>();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool TryFindProposedType(out CachedTypeReader proposedTypeReader, Type expectedType, out bool foundValueField)
+        bool TryFindProposedType(ref CachedTypeReader proposedTypeReaderRef, ref ByteSegment proposedTypeNameRef, Type expectedType, out bool foundValueField)
         {
-            proposedTypeReader = null;
             foundValueField = false;
 
             // IMPORTANT: Currently, the type-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
@@ -4016,22 +4015,39 @@ namespace FeatureLoom.Serialization
             buffer.TryNextByte();
             var proposedTypeBytes = ReadStringBytes();
 
-            // 2. try get proposedTypeReader, if possible from cache, otherwise resolve type and get proposedTypeReader
-            proposedTypeBytes.EnsureHashCode();
-            if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out proposedTypeReader))
-            {
-                proposedTypeReader = null;
-                string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
-                var proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
-                if (proposedType != null && 
-                    proposedType != expectedType && 
-                    proposedType.IsAssignableTo(expectedType))
+            // 2. try get proposedTypeReader, first check if already present, if not check the cache, otherwise resolve type and get proposedTypeReader
+            // Skip finding proposed type if it already found the last time.
+            // This allows to avoid expensive type resolution and reader lookup in the common case where many objects of the same type are deserialized in a row.
+            bool isProposedTypeCompatible = true;
+            if (!proposedTypeNameRef.IsValid || !proposedTypeNameRef.Equals(proposedTypeBytes))
+            {                
+                proposedTypeBytes.EnsureHashCode();
+                // Force a copy of the proposedTypeBytes so it can be safely used as dictionary key without worrying about buffer changes.
+                proposedTypeBytes = proposedTypeBytes.CropArray(true);
+                if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out var proposedTypeReader))
                 {
-                    proposedTypeReader = GetCachedTypeReader(proposedType);
+                    proposedTypeReader = null;
+                    string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
+                    var proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
+                    if (proposedType != null &&
+                        proposedType != expectedType &&
+                        proposedType.IsAssignableTo(expectedType))
+                    {
+                        proposedTypeReader = GetCachedTypeReader(proposedType);
+                    }
+                    proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
                 }
-                proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
+                isProposedTypeCompatible = proposedTypeReader != null && proposedTypeReader.ReaderType.IsAssignableTo(expectedType);
+                if (isProposedTypeCompatible)
+                {
+                    proposedTypeReaderRef = proposedTypeReader;
+                    proposedTypeNameRef = proposedTypeBytes;
+                }
             }
-            bool isProposedTypeCompatible = proposedTypeReader != null && proposedTypeReader.ReaderType.IsAssignableTo(expectedType);
+            else
+            {
+                isProposedTypeCompatible = proposedTypeReaderRef != null && proposedTypeReaderRef.ReaderType.IsAssignableTo(expectedType);
+            }
 
             // 3. look if next is $value field
             b = SkipWhiteSpaces();

@@ -725,5 +725,78 @@ namespace FeatureLoom.Serialization
         private class ProposedDerivedSample : ProposedBaseSample
         {
         }
+        
+        [Fact]
+        public void Deserialize_ProposedType_RepeatedSameTypeName_GenericThenTypeOverload_UsesDerivedTypeInBothCalls()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":41,\"B\":42}}}}";
+
+            Assert.True(deserializer.TryDeserialize(json, out ProposedBaseSample first));
+            Assert.True(deserializer.TryDeserialize(json, typeof(ProposedBaseSample), out object secondObj));
+
+            var firstDerived = Assert.IsType<ProposedDerivedSample>(first);
+            var secondDerived = Assert.IsType<ProposedDerivedSample>(secondObj);
+
+            Assert.Equal(41, firstDerived.A);
+            Assert.Equal(42, firstDerived.B);
+            Assert.Equal(41, secondDerived.A);
+            Assert.Equal(42, secondDerived.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_RepeatedSameTypeName_TypeOverloadThenGeneric_UsesDerivedTypeInBothCalls()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":51,\"B\":52}}}}";
+
+            Assert.True(deserializer.TryDeserialize(json, typeof(ProposedBaseSample), out object firstObj));
+            Assert.True(deserializer.TryDeserialize(json, out ProposedBaseSample second));
+
+            var firstDerived = Assert.IsType<ProposedDerivedSample>(firstObj);
+            var secondDerived = Assert.IsType<ProposedDerivedSample>(second);
+
+            Assert.Equal(51, firstDerived.A);
+            Assert.Equal(52, firstDerived.B);
+            Assert.Equal(51, secondDerived.A);
+            Assert.Equal(52, secondDerived.B);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_RepeatedSameTypeName_WithAndWithoutValueWrapper_UsesDerivedTypeInBothCalls()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            string typeName = typeof(ProposedDerivedSample).FullName;
+            string wrappedJson = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"A\":61,\"B\":62}}}}";
+            string embeddedJson = $"{{\"$type\":\"{typeName}\",\"A\":63,\"B\":64}}";
+
+            Assert.True(deserializer.TryDeserialize(wrappedJson, out ProposedBaseSample wrapped));
+            Assert.True(deserializer.TryDeserialize(embeddedJson, out ProposedBaseSample embedded));
+
+            var wrappedDerived = Assert.IsType<ProposedDerivedSample>(wrapped);
+            var embeddedDerived = Assert.IsType<ProposedDerivedSample>(embedded);
+
+            Assert.Equal(61, wrappedDerived.A);
+            Assert.Equal(62, wrappedDerived.B);
+            Assert.Equal(63, embeddedDerived.A);
+            Assert.Equal(64, embeddedDerived.B);
+        }
     }
 }
