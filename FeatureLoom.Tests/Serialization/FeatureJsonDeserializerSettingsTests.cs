@@ -1,5 +1,7 @@
 using FeatureLoom.Collections;
+using FeatureLoom.Helpers;
 using FeatureLoom.Serialization;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -452,6 +454,16 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        private class NoDefaultCtorReadonlyField
+        {
+            public readonly int X;
+
+            public NoDefaultCtorReadonlyField(int x)
+            {
+                X = x;
+            }
+        }
+
         private class EnumerableWrapper : IEnumerable<int>
         {
             public List<int> Items { get; }
@@ -657,6 +669,354 @@ namespace FeatureLoom.Serialization
             Assert.True(deserializer.TryDeserialize("123", out CustomStringTryResultType value));
             Assert.False(value.Success);
             Assert.Null(value.Text);
+        }
+
+        [Fact]
+        public void Settings_AllowUninitializedObjectCreation_PublicAndPrivateFields_CanCreateTypeWithoutDefaultConstructor()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                allowUninitializedObjectCreation = true,
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicAndPrivateFields
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"X\":7}", out NoDefaultCtorReadonlyField value));
+            Assert.Equal(7, value.X);
+        }
+
+        [Fact]
+        public void Settings_AllowUninitializedObjectCreation_PublicFieldsAndProperties_IsDisallowed()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                allowUninitializedObjectCreation = true,
+                dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("{\"X\":7}", out NoDefaultCtorReadonlyField value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_DirectType_IsRejected()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.AddForbiddenType(typeof(ForbiddenType));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("{\"Value\":1}", out ForbiddenType value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_AsMemberType_IsRejected()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.AddForbiddenType(typeof(ForbiddenType));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("{\"Child\":{\"Value\":1}}", out HasForbiddenMember value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_AsGenericTypeArgument_IsRejected()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.AddForbiddenType(typeof(ForbiddenType));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("{\"Item\":{\"Value\":1}}", out GenericHolder<ForbiddenType> value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_ForbiddenGenericTypeDefinition_IsRejected()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.AddForbiddenType(typeof(List<>));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("[1,2,3]", out List<int> value));
+            Assert.Null(value);
+        }
+        private class ForbiddenType
+        {
+            public int Value;
+        }
+
+        private class HasForbiddenMember
+        {
+            public ForbiddenType Child;
+        }
+
+        private class GenericHolder<T>
+        {
+            public T Item;
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_DelegateBase_BlocksFuncType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.forbiddenTypes.Clear();
+            settings.AddForbiddenType(typeof(Delegate));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("null", out Func<int> value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_DelegateBase_BlocksFuncMemberType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.forbiddenTypes.Clear();
+            settings.AddForbiddenType(typeof(Delegate));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("{\"Factory\":null}", out HasFuncMember value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_ExpressionBase_BlocksExpressionDerivedType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.forbiddenTypes.Clear();
+            settings.AddForbiddenType(typeof(System.Linq.Expressions.Expression));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("null", out System.Linq.Expressions.Expression<Func<int>> value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_BaseType_BlocksDerivedType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.forbiddenTypes.Clear();
+            settings.AddForbiddenType(typeof(System.IO.FileSystemInfo));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("null", out System.IO.FileInfo value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_ForbiddenTypes_GenericInterfaceDefinition_BlocksImplementingConcreteType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.forbiddenTypes.Clear();
+            settings.AddForbiddenType(typeof(IEnumerable<>));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.False(deserializer.TryDeserialize("[1,2,3]", out List<int> value));
+            Assert.Null(value);
+        }
+
+        private class HasFuncMember
+        {
+            public Func<int> Factory;
+        }
+
+        [Fact]
+        public void Settings_Whitelist_ForProposedTypesOnly_NonWhitelistedProposedWithoutValue_FallsBackToExpectedType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true,
+                typeWhitelistMode = FeatureJsonDeserializer.Settings.TypeWhitelistMode.ForProposedTypesOnly,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+            string blockedTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(WhitelistBlockedDerived));
+            string json = $"{{\"$type\":\"{blockedTypeName}\",\"A\":7,\"B\":11}}";
+
+            Assert.True(deserializer.TryDeserialize(json, out WhitelistExpectedConcrete value));
+            Assert.NotNull(value);
+            Assert.Equal(7, value.A);
+            Assert.IsType<WhitelistExpectedConcrete>(value);
+        }
+
+        [Fact]
+        public void Settings_Whitelist_ForProposedTypesOnly_NonWhitelistedProposedWithValue_FallsBackToExpectedType()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true,
+                typeWhitelistMode = FeatureJsonDeserializer.Settings.TypeWhitelistMode.ForProposedTypesOnly,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+            string blockedTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(WhitelistBlockedDerived));
+            string json = $"{{\"$type\":\"{blockedTypeName}\",\"$value\":{{\"A\":9,\"B\":12}},\"ignored\":1}}";
+
+            Assert.True(deserializer.TryDeserialize(json, out WhitelistExpectedConcrete value));
+            Assert.NotNull(value);
+            Assert.Equal(9, value.A);
+            Assert.IsType<WhitelistExpectedConcrete>(value);
+        }
+
+        [Fact]
+        public void Settings_Whitelist_ForProposedTypesOnly_NonWhitelistedProposedForInterface_IsRejected()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                enableProposedTypes = true,
+                typeWhitelistMode = FeatureJsonDeserializer.Settings.TypeWhitelistMode.ForProposedTypesOnly,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+            string blockedTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(WhitelistBlockedDerived));
+            string json = $"{{\"$type\":\"{blockedTypeName}\",\"A\":7,\"B\":11}}";
+
+            Assert.False(deserializer.TryDeserialize(json, out IWhitelistExpected value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_Whitelist_ForAllNonIntrinsicTypes_AllowedNormalType_Deserializes()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                typeWhitelistMode = FeatureJsonDeserializer.Settings.TypeWhitelistMode.ForAllNonIntrinsicTypes,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.AddAllowedType<WhitelistAllowedType>();
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"A\":42}", out WhitelistAllowedType value));
+            Assert.NotNull(value);
+            Assert.Equal(42, value.A);
+        }
+
+        [Fact]
+        public void Settings_Whitelist_ForAllNonIntrinsicTypes_AllowedGenericTypeDefinition_Deserializes()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                typeWhitelistMode = FeatureJsonDeserializer.Settings.TypeWhitelistMode.ForAllNonIntrinsicTypes,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.AddAllowedType(typeof(WhitelistGenericBox<>));
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"Item\":7}", out WhitelistGenericBox<int> value));
+            Assert.NotNull(value);
+            Assert.Equal(7, value.Item);
+        }
+
+        [Fact]
+        public void Settings_Whitelist_ForAllNonIntrinsicTypes_AllowedNamespacePrefix_Deserializes()
+        {
+            var settings = new FeatureJsonDeserializer.Settings
+            {
+                typeWhitelistMode = FeatureJsonDeserializer.Settings.TypeWhitelistMode.ForAllNonIntrinsicTypes,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.AddAllowedNamespacePrefix("FeatureLoom.Serialization");
+
+            var deserializer = new FeatureJsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"A\":99}", out WhitelistNamespaceAllowedType value));
+            Assert.NotNull(value);
+            Assert.Equal(99, value.A);
+        }
+
+        private interface IWhitelistExpected
+        {
+            int A { get; set; }
+        }
+
+        private class WhitelistExpectedConcrete : IWhitelistExpected
+        {
+            public int A;
+            int IWhitelistExpected.A
+            {
+                get => A;
+                set => A = value;
+            }
+        }
+
+        private class WhitelistBlockedDerived : WhitelistExpectedConcrete
+        {
+            public int B;
+        }
+
+        private class WhitelistAllowedType
+        {
+            public int A;
+        }
+
+        private class WhitelistGenericBox<T>
+        {
+            public T Item;
+        }
+
+        private class WhitelistNamespaceAllowedType
+        {
+            public int A;
         }
     }
 }

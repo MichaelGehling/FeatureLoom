@@ -585,5 +585,42 @@ namespace FeatureLoom.Serialization
             Assert.True(deserializer.TryDeserialize("\"\"", out TimeSpan? value));
             Assert.Null(value);
         }
+
+        [Fact]
+        public void Deserialize_DateTimeOffset()
+        {
+            var expected = DateTimeOffset.Parse("2024-01-02T03:04:05+02:30", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            AssertDeserialized("\"2024-01-02T03:04:05+02:30\"", expected);
+        }
+
+        [Theory]
+        [InlineData("null", null)]
+        [InlineData("\"2024-01-02T03:04:05+02:30\"", "2024-01-02T03:04:05+02:30")]
+        public void Deserialize_NullableDateTimeOffset(string json, string expectedText)
+        {
+            DateTimeOffset? expected = expectedText == null
+                ? null
+                : DateTimeOffset.Parse(expectedText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
+            AssertDeserialized(json, expected);
+        }
+
+        [Theory]
+        [InlineData("\"2024-01-02T03:04:05+02:30\"")]
+        [InlineData("\"2024-01-02T03:04:05Z\"")]
+        [InlineData("\"2024-01-02T03:04:05.1234567-07:00\"")]
+        public void Deserialize_DateTimeOffset_EdgeCases(string json)
+        {
+            var expected = DateTimeOffset.Parse(json.Trim('"'), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            AssertDeserialized(json, expected);
+        }
+
+        [Fact]
+        public void Deserialize_NullableDateTimeOffset_EmptyString_NonStrict_ReturnsNull()
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            Assert.True(deserializer.TryDeserialize("\"\"", out DateTimeOffset? value));
+            Assert.Null(value);
+        }
     }
 }

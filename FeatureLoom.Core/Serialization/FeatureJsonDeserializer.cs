@@ -1,27 +1,28 @@
-﻿using FeatureLoom.Synchronization;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
+using FeatureLoom.Logging;
+using FeatureLoom.Serialization;
+using FeatureLoom.Synchronization;
 using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
-using FeatureLoom.Extensions;
-using System.Reflection;
-using System.Collections;
-using System.Runtime.CompilerServices;
-using FeatureLoom.Helpers;
 using System.Linq.Expressions;
-using FeatureLoom.Collections;
-using static FeatureLoom.Serialization.FeatureJsonSerializer;
-using System.Collections.Concurrent;
 using System.Net;
-using System.ComponentModel;
-using System.Runtime.Serialization.Formatters;
 using System.Net.Http.Headers;
-using FeatureLoom.Serialization;
-using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using FeatureLoom.Logging;
-using System.Globalization;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters;
+using System.Text;
+using static FeatureLoom.Serialization.FeatureJsonSerializer;
 
 #if !NETSTANDARD2_0
 using System.Buffers.Text;
@@ -45,7 +46,8 @@ namespace FeatureLoom.Serialization
         ExtensionApi extensionApi;
 
         Dictionary<Type, CachedTypeReader> typeReaderCache = new();
-        Dictionary<Type, object> typeConstructorMap = new();
+        Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new();
+        readonly Dictionary<Type, bool> forbiddenTypeCache = new();
 
         static readonly FilterResult[] map_IsFieldEnd = CreateFilterMap_IsFieldEnd();
         static readonly TypeResult[] map_TypeStart = CreateTypeStartMap();
@@ -98,6 +100,36 @@ namespace FeatureLoom.Serialization
             if (settings.useStringCache)
             {
                 stringCache = new QuickStringCache(settings.stringCacheBitSize, settings.stringCacheMaxLength);                
+            }
+
+            if (settings.enableProposedTypes)
+            {
+                foreach (var kvp in settings.customTypeNames)
+                {
+                    if (kvp.Key.EmptyOrNull()) continue;
+                    var cachedTypeReader = GetCachedTypeReader(kvp.Value);
+                    AddCustomTypeNameToProposedCache(kvp.Key, cachedTypeReader, settings.addCaseVariantsForCustomTypeNames);
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AddCustomTypeNameToProposedCache(string customTypeName, CachedTypeReader cachedTypeReader, bool addCaseVariants)
+        {
+            proposedTypeReaderCache[new ByteSegment(customTypeName, true)] = cachedTypeReader;
+
+            if (!addCaseVariants) return;
+
+            string lower = customTypeName.ToLowerInvariant();
+            if (lower != customTypeName)
+            {
+                proposedTypeReaderCache[new ByteSegment(lower, true)] = cachedTypeReader;
+            }
+
+            string upper = customTypeName.ToUpperInvariant();
+            if (upper != customTypeName && upper != lower)
+            {
+                proposedTypeReaderCache[new ByteSegment(upper, true)] = cachedTypeReader;
             }
         }
 
@@ -176,6 +208,15 @@ namespace FeatureLoom.Serialization
 
         CachedTypeReader CreateCachedTypeReader(Type itemType)
         {
+            if (IsForbiddenType(itemType))
+            {
+                throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(itemType)} is forbidden for deserialization.");
+            }
+            if (settings.typeWhitelistMode == Settings.TypeWhitelistMode.ForAllNonIntrinsicTypes && !IsWhitelistedType(itemType))
+            {
+                throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(itemType)} is not whitelisted for deserialization.");
+            }
+
             if (settings.typeMapping.TryGetValue(itemType, out Type mappedType))
             {
                 CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType);
@@ -231,6 +272,8 @@ namespace FeatureLoom.Serialization
                 else if (itemType == typeof(char?)) return TypeReaderInitializer.Create(this, ReadNullableCharValue, null, false);
                 else if (itemType == typeof(DateTime)) return TypeReaderInitializer.Create(this, ReadDateTimeValue, null, false);
                 else if (itemType == typeof(DateTime?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeValue, null, false);
+                else if (itemType == typeof(DateTimeOffset)) return TypeReaderInitializer.Create(this, ReadDateTimeOffsetValue, null, false);
+                else if (itemType == typeof(DateTimeOffset?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeOffsetValue, null, false);
                 else if (itemType == typeof(TimeSpan)) return TypeReaderInitializer.Create(this, ReadTimeSpanValue, null, false);
                 else if (itemType == typeof(TimeSpan?)) return TypeReaderInitializer.Create(this, ReadNullableTimeSpanValue, null, false);
                 else if (itemType == typeof(Guid)) return TypeReaderInitializer.Create(this, ReadGuidValue, null, false);
@@ -239,11 +282,12 @@ namespace FeatureLoom.Serialization
                 else if (itemType == typeof(JsonFragment?)) return TypeReaderInitializer.Create(this, ReadNullableJsonFragmentValue, null, false);
                 else if (itemType == typeof(IntPtr)) return TypeReaderInitializer.Create(this, ReadIntPtrValue, null, false);
                 else if (itemType == typeof(UIntPtr)) return TypeReaderInitializer.Create(this, ReadUIntPtrValue, null, false);
+                else if (itemType == typeof(Uri)) return TypeReaderInitializer.Create(this, () => new Uri(ReadStringValue()), null, true);
                 else if (itemType == typeof(ByteSegment)) return CreateByteSegmentTypeReader();
                 else if (itemType == typeof(ByteSegment?)) return CreateNullableByteSegmentTypeReader();
                 else if (itemType == typeof(ArraySegment<byte>)) return CreateByteArraySegmentTypeReader();
                 else if (itemType == typeof(ArraySegment<byte>?)) return CreateNullableByteArraySegmentTypeReader();                
-                else if (itemType == typeof(TextSegment)) return CreateTextSegmentTypeReader();
+                else if (itemType == typeof(TextSegment)) return CreateTextSegmentTypeReader();                
                 else if (itemType.IsEnum || (Nullable.GetUnderlyingType(itemType)?.IsEnum ?? false))
                 {
                     if (!itemType.IsNullable()) return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateEnumReader), new Type[] { itemType });
@@ -254,6 +298,101 @@ namespace FeatureLoom.Serialization
                 else if (TryCreateEnumerableTypeReader(itemType, out initializer)) return initializer;
                 else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { itemType }, true);
             });
+        }        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsForbiddenType(Type itemType)
+        {
+            if (forbiddenTypeCache.TryGetValue(itemType, out bool cached)) return cached;
+
+            bool forbidden = false;
+
+            // 1) direct match
+            if (settings.forbiddenTypes.Contains(itemType))
+            {
+                forbidden = true;
+            }
+            // 2) generic definition match (e.g. Task<int> vs Task<>)
+            else if (itemType.IsGenericType && settings.forbiddenTypes.Contains(itemType.GetGenericTypeDefinition()))
+            {
+                forbidden = true;
+            }
+            // 3) delegate family (covers Func<...>, Action<...>, custom delegates)
+            else if (settings.forbiddenTypes.Contains(typeof(Delegate)) && typeof(Delegate).IsAssignableFrom(itemType))
+            {
+                forbidden = true;
+            }
+            // 4) expression family
+            else if (settings.forbiddenTypes.Contains(typeof(System.Linq.Expressions.Expression)) &&
+                     typeof(System.Linq.Expressions.Expression).IsAssignableFrom(itemType))
+            {
+                forbidden = true;
+            }
+            else
+            {
+                // 5) base/interface fallback
+                for (Type t = itemType.BaseType; t != null && !forbidden; t = t.BaseType)
+                {
+                    if (settings.forbiddenTypes.Contains(t)) forbidden = true;
+                }
+
+                if (!forbidden)
+                {
+                    foreach (var i in itemType.GetInterfaces())
+                    {
+                        if (settings.forbiddenTypes.Contains(i) ||
+                            (i.IsGenericType && settings.forbiddenTypes.Contains(i.GetGenericTypeDefinition())))
+                        {
+                            forbidden = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            forbiddenTypeCache[itemType] = forbidden;
+            return forbidden;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsIntrinsicSafeType(Type type)
+        {
+            type = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (type.IsPrimitive || type.IsEnum) return true;
+
+            return type == typeof(string) ||
+                   type == typeof(decimal) ||
+                   type == typeof(DateTime) ||
+                   type == typeof(DateTimeOffset) ||
+                   type == typeof(TimeSpan) ||
+                   type == typeof(Guid) ||
+                   type == typeof(IntPtr) ||
+                   type == typeof(UIntPtr) ||
+                   type == typeof(Uri) ||
+                   type == typeof(JsonFragment) ||
+                   type == typeof(ByteSegment) ||
+                   type == typeof(TextSegment) ||
+                   type == typeof(ArraySegment<byte>) ||
+                   type == typeof(byte[]);
+        }
+
+        private bool IsWhitelistedType(Type itemType)
+        {
+            if (IsIntrinsicSafeType(itemType)) return true;
+
+            if (settings.allowedTypes.Contains(itemType)) return true;
+
+            if (itemType.IsGenericType &&
+                settings.allowedTypes.Contains(itemType.GetGenericTypeDefinition())) return true;
+
+            string ns = itemType.Namespace ?? string.Empty;
+            foreach (var prefix in settings.allowedNamespacePrefixes)
+            {
+                if (ns.StartsWith(prefix, StringComparison.Ordinal)) return true;
+            }
+
+            return false;
         }
 
         TypeReaderInitializer CreateCustomTypeReader<T>(object customReaderObj)
@@ -415,7 +554,20 @@ namespace FeatureLoom.Serialization
             else if (type.IsValueType) return () => default;
             else if (!TryCompileConstructor<T>(out constructor, derivedType))
             {
-                throw new Exception($"No default constructor for type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)}.");
+                bool canUseUninitialized =
+        settings.allowUninitializedObjectCreation &&
+        settings.dataAccess == DataAccess.PublicAndPrivateFields;
+
+                if (canUseUninitialized)
+                {
+                    constructor = () => CreateUninitialized<T>();
+                }
+                else
+                {
+                    throw new Exception(
+                        $"No default constructor for type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)}. " +
+                        $"Either add a custom constructor in settings, or enable uninitialized creation with {nameof(DataAccess.PublicAndPrivateFields)}.");
+                }
             }
             
             if (!type.IsValueType && settings.enableReferenceResolution)
@@ -451,7 +603,16 @@ namespace FeatureLoom.Serialization
             }
             else return constructor;
         }
-    
+
+        static T CreateUninitialized<T>()
+        {
+#if NET8_0_OR_GREATER
+            return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
+#else
+            return (T)FormatterServices.GetUninitializedObject(typeof(T));
+#endif
+        }
+
         private static bool TryCompileConstructor<T>(out Func<T> constructor, Type derivedType = null)
         {
             if (derivedType == null)
@@ -2096,6 +2257,57 @@ namespace FeatureLoom.Serialization
         {
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDateTimeValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private DateTimeOffset ReadDateTimeOffsetValue()
+        {
+            var stringBytes = ReadStringBytes();
+
+            if (stringBytes.Count == 0 && !settings.strict)
+            {
+                return default;
+            }
+
+            DateTimeOffset result;
+#if NET5_0_OR_GREATER
+            Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
+            ReadOnlySpan<char> span = new ReadOnlySpan<char>();
+            foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+            {
+                if (span.IsEmpty) span = chunk.Span; // First chunk, that is good
+                else
+                {
+                    // second chunk is bad and we need to reset to fall back to copying (This is very unlikely for a DateTimeOffset string)
+                    span = new ReadOnlySpan<char>();
+                    break;
+                }
+            }
+            if (span.IsEmpty)
+            {
+                var chars = charSlicedBuffer.GetSlice(stringBuilder.Length);
+                stringBuilder.CopyTo(0, chars.Array, chars.Offset, stringBuilder.Length);
+                span = chars;
+                charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
+            }
+            result = DateTimeOffset.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+#elif NETSTANDARD2_1_OR_GREATER
+            ReadOnlySpan<char> span = Utf8Converter.DecodeUtf8ToSpanOfChars(stringBytes, stringBuilder, charSlicedBuffer);
+            result = DateTimeOffset.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            charSlicedBuffer.Reset(true);
+#else
+            string str = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
+            result = DateTimeOffset.Parse(str, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+#endif
+            stringBuilder.Clear();
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private DateTimeOffset? ReadNullableDateTimeOffsetValue()
+        {
+            if (!settings.strict && TryReadEmptyStringValue()) return null;
+            return ReadDateTimeOffsetValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3967,13 +4179,7 @@ namespace FeatureLoom.Serialization
             }
             return b;
 #endif
-        }
-
-        readonly static ByteSegment typeFieldName = "$type".ToByteArray();
-        readonly static ByteSegment valueFieldName = "$value".ToByteArray();
-
-
-        Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new Dictionary<ByteSegment, CachedTypeReader>();
+        }      
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryFindProposedType(ref CachedTypeReader proposedTypeReaderRef, ref ByteSegment proposedTypeNameRef, Type expectedType, out bool foundValueField)
@@ -3995,19 +4201,19 @@ namespace FeatureLoom.Serialization
             if (b != (byte)'$') return false;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'t') return false;
+            if (FoldAsciiToLower(b) != (byte)'t') return false;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'y') return false;
+            if (FoldAsciiToLower(b) != (byte)'y') return false;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'p') return false;
+            if (FoldAsciiToLower(b) != (byte)'p') return false;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'e') return false;
+            if (FoldAsciiToLower(b) != (byte)'e') return false;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'"') return false;
+            if (FoldAsciiToLower(b) != (byte)'"') return false;
             buffer.TryNextByte();
 
             b = SkipWhiteSpaces();
@@ -4022,19 +4228,40 @@ namespace FeatureLoom.Serialization
             if (!proposedTypeNameRef.IsValid || !proposedTypeNameRef.Equals(proposedTypeBytes))
             {                
                 proposedTypeBytes.EnsureHashCode();
-                // Force a copy of the proposedTypeBytes so it can be safely used as dictionary key without worrying about buffer changes.
-                proposedTypeBytes = proposedTypeBytes.CropArray(true);
+                // Force a copy of the proposedTypeBytes so it can be safely used as dictionary key without worrying about buffer changes.                
                 if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out var proposedTypeReader))
                 {
+                    proposedTypeBytes = proposedTypeBytes.CropArray(true);
                     proposedTypeReader = null;
                     string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
                     var proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
-                    if (proposedType != null &&
-                        proposedType != expectedType &&
-                        proposedType.IsAssignableTo(expectedType))
+
+                    if (proposedType == null)
                     {
-                        proposedTypeReader = GetCachedTypeReader(proposedType);
+                        proposedTypeReader = null;
                     }
+                    else
+                    {
+                        bool enforceWhitelist = settings.typeWhitelistMode != Settings.TypeWhitelistMode.Disabled;
+                        if (enforceWhitelist && !IsWhitelistedType(proposedType))
+                        {
+                            if (expectedType.IsInterface || expectedType.IsAbstract)
+                            {
+                                throw new Exception(
+                                    $"Proposed type '{proposedTypename}' is not whitelisted and expected type '{expectedType.FullName}' is an interface or abstract class, " +
+                                    "which is not allowed for security reasons. Consider changing the expected type to a concrete class or adjust the type whitelist settings.");
+                            }
+
+                            // No early return here:
+                            // proposed type is ignored, fallback to expected type reader later.
+                            proposedTypeReader = null;
+                        }
+                        else if (proposedType != expectedType && proposedType.IsAssignableTo(expectedType))
+                        {
+                            proposedTypeReader = GetCachedTypeReader(proposedType);
+                        }
+                    }
+
                     proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
                 }
                 isProposedTypeCompatible = proposedTypeReader != null && proposedTypeReader.ReaderType.IsAssignableTo(expectedType);
@@ -4062,22 +4289,27 @@ namespace FeatureLoom.Serialization
             if (b != (byte)'$') return isProposedTypeCompatible;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'v') return isProposedTypeCompatible;
+            if (FoldAsciiToLower(b) != (byte)'v') return isProposedTypeCompatible;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'a') return isProposedTypeCompatible;
+            if (FoldAsciiToLower(b) != (byte)'a') return isProposedTypeCompatible;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'l') return isProposedTypeCompatible;
+            if (FoldAsciiToLower(b) != (byte)'l') return isProposedTypeCompatible;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'u') return isProposedTypeCompatible;
+            if (FoldAsciiToLower(b) != (byte)'u') return isProposedTypeCompatible;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'e') return isProposedTypeCompatible;
+            if (FoldAsciiToLower(b) != (byte)'e') return isProposedTypeCompatible;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
-            if (b != (byte)'"') return isProposedTypeCompatible;
+            if (FoldAsciiToLower(b) == (byte)'s')
+            {
+                buffer.TryNextByte();
+                b = buffer.CurrentByte;
+            }
+            if (FoldAsciiToLower(b) != (byte)'"') return isProposedTypeCompatible;
             buffer.TryNextByte();
 
             b = SkipWhiteSpaces();

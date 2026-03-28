@@ -15,7 +15,7 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]    
 [HtmlExporter]
-[MinIterationCount(200)]
+[MinIterationCount(1000)]
 [MaxIterationCount(5000)]
 public partial class DeserializeComplexObjectTest
 {
@@ -81,7 +81,7 @@ public partial class DeserializeComplexObjectTest
         iterations = Math.Abs(iterations);
     }
 
-    [Benchmark(Baseline = true)]
+    [Benchmark]
     public void DeserializeComplexObject_FromStream_Feature()
     {
         for (int i = 0; i < iterations; i++)
@@ -101,8 +101,8 @@ public partial class DeserializeComplexObjectTest
         }
     }
 
-    
-    [Benchmark]
+
+    [Benchmark(Baseline = true)]
     public void DeserializeComplexObject_FromStream_SystemText()
     {
         for (int i = 0; i < iterations; i++)
