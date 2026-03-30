@@ -274,6 +274,7 @@ namespace FeatureLoom.Helpers
                    type == typeof(TimeSpan) ||
                    type == typeof(Guid) ||
                    type == typeof(Uri) ||
+                   typeof(Type).IsAssignableFrom(type) ||
                    (type.IsGenericType &&
                     type.GetGenericTypeDefinition() == typeof(Nullable<>) &&
                     IsImmutable(Nullable.GetUnderlyingType(type)));

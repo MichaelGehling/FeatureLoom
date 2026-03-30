@@ -14,6 +14,9 @@
 - In this codebase, `Deserialize_*_FromArrayOfKeyValuePairs_PublicFieldsAndProperties` should not be expected to pass because `KeyValuePair<TKey,TValue>` properties are not writable in `PublicFieldsAndProperties` mode.
 - For `Settings_AddCustomTypeReader_UsesTryReadNullValue`, use a struct (`CustomNullReadType`) so `api.TryReadNullValue()` can be asserted meaningfully; a class result may be `null` before custom-reader state is observable.
 
+## Parser Guidelines
+- When proposing parser fast-path substitutions, only mark call sites as safe if they preserve whitespace tolerance (e.g., account for pretty-printed JSON whitespace after '{', ',', or ':').
+
 ## General Guidelines
 - Avoid using phrases like "take a deep breath" in responses.
 - When evaluating parser buffer helpers, explicitly distinguish normal state from EOF rollback state (e.g., BufferReadTillEnd) to avoid contradictory guidance.

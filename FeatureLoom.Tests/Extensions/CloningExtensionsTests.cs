@@ -1061,4 +1061,47 @@ public class CloningExtensionsTests
 
         await Task.WhenAll(tasks);
     }
+
+    private sealed class TypeFieldContainer
+    {
+        public Type DeclaredType;
+    }
+
+    [Fact]
+    public void TryClone_TypeField_ShouldSucceedAndKeepSameTypeReference()
+    {
+        var source = new TypeFieldContainer
+        {
+            DeclaredType = typeof(Dictionary<string, int>)
+        };
+
+        bool success = source.TryCloneDeep(out TypeFieldContainer clone);
+
+        Assert.True(success);
+        Assert.NotNull(clone);
+        Assert.NotSame(source, clone);
+
+        Assert.NotNull(clone.DeclaredType);
+        Assert.Same(source.DeclaredType, clone.DeclaredType);
+    }
+
+
+    [Fact]
+    public void TryClone_TypeDictValue_ShouldSucceedAndKeepSameTypeReference()
+    {
+       
+        Dictionary<Type, Type[]> source = new Dictionary<Type, Type[]>
+        {
+            [typeof(string)] = new Type[] { typeof(string) }
+        };
+
+        bool success = source.TryCloneDeep(out Dictionary<Type, Type[]> clone);
+
+        Assert.True(success);
+        Assert.NotNull(clone);
+        Assert.NotSame(source, clone);
+
+        Assert.NotNull(clone[typeof(string)]);
+        Assert.Equal(source[typeof(string)], clone[typeof(string)]);
+    }
 }

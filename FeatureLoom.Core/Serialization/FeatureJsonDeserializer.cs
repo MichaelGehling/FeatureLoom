@@ -86,13 +86,13 @@ namespace FeatureLoom.Serialization
             PublicFieldsAndProperties = 1
         }
 
-        readonly Settings settings;
+        readonly CompiledSettings settings;
 
 
-        public FeatureJsonDeserializer(Settings settings = null)
+        public FeatureJsonDeserializer(Settings deserializerSettings = null)
         {
-            settings = settings ?? new Settings();
-            this.settings = settings;            
+            deserializerSettings = deserializerSettings ?? new Settings();
+            this.settings = new CompiledSettings(deserializerSettings);            
             buffer.Init(settings.initialBufferSize);            
             extensionApi = new ExtensionApi(this);
             isPopulating = settings.populateExistingMembers;
@@ -3909,22 +3909,25 @@ namespace FeatureLoom.Serialization
                 {
                     int jump = remaining.Length - 1;
                     if (jump > 0) buffer.TrySkipBytes(jump);
-
                     if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: No ending quote found.");
                     continue;
                 }
 
                 if (specialIndex > 0) buffer.TrySkipBytes(specialIndex);
 
-                b = buffer.CurrentByte;
-                if (b == (byte)'"')
+                if (remaining[specialIndex] == (byte)'"')
                 {
                     var stringBytes = recording.GetRecordedBytes_WithoutCurrent();
                     buffer.TryNextByte();
                     return stringBytes;
                 }
 
-                // Skip '\' + escaped byte
+                if (remaining.Length - specialIndex > 2)
+                {
+                    buffer.TrySkipBytes(2);
+                    continue;
+                }
+
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: Invalid escape sequence.");
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: No ending quote found.");
             }
@@ -3978,8 +3981,7 @@ namespace FeatureLoom.Serialization
 
                     if (specialIndex > 0) buffer.TrySkipBytes(specialIndex);
 
-                    b = buffer.CurrentByte;
-                    if (b == (byte)'"')
+                    if (remaining[specialIndex] == (byte)'"')
                     {
                         stringBytes = recording.GetRecordedBytes_WithoutCurrent();
                         buffer.TryNextByte();
@@ -3987,7 +3989,13 @@ namespace FeatureLoom.Serialization
                         return true;
                     }
 
-                    // Skip '\' + escaped byte
+                    // Found '\'
+                    if (remaining.Length - specialIndex > 2)
+                    {
+                        buffer.TrySkipBytes(2);
+                        continue;
+                    }
+
                     if (!buffer.TryNextByte()) return false;
                     if (!buffer.TryNextByte()) return false;
                 }
@@ -4009,6 +4017,7 @@ namespace FeatureLoom.Serialization
 #endif
             }
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadStringBytesOrNull(out ByteSegment stringBytes, out bool isNull)
         {
@@ -4047,8 +4056,7 @@ namespace FeatureLoom.Serialization
 
                     if (specialIndex > 0) buffer.TrySkipBytes(specialIndex);
 
-                    b = buffer.CurrentByte;
-                    if (b == (byte)'"')
+                    if (remaining[specialIndex] == (byte)'"')
                     {
                         stringBytes = recording.GetRecordedBytes_WithoutCurrent();
                         buffer.TryNextByte();
@@ -4056,7 +4064,13 @@ namespace FeatureLoom.Serialization
                         return true;
                     }
 
-                    // Skip '\' + escaped byte
+                    // Found '\'
+                    if (remaining.Length - specialIndex > 2)
+                    {
+                        buffer.TrySkipBytes(2);
+                        continue;
+                    }
+
                     if (!buffer.TryNextByte()) return false;
                     if (!buffer.TryNextByte()) return false;
                 }
@@ -4225,7 +4239,11 @@ namespace FeatureLoom.Serialization
             // Skip finding proposed type if it already found the last time.
             // This allows to avoid expensive type resolution and reader lookup in the common case where many objects of the same type are deserialized in a row.
             bool isProposedTypeCompatible = true;
-            if (!proposedTypeNameRef.IsValid || !proposedTypeNameRef.Equals(proposedTypeBytes))
+            if (proposedTypeNameRef.IsValid && proposedTypeNameRef.Equals(proposedTypeBytes))
+            {
+                isProposedTypeCompatible = proposedTypeReaderRef != null && proposedTypeReaderRef.ReaderType.IsAssignableTo(expectedType);
+            }
+            else
             {                
                 proposedTypeBytes.EnsureHashCode();
                 // Force a copy of the proposedTypeBytes so it can be safely used as dictionary key without worrying about buffer changes.                
@@ -4270,10 +4288,6 @@ namespace FeatureLoom.Serialization
                     proposedTypeReaderRef = proposedTypeReader;
                     proposedTypeNameRef = proposedTypeBytes;
                 }
-            }
-            else
-            {
-                isProposedTypeCompatible = proposedTypeReaderRef != null && proposedTypeReaderRef.ReaderType.IsAssignableTo(expectedType);
             }
 
             // 3. look if next is $value field
