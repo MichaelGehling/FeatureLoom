@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FeatureLoom.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -37,6 +38,72 @@ public partial class FeatureJsonDeserializer
             return parentItem;
         };
     }
+
+    private TypeReaderInitializer CreateGenericEnumerableTypeReaderViaStrategy<T, E, S, SV>(CachedTypeReader cachedTypeReader, Func<IEnumerable<E>, T> constructor, Pool<List<E>> bufferPool) where S : struct, IReaderStrategy<SV>
+    {
+        var r = () =>
+        {
+            if (TryReadNullValue()) return default;
+            var b = buffer.CurrentByte;
+            if (b != '[') throw new Exception("Failed reading Array");
+            if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+            List<E> elementBuffer = bufferPool.Take();
+            while (true)
+            {
+                b = SkipWhiteSpaces();
+                if (b == ']') break;
+#if NET8_0_OR_GREATER
+                SV v = S.Read(cachedTypeReader);
+#else
+                SV v = default(S).Read(cachedTypeReader);
+#endif                
+                E value = Unsafe.As<SV, E>(ref v);
+                elementBuffer.Add(value);
+                b = SkipWhiteSpaces();
+                if (b == ',') buffer.TryNextByte();
+                else if (b != ']') throw new Exception("Failed reading Array");
+            }
+            T item = constructor(elementBuffer);
+            bufferPool.Return(elementBuffer);
+            if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
+            buffer.TryNextByte();
+            return item;
+        };
+        return TypeReaderInitializer.Create(this, r, null, true);
+    }
+
+    private TypeReaderInitializer CreateGenericArrayTypeReaderViaStrategy<E, S, SV>(CachedTypeReader cachedTypeReader, Pool<List<E>> bufferPool) where S : struct, IReaderStrategy<SV>
+    {
+        var stringArrayReader = () =>
+        {
+            byte b = SkipWhiteSpaces();
+            if (b != '[') throw new Exception("Failed reading Array");
+            if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+            List<E> elementBuffer = bufferPool.Take();
+            while (true)
+            {
+                b = SkipWhiteSpaces();
+                if (b == ']') break;
+#if NET8_0_OR_GREATER
+                SV v = S.Read(cachedTypeReader);
+#else
+                SV v = default(S).Read(cachedTypeReader);
+#endif                
+                E value = Unsafe.As<SV, E>(ref v);
+                elementBuffer.Add(value);
+                b = SkipWhiteSpaces();
+                if (b == ',') buffer.TryNextByte();
+                else if (b != ']') throw new Exception("Failed reading Array");
+            }
+            E[] item = elementBuffer.ToArray();
+            if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
+            bufferPool.Return(elementBuffer);
+            buffer.TryNextByte();
+            return item;
+        };
+        return TypeReaderInitializer.Create(this, stringArrayReader, null, true);
+    }
+
 
     interface IReaderStrategy<TValue>
     {

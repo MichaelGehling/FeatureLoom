@@ -1925,81 +1925,20 @@ namespace FeatureLoom.Serialization
             var elementTypeReader = GetCachedTypeReader(typeof(E));
             if (elementTypeReader.IsNoCheckPossible<E>())
             {
-                if (typeof(E) == typeof(string))
-                {
-                    var stringArrayReader = () =>
-                    {
-                        byte b = SkipWhiteSpaces();
-                        if (b != '[') throw new Exception("Failed reading Array");
-                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
-                        List<E> elementBuffer = pool.Take();
-                        while (true)
-                        {
-                            b = SkipWhiteSpaces();
-                            if (b == ']') break;
-                            var v = ReadStringValueOrNull();
-                            E value = Unsafe.As<string, E>(ref v);
-                            elementBuffer.Add(value);
-                            b = SkipWhiteSpaces();
-                            if (b == ',') buffer.TryNextByte();
-                            else if (b != ']') throw new Exception("Failed reading Array");
-                        }
-                        E[] item = elementBuffer.ToArray();
-                        if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
-                        pool.Return(elementBuffer);
-                        buffer.TryNextByte();
-                        return item;
-                    };
-                    return TypeReaderInitializer.Create(this, stringArrayReader, null, true);
-                }
-                if (typeof(E) == typeof(int))
-                {
-                    var intArrayReader = () =>
-                    {
-                        byte b = SkipWhiteSpaces();
-                        if (b != '[') throw new Exception("Failed reading Array");
-                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
-                        List<E> elementBuffer = pool.Take();
-                        while (true)
-                        {
-                            b = SkipWhiteSpaces();
-                            if (b == ']') break;
-                            var v = ReadIntValue();
-                            E value = Unsafe.As<int, E>(ref v);
-                            elementBuffer.Add(value);
-                            b = SkipWhiteSpaces();
-                            if (b == ',') buffer.TryNextByte();
-                            else if (b != ']') throw new Exception("Failed reading Array");
-                        }
-                        E[] item = elementBuffer.ToArray();
-                        if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
-                        pool.Return(elementBuffer);
-                        buffer.TryNextByte();
-                        return item;
-                    };
-                    return TypeReaderInitializer.Create(this, intArrayReader, null, true);
-                }
-
-                var elementReaderPool = new Pool<NoCheck_ElementReader<E>>(() => new NoCheck_ElementReader<E>(this, elementTypeReader), l => l.Reset(), 10, false);
-
-                var reader = () =>
-                {
-                    byte b = SkipWhiteSpaces();
-                    if (b != '[') throw new Exception("Failed reading Array");
-                    if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
-                    List<E> elementBuffer = pool.Take();
-                    var elementReader = elementReaderPool.Take();
-                    elementBuffer.AddRange(elementReader);
-                    E[] item = elementBuffer.ToArray();
-                    if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
-                    pool.Return(elementBuffer);
-                    elementReaderPool.Return(elementReader);
-                    if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
-                    buffer.TryNextByte();
-                    return item;
-                };
-
-                return TypeReaderInitializer.Create(this, reader, null, true);
+                if (typeof(E) == typeof(string)) return CreateGenericArrayTypeReaderViaStrategy<E, StringReaderStrategy, string>(elementTypeReader, pool);
+                if (typeof(E) == typeof(char)) return CreateGenericArrayTypeReaderViaStrategy<E, CharReaderStrategy, char>(elementTypeReader, pool);
+                if (typeof(E) == typeof(sbyte)) return CreateGenericArrayTypeReaderViaStrategy<E, SByteReaderStrategy, sbyte>(elementTypeReader, pool);
+                if (typeof(E) == typeof(byte)) return CreateGenericArrayTypeReaderViaStrategy<E, ByteReaderStrategy, byte>(elementTypeReader, pool);
+                if (typeof(E) == typeof(short)) return CreateGenericArrayTypeReaderViaStrategy<E, Int16ReaderStrategy, short>(elementTypeReader, pool);
+                if (typeof(E) == typeof(ushort)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt16ReaderStrategy, ushort>(elementTypeReader, pool);
+                if (typeof(E) == typeof(int)) return CreateGenericArrayTypeReaderViaStrategy<E, Int32ReaderStrategy, int>(elementTypeReader, pool);
+                if (typeof(E) == typeof(uint)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt32ReaderStrategy, uint>(elementTypeReader, pool);
+                if (typeof(E) == typeof(long)) return CreateGenericArrayTypeReaderViaStrategy<E, Int64ReaderStrategy, long>(elementTypeReader, pool);
+                if (typeof(E) == typeof(ulong)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt64ReaderStrategy, ulong>(elementTypeReader, pool);
+                if (typeof(E) == typeof(bool)) return CreateGenericArrayTypeReaderViaStrategy<E, BoolReaderStrategy, bool>(elementTypeReader, pool);
+                if (typeof(E) == typeof(float)) return CreateGenericArrayTypeReaderViaStrategy<E, FloatReaderStrategy, float>(elementTypeReader, pool);
+                if (typeof(E) == typeof(double)) return CreateGenericArrayTypeReaderViaStrategy<E, DoubleReaderStrategy, double>(elementTypeReader, pool);
+                return CreateGenericArrayTypeReaderViaStrategy<E, GenericReaderStrategy<E>, E>(elementTypeReader, pool);
             }
             else
             {
@@ -2057,86 +1996,26 @@ namespace FeatureLoom.Serialization
                 return TypeReaderInitializer.Create<T>(this, null, null, true);
             }
 
-            var constructor = GetConstructor<T, IEnumerable<E>>();
+            Func<IEnumerable<E>, T> constructor = GetConstructor<T, IEnumerable<E>>();
             var elementTypeReader = GetCachedTypeReader(typeof(E));
             Pool<List<E>> bufferPool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 10, false);
 
             if (elementTypeReader.IsNoCheckPossible<E>())
             {
-                if (typeof(E) == typeof(string))
-                {
-                    var r = () =>
-                    {
-                        if (TryReadNullValue()) return default;
-                        var b = buffer.CurrentByte;
-                        if (b != '[') throw new Exception("Failed reading Array");
-                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
-                        List<E> elementBuffer = bufferPool.Take();
-                        while (true)
-                        {
-                            b = SkipWhiteSpaces();
-                            if (b == ']') break;
-                            var v = ReadStringValueOrNull();
-                            E value = Unsafe.As<string, E>(ref v);
-                            elementBuffer.Add(value);
-                            b = SkipWhiteSpaces();
-                            if (b == ',') buffer.TryNextByte();
-                            else if (b != ']') throw new Exception("Failed reading Array");
-                        }
-                        T item = constructor(elementBuffer);
-                        bufferPool.Return(elementBuffer);
-                        if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
-                        buffer.TryNextByte();
-                        return item;
-                    };
-                    return TypeReaderInitializer.Create(this, r, null, true);
-                }
-                if(typeof(E) == typeof(int))
-                {
-                    var r = () =>
-                    {
-                        if (TryReadNullValue()) return default;
-                        var b = buffer.CurrentByte;
-                        if (b != '[') throw new Exception("Failed reading Array");
-                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
-                        List<E> elementBuffer = bufferPool.Take();
-                        while (true)
-                        {
-                            b = SkipWhiteSpaces();
-                            if (b == ']') break;
-                            var v = ReadIntValue();
-                            E value = Unsafe.As<int, E>(ref v);
-                            elementBuffer.Add(value);
-                            b = SkipWhiteSpaces();
-                            if (b == ',') buffer.TryNextByte();
-                            else if (b != ']') throw new Exception("Failed reading Array");
-                        }
-                        T item = constructor(elementBuffer);
-                        bufferPool.Return(elementBuffer);
-                        if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
-                        buffer.TryNextByte();
-                        return item;
-                    };
-                    return TypeReaderInitializer.Create(this, r, null, true);
-                }
-
-                var elementReaderPool = new Pool<NoCheck_ElementReader<E>>(() => new NoCheck_ElementReader<E>(this, elementTypeReader), l => l.Reset(), 10, false);
-                var reader = () =>
-                {
-                    if (TryReadNullValue()) return default;
-                    var b = buffer.CurrentByte;
-                    if (b != '[') throw new Exception("Failed reading Array");
-                    if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
-                    var elementReader = elementReaderPool.Take();
-                    List<E> elementBuffer = bufferPool.Take();
-                    elementBuffer.AddRange(elementReader);
-                    T item = constructor(elementBuffer);
-                    bufferPool.Return(elementBuffer);
-                    if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
-                    buffer.TryNextByte();
-                    return item;
-                };
-                return TypeReaderInitializer.Create(this, reader, null, true);
+                if (typeof(E) == typeof(string)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringReaderStrategy, string>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(char)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, CharReaderStrategy, char>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(sbyte)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, SByteReaderStrategy, sbyte>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(byte)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, ByteReaderStrategy, byte>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(short)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int16ReaderStrategy, short>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(ushort)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt16ReaderStrategy, ushort>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(int)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int32ReaderStrategy, int>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(uint)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt32ReaderStrategy, uint>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(long)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int64ReaderStrategy, long>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(ulong)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt64ReaderStrategy, ulong>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(bool)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, BoolReaderStrategy, bool>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(float)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, FloatReaderStrategy, float>(elementTypeReader, constructor, bufferPool);
+                if (typeof(E) == typeof(double)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, DoubleReaderStrategy, double>(elementTypeReader, constructor, bufferPool);
+                return CreateGenericEnumerableTypeReaderViaStrategy<T, E, GenericReaderStrategy<E>, E>(elementTypeReader, constructor, bufferPool);
             }
             else
             {
