@@ -59,7 +59,18 @@ public class SerializeSimpleObjectTest
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, obj, systemTextJsonSerializerSettings);
         }
-    }    
+    }
+
+#if NET6_0_OR_GREATER
+    [Benchmark]
+    public void SerializeSimpleObject_ToBytes_SpanJson()
+    {
+        for (int i = 0; i < iterations; i++)
+        {
+            var jsonBytes = SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(obj, memoryStream);
+        }
+    }
+#endif
 
 
     /*  [Benchmark]

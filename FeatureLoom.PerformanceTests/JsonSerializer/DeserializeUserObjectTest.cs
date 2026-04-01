@@ -2,8 +2,6 @@
 using FeatureLoom.Helpers;
 using FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance;
 using FeatureLoom.Serialization;
-using FeatureLoom.Time;
-using SpanJson.Resolvers;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,7 +17,7 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [HtmlExporter]
 [MinIterationCount(500)]
 [MaxIterationCount(5000)]
-public partial class DeserializeComplexObjectTest
+public partial class DeserializeUserObjectTest
 {
     static FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
     {
@@ -52,20 +50,10 @@ public partial class DeserializeComplexObjectTest
         DefaultBufferSize = 1024*1024*10,                
     };
 
-    public sealed class MyResolver<TSymbol> : SpanJson.Resolvers.ResolverBase<TSymbol, MyResolver<TSymbol>> where TSymbol : struct
-    {
-        public MyResolver() : base(new SpanJsonOptions
-        {
-            EnumOption = EnumOptions.Integer
-        })
-        {
-        }
-    }
-
     MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
-    ComplexObject complexObject = new ComplexObject();
+    UserObject userObject = new UserObject();
 
-    [Params(-10000, -1000, -100, -10, -1)]
+    [Params(-20000, -200)]
     public int iterations;
 
     [GlobalSetup]
@@ -82,10 +70,8 @@ public partial class DeserializeComplexObjectTest
             featureJsonSerializer.Serialize(memoryStream, complexObject);
             memoryStream.WriteByte((byte)'\n');
         }*/
-        featureJsonSerializer.Serialize(memoryStream, complexObject);
-        string x = featureJsonSerializer.Serialize(complexObject);
-        ConsoleHelper.WriteLine(x);
-        //AppTime.Wait(1.Seconds());
+        featureJsonSerializer.Serialize(memoryStream, userObject);
+        string x = featureJsonSerializer.Serialize(userObject);
     }
 
     [IterationSetup]
@@ -96,46 +82,43 @@ public partial class DeserializeComplexObjectTest
     }
 
     [Benchmark]
-    public void DeserializeComplexObject_FromStream_Feature()
+    public void DeserializeUserObject_FromStream_Feature()
     {
         for (int i = 0; i < iterations; i++)
         {
             memoryStream.Position = 0;
-            featureJsonDeserializer.TryDeserialize(memoryStream, out ComplexObject result);
+            featureJsonDeserializer.TryDeserialize(memoryStream, out UserObject result);
         }
     }
 
     [Benchmark]
-    public void DeserializeComplexObject_FromStream_Feature2()
+    public void DeserializeUserObject_FromStream_Feature2()
     {
         for (int i = 0; i < iterations; i++)
         {
             memoryStream.Position = 0;
-            featureJsonDeserializer2.TryDeserialize(memoryStream, out ComplexObject result);
+            featureJsonDeserializer2.TryDeserialize(memoryStream, out UserObject  result);
         }
     }
 
 
     [Benchmark(Baseline = true)]
-    public void DeserializeComplexObject_FromStream_SystemText()
+    public void DeserializeUserObject_FromStream_SystemText()
     {
         for (int i = 0; i < iterations; i++)
         {
             memoryStream.Position = 0;
-            ComplexObject result = System.Text.Json.JsonSerializer.Deserialize<ComplexObject>(memoryStream, systemTextJsonSerializerSettings);
+            UserObject result = System.Text.Json.JsonSerializer.Deserialize<UserObject>(memoryStream, systemTextJsonSerializerSettings);
         }
     }
-
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void DeserializeComplexObject_FromStream_SpanJson()
+    public void DeserializeUserObject_FromStream_SpanJson()
     {
         for (int i = 0; i < iterations; i++)
         {
             memoryStream.Position = 0;
-            var result = SpanJson.JsonSerializer.Generic.Utf8
-                .DeserializeAsync<ComplexObject, MyResolver<byte>>(memoryStream)
-                .Result;
+            var result = SpanJson.JsonSerializer.Generic.Utf8.DeserializeAsync<UserObject>(memoryStream).Result;
         }
     }
 #endif

@@ -18,7 +18,7 @@ public sealed partial class FeatureJsonDeserializer
         int bufferPos = 0;
         int bufferResetLevel;
         
-        Stack<int> peekStack = new Stack<int>();
+        readonly Stack<int> peekStack = new Stack<int>();
 
         int bufferStartPos = 0;
         int bufferFillLevel = 0;
@@ -82,6 +82,11 @@ public sealed partial class FeatureJsonDeserializer
         public bool TryNextByte()
         {
             if (++bufferPos < bufferFillLevel) return true;
+            return TryNextByte_Continuation();
+        }
+
+        private bool TryNextByte_Continuation()
+        {
             if (TryReadFromStream()) return true;
             bufferReadTillEnd = true;
             bufferPos--;
@@ -239,10 +244,10 @@ public sealed partial class FeatureJsonDeserializer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Recording StartRecording(bool skipCurrent = false) => new Recording(this, skipCurrent);            
-        internal struct Recording
+        internal readonly struct Recording
         {
-            int startBufferPos;
-            Buffer buffer;
+            readonly int startBufferPos;
+            readonly Buffer buffer;
 
             public Recording(Buffer buffer, bool skipCurrent)
             {
@@ -269,8 +274,8 @@ public sealed partial class FeatureJsonDeserializer
 
         public struct UndoReadHandle : IDisposable
         {
-            private Buffer buffer;
-            private int startBufferPos;
+            readonly private Buffer buffer;
+            readonly private int startBufferPos;
             private bool undoReading;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -11,6 +11,11 @@
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
   </ItemGroup>
 
+  <!--<ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">-->
+    <ItemGroup>
+	    <PackageReference Include="SpanJson" Version="4.2.1" />
+    </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj" />
   </ItemGroup>

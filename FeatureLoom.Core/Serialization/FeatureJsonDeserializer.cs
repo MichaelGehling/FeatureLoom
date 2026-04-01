@@ -243,7 +243,7 @@ namespace FeatureLoom.Serialization
                 }
 
                 if (itemType.IsArray) return CreateArrayTypeReader(itemType, cachedTypeReader);
-                else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValue, null, true);
+                else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValueOrNull, null, true);
                 else if (itemType == typeof(long)) return TypeReaderInitializer.Create(this, ReadLongValue, null, false);
                 else if (itemType == typeof(long?)) return TypeReaderInitializer.Create(this, ReadNullableLongValue, null, false);
                 else if (itemType == typeof(int)) return TypeReaderInitializer.Create(this, ReadIntValue, null, false);
@@ -282,7 +282,7 @@ namespace FeatureLoom.Serialization
                 else if (itemType == typeof(JsonFragment?)) return TypeReaderInitializer.Create(this, ReadNullableJsonFragmentValue, null, false);
                 else if (itemType == typeof(IntPtr)) return TypeReaderInitializer.Create(this, ReadIntPtrValue, null, false);
                 else if (itemType == typeof(UIntPtr)) return TypeReaderInitializer.Create(this, ReadUIntPtrValue, null, false);
-                else if (itemType == typeof(Uri)) return TypeReaderInitializer.Create(this, () => new Uri(ReadStringValue()), null, true);
+                else if (itemType == typeof(Uri)) return TypeReaderInitializer.Create(this, () =>{ var s = ReadStringValueOrNull(); return s == null ? null : new Uri(s); }, null, true);
                 else if (itemType == typeof(ByteSegment)) return CreateByteSegmentTypeReader();
                 else if (itemType == typeof(ByteSegment?)) return CreateNullableByteSegmentTypeReader();
                 else if (itemType == typeof(ArraySegment<byte>)) return CreateByteArraySegmentTypeReader();
@@ -405,23 +405,12 @@ namespace FeatureLoom.Serialization
             return TypeReaderInitializer.Create(this, reader, null, true);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static object WrapContext<T>(T tupleValue)
-        {
-            return new Box<T>(tupleValue);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static T UnwrapContext<T>(object contextObject)
-        {
-            return ((Box<T>)contextObject).value;
-        }
-
         private TypeReaderInitializer CreateByteArrayTypeReader()
         {
             var byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
             var reader = () =>
             {
+                if (TryReadNullValue()) return default;
                 return ReadByteArray(byteArrayReader);
             };
                         
@@ -435,8 +424,7 @@ namespace FeatureLoom.Serialization
 
             var reader = () =>
             {                
-                byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
+                if (buffer.CurrentByte == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
                 return new ByteSegment(ReadByteArray(byteArrayReader));
             };            
 
@@ -449,9 +437,9 @@ namespace FeatureLoom.Serialization
             CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, false));
 
             var reader = () =>
-            {                
-                byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
+            {
+                if (TryReadNullValue()) return default;
+                if (buffer.CurrentByte == '{') return objectReader.ReadValue_CheckProposed<ByteSegment>();
                 return (ByteSegment?) new ByteSegment(ReadByteArray(byteArrayReader));
             };
             
@@ -464,9 +452,8 @@ namespace FeatureLoom.Serialization
             CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false));
 
             var reader = () =>
-            {                
-                byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
+            {
+                if (buffer.CurrentByte == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
                 return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
             };
                         
@@ -479,9 +466,9 @@ namespace FeatureLoom.Serialization
             CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false));
 
             var reader = () =>
-            {                
-                byte b = SkipWhiteSpaces();
-                if (b == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
+            {
+                if (TryReadNullValue()) return default;
+                if (buffer.CurrentByte == '{') return objectReader.ReadValue_CheckProposed<ArraySegment<byte>>();
                 return (ArraySegment<byte>?) new ArraySegment<byte>(ReadByteArray(byteArrayReader));
             };
                         
@@ -511,7 +498,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private byte[] ReadByteArray(CachedTypeReader byteArrayReader)
         {
-            SkipWhiteSpaces();
+            //SkipWhiteSpaces(); //Whitespaces are already skipped by the caller, so we can expect to be exactly at the start of the value
             byte b = buffer.CurrentByte;
             if (b == '"')
             {                
@@ -723,8 +710,9 @@ namespace FeatureLoom.Serialization
         private TypeReaderInitializer CreateNullableEnumReader<T>() where T : struct, Enum
         {
             var reader = () =>
-            {               
-                if (!settings.strict && TryReadEmptyStringValue()) return (T?)null;
+            {
+                if (TryReadNullValue()) return null;
+                if (!settings.strict && TryReadEmptyStringValue()) return null;
 
                 var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
                 if (valueType == TypeResult.Whitespace)
@@ -830,8 +818,9 @@ namespace FeatureLoom.Serialization
             // and pass those as context if we want to optimize this further (TODO: Benchmark this against a static reader with context)
             var reader = () =>
             {
+                if (TryReadNullValue()) return default;
+                var b = buffer.CurrentByte;
                 T dict = constructor();
-                byte b = SkipWhiteSpaces();
                 if (b == '{')
                 {
                     if (!buffer.TryNextByte()) throw new Exception("Failed reading Object to Dictionary");
@@ -874,10 +863,11 @@ namespace FeatureLoom.Serialization
                 List<KeyValuePair<K, V>> keyValueList = new();
                 populatingReader = (T itemToPopulate) =>
                 {
+                    if (TryReadNullValue()) return default;
+                    var b = buffer.CurrentByte;
                     T dict = itemToPopulate;                    
                     try
                     {
-                        byte b = SkipWhiteSpaces();
                         if (b == '{')
                         {
                             if (!buffer.TryNextByte()) throw new Exception("Failed reading Object to Dictionary");
@@ -970,10 +960,12 @@ namespace FeatureLoom.Serialization
             {
                 populatingReader = (T itemToPopulate) =>
                 {
+                    if (TryReadNullValue()) return default;
+                    var b = buffer.CurrentByte;
+
                     T dict = itemToPopulate;
                     dict.Clear();
 
-                    byte b = SkipWhiteSpaces();
                     if (b == '{')
                     {
                         if (!buffer.TryNextByte()) throw new Exception("Failed reading Object to Dictionary");
@@ -1048,7 +1040,7 @@ namespace FeatureLoom.Serialization
             CachedTypeReader objectReader = new CachedTypeReader((_) => CreateMultiOptionComplexTypeReader<object>(objectTypeOptions.ToArray()));
 
             var reader = () =>
-            {                
+            {                                
                 var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
                 if (valueType == TypeResult.Whitespace)
                 {
@@ -1297,10 +1289,12 @@ namespace FeatureLoom.Serialization
             // Cannot make it static, because it uses the TryFindFieldWriter local function
             var reader = () =>
             {
+                if (TryReadNullValue()) return default;
+                var b = buffer.CurrentByte;
+
                 T item = constructor();
                 int expectedFieldIndex = 0;
 
-                byte b = SkipWhiteSpaces();
                 if (b != '{') throw new Exception("Failed reading object");
                 buffer.TryNextByte();                
 
@@ -1326,10 +1320,12 @@ namespace FeatureLoom.Serialization
             // Cannot make it static, because it uses the TryFindFieldWriter local function
             var populatingReader = (T itemToPopulate) =>
             {
+                if (TryReadNullValue()) return default;
+                var b = buffer.CurrentByte;
+
                 T item = itemToPopulate;
                 int expectedFieldIndex = 0;
 
-                byte b = SkipWhiteSpaces();
                 if (b != '{') throw new Exception("Failed reading object");
                 buffer.TryNextByte();                
 
@@ -1512,6 +1508,31 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
+                        if (typeof(V) == typeof(string))
+                        {
+                            return parentItem =>
+                            {
+                                var v = ReadStringValue();
+                                V value = Unsafe.As<string, V>(ref v);
+                                var boxedItem = (object)parentItem;
+                                fieldInfo.SetValue(boxedItem, value);
+                                parentItem = (T)boxedItem;
+                                return parentItem;
+                            };
+                        }
+                        if (typeof(V) == typeof(int))
+                        {
+                            return parentItem =>
+                            {
+                                var v = ReadIntValue();
+                                V value = Unsafe.As<int, V>(ref v);
+                                var boxedItem = (object)parentItem;
+                                fieldInfo.SetValue(boxedItem, value);
+                                parentItem = (T)boxedItem;
+                                return parentItem;
+                            };
+                        }
+
                         return parentItem =>
                         {
                             V value = fieldTypeReader.ReadValue_NoCheck<V>();
@@ -1550,6 +1571,27 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
+                        if (typeof(V) == typeof(string))
+                        {
+                            return parentItem =>
+                            {
+                                var v = ReadStringValue();
+                                V value = Unsafe.As<string, V>(ref v);
+                                fieldInfo.SetValue(parentItem, value);
+                                return parentItem;
+                            };
+                        }
+                        if (typeof(V) == typeof(int))
+                        {
+                            return parentItem =>
+                            {
+                                var v = ReadIntValue();
+                                V value = Unsafe.As<int, V>(ref v);
+                                fieldInfo.SetValue(parentItem, value);
+                                return parentItem;
+                            };
+                        }
+
                         return parentItem =>
                         {
                             V value = fieldTypeReader.ReadValue_NoCheck<V>();
@@ -1626,12 +1668,22 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
-                        return parentItem =>
-                        {
-                            V fieldValue = fieldTypeReader.ReadValue_NoCheck<V>();
-                            parentItem = setValueAndReturn((T)parentItem, fieldValue);
-                            return parentItem;
-                        };
+
+
+                        if (typeof(V) == typeof(string)) return CreateValueFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(char)) return CreateValueFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(sbyte)) return CreateValueFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(byte)) return CreateValueFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(short)) return CreateValueFieldWriterViaStrategy<T, V, C, Int16ReaderStrategy, short>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(ushort)) return CreateValueFieldWriterViaStrategy<T, V, C, UInt16ReaderStrategy, ushort>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(int)) return CreateValueFieldWriterViaStrategy<T, V, C, Int32ReaderStrategy, int>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(uint)) return CreateValueFieldWriterViaStrategy<T, V, C, UInt32ReaderStrategy, uint>(setValueAndReturn, fieldTypeReader);                        
+                        if (typeof(V) == typeof(long)) return CreateValueFieldWriterViaStrategy<T, V, C, Int64ReaderStrategy, long>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(ulong)) return CreateValueFieldWriterViaStrategy<T, V, C, UInt64ReaderStrategy, ulong>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(float)) return CreateValueFieldWriterViaStrategy<T, V, C, FloatReaderStrategy, float>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(double)) return CreateValueFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(bool)) return CreateValueFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(setValueAndReturn, fieldTypeReader);
+                        return CreateValueFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(setValueAndReturn, fieldTypeReader);
                     }
                     else
                     {
@@ -1666,12 +1718,30 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
+#if NET8_0_OR_GREATER
+                        if (typeof(V) == typeof(string)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(char)) return CreateObjFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(sbyte)) return CreateObjFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(byte)) return CreateObjFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(short)) return CreateObjFieldWriterViaStrategy<T, V, C, Int16ReaderStrategy, short>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(ushort)) return CreateObjFieldWriterViaStrategy<T, V, C, UInt16ReaderStrategy, ushort>(setValue, fieldTypeReader);                        
+                        if (typeof(V) == typeof(int)) return CreateObjFieldWriterViaStrategy<T, V, C, Int32ReaderStrategy, int>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(uint)) return CreateObjFieldWriterViaStrategy<T, V, C, UInt32ReaderStrategy, uint>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(long)) return CreateObjFieldWriterViaStrategy<T, V, C, Int64ReaderStrategy, long>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(ulong)) return CreateObjFieldWriterViaStrategy<T, V, C, UInt64ReaderStrategy, ulong>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(float)) return CreateObjFieldWriterViaStrategy<T, V, C, FloatReaderStrategy, float>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(double)) return CreateObjFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(bool)) return CreateObjFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(setValue, fieldTypeReader);
+                        return CreateObjFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(setValue, fieldTypeReader);
+#else
+
                         return parentItem =>
                         {
                             V fieldValue = fieldTypeReader.ReadValue_NoCheck<V>();
                             setValue((T)parentItem, fieldValue);
                             return parentItem;
                         };
+#endif
                     }
                     else
                     {
@@ -1728,12 +1798,21 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
-                        return parentItem =>
-                        {
-                            V fieldValue = fieldTypeReader.ReadValue_NoCheck<V>();
-                            parentItem = setValueAndReturn((T)parentItem, fieldValue);
-                            return parentItem;
-                        };
+
+                        if (typeof(V) == typeof(string)) return CreateValueFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(char)) return CreateValueFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(sbyte)) return CreateValueFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(byte)) return CreateValueFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(short)) return CreateValueFieldWriterViaStrategy<T, V, C, Int16ReaderStrategy, short>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(ushort)) return CreateValueFieldWriterViaStrategy<T, V, C, UInt16ReaderStrategy, ushort>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(int)) return CreateValueFieldWriterViaStrategy<T, V, C, Int32ReaderStrategy, int>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(uint)) return CreateValueFieldWriterViaStrategy<T, V, C, UInt32ReaderStrategy, uint>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(long)) return CreateValueFieldWriterViaStrategy<T, V, C, Int64ReaderStrategy, long>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(ulong)) return CreateValueFieldWriterViaStrategy<T, V, C, UInt64ReaderStrategy, ulong>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(float)) return CreateValueFieldWriterViaStrategy<T, V, C, FloatReaderStrategy, float>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(double)) return CreateValueFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(setValueAndReturn, fieldTypeReader);
+                        if (typeof(V) == typeof(bool)) return CreateValueFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(setValueAndReturn, fieldTypeReader);
+                        return CreateValueFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(setValueAndReturn, fieldTypeReader);
                     }
                     else
                     {
@@ -1769,12 +1848,30 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
+#if NET8_0_OR_GREATER
+                        if (typeof(V) == typeof(string)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(char)) return CreateObjFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(sbyte)) return CreateObjFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(byte)) return CreateObjFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(short)) return CreateObjFieldWriterViaStrategy<T, V, C, Int16ReaderStrategy, short>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(ushort)) return CreateObjFieldWriterViaStrategy<T, V, C, UInt16ReaderStrategy, ushort>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(int)) return CreateObjFieldWriterViaStrategy<T, V, C, Int32ReaderStrategy, int>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(uint)) return CreateObjFieldWriterViaStrategy<T, V, C, UInt32ReaderStrategy, uint>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(long)) return CreateObjFieldWriterViaStrategy<T, V, C, Int64ReaderStrategy, long>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(ulong)) return CreateObjFieldWriterViaStrategy<T, V, C, UInt64ReaderStrategy, ulong>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(float)) return CreateObjFieldWriterViaStrategy<T, V, C, FloatReaderStrategy, float>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(double)) return CreateObjFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(setValue, fieldTypeReader);
+                        if (typeof(V) == typeof(bool)) return CreateObjFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(setValue, fieldTypeReader);
+                        return CreateObjFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(setValue, fieldTypeReader);
+#else
+
                         return parentItem =>
                         {
                             V fieldValue = fieldTypeReader.ReadValue_NoCheck<V>();
                             setValue((T)parentItem, fieldValue);
                             return parentItem;
                         };
+#endif
                     }
                     else
                     {
@@ -1828,6 +1925,61 @@ namespace FeatureLoom.Serialization
             var elementTypeReader = GetCachedTypeReader(typeof(E));
             if (elementTypeReader.IsNoCheckPossible<E>())
             {
+                if (typeof(E) == typeof(string))
+                {
+                    var stringArrayReader = () =>
+                    {
+                        byte b = SkipWhiteSpaces();
+                        if (b != '[') throw new Exception("Failed reading Array");
+                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+                        List<E> elementBuffer = pool.Take();
+                        while (true)
+                        {
+                            b = SkipWhiteSpaces();
+                            if (b == ']') break;
+                            var v = ReadStringValueOrNull();
+                            E value = Unsafe.As<string, E>(ref v);
+                            elementBuffer.Add(value);
+                            b = SkipWhiteSpaces();
+                            if (b == ',') buffer.TryNextByte();
+                            else if (b != ']') throw new Exception("Failed reading Array");
+                        }
+                        E[] item = elementBuffer.ToArray();
+                        if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
+                        pool.Return(elementBuffer);
+                        buffer.TryNextByte();
+                        return item;
+                    };
+                    return TypeReaderInitializer.Create(this, stringArrayReader, null, true);
+                }
+                if (typeof(E) == typeof(int))
+                {
+                    var intArrayReader = () =>
+                    {
+                        byte b = SkipWhiteSpaces();
+                        if (b != '[') throw new Exception("Failed reading Array");
+                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+                        List<E> elementBuffer = pool.Take();
+                        while (true)
+                        {
+                            b = SkipWhiteSpaces();
+                            if (b == ']') break;
+                            var v = ReadIntValue();
+                            E value = Unsafe.As<int, E>(ref v);
+                            elementBuffer.Add(value);
+                            b = SkipWhiteSpaces();
+                            if (b == ',') buffer.TryNextByte();
+                            else if (b != ']') throw new Exception("Failed reading Array");
+                        }
+                        E[] item = elementBuffer.ToArray();
+                        if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
+                        pool.Return(elementBuffer);
+                        buffer.TryNextByte();
+                        return item;
+                    };
+                    return TypeReaderInitializer.Create(this, intArrayReader, null, true);
+                }
+
                 var elementReaderPool = new Pool<NoCheck_ElementReader<E>>(() => new NoCheck_ElementReader<E>(this, elementTypeReader), l => l.Reset(), 10, false);
 
                 var reader = () =>
@@ -1893,6 +2045,8 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
+
+
         private TypeReaderInitializer CreateGenericEnumerableTypeReader<T, E>()
         {
             if (typeof(T).IsAbstract)
@@ -1909,10 +2063,68 @@ namespace FeatureLoom.Serialization
 
             if (elementTypeReader.IsNoCheckPossible<E>())
             {
+                if (typeof(E) == typeof(string))
+                {
+                    var r = () =>
+                    {
+                        if (TryReadNullValue()) return default;
+                        var b = buffer.CurrentByte;
+                        if (b != '[') throw new Exception("Failed reading Array");
+                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+                        List<E> elementBuffer = bufferPool.Take();
+                        while (true)
+                        {
+                            b = SkipWhiteSpaces();
+                            if (b == ']') break;
+                            var v = ReadStringValueOrNull();
+                            E value = Unsafe.As<string, E>(ref v);
+                            elementBuffer.Add(value);
+                            b = SkipWhiteSpaces();
+                            if (b == ',') buffer.TryNextByte();
+                            else if (b != ']') throw new Exception("Failed reading Array");
+                        }
+                        T item = constructor(elementBuffer);
+                        bufferPool.Return(elementBuffer);
+                        if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
+                        buffer.TryNextByte();
+                        return item;
+                    };
+                    return TypeReaderInitializer.Create(this, r, null, true);
+                }
+                if(typeof(E) == typeof(int))
+                {
+                    var r = () =>
+                    {
+                        if (TryReadNullValue()) return default;
+                        var b = buffer.CurrentByte;
+                        if (b != '[') throw new Exception("Failed reading Array");
+                        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+                        List<E> elementBuffer = bufferPool.Take();
+                        while (true)
+                        {
+                            b = SkipWhiteSpaces();
+                            if (b == ']') break;
+                            var v = ReadIntValue();
+                            E value = Unsafe.As<int, E>(ref v);
+                            elementBuffer.Add(value);
+                            b = SkipWhiteSpaces();
+                            if (b == ',') buffer.TryNextByte();
+                            else if (b != ']') throw new Exception("Failed reading Array");
+                        }
+                        T item = constructor(elementBuffer);
+                        bufferPool.Return(elementBuffer);
+                        if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
+                        buffer.TryNextByte();
+                        return item;
+                    };
+                    return TypeReaderInitializer.Create(this, r, null, true);
+                }
+
                 var elementReaderPool = new Pool<NoCheck_ElementReader<E>>(() => new NoCheck_ElementReader<E>(this, elementTypeReader), l => l.Reset(), 10, false);
                 var reader = () =>
                 {
-                    byte b = SkipWhiteSpaces();
+                    if (TryReadNullValue()) return default;
+                    var b = buffer.CurrentByte;
                     if (b != '[') throw new Exception("Failed reading Array");
                     if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
                     var elementReader = elementReaderPool.Take();
@@ -1931,7 +2143,8 @@ namespace FeatureLoom.Serialization
                 var elementReaderPool = new Pool<ElementReader<E>>(() => new ElementReader<E>(this), l => l.Reset(), 10, false);
                 var reader = () =>
                 {
-                    byte b = SkipWhiteSpaces();
+                    if (TryReadNullValue()) return default;
+                    var b = buffer.CurrentByte;
                     if (b != '[') throw new Exception("Failed reading Array");
                     if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
                     var elementReader = elementReaderPool.Take();
@@ -1963,7 +2176,8 @@ namespace FeatureLoom.Serialization
             Pool<ElementReader<object>> elementReaderPool = new Pool<ElementReader<object>>(() => new ElementReader<object>(this), l => l.Reset(), 1000, false);            
             var reader = () =>
             {
-                byte b = SkipWhiteSpaces();
+                if (TryReadNullValue()) return default;
+                var b = buffer.CurrentByte;
                 if (b != '[') throw new Exception("Failed reading Array");
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
                 ElementReader<object> elementReader = elementReaderPool.Take();
@@ -1990,7 +2204,7 @@ namespace FeatureLoom.Serialization
             return arrayElementNameCache[index];
         }
 
-        private class ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
+        private sealed class ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
         {
             FeatureJsonDeserializer deserializer;
             CachedTypeReader reader;
@@ -2055,7 +2269,7 @@ namespace FeatureLoom.Serialization
             IEnumerator IEnumerable.GetEnumerator() => this;
         }
 
-        private class NoCheck_ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
+        private sealed class NoCheck_ElementReader<T> : IEnumerable<T>, IEnumerator<T>, IEnumerable, IEnumerator
         {
             FeatureJsonDeserializer deserializer;
             CachedTypeReader reader;
@@ -2168,7 +2382,22 @@ namespace FeatureLoom.Serialization
             var stringBytes = ReadStringBytes();
             string result;
 
-            if (useStringCache) result = stringCache.GetOrCreate(stringBytes);
+            if (useStringCache) result = stringCache.GetOrCreate(stringBytes, stringBuilder);
+            else result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
+
+            stringBuilder.Clear();
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private string ReadStringValueOrNull()
+        {
+            if (TryReadNullValue()) return null;
+
+            var stringBytes = ReadStringBytes();
+            string result;
+
+            if (useStringCache) result = stringCache.GetOrCreate(stringBytes, stringBuilder);
             else result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
 
             stringBuilder.Clear();
@@ -2204,6 +2433,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private char? ReadNullableCharValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadCharValue();
         }
@@ -2255,6 +2485,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DateTime? ReadNullableDateTimeValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDateTimeValue();
         }
@@ -2306,6 +2537,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DateTimeOffset? ReadNullableDateTimeOffsetValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDateTimeOffsetValue();
         }
@@ -2357,6 +2589,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private TimeSpan? ReadNullableTimeSpanValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadTimeSpanValue();
         }
@@ -2402,6 +2635,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private Guid? ReadNullableGuidValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadGuidValue();
         }
@@ -2527,7 +2761,11 @@ namespace FeatureLoom.Serialization
         {
             byte b = SkipWhiteSpaces();
             if (FoldAsciiToLower(b) != (byte)'n') return false;
+            return TryReadNullValue_Continuation();
+        }
 
+        private bool TryReadNullValue_Continuation()
+        {
             using (var undoHandle = CreateUndoReadHandle())
             {
                 if (!buffer.TryNextByte()) return false;
@@ -2552,10 +2790,10 @@ namespace FeatureLoom.Serialization
             }
         }
 
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool? ReadNullableBoolValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadBoolValue();
         }
@@ -2656,6 +2894,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long? ReadNullableLongValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadLongValue();
         }
@@ -2671,6 +2910,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int? ReadNullableIntValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadIntValue();
         }
@@ -2686,6 +2926,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public short? ReadNullableShortValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadShortValue();
         }
@@ -2701,6 +2942,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sbyte? ReadNullableSbyteValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadSbyteValue();
         }
@@ -2749,6 +2991,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong? ReadNullableUlongValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUlongValue();
         }
@@ -2764,6 +3007,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint? ReadNullableUintValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUintValue();
         }
@@ -2779,6 +3023,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ushort? ReadNullableUshortValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadUshortValue();
         }
@@ -2794,6 +3039,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte? ReadNullableByteValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadByteValue();
         }
@@ -2869,6 +3115,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public double? ReadNullableDoubleValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDoubleValue();
         }
@@ -2884,6 +3131,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public decimal? ReadNullableDecimalValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadDecimalValue();
         }
@@ -2894,6 +3142,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float? ReadNullableFloatValue()
         {
+            if (TryReadNullValue()) return null;
             if (!settings.strict && TryReadEmptyStringValue()) return null;
             return ReadFloatValue();
         }
@@ -2927,7 +3176,11 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public JsonFragment? ReadNullableJsonFragmentValue() => ReadJsonFragmentValue();
+        public JsonFragment? ReadNullableJsonFragmentValue()
+        {
+            if (TryReadNullValue()) return null;
+            return ReadJsonFragmentValue();
+        }
 
         private string DecodeUtf8Bytes(ArraySegment<byte> bytes)
         {
@@ -4390,6 +4643,7 @@ namespace FeatureLoom.Serialization
             // first char must be '{', otherwise it's not an object and we can directly return false
             // without needing to reset buffer position
             if (b != (byte)'{') return false;
+
             using (var undoHandle = CreateUndoReadHandle())
             {
                 bool refAttributeFound = Try(out pathIsValid, out typeIsCompatible, out refObject);                

@@ -14,7 +14,7 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]    
 [HtmlExporter]
-[MinIterationCount(1000)]
+[MinIterationCount(500)]
 [MaxIterationCount(5000)]
 public partial class DeserializeSimpleObjectTest
 {
@@ -89,6 +89,15 @@ public partial class DeserializeSimpleObjectTest
             var result = System.Text.Json.JsonSerializer.Deserialize<SimpleObject>(memoryStream, systemTextJsonSerializerSettings);
         }
     }
-
-   
+#if NET6_0_OR_GREATER
+    [Benchmark]
+    public void DeserializeSimpleObject_FromStream_SpanJson()
+    {
+        for (int i = 0; i < iterations; i++)
+        {
+            memoryStream.Position = 0;
+            var result = SpanJson.JsonSerializer.Generic.Utf8.DeserializeAsync<SimpleObject>(memoryStream).Result;
+        }
+    }
+#endif
 }

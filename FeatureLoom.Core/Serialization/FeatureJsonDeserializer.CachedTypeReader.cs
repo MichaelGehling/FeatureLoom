@@ -24,57 +24,34 @@ public sealed partial class FeatureJsonDeserializer
             bool refTypeOrRefTypeChildren)
         {
             var readerType = typeof(T);
-            var isNullable = readerType.IsNullable();
             var resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
             var readingDelegate2 = readingDelegate;
             var populatingDelegate2 = populatingDelegate;
-            if (isNullable && resolveRefPath)
-            {
-                readingDelegate2 = () =>
-                {
-                    if (parent.TryReadNullValue()) return default;
-                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
-                    return readingDelegate.Invoke();
-                };
-                if (populatingDelegate != null)
-                {
-                    populatingDelegate2 = (item) =>
-                    {
-                        if (isNullable && parent.TryReadNullValue()) return default;
-                        if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
-                        return populatingDelegate.Invoke(item);
-                    };
-                }
-            }
-            else if (isNullable)
-            {
-                readingDelegate2 = () =>
-                {
-                    if (parent.TryReadNullValue()) return default;
-                    return readingDelegate.Invoke();
-                };
-                if (populatingDelegate != null)
-                {
-                    populatingDelegate2 = (item) =>
-                    {
-                        if (isNullable && parent.TryReadNullValue()) return default;
-                        return populatingDelegate.Invoke(item);
-                    };
-                }
-            }
-            else if (resolveRefPath)
+            Func<object> readingObjectDelegate = readingDelegate2 != null ? () => (object)readingDelegate2.Invoke() : null;
+            Func<object, object> populatingObjectDelegate = populatingDelegate2 != null ? (obj) => (object)populatingDelegate2.Invoke((T)obj) : null;
+            if (resolveRefPath)
             {
                 readingDelegate2 = () =>
                 {
                     if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
                     return readingDelegate.Invoke();
                 };
+                readingObjectDelegate = () =>
+                {
+                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return (object)refObject;
+                    return (object) readingDelegate.Invoke();
+                };
                 if (populatingDelegate != null)
                 {
                     populatingDelegate2 = (item) =>
                     {
-                        if (resolveRefPath && parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                        if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
                         return populatingDelegate.Invoke(item);
+                    };
+                    populatingObjectDelegate = (obj) =>
+                    {
+                        if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return (object)refObject;
+                        return (object)populatingDelegate.Invoke((T)obj);
                     };
                 }
             }
@@ -85,8 +62,8 @@ public sealed partial class FeatureJsonDeserializer
                 readerType = typeof(T),
                 readingDelegate = readingDelegate2,
                 populatingDelegate = populatingDelegate2,
-                readingObjectDelegate = readingDelegate2 != null ? () => (object)readingDelegate2.Invoke() : null,
-                populatingObjectDelegate = populatingDelegate2 != null ? (obj) => (object)populatingDelegate2.Invoke((T)obj) : null,
+                readingObjectDelegate = readingObjectDelegate,
+                populatingObjectDelegate = populatingObjectDelegate,
                 refTypeOrRefTypeChildren = refTypeOrRefTypeChildren
             };
         }
@@ -118,6 +95,8 @@ public sealed partial class FeatureJsonDeserializer
         public Type ReaderType => readerType;
         public bool IsNoCheckPossible<T>() => typeof(T) == readerType && !enableProposedTypes && !resolveRefPath && !writeRefPath;
         public bool CanBePopulated => canBePopulated;
+
+        public FeatureJsonDeserializer Parent => parent;
 
         public CachedTypeReader(Func<CachedTypeReader, TypeReaderInitializer> buildInit)
         {
