@@ -622,5 +622,48 @@ namespace FeatureLoom.Serialization
             Assert.True(deserializer.TryDeserialize("\"\"", out DateTimeOffset? value));
             Assert.Null(value);
         }
+
+        private static void AssertNotDeserialized<T>(string json)
+        {
+            var deserializer = new FeatureJsonDeserializer();
+            Assert.False(deserializer.TryDeserialize(json, out T _));
+        }
+
+        [Fact]
+        public void Deserialize_Long_WithExponent_UsesFullNumberParsing()
+        {
+            // Guards against signed fast-path accepting only the leading integer part (e.g. "12" from "12e2")
+            AssertDeserialized("12e2", 1200L);
+        }
+
+        [Theory]
+        [InlineData("123x")]
+        [InlineData("-7foo")]
+        public void Deserialize_Long_InvalidDelimiter_ReturnsFalse(string json)
+        {
+            AssertNotDeserialized<long>(json);
+        }
+
+        [Theory]
+        [InlineData("123x")]
+        public void Deserialize_ULong_InvalidDelimiter_ReturnsFalse(string json)
+        {
+            AssertNotDeserialized<ulong>(json);
+        }
+
+        [Theory]
+        [InlineData("9223372036854775808")]   // long.MaxValue + 1
+        [InlineData("-9223372036854775809")]  // long.MinValue - 1
+        public void Deserialize_Long_Overflow_ReturnsFalse(string json)
+        {
+            AssertNotDeserialized<long>(json);
+        }
+
+        [Theory]
+        [InlineData("18446744073709551616")] // ulong.MaxValue + 1
+        public void Deserialize_Ulong_OverflowOrInvalidDelimiter_ReturnsFalse(string json)
+        {
+            AssertNotDeserialized<ulong>(json);
+        }
     }
 }

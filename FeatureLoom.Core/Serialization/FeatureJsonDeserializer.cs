@@ -2535,6 +2535,20 @@ namespace FeatureLoom.Serialization
             byte b = SkipWhiteSpaces();
             if (FoldAsciiToLower(b) != (byte)'n') throw new Exception("Failed reading null");
 
+#if !NETSTANDARD2_0
+            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+            if (remaining.Length >= 5 &&
+                FoldAsciiToLower(remaining[0]) == (byte)'n' &&
+                FoldAsciiToLower(remaining[1]) == (byte)'u' &&
+                FoldAsciiToLower(remaining[2]) == (byte)'l' &&
+                FoldAsciiToLower(remaining[3]) == (byte)'l' &&
+                map_IsFieldEnd[remaining[4]] == FilterResult.Found)
+            {
+                buffer.TrySkipBytes(4); // move to delimiter
+                return null;
+            }
+#endif
+
             if (!buffer.TryNextByte()) throw new Exception("Failed reading null");
             if (FoldAsciiToLower(buffer.CurrentByte) != (byte)'u') throw new Exception("Failed reading null");
 
@@ -2555,6 +2569,20 @@ namespace FeatureLoom.Serialization
 
             if (b == (byte)'t')
             {
+#if !NETSTANDARD2_0
+                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+                if (remaining.Length >= 5 &&
+                    FoldAsciiToLower(remaining[0]) == (byte)'t' &&
+                    FoldAsciiToLower(remaining[1]) == (byte)'r' &&
+                    FoldAsciiToLower(remaining[2]) == (byte)'u' &&
+                    FoldAsciiToLower(remaining[3]) == (byte)'e' &&
+                    map_IsFieldEnd[remaining[4]] == FilterResult.Found)
+                {
+                    buffer.TrySkipBytes(4); // move to delimiter
+                    return true;
+                }
+#endif
+
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
                 if (FoldAsciiToLower(buffer.CurrentByte) != (byte)'r') throw new Exception("Failed reading boolean value");
 
@@ -2569,6 +2597,21 @@ namespace FeatureLoom.Serialization
             }
             else if (b == (byte)'f')
             {
+#if !NETSTANDARD2_0
+                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+                if (remaining.Length >= 6 &&
+                    FoldAsciiToLower(remaining[0]) == (byte)'f' &&
+                    FoldAsciiToLower(remaining[1]) == (byte)'a' &&
+                    FoldAsciiToLower(remaining[2]) == (byte)'l' &&
+                    FoldAsciiToLower(remaining[3]) == (byte)'s' &&
+                    FoldAsciiToLower(remaining[4]) == (byte)'e' &&
+                    map_IsFieldEnd[remaining[5]] == FilterResult.Found)
+                {
+                    buffer.TrySkipBytes(5); // move to delimiter
+                    return false;
+                }
+#endif
+
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
                 if (FoldAsciiToLower(buffer.CurrentByte) != (byte)'a') throw new Exception("Failed reading boolean value");
 
@@ -2596,6 +2639,21 @@ namespace FeatureLoom.Serialization
 
             if (b == (byte)'t')
             {
+#if !NETSTANDARD2_0
+                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+                if (remaining.Length >= 5 &&
+                    FoldAsciiToLower(remaining[0]) == (byte)'t' &&
+                    FoldAsciiToLower(remaining[1]) == (byte)'r' &&
+                    FoldAsciiToLower(remaining[2]) == (byte)'u' &&
+                    FoldAsciiToLower(remaining[3]) == (byte)'e' &&
+                    map_IsFieldEnd[remaining[4]] == FilterResult.Found)
+                {
+                    buffer.TrySkipBytes(4); // move to delimiter
+                    value = true;
+                    return true;
+                }
+#endif
+
                 using (var undoHandle = CreateUndoReadHandle())
                 {
                     if (!buffer.TryNextByte()) return false;
@@ -2615,6 +2673,22 @@ namespace FeatureLoom.Serialization
             }
             else if (b == (byte)'f')
             {
+#if !NETSTANDARD2_0
+                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+                if (remaining.Length >= 6 &&
+                    FoldAsciiToLower(remaining[0]) == (byte)'f' &&
+                    FoldAsciiToLower(remaining[1]) == (byte)'a' &&
+                    FoldAsciiToLower(remaining[2]) == (byte)'l' &&
+                    FoldAsciiToLower(remaining[3]) == (byte)'s' &&
+                    FoldAsciiToLower(remaining[4]) == (byte)'e' &&
+                    map_IsFieldEnd[remaining[5]] == FilterResult.Found)
+                {
+                    buffer.TrySkipBytes(5); // move to delimiter
+                    value = false;
+                    return true;
+                }
+#endif
+
                 using (var undoHandle = CreateUndoReadHandle())
                 {
                     if (!buffer.TryNextByte()) return false;
@@ -2651,6 +2725,27 @@ namespace FeatureLoom.Serialization
         {
             using (var undoHandle = CreateUndoReadHandle())
             {
+#if !NETSTANDARD2_0
+                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+
+                // If we have full token + delimiter buffered, decide in one pass.
+                if (remaining.Length >= 5)
+                {
+                    if (FoldAsciiToLower(remaining[0]) == (byte)'n' &&
+                        FoldAsciiToLower(remaining[1]) == (byte)'u' &&
+                        FoldAsciiToLower(remaining[2]) == (byte)'l' &&
+                        FoldAsciiToLower(remaining[3]) == (byte)'l' &&
+                        map_IsFieldEnd[remaining[4]] == FilterResult.Found)
+                    {
+                        buffer.TrySkipBytes(4); // land on delimiter
+                        undoHandle.SetUndoReading(false);
+                        return true;
+                    }
+                    return false;
+                }
+#endif
+
+                // Fallback path (needed for short remaining buffer / cross-buffer token)
                 if (!buffer.TryNextByte()) return false;
                 if (FoldAsciiToLower(buffer.CurrentByte) != (byte)'u') return false;
 
@@ -2684,7 +2779,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private object ReadNumberValueAsObject()
         {            
-            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
+            ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
                 out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.all);
 
             if (hasDecimalPart || isExponentNegative)
@@ -2734,8 +2829,12 @@ namespace FeatureLoom.Serialization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long ReadSignedIntegerValue()
-        {            
-            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits, 
+        {
+#if !NETSTANDARD2_0
+            if (TrySignedIntFastPath(out long fastPathValue)) return fastPathValue;
+#endif
+
+            ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits, 
                 out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.signedInteger);
 
             if (hasExponentPart)
@@ -2745,17 +2844,26 @@ namespace FeatureLoom.Serialization
                 integerPart = ApplyExponent(integerPart, exp);
             }
 
-            var value = (long)integerPart;
-            if (isNegative) value *= -1;
+            const ulong maxPos = (ulong)long.MaxValue;
+            const ulong maxNegAbs = 1UL + (ulong)long.MaxValue; // abs(long.MinValue)
 
-            return value;
+            if (isNegative)
+            {
+                if (integerPart > maxNegAbs) throw new Exception("Value is out of bounds.");
+                return integerPart == maxNegAbs ? long.MinValue : -(long)integerPart;
+            }
+            else
+            {
+                if (integerPart > maxPos) throw new Exception("Value is out of bounds.");
+                return (long)integerPart;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadSignedIntegerValue(out long value)
         {
             value = default;
-            if (!TryReadNumberBytes(out var isNegative, out var integerPart, out _, out _,
+            if (!TryReadNumberParts(out var isNegative, out var integerPart, out _, out _,
                 out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.signedInteger))
             {
                 return false;
@@ -2841,7 +2949,10 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadUnsignedIntegerValue()
         {
-            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
+#if !NETSTANDARD2_0
+            if (TryUnsignedIntFastPath(out ulong fastPathValue)) return fastPathValue;
+#endif
+            ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
                 out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.unsignedInteger);
 
             var value = integerPart;
@@ -2860,7 +2971,7 @@ namespace FeatureLoom.Serialization
         public bool TryReadUnsignedIntegerValue(out ulong value)
         {
             value = default;
-            if (!TryReadNumberBytes(out _, out var integerPart, out _, out _,
+            if (!TryReadNumberParts(out _, out var integerPart, out _, out _,
                 out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.unsignedInteger))
             {
                 return false;
@@ -2948,7 +3059,7 @@ namespace FeatureLoom.Serialization
                 if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
                 if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;                
             }            
-            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
+            ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
                 out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber);
 
             double value = ApplyExponent((double)decimalPart, -numDecimalDigits);        
@@ -2982,7 +3093,7 @@ namespace FeatureLoom.Serialization
                 if (isValidString) return true;
             }
 
-            if (!TryReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var decimalDigits,
+            if (!TryReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var decimalDigits,
                 out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber))
             {
                 return false;
@@ -3597,7 +3708,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipNumber()
         {
-            ReadNumberBytes(out _, out _, out _, out _, out _, out _, out _, out _, ValidNumberComponents.all);
+            ReadNumberParts(out _, out _, out _, out _, out _, out _, out _, out _, ValidNumberComponents.all);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3814,6 +3925,74 @@ namespace FeatureLoom.Serialization
 
         static readonly ByteSegment zeroAsBytes = new byte[] { (byte)'0' };
 
+  #if !NETSTANDARD2_0
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TrySignedIntFastPath(out long value)
+        {
+            buffer.TryEnsureBuffered(21); // max length of long in decimal is 20 chars (including sign)
+            bool isNegative = buffer.CurrentByte == (byte)'-';            
+            ulong uValue = 0;
+            value = 0;
+
+            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+            if (isNegative) remaining = remaining.Slice(1); // skip sign for digit parsing, but not for length check
+            int len = 0;
+            unchecked
+            {
+                while ((uint)len < (uint)remaining.Length && (uint)(remaining[len] - (byte)'0') <= 9u) len++;
+            }
+            if (len == 0 || len >= 19) return false;
+            if (len < remaining.Length && map_IsFieldEnd[remaining[len]] != FilterResult.Found) return false;
+
+            var digits = remaining.Slice(0, len);
+            for (int i = 0; i < digits.Length; i++)
+            {
+                unchecked { uValue = uValue * 10 + (uint)(digits[i] - (byte)'0'); }
+            }
+
+            if (isNegative)
+            {
+                value = -(long)uValue;
+                buffer.TrySkipBytes(len);
+            }
+            else
+            {
+                value = (long)uValue;
+                buffer.TrySkipBytes(len - 1);
+            }
+            buffer.TryNextByte();            
+            return true;
+        }
+#endif
+
+#if !NETSTANDARD2_0
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryUnsignedIntFastPath(out ulong value)
+        {
+            buffer.TryEnsureBuffered(21); // max length of long in decimal is 20 chars (including sign)
+            value = 0;
+
+            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+            int len = 0;
+            unchecked
+            {
+                while ((uint)len < (uint)remaining.Length && (uint)(remaining[len] - (byte)'0') <= 9u) len++;
+            }
+            if (len == 0 || len >= 20) return false; // leave fast path if more than 19 digits (max ulong is 20 digits but we need to check for overflow in that case)
+            if (len < remaining.Length && map_IsFieldEnd[remaining[len]] != FilterResult.Found) return false;
+
+            var digits = remaining.Slice(0, len);
+            for (int i = 0; i < digits.Length; i++)
+            {
+                unchecked { value = value * 10 + (uint)(digits[i] - (byte)'0'); }
+            }
+
+            buffer.TrySkipBytes(len - 1);
+            buffer.TryNextByte();
+            return true;
+        }
+#endif
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ulong ReadDigitSegmentAsUInt64(out int digitCount, out bool couldNotSkip)
         {
@@ -3835,53 +4014,69 @@ namespace FeatureLoom.Serialization
                 }
 
                 b = buffer.CurrentByte;
-            }
+    }
 #else
-            while (true)
+            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+
+            int len = 0;
+            unchecked
             {
-                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
-                if (remaining.Length == 0)
-                {
-                    if (!buffer.TryNextByte())
-                    {
-                        couldNotSkip = true;
-                        break;
-                    }
-                    continue;
-                }
-
-                int len = 0;
                 while ((uint)len < (uint)remaining.Length && (uint)(remaining[len] - (byte)'0') <= 9u) len++;
-                if (len == 0) break;
+            }
 
+            if (len == 0) return 0;            
+            if (len < 20)
+            {
                 var digits = remaining.Slice(0, len);
                 for (int i = 0; i < digits.Length; i++)
                 {
                     unchecked { value = value * 10 + (uint)(digits[i] - (byte)'0'); }
                 }
-                digitCount += len;
+            }
+            else
+            {
+                value = Handle20OrMoreDigits(value, remaining, len);
+            }
 
-                if (len < remaining.Length)
-                {
-                    buffer.TrySkipBytes(len); // land on first non-digit
-                    break;
-                }
+            digitCount = len;
 
+            if (len < remaining.Length)
+            {
+                // land on first non-digit
+                buffer.TrySkipBytes(len);
+            }
+            else
+            {
+                // consumed entire remaining span; advance once to get delimiter or EOF rollback state
                 int jump = remaining.Length - 1;
                 if (jump > 0) buffer.TrySkipBytes(jump);
+                couldNotSkip = !buffer.TryNextByte();
+            }
 
-                if (!buffer.TryNextByte())
+            static ulong Handle20OrMoreDigits(ulong value, ReadOnlySpan<byte> remaining, int len)
+            {
+                if (len == 20)
                 {
-                    couldNotSkip = true;
-                    break;
+                    var digits = remaining.Slice(0, 20);
+                    for (int i = 0; i < 19; i++)
+                    {
+                        unchecked { value = value * 10 + (uint)(digits[i] - (byte)'0'); }
+                    }
+                    // For the 20th digit we need to check for overflow since the value could exceed ulong.MaxValue
+                    const ulong maxDiv10 = ulong.MaxValue / 10;
+                    const byte maxLast = (byte)(ulong.MaxValue % 10);
+                    byte last = (byte)(remaining[19] - (byte)'0');
+                    if (value > maxDiv10 || (value == maxDiv10 && last > maxLast)) throw new Exception("Number is too large");
+                    unchecked { value = value * 10 + last; }
                 }
+                else throw new Exception("Too many digits in number");
+                return value;
             }
 #endif
-
-            return value;
+            return value;            
         }
 
-        void ReadNumberBytes(
+        void ReadNumberParts(
             out bool isNegative,
             out ulong integerPart,
             out ulong decimalPart,
@@ -3892,8 +4087,8 @@ namespace FeatureLoom.Serialization
             out bool hasExponentPart,
             ValidNumberComponents validComponents)
         {
-            const int PrefetchBytesForTypicalNumber = 48; // best-effort warm-up
-            _ = buffer.TryEnsureBuffered(PrefetchBytesForTypicalNumber);
+            const int MaxNumberTokenBytes = 52;  // int(20) + dec(20) + exp(8) + signs/dot/delimiter(4)
+            _ = buffer.TryEnsureBuffered(MaxNumberTokenBytes);
 
             bool stringAsNumberStarted = false;
 
@@ -3939,12 +4134,7 @@ namespace FeatureLoom.Serialization
             {
                 if (b != '.') throw new Exception("Failed reading number: no digits found for integer part and no decimal point found");
                 integerPart = 0;
-            }
-
-            if (map_IsFieldEnd[buffer.CurrentByte] == FilterResult.Found)
-            {
-                return;
-            }
+            }            
 
             if (b == '.')
             {
@@ -3955,7 +4145,7 @@ namespace FeatureLoom.Serialization
                 decimalPart = ReadDigitSegmentAsUInt64(out decimalDigits, out couldNotSkip);
 
                 // semantic: "." counts like ".0"
-                if (decimalDigits == 0) decimalDigits = 1;
+                if (decimalDigits == 0) decimalDigits = 1;                
             }
 
             if (buffer.CurrentByte == 'e' || buffer.CurrentByte == 'E')
@@ -3972,32 +4162,32 @@ namespace FeatureLoom.Serialization
                 }
 
                 exponentPart = ReadDigitSegmentAsUInt64(out int expDigits, out couldNotSkip);
-                if (expDigits == 0) exponentPart = 0; // semantic: "e+" => exponent 0
+                if (expDigits == 0) exponentPart = 0; // semantic: "e+" => exponent 0                
             }
 
             if (stringAsNumberStarted)
             {
                 if (buffer.CurrentByte != '"') throw new Exception("Failed reading number: string as number not closed");
-                buffer.TryNextByte();
+                couldNotSkip = !buffer.TryNextByte();
             }
 
-            if (!buffer.IsBufferReadToEnd && map_IsFieldEnd[buffer.CurrentByte] != FilterResult.Found)
+            if (!couldNotSkip && map_IsFieldEnd[buffer.CurrentByte] != FilterResult.Found)
                 throw new Exception("Failed reading number: unexpected character after number");
         }
 
-        bool TryReadNumberBytes(
-    out bool isNegative,
-    out ulong integerPart,
-    out ulong decimalPart,
-    out int decimalDigits,
-    out ulong exponentPart,
-    out bool isExponentNegative,
-    out bool hasDecimalPart,
-    out bool hasExponentPart,
-    ValidNumberComponents validComponents)
+        bool TryReadNumberParts(
+            out bool isNegative,
+            out ulong integerPart,
+            out ulong decimalPart,
+            out int decimalDigits,
+            out ulong exponentPart,
+            out bool isExponentNegative,
+            out bool hasDecimalPart,
+            out bool hasExponentPart,
+            ValidNumberComponents validComponents)
         {
-            const int PrefetchBytesForTypicalNumber = 48; // best-effort warm-up
-            _ = buffer.TryEnsureBuffered(PrefetchBytesForTypicalNumber);
+            const int MaxNumberTokenBytes = 52;  // int(20) + dec(20) + exp(8) + signs/dot/delimiter(4)
+            _ = buffer.TryEnsureBuffered(MaxNumberTokenBytes);
 
             bool stringAsNumberStarted = false;
 

@@ -6,7 +6,7 @@ public class SimpleObject
 {
     public int id = 0;
     public string name = "This is a string";
-    public double value = 123.456;    
+    public double value = 123.456;
 }
 
 public class UserObject
