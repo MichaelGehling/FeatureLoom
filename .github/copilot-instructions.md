@@ -21,3 +21,5 @@
 - Avoid using phrases like "take a deep breath" in responses.
 - When evaluating parser buffer helpers, explicitly distinguish normal state from EOF rollback state (e.g., BufferReadTillEnd) to avoid contradictory guidance.
 - Prefer direct in-file code edits in responses instead of git patch format when asking to change uncommitted code.
+- Use properly separated code blocks and ensure all markdown code fences are correctly closed.
+- Ensure markdown code blocks are clearly separated from surrounding text, with correct fence closure and no trailing text attached.

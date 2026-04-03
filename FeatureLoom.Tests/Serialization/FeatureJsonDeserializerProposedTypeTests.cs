@@ -1,5 +1,6 @@
 using FeatureLoom.Helpers;
 using FeatureLoom.Serialization;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -79,6 +80,62 @@ namespace FeatureLoom.Serialization
 
             var queue = Assert.IsType<Queue<string>>(value);
             Assert.Equal(new[] { "a", "b" }, queue.ToArray());
+        }
+
+        private static string GetNewtonsoftCompatibleTypeName(Type type)
+        {
+            string typeName = type.AssemblyQualifiedName;
+            Assert.False(string.IsNullOrWhiteSpace(typeName));
+            return typeName;
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_WithValueField_NewtonsoftCompatibleTypeName()
+        {
+            string typeName = GetNewtonsoftCompatibleTypeName(typeof(DerivedType));
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"BaseValue\":1,\"DerivedValue\":2}}}}";
+
+            BaseType value = Deserialize<BaseType>(json);
+
+            Assert.IsType<DerivedType>(value);
+            Assert.Equal(1, value.BaseValue);
+            Assert.Equal(2, ((DerivedType)value).DerivedValue);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_GenericList_WithValuesField_NewtonsoftCompatible()
+        {
+            string typeName = GetNewtonsoftCompatibleTypeName(typeof(List<int>));
+            string json = $"{{\"$type\":\"{typeName}\",\"$values\":[1,2,3]}}";
+
+            object value = Deserialize<object>(json);
+
+            var list = Assert.IsType<List<int>>(value);
+            Assert.Equal(new[] { 1, 2, 3 }, list);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_GenericList_WithUppercaseValuesField_NewtonsoftCompatible()
+        {
+            string typeName = GetNewtonsoftCompatibleTypeName(typeof(List<int>));
+            string json = $"{{\"$type\":\"{typeName}\",\"$VALUES\":[4,5]}}";
+
+            object value = Deserialize<object>(json);
+
+            var list = Assert.IsType<List<int>>(value);
+            Assert.Equal(new[] { 4, 5 }, list);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedType_WithValuesField_AndAdditionalFields_SkipsRemainder()
+        {
+            string typeName = GetNewtonsoftCompatibleTypeName(typeof(List<int>));
+            string json = $"{{\"$type\":\"{typeName}\",\"$values\":[7,8],\"meta\":{{\"x\":1}}}}";
+
+            object value = Deserialize<object>(json);
+
+            var list = Assert.IsType<List<int>>(value);
+            Assert.Equal(new[] { 7, 8 }, list);
         }
 
         [Fact]

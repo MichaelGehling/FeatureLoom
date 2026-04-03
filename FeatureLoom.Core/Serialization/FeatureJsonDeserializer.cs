@@ -4330,9 +4330,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryFindProposedType(ref CachedTypeReader proposedTypeReaderRef, ref ByteSegment proposedTypeNameRef, Type expectedType, out bool foundValueField)
         {
-            foundValueField = false;
-
-            // IMPORTANT: Currently, the type-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)
+            foundValueField = false;            
 
             // 1. find $type field
             byte b = SkipWhiteSpaces();
@@ -4385,6 +4383,18 @@ namespace FeatureLoom.Serialization
                     proposedTypeReader = null;
                     string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
                     var proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
+                    if (proposedType == null)
+                    {
+                        // Try old format with assembly name for backward compatibility
+                        try
+                        {
+                            proposedType = Type.GetType(proposedTypename, false, true);
+                        }
+                        catch
+                        {
+                            // Ignore any exceptions from Type.GetType and treat it as type not found, to be consistent with TypeNameHelper behavior.
+                        }
+                    }
 
                     if (proposedType == null)
                     {
