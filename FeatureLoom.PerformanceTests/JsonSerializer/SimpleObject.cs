@@ -6,8 +6,7 @@ public class SimpleObject
 {
     public int id = 0;
     public string name = "This is a string";
-    public double value = 123.456;
-    //public List<string> tags = new List<string> { "tag1", "tag2", "tag3", "tag4", "tag1", "tag2", "tag3", "tag4", "tag1", "tag2", "tag3", "tag4", "tag1", "tag2", "tag3", "tag4", "tag1", "tag2", "tag3", "tag4", "tag1", "tag2", "tag3", "tag4", "tag1", "tag2", "tag3", "tag4" };
+    public double value = 123.456;    
 }
 
 public class UserObject

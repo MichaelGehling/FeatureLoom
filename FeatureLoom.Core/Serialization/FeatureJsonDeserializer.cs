@@ -56,7 +56,7 @@ namespace FeatureLoom.Serialization
 
         struct ItemInfo
         {
-            public ByteSegment name;
+            public ByteSegment name;            
             public int parentIndex;
             public object itemRef;
 
@@ -166,6 +166,7 @@ namespace FeatureLoom.Serialization
                 }
                 do
                 {
+                    if (!buffer.TryEnsureBuffered(1)) break; // ensure GetRemainingBytes has data
                     ByteSegment bufferBytes = buffer.GetRemainingBytes();
                     if (bufferBytes.TryFindIndex(delimiterBytes, out int index))
                     {
@@ -527,10 +528,15 @@ namespace FeatureLoom.Serialization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SetItemRefInCurrentItemInfo(object item)
-        {            
+        {
+#if NET8_0_OR_GREATER
+            ref ItemInfo itemInfo = ref CollectionsMarshal.AsSpan(itemInfos)[currentItemInfoIndex];
+            itemInfo.itemRef = item;
+#else
             var itemInfo = itemInfos[currentItemInfoIndex];
             itemInfo.itemRef = item;
             itemInfos[currentItemInfoIndex] = itemInfo;
+#endif
         }
 
         private Func<T> GetConstructor<T>(Type derivedType = null)
@@ -1668,8 +1674,6 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
-
-
                         if (typeof(V) == typeof(string)) return CreateValueFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValueAndReturn, fieldTypeReader);
                         if (typeof(V) == typeof(char)) return CreateValueFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValueAndReturn, fieldTypeReader);
                         if (typeof(V) == typeof(sbyte)) return CreateValueFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValueAndReturn, fieldTypeReader);
@@ -2679,19 +2683,19 @@ namespace FeatureLoom.Serialization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private object ReadNumberValueAsObject()
-        {
-            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all);
-            if (decimalBytes.IsValid || isExponentNegative)
+        {            
+            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
+                out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.all);
+
+            if (hasDecimalPart || isExponentNegative)
             {
-                ulong integerPart = integerBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
-                double decimalPart = decimalBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
-                double value = ApplyExponent(decimalPart, -decimalBytes.Count);
+                double value = ApplyExponent((double)decimalPart, -numDecimalDigits);
                 value += integerPart;
                 if (isNegative) value *= -1;
 
-                if (exponentBytes.IsValid)
+                if (hasExponentPart)
                 {
-                    int exp = (int)BytesToInteger(exponentBytes);
+                    int exp = (int)exponentPart;
                     if (isExponentNegative) exp = -exp;
                     value = ApplyExponent(value, exp);
                 }
@@ -2700,10 +2704,9 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                ulong integerPart = integerBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
-                if (exponentBytes.IsValid)
+                if (hasExponentPart)
                 {
-                    int exp = (int)BytesToInteger(exponentBytes);
+                    int exp = (int)exponentPart;
                     integerPart = ApplyExponent(integerPart, exp);                    
                 }
 
@@ -2731,14 +2734,13 @@ namespace FeatureLoom.Serialization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long ReadSignedIntegerValue()
-        {
-            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.signedInteger);
+        {            
+            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits, 
+                out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.signedInteger);
 
-            ulong integerPart = BytesToInteger(integerBytes);
-
-            if (exponentBytes.IsValid)
+            if (hasExponentPart)
             {
-                int exp = (int)BytesToInteger(exponentBytes);
+                int exp = (int)exponentPart;
                 if (isExponentNegative) exp = -exp;
                 integerPart = ApplyExponent(integerPart, exp);
             }
@@ -2753,20 +2755,21 @@ namespace FeatureLoom.Serialization
         public bool TryReadSignedIntegerValue(out long value)
         {
             value = default;
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.signedInteger)) return false;
-
-            ulong integerPart = BytesToInteger(integerBytes);
-
-            if (exponentBytes.IsValid)
+            if (!TryReadNumberBytes(out var isNegative, out var integerPart, out _, out _,
+                out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.signedInteger))
             {
-                int exp = (int)BytesToInteger(exponentBytes);
+                return false;
+            }
+
+            if (hasExponentPart)
+            {
+                int exp = (int)exponentPart;
                 if (isExponentNegative) exp = -exp;
                 integerPart = ApplyExponent(integerPart, exp);
             }
 
             value = (long)integerPart;
             if (isNegative) value *= -1;
-
             return true;
         }
 
@@ -2782,8 +2785,9 @@ namespace FeatureLoom.Serialization
         public int ReadIntValue()
         {
             long longValue = ReadSignedIntegerValue();
-            if (longValue > int.MaxValue || longValue < int.MinValue) throw new Exception("Value is out of bounds.");
-            return (int)longValue;
+            int value = (int)longValue;
+            if (value != longValue) throw new Exception("Value is out of bounds.");
+            return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2798,8 +2802,9 @@ namespace FeatureLoom.Serialization
         public short ReadShortValue()
         {
             long longValue = ReadSignedIntegerValue();
-            if (longValue > short.MaxValue || longValue < short.MinValue) throw new Exception("Value is out of bounds.");
-            return (short)longValue;
+            short value = (short)longValue;
+            if (value != longValue) throw new Exception("Value is out of bounds.");
+            return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2814,8 +2819,9 @@ namespace FeatureLoom.Serialization
         public sbyte ReadSbyteValue()
         {
             long longValue = ReadSignedIntegerValue();
-            if (longValue > sbyte.MaxValue || longValue < sbyte.MinValue) throw new Exception("Value is out of bounds.");
-            return (sbyte)longValue;
+            sbyte value = (sbyte)longValue;
+            if (value != longValue) throw new Exception("Value is out of bounds.");
+            return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2835,13 +2841,14 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadUnsignedIntegerValue()
         {
-            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.unsignedInteger);
+            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
+                out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.unsignedInteger);
 
-            var value = BytesToInteger(integerBytes);
+            var value = integerPart;
 
-            if (exponentBytes.IsValid)
+            if (hasExponentPart)
             {
-                int exp = (int)BytesToInteger(exponentBytes);
+                int exp = (int)exponentPart;
                 if (isExponentNegative) exp = -exp;
                 value = ApplyExponent(value, exp);
             }
@@ -2853,13 +2860,16 @@ namespace FeatureLoom.Serialization
         public bool TryReadUnsignedIntegerValue(out ulong value)
         {
             value = default;
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.unsignedInteger)) return false;
-
-            value = BytesToInteger(integerBytes);
-
-            if (exponentBytes.IsValid)
+            if (!TryReadNumberBytes(out _, out var integerPart, out _, out _,
+                out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.unsignedInteger))
             {
-                int exp = (int)BytesToInteger(exponentBytes);
+                return false;
+            }
+
+            value = integerPart;
+            if (hasExponentPart)
+            {
+                int exp = (int)exponentPart;
                 if (isExponentNegative) exp = -exp;
                 value = ApplyExponent(value, exp);
             }
@@ -2937,18 +2947,17 @@ namespace FeatureLoom.Serialization
                 if (SPECIAL_NUMBER_NAN.Equals(str)) return double.NaN;
                 if (SPECIAL_NUMBER_POS_INFINITY.Equals(str)) return double.PositiveInfinity;
                 if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;                
-            }
-            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber);
+            }            
+            ReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
+                out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber);
 
-            ulong integerPart = integerBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
-            double decimalPart = decimalBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
-            double value = ApplyExponent(decimalPart, -decimalBytes.Count);        
+            double value = ApplyExponent((double)decimalPart, -numDecimalDigits);        
             value += integerPart;
             if (isNegative) value *= -1;
 
-            if (exponentBytes.IsValid)
+            if (hasExponentPart)
             {
-                int exp = (int)BytesToInteger(exponentBytes);
+                int exp = (int)exponentPart;
                 if (isExponentNegative) exp = -exp;
                 value = ApplyExponent(value, exp);
             }
@@ -2961,7 +2970,7 @@ namespace FeatureLoom.Serialization
             value = default;
             byte b = SkipWhiteSpaces();
             if (b == (byte)'"')
-            {                  
+            {
                 bool isValidString = TryReadStringBytes(out var str);
                 if (isValidString)
                 {
@@ -2973,17 +2982,19 @@ namespace FeatureLoom.Serialization
                 if (isValidString) return true;
             }
 
-            if (!TryReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.floatingPointNumber)) return false;
+            if (!TryReadNumberBytes(out var isNegative, out var integerPart, out var decimalPart, out var decimalDigits,
+                out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber))
+            {
+                return false;
+            }
 
-            ulong integerPart = integerBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(integerBytes);
-            double decimalPart = decimalBytes.AsArraySegment.EmptyOrNull() ? 0 : BytesToInteger(decimalBytes);
-            value = ApplyExponent(decimalPart, -decimalBytes.Count);
+            value = ApplyExponent((double)decimalPart, -decimalDigits);
             value += integerPart;
             if (isNegative) value *= -1;
 
-            if (exponentBytes.IsValid)
+            if (hasExponentPart)
             {
-                int exp = (int)BytesToInteger(exponentBytes);
+                int exp = (int)exponentPart;
                 if (isExponentNegative) exp = -exp;
                 value = ApplyExponent(value, exp);
             }
@@ -3586,7 +3597,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SkipNumber()
         {
-            ReadNumberBytes(out var isNegative, out var integerBytes, out var decimalBytes, out var exponentBytes, out bool isExponentNegative, ValidNumberComponents.all);
+            ReadNumberBytes(out _, out _, out _, out _, out _, out _, out _, out _, ValidNumberComponents.all);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3653,7 +3664,6 @@ namespace FeatureLoom.Serialization
             _ = ReadStringBytes();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         double ApplyExponent(double value, int exponent)
         {
             int maxExponentFactorLookup = exponentFactorMap.Length-1;
@@ -3709,7 +3719,6 @@ namespace FeatureLoom.Serialization
             }                   
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         ulong ApplyExponent(ulong value, int exponent)
         {
             int maxExponentFactorLookup = exponentFactorMap.Length - 1;
@@ -3769,14 +3778,26 @@ namespace FeatureLoom.Serialization
         ulong BytesToInteger(ArraySegment<byte> bytes)
         {
             ulong value = 0;
+#if NETSTANDARD2_0            
             if (bytes.Count == 0) return value;
             value += (byte)(bytes.Get(0) - (byte)'0');
             for (int i = 1; i < bytes.Count; i++)
             {
                 value *= 10;
                 value += (byte)(bytes.Get(i) - (byte)'0');
+            }            
+#else
+            var span = bytes.AsSpan();
+            if (span.Length == 0) return value;
+            value += (byte)(span[0] - (byte)'0');
+            for (int i = 1; i < span.Length; i++) 
+            {
+                value *= 10;
+                value += (byte)(span[i] - (byte)'0');
             }
+#endif
             return value;
+
         }
 
         [Flags]
@@ -3793,101 +3814,165 @@ namespace FeatureLoom.Serialization
 
         static readonly ByteSegment zeroAsBytes = new byte[] { (byte)'0' };
 
-        void ReadNumberBytes(out bool isNegative, out ByteSegment integerBytes, out ByteSegment decimalBytes, out ByteSegment exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong ReadDigitSegmentAsUInt64(out int digitCount, out bool couldNotSkip)
         {
-            bool stringAsNumberStarted = false;
+            ulong value = 0;
+            digitCount = 0;
+            couldNotSkip = false;
 
-            integerBytes = default;
-            decimalBytes = default;
-            exponentBytes = default;
-            isNegative = false;
-            isExponentNegative = false;
-
-            // Skip whitespaces until number starts
-            byte b = SkipWhiteSpaces();
-            if (b == '"' )
+#if NETSTANDARD2_0
+            byte b = buffer.CurrentByte;
+            while (b >= (byte)'0' && b <= (byte)'9')
             {
-                if (settings.strict) throw new Exception("Failed reading number: unexpected '\"' character");
-                stringAsNumberStarted = true;
-                if (!buffer.TryNextByte()) throw new Exception("Failed reading number: unexpected end of input");
-                if (buffer.CurrentByte == '"')
-                {
-                    integerBytes = zeroAsBytes;
-                    buffer.TryNextByte();
-                    return;
-                }
-            }
+                unchecked { value = value * 10 + (uint)(b - (byte)'0'); }
+                digitCount++;
 
-            // Check if negative
-            isNegative = buffer.CurrentByte == '-';
-            if (isNegative)
-            {
-                if (!validComponents.IsFlagSet(ValidNumberComponents.negativeSign)) throw new Exception("Failed reading number");
-                if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
-            }
-
-            var recording = buffer.StartRecording();
-
-            bool couldNotSkip = false;
-            b = buffer.CurrentByte;
-            // Read integer part
-            while (b >= '0' && b <= '9')
-            {
                 if (!buffer.TryNextByte())
                 {
                     couldNotSkip = true;
                     break;
                 }
+
                 b = buffer.CurrentByte;
             }
-            integerBytes = recording.GetRecordedBytes(couldNotSkip);
-            if (integerBytes.Count == 0)
+#else
+            while (true)
+            {
+                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+                if (remaining.Length == 0)
+                {
+                    if (!buffer.TryNextByte())
+                    {
+                        couldNotSkip = true;
+                        break;
+                    }
+                    continue;
+                }
+
+                int len = 0;
+                while ((uint)len < (uint)remaining.Length && (uint)(remaining[len] - (byte)'0') <= 9u) len++;
+                if (len == 0) break;
+
+                var digits = remaining.Slice(0, len);
+                for (int i = 0; i < digits.Length; i++)
+                {
+                    unchecked { value = value * 10 + (uint)(digits[i] - (byte)'0'); }
+                }
+                digitCount += len;
+
+                if (len < remaining.Length)
+                {
+                    buffer.TrySkipBytes(len); // land on first non-digit
+                    break;
+                }
+
+                int jump = remaining.Length - 1;
+                if (jump > 0) buffer.TrySkipBytes(jump);
+
+                if (!buffer.TryNextByte())
+                {
+                    couldNotSkip = true;
+                    break;
+                }
+            }
+#endif
+
+            return value;
+        }
+
+        void ReadNumberBytes(
+            out bool isNegative,
+            out ulong integerPart,
+            out ulong decimalPart,
+            out int decimalDigits,
+            out ulong exponentPart,
+            out bool isExponentNegative,
+            out bool hasDecimalPart,
+            out bool hasExponentPart,
+            ValidNumberComponents validComponents)
+        {
+            const int PrefetchBytesForTypicalNumber = 48; // best-effort warm-up
+            _ = buffer.TryEnsureBuffered(PrefetchBytesForTypicalNumber);
+
+            bool stringAsNumberStarted = false;
+
+            isNegative = false;
+            integerPart = 0;
+            decimalPart = 0;
+            decimalDigits = 0;
+            exponentPart = 0;
+            isExponentNegative = false;
+            hasDecimalPart = false;
+            hasExponentPart = false;
+
+            bool allowNegative = validComponents.IsFlagSet(ValidNumberComponents.negativeSign);
+            bool allowDecimal = validComponents.IsFlagSet(ValidNumberComponents.decimalPart);
+            bool allowExponent = validComponents.IsFlagSet(ValidNumberComponents.exponent);
+
+            byte b = SkipWhiteSpaces();
+            if (b == '"')
+            {
+                if (settings.strict) throw new Exception("Failed reading number: unexpected '\"' character");
+                stringAsNumberStarted = true;
+
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading number: unexpected end of input");
+                if (buffer.CurrentByte == '"')
+                {
+                    // empty string => zero (legacy behavior)
+                    if (!buffer.TryNextByte()) return;
+                    return;
+                }
+            }
+
+            isNegative = buffer.CurrentByte == '-';
+            if (isNegative)
+            {
+                if (!allowNegative) throw new Exception("Failed reading number");
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
+            }
+
+            integerPart = ReadDigitSegmentAsUInt64(out int intDigits, out bool couldNotSkip);
+            b = buffer.CurrentByte;
+
+            if (intDigits == 0)
             {
                 if (b != '.') throw new Exception("Failed reading number: no digits found for integer part and no decimal point found");
-                integerBytes = zeroAsBytes;
+                integerPart = 0;
+            }
+
+            if (map_IsFieldEnd[buffer.CurrentByte] == FilterResult.Found)
+            {
+                return;
             }
 
             if (b == '.')
             {
-                if (!validComponents.IsFlagSet(ValidNumberComponents.decimalPart) && settings.strict) throw new Exception("Failed reading number: Unexpected decimal point");
-                buffer.TryNextByte();
-                // Read decimal part
-                recording = buffer.StartRecording();
-                b = buffer.CurrentByte;
-                while (b >= '0' && b <= '9')
-                {
-                    if (!buffer.TryNextByte())
-                    {
-                        couldNotSkip = true;
-                        break;
-                    }
-                    b = buffer.CurrentByte;
-                }
-                decimalBytes = recording.GetRecordedBytes(couldNotSkip);
-                if (decimalBytes.Count == 0) decimalBytes = zeroAsBytes;
+                if (!allowDecimal && settings.strict) throw new Exception("Failed reading number: Unexpected decimal point");
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
+
+                hasDecimalPart = true;
+                decimalPart = ReadDigitSegmentAsUInt64(out decimalDigits, out couldNotSkip);
+
+                // semantic: "." counts like ".0"
+                if (decimalDigits == 0) decimalDigits = 1;
             }
 
             if (buffer.CurrentByte == 'e' || buffer.CurrentByte == 'E')
             {
-                if (!validComponents.IsFlagSet(ValidNumberComponents.exponent)) throw new Exception("Failed reading number: Unexpected exponent");
+                if (!allowExponent) throw new Exception("Failed reading number: Unexpected exponent");
 
-                buffer.TryNextByte();
-                // Read exponent part
+                if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
+                hasExponentPart = true;
+
                 isExponentNegative = buffer.CurrentByte == '-';
-                if (isExponentNegative || buffer.CurrentByte == '+') buffer.TryNextByte();
-                recording = buffer.StartRecording();
-                b = buffer.CurrentByte;
-                while (b >= '0' && b <= '9')
+                if (isExponentNegative || buffer.CurrentByte == '+')
                 {
-                    if (!buffer.TryNextByte())
-                    {
-                        couldNotSkip = true;
-                        break;
-                    }
-                    b = buffer.CurrentByte;
+                    if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
                 }
-                exponentBytes = recording.GetRecordedBytes(couldNotSkip);
-                if (exponentBytes.Count == 0) exponentBytes = zeroAsBytes;
+
+                exponentPart = ReadDigitSegmentAsUInt64(out int expDigits, out couldNotSkip);
+                if (expDigits == 0) exponentPart = 0; // semantic: "e+" => exponent 0
             }
 
             if (stringAsNumberStarted)
@@ -3895,117 +3980,106 @@ namespace FeatureLoom.Serialization
                 if (buffer.CurrentByte != '"') throw new Exception("Failed reading number: string as number not closed");
                 buffer.TryNextByte();
             }
-            if (!buffer.IsBufferReadToEnd && map_IsFieldEnd[buffer.CurrentByte] != FilterResult.Found) throw new Exception("Failed reading number: unexpected character after number");
+
+            if (!buffer.IsBufferReadToEnd && map_IsFieldEnd[buffer.CurrentByte] != FilterResult.Found)
+                throw new Exception("Failed reading number: unexpected character after number");
         }
 
-        bool TryReadNumberBytes(out bool isNegative, out ByteSegment integerBytes, out ByteSegment decimalBytes, out ByteSegment exponentBytes, out bool isExponentNegative, ValidNumberComponents validComponents)
+        bool TryReadNumberBytes(
+    out bool isNegative,
+    out ulong integerPart,
+    out ulong decimalPart,
+    out int decimalDigits,
+    out ulong exponentPart,
+    out bool isExponentNegative,
+    out bool hasDecimalPart,
+    out bool hasExponentPart,
+    ValidNumberComponents validComponents)
         {
+            const int PrefetchBytesForTypicalNumber = 48; // best-effort warm-up
+            _ = buffer.TryEnsureBuffered(PrefetchBytesForTypicalNumber);
+
             bool stringAsNumberStarted = false;
 
             using (var undoHandle = CreateUndoReadHandle())
             {
-                integerBytes = default;
-                decimalBytes = default;
-                exponentBytes = default;
                 isNegative = false;
+                integerPart = 0;
+                decimalPart = 0;
+                decimalDigits = 0;
+                exponentPart = 0;
                 isExponentNegative = false;
+                hasDecimalPart = false;
+                hasExponentPart = false;
 
-                // Skip whitespaces until number starts
+                bool allowNegative = validComponents.IsFlagSet(ValidNumberComponents.negativeSign);
+                bool allowDecimal = validComponents.IsFlagSet(ValidNumberComponents.decimalPart);
+                bool allowExponent = validComponents.IsFlagSet(ValidNumberComponents.exponent);
+
                 byte b = SkipWhiteSpaces();
                 if (b == '"')
                 {
                     if (settings.strict) return false;
                     stringAsNumberStarted = true;
+
                     if (!buffer.TryNextByte()) return false;
                     if (buffer.CurrentByte == '"')
                     {
-                        integerBytes = zeroAsBytes;
+                        // empty string => zero (legacy behavior)
                         buffer.TryNextByte();
                         undoHandle.SetUndoReading(false);
                         return true;
                     }
                 }
 
-                // Check if negative
                 isNegative = buffer.CurrentByte == '-';
                 if (isNegative)
                 {
-                    if (!validComponents.IsFlagSet(ValidNumberComponents.negativeSign)) return false;
+                    if (!allowNegative) return false;
                     if (!buffer.TryNextByte()) return false;
                 }
 
-                var recording = buffer.StartRecording();
-
-                bool couldNotSkip = false;
+                integerPart = ReadDigitSegmentAsUInt64(out int intDigits, out _);
                 b = buffer.CurrentByte;
 
-                // Read integer part
-                while (b >= '0' && b <= '9')
-                {
-                    if (!buffer.TryNextByte())
-                    {
-                        couldNotSkip = true;
-                        break;
-                    }
-                    b = buffer.CurrentByte;
-                }
-
-                integerBytes = recording.GetRecordedBytes(couldNotSkip);
-                if (integerBytes.Count == 0)
+                if (intDigits == 0)
                 {
                     if (b != '.') return false;
-                    integerBytes = zeroAsBytes;
+                    integerPart = 0;
+                }
+
+                if (map_IsFieldEnd[buffer.CurrentByte] == FilterResult.Found)
+                {
+                    undoHandle.SetUndoReading(false);
+                    return true;
                 }
 
                 if (b == '.')
                 {
-                    if (!validComponents.IsFlagSet(ValidNumberComponents.decimalPart) && settings.strict) return false;
+                    if (!allowDecimal && settings.strict) return false;
                     if (!buffer.TryNextByte()) return false;
 
-                    // Read decimal part
-                    recording = buffer.StartRecording();
-                    b = buffer.CurrentByte;
-                    while (b >= '0' && b <= '9')
-                    {
-                        if (!buffer.TryNextByte())
-                        {
-                            couldNotSkip = true;
-                            break;
-                        }
-                        b = buffer.CurrentByte;
-                    }
+                    hasDecimalPart = true;
+                    decimalPart = ReadDigitSegmentAsUInt64(out decimalDigits, out _);
 
-                    decimalBytes = recording.GetRecordedBytes(couldNotSkip);
-                    if (decimalBytes.Count == 0) decimalBytes = zeroAsBytes;
+                    // semantic: "." counts like ".0"
+                    if (decimalDigits == 0) decimalDigits = 1;
                 }
 
                 if (buffer.CurrentByte == 'e' || buffer.CurrentByte == 'E')
                 {
-                    if (!validComponents.IsFlagSet(ValidNumberComponents.exponent)) return false;
-
+                    if (!allowExponent) return false;
                     if (!buffer.TryNextByte()) return false;
 
-                    // Read exponent part
+                    hasExponentPart = true;
                     isExponentNegative = buffer.CurrentByte == '-';
                     if (isExponentNegative || buffer.CurrentByte == '+')
                     {
                         if (!buffer.TryNextByte()) return false;
                     }
 
-                    recording = buffer.StartRecording();
-                    b = buffer.CurrentByte;
-                    while (b >= '0' && b <= '9')
-                    {
-                        if (!buffer.TryNextByte())
-                        {
-                            couldNotSkip = true;
-                            break;
-                        }
-                        b = buffer.CurrentByte;
-                    }
-
-                    exponentBytes = recording.GetRecordedBytes(couldNotSkip);
-                    if (exponentBytes.Count == 0) exponentBytes = zeroAsBytes;
+                    exponentPart = ReadDigitSegmentAsUInt64(out int expDigits, out _);
+                    if (expDigits == 0) exponentPart = 0; // semantic: "e+" => exponent 0
                 }
 
                 if (stringAsNumberStarted)
@@ -4330,19 +4404,29 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryFindProposedType(ref CachedTypeReader proposedTypeReaderRef, ref ByteSegment proposedTypeNameRef, Type expectedType, out bool foundValueField)
         {
-            foundValueField = false;            
+            foundValueField = false;
 
             // 1. find $type field
-            byte b = SkipWhiteSpaces();
-            if (b != (byte)'{') return false;
+
+            // Already skipped whitespace and checked for '{' in TryReadAsProposedType before calling this method,
+            // so we can skip it here to save some performance in the common case where no proposed type is provided.
+            // byte b = SkipWhiteSpaces();
+            // if (b != (byte)'{') return false;
             buffer.TryNextByte();
 
-            // compare byte per byte to fail early
-            b = SkipWhiteSpaces();
+            // compare byte per byte to fail early            
+            byte b = SkipWhiteSpaces();
             if (b != (byte)'"') return false;
             buffer.TryNextByte();
             b = buffer.CurrentByte;
             if (b != (byte)'$') return false;
+            // No inlining here to reduce code size of the main deserialization loop,
+            // since this code is only executed when a proposed type is provided, which is not the common case.
+            return FindProposedType_Continuation(ref proposedTypeReaderRef, ref proposedTypeNameRef, expectedType, ref foundValueField, out b);
+        }
+
+        private bool FindProposedType_Continuation(ref CachedTypeReader proposedTypeReaderRef, ref ByteSegment proposedTypeNameRef, Type expectedType, ref bool foundValueField, out byte b)
+        {
             buffer.TryNextByte();
             b = buffer.CurrentByte;
             if (FoldAsciiToLower(b) != (byte)'t') return false;
@@ -4374,7 +4458,7 @@ namespace FeatureLoom.Serialization
                 isProposedTypeCompatible = proposedTypeReaderRef != null && proposedTypeReaderRef.ReaderType.IsAssignableTo(expectedType);
             }
             else
-            {                
+            {
                 proposedTypeBytes.EnsureHashCode();
                 // Force a copy of the proposedTypeBytes so it can be safely used as dictionary key without worrying about buffer changes.                
                 if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out var proposedTypeReader))

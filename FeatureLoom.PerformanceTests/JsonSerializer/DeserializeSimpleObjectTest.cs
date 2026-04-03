@@ -31,7 +31,8 @@ public partial class DeserializeSimpleObjectTest
     static FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024 * 1024 * 10,
-        useStringCache = true,
+        //useStringCache = true,
+        enableProposedTypes = true,
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()

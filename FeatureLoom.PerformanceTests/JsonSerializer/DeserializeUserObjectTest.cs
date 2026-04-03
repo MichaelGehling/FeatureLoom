@@ -38,10 +38,10 @@ public partial class DeserializeUserObjectTest
     {
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        //enableProposedTypes = true,
+        enableProposedTypes = true,
         //enableReferenceResolution = true
-        useStringCache = true,
-        stringCacheBitSize = 12,        
+        //useStringCache = true,
+        //stringCacheBitSize = 12,        
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()

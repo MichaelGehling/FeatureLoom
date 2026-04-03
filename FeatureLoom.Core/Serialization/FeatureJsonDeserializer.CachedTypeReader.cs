@@ -9,7 +9,7 @@ public sealed partial class FeatureJsonDeserializer
 {    
     sealed class TypeReaderInitializer
     {
-        public FeatureJsonDeserializer parent;
+        public FeatureJsonDeserializer deserializer;
         public Type readerType;
         public Delegate readingDelegate;
         public Delegate populatingDelegate;
@@ -58,7 +58,7 @@ public sealed partial class FeatureJsonDeserializer
 
             return new TypeReaderInitializer
             {
-                parent = parent,
+                deserializer = parent,
                 readerType = typeof(T),
                 readingDelegate = readingDelegate2,
                 populatingDelegate = populatingDelegate2,
@@ -72,7 +72,7 @@ public sealed partial class FeatureJsonDeserializer
 
     sealed class CachedTypeReader
     {
-        private readonly FeatureJsonDeserializer parent;        
+        private readonly FeatureJsonDeserializer deserializer;        
 
         private readonly Type readerType;
         private readonly bool refTypeOrRefTypeChildren;
@@ -96,21 +96,21 @@ public sealed partial class FeatureJsonDeserializer
         public bool IsNoCheckPossible<T>() => typeof(T) == readerType && !enableProposedTypes && !resolveRefPath && !writeRefPath;
         public bool CanBePopulated => canBePopulated;
 
-        public FeatureJsonDeserializer Parent => parent;
+        public FeatureJsonDeserializer Parent => deserializer;
 
         public CachedTypeReader(Func<CachedTypeReader, TypeReaderInitializer> buildInit)
         {
             var init = buildInit(this);
-            parent = init.parent;
+            deserializer = init.deserializer;
 
             readerType = init.readerType;
             refTypeOrRefTypeChildren = init.refTypeOrRefTypeChildren;
             isAbstract = readerType.IsAbstract;
             isNullable = readerType.IsNullable();
             canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;            
-            resolveRefPath = parent.settings.enableReferenceResolution && !readerType.IsValueType;
-            enableProposedTypes = parent.settings.enableProposedTypes;
-            writeRefPath = parent.settings.enableReferenceResolution && refTypeOrRefTypeChildren;
+            resolveRefPath = deserializer.settings.enableReferenceResolution && !readerType.IsValueType;
+            enableProposedTypes = deserializer.settings.enableProposedTypes;
+            writeRefPath = deserializer.settings.enableReferenceResolution && refTypeOrRefTypeChildren;
 
             readingDelegate = init.readingDelegate;
             populatingDelegate = init.populatingDelegate;
@@ -123,9 +123,9 @@ public sealed partial class FeatureJsonDeserializer
         {
             if (writeRefPath)
             {
-                byte b = parent.SkipWhiteSpaces();
+                byte b = deserializer.SkipWhiteSpaces();
                 if (b != '"') throw new Exception("Not a proper field name");                    
-                var recording = parent.buffer.StartRecording(true);
+                var recording = deserializer.buffer.StartRecording(true);
 
                 T result = ReadValue_IgnoreProposed<T>();
 
@@ -151,13 +151,13 @@ public sealed partial class FeatureJsonDeserializer
             }
             else
             {
-                ItemInfo myItemInfo = new ItemInfo(fieldName, parent.currentItemInfoIndex);
-                parent.currentItemInfoIndex = parent.itemInfos.Count;
-                parent.itemInfos.Add(myItemInfo);
+                ItemInfo myItemInfo = new ItemInfo(fieldName, deserializer.currentItemInfoIndex);
+                deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
+                deserializer.itemInfos.Add(myItemInfo);
 
                 T result = ReadValue_CheckProposed<T>();
 
-                parent.currentItemInfoIndex = myItemInfo.parentIndex;
+                deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
                 return result;
             }
         }
@@ -171,13 +171,13 @@ public sealed partial class FeatureJsonDeserializer
             }
             else
             {
-                ItemInfo myItemInfo = new ItemInfo(fieldName, parent.currentItemInfoIndex);
-                parent.currentItemInfoIndex = parent.itemInfos.Count;
-                parent.itemInfos.Add(myItemInfo);
+                ItemInfo myItemInfo = new ItemInfo(fieldName, deserializer.currentItemInfoIndex);
+                deserializer.currentItemInfoIndex = deserializer.itemInfos.Count;
+                deserializer.itemInfos.Add(myItemInfo);
 
                 T result = ReadValue_CheckProposed<T>(itemToPopulate);
 
-                parent.currentItemInfoIndex = myItemInfo.parentIndex;
+                deserializer.currentItemInfoIndex = myItemInfo.parentIndex;
                 return result;
             }
         }
@@ -202,7 +202,7 @@ public sealed partial class FeatureJsonDeserializer
                 }
                 else
                 {
-                    var typedReader = parent.GetCachedTypeReader(callType);
+                    var typedReader = deserializer.GetCachedTypeReader(callType);
                     result = typedReader.ReadValue_CheckProposed<T>();
                 }
             }
@@ -232,7 +232,7 @@ public sealed partial class FeatureJsonDeserializer
             }
             else
             {
-                var typedReader = parent.GetCachedTypeReader(itemType);
+                var typedReader = deserializer.GetCachedTypeReader(itemType);
                 result = typedReader.ReadValue_CheckProposed(itemToPopulate);
             }
 
@@ -257,7 +257,7 @@ public sealed partial class FeatureJsonDeserializer
                 }
                 else
                 {
-                    var typedReader = parent.GetCachedTypeReader(callType);
+                    var typedReader = deserializer.GetCachedTypeReader(callType);
                     result = typedReader.ReadValue_IgnoreProposed<T>();
                 }
             }
@@ -287,7 +287,7 @@ public sealed partial class FeatureJsonDeserializer
             }
             else
             {
-                var typedReader = parent.GetCachedTypeReader(itemType);
+                var typedReader = deserializer.GetCachedTypeReader(itemType);
                 result = typedReader.ReadValue_IgnoreProposed(itemToPopulate);
             }
 
@@ -322,45 +322,41 @@ public sealed partial class FeatureJsonDeserializer
             }
             else
             {
-                var typedReader = parent.GetCachedTypeReader(itemType);
+                var typedReader = deserializer.GetCachedTypeReader(itemType);
                 result = typedReader.ReadValue_IgnoreProposed(itemToPopulate);
             }
 
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, out T item)
         {
             item = default;
-            byte b = parent.SkipWhiteSpaces();
+            byte b = deserializer.SkipWhiteSpaces();
             // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
             // so we can skip the rest of this method and just read it as the original type
-            if (b != (byte)'{') return false;
+            if (b != (byte)'{') return false;            
 
             bool foundProposedReader = false;
             bool foundValueField = false;
 
-            var undoHandle = parent.CreateUndoReadHandle();
+            var undoHandle = deserializer.CreateUndoReadHandle();
+            foundProposedReader = deserializer.TryFindProposedType(ref lastProposedTypeReader, ref lastProposedTypeName, typeof(T), out foundValueField);
+            if (!foundProposedReader && !foundValueField)
             {
-                foundProposedReader = parent.TryFindProposedType(ref lastProposedTypeReader, ref lastProposedTypeName, typeof(T), out foundValueField);
-                if (!foundProposedReader && !foundValueField)
-                {
-                    undoHandle.Dispose();
-                    return false;                    
-                }
-                undoHandle.SetUndoReading(!foundValueField);
+                undoHandle.Dispose();
+                return false;
             }
+            undoHandle.SetUndoReading(!foundValueField);
             undoHandle.Dispose();
 
             if (foundValueField)
             {
                 // bufferPos is currently at the position of the actual value, so read on from here, but handle the rest of the type object afterwards
-                if (foundProposedReader)
-                {
-                    item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>();
-                }
+                if (foundProposedReader) item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>();                
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>();
-                parent.SkipRemainingFieldsOfObject();
+                deserializer.SkipRemainingFieldsOfObject();
             }
             else
             {
@@ -371,26 +367,25 @@ public sealed partial class FeatureJsonDeserializer
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryReadAsProposedType<T>(CachedTypeReader originalTypeReader, T itemToPopulate, out T item)
         {
             item = default;
-            byte b = parent.SkipWhiteSpaces();
+            byte b = deserializer.SkipWhiteSpaces();
             // If the first non-whitespace character is not a '{', then this can't be an object with a proposed type,
             if (b != (byte)'{') return false;
 
             bool foundProposedReader = false;
             bool foundValueField = false;
 
-            var undoHandle = parent.CreateUndoReadHandle();
+            var undoHandle = deserializer.CreateUndoReadHandle();
+            foundProposedReader = deserializer.TryFindProposedType(ref lastProposedTypeReader, ref lastProposedTypeName, typeof(T), out foundValueField);
+            if (!foundProposedReader && !foundValueField)
             {
-                foundProposedReader = parent.TryFindProposedType(ref lastProposedTypeReader, ref lastProposedTypeName, typeof(T), out foundValueField);
-                if (!foundProposedReader && !foundValueField)
-                {
-                    undoHandle.Dispose();
-                    return false;
-                }
-                undoHandle.SetUndoReading(!foundValueField);
+                undoHandle.Dispose();
+                return false;
             }
+            undoHandle.SetUndoReading(!foundValueField);
             undoHandle.Dispose();
 
             if (foundValueField)
@@ -402,7 +397,7 @@ public sealed partial class FeatureJsonDeserializer
                     else item = lastProposedTypeReader.ReadValue_IgnoreProposed<T>();
                 }
                 else item = originalTypeReader.ReadValue_IgnoreProposed<T>(itemToPopulate);
-                parent.SkipRemainingFieldsOfObject();
+                deserializer.SkipRemainingFieldsOfObject();
             }
             else
             {

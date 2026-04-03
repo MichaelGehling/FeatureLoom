@@ -13,9 +13,11 @@
 - When validating reference-resolution tests, treat assignment to `object` as type-compatible; use a truly incompatible target type for negative compatibility cases.
 - In this codebase, `Deserialize_*_FromArrayOfKeyValuePairs_PublicFieldsAndProperties` should not be expected to pass because `KeyValuePair<TKey,TValue>` properties are not writable in `PublicFieldsAndProperties` mode.
 - For `Settings_AddCustomTypeReader_UsesTryReadNullValue`, use a struct (`CustomNullReadType`) so `api.TryReadNullValue()` can be asserted meaningfully; a class result may be `null` before custom-reader state is observable.
+- When optimizing number parsing, prefer one upfront `TryEnsureBuffered` call in `ReadNumberBytes`/`TryReadNumberBytes` (best-effort, result may be ignored) rather than calling it inside the hot digit-scanning loop to avoid performance regression.
 
 ## Parser Guidelines
 - When proposing parser fast-path substitutions, only mark call sites as safe if they preserve whitespace tolerance (e.g., account for pretty-printed JSON whitespace after '{', ',', or ':').
+- For parser performance changes, avoid making `TrySkipBytes` auto-buffer unless there is a proven boundary bug to prevent unnecessary overhead when current logic is already safe.
 
 ## General Guidelines
 - Avoid using phrases like "take a deep breath" in responses.

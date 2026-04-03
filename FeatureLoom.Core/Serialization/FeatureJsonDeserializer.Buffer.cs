@@ -307,5 +307,31 @@ public sealed partial class FeatureJsonDeserializer
                 else buffer.peekStack.Pop();
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetAvailableBufferedCount()
+        {
+            // excludes the EOF rollback phantom byte
+            int count = bufferFillLevel - bufferPos - (bufferReadTillEnd ? 1 : 0);
+            Debug.Assert(count >= 0);
+            return count;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryEnsureBuffered(int minBytes)
+        {
+            while (GetAvailableBufferedCount() < minBytes)
+            {
+                if (bufferFillLevel == buffer.Length)
+                {
+                    // compact, keep unread bytes
+                    ResetBuffer(true, false);
+                }
+
+                if (!TryReadFromStream()) return GetAvailableBufferedCount() >= minBytes;
+            }
+
+            return true;
+        }
     }
 }
