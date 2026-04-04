@@ -262,7 +262,7 @@ public sealed partial class FeatureJsonDeserializer
             enableProposedTypes = settings.enableProposedTypes;
             addCaseVariantsForCustomTypeNames = settings.addCaseVariantsForCustomTypeNames;
 
-            initialBufferSize = settings.initialBufferSize;
+            initialBufferSize = settings.initialBufferSize.ClampLow(1024 * 16); // minimum 16KB buffer size to avoid too many resizes for larger JSON inputs
             tryCastArraysOfUnknownValues = settings.tryCastArraysOfUnknownValues;
             rethrowExceptions = settings.rethrowExceptions;
             logCatchedExceptions = settings.logCatchedExceptions;

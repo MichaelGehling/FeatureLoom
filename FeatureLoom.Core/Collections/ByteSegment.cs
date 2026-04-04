@@ -122,10 +122,27 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     public ByteSegment SubSegment(int startIndex) => new ByteSegment(segment.Array, startIndex + segment.Offset, segment.Count - startIndex);
 
     /// <summary>
+    /// Mimics the behavior of <c>Span.Slice(int)</c> for consistency, returning a subsegment starting at the specified index to the end of the segment.
+    /// </summary>
+    /// <param name="startIndex">The starting index of the subsegment.</param>
+    /// <returns>A new <see cref="ByteSegment"/> representing the subsegment.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ByteSegment Slice(int startIndex) => SubSegment(startIndex);
+
+    /// <summary>
     /// Returns a subsegment starting at the specified index with the specified length.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ByteSegment SubSegment(int startIndex, int length) => new ByteSegment(segment.Array, startIndex + segment.Offset, length);
+
+    /// <summary>
+    /// Mimics the behavior of <c>Span.Slice(int, int)</c> for consistency, returning a subsegment starting at the specified index with the specified length.
+    /// </summary>
+    /// <param name="startIndex">The starting index of the subsegment.</param>
+    /// <param name="length">The length of the subsegment.</param>
+    /// <returns>A new <see cref="ByteSegment"/> representing the subsegment.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ByteSegment Slice(int startIndex, int length) => SubSegment(startIndex, length);
 
     /// <summary>
     /// Tries to find the index of the first occurrence of another <see cref="FeatureLoom.Collections.ByteSegment"/> within this segment.
@@ -180,6 +197,11 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     public int Count => segment.Count;
 
     /// <summary>
+    /// Gets the number of elements in the segment. (Same as <see cref="Count"/>; included to mimic Span's Length property for consistency.)
+    /// </summary>
+    public int Length => segment.Count;
+
+    /// <summary>
     /// Gets a value indicating whether the segment is empty or invalid.
     /// </summary>
     public bool IsEmptyOrInvalid => !IsValid || segment.Count == 0;
@@ -192,6 +214,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     /// <summary>
     /// Returns a new array containing the bytes in the segment.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte[] ToArray() => segment.ToArray();
 
     public ByteSegment CropArray(bool forceCopy)
@@ -209,6 +232,7 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     /// <param name="separator">The byte to split on.</param>
     /// <param name="skipEmpty">Whether to skip empty segments.</param>
     /// <returns>An enumerable of <see cref="FeatureLoom.Collections.ByteSegment"/>.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)] 
     public SplitEnumerator Split(byte separator, bool skipEmpty = false) => new SplitEnumerator(this, separator, skipEmpty);    
 
     /// <summary>

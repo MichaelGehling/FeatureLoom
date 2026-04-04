@@ -18,7 +18,7 @@ public sealed partial class FeatureJsonDeserializer
         int bufferPos = 0;
         int bufferResetLevel;
         
-        readonly Stack<int> peekStack = new Stack<int>();
+        //readonly Stack<int> peekStack = new Stack<int>();
 
         int bufferStartPos = 0;
         int bufferFillLevel = 0;
@@ -200,7 +200,6 @@ public sealed partial class FeatureJsonDeserializer
                 bufferFillLevel = 0;
             }
             bufferStartPos = bufferPos;
-            peekStack.Clear();
         }
 
         public void ResetBufferAfterFullSkip()
@@ -215,7 +214,6 @@ public sealed partial class FeatureJsonDeserializer
             bool growBuffer = bufferStartPos < (int)(buffer.Length * 0.5);
             ResetBuffer(true, growBuffer);
             bufferPos = bufferStartPos;
-            peekStack.Clear();
         }
 
         public string ShowBufferAroundCurrentPosition(int before = 100, int after = 50)
@@ -286,7 +284,6 @@ public sealed partial class FeatureJsonDeserializer
                 this.buffer = buffer;
                 undoReading = initUndo;
                 startBufferPos = buffer.bufferPos;
-                buffer.peekStack.Push(buffer.bufferPos);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -298,13 +295,12 @@ public sealed partial class FeatureJsonDeserializer
                 if (undoReading)
                 {
                     var preRestorePos = buffer.bufferPos;
-                    buffer.bufferPos = buffer.peekStack.Pop();
+                    buffer.bufferPos = startBufferPos;
                     if (preRestorePos > buffer.bufferPos)
                     {
                         buffer.bufferReadTillEnd = false;
                     }
                 }
-                else buffer.peekStack.Pop();
             }
         }
 

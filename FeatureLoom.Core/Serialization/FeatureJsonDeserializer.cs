@@ -529,7 +529,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SetItemRefInCurrentItemInfo(object item)
         {
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
             ref ItemInfo itemInfo = ref CollectionsMarshal.AsSpan(itemInfos)[currentItemInfoIndex];
             itemInfo.itemRef = item;
 #else
@@ -599,7 +599,7 @@ namespace FeatureLoom.Serialization
 
         static T CreateUninitialized<T>()
         {
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
             return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
 #else
             return (T)FormatterServices.GetUninitializedObject(typeof(T));
@@ -1722,7 +1722,7 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
                         if (typeof(V) == typeof(string)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValue, fieldTypeReader);
                         if (typeof(V) == typeof(char)) return CreateObjFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValue, fieldTypeReader);
                         if (typeof(V) == typeof(sbyte)) return CreateObjFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValue, fieldTypeReader);
@@ -1852,7 +1852,7 @@ namespace FeatureLoom.Serialization
                 {
                     if (fieldTypeReader.IsNoCheckPossible<V>())
                     {
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
                         if (typeof(V) == typeof(string)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValue, fieldTypeReader);
                         if (typeof(V) == typeof(char)) return CreateObjFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValue, fieldTypeReader);
                         if (typeof(V) == typeof(sbyte)) return CreateObjFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValue, fieldTypeReader);
@@ -2535,8 +2535,11 @@ namespace FeatureLoom.Serialization
             byte b = SkipWhiteSpaces();
             if (FoldAsciiToLower(b) != (byte)'n') throw new Exception("Failed reading null");
 
-#if !NETSTANDARD2_0
-            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#if NETSTANDARD2_0
+            var remaining = buffer.GetRemainingBytes();
+#else
+            var remaining = buffer.GetRemainingSpan();
+#endif
             if (remaining.Length >= 5 &&
                 FoldAsciiToLower(remaining[0]) == (byte)'n' &&
                 FoldAsciiToLower(remaining[1]) == (byte)'u' &&
@@ -2547,7 +2550,6 @@ namespace FeatureLoom.Serialization
                 buffer.TrySkipBytes(4); // move to delimiter
                 return null;
             }
-#endif
 
             if (!buffer.TryNextByte()) throw new Exception("Failed reading null");
             if (FoldAsciiToLower(buffer.CurrentByte) != (byte)'u') throw new Exception("Failed reading null");
@@ -2569,8 +2571,11 @@ namespace FeatureLoom.Serialization
 
             if (b == (byte)'t')
             {
-#if !NETSTANDARD2_0
-                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#if NETSTANDARD2_0
+                var remaining = buffer.GetRemainingBytes();
+#else
+                var remaining = buffer.GetRemainingSpan();
+#endif
                 if (remaining.Length >= 5 &&
                     FoldAsciiToLower(remaining[0]) == (byte)'t' &&
                     FoldAsciiToLower(remaining[1]) == (byte)'r' &&
@@ -2581,8 +2586,8 @@ namespace FeatureLoom.Serialization
                     buffer.TrySkipBytes(4); // move to delimiter
                     return true;
                 }
-#endif
 
+                // Fallback if the optimization is not possible (e.g. because the buffer does not contain enough bytes).
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
                 if (FoldAsciiToLower(buffer.CurrentByte) != (byte)'r') throw new Exception("Failed reading boolean value");
 
@@ -2597,8 +2602,11 @@ namespace FeatureLoom.Serialization
             }
             else if (b == (byte)'f')
             {
-#if !NETSTANDARD2_0
-                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#if NETSTANDARD2_0
+                var remaining = buffer.GetRemainingBytes();
+#else
+                var remaining = buffer.GetRemainingSpan();
+#endif
                 if (remaining.Length >= 6 &&
                     FoldAsciiToLower(remaining[0]) == (byte)'f' &&
                     FoldAsciiToLower(remaining[1]) == (byte)'a' &&
@@ -2610,8 +2618,8 @@ namespace FeatureLoom.Serialization
                     buffer.TrySkipBytes(5); // move to delimiter
                     return false;
                 }
-#endif
 
+                // Fallback if the optimization is not possible (e.g. because the buffer does not contain enough bytes).
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading boolean value");
                 if (FoldAsciiToLower(buffer.CurrentByte) != (byte)'a') throw new Exception("Failed reading boolean value");
 
@@ -2639,8 +2647,11 @@ namespace FeatureLoom.Serialization
 
             if (b == (byte)'t')
             {
-#if !NETSTANDARD2_0
-                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#if NETSTANDARD2_0
+                var remaining = buffer.GetRemainingBytes();
+#else
+                var remaining = buffer.GetRemainingSpan();
+#endif
                 if (remaining.Length >= 5 &&
                     FoldAsciiToLower(remaining[0]) == (byte)'t' &&
                     FoldAsciiToLower(remaining[1]) == (byte)'r' &&
@@ -2652,8 +2663,8 @@ namespace FeatureLoom.Serialization
                     value = true;
                     return true;
                 }
-#endif
 
+                // Fallback if the optimization is not possible (e.g. because the buffer does not contain enough bytes).
                 using (var undoHandle = CreateUndoReadHandle())
                 {
                     if (!buffer.TryNextByte()) return false;
@@ -2673,8 +2684,11 @@ namespace FeatureLoom.Serialization
             }
             else if (b == (byte)'f')
             {
-#if !NETSTANDARD2_0
-                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#if NETSTANDARD2_0
+                var remaining = buffer.GetRemainingBytes();
+#else
+                var remaining = buffer.GetRemainingSpan();
+#endif
                 if (remaining.Length >= 6 &&
                     FoldAsciiToLower(remaining[0]) == (byte)'f' &&
                     FoldAsciiToLower(remaining[1]) == (byte)'a' &&
@@ -2687,8 +2701,8 @@ namespace FeatureLoom.Serialization
                     value = false;
                     return true;
                 }
-#endif
 
+                // Fallback if the optimization is not possible (e.g. because the buffer does not contain enough bytes).
                 using (var undoHandle = CreateUndoReadHandle())
                 {
                     if (!buffer.TryNextByte()) return false;
@@ -2725,9 +2739,11 @@ namespace FeatureLoom.Serialization
         {
             using (var undoHandle = CreateUndoReadHandle())
             {
-#if !NETSTANDARD2_0
-                ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
-
+#if NETSTANDARD2_0
+                var remaining = buffer.GetRemainingBytes();
+#else
+                var remaining = buffer.GetRemainingSpan();
+#endif
                 // If we have full token + delimiter buffered, decide in one pass.
                 if (remaining.Length >= 5)
                 {
@@ -2743,7 +2759,6 @@ namespace FeatureLoom.Serialization
                     }
                     return false;
                 }
-#endif
 
                 // Fallback path (needed for short remaining buffer / cross-buffer token)
                 if (!buffer.TryNextByte()) return false;
@@ -2830,9 +2845,7 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public long ReadSignedIntegerValue()
         {
-#if !NETSTANDARD2_0
             if (TrySignedIntFastPath(out long fastPathValue)) return fastPathValue;
-#endif
 
             ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits, 
                 out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.signedInteger);
@@ -2949,9 +2962,8 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadUnsignedIntegerValue()
         {
-#if !NETSTANDARD2_0
             if (TryUnsignedIntFastPath(out ulong fastPathValue)) return fastPathValue;
-#endif
+
             ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
                 out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.unsignedInteger);
 
@@ -3886,29 +3898,22 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ulong BytesToInteger(ArraySegment<byte> bytes)
+        ulong BytesToInteger(ByteSegment byteSegment)
         {
             ulong value = 0;
 #if NETSTANDARD2_0            
-            if (bytes.Count == 0) return value;
-            value += (byte)(bytes.Get(0) - (byte)'0');
-            for (int i = 1; i < bytes.Count; i++)
-            {
-                value *= 10;
-                value += (byte)(bytes.Get(i) - (byte)'0');
-            }            
+            var bytes = byteSegment;
 #else
-            var span = bytes.AsSpan();
-            if (span.Length == 0) return value;
-            value += (byte)(span[0] - (byte)'0');
-            for (int i = 1; i < span.Length; i++) 
+            var bytes = byteSegment.AsSpan();
+#endif
+            if (bytes.Length == 0) return value;
+            value += (byte)(bytes[0] - (byte)'0');
+            for (int i = 1; i < bytes.Length; i++) 
             {
                 value *= 10;
-                value += (byte)(span[i] - (byte)'0');
+                value += (byte)(bytes[i] - (byte)'0');
             }
-#endif
             return value;
-
         }
 
         [Flags]
@@ -3925,7 +3930,6 @@ namespace FeatureLoom.Serialization
 
         static readonly ByteSegment zeroAsBytes = new byte[] { (byte)'0' };
 
-  #if !NETSTANDARD2_0
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TrySignedIntFastPath(out long value)
         {
@@ -3933,15 +3937,18 @@ namespace FeatureLoom.Serialization
             bool isNegative = buffer.CurrentByte == (byte)'-';            
             ulong uValue = 0;
             value = 0;
-
-            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#if NETSTANDARD2_0
+            var remaining = buffer.GetRemainingBytes();
+#else
+            var remaining = buffer.GetRemainingSpan();
+#endif
             if (isNegative) remaining = remaining.Slice(1); // skip sign for digit parsing, but not for length check
             int len = 0;
             unchecked
             {
                 while ((uint)len < (uint)remaining.Length && (uint)(remaining[len] - (byte)'0') <= 9u) len++;
             }
-            if (len == 0 || len >= 19) return false;
+            if (len == 0 || len >= 19) return false; // leave fast path if more than 18 digits as a performance tradeoff (max long is 19 digits, but overflow is possible, which is checked in the slow path)
             if (len < remaining.Length && map_IsFieldEnd[remaining[len]] != FilterResult.Found) return false;
 
             var digits = remaining.Slice(0, len);
@@ -3963,22 +3970,25 @@ namespace FeatureLoom.Serialization
             buffer.TryNextByte();            
             return true;
         }
-#endif
 
-#if !NETSTANDARD2_0
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+
         private bool TryUnsignedIntFastPath(out ulong value)
         {
             buffer.TryEnsureBuffered(21); // max length of long in decimal is 20 chars (including sign)
             value = 0;
 
-            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#if NETSTANDARD2_0
+            var remaining = buffer.GetRemainingBytes();
+#else
+            var remaining = buffer.GetRemainingSpan();
+#endif
             int len = 0;
             unchecked
             {
                 while ((uint)len < (uint)remaining.Length && (uint)(remaining[len] - (byte)'0') <= 9u) len++;
             }
-            if (len == 0 || len >= 20) return false; // leave fast path if more than 19 digits (max ulong is 20 digits but we need to check for overflow in that case)
+            if (len == 0 || len >= 20) return false; // leave fast path if more than 19 digits as a performance tradeoff (max ulong is 20 digits, but overflow is possible, which is checked in the slow path)
             if (len < remaining.Length && map_IsFieldEnd[remaining[len]] != FilterResult.Found) return false;
 
             var digits = remaining.Slice(0, len);
@@ -3991,7 +4001,7 @@ namespace FeatureLoom.Serialization
             buffer.TryNextByte();
             return true;
         }
-#endif
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ulong ReadDigitSegmentAsUInt64(out int digitCount, out bool couldNotSkip)
@@ -4001,22 +4011,10 @@ namespace FeatureLoom.Serialization
             couldNotSkip = false;
 
 #if NETSTANDARD2_0
-            byte b = buffer.CurrentByte;
-            while (b >= (byte)'0' && b <= (byte)'9')
-            {
-                unchecked { value = value * 10 + (uint)(b - (byte)'0'); }
-                digitCount++;
-
-                if (!buffer.TryNextByte())
-                {
-                    couldNotSkip = true;
-                    break;
-                }
-
-                b = buffer.CurrentByte;
-    }
+            ByteSegment remaining = buffer.GetRemainingBytes();
 #else
             ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+#endif
 
             int len = 0;
             unchecked
@@ -4053,7 +4051,11 @@ namespace FeatureLoom.Serialization
                 couldNotSkip = !buffer.TryNextByte();
             }
 
+#if NETSTANDARD2_0
+            static ulong Handle20OrMoreDigits(ulong value, ByteSegment remaining, int len)
+#else
             static ulong Handle20OrMoreDigits(ulong value, ReadOnlySpan<byte> remaining, int len)
+#endif
             {
                 if (len == 20)
                 {
@@ -4072,7 +4074,6 @@ namespace FeatureLoom.Serialization
                 else throw new Exception("Too many digits in number");
                 return value;
             }
-#endif
             return value;            
         }
 
@@ -4293,7 +4294,7 @@ namespace FeatureLoom.Serialization
 
             var recording = buffer.StartRecording(true);
 
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
             if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: No ending quote found.");
 
             while (true)
@@ -4358,7 +4359,7 @@ namespace FeatureLoom.Serialization
             {
                 var recording = buffer.StartRecording(true);
 
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
                 if (!buffer.TryNextByte()) return false;
 
                 while (true)
@@ -4433,7 +4434,7 @@ namespace FeatureLoom.Serialization
 
                 var recording = buffer.StartRecording(true);
 
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
                 if (!buffer.TryNextByte()) return false;
 
                 while (true)
@@ -4553,7 +4554,7 @@ namespace FeatureLoom.Serialization
             return comparant == Unsafe.Add(ref map_firstElement, index);
         }
 
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
         static readonly SearchValues<byte> jsonWhitespaceSearchValues = SearchValues.Create(" \t\n\r"u8);
 #endif
 
@@ -4562,7 +4563,7 @@ namespace FeatureLoom.Serialization
         {
             byte b = buffer.CurrentByte;
 
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
             while (true)
             {
                 if (b != (byte)' ' && b != (byte)'\t' && b != (byte)'\n' && b != (byte)'\r') return b;
