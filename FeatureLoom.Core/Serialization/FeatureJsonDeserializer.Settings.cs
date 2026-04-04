@@ -1,9 +1,10 @@
-﻿using System;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using FeatureLoom.Extensions;
-using FeatureLoom.Helpers;
+using static FeatureLoom.Serialization.FeatureJsonDeserializer.Settings;
 
 namespace FeatureLoom.Serialization;
 
@@ -22,7 +23,7 @@ public sealed partial class FeatureJsonDeserializer
         public HashSet<Type> forbiddenTypes = new();
 
         public bool enableReferenceResolution = false;
-        public bool enableProposedTypes = false;
+        public ProposedTypeHandling proposedTypeHandling = ProposedTypeHandling.CheckWhereReasonable;
 
         // If true, when custom type names are loaded into the proposed-type cache,
         // lower/upper-case variants are added too.
@@ -204,7 +205,30 @@ public sealed partial class FeatureJsonDeserializer
             Disabled = 0,
             ForProposedTypesOnly = 1,
             ForAllNonIntrinsicTypes = 2
-        }            
+        } 
+        
+        public enum ProposedTypeHandling
+        {
+            /// <summary>
+            /// Proposed types (e.g. from $type properties in JSON) are ignored and not used for deserialization. 
+            /// This is the safest option when deserializing untrusted data, but also means that polymorphic deserialization based on type information in the JSON will not work.
+            /// This option allows for the hightest performance.
+            /// If primitive values and arrays are wrapped in a $type object, the deserializer will fail.
+            /// </summary>
+            Ignore = 0,
+            /// <summary>
+            /// Proposed types are ignored where they don't make any sense with the given target type, e.g. primitive values and sealed types, 
+            /// but used where they can be applied, e.g. for deserializing into an interface, abstract class or base class.
+            /// This option provides a good balance between performance and flexibility.            
+            /// </summary>
+            CheckWhereReasonable = 1,
+            /// <summary>
+            /// Proposed types are always checked and used for deserialization if they are present, regardless of the target type.
+            /// This option has a significant performance impact, but rarely used in practice, as it allows for proposed types to be applied in situations 
+            /// where they don't make much sense.
+            /// </summary>
+            CheckAlways = 2
+        }
 
         public void AddAllowedType(Type type) => allowedTypes.Add(type);
         public void AddAllowedType<T>() => allowedTypes.Add(typeof(T));
@@ -227,7 +251,7 @@ public sealed partial class FeatureJsonDeserializer
         public readonly HashSet<Type> forbiddenTypes;
 
         public readonly bool enableReferenceResolution;
-        public readonly bool enableProposedTypes;
+        public readonly ProposedTypeHandling proposedTypeHandling;
         public readonly bool addCaseVariantsForCustomTypeNames;
 
         public readonly int initialBufferSize;
@@ -259,7 +283,7 @@ public sealed partial class FeatureJsonDeserializer
             forbiddenTypes = new (settings.forbiddenTypes);
 
             enableReferenceResolution = settings.enableReferenceResolution;
-            enableProposedTypes = settings.enableProposedTypes;
+            proposedTypeHandling = settings.proposedTypeHandling;
             addCaseVariantsForCustomTypeNames = settings.addCaseVariantsForCustomTypeNames;
 
             initialBufferSize = settings.initialBufferSize.ClampLow(1024 * 16); // minimum 16KB buffer size to avoid too many resizes for larger JSON inputs

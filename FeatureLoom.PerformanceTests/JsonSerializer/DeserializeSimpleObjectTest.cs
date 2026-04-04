@@ -26,13 +26,14 @@ public partial class DeserializeSimpleObjectTest
     static FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024*1024*10,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
     });
 
     static FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024 * 1024 * 10,
-        //useStringCache = true,
-        enableProposedTypes = true,
+        useStringCache = true,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()

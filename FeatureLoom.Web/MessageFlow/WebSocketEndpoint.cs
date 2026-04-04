@@ -68,7 +68,7 @@ namespace FeatureLoom.MessageFlow
         
         static FeatureJsonDeserializer.Settings defaultDeserializerSettings = new()
         {
-            enableProposedTypes = false,
+            proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
             enableReferenceResolution = false,
             dataAccess = FeatureJsonDeserializer.DataAccess.PublicAndPrivateFields,
             rethrowExceptions = false,

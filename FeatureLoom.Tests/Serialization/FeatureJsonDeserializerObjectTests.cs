@@ -150,7 +150,10 @@ namespace FeatureLoom.Serialization
         [Fact]
         public void Deserialize_Object_TypeInfo_IsNotSpecialWithoutProposals()
         {
-            var value = (Dictionary<string, object>)Deserialize("{\"$type\":\"System.String\",\"Value\":1}");
+            var value = (Dictionary<string, object>)Deserialize("{\"$type\":\"System.String\",\"Value\":1}", new()
+            {
+                proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore
+            });
 
             Assert.Equal("System.String", value["$type"]);
             Assert.Equal(1, value["Value"]);

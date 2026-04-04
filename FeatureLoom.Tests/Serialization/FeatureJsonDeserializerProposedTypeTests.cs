@@ -9,22 +9,27 @@ namespace FeatureLoom.Serialization
 {
     public class FeatureJsonDeserializerProposedTypeTests
     {
-        private static T Deserialize<T>(string json)
+        private static T Deserialize<T>(
+            string json,
+            FeatureJsonDeserializer.Settings.ProposedTypeHandling proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckAlways)
         {
             var settings = new FeatureJsonDeserializer.Settings
             {
-                enableProposedTypes = true
+                proposedTypeHandling = proposedTypeHandling
             };
             var deserializer = new FeatureJsonDeserializer(settings);
             Assert.True(deserializer.TryDeserialize(json, out T value));
             return value;
         }
 
-        private static bool TryDeserialize<T>(string json, out T value)
+        private static bool TryDeserialize<T>(
+            string json,
+            out T value,
+            FeatureJsonDeserializer.Settings.ProposedTypeHandling proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckAlways)
         {
             var settings = new FeatureJsonDeserializer.Settings
             {
-                enableProposedTypes = true,
+                proposedTypeHandling = proposedTypeHandling,
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
@@ -192,6 +197,38 @@ namespace FeatureLoom.Serialization
 
             Assert.False(TryDeserialize(json, out BaseType value));
             Assert.Null(value);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedTypeHandling_Ignore_UsesExpectedTypeOnly()
+        {
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(DerivedType));
+            string json = $"{{\"$type\":\"{typeName}\",\"BaseValue\":9,\"DerivedValue\":2}}";
+
+            BaseType value = Deserialize<BaseType>(json, FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore);
+
+            Assert.IsType<BaseType>(value);
+            Assert.Equal(9, value.BaseValue);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedTypeHandling_CheckWherePossible_WrappedPrimitiveForInt_ReturnsFalse()
+        {
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(byte));
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":1}}";
+
+            Assert.False(TryDeserialize(json, out int value, FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable));
+            Assert.Equal(default, value);
+        }
+
+        [Fact]
+        public void Deserialize_ProposedTypeHandling_CheckAlways_WrappedPrimitiveForInt_UsesValueField()
+        {
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(byte));
+            string json = $"{{\"$type\":\"{typeName}\",\"$value\":1}}";
+
+            Assert.True(TryDeserialize(json, out int value, FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckAlways));
+            Assert.Equal(1, value);
         }
 
         private class BaseType

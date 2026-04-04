@@ -31,8 +31,8 @@ public partial class DeserializeComplexObjectTest
     static FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024*1024*10,        
-        dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties, 
-        //enableProposedTypes = true,
+        dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
         //enableReferenceResolution = true
     });
 
@@ -40,23 +40,23 @@ public partial class DeserializeComplexObjectTest
     {
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        enableProposedTypes = true,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
         //enableReferenceResolution = true
-        //useStringCache = true,
+        useStringCache = true,
         stringCacheBitSize = 12,        
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
     {
         IncludeFields = true,        
-        DefaultBufferSize = 1024*1024*10,                
+        DefaultBufferSize = 1024*1024*10,
     };
 
     public sealed class MyResolver<TSymbol> : SpanJson.Resolvers.ResolverBase<TSymbol, MyResolver<TSymbol>> where TSymbol : struct
     {
         public MyResolver() : base(new SpanJsonOptions
         {
-            EnumOption = EnumOptions.Integer
+            EnumOption = EnumOptions.Integer,            
         })
         {
         }

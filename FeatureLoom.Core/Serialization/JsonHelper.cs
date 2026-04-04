@@ -19,7 +19,7 @@ public class JsonHelperService
     });
     FeatureJsonDeserializer deserializer = new(new()
     {
-        enableProposedTypes = true,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
         strict = false,
     });
 

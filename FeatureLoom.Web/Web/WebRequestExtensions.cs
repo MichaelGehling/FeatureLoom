@@ -10,7 +10,7 @@ namespace FeatureLoom.Web
         static FeatureJsonDeserializer jsonDeserializer = new(new FeatureJsonDeserializer.Settings()
         {
             rethrowExceptions = false,
-            enableProposedTypes = false,
+            proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
         });
 
         public static async Task<(bool, T)> TryGetBodyAsync<T>(this IWebRequest request)

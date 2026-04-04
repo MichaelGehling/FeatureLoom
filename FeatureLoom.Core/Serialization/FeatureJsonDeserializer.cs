@@ -102,7 +102,7 @@ namespace FeatureLoom.Serialization
                 stringCache = new QuickStringCache(settings.stringCacheBitSize, settings.stringCacheMaxLength);                
             }
 
-            if (settings.enableProposedTypes)
+            if (settings.proposedTypeHandling != Settings.ProposedTypeHandling.Ignore)
             {
                 foreach (var kvp in settings.customTypeNames)
                 {

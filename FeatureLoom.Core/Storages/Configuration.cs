@@ -18,7 +18,7 @@ namespace FeatureLoom.Storages
         public static string defaultCategory = "config";
         public static FeatureJsonDeserializer deserializer = new FeatureJsonDeserializer(new()
         {
-            enableProposedTypes = false,
+            proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
             dataAccess = FeatureJsonDeserializer.DataAccess.PublicAndPrivateFields,
             enableReferenceResolution = false,            
         });

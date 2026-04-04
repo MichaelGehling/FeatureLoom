@@ -12,7 +12,7 @@ namespace FeatureLoom.TCP
     {
         FeatureJsonDeserializer deserializer = new FeatureJsonDeserializer(new()
         {
-            enableProposedTypes = true,
+            proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
             enableReferenceResolution = true
         });
         byte[] typeInfo = "TypedJSON".ToByteArray();

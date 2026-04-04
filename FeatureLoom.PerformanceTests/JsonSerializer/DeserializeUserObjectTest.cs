@@ -29,8 +29,8 @@ public partial class DeserializeUserObjectTest
     static FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024*1024*10,        
-        dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties, 
-        //enableProposedTypes = true,
+        dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
         //enableReferenceResolution = true
     });
 
@@ -38,9 +38,9 @@ public partial class DeserializeUserObjectTest
     {
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        enableProposedTypes = true,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
         //enableReferenceResolution = true
-        //useStringCache = true,
+        useStringCache = true,
         //stringCacheBitSize = 12,        
     });
 

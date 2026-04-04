@@ -76,7 +76,7 @@ public sealed partial class FeatureJsonDeserializer
 
         private readonly Type readerType;
         private readonly bool refTypeOrRefTypeChildren;
-        private readonly bool enableProposedTypes;
+        private readonly bool checkProposedTypes;
         private readonly bool isAbstract;
         private readonly bool isNullable;
         private readonly bool writeRefPath;
@@ -93,7 +93,7 @@ public sealed partial class FeatureJsonDeserializer
 
         public bool RefTypeOrRefTypeChildren => refTypeOrRefTypeChildren;
         public Type ReaderType => readerType;
-        public bool IsNoCheckPossible<T>() => typeof(T) == readerType && !enableProposedTypes && !resolveRefPath && !writeRefPath;
+        public bool IsNoCheckPossible<T>() => typeof(T) == readerType && !checkProposedTypes && !resolveRefPath && !writeRefPath;
         public bool CanBePopulated => canBePopulated;
 
         public FeatureJsonDeserializer Parent => deserializer;
@@ -109,7 +109,8 @@ public sealed partial class FeatureJsonDeserializer
             isNullable = readerType.IsNullable();
             canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;            
             resolveRefPath = deserializer.settings.enableReferenceResolution && !readerType.IsValueType;
-            enableProposedTypes = deserializer.settings.enableProposedTypes;
+            checkProposedTypes = deserializer.settings.proposedTypeHandling == Settings.ProposedTypeHandling.CheckAlways || 
+                (deserializer.settings.proposedTypeHandling == Settings.ProposedTypeHandling.CheckWhereReasonable && !readerType.IsValueType && !readerType.IsSealed);
             writeRefPath = deserializer.settings.enableReferenceResolution && refTypeOrRefTypeChildren;
 
             readingDelegate = init.readingDelegate;
@@ -185,7 +186,7 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T ReadValue_CheckProposed<T>()
         {
-            if (enableProposedTypes && TryReadAsProposedType(this, out T item)) return item;
+            if (checkProposedTypes && TryReadAsProposedType(this, out T item)) return item;
 
             Type callType = typeof(T);
  
@@ -214,7 +215,7 @@ public sealed partial class FeatureJsonDeserializer
         private T ReadValue_CheckProposed<T>(T itemToPopulate)
         {
             if (!canBePopulated || itemToPopulate == null) return ReadValue_CheckProposed<T>();
-            if (enableProposedTypes && TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
+            if (checkProposedTypes && TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
 
             Type itemType = itemToPopulate.GetType();
             T result;
