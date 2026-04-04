@@ -41,7 +41,7 @@ public partial class DeserializeComplexObjectTest
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
         proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
-        //enableReferenceResolution = true
+        enableReferenceResolution = true,
         useStringCache = true,
         stringCacheBitSize = 12,        
     });

@@ -24,7 +24,7 @@ public sealed partial class FeatureJsonDeserializer
             bool refTypeOrRefTypeChildren)
         {
             var readerType = typeof(T);
-            var resolveRefPath = parent.settings.enableReferenceResolution && (refTypeOrRefTypeChildren || !readerType.IsValueType);
+            var resolveRefPath = parent.settings.enableReferenceResolution && refTypeOrRefTypeChildren;
             var readingDelegate2 = readingDelegate;
             var populatingDelegate2 = populatingDelegate;
             Func<object> readingObjectDelegate = readingDelegate2 != null ? () => (object)readingDelegate2.Invoke() : null;
@@ -214,7 +214,7 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private T ReadValue_CheckProposed<T>(T itemToPopulate)
         {
-            if (!canBePopulated || itemToPopulate == null) return ReadValue_CheckProposed<T>();
+            if (!canBePopulated || !deserializer.isPopulating || itemToPopulate == null) return ReadValue_CheckProposed<T>();
             if (checkProposedTypes && TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
 
             Type itemType = itemToPopulate.GetType();

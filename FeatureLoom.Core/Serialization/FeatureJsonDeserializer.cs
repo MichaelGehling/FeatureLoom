@@ -56,8 +56,8 @@ namespace FeatureLoom.Serialization
 
         struct ItemInfo
         {
-            public ByteSegment name;            
-            public int parentIndex;
+            public readonly ByteSegment name;            
+            public readonly int parentIndex;
             public object itemRef;
 
             public ItemInfo(ByteSegment name, int parentIndex)
@@ -244,7 +244,7 @@ namespace FeatureLoom.Serialization
                 }
 
                 if (itemType.IsArray) return CreateArrayTypeReader(itemType, cachedTypeReader);
-                else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValueOrNull, null, true);
+                else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValueOrNull, null, settings.enableStringRefResolution);
                 else if (itemType == typeof(long)) return TypeReaderInitializer.Create(this, ReadLongValue, null, false);
                 else if (itemType == typeof(long?)) return TypeReaderInitializer.Create(this, ReadNullableLongValue, null, false);
                 else if (itemType == typeof(int)) return TypeReaderInitializer.Create(this, ReadIntValue, null, false);
@@ -710,7 +710,7 @@ namespace FeatureLoom.Serialization
                 else throw new Exception("Invalid character for determining enum value");
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true);
+            return TypeReaderInitializer.Create(this, reader, null, false);
         }
 
         private TypeReaderInitializer CreateNullableEnumReader<T>() where T : struct, Enum
@@ -742,7 +742,7 @@ namespace FeatureLoom.Serialization
                 else throw new Exception("Invalid character for determining enum value");
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true);
+            return TypeReaderInitializer.Create(this, reader, null, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1244,6 +1244,7 @@ namespace FeatureLoom.Serialization
 
             Dictionary<ByteSegment, int> itemFieldWritersIndexLookup = new();
             List<(ByteSegment name, Func<T, T> itemFieldWriter)> itemFieldWritersList = new();
+            bool refTypeOrRefTypeChildren = !itemType.IsValueType;
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
@@ -1260,6 +1261,8 @@ namespace FeatureLoom.Serialization
                     itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
                     itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
                 }
+
+                if (!refTypeOrRefTypeChildren && GetCachedTypeReader(fieldType).RefTypeOrRefTypeChildren) refTypeOrRefTypeChildren = true;
             }
             int writerCount = itemFieldWritersList.Count;
             var itemFieldWriters = itemFieldWritersList.ToArray();
@@ -1354,7 +1357,7 @@ namespace FeatureLoom.Serialization
                 return item;
             };
 
-            return TypeReaderInitializer.Create(this, reader, populatingReader, true);
+            return TypeReaderInitializer.Create(this, reader, populatingReader, refTypeOrRefTypeChildren);
         }
 
         private List<MemberInfo> CreateMemberInfosList(Type itemType)

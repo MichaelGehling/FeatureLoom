@@ -10,7 +10,8 @@ namespace FeatureLoom.Serialization
         {
             var settings = new FeatureJsonDeserializer.Settings
             {
-                enableReferenceResolution = true
+                enableReferenceResolution = true,
+                enableStringRefResolution = true,
             };
             var deserializer = new FeatureJsonDeserializer(settings);
             Assert.True(deserializer.TryDeserialize(json, out T value));

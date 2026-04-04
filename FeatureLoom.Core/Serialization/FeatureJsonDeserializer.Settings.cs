@@ -23,6 +23,7 @@ public sealed partial class FeatureJsonDeserializer
         public HashSet<Type> forbiddenTypes = new();
 
         public bool enableReferenceResolution = false;
+        public bool enableStringRefResolution = false;
         public ProposedTypeHandling proposedTypeHandling = ProposedTypeHandling.CheckWhereReasonable;
 
         // If true, when custom type names are loaded into the proposed-type cache,
@@ -251,6 +252,7 @@ public sealed partial class FeatureJsonDeserializer
         public readonly HashSet<Type> forbiddenTypes;
 
         public readonly bool enableReferenceResolution;
+        public readonly bool enableStringRefResolution;
         public readonly ProposedTypeHandling proposedTypeHandling;
         public readonly bool addCaseVariantsForCustomTypeNames;
 
@@ -283,6 +285,7 @@ public sealed partial class FeatureJsonDeserializer
             forbiddenTypes = new (settings.forbiddenTypes);
 
             enableReferenceResolution = settings.enableReferenceResolution;
+            enableStringRefResolution = settings.enableStringRefResolution;
             proposedTypeHandling = settings.proposedTypeHandling;
             addCaseVariantsForCustomTypeNames = settings.addCaseVariantsForCustomTypeNames;
 
