@@ -328,4 +328,9 @@ public sealed partial class JsonDeserializer
             return true;
         }
     }
+
+    public class BufferExceededException : Exception
+    {
+
+    }
 }
