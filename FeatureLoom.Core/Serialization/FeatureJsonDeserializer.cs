@@ -1277,6 +1277,8 @@ namespace FeatureLoom.Serialization
                     fieldWriter = null;
                     return false;
                 }
+                // Check the expected field index first, because in most cases the fields will be in the same order as they are
+                // defined in the type, so we can avoid the dictionary lookup in most cases.
                 (ByteSegment name, fieldWriter) = itemFieldWriters[expectedFieldIndex];                
                 if (name == fieldName)
                 {
@@ -1284,6 +1286,17 @@ namespace FeatureLoom.Serialization
                     if (expectedFieldIndex >= writerCount) expectedFieldIndex = 0;
                     return true;
                 }
+
+                // Try another quick check at the next index, because there might be a single field missing
+                (name, fieldWriter) = itemFieldWriters[expectedFieldIndex];
+                if (name == fieldName)
+                {
+                    expectedFieldIndex++;
+                    if (expectedFieldIndex >= writerCount) expectedFieldIndex = 0;
+                    return true;
+                }
+
+                // If the quick checks fail, we have to do the dictionary lookup
                 fieldName.EnsureHashCode();
                 if (itemFieldWritersIndexLookup.TryGetValue(fieldName, out int index))
                 {                    

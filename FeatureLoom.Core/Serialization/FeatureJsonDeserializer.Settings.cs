@@ -35,7 +35,7 @@ public sealed partial class FeatureJsonDeserializer
         public bool rethrowExceptions = false;
         public bool logCatchedExceptions = true;
         public bool strict = false;
-        public bool populateExistingMembers = false;
+        public bool populateExistingMembers = true;
         public bool useStringCache = false;
         public int stringCacheBitSize = 12; //4096 entries
         public int stringCacheMaxLength = 128; //max string length to be cached

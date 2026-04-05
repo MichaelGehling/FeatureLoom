@@ -28,20 +28,21 @@ public partial class DeserializeUserObjectTest
 
     static FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
-        initialBufferSize = 1024*1024*10,        
+        initialBufferSize = 1024 * 1024 * 10,
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
         proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
-        //enableReferenceResolution = true
+        //enableReferenceResolution = false
     });
 
     static FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
+        //proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
         proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
-        //enableReferenceResolution = true
+        //enableReferenceResolution = true,
         useStringCache = true,
-        //stringCacheBitSize = 12,        
+        //populateExistingMembers = false,
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()

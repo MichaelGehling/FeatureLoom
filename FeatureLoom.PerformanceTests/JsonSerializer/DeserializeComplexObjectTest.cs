@@ -33,17 +33,21 @@ public partial class DeserializeComplexObjectTest
         initialBufferSize = 1024*1024*10,        
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
         proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
-        //enableReferenceResolution = true
+        //enableReferenceResolution = false
+        enableReferenceResolution = false,
+        enableStringRefResolution = false,
     });
 
     static FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
     {
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
+        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
+        //proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
         enableReferenceResolution = true,
-        useStringCache = true,
-        stringCacheBitSize = 12,        
+        enableStringRefResolution = false,
+        //useStringCache = true,
+        //populateExistingMembers = false,
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()

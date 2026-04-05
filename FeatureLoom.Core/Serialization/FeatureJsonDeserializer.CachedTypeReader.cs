@@ -269,7 +269,7 @@ public sealed partial class FeatureJsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private T ReadValue_IgnoreProposed<T>(T itemToPopulate)
         {
-            if (!canBePopulated || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
+            if (!canBePopulated || !deserializer.isPopulating || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
 
             Type itemType = itemToPopulate.GetType();
             T result;
