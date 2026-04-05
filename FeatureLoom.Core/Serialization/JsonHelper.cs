@@ -7,22 +7,22 @@ namespace FeatureLoom.Serialization;
 
 public static class JsonHelper
 {
-    public static FeatureJsonSerializer DefaultSerializer { get => Service<JsonHelperService>.Instance.DefaultSerializer; set => Service<JsonHelperService>.Instance.DefaultSerializer = value; }
-    public static FeatureJsonDeserializer DefaultDeserializer { get => Service<JsonHelperService>.Instance.DefaultDeserializer; set => Service<JsonHelperService>.Instance.DefaultDeserializer = value; }
+    public static JsonSerializer DefaultSerializer { get => Service<JsonHelperService>.Instance.DefaultSerializer; set => Service<JsonHelperService>.Instance.DefaultSerializer = value; }
+    public static JsonDeserializer DefaultDeserializer { get => Service<JsonHelperService>.Instance.DefaultDeserializer; set => Service<JsonHelperService>.Instance.DefaultDeserializer = value; }
 }
 
 public class JsonHelperService
 {
-    FeatureJsonSerializer serializer = new(new()
+    JsonSerializer serializer = new(new()
     {
         indent = true
     });
-    FeatureJsonDeserializer deserializer = new(new()
+    JsonDeserializer deserializer = new(new()
     {
-        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
+        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
         strict = false,
     });
 
-    public FeatureJsonSerializer DefaultSerializer { get => serializer; set => serializer = value; }
-    public FeatureJsonDeserializer DefaultDeserializer { get => deserializer; set => deserializer = value; }
+    public JsonSerializer DefaultSerializer { get => serializer; set => serializer = value; }
+    public JsonDeserializer DefaultDeserializer { get => deserializer; set => deserializer = value; }
 }

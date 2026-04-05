@@ -16,20 +16,20 @@ namespace FeatureLoom.Storages
     public abstract class Configuration
     {        
         public static string defaultCategory = "config";
-        public static FeatureJsonDeserializer deserializer = new FeatureJsonDeserializer(new()
+        public static JsonDeserializer deserializer = new JsonDeserializer(new()
         {
-            proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
-            dataAccess = FeatureJsonDeserializer.DataAccess.PublicAndPrivateFields,
+            proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
+            dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields,
             enableReferenceResolution = false,            
         });
 
-        public static FeatureJsonSerializer serializer = new FeatureJsonSerializer(new()
+        public static JsonSerializer serializer = new JsonSerializer(new()
         {
             indent = true,
             enumAsString = true,
-            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
-            referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
-            dataSelection = FeatureJsonSerializer.DataSelection.PublicAndPrivateFields,            
+            typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+            referenceCheck = JsonSerializer.ReferenceCheck.NoRefCheck,
+            dataSelection = JsonSerializer.DataSelection.PublicAndPrivateFields,            
         });
 
         [JsonIgnore]

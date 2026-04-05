@@ -66,29 +66,29 @@ namespace FeatureLoom.MessageFlow
         bool useConnectionMetaDataForMessages;
 
         
-        static FeatureJsonDeserializer.Settings defaultDeserializerSettings = new()
+        static JsonDeserializer.Settings defaultDeserializerSettings = new()
         {
-            proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
+            proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
             enableReferenceResolution = false,
-            dataAccess = FeatureJsonDeserializer.DataAccess.PublicAndPrivateFields,
+            dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields,
             rethrowExceptions = false,
             strict = false,
             tryCastArraysOfUnknownValues = true            
         };
 
-        static FeatureJsonSerializer.Settings defaultSerializerSettings = new()
+        static JsonSerializer.Settings defaultSerializerSettings = new()
         {
-            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
-            dataSelection = FeatureJsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
+            typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+            dataSelection = JsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
             enumAsString = true,            
         };
 
-        static FeatureJsonDeserializer defaultDeserializer = new(defaultDeserializerSettings);
-        static FeatureJsonSerializer defaultSerializer = new(defaultSerializerSettings);
-        FeatureJsonDeserializer deserializer;
-        FeatureJsonSerializer serializer;
+        static JsonDeserializer defaultDeserializer = new(defaultDeserializerSettings);
+        static JsonSerializer defaultSerializer = new(defaultSerializerSettings);
+        JsonDeserializer deserializer;
+        JsonSerializer serializer;
 
-        public WebSocketEndpoint(WebSocket webSocket, Type deserializationType = null, bool useConnectionMetaDataForMessages = true, int readBufferSize = 4096, FeatureJsonSerializer serializer = null, FeatureJsonDeserializer deserializer = null) 
+        public WebSocketEndpoint(WebSocket webSocket, Type deserializationType = null, bool useConnectionMetaDataForMessages = true, int readBufferSize = 4096, JsonSerializer serializer = null, JsonDeserializer deserializer = null) 
         { 
             endpointHandle = this.GetHandle();
 

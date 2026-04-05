@@ -21,28 +21,28 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MaxIterationCount(5000)]
 public partial class DeserializeComplexObjectTest
 {
-    static FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+    static Serialization.JsonSerializer featureJsonSerializer = new Serialization.JsonSerializer(new Serialization.JsonSerializer.Settings()
     {
         //indent = true,
-        dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-        typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo
+        dataSelection = Serialization.JsonSerializer.DataSelection.PublicFieldsAndProperties,
+        typeInfoHandling = Serialization.JsonSerializer.TypeInfoHandling.AddNoTypeInfo
     });
 
-    static FeatureJsonDeserializer featureJsonDeserializer = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+    static JsonDeserializer featureJsonDeserializer = new JsonDeserializer(new JsonDeserializer.Settings()
     {
         initialBufferSize = 1024*1024*10,        
-        dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
+        dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties,
+        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
         //enableReferenceResolution = false
         enableReferenceResolution = false,
         enableStringRefResolution = false,
     });
 
-    static FeatureJsonDeserializer featureJsonDeserializer2 = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+    static JsonDeserializer featureJsonDeserializer2 = new JsonDeserializer(new JsonDeserializer.Settings()
     {
         initialBufferSize = 1024 * 1024 * 10,
-        dataAccess = FeatureJsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
+        dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties,
+        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
         //proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
         enableReferenceResolution = true,
         enableStringRefResolution = false,

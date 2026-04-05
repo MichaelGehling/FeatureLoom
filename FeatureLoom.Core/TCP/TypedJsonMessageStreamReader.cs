@@ -10,14 +10,14 @@ namespace FeatureLoom.TCP
 {
     public class TypedJsonMessageStreamReader : ISpecificMessageStreamReader
     {
-        FeatureJsonDeserializer deserializer = new FeatureJsonDeserializer(new()
+        JsonDeserializer deserializer = new JsonDeserializer(new()
         {
-            proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
+            proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
             enableReferenceResolution = true
         });
         byte[] typeInfo = "TypedJSON".ToByteArray();
 
-        public TypedJsonMessageStreamReader(FeatureJsonDeserializer deserializer)
+        public TypedJsonMessageStreamReader(JsonDeserializer deserializer)
         {
             this.deserializer = deserializer;
         }

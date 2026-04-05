@@ -206,7 +206,7 @@ namespace Playground
             
             { 
                 Xenum xenum = Xenum.B;
-                FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+                JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
                 {
 
                 });
@@ -225,7 +225,7 @@ namespace Playground
                     ""3"": ""Three""
                 }";
 
-                FeatureJsonDeserializer des = new FeatureJsonDeserializer();
+                JsonDeserializer des = new JsonDeserializer();
                 bool success = des.TryDeserialize(jsonIntToStringMap, out intToStringMap);
 
             }
@@ -315,10 +315,10 @@ namespace Playground
             {
 
                 byte[] bytes = RandomGenerator.Bytes(30);
-                FeatureJsonSerializer serializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+                JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
                 {
                     indent = true,
-                    dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
+                    dataSelection = JsonSerializer.DataSelection.PublicFieldsAndProperties,
                     writeByteArrayAsBase64String = false
                 });
                 var bytesJson = serializer.Serialize(bytes);
@@ -337,7 +337,7 @@ namespace Playground
 
                 JsonHelper.DefaultDeserializer.TryDeserialize<TestClass>(jft.obj.JsonString, out var tc);
 
-                FeatureJsonDeserializer des = new FeatureJsonDeserializer(new FeatureJsonDeserializer.Settings()
+                JsonDeserializer des = new JsonDeserializer(new JsonDeserializer.Settings()
                 {
                     initialBufferSize = 10,
                 });

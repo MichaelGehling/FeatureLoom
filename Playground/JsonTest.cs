@@ -212,16 +212,16 @@ namespace Playground
             public override void Write(byte[] buffer, int offset, int count) { }
         }
 
-        class MyGenericIListTypeHandlerCreator : FeatureJsonSerializer.GenericTypeHandlerCreator
+        class MyGenericIListTypeHandlerCreator : FeatureLoom.Serialization.JsonSerializer.GenericTypeHandlerCreator
         {
             public MyGenericIListTypeHandlerCreator() : base(typeof(IList<>))
             {
             }
 
-            protected override void CreateAndSetGenericTypeHandler<ARG1>(FeatureJsonSerializer.ExtensionApi api, FeatureJsonSerializer.ICachedTypeHandler cachedTypeHandler)
+            protected override void CreateAndSetGenericTypeHandler<ARG1>(FeatureLoom.Serialization.JsonSerializer.ExtensionApi api, FeatureLoom.Serialization.JsonSerializer.ICachedTypeHandler cachedTypeHandler)
             {                
                 var elementTypeHandler = api.GetCachedTypeHandler(typeof(ARG1));
-                FeatureJsonSerializer.ItemHandler<IList<ARG1>> itemHandler;
+                FeatureLoom.Serialization.JsonSerializer.ItemHandler<IList<ARG1>> itemHandler;
                 if (!api.RequiresHandler && api.Writer.TryPreparePrimitiveWriteDelegate<ARG1>(out var primitiveWrite))
                 {
                     itemHandler = list =>
@@ -396,7 +396,7 @@ namespace Playground
 
 
                          """;
-            FeatureJsonDeserializer.Settings deserializerSettings = new FeatureJsonDeserializer.Settings();
+            JsonDeserializer.Settings deserializerSettings = new JsonDeserializer.Settings();
             deserializerSettings.AddMultiOptionTypeMapping(typeof(object), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
             deserializerSettings.AddMultiOptionTypeMapping(typeof(IMyInterface), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
             deserializerSettings.AddGenericTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
@@ -405,11 +405,11 @@ namespace Playground
             //deserializerSettings.AddConstructor<KeyValuePair<string, int>>(() => new KeyValuePair<string, int>(default, default));
             //deserializerSettings.AddConstructor<KeyValuePair<string, object>>(() => new KeyValuePair<string, object>(default, default));
             //deserializerSettings.AddConstructor<KeyValuePair<object, object>>(() => new KeyValuePair<object, object>(default, default));
-            var featureJsonDeserializer = new FeatureJsonDeserializer(deserializerSettings);
+            var featureJsonDeserializer = new JsonDeserializer(deserializerSettings);
             //featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
             //featureJsonDeserializer.TryDeserialize<int[][]>(jsonString.ToStream(), out var result);
 
-            deserializerSettings.AddCustomTypeReader<XmlElement>(new FeatureJsonDeserializer.CustomTypeReader<XmlElement>(
+            deserializerSettings.AddCustomTypeReader<XmlElement>(new JsonDeserializer.CustomTypeReader<XmlElement>(
                 api =>
                 {
                     if (api.TryReadStringValueOrNull(out string xmlString))
@@ -527,11 +527,11 @@ namespace Playground
             //Stream stream = new NullStream();
             MemoryStream stream = new MemoryStream();
 
-            var settings = new FeatureJsonSerializer.Settings()
+            var settings = new FeatureLoom.Serialization.JsonSerializer.Settings()
             {
-                typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
-                dataSelection = FeatureJsonSerializer.DataSelection.PublicFieldsAndProperties,
-                referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
+                typeInfoHandling = FeatureLoom.Serialization.JsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                dataSelection = FeatureLoom.Serialization.JsonSerializer.DataSelection.PublicFieldsAndProperties,
+                referenceCheck = FeatureLoom.Serialization.JsonSerializer.ReferenceCheck.NoRefCheck,
                 enumAsString = true,
                 treatEnumerablesAsCollections = true,
                 indent = true
@@ -614,7 +614,7 @@ namespace Playground
                 });
             */
 
-            var featureJsonSerializer = new FeatureJsonSerializer(settings);
+            var featureJsonSerializer = new FeatureLoom.Serialization.JsonSerializer(settings);
 
             Console.WriteLine("FeatureJsonSerializer:");
             Console.WriteLine(featureJsonSerializer.Serialize(testDto));

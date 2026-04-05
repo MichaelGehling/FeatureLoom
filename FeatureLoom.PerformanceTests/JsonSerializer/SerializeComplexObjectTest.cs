@@ -19,7 +19,7 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MaxIterationCount(5000)]
 public class SerializeComplexObjectTest
 {
-    static FeatureJsonSerializer featureJsonSerializer = new FeatureJsonSerializer(new FeatureJsonSerializer.Settings()
+    static Serialization.JsonSerializer featureJsonSerializer = new Serialization.JsonSerializer(new Serialization.JsonSerializer.Settings()
     {
 
     });

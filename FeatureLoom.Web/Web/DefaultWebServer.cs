@@ -21,19 +21,19 @@ namespace FeatureLoom.Web
 {
     public partial class DefaultWebServer : IWebServer
     {
-        public static FeatureJsonSerializer.Settings DefaultSerializerSettings = new()
+        public static JsonSerializer.Settings DefaultSerializerSettings = new()
         {
             indent = false,
-            referenceCheck = FeatureJsonSerializer.ReferenceCheck.NoRefCheck,
-            dataSelection = FeatureJsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
+            referenceCheck = JsonSerializer.ReferenceCheck.NoRefCheck,
+            dataSelection = JsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
             enumAsString = true,
-            typeInfoHandling = FeatureJsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+            typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo,
         };
 
     public class Config : Configuration
         {
             public HttpEndpointConfig[] endpointConfigs = { new HttpEndpointConfig(IPAddress.Loopback, 5000) };
-            public FeatureJsonSerializer.Settings serializerSettings = DefaultSerializerSettings;
+            public JsonSerializer.Settings serializerSettings = DefaultSerializerSettings;
         }
 
         private Config config = new Config();
@@ -50,7 +50,7 @@ namespace FeatureLoom.Web
         private List<IWebResultHandler> resultHandlers = new List<IWebResultHandler>();
         private List<HttpEndpointConfig> endpoints = new List<HttpEndpointConfig>();
 
-        FeatureJsonSerializer jsonSerializer = new FeatureJsonSerializer(DefaultSerializerSettings);
+        JsonSerializer jsonSerializer = new JsonSerializer(DefaultSerializerSettings);
         public DefaultWebServer()
         {
             favicon = Resource.favicon;
@@ -61,7 +61,7 @@ namespace FeatureLoom.Web
         {
             if (await config.TryUpdateFromStorageAsync(false))
             {
-                jsonSerializer = new FeatureJsonSerializer(config.serializerSettings ?? DefaultSerializerSettings);
+                jsonSerializer = new JsonSerializer(config.serializerSettings ?? DefaultSerializerSettings);
 
                 bool wasRunning = running;
                 if (wasRunning) Stop();
