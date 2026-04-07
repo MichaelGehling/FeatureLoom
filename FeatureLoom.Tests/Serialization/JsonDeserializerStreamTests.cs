@@ -380,6 +380,58 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
+        public void IsAnyDataLeft_ReturnsTrue_WhenLastBufferedByteIsUnreadNonWhitespace()
+        {
+            var deserializer = new JsonDeserializer();
+            using var stream = Utf8Stream("abcX");
+
+            deserializer.SetDataSource(stream);
+            deserializer.SkipBufferUntil("c", alsoSkipDelimiter: true, out bool found);
+
+            Assert.True(found);
+            Assert.True(deserializer.IsAnyDataLeft());
+        }
+
+        [Fact]
+        public void IsAnyDataLeft_ReturnsFalse_AfterValueConsumedAtEndOfInput()
+        {
+            var deserializer = new JsonDeserializer();
+
+            Assert.True(deserializer.TryDeserialize("1", out int value));
+            Assert.Equal(1, value);
+            Assert.False(deserializer.IsAnyDataLeft());
+        }
+
+        [Fact]
+        public void IsAnyDataLeft_ReturnsFalse_WhenOnlyWhitespaceRemains()
+        {
+            var deserializer = new JsonDeserializer();
+
+            deserializer.SetDataSource(" \t\r\n");
+            Assert.False(deserializer.IsAnyDataLeft());
+        }
+
+        [Fact]
+        public void IsAnyDataLeft_ReturnsTrue_WhenMoreDataExistsInStreamBeyondCurrentBuffer()
+        {
+            var settings = new JsonDeserializer.Settings
+            {
+                initialBufferSize = 5
+            };
+            var deserializer = new JsonDeserializer(settings);
+            using var stream = Utf8Stream("12345 2");
+
+            Assert.True(deserializer.TryDeserialize(stream, out int first));
+            Assert.Equal(12345, first);
+
+            Assert.True(deserializer.IsAnyDataLeft());
+
+            Assert.True(deserializer.TryDeserialize(out int second));
+            Assert.Equal(2, second);
+            Assert.False(deserializer.IsAnyDataLeft());
+        }
+
+        [Fact]
         public void Deserialize_Stream_WhitespaceOnly_ReturnsFalse()
         {
             var deserializer = new JsonDeserializer();
@@ -435,4 +487,5 @@ namespace FeatureLoom.Serialization
             Assert.Equal(default, value);
         }
     }
+
 }

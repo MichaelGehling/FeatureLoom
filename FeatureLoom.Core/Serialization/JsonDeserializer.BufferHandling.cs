@@ -83,21 +83,22 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool IsAnyDataLeftUnlocked()
     {
-        byte b;
-        if (!buffer.IsBufferReadToEnd)
+        // Normal buffered state: current byte is still valid unread data.
+        // EOF rollback state must be excluded (BufferReadTillEnd == true).
+        if (buffer.CountRemainingBytes > 0 && !buffer.BufferReadTillEnd)
         {
-            // Ignore whitespaces and check if any other character is found
-            b = SkipWhiteSpaces();
+            byte b = SkipWhiteSpaces();
             if (!IsWhiteSpace(b)) return true;
         }
 
         if (buffer.IsBufferCompletelyFilled) buffer.ResetBuffer(true, false);
         if (!buffer.TryReadFromStream()) return false;
 
-        // Ignore whitespaces and check if any other character is found
-        b = SkipWhiteSpaces();
-        return !IsWhiteSpace(b);
+        byte next = SkipWhiteSpaces();
+        return !IsWhiteSpace(next);
     }
+
+
 
     public void SetDataSource(Stream stream)
     {
