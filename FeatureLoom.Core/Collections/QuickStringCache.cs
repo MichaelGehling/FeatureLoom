@@ -22,7 +22,7 @@ public sealed class QuickStringCache
     /// </summary>
     struct CacheEntry
     {
-        /// <summary>The cached key.</summary>
+        /// <summary>The cached key (detached copy).</summary>
         public ByteSegment key;
 
         /// <summary>The cached string value for <see cref="key"/>.</summary>
@@ -30,6 +30,12 @@ public sealed class QuickStringCache
 
         /// <summary>Monotonic access/update marker used for victim selection.</summary>
         public uint stamp;
+
+        /// <summary>
+        /// Cached length of the key for fast comparison.
+        /// Avoids accessing <see cref="key"/> in most cases.
+        /// </summary>
+        public int length;
     }
 
     readonly CacheEntry[] cache;
@@ -74,50 +80,84 @@ public sealed class QuickStringCache
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string GetOrCreate(ByteSegment segment, StringBuilder stringBuilder = null)
     {
-        if (segment.Count > maxStringLength)
+        int len = segment.Count;
+
+        if (len > maxStringLength)
         {
             // Too long to cache, decode directly without caching
             return Utf8Converter.DecodeUtf8ToString(segment, stringBuilder);
         }
+
         int hash = ComputeFastHash(segment);
-        segment.SetCustomHashCode(hash);
+        segment.SetCustomHashCode(hash);     
 
         int index1 = hash & mask;
         ref CacheEntry entry1 = ref cache[index1];
-        if (entry1.key.Equals(segment))
+        
+        // Fast path:
+        // 1. Compare length (cheap)
+        // 3. Only if both match → full SIMD comparison
+        if (entry1.length == len)
         {
-            entry1.stamp = ++stampCounter;
-            return entry1.value;
+#if !NETSTANDARD2_0
+            Span<byte> span1 = segment.AsSpan();
+            var span2 = entry1.key.AsSpan();
+            if (span1.SequenceEqual(span2))
+#else
+            if (segment.Equals(entry1.key))
+#endif
+            {
+                entry1.stamp = ++stampCounter;
+                return entry1.value;
+            }
         }
 
         int index2 = (index1 + 1) & mask;
         ref CacheEntry entry2 = ref cache[index2];
-        if (entry2.key.Equals(segment))
+
+        if (entry2.length == len)
         {
-            entry2.stamp = ++stampCounter;
-            return entry2.value;
+#if !NETSTANDARD2_0
+            Span<byte> span1 = segment.AsSpan();
+            var span2 = entry2.key.AsSpan();
+            if (span1.SequenceEqual(span2))
+#else
+            if (segment.Equals(entry2.key))
+#endif
+            {
+                entry2.stamp = ++stampCounter;
+                return entry2.value;
+            }
         }
 
+        // Cache miss → create new entry
         ByteSegment cropped = segment.CropArray(true);
         string value = Utf8Converter.DecodeUtf8ToString(cropped, stringBuilder);
 
+        // Select victim entry (simple 2-way LRU-like policy)
         ref CacheEntry victim = ref entry1;
+
         if (!entry1.key.IsValid)
         {
-            // keep victim = entry1
+            // keep entry1
         }
         else if (!entry2.key.IsValid)
         {
             victim = ref entry2;
         }
-        else if (entry2.stamp < victim.stamp)
+        else if (entry2.stamp < entry1.stamp)
         {
             victim = ref entry2;
         }
 
+        // Store new entry
         victim.key = cropped;
         victim.value = value;
         victim.stamp = ++stampCounter;
+
+        // Store fast comparison metadata
+        victim.length = len;
+
         return value;
     }
 
