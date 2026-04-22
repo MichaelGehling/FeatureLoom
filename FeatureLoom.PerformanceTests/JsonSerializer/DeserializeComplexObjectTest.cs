@@ -24,35 +24,48 @@ public partial class DeserializeComplexObjectTest
     static Serialization.JsonSerializer featureJsonSerializer = new Serialization.JsonSerializer(new Serialization.JsonSerializer.Settings()
     {
         //indent = true,
-        dataSelection = Serialization.JsonSerializer.DataSelection.PublicFieldsAndProperties,
+        dataSelection = Serialization.JsonSerializer.DataSelection.PublicAndPrivateFields,
         typeInfoHandling = Serialization.JsonSerializer.TypeInfoHandling.AddNoTypeInfo
     });
 
-    static JsonDeserializer featureJsonDeserializer = new JsonDeserializer(new JsonDeserializer.Settings()
+    static JsonDeserializer featureJsonDeserializer = new JsonDeserializer(settings =>
     {
-        initialBufferSize = 1024*1024*10,        
-        dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
-        //enableReferenceResolution = false
-        enableReferenceResolution = false,
-        enableStringRefResolution = false,
+        settings.initialBufferSize = 1024 * 1024 * 10;
+        settings.dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties;
+        settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
+        //settings.strict = false;
+        //settings.proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable;
+        // settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.OnlyPerType;
+        //settings.useStringCache = true,
+        //populateExistingMembers = false,        
+        settings.useStringCache = true;
+        /*settings.ConfigureType<SimpleObject>(typeSettings =>
+        {
+            typeSettings.ConfigureMember<string>("name", memberSettings =>
+            {
+                memberSettings.SetUseStringCache(true);                   
+            });
+        });*/
     });
 
-    static JsonDeserializer featureJsonDeserializer2 = new JsonDeserializer(new JsonDeserializer.Settings()
+    static JsonDeserializer featureJsonDeserializer2 = new JsonDeserializer(settings =>
     {
-        initialBufferSize = 1024 * 1024 * 10,
-        dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
-        //proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
-        enableReferenceResolution = true,
-        enableStringRefResolution = false,
-        //useStringCache = true,
-        //populateExistingMembers = false,
+        settings.initialBufferSize = 1024 * 1024 * 10;
+        settings.dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields;
+        settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
+        //settings.strict = true;
+        //settings.proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable;
+        //settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
+        //settings.useStringCache = true,
+        //settings.populateExistingMembers = false;
+        settings.useStringCache = false;
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
     {
         IncludeFields = true,        
+        //PreferredObjectCreationHandling = System.Text.Json.Serialization.JsonObjectCreationHandling.Populate,
+        IgnoreReadOnlyFields = false,
         DefaultBufferSize = 1024*1024*10,
     };
 

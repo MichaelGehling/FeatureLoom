@@ -41,7 +41,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                enableReferenceResolution = true,
+                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.EnabledByDefault,
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
@@ -117,11 +117,11 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                tryCastArraysOfUnknownValues = true
+                castObjectArrayToCommonTypeArray = true
             };
             var value = Deserialize("[1,2]", settings);
 
-            var list = Assert.IsType<List<int>>(value);
+            var list = Assert.IsType<int[]>(value);
             Assert.Equal(new[] { 1, 2 }, list);
         }
 
@@ -130,11 +130,11 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                tryCastArraysOfUnknownValues = false
+                castObjectArrayToCommonTypeArray = false
             };
             var value = Deserialize("[1,2]", settings);
 
-            var list = Assert.IsType<List<object>>(value);
+            var list = Assert.IsType<object[]>(value);
             Assert.Equal(new object[] { 1, 2 }, list);
         }
 
@@ -152,7 +152,7 @@ namespace FeatureLoom.Serialization
         {
             var value = (Dictionary<string, object>)Deserialize("{\"$type\":\"System.String\",\"Value\":1}", new()
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore
             });
 
             Assert.Equal("System.String", value["$type"]);
@@ -180,12 +180,12 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                tryCastArraysOfUnknownValues = true
+                castObjectArrayToCommonTypeArray = true
             };
             var value = Deserialize("[1,2.5]", settings);
 
-            var list = Assert.IsType<List<IComparable>>(value);
-            Assert.Equal(2, list.Count);
+            var list = Assert.IsType<IComparable[]>(value);
+            Assert.Equal(2, list.Length);
             Assert.IsType<int>(list[0]);
             Assert.IsType<double>(list[1]);
             Assert.Equal(1, (int)list[0]);
@@ -197,12 +197,12 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                tryCastArraysOfUnknownValues = true
+                castObjectArrayToCommonTypeArray = true
             };
             var value = Deserialize("[1,\"2\",null]", settings);
 
-            var list = Assert.IsType<List<IComparable>>(value);
-            Assert.Equal(3, list.Count);
+            var list = Assert.IsType<IComparable[]>(value);
+            Assert.Equal(3, list.Length);
             Assert.Equal(1, list[0]);
             Assert.Equal("2", list[1]);
             Assert.Null(list[2]);
@@ -258,8 +258,8 @@ namespace FeatureLoom.Serialization
         {
             var value = DeserializeTyped<object>("[1,2,3]");
 
-            var list = Assert.IsType<List<int>>(value);
-            Assert.Equal(new[] { 1, 2, 3 }, list);
+            var array = Assert.IsType<int[]>(value);
+            Assert.Equal(new[] { 1, 2, 3 }, array);
         }
 
         [Fact]

@@ -22,6 +22,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters;
 using System.Text;
+using static FeatureLoom.Serialization.JsonDeserializer;
 using static FeatureLoom.Serialization.JsonSerializer;
 
 namespace FeatureLoom.Serialization;
@@ -32,8 +33,14 @@ public sealed partial class JsonDeserializer
     Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new();
     readonly Dictionary<Type, bool> forbiddenTypeCache = new();
 
-    CachedTypeReader CreateCachedTypeReader(Type itemType)
+    CachedTypeReader CreateCachedTypeReader(Type itemType, BaseTypeSettings typeSettings = null)
     {
+        bool overriddenTypeSettings = typeSettings != null;
+        if (!overriddenTypeSettings)
+        {
+            settings.typeSettingsDict.TryGetValue(itemType, out typeSettings);
+        }        
+
         if (IsForbiddenType(itemType))
         {
             throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(itemType)} is forbidden for deserialization.");
@@ -43,86 +50,95 @@ public sealed partial class JsonDeserializer
             throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(itemType)} is not whitelisted for deserialization.");
         }
 
+        // If a base type is mapped to a more specific type, we create a reader for the mapped type and cache it for the original type,
+        // so we can reuse it if the original type is encountered again.
+        // This is usually used for abstract types that are mapped to a concrete implementation,
+        // but it can also be used to map a concrete type to a derived type if the derived type.
         if (settings.typeMapping.TryGetValue(itemType, out Type mappedType))
         {
-            CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType);
-            typeReaderCache[itemType] = mappedTypeReader;
+            CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType, overriddenTypeSettings ? typeSettings : null);
+            if (!overriddenTypeSettings) typeReaderCache[itemType] = mappedTypeReader;
             return mappedTypeReader;
         }
 
+        // For generic types we also check if there is a mapping for the generic type definition,
+        // so we can map e.g. all IReadOnlyList<T> to List<T>.
         if (itemType.IsGenericType && settings.genericTypeMapping.Count > 0)
         {
             Type genericType = itemType.GetGenericTypeDefinition();
             if (settings.genericTypeMapping.TryGetValue(genericType, out Type genericMappedType))
             {
-                itemType = genericMappedType.MakeGenericType(itemType.GenericTypeArguments);
+                mappedType = genericMappedType.MakeGenericType(itemType.GenericTypeArguments);
+                CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType, overriddenTypeSettings ? typeSettings : null);
+                if (!overriddenTypeSettings) typeReaderCache[itemType] = mappedTypeReader;
+                return mappedTypeReader;
             }
         }
 
         return new CachedTypeReader((cachedTypeReader) =>
         {
-            typeReaderCache[itemType] = cachedTypeReader;
+            if (!overriddenTypeSettings) typeReaderCache[itemType] = cachedTypeReader;
 
             if (settings.customTypeReaders.TryGetValue(itemType, out object customReaderObj))
             {
-                return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateCustomTypeReader), itemType.ToSingleEntryArray(), customReaderObj);
+                return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateCustomTypeReader), itemType.ToSingleEntryArray(), customReaderObj, typeSettings);
             }
 
-            if (itemType.IsArray) return CreateArrayTypeReader(itemType, cachedTypeReader);
-            else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValueOrNull, null, settings.enableStringRefResolution);
-            else if (itemType == typeof(long)) return TypeReaderInitializer.Create(this, ReadLongValue, null, false);
-            else if (itemType == typeof(long?)) return TypeReaderInitializer.Create(this, ReadNullableLongValue, null, false);
-            else if (itemType == typeof(int)) return TypeReaderInitializer.Create(this, ReadIntValue, null, false);
-            else if (itemType == typeof(int?)) return TypeReaderInitializer.Create(this, ReadNullableIntValue, null, false);
-            else if (itemType == typeof(short)) return TypeReaderInitializer.Create(this, ReadShortValue, null, false);
-            else if (itemType == typeof(short?)) return TypeReaderInitializer.Create(this, ReadNullableShortValue, null, false);
-            else if (itemType == typeof(sbyte)) return TypeReaderInitializer.Create(this, ReadSbyteValue, null, false);
-            else if (itemType == typeof(sbyte?)) return TypeReaderInitializer.Create(this, ReadNullableSbyteValue, null, false);
-            else if (itemType == typeof(ulong)) return TypeReaderInitializer.Create(this, ReadUlongValue, null, false);
-            else if (itemType == typeof(ulong?)) return TypeReaderInitializer.Create(this, ReadNullableUlongValue, null, false);
-            else if (itemType == typeof(uint)) return TypeReaderInitializer.Create(this, ReadUintValue, null, false);
-            else if (itemType == typeof(uint?)) return TypeReaderInitializer.Create(this, ReadNullableUintValue, null, false);
-            else if (itemType == typeof(ushort)) return TypeReaderInitializer.Create(this, ReadUshortValue, null, false);
-            else if (itemType == typeof(ushort?)) return TypeReaderInitializer.Create(this, ReadNullableUshortValue, null, false);
-            else if (itemType == typeof(byte)) return TypeReaderInitializer.Create(this, ReadByteValue, null, false);
-            else if (itemType == typeof(byte?)) return TypeReaderInitializer.Create(this, ReadNullableByteValue, null, false);
-            else if (itemType == typeof(double)) return TypeReaderInitializer.Create(this, ReadDoubleValue, null, false);
-            else if (itemType == typeof(double?)) return TypeReaderInitializer.Create(this, ReadNullableDoubleValue, null, false);
-            else if (itemType == typeof(float)) return TypeReaderInitializer.Create(this, ReadFloatValue, null, false);
-            else if (itemType == typeof(float?)) return TypeReaderInitializer.Create(this, ReadNullableFloatValue, null, false);
-            else if (itemType == typeof(decimal)) return TypeReaderInitializer.Create(this, ReadDecimalValue, null, false);
-            else if (itemType == typeof(decimal?)) return TypeReaderInitializer.Create(this, ReadNullableDecimalValue, null, false);
-            else if (itemType == typeof(bool)) return TypeReaderInitializer.Create(this, ReadBoolValue, null, false);
-            else if (itemType == typeof(bool?)) return TypeReaderInitializer.Create(this, ReadNullableBoolValue, null, false);
-            else if (itemType == typeof(char)) return TypeReaderInitializer.Create(this, ReadCharValue, null, false);
-            else if (itemType == typeof(char?)) return TypeReaderInitializer.Create(this, ReadNullableCharValue, null, false);
-            else if (itemType == typeof(DateTime)) return TypeReaderInitializer.Create(this, ReadDateTimeValue, null, false);
-            else if (itemType == typeof(DateTime?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeValue, null, false);
-            else if (itemType == typeof(DateTimeOffset)) return TypeReaderInitializer.Create(this, ReadDateTimeOffsetValue, null, false);
-            else if (itemType == typeof(DateTimeOffset?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeOffsetValue, null, false);
-            else if (itemType == typeof(TimeSpan)) return TypeReaderInitializer.Create(this, ReadTimeSpanValue, null, false);
-            else if (itemType == typeof(TimeSpan?)) return TypeReaderInitializer.Create(this, ReadNullableTimeSpanValue, null, false);
-            else if (itemType == typeof(Guid)) return TypeReaderInitializer.Create(this, ReadGuidValue, null, false);
-            else if (itemType == typeof(Guid?)) return TypeReaderInitializer.Create(this, ReadNullableGuidValue, null, false);
-            else if (itemType == typeof(JsonFragment)) return TypeReaderInitializer.Create(this, ReadJsonFragmentValue, null, false);
-            else if (itemType == typeof(JsonFragment?)) return TypeReaderInitializer.Create(this, ReadNullableJsonFragmentValue, null, false);
-            else if (itemType == typeof(IntPtr)) return TypeReaderInitializer.Create(this, ReadIntPtrValue, null, false);
-            else if (itemType == typeof(UIntPtr)) return TypeReaderInitializer.Create(this, ReadUIntPtrValue, null, false);
-            else if (itemType == typeof(Uri)) return TypeReaderInitializer.Create(this, () => { var s = ReadStringValueOrNull(); return s == null ? null : new Uri(s); }, null, true);
-            else if (itemType == typeof(ByteSegment)) return CreateByteSegmentTypeReader();
-            else if (itemType == typeof(ByteSegment?)) return CreateNullableByteSegmentTypeReader();
-            else if (itemType == typeof(ArraySegment<byte>)) return CreateByteArraySegmentTypeReader();
-            else if (itemType == typeof(ArraySegment<byte>?)) return CreateNullableByteArraySegmentTypeReader();
-            else if (itemType == typeof(TextSegment)) return CreateTextSegmentTypeReader();
+            if (itemType.IsArray) return CreateArrayTypeReader(itemType, cachedTypeReader, typeSettings);
+            else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValueOrNull, null, false, typeSettings);
+            else if (itemType == typeof(long)) return TypeReaderInitializer.Create(this, ReadLongValue, null, false, typeSettings);
+            else if (itemType == typeof(long?)) return TypeReaderInitializer.Create(this, ReadNullableLongValue, null, false, typeSettings);
+            else if (itemType == typeof(int)) return TypeReaderInitializer.Create(this, ReadIntValue, null, false, typeSettings);
+            else if (itemType == typeof(int?)) return TypeReaderInitializer.Create(this, ReadNullableIntValue, null, false, typeSettings);
+            else if (itemType == typeof(short)) return TypeReaderInitializer.Create(this, ReadShortValue, null, false, typeSettings);
+            else if (itemType == typeof(short?)) return TypeReaderInitializer.Create(this, ReadNullableShortValue, null, false, typeSettings);
+            else if (itemType == typeof(sbyte)) return TypeReaderInitializer.Create(this, ReadSbyteValue, null, false, typeSettings);
+            else if (itemType == typeof(sbyte?)) return TypeReaderInitializer.Create(this, ReadNullableSbyteValue, null, false, typeSettings);
+            else if (itemType == typeof(ulong)) return TypeReaderInitializer.Create(this, ReadUlongValue, null, false, typeSettings);
+            else if (itemType == typeof(ulong?)) return TypeReaderInitializer.Create(this, ReadNullableUlongValue, null, false, typeSettings);
+            else if (itemType == typeof(uint)) return TypeReaderInitializer.Create(this, ReadUintValue, null, false, typeSettings);
+            else if (itemType == typeof(uint?)) return TypeReaderInitializer.Create(this, ReadNullableUintValue, null, false, typeSettings);
+            else if (itemType == typeof(ushort)) return TypeReaderInitializer.Create(this, ReadUshortValue, null, false, typeSettings);
+            else if (itemType == typeof(ushort?)) return TypeReaderInitializer.Create(this, ReadNullableUshortValue, null, false, typeSettings);
+            else if (itemType == typeof(byte)) return TypeReaderInitializer.Create(this, ReadByteValue, null, false, typeSettings);
+            else if (itemType == typeof(byte?)) return TypeReaderInitializer.Create(this, ReadNullableByteValue, null, false, typeSettings);
+            else if (itemType == typeof(double)) return TypeReaderInitializer.Create(this, ReadDoubleValue, null, false, typeSettings);
+            else if (itemType == typeof(double?)) return TypeReaderInitializer.Create(this, ReadNullableDoubleValue, null, false, typeSettings);
+            else if (itemType == typeof(float)) return TypeReaderInitializer.Create(this, ReadFloatValue, null, false, typeSettings);
+            else if (itemType == typeof(float?)) return TypeReaderInitializer.Create(this, ReadNullableFloatValue, null, false, typeSettings);
+            else if (itemType == typeof(decimal)) return TypeReaderInitializer.Create(this, ReadDecimalValue, null, false, typeSettings);
+            else if (itemType == typeof(decimal?)) return TypeReaderInitializer.Create(this, ReadNullableDecimalValue, null, false, typeSettings);
+            else if (itemType == typeof(bool)) return TypeReaderInitializer.Create(this, ReadBoolValue, null, false, typeSettings);
+            else if (itemType == typeof(bool?)) return TypeReaderInitializer.Create(this, ReadNullableBoolValue, null, false, typeSettings);
+            else if (itemType == typeof(char)) return TypeReaderInitializer.Create(this, ReadCharValue, null, false, typeSettings);
+            else if (itemType == typeof(char?)) return TypeReaderInitializer.Create(this, ReadNullableCharValue, null, false, typeSettings);
+            else if (itemType == typeof(DateTime)) return TypeReaderInitializer.Create(this, ReadDateTimeValue, null, false, typeSettings);
+            else if (itemType == typeof(DateTime?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeValue, null, false, typeSettings);
+            else if (itemType == typeof(DateTimeOffset)) return TypeReaderInitializer.Create(this, ReadDateTimeOffsetValue, null, false, typeSettings);
+            else if (itemType == typeof(DateTimeOffset?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeOffsetValue, null, false, typeSettings);
+            else if (itemType == typeof(TimeSpan)) return TypeReaderInitializer.Create(this, ReadTimeSpanValue, null, false, typeSettings);
+            else if (itemType == typeof(TimeSpan?)) return TypeReaderInitializer.Create(this, ReadNullableTimeSpanValue, null, false, typeSettings);
+            else if (itemType == typeof(Guid)) return TypeReaderInitializer.Create(this, ReadGuidValue, null, false, typeSettings);
+            else if (itemType == typeof(Guid?)) return TypeReaderInitializer.Create(this, ReadNullableGuidValue, null, false, typeSettings);
+            else if (itemType == typeof(JsonFragment)) return TypeReaderInitializer.Create(this, ReadJsonFragmentValue, null, false, typeSettings);
+            else if (itemType == typeof(JsonFragment?)) return TypeReaderInitializer.Create(this, ReadNullableJsonFragmentValue, null, false, typeSettings);
+            else if (itemType == typeof(IntPtr)) return TypeReaderInitializer.Create(this, ReadIntPtrValue, null, false, typeSettings);
+            else if (itemType == typeof(UIntPtr)) return TypeReaderInitializer.Create(this, ReadUIntPtrValue, null, false, typeSettings);
+            else if (itemType == typeof(Uri)) return TypeReaderInitializer.Create(this, () => { var s = ReadStringValueOrNull(); return s == null ? null : new Uri(s); }, null, false, typeSettings);
+            else if (itemType == typeof(ByteSegment)) return CreateByteSegmentTypeReader(typeSettings);
+            else if (itemType == typeof(ByteSegment?)) return CreateNullableByteSegmentTypeReader(typeSettings);
+            else if (itemType == typeof(ArraySegment<byte>)) return CreateByteArraySegmentTypeReader(typeSettings);
+            else if (itemType == typeof(ArraySegment<byte>?)) return CreateNullableByteArraySegmentTypeReader(typeSettings);
+            else if (itemType == typeof(TextSegment)) return CreateTextSegmentTypeReader(typeSettings);
             else if (itemType.IsEnum || (Nullable.GetUnderlyingType(itemType)?.IsEnum ?? false))
             {
-                if (!itemType.IsNullable()) return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateEnumReader), new Type[] { itemType });
-                else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateNullableEnumReader), new Type[] { Nullable.GetUnderlyingType(itemType) });
+                if (!itemType.IsNullable()) return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateEnumReader), [ itemType ], typeSettings);
+                else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateNullableEnumReader), [ Nullable.GetUnderlyingType(itemType) ], typeSettings);
             }
-            else if (itemType == typeof(object)) return CreateUnknownObjectReader(cachedTypeReader);
-            else if (TryCreateDictionaryTypeReader(itemType, out TypeReaderInitializer initializer)) return initializer;
-            else if (TryCreateEnumerableTypeReader(itemType, out initializer)) return initializer;
-            else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { itemType }, true);
+            else if (itemType == typeof(object)) return CreateUnknownObjectReader(cachedTypeReader, typeSettings);
+            else if (TryCreateDictionaryTypeReader(itemType, typeSettings, out TypeReaderInitializer initializer)) return initializer;
+            else if (TryCreateEnumerableTypeReader(itemType, typeSettings, out initializer)) return initializer;
+            else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { itemType }, true, typeSettings);
         });
     }
 
@@ -221,32 +237,44 @@ public sealed partial class JsonDeserializer
         return false;
     }
 
-    TypeReaderInitializer CreateCustomTypeReader<T>(object customReaderObj)
+    TypeReaderInitializer CreateCustomTypeReader<T>(object customReaderObj, BaseTypeSettings typeSettings)
     {
         var customReader = (ICustomTypeReader<T>)customReaderObj;
+        customReader.PrepareReader(this.preparationApi);
         var reader = () =>
         {
             return customReader.ReadValue(this.extensionApi);
         };
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        Func<T, T> populatingReader = null;
+        if (customReader.CanPopulateExistingValue)
+        {
+            populatingReader = (T itemToPopulate) =>
+            {
+                return customReader.ReadValue(this.extensionApi, itemToPopulate);
+            };
+        }
+        // TODO: CustomTypes must be enabled to configure if children must write ref paths, but for now we assume that they do.        
+        return TypeReaderInitializer.Create(this, reader, populatingReader, true, typeSettings);
     }
 
-    private TypeReaderInitializer CreateByteArrayTypeReader()
+    private TypeReaderInitializer CreateByteArrayTypeReader(BaseTypeSettings typeSettings)
     {
-        var byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
+        var byteTypeReader = GetCachedTypeReader(typeof(byte));
+        var byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteTypeReader.TypeSettings));
         var reader = () =>
         {
             if (TryReadNullValue()) return default;
             return ReadByteArray(byteArrayReader);
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, false, typeSettings);
     }
 
-    private TypeReaderInitializer CreateByteSegmentTypeReader()
+    private TypeReaderInitializer CreateByteSegmentTypeReader(BaseTypeSettings typeSettings)
     {
-        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
-        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, false));
+        var byteTypeReader = GetCachedTypeReader(typeof(byte));
+        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteTypeReader.TypeSettings));
+        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, false, typeSettings));
 
         var reader = () =>
         {
@@ -254,13 +282,14 @@ public sealed partial class JsonDeserializer
             return new ByteSegment(ReadByteArray(byteArrayReader));
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, true, typeSettings);
     }
 
-    private TypeReaderInitializer CreateNullableByteSegmentTypeReader()
+    private TypeReaderInitializer CreateNullableByteSegmentTypeReader(BaseTypeSettings typeSettings)
     {
-        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
-        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, false));
+        var byteTypeReader = GetCachedTypeReader(typeof(byte));
+        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteTypeReader.TypeSettings));
+        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ByteSegment) }, false, typeSettings));
 
         var reader = () =>
         {
@@ -269,13 +298,14 @@ public sealed partial class JsonDeserializer
             return (ByteSegment?)new ByteSegment(ReadByteArray(byteArrayReader));
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, byteArrayReader.WriteRefPath, typeSettings);
     }
 
-    private TypeReaderInitializer CreateByteArraySegmentTypeReader()
+    private TypeReaderInitializer CreateByteArraySegmentTypeReader(BaseTypeSettings typeSettings)
     {
-        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
-        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false));
+        var byteTypeReader = GetCachedTypeReader(typeof(byte));
+        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteTypeReader.TypeSettings));
+        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false, typeSettings));
 
         var reader = () =>
         {
@@ -283,13 +313,14 @@ public sealed partial class JsonDeserializer
             return new ArraySegment<byte>(ReadByteArray(byteArrayReader));
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, byteArrayReader.WriteRefPath, typeSettings);
     }
 
-    private TypeReaderInitializer CreateNullableByteArraySegmentTypeReader()
+    private TypeReaderInitializer CreateNullableByteArraySegmentTypeReader(BaseTypeSettings typeSettings)
     {
-        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }));
-        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false));
+        var byteTypeReader = GetCachedTypeReader(typeof(byte));
+        CachedTypeReader byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, byteTypeReader.TypeSettings));
+        CachedTypeReader objectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(ArraySegment<byte>) }, false, typeSettings));
 
         var reader = () =>
         {
@@ -298,13 +329,13 @@ public sealed partial class JsonDeserializer
             return (ArraySegment<byte>?)new ArraySegment<byte>(ReadByteArray(byteArrayReader));
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, byteArrayReader.WriteRefPath, typeSettings);
     }
 
-    private TypeReaderInitializer CreateTextSegmentTypeReader()
+    private TypeReaderInitializer CreateTextSegmentTypeReader(BaseTypeSettings typeSettings)
     {
-        CachedTypeReader textSegmentObjectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(TextSegment) }, false));
-
+        CachedTypeReader textSegmentObjectReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { typeof(TextSegment) }, false, typeSettings));
+        CachedTypeReader stringReader = GetCachedTypeReader(typeof(string));
         var reader = () =>
         {
             if (TryReadStringValueOrNull(out string s))
@@ -318,10 +349,10 @@ public sealed partial class JsonDeserializer
             }
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, stringReader.WriteRefPath, typeSettings);
     }
 
-    private TypeReaderInitializer CreateEnumReader<T>() where T : struct, Enum
+    private TypeReaderInitializer CreateEnumReader<T>(BaseTypeSettings typeSettings) where T : struct, Enum
     {
         var reader = () =>
         {
@@ -347,10 +378,10 @@ public sealed partial class JsonDeserializer
             else throw new Exception("Invalid character for determining enum value");
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, false);
+        return TypeReaderInitializer.Create(this, reader, null, false, typeSettings);
     }
 
-    private TypeReaderInitializer CreateNullableEnumReader<T>() where T : struct, Enum
+    private TypeReaderInitializer CreateNullableEnumReader<T>(BaseTypeSettings typeSettings) where T : struct, Enum
     {
         var reader = () =>
         {
@@ -379,10 +410,10 @@ public sealed partial class JsonDeserializer
             else throw new Exception("Invalid character for determining enum value");
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, false);
+        return TypeReaderInitializer.Create(this, reader, null, false, typeSettings);
     }
 
-    private bool TryCreateDictionaryTypeReader(Type itemType, out TypeReaderInitializer initializer)
+    private bool TryCreateDictionaryTypeReader(Type itemType, BaseTypeSettings typeSettings, out TypeReaderInitializer initializer)
     {
         initializer = null;
         if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type keyType, out Type valueType)) return false;
@@ -399,24 +430,25 @@ public sealed partial class JsonDeserializer
             }
         }
 
-        initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateDictionaryTypeReader), [itemType, keyType, valueType]);
+        initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateDictionaryTypeReader), [itemType, keyType, valueType], typeSettings);
         return true;
     }
 
-    private TypeReaderInitializer CreateDictionaryTypeReader<T, K, V>() where T : IDictionary<K, V>, new()
+    private TypeReaderInitializer CreateDictionaryTypeReader<T, K, V>(BaseTypeSettings typeSettings) where T : IDictionary<K, V>, new()
     {
+        var keyReader = GetCachedTypeReader(typeof(K));
+        var valueReader = GetCachedTypeReader(typeof(V));
+
         if (typeof(T).IsAbstract)
         {
             // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
             // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
             // use the type mapping or multi option type mapping in the settings.
-            return TypeReaderInitializer.Create<T>(this, null, null, true);
+            return TypeReaderInitializer.Create<T>(this, null, null, valueReader.WriteRefPath, typeSettings);
         }
 
-        var constructor = GetConstructor<T>();
-        var elementReader = new ElementReader<KeyValuePair<K, V>>(this);
-        var keyReader = GetCachedTypeReader(typeof(K));
-        var valueReader = GetCachedTypeReader(typeof(V));
+        var constructor = GetConstructor<T>(null, typeSettings);
+        var elementReader = new ElementReader<KeyValuePair<K, V>>(this);        
         var keyValuePairReader = GetCachedTypeReader(typeof(KeyValuePair<K, V>));
         bool isValueRefType = typeof(V).IsByRef;
         bool canValueBePopulated = CanTypeBePopulated(typeof(V));
@@ -615,14 +647,14 @@ public sealed partial class JsonDeserializer
             };
         }
 
-        return TypeReaderInitializer.Create(this, reader, populatingReader, true);
+        return TypeReaderInitializer.Create(this, reader, populatingReader, valueReader.WriteRefPath, typeSettings);
     }
 
-    private TypeReaderInitializer CreateUnknownObjectReader(CachedTypeReader cachedTypeReader)
+    private TypeReaderInitializer CreateUnknownObjectReader(CachedTypeReader cachedTypeReader, BaseTypeSettings typeSettings)
     {
         if (!settings.multiOptionTypeMapping.TryGetValue(typeof(object), out var typeOptions))
         {
-            return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true);
+            return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true, typeSettings);
         }
 
         List<Type> objectTypeOptions = new List<Type>();
@@ -642,14 +674,14 @@ public sealed partial class JsonDeserializer
 
         if (arrayTypeOption == null && objectTypeOptions.Count == 0)
         {
-            return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true);
+            return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true, typeSettings);
         }
 
         if (arrayTypeOption == null) arrayTypeOption = typeof(List<object>);
         objectTypeOptions.Add(typeof(Dictionary<string, object>));
 
         var arrayReader = GetCachedTypeReader(arrayTypeOption);
-        CachedTypeReader objectReader = new CachedTypeReader((_) => CreateMultiOptionComplexTypeReader<object>(objectTypeOptions.ToArray()));
+        CachedTypeReader objectReader = new CachedTypeReader((_) => CreateMultiOptionComplexTypeReader<object>(objectTypeOptions.ToArray(), typeSettings));
 
         var reader = () =>
         {
@@ -672,11 +704,11 @@ public sealed partial class JsonDeserializer
             }
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, true, typeSettings);
 
     }
 
-    private TypeReaderInitializer CreateMultiOptionComplexTypeReader<T>(Type[] typeOptions)
+    private TypeReaderInitializer CreateMultiOptionComplexTypeReader<T>(Type[] typeOptions, BaseTypeSettings typeSettings)
     {
 
         Type[] objectTypeOptions = typeOptions
@@ -691,7 +723,7 @@ public sealed partial class JsonDeserializer
                     // If the type option is the same as the requested type, we have to create the type reader with CreateComplexTypeReader
                     // to avoid infinite recursion, because GetCachedTypeReader would return the currently created type reader which is not yet
                     // fully initialized and would cause infinite recursion when we try to read a value with it.
-                    return new CachedTypeReader((_) => CreateComplexTypeReader<T>(false));
+                    return new CachedTypeReader((_) => CreateComplexTypeReader<T>(false, typeSettings));
                 }
                 else return GetCachedTypeReader(t);
             })
@@ -706,13 +738,11 @@ public sealed partial class JsonDeserializer
         for (int i = 0; i < objectTypeOptions.Length; i++)
         {
             var typeOption = objectTypeOptions[i];
-            var memberInfos = CreateMemberInfosList(typeOption);
+            var memberInfos = CreateMemberInfosList(typeOption, typeSettings?.dataAccess ?? settings.dataAccess);
 
             foreach (var memberInfo in memberInfos)
             {
-                Type fieldType = GetFieldOrPropertyType(memberInfo);
                 string name = memberInfo.Name;
-                if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName)) name = backingFieldName;
                 var itemFieldName = new ByteSegment(name.ToByteArray(), true);
                 if (!fieldNameToIsTypeMember.TryGetValue(itemFieldName, out var indicesList))
                 {
@@ -720,7 +750,18 @@ public sealed partial class JsonDeserializer
                     fieldNameToIsTypeMember[itemFieldName] = indicesList;
                 }
                 indicesList[i] = true;
-                // TODO: BackingFields are not yet supported for multi options
+
+                if (name.TryExtract("<{name}>k__BackingField", out string propertyName))
+                {
+                    name = propertyName;
+                    itemFieldName = new ByteSegment(name.ToByteArray(), true);
+                    if (!fieldNameToIsTypeMember.TryGetValue(itemFieldName, out indicesList))
+                    {
+                        indicesList = Enumerable.Repeat(false, objectTypeOptions.Length).ToList();
+                        fieldNameToIsTypeMember[itemFieldName] = indicesList;
+                    }
+                    indicesList[i] = true;
+                }
             }
 
             // Mark all fields that are equally available for all types
@@ -824,16 +865,16 @@ public sealed partial class JsonDeserializer
             return objectTypeReaders[selectionIndex].ReadValue_CheckProposed<T>();
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, true, typeSettings);
     }
 
-    private TypeReaderInitializer CreateComplexTypeReader<T>(bool checkForMultiOptions)
+    private TypeReaderInitializer CreateComplexTypeReader<T>(bool checkForMultiOptions, BaseTypeSettings typeSettings)
     {
         Type itemType = typeof(T);
 
         if (checkForMultiOptions && settings.multiOptionTypeMapping.TryGetValue(itemType, out Type[] mappedTypeOptions))
         {
-            return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateMultiOptionComplexTypeReader), [itemType], [mappedTypeOptions]);
+            return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateMultiOptionComplexTypeReader), [itemType], [mappedTypeOptions, typeSettings]);
         }
 
         if (itemType.IsAbstract)
@@ -841,36 +882,61 @@ public sealed partial class JsonDeserializer
             // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
             // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
             // use the type mapping or multi option type mapping in the settings.
-            return TypeReaderInitializer.Create<T>(this, null, null, true);
+            return TypeReaderInitializer.Create<T>(this, null, null, true, typeSettings);
         }
-        List<MemberInfo> memberInfos = CreateMemberInfosList(itemType);
+        List<MemberInfo> memberInfos = CreateMemberInfosList(itemType, typeSettings?.dataAccess ?? settings.dataAccess);
 
         Dictionary<ByteSegment, int> itemFieldWritersIndexLookup = new();
         List<(ByteSegment name, Func<T, T> itemFieldWriter)> itemFieldWritersList = new();
-        bool refTypeOrRefTypeChildren = !itemType.IsValueType;
+        bool childrenMustWriteRefPath = false;
         foreach (var memberInfo in memberInfos)
         {
+            ByteSegment itemFieldName;
+            Func<T, T> itemFieldWriter;
+
             Type fieldType = GetFieldOrPropertyType(memberInfo);
             string name = memberInfo.Name;
-            var itemFieldName = new ByteSegment(name.ToByteArray(), true);
-            var itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, itemFieldName);
-            itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
-            itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
+            if (!name.TryExtract("<{name}>k__BackingField", out string propertyName)) propertyName = null;
+            Settings.BackingFieldMode backingFieldMode = typeSettings?.backingFieldMode ?? settings.backingFieldMode;
 
-            if (name.TryExtract("<{name}>k__BackingField", out string backingFieldName))
+            BaseTypeSettings memberSettings = null;
+            if (typeSettings != null &&
+                (typeSettings.memberSettingsDict.TryGetValue(name, out memberSettings) ||
+                 typeSettings.memberSettingsDict.TryGetValue(propertyName ?? name, out memberSettings)))
             {
-                name = backingFieldName;
+                if (memberSettings.member_ignore == true) continue;
+                if (memberSettings.member_overrideName != null)
+                {
+                    // If there is an override name, we ignore the propertyName,
+                    // because otherwise we would create two field writers for the same name.
+                    name = memberSettings.member_overrideName;
+                    propertyName = null;
+                    backingFieldMode = Settings.BackingFieldMode.TryBackingFieldNameOnly;
+                }
+            }
+
+            if (backingFieldMode != Settings.BackingFieldMode.TryPropertyNameOnly)
+            {
                 itemFieldName = new ByteSegment(name.ToByteArray(), true);
+                itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, itemFieldName, memberSettings);
+                itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
+                itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
+            }
+            if (propertyName != null && backingFieldMode != Settings.BackingFieldMode.TryBackingFieldNameOnly)
+            {                
+                name = propertyName;
+                itemFieldName = new ByteSegment(name.ToByteArray(), true);
+                itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, itemFieldName, memberSettings);
                 itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
                 itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
             }
 
-            if (!refTypeOrRefTypeChildren && GetCachedTypeReader(fieldType).RefTypeOrRefTypeChildren) refTypeOrRefTypeChildren = true;
+            if (!childrenMustWriteRefPath && GetCachedTypeReader(fieldType).WriteRefPath) childrenMustWriteRefPath = true;
         }
         int writerCount = itemFieldWritersList.Count;
         var itemFieldWriters = itemFieldWritersList.ToArray();
         itemFieldWritersList = null;
-        var constructor = GetConstructor<T>();
+        var constructor = GetConstructor<T>(null, typeSettings);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryFindFieldWriter(ByteSegment fieldName, ref int expectedFieldIndex, out Func<T, T> fieldWriter)
@@ -973,13 +1039,13 @@ public sealed partial class JsonDeserializer
             return item;
         };
 
-        return TypeReaderInitializer.Create(this, reader, populatingReader, refTypeOrRefTypeChildren);
+        return TypeReaderInitializer.Create(this, reader, populatingReader, childrenMustWriteRefPath, typeSettings);
     }
 
-    private List<MemberInfo> CreateMemberInfosList(Type itemType)
+    private List<MemberInfo> CreateMemberInfosList(Type itemType, DataAccess dataAccess)
     {
         var memberInfos = new List<MemberInfo>();
-        if (settings.dataAccess == DataAccess.PublicFieldsAndProperties)
+        if (dataAccess == DataAccess.PublicFieldsAndProperties)
         {
             memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(prop => prop.SetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
@@ -1017,7 +1083,7 @@ public sealed partial class JsonDeserializer
         return memberInfos;
     }
 
-    private Func<C, C> CreateItemFieldWriter<T, V, C>(MemberInfo memberInfo, ByteSegment fieldName) where T : C
+    private Func<C, C> CreateItemFieldWriter<T, V, C>(MemberInfo memberInfo, ByteSegment fieldName, BaseTypeSettings memberSettings) where T : C
     {
         Type itemType = typeof(T);
         Type fieldType = typeof(V);
@@ -1027,12 +1093,12 @@ public sealed partial class JsonDeserializer
             if (fieldInfo.IsInitOnly) // Check if the field is read-only
             {
                 // Handle read-only fields
-                return CreateFieldWriterForInitOnlyFields<T, V, C>(fieldName, itemType, fieldType, fieldInfo);
+                return CreateFieldWriterForInitOnlyFields<T, V, C>(fieldInfo, fieldName, memberSettings);
             }
             else
             {
                 // Use expression tree for normal writable field
-                return CreateFieldWriterUsingExpression<T, V, C>(fieldInfo, fieldName);
+                return CreateFieldWriterUsingExpression<T, V, C>(fieldInfo, fieldName, memberSettings);
             }
         }
         else if (memberInfo is PropertyInfo propertyInfo)
@@ -1042,79 +1108,19 @@ public sealed partial class JsonDeserializer
                 // Includes init-only properties in current runtime behavior:
                 // init accessors are reported as writable here.
                 // Use expression tree for writable property
-                return CreatePropertyWriterUsingExpression<T, V, C>(propertyInfo, fieldName);
+                return CreatePropertyWriterUsingExpression<T, V, C>(propertyInfo, fieldName, memberSettings);
             }
-            // Intentionally disabled:
-            // In this codebase/runtime context, init-only properties are already covered by CanWrite == true,
-            // so this fallback branch is not expected to be reachable.
-            //
-            // else if (HasInitAccessor(propertyInfo))
-            // {
-            //     return CreateFieldWriterForInitOnlyProperties<T, V, C>(fieldName, itemType, fieldType, propertyInfo);
-            // }
         }
 
         throw new InvalidOperationException("MemberInfo must be a writable field, property, or init-only property.");
     }
 
-    /*
-    private Func<C, C> CreateFieldWriterForInitOnlyProperties<T, V, C>(ByteSegment fieldName, Type itemType, Type fieldType, PropertyInfo propertyInfo) where T : C
-    {            
-        var fieldTypeReader = GetCachedTypeReader(fieldType);
-        if (itemType.IsValueType)
-        {
-            if (fieldTypeReader.CanBePopulated && propertyInfo.CanRead)
-            {
-                return parentItem =>
-                {
-                    V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                    value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
-                    var boxedItem = (object)parentItem;
-                    propertyInfo.SetValue(boxedItem, value);
-                    parentItem = (T)boxedItem;
-                    return parentItem;
-                };
-            }
-            else
-            {
-                return parentItem =>
-                {
-                    V value = fieldTypeReader.ReadFieldValue<V>(fieldName);
-                    var boxedItem = (object)parentItem;
-                    propertyInfo.SetValue(boxedItem, value);
-                    parentItem = (T)boxedItem;
-                    return parentItem;
-                };
-            }
-        }
-        else
-        {
-            if (fieldTypeReader.CanBePopulated && propertyInfo.CanRead)
-            {
-                return parentItem =>
-                {
-                    V value = (V)propertyInfo.GetValue(parentItem); // TODO: can be optimized via Expression
-                    value = fieldTypeReader.ReadFieldValue<V>(fieldName, value);
-                    propertyInfo.SetValue(parentItem, value);            
-                    return parentItem;
-                };
-            }
-            else
-            {
-                return parentItem =>
-                {
-                    V value = fieldTypeReader.ReadFieldValue<V>(fieldName);
-                    propertyInfo.SetValue(parentItem, value);
-                    return parentItem;
-                };
-            }
-        }
-    }
-    */
-
-    private Func<C, C> CreateFieldWriterForInitOnlyFields<T, V, C>(ByteSegment fieldName, Type itemType, Type fieldType, FieldInfo fieldInfo) where T : C
+    private Func<C, C> CreateFieldWriterForInitOnlyFields<T, V, C>(FieldInfo fieldInfo, ByteSegment fieldName, BaseTypeSettings memberSettings) where T : C
     {
-        var fieldTypeReader = GetCachedTypeReader(fieldType);
+        Type itemType = typeof(T);
+        Type fieldType = typeof(V);
+        var fieldTypeReader = GetCachedTypeReader(fieldType, memberSettings);
+
         if (itemType.IsValueType)
         {
             if (fieldTypeReader.CanBePopulated)
@@ -1135,37 +1141,22 @@ public sealed partial class JsonDeserializer
                 {
                     if (typeof(V) == typeof(string))
                     {
-                        return parentItem =>
-                        {
-                            var v = ReadStringValue();
-                            V value = Unsafe.As<string, V>(ref v);
-                            var boxedItem = (object)parentItem;
-                            fieldInfo.SetValue(boxedItem, value);
-                            parentItem = (T)boxedItem;
-                            return parentItem;
-                        };
+                        if (CheckUseStringCache(memberSettings)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, StringReader_WithStringCache_Strategy, string>(fieldInfo, fieldTypeReader);
+                        else return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, StringReader_WithoutStringCache_Strategy, string>(fieldInfo, fieldTypeReader);
                     }
-                    if (typeof(V) == typeof(int))
-                    {
-                        return parentItem =>
-                        {
-                            var v = ReadIntValue();
-                            V value = Unsafe.As<int, V>(ref v);
-                            var boxedItem = (object)parentItem;
-                            fieldInfo.SetValue(boxedItem, value);
-                            parentItem = (T)boxedItem;
-                            return parentItem;
-                        };
-                    }
-
-                    return parentItem =>
-                    {
-                        V value = fieldTypeReader.ReadValue_NoCheck<V>();
-                        var boxedItem = (object)parentItem;
-                        fieldInfo.SetValue(boxedItem, value);
-                        parentItem = (T)boxedItem;
-                        return parentItem;
-                    };
+                    if (typeof(V) == typeof(char)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(sbyte)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(byte)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(short)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, Int16ReaderStrategy, short>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(ushort)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, UInt16ReaderStrategy, ushort>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(int)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, Int32ReaderStrategy, int>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(uint)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, UInt32ReaderStrategy, uint>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(long)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, Int64ReaderStrategy, long>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(ulong)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, UInt64ReaderStrategy, ulong>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(float)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, FloatReaderStrategy, float>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(double)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(bool)) return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(fieldInfo, fieldTypeReader);
+                    return CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(fieldInfo, fieldTypeReader);
                 }
                 else
                 {
@@ -1198,31 +1189,22 @@ public sealed partial class JsonDeserializer
                 {
                     if (typeof(V) == typeof(string))
                     {
-                        return parentItem =>
-                        {
-                            var v = ReadStringValue();
-                            V value = Unsafe.As<string, V>(ref v);
-                            fieldInfo.SetValue(parentItem, value);
-                            return parentItem;
-                        };
+                        if (CheckUseStringCache(memberSettings)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, StringReader_WithStringCache_Strategy, string>(fieldInfo, fieldTypeReader);
+                        else return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, StringReader_WithoutStringCache_Strategy, string>(fieldInfo, fieldTypeReader);
                     }
-                    if (typeof(V) == typeof(int))
-                    {
-                        return parentItem =>
-                        {
-                            var v = ReadIntValue();
-                            V value = Unsafe.As<int, V>(ref v);
-                            fieldInfo.SetValue(parentItem, value);
-                            return parentItem;
-                        };
-                    }
-
-                    return parentItem =>
-                    {
-                        V value = fieldTypeReader.ReadValue_NoCheck<V>();
-                        fieldInfo.SetValue(parentItem, value);
-                        return parentItem;
-                    };
+                    if (typeof(V) == typeof(char)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(sbyte)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(byte)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(short)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, Int16ReaderStrategy, short>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(ushort)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, UInt16ReaderStrategy, ushort>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(int)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, Int32ReaderStrategy, int>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(uint)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, UInt32ReaderStrategy, uint>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(long)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, Int64ReaderStrategy, long>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(ulong)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, UInt64ReaderStrategy, ulong>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(float)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, FloatReaderStrategy, float>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(double)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(fieldInfo, fieldTypeReader);
+                    if (typeof(V) == typeof(bool)) return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(fieldInfo, fieldTypeReader);
+                    return CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(fieldInfo, fieldTypeReader);
                 }
                 else
                 {
@@ -1236,27 +1218,12 @@ public sealed partial class JsonDeserializer
             }
         }
     }
-#if NET5_0_OR_GREATER
-    private bool HasInitAccessor(PropertyInfo propertyInfo)
-    {
-        // Use reflection to check if the property has an init accessor
-        var setMethod = propertyInfo.SetMethod;
-        return setMethod != null && setMethod.ReturnParameter.GetRequiredCustomModifiers().Contains(typeof(System.Runtime.CompilerServices.IsExternalInit));
-    }
-#else
-    private bool HasInitAccessor(PropertyInfo propertyInfo)
-    {
-        // .NET Standard 2.0 + 2.1 doesn't support init-only properties, so return false
-        return false;
-    }
-#endif
 
-    private Func<C, C> CreateFieldWriterUsingExpression<T, V, C>(FieldInfo fieldInfo, ByteSegment fieldName) where T : C
+    private Func<C, C> CreateFieldWriterUsingExpression<T, V, C>(FieldInfo fieldInfo, ByteSegment fieldName, BaseTypeSettings memberSettings) where T : C
     {
         Type itemType = typeof(T);
         Type fieldType = typeof(V);
-
-        var fieldTypeReader = GetCachedTypeReader(fieldType);
+        var fieldTypeReader = GetCachedTypeReader(fieldType, memberSettings);
 
         var target = Expression.Parameter(itemType, "target");
         var value = Expression.Parameter(fieldType, "value");
@@ -1293,7 +1260,11 @@ public sealed partial class JsonDeserializer
             {
                 if (fieldTypeReader.IsNoCheckPossible<V>())
                 {
-                    if (typeof(V) == typeof(string)) return CreateValueFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValueAndReturn, fieldTypeReader);
+                    if (typeof(V) == typeof(string))
+                    {
+                        if (CheckUseStringCache(memberSettings)) return CreateValueFieldWriterViaStrategy<T, V, C, StringReader_WithStringCache_Strategy, string>(setValueAndReturn, fieldTypeReader);
+                        else return CreateValueFieldWriterViaStrategy<T, V, C, StringReader_WithoutStringCache_Strategy, string>(setValueAndReturn, fieldTypeReader);
+                    }
                     if (typeof(V) == typeof(char)) return CreateValueFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValueAndReturn, fieldTypeReader);
                     if (typeof(V) == typeof(sbyte)) return CreateValueFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValueAndReturn, fieldTypeReader);
                     if (typeof(V) == typeof(byte)) return CreateValueFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValueAndReturn, fieldTypeReader);
@@ -1341,8 +1312,11 @@ public sealed partial class JsonDeserializer
             {
                 if (fieldTypeReader.IsNoCheckPossible<V>())
                 {
-#if NET5_0_OR_GREATER
-                    if (typeof(V) == typeof(string)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValue, fieldTypeReader);
+                    if (typeof(V) == typeof(string))
+                    {
+                        if (CheckUseStringCache(memberSettings)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReader_WithStringCache_Strategy, string>(setValue, fieldTypeReader);
+                        else return CreateObjFieldWriterViaStrategy<T, V, C, StringReader_WithoutStringCache_Strategy, string>(setValue, fieldTypeReader);
+                    }
                     if (typeof(V) == typeof(char)) return CreateObjFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValue, fieldTypeReader);
                     if (typeof(V) == typeof(sbyte)) return CreateObjFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValue, fieldTypeReader);
                     if (typeof(V) == typeof(byte)) return CreateObjFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValue, fieldTypeReader);
@@ -1356,15 +1330,6 @@ public sealed partial class JsonDeserializer
                     if (typeof(V) == typeof(double)) return CreateObjFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(setValue, fieldTypeReader);
                     if (typeof(V) == typeof(bool)) return CreateObjFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(setValue, fieldTypeReader);
                     return CreateObjFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(setValue, fieldTypeReader);
-#else
-
-                    return parentItem =>
-                    {
-                        V fieldValue = fieldTypeReader.ReadValue_NoCheck<V>();
-                        setValue((T)parentItem, fieldValue);
-                        return parentItem;
-                    };
-#endif
                 }
                 else
                 {
@@ -1379,12 +1344,18 @@ public sealed partial class JsonDeserializer
         }
     }
 
-    private Func<C, C> CreatePropertyWriterUsingExpression<T, V, C>(PropertyInfo propertyInfo, ByteSegment fieldName) where T : C
+    private bool CheckUseStringCache(BaseTypeSettings memberSettings)
+    {
+        if (memberSettings?.member_useStringCache == null) return useStringCache;
+        return memberSettings.member_useStringCache.Value;
+    }
+
+    private Func<C, C> CreatePropertyWriterUsingExpression<T, V, C>(PropertyInfo propertyInfo, ByteSegment fieldName, BaseTypeSettings memberSettings) where T : C
     {
         Type itemType = typeof(T);
         Type fieldType = typeof(V);
 
-        var fieldTypeReader = GetCachedTypeReader(fieldType);
+        var fieldTypeReader = GetCachedTypeReader(fieldType, memberSettings);
 
         var target = Expression.Parameter(itemType, "target");
         var value = Expression.Parameter(fieldType, "value");
@@ -1422,7 +1393,11 @@ public sealed partial class JsonDeserializer
                 if (fieldTypeReader.IsNoCheckPossible<V>())
                 {
 
-                    if (typeof(V) == typeof(string)) return CreateValueFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValueAndReturn, fieldTypeReader);
+                    if (typeof(V) == typeof(string))
+                    {
+                        if (CheckUseStringCache(memberSettings)) return CreateValueFieldWriterViaStrategy<T, V, C, StringReader_WithStringCache_Strategy, string>(setValueAndReturn, fieldTypeReader);
+                        else return CreateValueFieldWriterViaStrategy<T, V, C, StringReader_WithoutStringCache_Strategy, string>(setValueAndReturn, fieldTypeReader);
+                    }
                     if (typeof(V) == typeof(char)) return CreateValueFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValueAndReturn, fieldTypeReader);
                     if (typeof(V) == typeof(sbyte)) return CreateValueFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValueAndReturn, fieldTypeReader);
                     if (typeof(V) == typeof(byte)) return CreateValueFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValueAndReturn, fieldTypeReader);
@@ -1471,8 +1446,11 @@ public sealed partial class JsonDeserializer
             {
                 if (fieldTypeReader.IsNoCheckPossible<V>())
                 {
-#if NET5_0_OR_GREATER
-                    if (typeof(V) == typeof(string)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReaderStrategy, string>(setValue, fieldTypeReader);
+                    if (typeof(V) == typeof(string))
+                    {
+                        if (CheckUseStringCache(memberSettings)) return CreateObjFieldWriterViaStrategy<T, V, C, StringReader_WithStringCache_Strategy, string>(setValue, fieldTypeReader);
+                        else return CreateObjFieldWriterViaStrategy<T, V, C, StringReader_WithoutStringCache_Strategy, string>(setValue, fieldTypeReader);
+                    }
                     if (typeof(V) == typeof(char)) return CreateObjFieldWriterViaStrategy<T, V, C, CharReaderStrategy, char>(setValue, fieldTypeReader);
                     if (typeof(V) == typeof(sbyte)) return CreateObjFieldWriterViaStrategy<T, V, C, SByteReaderStrategy, sbyte>(setValue, fieldTypeReader);
                     if (typeof(V) == typeof(byte)) return CreateObjFieldWriterViaStrategy<T, V, C, ByteReaderStrategy, byte>(setValue, fieldTypeReader);
@@ -1486,15 +1464,6 @@ public sealed partial class JsonDeserializer
                     if (typeof(V) == typeof(double)) return CreateObjFieldWriterViaStrategy<T, V, C, DoubleReaderStrategy, double>(setValue, fieldTypeReader);
                     if (typeof(V) == typeof(bool)) return CreateObjFieldWriterViaStrategy<T, V, C, BoolReaderStrategy, bool>(setValue, fieldTypeReader);
                     return CreateObjFieldWriterViaStrategy<T, V, C, GenericReaderStrategy<V>, V>(setValue, fieldTypeReader);
-#else
-
-                    return parentItem =>
-                    {
-                        V fieldValue = fieldTypeReader.ReadValue_NoCheck<V>();
-                        setValue((T)parentItem, fieldValue);
-                        return parentItem;
-                    };
-#endif
                 }
                 else
                 {
@@ -1509,39 +1478,43 @@ public sealed partial class JsonDeserializer
         }
     }
 
-    private TypeReaderInitializer CreateArrayTypeReader(Type arrayType, CachedTypeReader cachedTypeReader)
+    private TypeReaderInitializer CreateArrayTypeReader(Type arrayType, CachedTypeReader cachedTypeReader, BaseTypeSettings typeSettings)
     {
         if (arrayType == typeof(byte[]))
         {
-            return CreateByteArrayTypeReader();
+            return CreateByteArrayTypeReader(typeSettings);
         }
         else
         {
-            return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { arrayType.GetElementType() });
+            return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { arrayType.GetElementType() }, typeSettings);
         }
     }
 
-    private TypeReaderInitializer CreateGenericArrayTypeReader<E>()
+    private TypeReaderInitializer CreateGenericArrayTypeReader<E>(BaseTypeSettings typeSettings)
     {
         var pool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 10, false);
 
         var elementTypeReader = GetCachedTypeReader(typeof(E));
         if (elementTypeReader.IsNoCheckPossible<E>())
         {
-            if (typeof(E) == typeof(string)) return CreateGenericArrayTypeReaderViaStrategy<E, StringReaderStrategy, string>(elementTypeReader, pool);
-            if (typeof(E) == typeof(char)) return CreateGenericArrayTypeReaderViaStrategy<E, CharReaderStrategy, char>(elementTypeReader, pool);
-            if (typeof(E) == typeof(sbyte)) return CreateGenericArrayTypeReaderViaStrategy<E, SByteReaderStrategy, sbyte>(elementTypeReader, pool);
-            if (typeof(E) == typeof(byte)) return CreateGenericArrayTypeReaderViaStrategy<E, ByteReaderStrategy, byte>(elementTypeReader, pool);
-            if (typeof(E) == typeof(short)) return CreateGenericArrayTypeReaderViaStrategy<E, Int16ReaderStrategy, short>(elementTypeReader, pool);
-            if (typeof(E) == typeof(ushort)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt16ReaderStrategy, ushort>(elementTypeReader, pool);
-            if (typeof(E) == typeof(int)) return CreateGenericArrayTypeReaderViaStrategy<E, Int32ReaderStrategy, int>(elementTypeReader, pool);
-            if (typeof(E) == typeof(uint)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt32ReaderStrategy, uint>(elementTypeReader, pool);
-            if (typeof(E) == typeof(long)) return CreateGenericArrayTypeReaderViaStrategy<E, Int64ReaderStrategy, long>(elementTypeReader, pool);
-            if (typeof(E) == typeof(ulong)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt64ReaderStrategy, ulong>(elementTypeReader, pool);
-            if (typeof(E) == typeof(bool)) return CreateGenericArrayTypeReaderViaStrategy<E, BoolReaderStrategy, bool>(elementTypeReader, pool);
-            if (typeof(E) == typeof(float)) return CreateGenericArrayTypeReaderViaStrategy<E, FloatReaderStrategy, float>(elementTypeReader, pool);
-            if (typeof(E) == typeof(double)) return CreateGenericArrayTypeReaderViaStrategy<E, DoubleReaderStrategy, double>(elementTypeReader, pool);
-            return CreateGenericArrayTypeReaderViaStrategy<E, GenericReaderStrategy<E>, E>(elementTypeReader, pool);
+            if (typeof(E) == typeof(string))
+            {
+                if (CheckUseStringCache(typeSettings)) return CreateGenericArrayTypeReaderViaStrategy<E, StringReader_WithStringCache_Strategy, string>(elementTypeReader, pool, typeSettings);
+                else return CreateGenericArrayTypeReaderViaStrategy<E, StringReader_WithoutStringCache_Strategy, string>(elementTypeReader, pool, typeSettings);
+            }
+            if (typeof(E) == typeof(char)) return CreateGenericArrayTypeReaderViaStrategy<E, CharReaderStrategy, char>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(sbyte)) return CreateGenericArrayTypeReaderViaStrategy<E, SByteReaderStrategy, sbyte>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(byte)) return CreateGenericArrayTypeReaderViaStrategy<E, ByteReaderStrategy, byte>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(short)) return CreateGenericArrayTypeReaderViaStrategy<E, Int16ReaderStrategy, short>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(ushort)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt16ReaderStrategy, ushort>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(int)) return CreateGenericArrayTypeReaderViaStrategy<E, Int32ReaderStrategy, int>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(uint)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt32ReaderStrategy, uint>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(long)) return CreateGenericArrayTypeReaderViaStrategy<E, Int64ReaderStrategy, long>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(ulong)) return CreateGenericArrayTypeReaderViaStrategy<E, UInt64ReaderStrategy, ulong>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(bool)) return CreateGenericArrayTypeReaderViaStrategy<E, BoolReaderStrategy, bool>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(float)) return CreateGenericArrayTypeReaderViaStrategy<E, FloatReaderStrategy, float>(elementTypeReader, pool, typeSettings);
+            if (typeof(E) == typeof(double)) return CreateGenericArrayTypeReaderViaStrategy<E, DoubleReaderStrategy, double>(elementTypeReader, pool, typeSettings);
+            return CreateGenericArrayTypeReaderViaStrategy<E, GenericReaderStrategy<E>, E>(elementTypeReader, pool, typeSettings);
         }
         else
         {
@@ -1556,7 +1529,7 @@ public sealed partial class JsonDeserializer
                 var elementReader = elementReaderPool.Take();
                 elementBuffer.AddRange(elementReader);
                 E[] item = elementBuffer.ToArray();
-                if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
+                if (elementTypeReader.ResolveRefPath) SetItemRefInCurrentItemInfo(item);
                 pool.Return(elementBuffer);
                 elementReaderPool.Return(elementReader);
                 if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
@@ -1564,19 +1537,19 @@ public sealed partial class JsonDeserializer
                 return item;
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true);
+            return TypeReaderInitializer.Create(this, reader, null, elementTypeReader.WriteRefPath, typeSettings);
         }
     }
 
-    private bool TryCreateEnumerableTypeReader(Type itemType, out TypeReaderInitializer initializer)
+    private bool TryCreateEnumerableTypeReader(Type itemType, BaseTypeSettings typeSettings, out TypeReaderInitializer initializer)
     {
         if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))
         {
-            initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericEnumerableTypeReader), new Type[] { itemType, elementType });
+            initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericEnumerableTypeReader), new Type[] { itemType, elementType }, typeSettings);
         }
         else if (itemType.ImplementsInterface(typeof(IEnumerable)))
         {
-            initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateEnumerableTypeReader), new Type[] { itemType });
+            initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateEnumerableTypeReader), new Type[] { itemType }, typeSettings);
         }
         else
         {
@@ -1589,36 +1562,41 @@ public sealed partial class JsonDeserializer
 
 
 
-    private TypeReaderInitializer CreateGenericEnumerableTypeReader<T, E>()
+    private TypeReaderInitializer CreateGenericEnumerableTypeReader<T, E>(BaseTypeSettings typeSettings)
     {
+        var elementTypeReader = GetCachedTypeReader(typeof(E));
+
         if (typeof(T).IsAbstract)
         {
             // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
             // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
             // use the type mapping in the settings.
-            return TypeReaderInitializer.Create<T>(this, null, null, true);
+            return TypeReaderInitializer.Create<T>(this, null, null, elementTypeReader.WriteRefPath, typeSettings);
         }
 
-        Func<IEnumerable<E>, T> constructor = GetConstructor<T, IEnumerable<E>>();
-        var elementTypeReader = GetCachedTypeReader(typeof(E));
+        Func<IEnumerable<E>, T> constructor = GetConstructor<T, IEnumerable<E>>(typeSettings);        
         Pool<List<E>> bufferPool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 10, false);
 
         if (elementTypeReader.IsNoCheckPossible<E>())
         {
-            if (typeof(E) == typeof(string)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringReaderStrategy, string>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(char)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, CharReaderStrategy, char>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(sbyte)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, SByteReaderStrategy, sbyte>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(byte)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, ByteReaderStrategy, byte>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(short)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int16ReaderStrategy, short>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(ushort)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt16ReaderStrategy, ushort>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(int)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int32ReaderStrategy, int>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(uint)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt32ReaderStrategy, uint>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(long)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int64ReaderStrategy, long>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(ulong)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt64ReaderStrategy, ulong>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(bool)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, BoolReaderStrategy, bool>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(float)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, FloatReaderStrategy, float>(elementTypeReader, constructor, bufferPool);
-            if (typeof(E) == typeof(double)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, DoubleReaderStrategy, double>(elementTypeReader, constructor, bufferPool);
-            return CreateGenericEnumerableTypeReaderViaStrategy<T, E, GenericReaderStrategy<E>, E>(elementTypeReader, constructor, bufferPool);
+            if (typeof(E) == typeof(string))
+            {
+                if (CheckUseStringCache(typeSettings)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringReader_WithStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, typeSettings);
+                else return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringReader_WithoutStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, typeSettings);
+            }
+            if (typeof(E) == typeof(char)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, CharReaderStrategy, char>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(sbyte)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, SByteReaderStrategy, sbyte>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(byte)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, ByteReaderStrategy, byte>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(short)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int16ReaderStrategy, short>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(ushort)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt16ReaderStrategy, ushort>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(int)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int32ReaderStrategy, int>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(uint)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt32ReaderStrategy, uint>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(long)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, Int64ReaderStrategy, long>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(ulong)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, UInt64ReaderStrategy, ulong>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(bool)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, BoolReaderStrategy, bool>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(float)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, FloatReaderStrategy, float>(elementTypeReader, constructor, bufferPool, typeSettings);
+            if (typeof(E) == typeof(double)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, DoubleReaderStrategy, double>(elementTypeReader, constructor, bufferPool, typeSettings);
+            return CreateGenericEnumerableTypeReaderViaStrategy<T, E, GenericReaderStrategy<E>, E>(elementTypeReader, constructor, bufferPool, typeSettings);
         }
         else
         {
@@ -1639,21 +1617,21 @@ public sealed partial class JsonDeserializer
                 return item;
             };
 
-            return TypeReaderInitializer.Create(this, reader, null, true);
+            return TypeReaderInitializer.Create(this, reader, null, elementTypeReader.WriteRefPath, typeSettings);
         }
     }
 
-    private TypeReaderInitializer CreateEnumerableTypeReader<T>()
+    private TypeReaderInitializer CreateEnumerableTypeReader<T>(BaseTypeSettings typeSettings)
     {
         if (typeof(T).IsAbstract)
         {
             // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
             // If the user wants to deserialize to an abstract type, they either have to provide a proposed type with the $type property or
             // use the type mapping in the settings.
-            return TypeReaderInitializer.Create<T>(this, null, null, true);
+            return TypeReaderInitializer.Create<T>(this, null, null, true, typeSettings);
         }
 
-        Func<IEnumerable, T> constructor = GetConstructor<T, IEnumerable>();
+        Func<IEnumerable, T> constructor = GetConstructor<T, IEnumerable>(typeSettings);
         Pool<List<object>> pool = new Pool<List<object>>(() => new List<object>(), l => l.Clear(), 1000, false);
         Pool<ElementReader<object>> elementReaderPool = new Pool<ElementReader<object>>(() => new ElementReader<object>(this), l => l.Reset(), 1000, false);
         var reader = () =>
@@ -1672,8 +1650,9 @@ public sealed partial class JsonDeserializer
             return item;
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true);
+        return TypeReaderInitializer.Create(this, reader, null, true, typeSettings);
     }
+
 
     readonly List<ByteSegment> arrayElementNameCache = new List<ByteSegment>();
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1692,19 +1671,19 @@ public sealed partial class JsonDeserializer
         CachedTypeReader reader;
         T current = default;
         int index = -1;
-        readonly bool enableReferenceResolution;
+        readonly bool writeRefPath;
 
         public ElementReader(JsonDeserializer deserializer)
         {
-            this.deserializer = deserializer;
-            enableReferenceResolution = deserializer.settings.enableReferenceResolution;
+            this.deserializer = deserializer;            
             reader = deserializer.GetCachedTypeReader(typeof(T));
+            writeRefPath =reader.WriteRefPath;
         }
 
         public ElementReader(JsonDeserializer deserializer, CachedTypeReader reader)
         {
             this.deserializer = deserializer;
-            enableReferenceResolution = deserializer.settings.enableReferenceResolution;
+            writeRefPath = reader.WriteRefPath;
             this.reader = reader;
         }
 
@@ -1720,7 +1699,7 @@ public sealed partial class JsonDeserializer
             {
                 return false;
             }
-            if (enableReferenceResolution) current = reader.ReadFieldValue<T>(deserializer.GetArrayElementName(++index));
+            if (writeRefPath) current = reader.ReadFieldValue<T>(deserializer.GetArrayElementName(++index));
             else current = reader.ReadValue_CheckProposed<T>();
             b = deserializer.SkipWhiteSpaces();
             if (b == ',') deserializer.buffer.TryNextByte();
@@ -1756,12 +1735,10 @@ public sealed partial class JsonDeserializer
         JsonDeserializer deserializer;
         CachedTypeReader reader;
         T current = default;
-        readonly bool enableReferenceResolution;
 
         public NoCheck_ElementReader(JsonDeserializer deserializer, CachedTypeReader reader)
         {
             this.deserializer = deserializer;
-            enableReferenceResolution = deserializer.settings.enableReferenceResolution;
             this.reader = reader;
         }
 
@@ -1839,17 +1816,17 @@ public sealed partial class JsonDeserializer
 #endif
     }
 
-    private Func<T> GetConstructor<T>(Type derivedType = null)
+    private Func<T> GetConstructor<T>(Type derivedType, BaseTypeSettings typeSettings)
     {
         Func<T> constructor = null;
         Type type = derivedType ?? typeof(T);
-        if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> typedConstructor) constructor = () => typedConstructor();
+        if (typeSettings?.constructor != null && typeSettings.constructor is Func<T> castedConstructor) constructor = castedConstructor;
+        else if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> typedConstructor) constructor = () => typedConstructor();
         else if (type.IsValueType) return () => default;
         else if (!TryCompileConstructor<T>(out constructor, derivedType))
         {
-            bool canUseUninitialized =
-    settings.allowUninitializedObjectCreation &&
-    settings.dataAccess == DataAccess.PublicAndPrivateFields;
+            bool canUseUninitialized = settings.allowUninitializedObjectCreation &&
+                                       settings.dataAccess == DataAccess.PublicAndPrivateFields;
 
             if (canUseUninitialized)
             {
@@ -1863,7 +1840,10 @@ public sealed partial class JsonDeserializer
             }
         }
 
-        if (!type.IsValueType && settings.enableReferenceResolution)
+        if (!type.IsValueType && typeSettings?.enableReferenceResolution != false &&
+            (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefault || 
+            settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings ||
+            (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.OnlyPerType && typeSettings?.enableReferenceResolution == true)))
         {
             return () =>
             {
@@ -1875,17 +1855,21 @@ public sealed partial class JsonDeserializer
         else return constructor;
     }
 
-    private Func<P, T> GetConstructor<T, P>()
+    private Func<P, T> GetConstructor<T, P>(BaseTypeSettings typeSettings)
     {
         Func<P, T> constructor = null;
         Type type = typeof(T);
-        if (settings.constructorsWithParam.TryGetValue((type, typeof(P)), out object c) && c is Func<P, T> typedConstructor) constructor = typedConstructor;
+        if (typeSettings?.collectionConstructor != null && typeSettings.collectionConstructor is Func<P, T> castedConstructor) constructor = castedConstructor;
+        else if (settings.constructorsWithParam.TryGetValue((type, typeof(P)), out object c) && c is Func<P, T> typedConstructor) constructor = typedConstructor;
         else if (!TryCompileConstructor(out constructor))
         {
             throw new Exception($"No constructor for type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
         }
 
-        if (!type.IsValueType && settings.enableReferenceResolution)
+        if (!type.IsValueType && typeSettings?.enableReferenceResolution != false &&
+            (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefault ||
+            settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings ||
+            (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.OnlyPerType && typeSettings?.enableReferenceResolution == true)))
         {
             return (parameter) =>
             {

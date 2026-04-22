@@ -79,7 +79,7 @@ public sealed partial class JsonDeserializer
             case TypeResult.Object: return ReadObjectValueAsDictionary();
             case TypeResult.Bool: return ReadBoolValue();
             case TypeResult.Null: return ReadNullValue();
-            case TypeResult.Array: return ReadArrayValueAsList();
+            case TypeResult.Array: return ReadArrayValue();
             case TypeResult.Number: return ReadNumberValueAsObject();
             default: throw new Exception("Invalid character for determining value");
         }
@@ -94,17 +94,17 @@ public sealed partial class JsonDeserializer
         return cachedStringObjectDictionaryReader.ReadValue_CheckProposed<Dictionary<string, object>>();
     }
 
-    CollectionCaster listCaster = new CollectionCaster();
-    CachedTypeReader cachedObjectListReader = null;
+    CollectionCaster collectionCaster = new CollectionCaster();
+    CachedTypeReader cachedObjectArrayReader = null;
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private object ReadArrayValueAsList()
+    private object ReadArrayValue()
     {
-        if (cachedObjectListReader == null) cachedObjectListReader = CreateCachedTypeReader(typeof(List<object>));
-        var objectsList = cachedObjectListReader.ReadValue_CheckProposed<List<object>>();
-        if (!settings.tryCastArraysOfUnknownValues || objectsList.Count == 0) return objectsList;
+        if (cachedObjectArrayReader == null) cachedObjectArrayReader = CreateCachedTypeReader(typeof(object[]));
+        var objectsArray = cachedObjectArrayReader.ReadValue_CheckProposed<object[]>();
+        if (!settings.castObjectArrayToCommonTypeArray || objectsArray.Length == 0) return objectsArray;
 
-        var castedList = listCaster.CastToCommonTypeList(objectsList, out _);
-        return castedList;
+        var castedArray = collectionCaster.CastToCommonTypeArray(objectsArray, out _);
+        return castedArray;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -144,6 +144,7 @@ public sealed partial class JsonDeserializer
     readonly QuickStringCache stringCache;
     readonly bool useStringCache;
 
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string ReadStringValue()
     {
@@ -156,6 +157,7 @@ public sealed partial class JsonDeserializer
         stringBuilder.Clear();
         return result;
     }
+
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string ReadStringValueOrNull()
@@ -171,6 +173,56 @@ public sealed partial class JsonDeserializer
         stringBuilder.Clear();
         return result;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private string ReadStringValue_WithoutStringCache()
+    {
+        var stringBytes = ReadStringBytes();
+        string result;
+
+        result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
+
+        stringBuilder.Clear();
+        return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private string ReadStringValue_WithStringCache()
+    {
+        var stringBytes = ReadStringBytes();
+        string result;
+
+        result = stringCache.GetOrCreate(stringBytes, stringBuilder);
+
+        stringBuilder.Clear();
+        return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private string ReadStringValueOrNull_WithoutStringCache()
+    {
+        if (TryReadNullValue()) return null;
+
+        var stringBytes = ReadStringBytes();
+        string result;
+
+        result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
+
+        stringBuilder.Clear();
+        return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private string ReadStringValueOrNull_WithStringCache()
+    {
+        if (TryReadNullValue()) return null;
+        var stringBytes = ReadStringBytes();
+        string result;
+        result = stringCache.GetOrCreate(stringBytes, stringBuilder);
+        stringBuilder.Clear();
+        return result;
+    }
+
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool TryReadStringValueOrNull(out string value)

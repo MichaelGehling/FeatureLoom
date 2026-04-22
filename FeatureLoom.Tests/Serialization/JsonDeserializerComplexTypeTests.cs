@@ -324,7 +324,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
 
             string typeName = typeof(ProposedDerivedSample).FullName;
@@ -342,7 +342,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
 
             string typeName = typeof(ProposedDerivedSample).FullName;
@@ -360,7 +360,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
 
             string typeName = typeof(ProposedDerivedSample).FullName;
@@ -377,7 +377,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
 
             const string json = "{\"$type\":\"Does.Not.Exist\",\"$value\":{\"A\":10,\"B\":20}}";
@@ -393,7 +393,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
 
             const string json = "{\"$type\":\"System.String\",\"$value\":{\"A\":11,\"B\":22}}";
@@ -409,7 +409,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
 
             const string json = "{\"$type\":\"System.String\",\"A\":12,\"B\":23}";
@@ -425,7 +425,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
 
             string typeName = typeof(ProposedDerivedSample).FullName;
@@ -443,7 +443,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore
             };
 
             string typeName = typeof(ProposedDerivedSample).FullName;
@@ -461,7 +461,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore
             };
 
             const string json = "{\"A\":31,\"B\":42}";
@@ -476,7 +476,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
             var deserializer = new JsonDeserializer(settings);
 
@@ -498,7 +498,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
             var deserializer = new JsonDeserializer(settings);
 
@@ -516,7 +516,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore
             };
             var deserializer = new JsonDeserializer(settings);
 
@@ -731,7 +731,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
             var deserializer = new JsonDeserializer(settings);
 
@@ -755,7 +755,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
             var deserializer = new JsonDeserializer(settings);
 
@@ -779,7 +779,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways
             };
             var deserializer = new JsonDeserializer(settings);
 

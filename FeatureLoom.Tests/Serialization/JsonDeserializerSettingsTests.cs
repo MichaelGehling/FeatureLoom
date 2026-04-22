@@ -104,7 +104,7 @@ namespace FeatureLoom.Serialization
         public void Settings_GenericTypeMapping_CanOverrideIEnumerableMapping()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddGenericTypeMapping(typeof(IEnumerable<>), typeof(Queue<>));
+            settings.AddTypeMapping(typeof(IEnumerable<>), typeof(Queue<>));
 
             var deserializer = new JsonDeserializer(settings);
 
@@ -142,10 +142,11 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings();
             settings.AddCustomTypeReader<CustomReadType>(
-                api =>
+                (api, item) =>
                 {
                     Assert.True(api.TryReadStringValueOrNull(out string text));
-                    return new CustomReadType { Value = text };
+                    item.Value = text;
+                    return item;
                 });
 
             var deserializer = new JsonDeserializer(settings);
@@ -787,7 +788,7 @@ namespace FeatureLoom.Serialization
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
-            settings.forbiddenTypes.Clear();
+            settings.ClearForbiddenTypes();
             settings.AddForbiddenType(typeof(Delegate));
 
             var deserializer = new JsonDeserializer(settings);
@@ -804,7 +805,7 @@ namespace FeatureLoom.Serialization
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
-            settings.forbiddenTypes.Clear();
+            settings.ClearForbiddenTypes();
             settings.AddForbiddenType(typeof(Delegate));
 
             var deserializer = new JsonDeserializer(settings);
@@ -821,7 +822,7 @@ namespace FeatureLoom.Serialization
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
-            settings.forbiddenTypes.Clear();
+            settings.ClearForbiddenTypes();
             settings.AddForbiddenType(typeof(System.Linq.Expressions.Expression));
 
             var deserializer = new JsonDeserializer(settings);
@@ -838,7 +839,7 @@ namespace FeatureLoom.Serialization
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
-            settings.forbiddenTypes.Clear();
+            settings.ClearForbiddenTypes();
             settings.AddForbiddenType(typeof(System.IO.FileSystemInfo));
 
             var deserializer = new JsonDeserializer(settings);
@@ -854,9 +855,9 @@ namespace FeatureLoom.Serialization
             {
                 rethrowExceptions = false,
                 logCatchedExceptions = false,
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore
             };
-            settings.forbiddenTypes.Clear();
+            settings.ClearForbiddenTypes();
             settings.AddForbiddenType(typeof(IEnumerable<>));
 
             var deserializer = new JsonDeserializer(settings);
@@ -875,7 +876,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways,
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways,
                 typeWhitelistMode = JsonDeserializer.Settings.TypeWhitelistMode.ForProposedTypesOnly,
                 rethrowExceptions = false,
                 logCatchedExceptions = false
@@ -896,7 +897,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways,
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways,
                 typeWhitelistMode = JsonDeserializer.Settings.TypeWhitelistMode.ForProposedTypesOnly,
                 rethrowExceptions = false,
                 logCatchedExceptions = false
@@ -917,7 +918,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways,
+                proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways,
                 typeWhitelistMode = JsonDeserializer.Settings.TypeWhitelistMode.ForProposedTypesOnly,
                 rethrowExceptions = false,
                 logCatchedExceptions = false

@@ -26,8 +26,10 @@ public sealed partial class JsonDeserializer
         bool bufferReadTillEnd = false;
 
         public byte CurrentByte => buffer[bufferPos];
-        public int BufferPos => bufferPos;
-        public bool BufferReadTillEnd => bufferReadTillEnd;
+        public int BufferPos { get{ return bufferPos; } set{ bufferPos = value; } }
+        public bool BufferReadTillEnd { get{ return bufferReadTillEnd; } set{ bufferReadTillEnd = value; } }
+
+        public byte[] InternalBuffer => buffer;
 
         public void Init(int bufferSize)
         {
@@ -268,40 +270,6 @@ public sealed partial class JsonDeserializer
             }
         }
 
-        public struct UndoReadHandle : IDisposable
-        {
-            readonly private Buffer buffer;
-            readonly private int startBufferPos;
-            private bool undoReading;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool SetUndoReading(bool undo) => this.undoReading = undo;
-
-            public UndoReadHandle(Buffer buffer, bool initUndo) : this()
-            {
-                this.buffer = buffer;
-                undoReading = initUndo;
-                startBufferPos = buffer.bufferPos;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ByteSegment GetReadBytes() => new ByteSegment(buffer.buffer, startBufferPos, buffer.bufferPos - startBufferPos + (buffer.BufferReadTillEnd ? 1 : 0));
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Dispose()
-            {
-                if (undoReading)
-                {
-                    var preRestorePos = buffer.bufferPos;
-                    buffer.bufferPos = startBufferPos;
-                    if (preRestorePos > buffer.bufferPos)
-                    {
-                        buffer.bufferReadTillEnd = false;
-                    }
-                }
-            }
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetAvailableBufferedCount()
         {
@@ -332,5 +300,39 @@ public sealed partial class JsonDeserializer
     public class BufferExceededException : Exception
     {
 
+    }
+
+    public struct UndoReadHandle : IDisposable
+    {
+        readonly private Buffer buffer;
+        readonly private int startBufferPos;
+        private bool undoReading;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool SetUndoReading(bool undo) => this.undoReading = undo;
+
+        internal UndoReadHandle(JsonDeserializer deserializer, bool initUndo) : this()
+        {
+            buffer = deserializer.buffer;
+            undoReading = initUndo;
+            startBufferPos = buffer.BufferPos;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment GetReadBytes() => new ByteSegment(buffer.InternalBuffer, startBufferPos, buffer.BufferPos - startBufferPos + (buffer.BufferReadTillEnd ? 1 : 0));
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Dispose()
+        {
+            if (undoReading)
+            {
+                var preRestorePos = buffer.BufferPos;
+                buffer.BufferPos = startBufferPos;
+                if (preRestorePos > buffer.BufferPos)
+                {
+                    buffer.BufferReadTillEnd = false;
+                }
+            }
+        }
     }
 }

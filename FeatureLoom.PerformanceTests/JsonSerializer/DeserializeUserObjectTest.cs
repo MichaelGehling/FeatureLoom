@@ -30,7 +30,7 @@ public partial class DeserializeUserObjectTest
     {
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties,
-        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
+        proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore,
         //enableReferenceResolution = false
     });
 
@@ -39,7 +39,7 @@ public partial class DeserializeUserObjectTest
         initialBufferSize = 1024 * 1024 * 10,
         dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties,
         //proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.Ignore,
-        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
+        proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckWhereReasonable,
         //enableReferenceResolution = true,
         useStringCache = true,
         //populateExistingMembers = false,

@@ -1,8 +1,10 @@
 ﻿using FeatureLoom.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using static FeatureLoom.Serialization.JsonDeserializer;
 
 namespace FeatureLoom.Serialization;
 
@@ -39,7 +41,39 @@ public partial class JsonDeserializer
         };
     }
 
-    private TypeReaderInitializer CreateGenericEnumerableTypeReaderViaStrategy<T, E, S, SV>(CachedTypeReader cachedTypeReader, Func<IEnumerable<E>, T> constructor, Pool<List<E>> bufferPool) where S : struct, IReaderStrategy<SV>
+    private Func<C, C> CreateInitOnlyValueFieldWriterViaStrategy<T, V, C, S, SV>(FieldInfo fieldInfo, CachedTypeReader cachedTypeReader) where S : struct, IReaderStrategy<SV> where T : C
+    {
+        return parentItem =>
+        {
+#if NET5_0_OR_GREATER
+            var v = S.Read(cachedTypeReader);
+#else
+            var v = default(S).Read(cachedTypeReader);
+#endif
+            V fieldValue = Unsafe.As<SV, V>(ref v);
+            var boxedItem = (object)parentItem;
+            fieldInfo.SetValue(boxedItem, fieldValue);
+            parentItem = (T)boxedItem;
+            return parentItem;
+        };
+    }
+
+    private Func<C, C> CreateInitOnlyObjFieldWriterViaStrategy<T, V, C, S, SV>(FieldInfo fieldInfo, CachedTypeReader cachedTypeReader) where S : struct, IReaderStrategy<SV> where T : C
+    {
+        return parentItem =>
+        {
+#if NET5_0_OR_GREATER
+            var v = S.Read(cachedTypeReader);
+#else
+            var v = default(S).Read(cachedTypeReader);
+#endif
+            V fieldValue = Unsafe.As<SV, V>(ref v);
+            fieldInfo.SetValue(parentItem, fieldValue);
+            return parentItem;
+        };
+    }
+
+    private TypeReaderInitializer CreateGenericEnumerableTypeReaderViaStrategy<T, E, S, SV>(CachedTypeReader elementTypeReader, Func<IEnumerable<E>, T> constructor, Pool<List<E>> bufferPool, BaseTypeSettings typeSettings) where S : struct, IReaderStrategy<SV>
     {
         var r = () =>
         {
@@ -53,27 +87,28 @@ public partial class JsonDeserializer
                 b = SkipWhiteSpaces();
                 if (b == ']') break;
 #if NET5_0_OR_GREATER
-                SV v = S.Read(cachedTypeReader);
+                SV v = S.Read(elementTypeReader);
 #else
-                SV v = default(S).Read(cachedTypeReader);
+                SV v = default(S).Read(elementTypeReader);
 #endif                
                 E value = Unsafe.As<SV, E>(ref v);
                 elementBuffer.Add(value);
                 b = SkipWhiteSpaces();
                 if (b == ',') buffer.TryNextByte();
                 else if (b != ']') throw new Exception("Failed reading Array");
-            }
+            }            
             T item = constructor(elementBuffer);
             bufferPool.Return(elementBuffer);
             if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
             buffer.TryNextByte();
             return item;
         };
-        return TypeReaderInitializer.Create(this, r, null, true);
+        return TypeReaderInitializer.Create(this, r, null, elementTypeReader.WriteRefPath, typeSettings);
     }
 
-    private TypeReaderInitializer CreateGenericArrayTypeReaderViaStrategy<E, S, SV>(CachedTypeReader cachedTypeReader, Pool<List<E>> bufferPool) where S : struct, IReaderStrategy<SV>
+    private TypeReaderInitializer CreateGenericArrayTypeReaderViaStrategy<E, S, SV>(CachedTypeReader elementTypeReader, Pool<List<E>> bufferPool, BaseTypeSettings typeSettings) where S : struct, IReaderStrategy<SV>
     {
+        bool setItemRef = elementTypeReader.ResolveRefPath;
         var stringArrayReader = () =>
         {
             byte b = SkipWhiteSpaces();
@@ -85,9 +120,9 @@ public partial class JsonDeserializer
                 b = SkipWhiteSpaces();
                 if (b == ']') break;
 #if NET5_0_OR_GREATER
-                SV v = S.Read(cachedTypeReader);
+                SV v = S.Read(elementTypeReader);
 #else
-                SV v = default(S).Read(cachedTypeReader);
+                SV v = default(S).Read(elementTypeReader);
 #endif                
                 E value = Unsafe.As<SV, E>(ref v);
                 elementBuffer.Add(value);
@@ -96,12 +131,12 @@ public partial class JsonDeserializer
                 else if (b != ']') throw new Exception("Failed reading Array");
             }
             E[] item = elementBuffer.ToArray();
-            if (settings.enableReferenceResolution) SetItemRefInCurrentItemInfo(item);
+            if (setItemRef) SetItemRefInCurrentItemInfo(item);
             bufferPool.Return(elementBuffer);
             buffer.TryNextByte();
             return item;
         };
-        return TypeReaderInitializer.Create(this, stringArrayReader, null, true);
+        return TypeReaderInitializer.Create(this, stringArrayReader, null, elementTypeReader.WriteRefPath, typeSettings);
     }
 
 
@@ -131,6 +166,26 @@ public partial class JsonDeserializer
         public static string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull();
 #else
         public string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull();
+#endif
+    }
+
+    struct StringReader_WithoutStringCache_Strategy : IReaderStrategy<string>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithoutStringCache();
+#else
+        public string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithoutStringCache();
+#endif
+    }
+
+    struct StringReader_WithStringCache_Strategy : IReaderStrategy<string>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithStringCache();
+#else
+        public string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithStringCache();
 #endif
     }
 

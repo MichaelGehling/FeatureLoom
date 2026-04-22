@@ -10,10 +10,10 @@ namespace FeatureLoom.TCP
 {
     public class TypedJsonMessageStreamReader : ISpecificMessageStreamReader
     {
-        JsonDeserializer deserializer = new JsonDeserializer(new()
+        JsonDeserializer deserializer = new JsonDeserializer(settings =>
         {
-            proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
-            enableReferenceResolution = true
+            settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckWhereReasonable;
+            settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.EnabledByDefault;
         });
         byte[] typeInfo = "TypedJSON".ToByteArray();
 

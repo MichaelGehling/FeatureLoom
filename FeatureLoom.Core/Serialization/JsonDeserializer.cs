@@ -77,21 +77,22 @@ public sealed partial class JsonDeserializer
 
     readonly CompiledSettings settings;
 
+    public JsonDeserializer(Action<Settings> buildSettings) : this(Settings.Build(buildSettings))
+    {
+
+    }
 
     public JsonDeserializer(Settings deserializerSettings = null)
     {
         deserializerSettings = deserializerSettings ?? new Settings();
         this.settings = new CompiledSettings(deserializerSettings);            
         buffer.Init(settings.initialBufferSize);            
+        preparationApi = new PreparationApi(this);
         extensionApi = new ExtensionApi(this);
         isPopulating = settings.populateExistingMembers;
-        this.useStringCache = settings.useStringCache;
-        if (settings.useStringCache)
-        {
-            stringCache = new QuickStringCache(settings.stringCacheBitSize, settings.stringCacheMaxLength);                
-        }
+        useStringCache = settings.useStringCache;
 
-        if (settings.proposedTypeHandling != Settings.ProposedTypeHandling.Ignore)
+        if (settings.anyAllowsProposedTypes)
         {
             foreach (var kvp in settings.customTypeNames)
             {
@@ -99,6 +100,11 @@ public sealed partial class JsonDeserializer
                 var cachedTypeReader = GetCachedTypeReader(kvp.Value);
                 AddCustomTypeNameToProposedCache(kvp.Key, cachedTypeReader, settings.addCaseVariantsForCustomTypeNames);
             }
+        }
+
+        if (settings.anyUsesStringCache)
+        {
+            stringCache = new QuickStringCache(settings.stringCacheBitSize, settings.stringCacheMaxLength);
         }
     }
 
@@ -128,7 +134,7 @@ public sealed partial class JsonDeserializer
         buffer.ResetAfterReading();
         isPopulating = settings.populateExistingMembers;
 
-        if (settings.enableReferenceResolution)
+        if (settings.referenceResolutionMode != Settings.ReferenceResolutionMode.ForceDisabled)
         {
             currentItemName = rootName;                
             itemInfos.Clear();
@@ -141,6 +147,13 @@ public sealed partial class JsonDeserializer
     {
         if (typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
         else return CreateCachedTypeReader(itemType);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    CachedTypeReader GetCachedTypeReader(Type itemType, BaseTypeSettings typeSettings)
+    {
+        if (typeSettings == null && typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
+        else return CreateCachedTypeReader(itemType, typeSettings);
     }
 
     CachedTypeReader lastTypeReader = null;

@@ -17,10 +17,10 @@ public class JsonHelperService
     {
         indent = true
     });
-    JsonDeserializer deserializer = new(new()
+    JsonDeserializer deserializer = new(settings =>
     {
-        proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable,
-        strict = false,
+        settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.CheckWhereReasonable;
+        settings.strict = false;
     });
 
     public JsonSerializer DefaultSerializer { get => serializer; set => serializer = value; }

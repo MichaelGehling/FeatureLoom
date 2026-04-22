@@ -68,12 +68,12 @@ namespace FeatureLoom.MessageFlow
         
         static JsonDeserializer.Settings defaultDeserializerSettings = new()
         {
-            proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.Ignore,
-            enableReferenceResolution = false,
+            proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore,
+            referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled,
             dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields,
             rethrowExceptions = false,
             strict = false,
-            tryCastArraysOfUnknownValues = true            
+            castObjectArrayToCommonTypeArray = true            
         };
 
         static JsonSerializer.Settings defaultSerializerSettings = new()

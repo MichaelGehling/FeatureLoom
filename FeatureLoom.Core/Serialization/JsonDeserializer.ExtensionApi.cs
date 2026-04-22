@@ -8,7 +8,40 @@ namespace FeatureLoom.Serialization;
 
 public sealed partial class JsonDeserializer
 {
+    PreparationApi preparationApi;
     ExtensionApi extensionApi;
+
+    public sealed class PreparationApi
+    {
+        readonly JsonDeserializer deserializer;
+        public PreparationApi(JsonDeserializer deserializer)
+        {
+            this.deserializer = deserializer;
+        }
+
+        public Func<T,T> PrepareTypeReader<T>(TypeSettings<T> typeSettingsOverride = null)
+        {
+            if (typeSettingsOverride == null)
+            {
+                var typeReader = deserializer.GetCachedTypeReader(typeof(T));
+                if (typeReader.IsNoCheckPossible<T>()) return (itemToPopulate) => typeReader.ReadValue_NoCheck<T>(itemToPopulate);
+                else return (itemToPopulate) => typeReader.ReadValue_CheckProposed<T>(itemToPopulate);
+            }
+            else
+            {
+                var typeReader = deserializer.CreateCachedTypeReader(typeof(T), typeSettingsOverride);
+                if (typeReader.IsNoCheckPossible<T>()) return (itemToPopulate) => typeReader.ReadValue_NoCheck<T>(itemToPopulate);
+                else return (itemToPopulate) => typeReader.ReadValue_CheckProposed<T>(itemToPopulate);
+            }
+        }
+
+        public Func<T, T> PrepareNonCustomTypeReader<T>() => PrepareTypeReader<T>(new TypeSettings<T>());
+
+        public ByteSegment ConvertStringToByteSegment(string value) => new ByteSegment(value, true);
+
+        public Func<T> GetContructor<T>() => deserializer.GetConstructor<T>(null, null);
+
+    }
 
     public sealed class ExtensionApi
     {
@@ -18,10 +51,16 @@ public sealed partial class JsonDeserializer
             this.deserializer = deserializer;
         }
 
+        public UndoReadHandle CreateUndoReadHandle(bool initUndo = true)
+        {
+            return deserializer.CreateUndoReadHandle(initUndo);
+        }
+
         public byte GetCurrentByte() => deserializer.buffer.CurrentByte;
         public bool TryNextByte() => deserializer.buffer.TryNextByte();
         
-        public void SkipNextValue() => deserializer.SkipValue();
+        public void SkipNextValue() => deserializer.SkipValue();        
+
         public void ReadRawJsonValue(out ByteSegment utf8Bytes)
         {
             deserializer.SkipWhiteSpaces();
@@ -66,7 +105,7 @@ public sealed partial class JsonDeserializer
         }
         public byte SkipWhiteSpaces() => deserializer.SkipWhiteSpaces();
 
-        public bool TryReadNullValue() => deserializer.TryReadNullValue();
+        public bool TryReadNullValue() => deserializer.TryReadNullValue();        
         public bool TryReadStringValueOrNull(out string value) => deserializer.TryReadStringValueOrNull(out value);
         public bool TryReadBoolValue(out bool value) => deserializer.TryReadBoolValue(out value);
         public bool TryReadSignedIntegerValue(out long value) => deserializer.TryReadSignedIntegerValue(out value);
@@ -75,9 +114,9 @@ public sealed partial class JsonDeserializer
         public bool TryReadObjectValue<T>(out T obj, ByteSegment fieldName) => deserializer.TryReadObjectValue(out obj, fieldName);
         public bool TryReadObjectValue(out Dictionary<string, object> obj, ByteSegment fieldName) => deserializer.TryReadObjectValue(out obj, fieldName);
         public bool TryReadArrayValue<T>(out T array, ByteSegment fieldName) where T : IEnumerable => deserializer.TryReadArrayValue(out array, fieldName);
-        public bool TryReadArrayValue(out List<object> array, ByteSegment fieldName) => deserializer.TryReadArrayValue(out array, fieldName);
+        public bool TryReadArrayValue(out object[] array, ByteSegment fieldName) => deserializer.TryReadArrayValue(out array, fieldName);
 
-        public string DecodeUtf8Bytes(ArraySegment<byte> bytes)
+        public string DecodeUtf8Bytes(ByteSegment bytes)
         {
             string str = Utf8Converter.DecodeUtf8ToString(bytes, deserializer.stringBuilder);            
             deserializer.stringBuilder.Clear();

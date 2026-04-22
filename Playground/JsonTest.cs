@@ -399,7 +399,7 @@ namespace Playground
             JsonDeserializer.Settings deserializerSettings = new JsonDeserializer.Settings();
             deserializerSettings.AddMultiOptionTypeMapping(typeof(object), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
             deserializerSettings.AddMultiOptionTypeMapping(typeof(IMyInterface), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
-            deserializerSettings.AddGenericTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
+            deserializerSettings.AddTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
             deserializerSettings.AddConstructor<MyEmbedded3>(() => new MyEmbedded3(default));
             //deserializerSettings.initialBufferSize = 20;
             //deserializerSettings.AddConstructor<KeyValuePair<string, int>>(() => new KeyValuePair<string, int>(default, default));

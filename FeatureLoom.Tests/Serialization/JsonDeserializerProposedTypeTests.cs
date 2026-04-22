@@ -11,11 +11,11 @@ namespace FeatureLoom.Serialization
     {
         private static T Deserialize<T>(
             string json,
-            JsonDeserializer.Settings.ProposedTypeHandling proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways)
+            JsonDeserializer.Settings.ProposedTypeMode proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways)
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = proposedTypeHandling
+                proposedTypeMode = proposedTypeHandling
             };
             var deserializer = new JsonDeserializer(settings);
             Assert.True(deserializer.TryDeserialize(json, out T value));
@@ -25,11 +25,11 @@ namespace FeatureLoom.Serialization
         private static bool TryDeserialize<T>(
             string json,
             out T value,
-            JsonDeserializer.Settings.ProposedTypeHandling proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways)
+            JsonDeserializer.Settings.ProposedTypeMode proposedTypeHandling = JsonDeserializer.Settings.ProposedTypeMode.CheckAlways)
         {
             var settings = new JsonDeserializer.Settings
             {
-                proposedTypeHandling = proposedTypeHandling,
+                proposedTypeMode = proposedTypeHandling,
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
@@ -205,7 +205,7 @@ namespace FeatureLoom.Serialization
             string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(DerivedType));
             string json = $"{{\"$type\":\"{typeName}\",\"BaseValue\":9,\"DerivedValue\":2}}";
 
-            BaseType value = Deserialize<BaseType>(json, JsonDeserializer.Settings.ProposedTypeHandling.Ignore);
+            BaseType value = Deserialize<BaseType>(json, JsonDeserializer.Settings.ProposedTypeMode.Ignore);
 
             Assert.IsType<BaseType>(value);
             Assert.Equal(9, value.BaseValue);
@@ -217,7 +217,7 @@ namespace FeatureLoom.Serialization
             string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(byte));
             string json = $"{{\"$type\":\"{typeName}\",\"$value\":1}}";
 
-            Assert.False(TryDeserialize(json, out int value, JsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable));
+            Assert.False(TryDeserialize(json, out int value, JsonDeserializer.Settings.ProposedTypeMode.CheckWhereReasonable));
             Assert.Equal(default, value);
         }
 
@@ -227,7 +227,7 @@ namespace FeatureLoom.Serialization
             string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(byte));
             string json = $"{{\"$type\":\"{typeName}\",\"$value\":1}}";
 
-            Assert.True(TryDeserialize(json, out int value, JsonDeserializer.Settings.ProposedTypeHandling.CheckAlways));
+            Assert.True(TryDeserialize(json, out int value, JsonDeserializer.Settings.ProposedTypeMode.CheckAlways));
             Assert.Equal(1, value);
         }
 

@@ -115,7 +115,11 @@ public class CollectionCaster
     public Array CastToCommonTypeArray(IEnumerable objects, out Type commonType)
     {
         commonType = CommonTypeFinder.GetCommonType(objects);
-        if (commonType == typeof(object)) return objects.ToArray();
+        if (commonType == typeof(object))
+        {
+            if (objects is object[] objArray) return objArray;
+            return objects.ToArray();
+        }
         try
         {
             if (!TryCastAllElementsToArray(objects, commonType, out Array typedArray)) return objects.ToArray();

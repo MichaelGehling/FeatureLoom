@@ -65,7 +65,7 @@ public sealed partial class JsonDeserializer
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Buffer.UndoReadHandle CreateUndoReadHandle(bool initUndo = true) => new Buffer.UndoReadHandle(buffer, initUndo);
+    private UndoReadHandle CreateUndoReadHandle(bool initUndo = true) => new UndoReadHandle(this, initUndo);
 
     public bool IsAnyDataLeft()
     {

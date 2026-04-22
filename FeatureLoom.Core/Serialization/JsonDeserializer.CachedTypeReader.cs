@@ -14,43 +14,73 @@ public sealed partial class JsonDeserializer
         public Delegate readingDelegate;
         public Delegate populatingDelegate;
         public Func<object> readingObjectDelegate;
-        public Func<object, object> populatingObjectDelegate;
-        public bool refTypeOrRefTypeChildren;        
+        public Func<object, object> populatingObjectDelegate;        
+        public BaseTypeSettings typeSettings;
+        public bool resolveRefPath;
+        public bool writeRefPath;
+        public bool overridePopulateExistingMembers;
 
         public static TypeReaderInitializer Create<T>(
-            JsonDeserializer parent,
+            JsonDeserializer deserializer,
             Func<T> readingDelegate, 
             Func<T, T> populatingDelegate, 
-            bool refTypeOrRefTypeChildren)
+            bool childrenMustWriteRefPath,
+            BaseTypeSettings typeSettings)
         {
             var readerType = typeof(T);
-            var resolveRefPath = parent.settings.enableReferenceResolution && refTypeOrRefTypeChildren;
+
+            bool writeRefPath = false;
+            bool resolveRefPath = false;
+            if (deserializer.settings.referenceResolutionMode != Settings.ReferenceResolutionMode.ForceDisabled)
+            {
+                if (readerType == typeof(string))
+                {
+                    writeRefPath = deserializer.settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings || typeSettings?.enableReferenceResolution == true;
+                    resolveRefPath = deserializer.settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings || typeSettings?.enableReferenceResolution == true;
+                }
+                else
+                {
+                    if (deserializer.settings.referenceResolutionMode == Settings.ReferenceResolutionMode.OnlyPerType)
+                    {
+                        writeRefPath = childrenMustWriteRefPath || (!readerType.IsValueType && typeSettings?.enableReferenceResolution == true);
+                        resolveRefPath = !readerType.IsValueType && typeSettings?.enableReferenceResolution == true;
+                    }
+                    else
+                    {
+                        writeRefPath = childrenMustWriteRefPath || (!readerType.IsValueType && typeSettings?.enableReferenceResolution != false);
+                        resolveRefPath = !readerType.IsValueType && typeSettings?.enableReferenceResolution != false;
+                    }
+                }
+            }
+
+            if (typeSettings?.populateAsMember == false) populatingDelegate = null;
+
             var readingDelegate2 = readingDelegate;
-            var populatingDelegate2 = populatingDelegate;
+            var populatingDelegate2 = populatingDelegate;            
             Func<object> readingObjectDelegate = readingDelegate2 != null ? () => (object)readingDelegate2.Invoke() : null;
             Func<object, object> populatingObjectDelegate = populatingDelegate2 != null ? (obj) => (object)populatingDelegate2.Invoke((T)obj) : null;
             if (resolveRefPath)
             {
                 readingDelegate2 = () =>
                 {
-                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                    if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
                     return readingDelegate.Invoke();
                 };
                 readingObjectDelegate = () =>
                 {
-                    if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return (object)refObject;
+                    if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return (object)refObject;
                     return (object) readingDelegate.Invoke();
                 };
                 if (populatingDelegate != null)
                 {
                     populatingDelegate2 = (item) =>
                     {
-                        if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
+                        if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return refObject;
                         return populatingDelegate.Invoke(item);
                     };
                     populatingObjectDelegate = (obj) =>
                     {
-                        if (parent.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return (object)refObject;
+                        if (deserializer.TryReadRefObject(out bool validPath, out bool compatibleType, out T refObject) && validPath && compatibleType) return (object)refObject;
                         return (object)populatingDelegate.Invoke((T)obj);
                     };
                 }
@@ -58,13 +88,16 @@ public sealed partial class JsonDeserializer
 
             return new TypeReaderInitializer
             {
-                deserializer = parent,
+                deserializer = deserializer,
                 readerType = typeof(T),
                 readingDelegate = readingDelegate2,
                 populatingDelegate = populatingDelegate2,
                 readingObjectDelegate = readingObjectDelegate,
                 populatingObjectDelegate = populatingObjectDelegate,
-                refTypeOrRefTypeChildren = refTypeOrRefTypeChildren
+                typeSettings = typeSettings,
+                writeRefPath = writeRefPath,
+                resolveRefPath = resolveRefPath,
+                overridePopulateExistingMembers = populatingDelegate2 != null && typeSettings?.populateAsMember == true
             };
         }
     }
@@ -75,14 +108,15 @@ public sealed partial class JsonDeserializer
         private readonly JsonDeserializer deserializer;        
 
         private readonly Type readerType;
-        private readonly bool refTypeOrRefTypeChildren;
         private readonly bool checkProposedTypes;
         private readonly bool isAbstract;
         private readonly bool isNullable;
         private readonly bool writeRefPath;
         private readonly bool resolveRefPath;
         private readonly bool canBePopulated;
-        
+        private readonly bool overridePopulateExistingMembers;
+        private readonly BaseTypeSettings typeSettings;
+
         private readonly Delegate readingDelegate;
         private readonly Delegate populatingDelegate;
         private readonly Func<object> readingObjectDelegate;
@@ -91,10 +125,13 @@ public sealed partial class JsonDeserializer
         private ByteSegment lastProposedTypeName = default;
         private CachedTypeReader lastProposedTypeReader = null;
 
-        public bool RefTypeOrRefTypeChildren => refTypeOrRefTypeChildren;
         public Type ReaderType => readerType;
         public bool IsNoCheckPossible<T>() => typeof(T) == readerType && !checkProposedTypes && !resolveRefPath && !writeRefPath;
         public bool CanBePopulated => canBePopulated;
+
+        public bool WriteRefPath => writeRefPath;
+        public bool ResolveRefPath => resolveRefPath;
+        public BaseTypeSettings TypeSettings => typeSettings;
 
         public JsonDeserializer Parent => deserializer;
 
@@ -102,16 +139,26 @@ public sealed partial class JsonDeserializer
         {
             var init = buildInit(this);
             deserializer = init.deserializer;
+            typeSettings = init.typeSettings;
 
             readerType = init.readerType;
-            refTypeOrRefTypeChildren = init.refTypeOrRefTypeChildren;
+            writeRefPath = init.writeRefPath;
             isAbstract = readerType.IsAbstract;
             isNullable = readerType.IsNullable();
-            canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;            
-            resolveRefPath = deserializer.settings.enableReferenceResolution && !readerType.IsValueType;
-            checkProposedTypes = deserializer.settings.proposedTypeHandling == Settings.ProposedTypeHandling.CheckAlways || 
-                (deserializer.settings.proposedTypeHandling == Settings.ProposedTypeHandling.CheckWhereReasonable && !readerType.IsValueType && !readerType.IsSealed);
-            writeRefPath = deserializer.settings.enableReferenceResolution && refTypeOrRefTypeChildren;
+            canBePopulated = init.populatingDelegate != null && init.populatingObjectDelegate != null;
+            overridePopulateExistingMembers = init.overridePopulateExistingMembers && canBePopulated;            
+
+            resolveRefPath = init.resolveRefPath;
+
+            if (typeSettings?.applyProposedTypes == null)
+            {
+                checkProposedTypes = deserializer.settings.proposedTypeMode == Settings.ProposedTypeMode.CheckAlways ||
+                                    (deserializer.settings.proposedTypeMode == Settings.ProposedTypeMode.CheckWhereReasonable && !readerType.IsValueType && !readerType.IsSealed);
+            }
+            else
+            {
+                checkProposedTypes = typeSettings.applyProposedTypes.Value;
+            }
 
             readingDelegate = init.readingDelegate;
             populatingDelegate = init.populatingDelegate;
@@ -212,22 +259,22 @@ public sealed partial class JsonDeserializer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private T ReadValue_CheckProposed<T>(T itemToPopulate)
+        public T ReadValue_CheckProposed<T>(T itemToPopulate)
         {
-            if (!canBePopulated || !deserializer.isPopulating || itemToPopulate == null) return ReadValue_CheckProposed<T>();
+            if (SkipPopulate(itemToPopulate)) return ReadValue_CheckProposed<T>();
             if (checkProposedTypes && TryReadAsProposedType(this, itemToPopulate, out T item)) return item;
 
             Type itemType = itemToPopulate.GetType();
             T result;
             if (itemType == this.readerType)
-            {                
+            {
                 Type callType = typeof(T);
                 if (callType == this.readerType)
-                {                    
+                {
                     result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
                 }
                 else
-                {                    
+                {
                     result = (T)populatingObjectDelegate.Invoke(itemToPopulate);
                 }
             }
@@ -238,6 +285,13 @@ public sealed partial class JsonDeserializer
             }
 
             return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool SkipPopulate<T>(T itemToPopulate)
+        {            
+            bool doPopulate = canBePopulated && (deserializer.isPopulating || overridePopulateExistingMembers) && itemToPopulate != null;
+            return !doPopulate;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -269,7 +323,7 @@ public sealed partial class JsonDeserializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private T ReadValue_IgnoreProposed<T>(T itemToPopulate)
         {
-            if (!canBePopulated || !deserializer.isPopulating || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
+            if (SkipPopulate(itemToPopulate)) return ReadValue_IgnoreProposed<T>();
 
             Type itemType = itemToPopulate.GetType();
             T result;
@@ -302,24 +356,15 @@ public sealed partial class JsonDeserializer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private T ReadValue_NoCheck<T>(T itemToPopulate)
+        public T ReadValue_NoCheck<T>(T itemToPopulate)
         {
-            if (!canBePopulated || itemToPopulate == null) return ReadValue_IgnoreProposed<T>();
+            if (SkipPopulate(itemToPopulate)) return ReadValue_NoCheck<T>();
 
             Type itemType = itemToPopulate.GetType();
             T result;
             if (itemType == this.readerType)
             {
-                Type callType = typeof(T);
-
-                if (callType == this.readerType)
-                {
-                    result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
-                }
-                else
-                {
-                    result = (T)populatingObjectDelegate.Invoke(itemToPopulate);
-                }
+                result = ((Func<T, T>)populatingDelegate).Invoke(itemToPopulate);
             }
             else
             {
