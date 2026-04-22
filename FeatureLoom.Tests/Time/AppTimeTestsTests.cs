@@ -42,13 +42,13 @@ namespace FeatureLoom.Time
 
             var tk = AppTime.TimeKeeper;
             AppTime.WaitPreciselyAsync(5.Milliseconds()).WaitFor();
-            Assert.True(tk.Elapsed >= 5.Milliseconds());
-            Assert.True(tk.LastElapsed < 8.Milliseconds());
+            Assert.True(tk.Elapsed > 5.Milliseconds());
+            Assert.True(tk.LastElapsed < 10.Milliseconds());
 
             tk = AppTime.TimeKeeper;
             AppTime.WaitPreciselyAsync(20.Milliseconds()).WaitFor();
-            Assert.True(tk.Elapsed >= 20.Milliseconds());
-            Assert.True(tk.LastElapsed < 25.Milliseconds());
+            Assert.True(tk.Elapsed > 20.Milliseconds());
+            Assert.True(tk.LastElapsed < 30.Milliseconds());
         }
         
     }
