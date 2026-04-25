@@ -17,19 +17,58 @@ namespace FeatureLoom.Helpers
     /// </summary>
     public static class DeepCloner
     {
+        public enum DelegateCloneHandling
+        {
+            /// <summary>
+            /// Delegates are copied by reference.
+            /// </summary>
+            CopyReference = 0,
+
+            /// <summary>
+            /// After the graph is cloned, delegate targets are rebound to cloned targets if those targets are part of the cloned graph.
+            /// External targets remain unchanged.
+            /// </summary>
+            RebindKnownTargetsAfterClone = 1
+        }
+
         /// <summary>
         /// Attempts to create a deep clone of <paramref name="obj"/>.
+        /// Uses deferred delegate rebinding by default.
         /// </summary>
-        /// <typeparam name="T">The type of the object to clone.</typeparam>
-        /// <param name="obj">The source object.</param>
-        /// <param name="clone">The resulting deep clone if successful; otherwise default.</param>
-        /// <returns><see langword="true"/> if cloning succeeded; otherwise <see langword="false"/>.</returns>
         public static bool TryClone<T>(T obj, out T clone)
+        {
+            return TryClone(obj, out clone, DelegateCloneHandling.RebindKnownTargetsAfterClone);
+        }
+
+        /// <summary>
+        /// Attempts to create a deep clone of <paramref name="obj"/> with configurable delegate handling.
+        /// </summary>
+        public static bool TryClone<T>(T obj, out T clone, DelegateCloneHandling delegateHandling)
         {
             var visited = visitedPool.Take();
             try
             {
-                return TryCloneInternal(obj, out clone, visited);
+                if (!TryCloneInternal(obj, out clone, visited))
+                {
+                    return false;
+                }
+
+                if (delegateHandling == DelegateCloneHandling.RebindKnownTargetsAfterClone)
+                {
+                    if (!TryFinalizeDelegateRebinding(visited))
+                    {
+                        clone = default;
+                        return false;
+                    }
+
+                    if (clone is Delegate cloneDelegate &&
+                        TryRebindDelegate(cloneDelegate, visited, out var reboundRootDelegate))
+                    {
+                        clone = (T)(object)reboundRootDelegate;
+                    }
+                }
+
+                return true;
             }
             finally
             {
@@ -275,6 +314,7 @@ namespace FeatureLoom.Helpers
                    type == typeof(Guid) ||
                    type == typeof(Uri) ||
                    typeof(Type).IsAssignableFrom(type) ||
+                   typeof(Delegate).IsAssignableFrom(type) ||
                    (type.IsGenericType &&
                     type.GetGenericTypeDefinition() == typeof(Nullable<>) &&
                     IsImmutable(Nullable.GetUnderlyingType(type)));
@@ -961,6 +1001,116 @@ namespace FeatureLoom.Helpers
             }
 
             return true;
+        }
+
+        private static bool TryFinalizeDelegateRebinding(IDictionary<object, object> visited)
+        {
+            foreach (var kv in visited)
+            {
+                var sourceObj = kv.Key;
+                var cloneObj = kv.Value;
+
+                if (sourceObj == null || cloneObj == null) continue;
+
+                var sourceType = sourceObj.GetType();
+                if (sourceType.IsValueType) continue;
+
+                var fields = GetAllInstanceFields(sourceType);
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    var field = fields[i];
+                    if (field.IsStatic) continue;
+                    if (!typeof(Delegate).IsAssignableFrom(field.FieldType)) continue;
+
+                    Delegate sourceDelegate;
+                    try
+                    {
+                        sourceDelegate = field.GetValue(sourceObj) as Delegate;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+
+                    if (sourceDelegate == null) continue;
+
+                    if (!TryRebindDelegate(sourceDelegate, visited, out var reboundDelegate))
+                    {
+                        return false;
+                    }
+
+                    if (!TrySetFieldValue(cloneObj, field, reboundDelegate))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryRebindDelegate(Delegate source, IDictionary<object, object> visited, out Delegate rebound)
+        {
+            if (source == null)
+            {
+                rebound = null;
+                return true;
+            }
+
+            var invocationList = source.GetInvocationList();
+            Delegate combined = null;
+
+            for (int i = 0; i < invocationList.Length; i++)
+            {
+                var handler = invocationList[i];
+                Delegate reboundHandler;
+
+                if (handler.Target == null)
+                {
+                    // static/open delegate
+                    reboundHandler = handler;
+                }
+                else if (visited.TryGetValue(handler.Target, out var clonedTarget))
+                {
+                    try
+                    {
+                        reboundHandler = Delegate.CreateDelegate(handler.GetType(), clonedTarget, handler.Method, true);
+                    }
+                    catch
+                    {
+                        rebound = null;
+                        return false;
+                    }
+                }
+                else
+                {
+                    // external target: keep original binding
+                    reboundHandler = handler;
+                }
+
+                combined = combined == null ? reboundHandler : Delegate.Combine(combined, reboundHandler);
+            }
+
+            rebound = combined;
+            return true;
+        }
+
+        private static bool TrySetFieldValue(object target, FieldInfo field, object value)
+        {
+            if (field.IsInitOnly)
+            {
+                return TrySetInstanceField(target, field, value);
+            }
+
+            try
+            {
+                field.SetValue(target, value);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

@@ -242,6 +242,43 @@ public class CloningExtensionsTests
         }
     }
 
+    private sealed class DelegateBoundOwner
+    {
+        public int Value;
+        public Func<int> Reader;
+
+        public int Read() => Value;
+    }
+
+    private sealed class DelegateExternalTarget
+    {
+        public int Value;
+
+        public int Read() => Value;
+    }
+
+    private sealed class DelegateHolder
+    {
+        public Func<int> Reader;
+    }
+
+    private sealed class DelegateMulticastOwner
+    {
+        public int Value;
+        public Action<List<int>> Handler;
+
+        public void PushValue(List<int> sink) => sink.Add(Value);
+    }
+
+    private sealed class DelegateMulticastExternalTarget
+    {
+        public int Value;
+
+        public void PushValue(List<int> sink) => sink.Add(Value);
+    }
+
+    private static void PushStaticMarker(List<int> sink) => sink.Add(999);
+
     [Fact]
     public void TryClone_NullReference_ShouldReturnTrueAndNullClone()
     {
@@ -980,14 +1017,91 @@ public class CloningExtensionsTests
     }
 
     [Fact]
-    public void TryClone_DelegateRoot_ShouldReturnFalse()
+    public void TryClone_DelegateRoot_ShouldSucceed()
     {
         Action source = static () => { };
 
         bool success = source.TryCloneDeep(out Action clone);
 
-        Assert.False(success);
-        Assert.Null(clone);
+        Assert.True(success);
+        Assert.NotNull(clone);
+
+        // Should remain invokable
+        clone();
+    }
+
+    [Fact]
+    public void TryClone_DelegateBoundToClonedObject_ShouldRebindToCloneTarget()
+    {
+        var source = new DelegateBoundOwner { Value = 1 };
+        source.Reader = source.Read;
+
+        bool success = source.TryCloneDeep(out DelegateBoundOwner clone);
+
+        Assert.True(success);
+        Assert.NotNull(clone);
+        Assert.NotSame(source, clone);
+        Assert.NotNull(clone.Reader);
+
+        source.Value = 10;
+        clone.Value = 20;
+
+        Assert.Equal(10, source.Reader());
+        Assert.Equal(20, clone.Reader()); // proves delegate target is clone, not source
+    }
+
+    [Fact]
+    public void TryClone_DelegateWithExternalTarget_ShouldKeepExternalTarget()
+    {
+        var external = new DelegateExternalTarget { Value = 3 };
+        var source = new DelegateHolder { Reader = external.Read };
+
+        bool success = source.TryCloneDeep(out DelegateHolder clone);
+
+        Assert.True(success);
+        Assert.NotNull(clone);
+        Assert.NotSame(source, clone);
+        Assert.NotNull(clone.Reader);
+
+        // External target should be shared (not deep-cloned)
+        Assert.Same(external, clone.Reader.Target);
+        Assert.Same(source.Reader.Target, clone.Reader.Target);
+
+        external.Value = 11;
+
+        Assert.Equal(11, source.Reader());
+        Assert.Equal(11, clone.Reader());
+    }
+
+    [Fact]
+    public void TryClone_MulticastDelegate_ShouldRebindInternalAndKeepExternalAndStaticHandlers()
+    {
+        var external = new DelegateMulticastExternalTarget { Value = 3 };
+
+        var source = new DelegateMulticastOwner { Value = 1 };
+        source.Handler = source.PushValue;          // internal target
+        source.Handler += external.PushValue;       // external target
+        source.Handler += PushStaticMarker;         // static handler
+
+        bool success = source.TryCloneDeep(out DelegateMulticastOwner clone);
+
+        Assert.True(success);
+        Assert.NotNull(clone);
+        Assert.NotSame(source, clone);
+        Assert.NotNull(clone.Handler);
+
+        source.Value = 10;
+        clone.Value = 20;
+        external.Value = 30;
+
+        var sourceSink = new List<int>();
+        var cloneSink = new List<int>();
+
+        source.Handler(sourceSink);
+        clone.Handler(cloneSink);
+
+        Assert.Equal(new[] { 10, 30, 999 }, sourceSink);
+        Assert.Equal(new[] { 20, 30, 999 }, cloneSink);
     }
 
     [Fact]

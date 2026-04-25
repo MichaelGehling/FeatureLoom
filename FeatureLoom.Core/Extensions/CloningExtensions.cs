@@ -10,7 +10,7 @@ namespace FeatureLoom.Extensions
         /// </summary>
         /// <remarks>Use this method to create a copy of an object while preserving its type. The original
         /// object must implement a valid <see cref="ICloneable.Clone"/> method to ensure correct cloning
-        /// behavior. Alternatively, you can use <see cref="DeepCloner.TryClone{T}"/> for generic deep cloning of arbitrary object graphs.</remarks>
+        /// behavior. Alternatively, you can use <see cref="DeepCloner.TryClone{T}(T, out T)"/> for generic deep cloning of arbitrary object graphs.</remarks>
         /// <typeparam name="T">The type of the object to clone. Must be a reference type that implements <see cref="ICloneable"/>.</typeparam>
         /// <param name="original">The object to clone. Cannot be null.</param>
         /// <returns>A new instance of <typeparamref name="T"/> that is a clone of the original object, or <see langword="null"/>
@@ -25,7 +25,7 @@ namespace FeatureLoom.Extensions
         /// </summary>
         /// <remarks>Each element in the new array is cloned using the <c>ICloneable.Clone</c> method.
         /// Modifications to the elements in the returned array do not affect the original array.
-        /// Alternatively, you can use <see cref="DeepCloner.TryClone{T}"/> for generic deep cloning of arbitrary object graphs.</remarks>
+        /// Alternatively, you can use <see cref="DeepCloner.TryClone{T}(T, out T)"/> for generic deep cloning of arbitrary object graphs.</remarks>
         /// <typeparam name="T">The type of the elements in the array. Must be a reference type that implements <see cref="ICloneable"/>.</typeparam>
         /// <param name="originalArray">The array whose elements are to be cloned. Can be null.</param>
         /// <returns>A new array containing clones of the elements from the original array, or null if <paramref
