@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using FeatureLoom.Helpers;
 using Xunit;
 
 namespace FeatureLoom.Extensions;
@@ -1074,34 +1075,30 @@ public class CloningExtensionsTests
     }
 
     [Fact]
-    public void TryClone_MulticastDelegate_ShouldRebindInternalAndKeepExternalAndStaticHandlers()
+    public void TryClone_DelegateWithExternalTarget_RebindAllTargets_ShouldCloneAndRebindExternalTarget()
     {
-        var external = new DelegateMulticastExternalTarget { Value = 3 };
+        var external = new DelegateExternalTarget { Value = 3 };
+        var source = new DelegateHolder { Reader = external.Read };
 
-        var source = new DelegateMulticastOwner { Value = 1 };
-        source.Handler = source.PushValue;          // internal target
-        source.Handler += external.PushValue;       // external target
-        source.Handler += PushStaticMarker;         // static handler
-
-        bool success = source.TryCloneDeep(out DelegateMulticastOwner clone);
+        bool success = DeepCloner.TryClone(
+            source,
+            out DelegateHolder clone,
+            DeepCloner.DelegateCloneHandling.RebindAllTargetsAfterClone);
 
         Assert.True(success);
         Assert.NotNull(clone);
         Assert.NotSame(source, clone);
-        Assert.NotNull(clone.Handler);
+        Assert.NotNull(clone.Reader);
 
-        source.Value = 10;
-        clone.Value = 20;
-        external.Value = 30;
+        // External target should be cloned and rebound for this mode.
+        Assert.NotSame(source.Reader.Target, clone.Reader.Target);
+        var clonedExternal = Assert.IsType<DelegateExternalTarget>(clone.Reader.Target);
 
-        var sourceSink = new List<int>();
-        var cloneSink = new List<int>();
+        external.Value = 10;
+        clonedExternal.Value = 20;
 
-        source.Handler(sourceSink);
-        clone.Handler(cloneSink);
-
-        Assert.Equal(new[] { 10, 30, 999 }, sourceSink);
-        Assert.Equal(new[] { 20, 30, 999 }, cloneSink);
+        Assert.Equal(10, source.Reader());
+        Assert.Equal(20, clone.Reader());
     }
 
     [Fact]
