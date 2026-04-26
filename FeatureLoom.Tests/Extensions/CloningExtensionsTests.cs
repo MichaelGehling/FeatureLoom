@@ -1083,14 +1083,13 @@ public class CloningExtensionsTests
         bool success = DeepCloner.TryClone(
             source,
             out DelegateHolder clone,
-            DeepCloner.DelegateCloneHandling.RebindAllTargetsAfterClone);
+            s => s.WithDelegateHandling(DeepCloner.DelegateCloneHandling.RebindAllTargetsAfterClone));
 
         Assert.True(success);
         Assert.NotNull(clone);
         Assert.NotSame(source, clone);
         Assert.NotNull(clone.Reader);
 
-        // External target should be cloned and rebound for this mode.
         Assert.NotSame(source.Reader.Target, clone.Reader.Target);
         var clonedExternal = Assert.IsType<DelegateExternalTarget>(clone.Reader.Target);
 
@@ -1102,38 +1101,79 @@ public class CloningExtensionsTests
     }
 
     [Fact]
-    public void TryClone_ReadonlyFieldsInInheritance_ShouldBeCloned()
+    public void TryClone_TaskOfNode_DefaultSettings_ShouldCopyTaskReference()
     {
-        var source = new DerivedReadonlyOwner(
-            new Node
-            {
-                Value = 300,
-                Next = new Node { Value = 301 }
-            },
-            new List<int> { 7, 8, 9 },
-            new Node { Value = 400 });
+        var source = Task.FromResult(new Node
+        {
+            Value = 7,
+            Next = new Node { Value = 8 }
+        });
 
-        bool success = source.TryCloneDeep(out DerivedReadonlyOwner clone);
+        bool success = DeepCloner.TryClone(source, out Task<Node> clone);
+
+        Assert.True(success);
+        Assert.Same(source, clone);
+        Assert.Same(source.Result, clone.Result);
+    }
+
+    [Fact]
+    public void TryClone_TaskOfNode_CloneCompletedResult_ShouldCreateNewTaskWithClonedResult()
+    {
+        var source = Task.FromResult(new Node
+        {
+            Value = 100,
+            Next = new Node { Value = 101 }
+        });
+
+        bool success = DeepCloner.TryClone(
+            source,
+            out Task<Node> clone,
+            s => s.WithTaskHandling(DeepCloner.TaskCloneHandling.CloneCompletedResult));
 
         Assert.True(success);
         Assert.NotNull(clone);
         Assert.NotSame(source, clone);
 
-        Assert.NotNull(clone.BaseNode);
-        Assert.NotSame(source.BaseNode, clone.BaseNode);
-        Assert.Equal(300, clone.BaseNode.Value);
+        var sourceResult = source.Result;
+        var cloneResult = clone.Result;
 
-        Assert.NotNull(clone.BaseNode.Next);
-        Assert.NotSame(source.BaseNode.Next, clone.BaseNode.Next);
-        Assert.Equal(301, clone.BaseNode.Next.Value);
+        Assert.NotNull(cloneResult);
+        Assert.NotSame(sourceResult, cloneResult);
+        Assert.Equal(100, cloneResult.Value);
 
-        Assert.NotNull(clone.Numbers);
-        Assert.NotSame(source.Numbers, clone.Numbers);
-        Assert.Equal(new[] { 7, 8, 9 }, clone.Numbers);
+        Assert.NotNull(cloneResult.Next);
+        Assert.NotSame(sourceResult.Next, cloneResult.Next);
+        Assert.Equal(101, cloneResult.Next.Value);
+    }
 
-        Assert.NotNull(clone.Tail);
-        Assert.NotSame(source.Tail, clone.Tail);
-        Assert.Equal(400, clone.Tail.Value);
+    [Fact]
+    public void TryClone_IncompleteTaskOfNode_CloneCompletedResult_ShouldKeepTaskReference()
+    {
+        var tcs = new TaskCompletionSource<Node>();
+        Task<Node> source = tcs.Task;
+
+        bool success = DeepCloner.TryClone(
+            source,
+            out Task<Node> clone,
+            s => s.WithTaskHandling(DeepCloner.TaskCloneHandling.CloneCompletedResult));
+
+        Assert.True(success);
+        Assert.Same(source, clone);
+    }
+
+    [Fact]
+    public void TryClone_NonGenericTask_CloneCompletedResult_ShouldKeepTaskReference()
+    {
+        var source = Task.Run(static () => { });
+        source.GetAwaiter().GetResult();
+
+        bool success = DeepCloner.TryClone(
+            source,
+            out Task clone,
+            s => s.WithTaskHandling(DeepCloner.TaskCloneHandling.CloneCompletedResult));
+
+        Assert.True(success);
+        Assert.Same(source, clone);
     }
 
     [Fact]

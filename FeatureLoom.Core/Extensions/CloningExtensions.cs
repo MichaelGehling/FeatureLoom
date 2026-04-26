@@ -42,13 +42,45 @@ namespace FeatureLoom.Extensions
         }
 
         /// <summary>
-        /// Attempts to create a generic deep clone of <paramref name="obj"/>.
+        /// Attempts to create a generic deep clone of <paramref name="obj"/> using the default deep-cloner settings.
         /// </summary>
-        /// <remarks>This method does not rely on the <see cref="ICloneable"/> interface and can clone arbitrary object graphs.</remarks>
+        /// <remarks>
+        /// This method does not rely on the <see cref="ICloneable"/> interface and can clone arbitrary object graphs.
+        /// Default settings are <see cref="DeepCloner.DelegateCloneHandling.RebindKnownTargetsAfterClone"/> for delegates
+        /// and <see cref="DeepCloner.TaskCloneHandling.CopyReference"/> for tasks.
+        /// </remarks>
         /// <typeparam name="T">The type of the object to clone.</typeparam>
         /// <param name="obj">The source object.</param>
         /// <param name="clone">The resulting deep clone if successful; otherwise default.</param>
         /// <returns><see langword="true"/> if cloning succeeded; otherwise <see langword="false"/>.</returns>
         public static bool TryCloneDeep<T>(this T obj, out T clone) => DeepCloner.TryClone(obj, out clone);
+
+        /// <summary>
+        /// Attempts to create a generic deep clone of <paramref name="obj"/> using explicit settings.
+        /// </summary>
+        /// <remarks>This method does not rely on the <see cref="ICloneable"/> interface and can clone arbitrary object graphs.</remarks>
+        /// <typeparam name="T">The type of the object to clone.</typeparam>
+        /// <param name="obj">The source object.</param>
+        /// <param name="clone">The resulting deep clone if successful; otherwise default.</param>
+        /// <param name="settings">The deep-cloner settings to use.</param>
+        /// <returns><see langword="true"/> if cloning succeeded; otherwise <see langword="false"/>.</returns>
+        public static bool TryCloneDeep<T>(this T obj, out T clone, in DeepCloner.Settings settings) =>
+            DeepCloner.TryClone(obj, out clone, in settings);
+
+        /// <summary>
+        /// Attempts to create a generic deep clone of <paramref name="obj"/> using configured settings.
+        /// </summary>
+        /// <remarks>
+        /// The configuration starts from <see cref="DeepCloner.Settings.Default"/>
+        /// (<see cref="DeepCloner.DelegateCloneHandling.RebindKnownTargetsAfterClone"/> and
+        /// <see cref="DeepCloner.TaskCloneHandling.CopyReference"/>).
+        /// </remarks>
+        /// <typeparam name="T">The type of the object to clone.</typeparam>
+        /// <param name="obj">The source object.</param>
+        /// <param name="clone">The resulting deep clone if successful; otherwise default.</param>
+        /// <param name="configureSettings">A function that transforms the default settings.</param>
+        /// <returns><see langword="true"/> if cloning succeeded; otherwise <see langword="false"/>.</returns>
+        public static bool TryCloneDeep<T>(this T obj, out T clone, Func<DeepCloner.Settings, DeepCloner.Settings> configureSettings) =>
+            DeepCloner.TryClone(obj, out clone, configureSettings);
     }
 }

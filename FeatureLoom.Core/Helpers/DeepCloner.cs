@@ -7,6 +7,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
+using System.Threading.Tasks;
 
 namespace FeatureLoom.Helpers;
 
@@ -25,45 +26,117 @@ public static class DeepCloner
         CopyReference = 0,
 
         /// <summary>
-        /// After the graph is cloned, delegate targets are rebound to cloned targets if those targets are part of the cloned graph.
-        /// External targets remain unchanged.
+        /// After cloning, delegate targets are rebound only when the original target is part of the cloned object graph.
+        /// Targets outside the cloned graph remain unchanged.
         /// </summary>
         RebindKnownTargetsAfterClone = 1,
 
         /// <summary>
         /// WARNING: Rebinds delegate targets even when they were not part of the original cloned graph.
-        /// This may clone additional external object graphs, change identity semantics, and increase runtime/memory cost significantly.
+        /// This can clone additional external object graphs, change identity semantics, and increase runtime/memory cost.
         /// </summary>
         RebindAllTargetsAfterClone = 2
     }
 
-    /// <summary>
-    /// Attempts to create a deep clone of <paramref name="obj"/>.
-    /// Uses deferred delegate rebinding by default.
-    /// </summary>
-    public static bool TryClone<T>(T obj, out T clone)
+    public enum TaskCloneHandling
     {
-        return TryClone(obj, out clone, DelegateCloneHandling.RebindKnownTargetsAfterClone);
+        /// <summary>
+        /// Tasks are copied by reference.
+        /// </summary>
+        CopyReference = 0,
+
+        /// <summary>
+        /// For successfully completed <c>Task&lt;TResult&gt;</c>, creates a new completed task with a deep-cloned result.
+        /// All other tasks are copied by reference.
+        /// </summary>
+        CloneCompletedResult = 1
     }
 
     /// <summary>
-    /// Attempts to create a deep clone of <paramref name="obj"/> with configurable delegate handling.
+    /// Configures deep-clone behavior.
     /// </summary>
-    public static bool TryClone<T>(T obj, out T clone, DelegateCloneHandling delegateHandling)
+    public readonly struct Settings
+    {
+        /// <summary>
+        /// Gets the default settings used by <see cref="TryClone{T}(T, out T)"/>.
+        /// </summary>
+        /// <remarks>
+        /// Defaults are:
+        /// <list type="bullet">
+        /// <item><description><see cref="DelegateCloneHandling.RebindKnownTargetsAfterClone"/></description></item>
+        /// <item><description><see cref="TaskCloneHandling.CopyReference"/></description></item>
+        /// </list>
+        /// </remarks>
+        public static Settings Default => new Settings(
+            DelegateCloneHandling.RebindKnownTargetsAfterClone,
+            TaskCloneHandling.CopyReference);
+
+        /// <summary>
+        /// Initializes settings with explicit delegate and task handling.
+        /// </summary>
+        public Settings(DelegateCloneHandling delegateHandling, TaskCloneHandling taskHandling)
+        {
+            DelegateHandling = delegateHandling;
+            TaskHandling = taskHandling;
+        }
+
+        /// <summary>
+        /// Gets delegate clone handling.
+        /// </summary>
+        public DelegateCloneHandling DelegateHandling { get; }
+
+        /// <summary>
+        /// Gets task clone handling.
+        /// </summary>
+        public TaskCloneHandling TaskHandling { get; }
+
+        /// <summary>
+        /// Returns a copy of these settings with a different delegate handling mode.
+        /// </summary>
+        public Settings WithDelegateHandling(DelegateCloneHandling value) => new Settings(value, TaskHandling);
+
+        /// <summary>
+        /// Returns a copy of these settings with a different task handling mode.
+        /// </summary>
+        public Settings WithTaskHandling(TaskCloneHandling value) => new Settings(DelegateHandling, value);
+    }
+
+    /// <summary>
+    /// Attempts to create a deep clone of <paramref name="obj"/> using <see cref="Settings.Default"/>.
+    /// </summary>
+    /// <remarks>
+    /// Default behavior:
+    /// <list type="bullet">
+    /// <item><description>Delegates: <see cref="DelegateCloneHandling.RebindKnownTargetsAfterClone"/></description></item>
+    /// <item><description>Tasks: <see cref="TaskCloneHandling.CopyReference"/></description></item>
+    /// </list>
+    /// </remarks>
+    public static bool TryClone<T>(T obj, out T clone)
+    {
+        return TryClone(obj, out clone, Settings.Default);
+    }
+
+    /// <summary>
+    /// Attempts to create a deep clone of <paramref name="obj"/> using explicit <paramref name="settings"/>.
+    /// </summary>
+    public static bool TryClone<T>(T obj, out T clone, in Settings settings)
     {
         var visited = visitedPool.Take();
         try
         {
             bool rebindDelegates =
-                delegateHandling == DelegateCloneHandling.RebindKnownTargetsAfterClone ||
-                delegateHandling == DelegateCloneHandling.RebindAllTargetsAfterClone;
+                settings.DelegateHandling == DelegateCloneHandling.RebindKnownTargetsAfterClone ||
+                settings.DelegateHandling == DelegateCloneHandling.RebindAllTargetsAfterClone;
 
-            bool rebindAllTargets = delegateHandling == DelegateCloneHandling.RebindAllTargetsAfterClone;
+            bool rebindAllTargets = settings.DelegateHandling == DelegateCloneHandling.RebindAllTargetsAfterClone;
 
             if (rebindDelegates)
             {
                 visited[DelegateRebindEnabledKey] = DelegateRebindEnabledKey;
             }
+
+            // Keep this for task handling logic (already in settings-based API).
+            visited[TaskCloneHandlingKey] = settings.TaskHandling;
 
             if (!TryCloneInternal(obj, out clone, visited))
             {
@@ -80,6 +153,93 @@ public static class DeepCloner
 
                 if (clone is Delegate cloneDelegate &&
                     TryRebindDelegate(cloneDelegate, visited, rebindAllTargets, out var reboundRootDelegate))
+                {
+                    clone = (T)(object)reboundRootDelegate;
+                }
+            }
+
+            return true;
+        }
+        finally
+        {
+            if (visited.TryGetValue(DelegateRebindWorklistKey, out var worklistObj))
+            {
+                delegateRebindWorklistPool.Return((List<DelegateRebindEntry>)worklistObj);
+            }
+
+            visitedPool.Return(visited);
+        }
+    }
+
+    /// <summary>
+    /// Attempts to create a deep clone of <paramref name="obj"/> by transforming <see cref="Settings.Default"/>.
+    /// </summary>
+    /// <param name="configureSettings">
+    /// Function that receives <see cref="Settings.Default"/> and returns the settings to use.
+    /// If <see langword="null"/>, <see cref="Settings.Default"/> is used unchanged.
+    /// </param>
+    public static bool TryClone<T>(T obj, out T clone, Func<Settings, Settings> configureSettings)
+    {
+        var settings = configureSettings == null ? Settings.Default : configureSettings(Settings.Default);
+        return TryClone(obj, out clone, in settings);
+    }
+
+    /// <summary>
+    /// Backward-compatible overload that overrides only delegate handling while keeping default task handling.
+    /// </summary>
+    /// <remarks>
+    /// Equivalent to:
+    /// <c>TryClone(obj, out clone, s =&gt; s.WithDelegateHandling(delegateHandling))</c>.
+    /// </remarks>
+    public static bool TryClone<T>(T obj, out T clone, DelegateCloneHandling delegateHandling)
+    {
+        var settings = Settings.Default.WithDelegateHandling(delegateHandling);
+        return TryClone(obj, out clone, in settings);
+    }
+
+    /// <summary>
+    /// Backward-compatible overload with explicit delegate and task handling.
+    /// </summary>
+    /// <remarks>
+    /// Equivalent to:
+    /// <c>TryClone(obj, out clone, new Settings(delegateHandling, taskHandling))</c>.
+    /// </remarks>
+    public static bool TryClone<T>(T obj, out T clone, DelegateCloneHandling delegateHandling, TaskCloneHandling taskHandling)
+    {
+        var visited = visitedPool.Take();
+        try
+        {
+            bool rebindDelegates =
+                delegateHandling == DelegateCloneHandling.RebindKnownTargetsAfterClone ||
+                delegateHandling == DelegateCloneHandling.RebindAllTargetsAfterClone;
+
+            bool rebindAllDelegateTargets = delegateHandling == DelegateCloneHandling.RebindAllTargetsAfterClone;
+
+            if (rebindDelegates)
+            {
+                visited[DelegateRebindEnabledKey] = DelegateRebindEnabledKey;
+            }
+
+            if (taskHandling != TaskCloneHandling.CopyReference)
+            {
+                visited[TaskCloneHandlingKey] = taskHandling;
+            }
+
+            if (!TryCloneInternal(obj, out clone, visited))
+            {
+                return false;
+            }
+
+            if (rebindDelegates)
+            {
+                if (!TryFinalizeDelegateRebinding(visited, rebindAllDelegateTargets))
+                {
+                    clone = default;
+                    return false;
+                }
+
+                if (clone is Delegate cloneDelegate &&
+                    TryRebindDelegate(cloneDelegate, visited, rebindAllDelegateTargets, out var reboundRootDelegate))
                 {
                     clone = (T)(object)reboundRootDelegate;
                 }
@@ -342,6 +502,108 @@ public static class DeepCloner
                 IsImmutable(Nullable.GetUnderlyingType(type)));
     }
 
+    private static TaskCloneHandling GetTaskCloneHandling(IDictionary<object, object> visited)
+    {
+        if (visited.TryGetValue(TaskCloneHandlingKey, out var value) && value is TaskCloneHandling handling)
+        {
+            return handling;
+        }
+
+        return TaskCloneHandling.CopyReference;
+    }
+
+    private static bool TryCloneTaskObject(object sourceObj, IDictionary<object, object> visited, out object cloneObj)
+    {
+        if (sourceObj == null)
+        {
+            cloneObj = null;
+            return true;
+        }
+
+        if (!(sourceObj is Task sourceTask))
+        {
+            cloneObj = sourceObj;
+            return true;
+        }
+
+        var handling = GetTaskCloneHandling(visited);
+        if (handling == TaskCloneHandling.CopyReference)
+        {
+            cloneObj = sourceObj;
+            return true;
+        }
+
+        var sourceType = sourceObj.GetType();
+
+        // Non-generic Task has no result payload to clone.
+        if (!sourceType.IsGenericType || sourceType.GetGenericTypeDefinition() != typeof(Task<>))
+        {
+            cloneObj = sourceObj;
+            return true;
+        }
+
+        // Only clone completed successful Task<T>; keep all other tasks as reference.
+        if (sourceTask.Status != TaskStatus.RanToCompletion)
+        {
+            cloneObj = sourceObj;
+            return true;
+        }
+
+        if (visited.TryGetValue(sourceObj, out var existing))
+        {
+            cloneObj = existing;
+            return true;
+        }
+
+        var cloner = TaskResultClonerCache.GetOrAdd(sourceType, BuildTaskResultCloner);
+        return cloner(sourceTask, visited, out cloneObj);
+    }
+
+    private static TaskResultClonerFunction BuildTaskResultCloner(Type taskType)
+    {
+        var resultType = taskType.GetGenericArguments()[0];
+        var method = typeof(DeepCloner)
+            .GetMethod(nameof(TryCloneCompletedTaskWithResultBridge), BindingFlags.NonPublic | BindingFlags.Static)
+            .MakeGenericMethod(resultType);
+
+        return (TaskResultClonerFunction)Delegate.CreateDelegate(typeof(TaskResultClonerFunction), method);
+    }
+
+    private static bool TryCloneCompletedTaskWithResultBridge<TResult>(Task sourceTask, IDictionary<object, object> visited, out object cloneTaskObj)
+    {
+        if (!TryCloneCompletedTaskWithResult((Task<TResult>)sourceTask, visited, out Task<TResult> cloneTask))
+        {
+            cloneTaskObj = null;
+            return false;
+        }
+
+        cloneTaskObj = cloneTask;
+        return true;
+    }
+
+    private static bool TryCloneCompletedTaskWithResult<TResult>(Task<TResult> sourceTask, IDictionary<object, object> visited, out Task<TResult> cloneTask)
+    {
+        if (visited.TryGetValue(sourceTask, out var existing))
+        {
+            cloneTask = (Task<TResult>)existing;
+            return true;
+        }
+
+        var tcs = new TaskCompletionSource<TResult>();
+        visited[sourceTask] = tcs.Task;
+
+        if (!TryCloneInternal(sourceTask.Result, out TResult clonedResult, visited))
+        {
+            cloneTask = null;
+            return false;
+        }
+
+        tcs.SetResult(clonedResult);
+        cloneTask = tcs.Task;
+        visited[sourceTask] = cloneTask;
+        return true;
+    }
+
     /// <summary>
     /// Delegate signature for strongly typed clone functions.
     /// </summary>
@@ -358,19 +620,24 @@ public static class DeepCloner
     private delegate bool CloneFieldsFunction<T>(T source, T target, IDictionary<object, object> visited, out T clone);
 
     /// <summary>
-    /// Delegate signature for SzArray cloning
+    /// Delegate signature for SzArray cloning.
     /// </summary>
     private delegate bool SzArrayClonerFunction(Array source, IDictionary<object, object> visited, out Array clone);
 
     /// <summary>
-    /// Delegate signature for cloning generic lists
+    /// Delegate signature for cloning generic lists.
     /// </summary>
     private delegate bool GenericListClonerFunction(object source, IDictionary<object, object> visited, out object clone);
 
     /// <summary>
-    /// Delegate signature for cloning generic dictionaries
+    /// Delegate signature for cloning generic dictionaries.
     /// </summary>
     private delegate bool GenericDictionaryClonerFunction(object source, IDictionary<object, object> visited, out object clone);
+
+    /// <summary>
+    /// Delegate signature for cloning completed Task&lt;T&gt; results.
+    /// </summary>
+    private delegate bool TaskResultClonerFunction(Task source, IDictionary<object, object> visited, out object clone);
 
     /// <summary>
     /// Per-type clone delegate cache.
@@ -394,6 +661,21 @@ public static class DeepCloner
                 return (T source, IDictionary<object, object> visited, out T clone) =>
                 {
                     clone = source;
+                    return true;
+                };
+            }
+
+            if (typeof(Task).IsAssignableFrom(type))
+            {
+                return (T source, IDictionary<object, object> visited, out T clone) =>
+                {
+                    if (!TryCloneTaskObject(source, visited, out object clonedObj))
+                    {
+                        clone = default;
+                        return false;
+                    }
+
+                    clone = clonedObj is null ? default : (T)clonedObj;
                     return true;
                 };
             }
@@ -841,6 +1123,7 @@ public static class DeepCloner
     private static readonly ConcurrentDictionary<Type, SzArrayClonerFunction> SzArrayClonerCache = new ConcurrentDictionary<Type, SzArrayClonerFunction>();
     private static readonly ConcurrentDictionary<Type, GenericListClonerFunction> GenericListClonerCache = new ConcurrentDictionary<Type, GenericListClonerFunction>();
     private static readonly ConcurrentDictionary<Type, GenericDictionaryClonerFunction> GenericDictionaryClonerCache = new ConcurrentDictionary<Type, GenericDictionaryClonerFunction>();
+    private static readonly ConcurrentDictionary<Type, TaskResultClonerFunction> TaskResultClonerCache = new ConcurrentDictionary<Type, TaskResultClonerFunction>();
 
     private static bool TrySetInstanceField(object target, FieldInfo field, object value)
     {
@@ -871,10 +1154,10 @@ public static class DeepCloner
     }
 
     private static readonly MethodInfo SetInstanceFieldMethod =
-typeof(DeepCloner).GetMethod(nameof(TrySetInstanceField), BindingFlags.NonPublic | BindingFlags.Static);
+        typeof(DeepCloner).GetMethod(nameof(TrySetInstanceField), BindingFlags.NonPublic | BindingFlags.Static);
 
     private static readonly MethodInfo SetInitOnlyStructFieldGenericMethod =
-typeof(DeepCloner).GetMethod(nameof(TrySetInitOnlyStructField), BindingFlags.NonPublic | BindingFlags.Static);
+        typeof(DeepCloner).GetMethod(nameof(TrySetInitOnlyStructField), BindingFlags.NonPublic | BindingFlags.Static);
 
     private static SzArrayClonerFunction BuildSzArrayCloner(Type arrayType)
     {
@@ -1164,9 +1447,6 @@ typeof(DeepCloner).GetMethod(nameof(TrySetInitOnlyStructField), BindingFlags.Non
             100,
             true);
 
-    private static readonly ConcurrentDictionary<IDictionary<object, object>, List<DelegateRebindEntry>> DelegateRebindWorklists =
-        new ConcurrentDictionary<IDictionary<object, object>, List<DelegateRebindEntry>>();
-
     private static readonly MethodInfo RegisterDelegateFieldForRebindingMethod =
         typeof(DeepCloner).GetMethod(nameof(RegisterDelegateFieldForRebinding), BindingFlags.NonPublic | BindingFlags.Static);
 
@@ -1177,7 +1457,6 @@ typeof(DeepCloner).GetMethod(nameof(TrySetInitOnlyStructField), BindingFlags.Non
         Delegate sourceDelegate)
     {
         if (sourceDelegate == null) return;
-
         if (!visited.ContainsKey(DelegateRebindEnabledKey)) return;
 
         if (!visited.TryGetValue(DelegateRebindWorklistKey, out var worklistObj))
@@ -1191,4 +1470,5 @@ typeof(DeepCloner).GetMethod(nameof(TrySetInitOnlyStructField), BindingFlags.Non
 
     private static readonly object DelegateRebindEnabledKey = new object();
     private static readonly object DelegateRebindWorklistKey = new object();
+    private static readonly object TaskCloneHandlingKey = new object();
 }
