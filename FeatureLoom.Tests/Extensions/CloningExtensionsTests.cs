@@ -1255,4 +1255,103 @@ public class CloningExtensionsTests
         Assert.NotNull(clone[typeof(string)]);
         Assert.Equal(source[typeof(string)], clone[typeof(string)]);
     }
+
+    private struct MutableNullablePayload
+    {
+        public int Id;
+        public Node Anchor;
+    }
+
+    private readonly struct ImmutableNullablePayload
+    {
+        public readonly int Id;
+        public readonly Node Anchor;
+
+        public ImmutableNullablePayload(int id, Node anchor)
+        {
+            Id = id;
+            Anchor = anchor;
+        }
+    }
+
+    private sealed class NullableStructMemberContainer
+    {
+        public MutableNullablePayload? Mutable;
+        public ImmutableNullablePayload? Immutable;
+    }
+
+    [Fact]
+    public void TryClone_NullableStructMembers_MutableAndImmutable_ShouldCloneValuesAndNestedReferences()
+    {
+        var source = new NullableStructMemberContainer
+        {
+            Mutable = new MutableNullablePayload
+            {
+                Id = 1,
+                Anchor = new Node
+                {
+                    Value = 100,
+                    Next = new Node { Value = 101 }
+                }
+            },
+            Immutable = new ImmutableNullablePayload(
+                2,
+                new Node
+                {
+                    Value = 200,
+                    Next = new Node { Value = 201 }
+                })
+        };
+
+        bool success = source.TryCloneDeep(out NullableStructMemberContainer clone);
+
+        Assert.True(success);
+        Assert.NotNull(clone);
+        Assert.NotSame(source, clone);
+
+        Assert.True(source.Mutable.HasValue);
+        Assert.True(clone.Mutable.HasValue);
+
+        var sourceMutable = source.Mutable.Value;
+        var cloneMutable = clone.Mutable.Value;
+
+        Assert.Equal(1, cloneMutable.Id);
+        Assert.NotNull(cloneMutable.Anchor);
+        Assert.NotSame(sourceMutable.Anchor, cloneMutable.Anchor);
+        Assert.Equal(100, cloneMutable.Anchor.Value);
+        Assert.NotNull(cloneMutable.Anchor.Next);
+        Assert.NotSame(sourceMutable.Anchor.Next, cloneMutable.Anchor.Next);
+        Assert.Equal(101, cloneMutable.Anchor.Next.Value);
+
+        Assert.True(source.Immutable.HasValue);
+        Assert.True(clone.Immutable.HasValue);
+
+        var sourceImmutable = source.Immutable.Value;
+        var cloneImmutable = clone.Immutable.Value;
+
+        Assert.Equal(2, cloneImmutable.Id);
+        Assert.NotNull(cloneImmutable.Anchor);
+        Assert.NotSame(sourceImmutable.Anchor, cloneImmutable.Anchor);
+        Assert.Equal(200, cloneImmutable.Anchor.Value);
+        Assert.NotNull(cloneImmutable.Anchor.Next);
+        Assert.NotSame(sourceImmutable.Anchor.Next, cloneImmutable.Anchor.Next);
+        Assert.Equal(201, cloneImmutable.Anchor.Next.Value);
+    }
+
+    [Fact]
+    public void TryClone_NullableStructMembers_WhenNull_ShouldRemainNull()
+    {
+        var source = new NullableStructMemberContainer
+        {
+            Mutable = null,
+            Immutable = null
+        };
+
+        bool success = source.TryCloneDeep(out NullableStructMemberContainer clone);
+
+        Assert.True(success);
+        Assert.NotNull(clone);
+        Assert.False(clone.Mutable.HasValue);
+        Assert.False(clone.Immutable.HasValue);
+    }
 }

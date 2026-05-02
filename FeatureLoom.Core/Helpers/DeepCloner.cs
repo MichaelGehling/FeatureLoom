@@ -174,6 +174,8 @@ public static class DeepCloner
     /// <summary>
     /// Attempts to create a deep clone of <paramref name="obj"/> by transforming <see cref="Settings.Default"/>.
     /// </summary>
+    /// <param name="obj">The object to clone.</param>
+    /// <param name="clone">The cloned object, or default if cloning failed.</param>
     /// <param name="configureSettings">
     /// Function that receives <see cref="Settings.Default"/> and returns the settings to use.
     /// If <see langword="null"/>, <see cref="Settings.Default"/> is used unchanged.
@@ -661,6 +663,32 @@ public static class DeepCloner
                 return (T source, IDictionary<object, object> visited, out T clone) =>
                 {
                     clone = source;
+                    return true;
+                };
+            }
+
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                return (T source, IDictionary<object, object> visited, out T clone) =>
+                {
+                    // source is null nullable => clone null nullable
+                    if (EqualityComparer<T>.Default.Equals(source, default))
+                    {
+                        clone = default;
+                        return true;
+                    }
+
+                    // Boxing Nullable<TValue> with HasValue=true boxes TValue
+                    object boxedSource = source;
+
+                    if (!TryCloneInternal(boxedSource, out object boxedClone, visited))
+                    {
+                        clone = default;
+                        return false;
+                    }
+
+                    // boxedClone is TValue; cast reconstructs Nullable<TValue>
+                    clone = (T)boxedClone;
                     return true;
                 };
             }
