@@ -11,8 +11,6 @@ public struct MicroValueLock
     private const int WRITE_LOCK = NO_LOCK - 1;
     private const int FIRST_READ_LOCK = NO_LOCK + 1;
 
-    private const int DEFAULT_HOT_CYCLES = 0;
-
     // NOTE: The order of the variables matters for performance.
     private volatile bool readerBlocked;
     private volatile bool prioritizedWaiting;
@@ -27,59 +25,51 @@ public struct MicroValueLock
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Enter(bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
+    public void Enter(bool prioritized = false)
     {
         if (TryEnter(prioritized)) return;
-        Enter_Wait(prioritized, numHotCycles);
+        Enter_Wait(prioritized);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryEnter(TimeSpan timeout, bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
+    public bool TryEnter(TimeSpan timeout, bool prioritized = false)
     {
         if (TryEnter(prioritized)) return true;
-        if (Enter_Wait_Timeout(timeout, prioritized, numHotCycles)) return true;
+        if (Enter_Wait_Timeout(timeout, prioritized)) return true;
         return false;
     }
 
-    private void Enter_Wait(bool prioritized, int numHotCycles)
+    private void Enter_Wait(bool prioritized)
     {
         uint blockedByReaderCounter = 0;
-        uint cycleCounter = 0;
         do
         {
             blockedByReaderCounter = HandleReaderBlocking(blockedByReaderCounter);
-
             if (prioritized) prioritizedWaiting = true;
-
-            if (cycleCounter >= numHotCycles) Thread.Yield();
-            else cycleCounter++;
+            Thread.Yield();
         } while (!TryEnter(prioritized));
 
         if (prioritized) prioritizedWaiting = false;
         readerBlocked = false;
     }
 
-    private bool Enter_Wait_Timeout(TimeSpan timeout, bool prioritized, int numHotCycles)
+    private bool Enter_Wait_Timeout(TimeSpan timeout, bool prioritized)
     {
         TimeFrame timer = new TimeFrame(AppTime.Now, timeout);
         uint blockedByReaderCounter = 0;
-        uint cycleCounter = 0;
         do
         {
             blockedByReaderCounter = HandleReaderBlocking(blockedByReaderCounter);
 
             if (prioritized) prioritizedWaiting = true;
 
-            if (cycleCounter >= numHotCycles)
+            if (timer.Elapsed(AppTime.CoarseNow + AppTime.CoarsePrecision) && timer.Elapsed(AppTime.Now))
             {
-                if (timer.Elapsed(AppTime.CoarseNow + AppTime.CoarsePrecision) && timer.Elapsed(AppTime.Now))
-                {
-                    if (prioritized) prioritizedWaiting = false;
-                    return false;
-                }
-                else Thread.Yield();
+                if (prioritized) prioritizedWaiting = false;
+                return false;
             }
-            else cycleCounter++;
+            else Thread.Yield();
+
         } while (!TryEnter(prioritized));
 
         if (prioritized) prioritizedWaiting = false;
@@ -99,52 +89,44 @@ public struct MicroValueLock
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void EnterReadOnly(bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
+    public void EnterReadOnly(bool prioritized = false)
     {
         if (TryEnterReadOnly(prioritized)) return;
-        EnterReadOnly_Wait(prioritized, numHotCycles);
+        EnterReadOnly_Wait(prioritized);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryEnterReadOnly(TimeSpan timeout, bool prioritized = false, int numHotCycles = DEFAULT_HOT_CYCLES)
+    public bool TryEnterReadOnly(TimeSpan timeout, bool prioritized = false)
     {
         if (TryEnterReadOnly(prioritized)) return true;
-        if (EnterReadOnly_Wait_Timeout(timeout, prioritized, numHotCycles)) return true;
+        if (EnterReadOnly_Wait_Timeout(timeout, prioritized)) return true;
         return false;
     }
 
-    private void EnterReadOnly_Wait(bool prioritized, int numHotCycles)
+    private void EnterReadOnly_Wait(bool prioritized)
     {
-        uint cycleCounter = 0;
         do
         {
             if (prioritized) prioritizedWaiting = true;
-
-            if (cycleCounter >= numHotCycles) Thread.Yield();
-            else cycleCounter++;
+            Thread.Yield();
         } while (!TryEnterReadOnly(prioritized));
 
         if (prioritized) prioritizedWaiting = false;
     }
 
-    private bool EnterReadOnly_Wait_Timeout(TimeSpan timeout, bool prioritized, int numHotCycles)
+    private bool EnterReadOnly_Wait_Timeout(TimeSpan timeout, bool prioritized)
     {
         TimeFrame timer = new TimeFrame(AppTime.Now, timeout);
-        uint cycleCounter = 0;
         do
         {
             if (prioritized) prioritizedWaiting = true;
 
-            if (cycleCounter >= numHotCycles)
+            if (timer.Elapsed(AppTime.CoarseNow + AppTime.CoarsePrecision) && timer.Elapsed(AppTime.Now))
             {
-                if (timer.Elapsed(AppTime.CoarseNow + AppTime.CoarsePrecision) && timer.Elapsed(AppTime.Now))
-                {
-                    if (prioritized) prioritizedWaiting = false;
-                    return false;
-                }
-                else Thread.Yield();
+                if (prioritized) prioritizedWaiting = false;
+                return false;
             }
-            else cycleCounter++;
+            else Thread.Yield();
         } while (!TryEnterReadOnly(prioritized));
 
         if (prioritized) prioritizedWaiting = false;

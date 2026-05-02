@@ -10,9 +10,9 @@ namespace FeatureLoom.Synchronization
         public bool IsLocked => valueLock.IsLocked;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public LockHandle Lock(bool prioritized = false, int numHotCycles = 0)
+        public LockHandle Lock(bool prioritized = false)
         {
-            valueLock.Enter(prioritized, numHotCycles);
+            valueLock.Enter(prioritized);
             return new LockHandle(this, false);
         }
 
@@ -32,9 +32,9 @@ namespace FeatureLoom.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLock(out LockHandle lockHandle, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
+        public bool TryLock(out LockHandle lockHandle, TimeSpan timeout, bool prioritized = false)
         {
-            if (valueLock.TryEnter(timeout, prioritized, numHotCycles))
+            if (valueLock.TryEnter(timeout, prioritized))
             {
                 lockHandle = new LockHandle(this, false);
                 return true;
@@ -47,9 +47,9 @@ namespace FeatureLoom.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public LockHandle LockReadOnly(bool prioritized = false, int numHotCycles = 0)
+        public LockHandle LockReadOnly(bool prioritized = false)
         {
-            valueLock.EnterReadOnly(prioritized, numHotCycles);
+            valueLock.EnterReadOnly(prioritized);
             return new LockHandle(this, true);
         }
 
@@ -69,9 +69,9 @@ namespace FeatureLoom.Synchronization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryLockReadOnly(out LockHandle lockHandle, TimeSpan timeout, bool prioritized = false, int numHotCycles = 0)
+        public bool TryLockReadOnly(out LockHandle lockHandle, TimeSpan timeout, bool prioritized = false)
         {
-            if (valueLock.TryEnterReadOnly(timeout, prioritized, numHotCycles))
+            if (valueLock.TryEnterReadOnly(timeout, prioritized))
             {
                 lockHandle = new LockHandle(this, true);
                 return true;
