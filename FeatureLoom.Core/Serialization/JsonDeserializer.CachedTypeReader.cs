@@ -35,8 +35,8 @@ public sealed partial class JsonDeserializer
             {
                 if (readerType == typeof(string))
                 {
-                    writeRefPath = deserializer.settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings || typeSettings?.enableReferenceResolution == true;
-                    resolveRefPath = deserializer.settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings || typeSettings?.enableReferenceResolution == true;
+                    writeRefPath = false;
+                    resolveRefPath = false;
                 }
                 else
                 {
@@ -167,9 +167,9 @@ public sealed partial class JsonDeserializer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T ReadFieldName<T>(out ByteSegment fieldName)
+        public T ReadFieldName<T>(out ByteSegment fieldName, bool includeFieldNameBytes)
         {
-            if (writeRefPath)
+            if (includeFieldNameBytes)
             {
                 byte b = deserializer.SkipWhiteSpaces();
                 if (b != '"') throw new Exception("Not a proper field name");                    

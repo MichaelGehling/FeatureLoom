@@ -18,13 +18,7 @@ public sealed partial class JsonDeserializer
     {
         internal Dictionary<Type, BaseTypeSettings> typeSettingsDict = new();
 
-        public DataAccess dataAccess = DataAccess.PublicAndPrivateFields;
-        internal Dictionary<Type, object> constructors = new();
-        internal Dictionary<(Type, Type), object> constructorsWithParam = new();
-        internal Dictionary<Type, Type> typeMapping = new();
-        internal Dictionary<Type, Type[]> multiOptionTypeMapping = new();
-        internal Dictionary<Type, Type> genericTypeMapping = new();
-        internal Dictionary<Type, object> customTypeReaders = new();
+        public DataAccess dataAccess = DataAccess.PublicAndPrivateFields;        
         internal Dictionary<string, Type> customTypeNames = new();
         internal HashSet<Type> forbiddenTypes = new();
 
@@ -52,19 +46,19 @@ public sealed partial class JsonDeserializer
         public HashSet<string> allowedNamespacePrefixes = new(StringComparer.Ordinal);        
         public Settings()
         {
-            AddTypeMapping(typeof(IEnumerable), typeof(List<object>));
-            AddTypeMapping(typeof(ICollection), typeof(List<object>));
-            AddTypeMapping(typeof(IList), typeof(List<object>));
+            ConfigureType<IEnumerable>(ts => ts.SetInstanceTypeMapping<List<object>>());            
+            ConfigureType<ICollection>(ts => ts.SetInstanceTypeMapping<List<object>>());
+            ConfigureType<IList>(ts => ts.SetInstanceTypeMapping<List<object>>());
 
-            AddTypeMapping(typeof(IEnumerable<>), typeof(List<>));
-            AddTypeMapping(typeof(ICollection<>), typeof(List<>));
-            AddTypeMapping(typeof(IReadOnlyCollection<>), typeof(List<>));
-            AddTypeMapping(typeof(IList<>), typeof(List<>));
-            AddTypeMapping(typeof(IReadOnlyList<>), typeof(List<>));
-            AddTypeMapping(typeof(IDictionary<,>), typeof(Dictionary<,>));
-            AddTypeMapping(typeof(IReadOnlyDictionary<,>), typeof(Dictionary<,>));
-            AddTypeMapping(typeof(ISet<>), typeof(HashSet<>));
-            AddTypeMapping(typeof(IProducerConsumerCollection<>), typeof(ConcurrentQueue<>));
+            ConfigureGenericType(typeof(IEnumerable<>), ts => ts.SetInstanceTypeMapping(typeof(List<>)));
+            ConfigureGenericType(typeof(ICollection<>), ts => ts.SetInstanceTypeMapping(typeof(List<>)));
+            ConfigureGenericType(typeof(IReadOnlyCollection<>), ts => ts.SetInstanceTypeMapping(typeof(List<>)));
+            ConfigureGenericType(typeof(IList<>), ts => ts.SetInstanceTypeMapping(typeof(List<>)));
+            ConfigureGenericType(typeof(IReadOnlyList<>), ts => ts.SetInstanceTypeMapping(typeof(List<>)));
+            ConfigureGenericType(typeof(IDictionary<,>), ts => ts.SetInstanceTypeMapping(typeof(Dictionary<,>)));
+            ConfigureGenericType(typeof(IReadOnlyDictionary<,>), ts => ts.SetInstanceTypeMapping(typeof(Dictionary<,>)));
+            ConfigureGenericType(typeof(ISet<>), ts => ts.SetInstanceTypeMapping(typeof(HashSet<>)));
+            ConfigureGenericType(typeof(IProducerConsumerCollection<>), ts => ts.SetInstanceTypeMapping(typeof(ConcurrentQueue<>)));
 
             AddDefaultForbiddenTypes();
 
@@ -171,53 +165,6 @@ public sealed partial class JsonDeserializer
 
         public void ClearCustomTypeNames() => customTypeNames.Clear();
 
-        public void AddConstructor<T>(Func<T> constructor) => constructors[typeof(T)] = constructor;
-        public void AddConstructorWithParameter<T, P>(Func<P, T> constructor) => constructorsWithParam[(typeof(T), typeof(P))] = constructor;
-        public void AddTypeMapping(Type baseType, Type mappedType)
-        {
-            if (baseType.IsGenericTypeDefinition && mappedType.IsGenericTypeDefinition)
-            {                 
-                AddGenericTypeMapping(baseType, mappedType);
-                return;
-            }
-
-            if (!mappedType.IsAssignableTo(baseType)) throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(baseType)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(mappedType)}");
-            typeMapping[baseType] = mappedType;
-        }
-
-        private void AddGenericTypeMapping(Type genericBaseType, Type genericImplType)
-        {
-            if (!genericImplType.IsOfGenericType(genericBaseType)) throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(genericBaseType)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(genericImplType)}");
-            genericTypeMapping[genericBaseType] = genericImplType;
-        }
-
-        public void AddMultiOptionTypeMapping(Type baseType, params Type[] typeOptions)
-        {
-            foreach (var typeOption in typeOptions)
-            {
-                if (!typeOption.IsAssignableTo(baseType)) throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(baseType)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(typeOption)}");
-            }
-            multiOptionTypeMapping[baseType] = typeOptions;
-        }
-
-        public void AddCustomTypeReader<T>(ICustomTypeReader<T> customTypeReader)
-        {
-            customTypeReaders[typeof(T)] = customTypeReader;
-        }
-
-        public void AddCustomTypeReader<T>(Func<ExtensionApi, T, T> populateValue)
-        {
-            AddCustomTypeReader<T>(new CustomTypeReader<T>(populateValue));
-        }
-        public void AddCustomTypeReader<T>(Func<ExtensionApi, T> readValue)
-        {
-            AddCustomTypeReader<T>(new CustomTypeReader<T>(readValue));
-        }
-        public void AddCustomTypeReader<T>(Func<PreparationApi, Func<ExtensionApi, T, T>> prepareReader)
-        {
-            AddCustomTypeReader<T>(new CustomTypeReader<T>(prepareReader));
-        }
-
         public void AddCustomTypeName(string customTypeName, Type type)
         {
             customTypeNames[customTypeName] = type;
@@ -241,14 +188,48 @@ public sealed partial class JsonDeserializer
 
         public void ConfigureType<T>(Action<TypeSettings<T>> configureTypeSettings)
         {
+            Type type = typeof(T);
             if (configureTypeSettings == null)
             {
-                typeSettingsDict.Remove(typeof(T));
+                typeSettingsDict.Remove(type);
+                return;
+            }     
+            
+            if (typeSettingsDict.TryGetValue(type, out BaseTypeSettings existingSettings) && 
+                existingSettings is TypeSettings<T> typeSettings)
+            {
+                configureTypeSettings(typeSettings);
+                typeSettingsDict[type] = typeSettings;
+            }
+            else
+            {
+                typeSettings = new TypeSettings<T>();
+                configureTypeSettings(typeSettings);
+                typeSettingsDict[type] = typeSettings;
+            }                        
+        }
+
+        public void ConfigureGenericType(Type genericTypeDefinition, Action<GenericTypeSettings> configureTypeSettings)
+        {
+            if (configureTypeSettings == null)
+            {
+                typeSettingsDict.Remove(genericTypeDefinition);
                 return;
             }
-            var typeSettings = new TypeSettings<T>();
-            configureTypeSettings(typeSettings);
-            typeSettingsDict[typeof(T)] = typeSettings;
+
+            if (typeSettingsDict.TryGetValue(genericTypeDefinition, out BaseTypeSettings existingSettings) &&
+                existingSettings is GenericTypeSettings typeSettings)
+            {
+                configureTypeSettings(typeSettings);
+                typeSettingsDict[genericTypeDefinition] = typeSettings;
+                return;
+            }
+            else
+            {
+                typeSettings = new GenericTypeSettings(genericTypeDefinition);
+                configureTypeSettings(typeSettings);
+                typeSettingsDict[genericTypeDefinition] = typeSettings;
+            }
         }
 
         public enum TypeWhitelistMode
@@ -302,12 +283,6 @@ public sealed partial class JsonDeserializer
             /// Strings are not included for performance reasons, though.
             /// </summary>
             EnabledByDefault = 2,
-            /// <summary>
-            /// Specifies that the feature is enabled by default and also applies to string values, which is usually not necessary as strings are immutable and don't have reference semantics, 
-            /// but if the JSON contains reference information for strings it might be needed to correctly resolve references. 
-            /// This option has a significant performance impact and should only be used if you are sure that reference information for strings is present in the JSON and needs to be resolved.
-            /// </summary>
-            EnabledByDefaultPlusStrings = 3
         }
 
         public enum BackingFieldMode
@@ -318,20 +293,30 @@ public sealed partial class JsonDeserializer
         }
     }
 
+    internal readonly struct MappedType
+    {
+        readonly public Type type;
+        readonly public BaseTypeSettings typeSettings;
+
+        public MappedType(Type type, BaseTypeSettings typeSettings)
+        {
+            this.type = type;
+            this.typeSettings = typeSettings;
+        }
+    }
+
     public class BaseTypeSettings
     {
+        internal MappedType? mappedType;
+        internal LazyList<MappedType> multiOptionMappedTypes;
         internal bool? member_ignore = null;
         internal string member_overrideName = null;
-        internal Type member_typeMapping = null;
-        internal Type[] member_typeOptions = null;
         internal bool? member_useStringCache = null;
-
-        internal Type type = null;
+        
         internal DataAccess? dataAccess = null;
         internal BackingFieldMode? backingFieldMode = null;
         internal bool? enableReferenceResolution = null;
         internal bool? applyProposedTypes = null;
-        //internal bool? strictMode = null;
         internal bool? populateAsMember = null;        
         internal Delegate constructor = null;
         internal Delegate collectionConstructor = null;        
@@ -339,25 +324,75 @@ public sealed partial class JsonDeserializer
         internal LazyDictionary<string, BaseTypeSettings> memberSettingsDict = default;
     }
 
-    public class TypeSettings<T> : BaseTypeSettings
+    public class GenericTypeSettings : BaseTypeSettings
     {
-        public TypeSettings()
+        protected Type genericType;
+
+        public GenericTypeSettings(Type genericType)
         {
-            type = typeof(T);
+            this.genericType = genericType;
         }
 
         public void SetDataAccess(DataAccess dataAccess) => this.dataAccess = dataAccess;
-        public void SetReferenceResolution(bool enable)
-        {
-            if (enable && typeof(T).IsValueType)
-            {
-                throw new Exception("Reference resolution cannot be enabled for value types.");
-            }
-            enableReferenceResolution = enable;
-        }
+        public void SetReferenceResolution(bool enable) => this.enableReferenceResolution = enable;
         public void SetProposedTypeHandling(bool applyProposedTypes) => this.applyProposedTypes = applyProposedTypes;
-        //public void SetStrictMode(bool strict) => strictMode = strict;
         public void SetPopulateAsMember(bool populate) => populateAsMember = populate;
+        public void SetBackingFieldMode(BackingFieldMode mode) => this.backingFieldMode = mode;
+
+        public void ConfigureMember<TMember>(string memberName, Action<MemberSettings<TMember>> configureMemberSettings)
+        {
+            if (configureMemberSettings == null)
+            {
+                memberSettingsDict.Remove(memberName);
+                return;
+            }
+
+            Type objType = genericType;
+            Type memberType = typeof(TMember);
+            if (!objType.GetMember(memberName)
+                .TryFindFirst(member => member.MemberType == MemberTypes.Field || member.MemberType == MemberTypes.Property,
+                out MemberInfo member))
+            {
+                throw new Exception($"Member '{memberName}' not found on type {TypeNameHelper.Shared.GetSimplifiedTypeName(objType)}");
+            }
+            if (member is PropertyInfo propertyInfo && propertyInfo.PropertyType != memberType)
+            {
+                throw new Exception($"Member '{memberName}' on type {TypeNameHelper.Shared.GetSimplifiedTypeName(objType)} is of type {TypeNameHelper.Shared.GetSimplifiedTypeName(propertyInfo.PropertyType)}, not {TypeNameHelper.Shared.GetSimplifiedTypeName(memberType)}");
+            }
+            else if (member is FieldInfo fieldInfo && fieldInfo.FieldType != memberType)
+            {
+                throw new Exception($"Member '{memberName}' on type {TypeNameHelper.Shared.GetSimplifiedTypeName(objType)} is of type {TypeNameHelper.Shared.GetSimplifiedTypeName(fieldInfo.FieldType)}, not {TypeNameHelper.Shared.GetSimplifiedTypeName(memberType)}");
+            }
+
+            var memberSettings = new MemberSettings<TMember>();
+            configureMemberSettings(memberSettings);
+            memberSettingsDict[memberName] = memberSettings;
+        }
+
+        public void SetInstanceTypeMapping(Type genericInstanceTypeDefinition, Action<GenericTypeSettings> configureGenericInstanceTypeSettings = null)
+        {
+            this.multiOptionMappedTypes.Clear(); // clear multi option mappings if they exist, as we are now adding a single mapping
+
+            Type type = this.genericType;
+            if (!genericInstanceTypeDefinition.IsOfGenericType(type)) throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(genericInstanceTypeDefinition)}");
+            GenericTypeSettings typeSettings = null;
+            if (configureGenericInstanceTypeSettings != null)
+            {
+                typeSettings = new GenericTypeSettings(genericInstanceTypeDefinition);
+                configureGenericInstanceTypeSettings(typeSettings);
+            }
+            this.mappedType = new MappedType(genericInstanceTypeDefinition, typeSettings);
+        }
+    }
+
+    public class TypeSettings<T> : BaseTypeSettings
+    {
+        public void SetDataAccess(DataAccess dataAccess) => this.dataAccess = dataAccess;
+        public void SetReferenceResolution(bool enable) => this.enableReferenceResolution = enable;
+        public void SetProposedTypeHandling(bool applyProposedTypes) => this.applyProposedTypes = applyProposedTypes;
+        public void SetPopulateAsMember(bool populate) => populateAsMember = populate;
+        public void SetBackingFieldMode(BackingFieldMode mode) => this.backingFieldMode = mode;
+
         public void AddConstructor(Func<T> constructor) => this.constructor = constructor;
         public void AddCollectionConstructor<TElem>(Func<IEnumerable<TElem>, T> constructor)
         {
@@ -380,10 +415,10 @@ public sealed partial class JsonDeserializer
 
             collectionConstructor = constructor;
         }
-        public void SetBackingFieldMode(BackingFieldMode mode) => this.backingFieldMode = mode;
 
         public void SetCustomTypeReader(ICustomTypeReader<T> customTypeReader) => this.customTypeReader = customTypeReader;
-        public void SetCustomTypeReader(Func<ExtensionApi, T, T> readType) => SetCustomTypeReader(new CustomTypeReader<T>(readType));
+        public void SetCustomTypeReader(Func<ExtensionApi, T, T> populateType) => SetCustomTypeReader(new CustomTypeReader<T>(populateType));
+        public void SetCustomTypeReader(Func<ExtensionApi, T> readType) => SetCustomTypeReader(new CustomTypeReader<T>(readType));
         public void SetCustomTypeReader(Func<PreparationApi, Func<ExtensionApi, T, T>> readTypeCreator) => SetCustomTypeReader(new CustomTypeReader<T>(readTypeCreator));
 
         public void ConfigureMember<TMember>(string memberName, Action<MemberSettings<TMember>> configureMemberSettings)
@@ -415,34 +450,50 @@ public sealed partial class JsonDeserializer
             configureMemberSettings(memberSettings);
             memberSettingsDict[memberName] = memberSettings;
         }
+
+        public void SetInstanceTypeMapping<TMap>(Action<TypeSettings<TMap>> configureInstanceTypeSettings = null) where TMap : T
+        {
+            this.multiOptionMappedTypes.Clear(); // clear multi option mappings if they exist, as we are now adding a single mapping
+
+            Type instanceType = typeof(TMap);
+            Type type = typeof(T);
+            if (!instanceType.IsAssignableTo(type))
+            {
+                throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(instanceType)}");
+            }
+            TypeSettings<TMap> typeSettings = null;
+            if (configureInstanceTypeSettings != null)
+            {
+                typeSettings = new TypeSettings<TMap>();
+                configureInstanceTypeSettings(typeSettings);
+            }
+            this.mappedType = new MappedType(instanceType, typeSettings);
+        }
+        
+        public void AddInstanceTypeMappingOption<TMap>(Action<TypeSettings<TMap>> configureInstanceTypeSettings = null) where TMap : T
+        {            
+            this.mappedType = default; // clear single mapping if it exists, as we are now adding multiple options
+
+            Type instanceType = typeof(TMap);
+            Type type = typeof(T);
+            if (!instanceType.IsAssignableTo(type))
+            {
+                throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(instanceType)}");
+            }
+            TypeSettings<TMap> typeSettings = null;
+            if (configureInstanceTypeSettings != null)
+            {
+                typeSettings = new TypeSettings<TMap>();
+                configureInstanceTypeSettings(typeSettings);
+            }
+            multiOptionMappedTypes.Add(new MappedType(instanceType, typeSettings));
+        }
     }
 
     public class MemberSettings<T> : TypeSettings<T>
     {
         public void SetIgnore(bool ignore = true) => this.member_ignore = ignore;
         public void OverrideName(string alternateName) => this.member_overrideName = alternateName;
-        public void ReplaceType(Type instanceType)
-        {
-            Type type = typeof(T);
-            if (!instanceType.IsAssignableTo(type))
-            {
-                throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(instanceType)}");
-            }
-            this.member_typeMapping = instanceType;
-        }
-
-        public void ReplaceTypeOptions(params Type[] instanceTypeOptions)
-        {
-            Type type = typeof(T);
-            foreach (var instanceType in instanceTypeOptions)
-            {
-                if (!instanceType.IsAssignableTo(type))
-                {
-                    throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(instanceType)}");
-                }
-            }
-            this.member_typeOptions = instanceTypeOptions;
-        }
 
         public void SetUseStringCache(bool useStringCache)
         {
@@ -453,13 +504,7 @@ public sealed partial class JsonDeserializer
 
     private readonly struct CompiledSettings
     {
-        public readonly DataAccess dataAccess;
-        public readonly Dictionary<Type, object> constructors;
-        public readonly Dictionary<(Type, Type), object> constructorsWithParam;
-        public readonly Dictionary<Type, Type> typeMapping;
-        public readonly Dictionary<Type, Type[]> multiOptionTypeMapping;
-        public readonly Dictionary<Type, Type> genericTypeMapping;
-        public readonly Dictionary<Type, object> customTypeReaders;
+        public readonly DataAccess dataAccess;        
         public readonly Dictionary<string, Type> customTypeNames;
         public readonly HashSet<Type> forbiddenTypes;
 
@@ -489,14 +534,7 @@ public sealed partial class JsonDeserializer
 
         public CompiledSettings(Settings settings)
         {
-            dataAccess = settings.dataAccess;
-
-            constructors = new(settings.constructors);
-            constructorsWithParam = new(settings.constructorsWithParam);
-            typeMapping = new(settings.typeMapping);
-            settings.multiOptionTypeMapping.TryCloneDeep(out this.multiOptionTypeMapping);
-            genericTypeMapping = new(settings.genericTypeMapping);
-            customTypeReaders = new(settings.customTypeReaders);
+            dataAccess = settings.dataAccess;                        
             customTypeNames = new(settings.customTypeNames);
             forbiddenTypes = new(settings.forbiddenTypes);
 

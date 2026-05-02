@@ -397,10 +397,9 @@ namespace Playground
 
                          """;
             JsonDeserializer.Settings deserializerSettings = new JsonDeserializer.Settings();
-            deserializerSettings.AddMultiOptionTypeMapping(typeof(object), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
-            deserializerSettings.AddMultiOptionTypeMapping(typeof(IMyInterface), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
-            deserializerSettings.AddTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));
-            deserializerSettings.AddConstructor<MyEmbedded3>(() => new MyEmbedded3(default));
+            //deserializerSettings.AddMultiOptionTypeMapping(typeof(object), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
+            //deserializerSettings.AddMultiOptionTypeMapping(typeof(IMyInterface), typeof(MyEmbedded1), typeof(MyEmbedded2), typeof(MyEmbedded3));
+            //deserializerSettings.AddTypeMapping(typeof(IMyGenericInterface<>), typeof(MyGenericEmbedded<>));            
             //deserializerSettings.initialBufferSize = 20;
             //deserializerSettings.AddConstructor<KeyValuePair<string, int>>(() => new KeyValuePair<string, int>(default, default));
             //deserializerSettings.AddConstructor<KeyValuePair<string, object>>(() => new KeyValuePair<string, object>(default, default));
@@ -408,17 +407,6 @@ namespace Playground
             var featureJsonDeserializer = new JsonDeserializer(deserializerSettings);
             //featureJsonDeserializer.TryDeserialize<MyEmbedded3>(jsonString.ToStream(), out var result);
             //featureJsonDeserializer.TryDeserialize<int[][]>(jsonString.ToStream(), out var result);
-
-            deserializerSettings.AddCustomTypeReader<XmlElement>(new JsonDeserializer.CustomTypeReader<XmlElement>(
-                api =>
-                {
-                    if (api.TryReadStringValueOrNull(out string xmlString))
-                    {
-                        XmlElement xml = XmlHelper.ToXmlElement(xmlString);
-                        return xml;
-                    }
-                    else throw new Exception("Not a string");
-                }));
 
             var jsonStream = jsonString.ToStream();
 

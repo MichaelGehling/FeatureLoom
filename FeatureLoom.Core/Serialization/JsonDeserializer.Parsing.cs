@@ -2386,18 +2386,6 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static byte FoldAsciiToLower(byte b) => (byte)(b | 0x20);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static FilterResult Lookup(FilterResult[] map, byte index)
-    {
-        Debug.Assert(map != null && map.Length > byte.MaxValue);
-        return map[index];
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static FilterResult Lookup(ref FilterResult map_firstElement, byte index)
-    {
-        return Unsafe.Add(ref map_firstElement, index);
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static TypeResult Lookup(TypeResult[] map, byte index)
@@ -2407,21 +2395,10 @@ public sealed partial class JsonDeserializer
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static TypeResult Lookup(ref TypeResult map_firstElement, byte index)
-    {
-        return Unsafe.Add(ref map_firstElement, index);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool LookupCheck(FilterResult[] map, byte index, FilterResult comparant)
     {
+        Debug.Assert(map != null && map.Length > byte.MaxValue);
         return comparant == map[index];
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool LookupCheck(ref FilterResult map_firstElement, byte index, FilterResult comparant)
-    {
-        return comparant == Unsafe.Add(ref map_firstElement, index);
     }
 
     enum FilterResult : byte

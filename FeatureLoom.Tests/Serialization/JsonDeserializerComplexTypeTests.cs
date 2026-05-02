@@ -312,7 +312,7 @@ namespace FeatureLoom.Serialization
         public void Deserialize_ClassWithoutDefaultConstructor_WithConfiguredConstructor_Works()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddConstructor(() => new NoDefaultCtorSample(42));
+            settings.ConfigureType<NoDefaultCtorSample>(typeSettings => typeSettings.AddConstructor(() => new NoDefaultCtorSample(42)));            
 
             var value = Deserialize<NoDefaultCtorSample>("{\"X\":5}", settings);
 

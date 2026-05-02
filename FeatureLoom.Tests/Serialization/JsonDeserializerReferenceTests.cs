@@ -10,7 +10,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings,                
+                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.EnabledByDefault,                
             };
             var deserializer = new JsonDeserializer(settings);
             Assert.True(deserializer.TryDeserialize(json, out T value));
@@ -21,7 +21,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings,
+                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.EnabledByDefault,
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };

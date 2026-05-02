@@ -14,6 +14,9 @@
 - In this codebase, `Deserialize_*_FromArrayOfKeyValuePairs_PublicFieldsAndProperties` should not be expected to pass because `KeyValuePair<TKey,TValue>` properties are not writable in `PublicFieldsAndProperties` mode.
 - For `Settings_AddCustomTypeReader_UsesTryReadNullValue`, use a struct (`CustomNullReadType`) so `api.TryReadNullValue()` can be asserted meaningfully; a class result may be `null` before custom-reader state is observable.
 - When optimizing number parsing, prefer one upfront `TryEnsureBuffered` call in `ReadNumberBytes`/`TryReadNumberBytes` (best-effort, result may be ignored) rather than calling it inside the hot digit-scanning loop to avoid performance regression. Accept using a fixed worst-case number length with upfront `TryEnsureBuffered` and failing tokens longer than that bound.
+- In this codebase, `populateExistingMembers` applies to deserialization of newly created objects and preinitialized member instances, not to `TryPopulate(...)` flows (which always run in populate mode and force populate behavior).
+- In this codebase, removing a generic type setting (e.g., for `IEnumerable<>`) also removes constructor-default mappings for that generic type, so tests must not expect fallback to default mapping after explicit removal.
+- The project intentionally removed `ReferenceResolutionMode.EnabledByDefaultPlusStrings`; string reference-resolution coverage is not required and should not be proposed as a missing test gap.
 
 ## Parser Guidelines
 - When proposing parser fast-path substitutions, only mark call sites as safe if they preserve whitespace tolerance (e.g., account for pretty-printed JSON whitespace after '{', ',', or ':').

@@ -282,10 +282,12 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_SelectsFirstObjectTypeByField()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectOptionA),
-                typeof(ObjectOptionB),
-                typeof(Queue<object>));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionB>();
+                typeSettings.AddInstanceTypeMappingOption<Queue<object>>();
+            });
 
             var value = DeserializeTyped<object>("{\"FieldA\":7}", settings);
 
@@ -297,10 +299,12 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_SelectsSecondObjectTypeByField()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectOptionA),
-                typeof(ObjectOptionB),
-                typeof(Queue<object>));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionB>();
+                typeSettings.AddInstanceTypeMappingOption<Queue<object>>();
+            });
 
             var value = DeserializeTyped<object>("{\"FieldB\":\"x\"}", settings);
 
@@ -312,10 +316,12 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_FallsBackToDictionaryForUnknownFields()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectOptionA),
-                typeof(ObjectOptionB),
-                typeof(Queue<object>));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionB>();
+                typeSettings.AddInstanceTypeMappingOption<Queue<object>>();
+            });
 
             var value = DeserializeTyped<object>("{\"Unknown\":42}", settings);
 
@@ -327,10 +333,12 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_UsesMappedEnumerableForArray()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectOptionA),
-                typeof(ObjectOptionB),
-                typeof(Queue<object>));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionB>();
+                typeSettings.AddInstanceTypeMappingOption<Queue<object>>();
+            });
 
             var value = DeserializeTyped<object>("[1,\"x\",null]", settings);
 
@@ -346,10 +354,12 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_NumberStillUsesPrimitivePath()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectOptionA),
-                typeof(ObjectOptionB),
-                typeof(Queue<object>));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionB>();
+                typeSettings.AddInstanceTypeMappingOption<Queue<object>>();
+            });
 
             var value = DeserializeTyped<object>("123", settings);
 
@@ -361,9 +371,11 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_UnknownField_WithoutDictionaryFallback_UsesImplicitDictionaryFallback()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectOptionA),
-                typeof(ObjectOptionB));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionB>();
+            });
 
             var value = DeserializeTyped<object>("{\"Unknown\":42}", settings);
 
@@ -375,9 +387,11 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_EmptyObject_WithoutDictionaryFallback_UsesImplicitDictionaryFallback()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectOptionA),
-                typeof(ObjectOptionB));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectOptionB>();
+            });
 
             var value = DeserializeTyped<object>("{}", settings);
 
@@ -389,9 +403,11 @@ namespace FeatureLoom.Serialization
         public void Deserialize_Object_WithMultiOptionTypeMapping_CommonFieldOnly_FallsBackToFirstOption()
         {
             var settings = new JsonDeserializer.Settings();
-            settings.AddMultiOptionTypeMapping(typeof(object),
-                typeof(ObjectCommonOptionA),
-                typeof(ObjectCommonOptionB));
+            settings.ConfigureType<object>(typeSettings =>
+            {
+                typeSettings.AddInstanceTypeMappingOption<ObjectCommonOptionA>();
+                typeSettings.AddInstanceTypeMappingOption<ObjectCommonOptionB>();
+            });
 
             var value = DeserializeTyped<object>("{\"Common\":7}", settings);
 

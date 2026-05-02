@@ -22,6 +22,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters;
 using System.Text;
+using System.Xml.Linq;
 using static FeatureLoom.Serialization.JsonDeserializer;
 using static FeatureLoom.Serialization.JsonSerializer;
 
@@ -36,12 +37,27 @@ public sealed partial class JsonDeserializer
     CachedTypeReader CreateCachedTypeReader(Type itemType, BaseTypeSettings typeSettings = null)
     {
         bool overriddenTypeSettings = typeSettings != null;
+        bool genericTypeSettings = false;
         if (!overriddenTypeSettings)
         {
-            settings.typeSettingsDict.TryGetValue(itemType, out typeSettings);
-        }        
+            // if not overridden type settings are provided, we check if there are type settings for the given item type                        
+            if (!settings.typeSettingsDict.TryGetValue(itemType, out typeSettings))
+            {
+                // if there are no type settings for the given item type, we also check for generic type definitions,
+                // so we can have type settings for e.g. List<> that apply to all List<T> types.
+                if (itemType.IsGenericType)
+                {
+                    settings.typeSettingsDict.TryGetValue(itemType.GetGenericTypeDefinition(), out typeSettings);
+                    if (typeSettings != null) genericTypeSettings = true;
+                }
+            }
+        }
 
-        if (IsForbiddenType(itemType))
+        // We check if the type is forbidden for deserialization before we check for type mappings,
+        // because even if a type is mapped to a different type,
+        // it should not be allowed if it is in the forbidden types,
+        // unless there are specific type settings for this type that allow it.
+        if ((typeSettings == null || genericTypeSettings) && IsForbiddenType(itemType))
         {
             throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(itemType)} is forbidden for deserialization.");
         }
@@ -50,6 +66,21 @@ public sealed partial class JsonDeserializer
             throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(itemType)} is not whitelisted for deserialization.");
         }
 
+        // Prefer type mapping from type settings over global type mapping, so we can override the global type mapping for specific members.
+        if (typeSettings?.mappedType != null && typeSettings.mappedType.Value.type != itemType)
+        {
+            var mappedType = typeSettings.mappedType.Value.type;
+            var mappedTypeSettings = typeSettings.mappedType.Value.typeSettings;
+            if (mappedType.IsGenericTypeDefinition)
+            {
+                mappedType = mappedType.MakeGenericType(itemType.GenericTypeArguments);
+            }
+            CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType, mappedTypeSettings);
+            if (!overriddenTypeSettings) typeReaderCache[itemType] = mappedTypeReader;
+            return mappedTypeReader;
+        }
+
+        /*
         // If a base type is mapped to a more specific type, we create a reader for the mapped type and cache it for the original type,
         // so we can reuse it if the original type is encountered again.
         // This is usually used for abstract types that are mapped to a concrete implementation,
@@ -59,29 +90,29 @@ public sealed partial class JsonDeserializer
             CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType, overriddenTypeSettings ? typeSettings : null);
             if (!overriddenTypeSettings) typeReaderCache[itemType] = mappedTypeReader;
             return mappedTypeReader;
-        }
+        }*/
 
         // For generic types we also check if there is a mapping for the generic type definition,
         // so we can map e.g. all IReadOnlyList<T> to List<T>.
-        if (itemType.IsGenericType && settings.genericTypeMapping.Count > 0)
+        /*if (itemType.IsGenericType && settings.genericTypeMapping.Count > 0)
         {
             Type genericType = itemType.GetGenericTypeDefinition();
             if (settings.genericTypeMapping.TryGetValue(genericType, out Type genericMappedType))
             {
-                mappedType = genericMappedType.MakeGenericType(itemType.GenericTypeArguments);
+                Type mappedType = genericMappedType.MakeGenericType(itemType.GenericTypeArguments);
                 CachedTypeReader mappedTypeReader = CreateCachedTypeReader(mappedType, overriddenTypeSettings ? typeSettings : null);
                 if (!overriddenTypeSettings) typeReaderCache[itemType] = mappedTypeReader;
                 return mappedTypeReader;
             }
-        }
+        }*/
 
         return new CachedTypeReader((cachedTypeReader) =>
         {
             if (!overriddenTypeSettings) typeReaderCache[itemType] = cachedTypeReader;
 
-            if (settings.customTypeReaders.TryGetValue(itemType, out object customReaderObj))
+            if (typeSettings?.customTypeReader != null)
             {
-                return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateCustomTypeReader), itemType.ToSingleEntryArray(), customReaderObj, typeSettings);
+                return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateCustomTypeReader), itemType.ToSingleEntryArray(), typeSettings.customTypeReader, typeSettings);
             }
 
             if (itemType.IsArray) return CreateArrayTypeReader(itemType, cachedTypeReader, typeSettings);
@@ -473,7 +504,7 @@ public sealed partial class JsonDeserializer
                     b = SkipWhiteSpaces();
                     if (b == '}') break;
 
-                    K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
+                    K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes, valueReader.WriteRefPath);
                     b = SkipWhiteSpaces();
                     if (b != ':') throw new Exception("Failed reading object to Dictionary");
                     buffer.TryNextByte();
@@ -520,7 +551,7 @@ public sealed partial class JsonDeserializer
                             b = SkipWhiteSpaces();
                             if (b == '}') break;
 
-                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
+                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes, valueReader.WriteRefPath);
                             keysToKeep.Add(fieldName);
                             b = SkipWhiteSpaces();
                             if (b != ':') throw new Exception("Failed reading object to Dictionary");
@@ -554,7 +585,7 @@ public sealed partial class JsonDeserializer
                             b = SkipWhiteSpaces();
                             if (b != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
                             buffer.TryNextByte();
-                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
+                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes, valueReader.WriteRefPath);
 
                             // next element
                             b = SkipWhiteSpaces();
@@ -618,7 +649,7 @@ public sealed partial class JsonDeserializer
                         b = SkipWhiteSpaces();
                         if (b == '}') break;
 
-                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes);
+                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes, valueReader.WriteRefPath);
                         keysToKeep.Add(fieldName);
                         b = SkipWhiteSpaces();
                         if (b != ':') throw new Exception("Failed reading object to Dictionary");
@@ -651,22 +682,23 @@ public sealed partial class JsonDeserializer
     }
 
     private TypeReaderInitializer CreateUnknownObjectReader(CachedTypeReader cachedTypeReader, BaseTypeSettings typeSettings)
-    {
-        if (!settings.multiOptionTypeMapping.TryGetValue(typeof(object), out var typeOptions))
+    {        
+        if (typeSettings == null || typeSettings.multiOptionMappedTypes.Count == 0)
         {
             return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true, typeSettings);
         }
+        var typeOptions = typeSettings.multiOptionMappedTypes;      
 
-        List<Type> objectTypeOptions = new List<Type>();
+        List<MappedType> objectTypeOptions = new List<MappedType>();
         Type arrayTypeOption = null;
 
         foreach (var typeOption in typeOptions)
         {
-            if (typeOption.ImplementsInterface(typeof(IEnumerable)) || typeOption.ImplementsGenericInterface(typeof(IEnumerable<>)))
+            if (typeOption.type.ImplementsInterface(typeof(IEnumerable)) || typeOption.type.ImplementsGenericInterface(typeof(IEnumerable<>)))
             {
-                if (arrayTypeOption == null) arrayTypeOption = typeOption;
+                if (arrayTypeOption == null) arrayTypeOption = typeOption.type;
             }
-            else if (!typeOption.IsPrimitive)
+            else if (!typeOption.type.IsPrimitive)
             {
                 objectTypeOptions.Add(typeOption);
             }
@@ -678,10 +710,10 @@ public sealed partial class JsonDeserializer
         }
 
         if (arrayTypeOption == null) arrayTypeOption = typeof(List<object>);
-        objectTypeOptions.Add(typeof(Dictionary<string, object>));
+        objectTypeOptions.Add(new MappedType(typeof(Dictionary<string, object>), null));
 
         var arrayReader = GetCachedTypeReader(arrayTypeOption);
-        CachedTypeReader objectReader = new CachedTypeReader((_) => CreateMultiOptionComplexTypeReader<object>(objectTypeOptions.ToArray(), typeSettings));
+        CachedTypeReader objectReader = new CachedTypeReader((_) => CreateMultiOptionComplexTypeReader<object>(objectTypeOptions.ToArray()));
 
         var reader = () =>
         {
@@ -708,29 +740,29 @@ public sealed partial class JsonDeserializer
 
     }
 
-    private TypeReaderInitializer CreateMultiOptionComplexTypeReader<T>(Type[] typeOptions, BaseTypeSettings typeSettings)
+    private TypeReaderInitializer CreateMultiOptionComplexTypeReader<T>(MappedType[] typeOptions)
     {
 
-        Type[] objectTypeOptions = typeOptions
-            .Where(t => !t.IsPrimitive && !t.ImplementsGenericInterface(typeof(IDictionary<,>)))
+        MappedType[] objectTypeOptions = typeOptions
+            .Where(map => !map.type.IsPrimitive && !map.type.ImplementsGenericInterface(typeof(IDictionary<,>)))
             .ToArray();
 
         CachedTypeReader[] objectTypeReaders = objectTypeOptions
-            .Select(t =>
+            .Select(map =>
             {
-                if (typeof(T) == t)
+                if (typeof(T) == map.type)
                 {
                     // If the type option is the same as the requested type, we have to create the type reader with CreateComplexTypeReader
                     // to avoid infinite recursion, because GetCachedTypeReader would return the currently created type reader which is not yet
                     // fully initialized and would cause infinite recursion when we try to read a value with it.
-                    return new CachedTypeReader((_) => CreateComplexTypeReader<T>(false, typeSettings));
+                    return new CachedTypeReader((_) => CreateComplexTypeReader<T>(false, map.typeSettings));
                 }
-                else return GetCachedTypeReader(t);
+                else return GetCachedTypeReader(map.type, map.typeSettings);
             })
             .ToArray();
 
-        Type dictType = typeOptions.FirstOrDefault(t => t.ImplementsGenericInterface(typeof(IDictionary<,>)));
-        CachedTypeReader dictTypeReader = dictType != null ? GetCachedTypeReader(dictType) : null;
+        MappedType dictType = typeOptions.FirstOrDefault(map => map.type.ImplementsGenericInterface(typeof(IDictionary<,>)));
+        CachedTypeReader dictTypeReader = dictType.type != null ? GetCachedTypeReader(dictType.type, dictType.typeSettings) : null;
 
         int numOptions = typeOptions.Length;
 
@@ -738,10 +770,10 @@ public sealed partial class JsonDeserializer
         for (int i = 0; i < objectTypeOptions.Length; i++)
         {
             var typeOption = objectTypeOptions[i];
-            var memberInfos = CreateMemberInfosList(typeOption, typeSettings?.dataAccess ?? settings.dataAccess);
+            var memberInfos = CreateMemberInfosList(typeOption.type, typeOption.typeSettings?.dataAccess ?? settings.dataAccess);            
 
             foreach (var memberInfo in memberInfos)
-            {
+            {                
                 string name = memberInfo.Name;
                 var itemFieldName = new ByteSegment(name.ToByteArray(), true);
                 if (!fieldNameToIsTypeMember.TryGetValue(itemFieldName, out var indicesList))
@@ -754,6 +786,20 @@ public sealed partial class JsonDeserializer
                 if (name.TryExtract("<{name}>k__BackingField", out string propertyName))
                 {
                     name = propertyName;
+                    itemFieldName = new ByteSegment(name.ToByteArray(), true);
+                    if (!fieldNameToIsTypeMember.TryGetValue(itemFieldName, out indicesList))
+                    {
+                        indicesList = Enumerable.Repeat(false, objectTypeOptions.Length).ToList();
+                        fieldNameToIsTypeMember[itemFieldName] = indicesList;
+                    }
+                    indicesList[i] = true;
+                }
+
+                if (typeOption.typeSettings != null &&
+                    typeOption.typeSettings.memberSettingsDict.TryGetValue(name, out var memberSettings) &&
+                    !memberSettings.member_overrideName.EmptyOrNull())
+                {
+                    name = memberSettings.member_overrideName;
                     itemFieldName = new ByteSegment(name.ToByteArray(), true);
                     if (!fieldNameToIsTypeMember.TryGetValue(itemFieldName, out indicesList))
                     {
@@ -865,16 +911,17 @@ public sealed partial class JsonDeserializer
             return objectTypeReaders[selectionIndex].ReadValue_CheckProposed<T>();
         };
 
-        return TypeReaderInitializer.Create(this, reader, null, true, typeSettings);
+        return TypeReaderInitializer.Create(this, reader, null, true, null);
     }
 
     private TypeReaderInitializer CreateComplexTypeReader<T>(bool checkForMultiOptions, BaseTypeSettings typeSettings)
     {
         Type itemType = typeof(T);
 
-        if (checkForMultiOptions && settings.multiOptionTypeMapping.TryGetValue(itemType, out Type[] mappedTypeOptions))
+        if (checkForMultiOptions && typeSettings != null && typeSettings.multiOptionMappedTypes.Count > 0)
         {
-            return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateMultiOptionComplexTypeReader), [itemType], [mappedTypeOptions, typeSettings]);
+            var multiOptionTypes = typeSettings.multiOptionMappedTypes.ToArray();            
+            return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateMultiOptionComplexTypeReader), [itemType], [multiOptionTypes]);
         }
 
         if (itemType.IsAbstract)
@@ -1820,8 +1867,7 @@ public sealed partial class JsonDeserializer
     {
         Func<T> constructor = null;
         Type type = derivedType ?? typeof(T);
-        if (typeSettings?.constructor != null && typeSettings.constructor is Func<T> castedConstructor) constructor = castedConstructor;
-        else if (settings.constructors.TryGetValue(type, out object c) && c is Func<T> typedConstructor) constructor = () => typedConstructor();
+        if (typeSettings?.constructor != null && typeSettings.constructor is Func<T> castedConstructor) constructor = castedConstructor;        
         else if (type.IsValueType) return () => default;
         else if (!TryCompileConstructor<T>(out constructor, derivedType))
         {
@@ -1842,7 +1888,6 @@ public sealed partial class JsonDeserializer
 
         if (!type.IsValueType && typeSettings?.enableReferenceResolution != false &&
             (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefault || 
-            settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings ||
             (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.OnlyPerType && typeSettings?.enableReferenceResolution == true)))
         {
             return () =>
@@ -1859,8 +1904,7 @@ public sealed partial class JsonDeserializer
     {
         Func<P, T> constructor = null;
         Type type = typeof(T);
-        if (typeSettings?.collectionConstructor != null && typeSettings.collectionConstructor is Func<P, T> castedConstructor) constructor = castedConstructor;
-        else if (settings.constructorsWithParam.TryGetValue((type, typeof(P)), out object c) && c is Func<P, T> typedConstructor) constructor = typedConstructor;
+        if (typeSettings?.collectionConstructor != null && typeSettings.collectionConstructor is Func<P, T> castedConstructor) constructor = castedConstructor;        
         else if (!TryCompileConstructor(out constructor))
         {
             throw new Exception($"No constructor for type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)} with parameter {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(P))}. Use AddConstructorWithParameter in Settings.");
@@ -1868,7 +1912,6 @@ public sealed partial class JsonDeserializer
 
         if (!type.IsValueType && typeSettings?.enableReferenceResolution != false &&
             (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefault ||
-            settings.referenceResolutionMode == Settings.ReferenceResolutionMode.EnabledByDefaultPlusStrings ||
             (settings.referenceResolutionMode == Settings.ReferenceResolutionMode.OnlyPerType && typeSettings?.enableReferenceResolution == true)))
         {
             return (parameter) =>
