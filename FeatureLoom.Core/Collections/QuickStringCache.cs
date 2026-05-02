@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -186,6 +187,21 @@ public sealed class QuickStringCache
         unchecked
         {
             ref byte arrayRef = ref arr[0];
+
+            // Safety proof for all Unsafe.Add(ref arrayRef, index) accesses:
+            // - ByteSegment wraps ArraySegment<byte>, which guarantees:
+            //   0 <= start, 0 <= count, and start + count <= arr.Length.
+            // - Therefore valid segment indices are exactly [start .. start + count - 1].
+            // - Short-path loop uses i in [start .. start + count - 1].
+            // - Sampled path indices are:
+            //   start,
+            //   start + (count >> 2),
+            //   start + (count >> 1),
+            //   start + ((count * 3) >> 2),
+            //   start + count - 1.
+            //   Each offset term is in [0 .. count - 1] for count > 0, so all are in-range.
+            // - arr == null and count == 0 are returned early, so no invalid dereference occurs.
+            Debug.Assert(start + count <= arr.Length);
 
             // For very short strings, full hash keeps quality and is still cheap.
             if (count <= 8)

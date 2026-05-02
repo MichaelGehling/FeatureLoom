@@ -23,7 +23,6 @@ public sealed class LatestMessageReceiver<T> : IMessageSink<T>, IReceiver<T>, IA
     private T receivedMessage;
     private bool hasMessage;
     private LazyValue<SourceHelper> alternativeSendingHelper;
-    readonly bool isAtomic = !typeof(T).IsValueType || System.IntPtr.Size >= System.Runtime.CompilerServices.Unsafe.SizeOf<T>();
 
     /// <summary>
     /// Provides an alternative source route for messages that are not of type <typeparamref name="T"/>.
@@ -59,17 +58,9 @@ public sealed class LatestMessageReceiver<T> : IMessageSink<T>, IReceiver<T>, IA
     {
         get
         {
-            if (isAtomic)
+            using (myLock.LockReadOnly())
             {
-                if (!Volatile.Read(ref hasMessage)) return default;
                 return receivedMessage;
-            }
-            else
-            {
-                using (myLock.LockReadOnly())
-                {
-                    return receivedMessage;
-                }
             }
         }
     }

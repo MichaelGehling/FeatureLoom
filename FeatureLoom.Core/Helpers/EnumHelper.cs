@@ -104,7 +104,13 @@ namespace FeatureLoom.Helpers
                 Type underlyingType = Enum.GetUnderlyingType(typeof(T));
                 var acceptedTypes = new[] { typeof(int), typeof(short), typeof(ushort), typeof(byte), typeof(sbyte) };
                 if (!acceptedTypes.Contains(underlyingType)) throw new NotSupportedException($"EnumHelper cannot used with enum type {typeof(T)}, because only int32 based types and compatible ones are supported.");
-                
+
+                // Safety note for Unsafe.As usage in this method:
+                // - Every Unsafe.As<TFrom, T>(ref x) call is gated by an exact runtime type check
+                //   (e.g. `underlyingType == typeof(int)`), so that branch executes only when underlyingType is exactly that type.
+                // - Therefore `TFrom` and `T` have identical runtime type/layout in the executed branch, and
+                //   Unsafe.As is used as a zero-allocation typed return path (no cross-type reinterpretation).
+
                 // Assign the most efficient conversion delegate for the enum's underlying type
                 if (underlyingType == typeof(int))  convertToInt = e => Unsafe.As<T, int>(ref e);
                 else if (underlyingType == typeof(byte)) convertToInt = e => Unsafe.As<T, byte>(ref e);

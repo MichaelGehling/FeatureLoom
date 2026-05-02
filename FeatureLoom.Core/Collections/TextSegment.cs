@@ -1312,9 +1312,14 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// <returns><c>true</c> if conversion succeeded; otherwise, <c>false</c>.</returns>
     public bool TryToType<T>(out T result, IFormatProvider provider = null)
     {
+        // Safety note for Unsafe.As usage in this method:
+        // - Every Unsafe.As<TFrom, T>(ref x) call is gated by an exact runtime type check
+        //   (e.g. `type == typeof(int)`), so that branch executes only when `T` is exactly that type.
+        // - Therefore `TFrom` and `T` have identical runtime type/layout in the executed branch, and
+        //   Unsafe.As is used as a zero-allocation typed return path (no cross-type reinterpretation).
         try
         {
-            Type type = typeof(T);            
+            Type type = typeof(T);
             
             if (type == typeof(string))
             {
@@ -1402,35 +1407,35 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = this;
-                    result = System.Runtime.CompilerServices.Unsafe.As<TextSegment, T>(ref x);
-                }                
+                    TextSegment? x = this;
+                    result = System.Runtime.CompilerServices.Unsafe.As<TextSegment?, T>(ref x);
+                }
             }
             else if (type == typeof(bool?))
             {
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToBoolean(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<bool, T>(ref x);
-                }                
+                    bool? x = ToBoolean(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<bool?, T>(ref x);
+                }
             }
             else if (type == typeof(byte?))
             {
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToByte(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<byte, T>(ref x);
-                }                
+                    byte? x = ToByte(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<byte?, T>(ref x);
+                }
             }
             else if (type == typeof(char?))
             {
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToChar(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<char, T>(ref x);
+                    char? x = ToChar(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<char?, T>(ref x);
                 }
             }
             else if (type == typeof(DateTime?))
@@ -1438,8 +1443,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToDateTime(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<DateTime, T>(ref x);
+                    DateTime? x = ToDateTime(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<DateTime?, T>(ref x);
                 }
             }
             else if (type == typeof(decimal?))
@@ -1447,17 +1452,17 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToDecimal(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<decimal, T>(ref x);
-                }                
+                    decimal? x = ToDecimal(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<decimal?, T>(ref x);
+                }
             }
             else if (type == typeof(double?))
             {
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToDouble(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<double, T>(ref x);
+                    double? x = ToDouble(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<double?, T>(ref x);
                 }
             }
             else if (type == typeof(short?))
@@ -1465,17 +1470,17 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToInt16(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<short, T>(ref x);
-                }                
+                    short? x = ToInt16(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<short?, T>(ref x);
+                }
             }
             else if (type == typeof(int?))
             {
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToInt32(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<int, T>(ref x);
+                    int? x = ToInt32(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<int?, T>(ref x);
                 }
             }
             else if (type == typeof(long?))
@@ -1483,8 +1488,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToInt64(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<long, T>(ref x);
+                    long? x = ToInt64(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<long?, T>(ref x);
                 }
             }
             else if (type == typeof(sbyte?))
@@ -1492,8 +1497,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToSByte(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<sbyte, T>(ref x);
+                    sbyte? x = ToSByte(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<sbyte?, T>(ref x);
                 }
             }
             else if (type == typeof(float?))
@@ -1501,8 +1506,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToSingle(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<float, T>(ref x);
+                    float? x = ToSingle(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<float?, T>(ref x);
                 }
             }
             else if (type == typeof(ushort?))
@@ -1510,8 +1515,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToUInt16(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<ushort, T>(ref x);
+                    ushort? x = ToUInt16(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<ushort?, T>(ref x);
                 }
             }
             else if (type == typeof(uint?))
@@ -1519,8 +1524,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToUInt32(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<uint, T>(ref x);
+                    uint? x = ToUInt32(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<uint?, T>(ref x);
                 }
             }
             else if (type == typeof(ulong?))
@@ -1528,8 +1533,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 if (this.IsEmptyOrInvalid) result = default;
                 else
                 {
-                    var x = ToUInt64(provider);
-                    result = System.Runtime.CompilerServices.Unsafe.As<ulong, T>(ref x);
+                    ulong? x = ToUInt64(provider);
+                    result = System.Runtime.CompilerServices.Unsafe.As<ulong?, T>(ref x);
                 }
             }
             else

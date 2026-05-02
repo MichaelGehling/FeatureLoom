@@ -78,7 +78,7 @@ public static class DictionaryExtensions
     {
 #if NET5_0_OR_GREATER
         ref var refValue = ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
-        if (Unsafe.IsNullRef(ref refValue)) return false;
+        if (Unsafe.IsNullRef(ref refValue)) return false; // key not found
         refValue = value;
         return true;
 #else
@@ -92,7 +92,7 @@ public static class DictionaryExtensions
     {
 #if NET5_0_OR_GREATER
         ref var refValue = ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
-        if (Unsafe.IsNullRef(ref refValue)) return false;
+        if (Unsafe.IsNullRef(ref refValue)) return false; // key not found
         refValue = valueCreator(valueCreatorInput);
         return true;
 #else
