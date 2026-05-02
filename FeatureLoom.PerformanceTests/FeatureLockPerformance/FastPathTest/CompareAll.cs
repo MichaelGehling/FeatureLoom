@@ -31,7 +31,7 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         //public void FastSpinLock_Lock() => fastSpinLockSubjects.Lock();
 
         [Benchmark]
-        public void MicroSpinLock_Lock() => microSpinLockSubjects.Lock();
+        public void MicroValueLock_Lock() => microSpinLockSubjects.Lock();
 
         [Benchmark]
         public void SpinLock_Lock() => spinLockSubjects.Lock();
@@ -45,11 +45,11 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         [Benchmark]
         public void ReaderWriterLockSlim_Lock() => readerWriterLockSlimSubjects.Lock();
 
-        [Benchmark]
-        public void AsyncEx_Lock() => asyncExSubjects.Lock();
+        //[Benchmark]
+        //public void AsyncEx_Lock() => asyncExSubjects.Lock();
 
-        [Benchmark]
-        public void AsyncExRW_Lock() => asyncExRWSubjects.Lock();
+        //[Benchmark]
+        //public void AsyncExRW_Lock() => asyncExRWSubjects.Lock();
 
         //[Benchmark]
         //public void NeoSmart_Lock() => neoSmartSubjects.Lock();
@@ -60,11 +60,11 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         [Benchmark]
         public void SemaphoreSlim_LockAsync_() => semaphoreSlimSubjects.LockAsync().WaitFor();
 
-        [Benchmark]
-        public void AsyncEx_LockAsync_() => asyncExSubjects.LockAsync().WaitFor();
+        //[Benchmark]
+        //public void AsyncEx_LockAsync_() => asyncExSubjects.LockAsync().WaitFor();
 
-        [Benchmark]
-        public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockAsync().WaitFor();
+        //[Benchmark]
+        //public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockAsync().WaitFor();
 
         /*
         [Benchmark]

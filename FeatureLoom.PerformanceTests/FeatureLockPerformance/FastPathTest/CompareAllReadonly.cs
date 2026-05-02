@@ -20,31 +20,26 @@ namespace FeatureLoom.PerformanceTests.FeatureLockPerformance.FastPathTest
         private AsyncExRWSubjects asyncExRWSubjects = new AsyncExRWSubjects();
         private ReaderWriterLockSlimSubjects readerWriterLockSlimSubjects = new ReaderWriterLockSlimSubjects();
         private SpinLockSubjects spinLockSubjects = new SpinLockSubjects();
-        private FastSpinLockSubjects fastSpinLockSubjects = new FastSpinLockSubjects();
-        private MicroValueLockSubjects microSpinLockSubjects = new MicroValueLockSubjects();
+        private MicroValueLockSubjects microValueLockSubjects = new MicroValueLockSubjects();
 
-        [Benchmark]
-        public void MicroSpinLock_Lock_() => microSpinLockSubjects.LockReadOnly();
 
         [Benchmark(Baseline = true)]
         public void FeatureLock_Lock() => featureLockSubjects.LockReadOnly();
 
-        [Benchmark]
-        public void FastSpinLock_Lock() => fastSpinLockSubjects.LockReadOnly();
 
         [Benchmark]
-        public void MicroSpinLock_Lock() => microSpinLockSubjects.LockReadOnly();
+        public void MicroValueLock_Lock() => microValueLockSubjects.LockReadOnly();
 
         [Benchmark]
         public void ReaderWriterLockSlim_Lock() => readerWriterLockSlimSubjects.LockReadOnly();
 
-        [Benchmark]
-        public void AsyncExRW_Lock() => asyncExRWSubjects.LockReadOnly();
+        //[Benchmark]
+        //public void AsyncExRW_Lock() => asyncExRWSubjects.LockReadOnly();
 
         [Benchmark]
         public void FeatureLock_LockAsync_() => featureLockSubjects.LockReadOnlyAsync().WaitFor();
 
-        [Benchmark]
-        public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockReadOnlyAsync().WaitFor();
+        //[Benchmark]
+        //public void AsyncExRW_LockAsync_() => asyncExRWSubjects.LockReadOnlyAsync().WaitFor();
     }
 }
