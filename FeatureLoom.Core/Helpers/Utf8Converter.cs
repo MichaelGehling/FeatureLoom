@@ -307,4 +307,16 @@ public static class Utf8Converter
         slicedBuffer.ResizeSlice(ref bytes, bytesCount);
         return bytes;
     }
+
+    /// <summary>
+    /// Returns a byte segment obtained from EncodeToUtf8 back to the pool for reuse.
+    /// The byte segment will be cleared and set to empty after returning to prevent accidental reuse.
+    /// </summary>
+    /// <param name="byteSegment">The byte segment to return to the pool.</param>
+    public static void ReturnBytesToPool(ref ByteSegment byteSegment)
+    {
+        ArraySegment<byte> bytes = byteSegment.AsArraySegment;
+        sharedSlicedByteBuffer.FreeSlice(ref bytes);
+        byteSegment = ByteSegment.Empty;
+    }
 }

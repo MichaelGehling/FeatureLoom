@@ -245,7 +245,8 @@ public class SlicedBuffer<T>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void FreeSlice(ref ArraySegment<T> slice)
     {
-        ResizeSlice(ref slice, 0);
+        if (slice.Array == this.buffer) ResizeSlice(ref slice, 0);
+        else slice = new ArraySegment<T>();
     }
 
     /// <summary>
