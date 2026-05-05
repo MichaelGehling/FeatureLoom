@@ -463,6 +463,51 @@ public sealed partial class JsonDeserializer
         }
     }
 
+    public bool TryDeserialize<T>(byte[] utf8Bytes, out T item) => TryDeserialize(new ByteSegment(utf8Bytes, true), out item);
+     
+    public bool TryDeserialize(byte[] utf8Bytes, Type type, out object item) => TryDeserialize(new ByteSegment(utf8Bytes, true), type, out item);
+
+    public bool TryDeserialize<T>(JsonFragment json, out T item)
+    {
+        serializerLock.Enter();
+        try
+        {
+            if (json.IsString) SetDataSourceUnlocked(json.JsonString);
+            else if (json.IsUtf8) SetDataSourceUnlocked(json.JsonUtf8);
+            else
+            {
+                item = default;
+                return false;
+            }
+            return TryDeserializeLocked(out item);
+        }
+        finally
+        {
+            serializerLock.Exit();
+        }
+    }
+
+    public bool TryDeserialize(JsonFragment json, Type type, out object item)
+    {
+        serializerLock.Enter();
+        try
+        {
+            if (json.IsString) SetDataSourceUnlocked(json.JsonString);
+            else if (json.IsUtf8) SetDataSourceUnlocked(json.JsonUtf8);
+            else
+            {
+                item = default;
+                return false;
+            }
+            return TryDeserializeLocked(type, out item);
+        }
+        finally
+        {
+            serializerLock.Exit();
+        }
+    }
+
+
     public bool TryPopulate<T>(ref T item) where T : struct
     {
         serializerLock.Enter();
@@ -496,6 +541,26 @@ public sealed partial class JsonDeserializer
         try
         {
             SetDataSourceUnlocked(json);
+            return TryPopulateLocked(ref item);
+        }
+        finally
+        {
+            serializerLock.Exit();
+        }
+    }
+
+    public bool TryPopulate<T>(JsonFragment json, ref T item) where T : struct
+    {
+        serializerLock.Enter();
+        try
+        {
+            if (json.IsString) SetDataSourceUnlocked(json.JsonString);
+            else if (json.IsUtf8) SetDataSourceUnlocked(json.JsonUtf8);
+            else
+            {
+                item = default;
+                return false;
+            }
             return TryPopulateLocked(ref item);
         }
         finally

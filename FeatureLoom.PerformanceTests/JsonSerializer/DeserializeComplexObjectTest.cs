@@ -31,7 +31,7 @@ public partial class DeserializeComplexObjectTest
     static JsonDeserializer featureJsonDeserializer = new JsonDeserializer(settings =>
     {
         settings.initialBufferSize = 1024 * 1024 * 10;
-        settings.dataAccess = JsonDeserializer.DataAccess.PublicFieldsAndProperties;
+        settings.dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields;
         settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
         //settings.strict = false;
         //settings.proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable;

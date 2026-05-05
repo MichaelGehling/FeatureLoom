@@ -451,7 +451,7 @@ namespace FeatureLoom.Serialization
         [Fact]
         public void Serialize_JsonFragment_Invalid_WritesNull()
         {
-            var value = new JsonFragment(null);
+            var value = new JsonFragment((string)null);
             const string expected = "null";
 
             AssertSerialized(value, expected);

@@ -777,10 +777,8 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteJsonFragmentValue(JsonFragment json)
         {
-            if (json.IsValid)                
-            {                    
-                WriteString(json.JsonString);
-            }
+            if (json.IsString) WriteString(json.JsonString);
+            else if (json.IsUtf8) WriteToBuffer(json.JsonUtf8);
             else WriteNullValue();
         }
 
@@ -791,14 +789,14 @@ public sealed partial class JsonSerializer
             EnsureFreeBufferSpace(64);
             var countBefore = mainBufferCount;
 
-        WriteEscapedString(str);
+            WriteEscapedString(str);
 
-        var writtenBytes = mainBufferCount - countBefore;
-        var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-        slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
 
-        WriteToBufferWithoutCheck(QUOTES);
-        return slice;
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -139,6 +139,24 @@ public sealed partial class JsonDeserializer
         }
     }
 
+    public void SetDataSource(byte[] utf8Bytes, int offset, int count) => SetDataSource(new ByteSegment(utf8Bytes, offset, count));
+    public void SetDataSource(byte[] utf8Bytes) => SetDataSource(new ByteSegment(utf8Bytes));
+
+    public void SetDataSource(JsonFragment json, int offset, int count)
+    {
+        serializerLock.Enter();
+        try
+        {
+            if (json.IsString) SetDataSourceUnlocked(json.JsonString);
+            else if (json.IsUtf8) SetDataSourceUnlocked(json.JsonUtf8);
+            else buffer.ResetBuffer(false, false);
+        }
+        finally
+        {
+            serializerLock.Exit();
+        }
+    }
+
     private void SetDataSourceUnlocked(Stream stream) => buffer.SetSource(stream);
     private void SetDataSourceUnlocked(string json) => buffer.SetSource(json);
     private void SetDataSourceUnlocked(ByteSegment jsonBytes) => buffer.SetSource(jsonBytes);

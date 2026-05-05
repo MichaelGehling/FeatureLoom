@@ -1117,8 +1117,7 @@ public sealed partial class JsonDeserializer
         var rec = buffer.StartRecording();
         SkipValue();
         var utf8Bytes = rec.GetRecordedBytes(buffer.IsBufferReadToEnd);
-        string json = DecodeUtf8Bytes(utf8Bytes);
-        JsonFragment fragment = new JsonFragment(json);
+        JsonFragment fragment = new JsonFragment(utf8Bytes);
         return fragment;
     }
 
