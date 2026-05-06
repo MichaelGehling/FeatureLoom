@@ -3,6 +3,7 @@ using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow;
@@ -91,7 +92,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     /// </summary>
     public ArraySegment<T> PeekMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
     {
-        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+        if (ResetWakeEventIfEmpty() || maxItems <= 0) return new ArraySegment<T>();
         if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
 
         if (remainingBuffer.Count == 0)
@@ -125,7 +126,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     /// </summary>
     public ArraySegment<T> ReceiveMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
     {
-        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+        if (ResetWakeEventIfEmpty() || maxItems <= 0) return new ArraySegment<T>();
         if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
 
         ArraySegment<T> readItems = new ArraySegment<T>();
@@ -160,7 +161,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
             SlicedBuffer<T>.Shared.FreeSlice(ref initialBuffer);
             initialBuffer = remainingBuffer;
         }
-        if (IsEmpty) readerWakeEvent.Reset();
+        ResetWakeEventIfEmpty();
         return readItems;
     }
 
@@ -209,7 +210,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     public bool TryReceive(out T message)
     {
         message = default;
-        if (IsEmpty) return false;
+        if (ResetWakeEventIfEmpty()) return false;
 
         if (remainingBuffer.Count == 0)
         {
@@ -218,7 +219,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
             remainingBuffer = initialBuffer;
         }
 
-        if (IsEmpty) return false;
+        if (ResetWakeEventIfEmpty()) return false;
 
         message = remainingBuffer.Array[remainingBuffer.Offset];                        
         if (remainingBuffer.Count > 1)
@@ -230,8 +231,19 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
             SlicedBuffer<T>.Shared.FreeSlice(ref initialBuffer);
             remainingBuffer = initialBuffer;
         }
-        
-        if (IsEmpty) readerWakeEvent.Reset();
+
+        ResetWakeEventIfEmpty();
         return true;
+    }
+
+    /// <summary>
+    /// Resets the wake event if the buffer is empty and returns whether it is empty.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool ResetWakeEventIfEmpty()
+    {
+        bool isEmpty = IsEmpty;
+        if (isEmpty) readerWakeEvent.Reset();
+        return isEmpty;
     }
 }
