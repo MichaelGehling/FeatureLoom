@@ -16,14 +16,14 @@ namespace FeatureLoom.Helpers
         public static TypeNameHelper Shared { get; } = new TypeNameHelper();
 
         public List<string> SupplementaryAssemblies { get; } = new List<string>();
-        private Dictionary<Assembly, Box<int>> checkedAssemblies = new();
+        readonly private Dictionary<Assembly, Box<int>> checkedAssemblies = new();
 
 
-        private Dictionary<Type, string> typeToName = new Dictionary<Type, string>();
-        private FeatureLock typeToNameLock = null;
+        readonly private Dictionary<Type, string> typeToName = new Dictionary<Type, string>();
+        readonly private FeatureLock typeToNameLock = null;
 
-        private Dictionary<string, Type> nameToType = new Dictionary<string, Type>();
-        private FeatureLock nameToTypeLock = null;
+        readonly private Dictionary<string, Type> nameToType = new Dictionary<string, Type>();
+        readonly private FeatureLock nameToTypeLock = null;
 
         
         public TypeNameHelper(bool threadSafe)

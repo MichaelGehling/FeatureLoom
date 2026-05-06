@@ -29,7 +29,7 @@ namespace FeatureLoom.Helpers
         {
             TypeNameHelper typeNameHelper = new TypeNameHelper();
 
-            string simplifiedName = TypeNameHelper.Shared.GetSimplifiedTypeName(type);
+            string simplifiedName = typeNameHelper.GetSimplifiedTypeName(type);
             Assert.NotNull(simplifiedName);
 
             Type resolvedType = typeNameHelper.GetTypeFromSimplifiedName(simplifiedName);
@@ -87,7 +87,7 @@ namespace FeatureLoom.Helpers
                 {
                     foreach (var type in types)
                     {
-                        string name = TypeNameHelper.Shared.GetSimplifiedTypeName(type);
+                        string name = typeNameHelper.GetSimplifiedTypeName(type);
                         Type resolvedType = typeNameHelper.GetTypeFromSimplifiedName(name);
                         Assert.Equal(type, resolvedType);
                     }
