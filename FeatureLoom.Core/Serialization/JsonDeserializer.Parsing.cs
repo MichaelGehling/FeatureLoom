@@ -2212,7 +2212,8 @@ public sealed partial class JsonDeserializer
     }
 
     static readonly ByteSegment refFieldName = new ByteSegment("$ref".ToByteArray(), true);
-    List<ByteSegment> fieldPathSegments = new List<ByteSegment>();
+    LazyList<ByteSegment> fieldPathSegments = new();
+    LazyDictionary<ByteSegment, object> refPathCache = new();
 
     bool TryReadRefObject<T>(out bool pathIsValid, out bool typeIsCompatible, out T refObject)
     {
@@ -2246,28 +2247,25 @@ public sealed partial class JsonDeserializer
             if (b != (byte)':') return false;
             buffer.TryNextByte();
             if (!TryReadStringBytes(out var refPath)) return false;
-            b = SkipWhiteSpaces();
-            if (b == ',') buffer.TryNextByte();
 
-            // Skip the rest
-            while (true)
+            // We can directly return after reading refPath without needing to reset buffer position,
+            // because if refPath is valid, we want to keep the buffer position after the ref object for further deserialization,
+            if (!TrySkipRemainingFieldsOfObject()) return false;
+
+
+            // Check cache for refPath to avoid expensive path parsing and itemInfo lookup for already resolved refPaths
+            if (refPathCache.TryGetValue(refPath, out var cachedRef))
             {
-                b = SkipWhiteSpaces();
-                if (b == '}') break;
-
-                if (!TryReadStringBytes(out var _)) return false;
-                b = SkipWhiteSpaces();
-                if (b != ':') return false;
-                buffer.TryNextByte();
-                SkipValue();
-                b = SkipWhiteSpaces();
-                if (b == ',') buffer.TryNextByte();
+                if (cachedRef is T compatibleCachedRef)
+                {
+                    typeIsCompatible = true;
+                    itemRef = compatibleCachedRef;
+                }
+                pathIsValid = true;
+                return true;
             }
-            if (buffer.TryNextByte() && !LookupCheck(map_IsFieldEnd, buffer.CurrentByte, FilterResult.Found)) return false;
 
-
-
-            // TODO find object
+            // Split refPath into segments by '.' and '[]' delimiters, to be able to compare it against itemInfos in a more efficient way than comparing the whole path as string for each itemInfo
             if (refPath.Count <= 0) return true;
             int pos = 0;
             int startPos = 0;
@@ -2337,7 +2335,9 @@ public sealed partial class JsonDeserializer
                 b = refPath.AsArraySegment.Get(pos);
             }
 
-
+            // Compare path segments with itemInfos to find the referenced item.
+            // Start by comparing the last segment with item names, if it matches,
+            // continue comparing parent segments with parent itemInfos until the whole path is validated or invalidated.
             object potentialItemRef = null;
             int lastSegmentIndex = fieldPathSegments.Count - 1;
             var referencedFieldName = fieldPathSegments[lastSegmentIndex];
@@ -2359,7 +2359,12 @@ public sealed partial class JsonDeserializer
                     }
 
                     pathIsValid = parentIndex == -1 && segmentIndex == -1;
-                    if (pathIsValid) break;
+                    if (pathIsValid)
+                    {
+                        // Cache resolved refPath with itemRef for faster resolution next time
+                        refPathCache[refPath] = potentialItemRef;
+                        break;
+                    }
                 }
             }
 

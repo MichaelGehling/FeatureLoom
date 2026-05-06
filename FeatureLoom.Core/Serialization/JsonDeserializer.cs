@@ -133,12 +133,17 @@ public sealed partial class JsonDeserializer
     {
         buffer.ResetAfterReading();
         isPopulating = settings.populateExistingMembers;
+        ResetRefResolutionHelper();
+    }
 
+    private void ResetRefResolutionHelper()
+    {
         if (settings.referenceResolutionMode != Settings.ReferenceResolutionMode.ForceDisabled)
         {
-            currentItemName = rootName;                
+            currentItemName = rootName;
             itemInfos.Clear();
             currentItemInfoIndex = -1;
+            refPathCache.Clear();
         }
     }
 
@@ -195,9 +200,8 @@ public sealed partial class JsonDeserializer
 
                 buffer.ResetAfterBufferExceededException();
 
-                currentItemName = rootName;                    
-                itemInfos.Clear();
-                currentItemInfoIndex = -1;
+                ResetRefResolutionHelper();
+
 
                 if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
                 {
@@ -260,9 +264,7 @@ public sealed partial class JsonDeserializer
 
                 buffer.ResetAfterBufferExceededException();
 
-                currentItemName = rootName;
-                itemInfos.Clear();
-                currentItemInfoIndex = -1;
+                ResetRefResolutionHelper();
 
                 if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
                 {
@@ -325,9 +327,7 @@ public sealed partial class JsonDeserializer
 
                 buffer.ResetAfterBufferExceededException();
 
-                currentItemName = rootName;
-                itemInfos.Clear();
-                currentItemInfoIndex = -1;
+                ResetRefResolutionHelper();
 
                 if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
                 {
