@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.Collections
 {
@@ -68,6 +69,7 @@ namespace FeatureLoom.Collections
         /// Allocates the underlying list if it does not exist.
         /// </summary>
         /// <param name="item">The object to add.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(T item)
         {
             list.Obj.Add(item);
@@ -77,6 +79,7 @@ namespace FeatureLoom.Collections
         /// Removes all items from the list.
         /// Does nothing if the list has not been created.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
             if (!list.Exists) return;
@@ -88,6 +91,7 @@ namespace FeatureLoom.Collections
         /// Returns false if the list has not been created.
         /// </summary>
         /// <param name="item">The object to locate.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(T item)
         {
             if (!list.Exists) return false;
@@ -100,6 +104,7 @@ namespace FeatureLoom.Collections
         /// </summary>
         /// <param name="array">The destination array.</param>
         /// <param name="arrayIndex">The zero-based index in array at which copying begins.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void CopyTo(T[] array, int arrayIndex)
         {
             if (!list.Exists) return;
@@ -110,6 +115,7 @@ namespace FeatureLoom.Collections
         /// Returns an enumerator that iterates through the list.
         /// Returns an empty enumerator if the list has not been created.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IEnumerator<T> GetEnumerator()
         {
             if (!list.Exists) return Enumerable.Empty<T>().GetEnumerator();
@@ -121,6 +127,7 @@ namespace FeatureLoom.Collections
         /// Returns -1 if the list has not been created or the item is not found.
         /// </summary>
         /// <param name="item">The object to locate.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(T item)
         {
             if (!list.Exists) return -1;
@@ -133,6 +140,7 @@ namespace FeatureLoom.Collections
         /// </summary>
         /// <param name="index">The zero-based index at which item should be inserted.</param>
         /// <param name="item">The object to insert.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Insert(int index, T item)
         {
             list.Obj.Insert(index, item);
@@ -143,6 +151,7 @@ namespace FeatureLoom.Collections
         /// Returns false if the list has not been created or the item is not found.
         /// </summary>
         /// <param name="item">The object to remove.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(T item)
         {
             if (!list.Exists) return false;
@@ -154,6 +163,7 @@ namespace FeatureLoom.Collections
         /// Throws <see cref="ArgumentOutOfRangeException"/> if the list is not allocated or the index is out of range.
         /// </summary>
         /// <param name="index">The zero-based index of the item to remove.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAt(int index)
         {
             if (!list.Exists) throw new ArgumentOutOfRangeException();
@@ -164,6 +174,7 @@ namespace FeatureLoom.Collections
         /// Returns an enumerator that iterates through the list (non-generic).
         /// Returns an empty enumerator if the list has not been created.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         IEnumerator IEnumerable.GetEnumerator()
         {
             if (!list.Exists) return Enumerable.Empty<T>().GetEnumerator();

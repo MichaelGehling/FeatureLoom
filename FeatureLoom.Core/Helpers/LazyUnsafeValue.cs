@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 
 namespace FeatureLoom.Helpers;
 
@@ -51,14 +52,16 @@ public struct LazyUnsafeValue<T> where T : class, new()
     /// <summary>
     /// Removes the current value, allowing it to be re-initialized on next access.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RemoveObj()
     {
         obj = default;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private T Create()
     {
-        if (obj == null) obj = new T();
+        obj = new T();
         return obj;
     }
 
