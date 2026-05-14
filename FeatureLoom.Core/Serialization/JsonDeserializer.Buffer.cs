@@ -326,13 +326,19 @@ public sealed partial class JsonDeserializer
         {
             if (undoReading)
             {
-                var preRestorePos = buffer.BufferPos;
-                buffer.BufferPos = startBufferPos;
-                if (preRestorePos > buffer.BufferPos)
-                {
-                    buffer.BufferReadTillEnd = false;
-                }
+                UndoNow();
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void UndoNow()
+        {
+            var preRestorePos = buffer.BufferPos;
+            buffer.BufferPos = startBufferPos;
+            if (preRestorePos > buffer.BufferPos)
+            {
+                buffer.BufferReadTillEnd = false;
+            }            
         }
     }
 }

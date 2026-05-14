@@ -35,9 +35,8 @@ public partial class DeserializeComplexObjectTest
         settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
         //settings.strict = false;
         //settings.proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable;
-        // settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.OnlyPerType;
-        //settings.useStringCache = true,
-        //populateExistingMembers = false,        
+        settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
+        settings.populateExistingMembers = true;        
         settings.useStringCache = true;
         /*settings.ConfigureType<SimpleObject>(typeSettings =>
         {
@@ -48,17 +47,20 @@ public partial class DeserializeComplexObjectTest
         });*/
     });
 
-    static JsonDeserializer featureJsonDeserializer2 = new JsonDeserializer(settings =>
+    static JsonDeserializer featureJsonDeserializer_NoPopulate_NoStringCache = new JsonDeserializer(settings =>
     {
         settings.initialBufferSize = 1024 * 1024 * 10;
         settings.dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields;
         settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
         //settings.strict = true;
         //settings.proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable;
-        //settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
-        //settings.useStringCache = true,
-        //settings.populateExistingMembers = false;
+        settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
+        settings.populateExistingMembers = false;
         settings.useStringCache = false;
+        settings.ConfigureGenericType(typeof(List<>), typeSettings =>
+        {
+            typeSettings.SetReferenceResolution(false);
+        });
     });
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
@@ -66,6 +68,7 @@ public partial class DeserializeComplexObjectTest
         IncludeFields = true,        
         //PreferredObjectCreationHandling = System.Text.Json.Serialization.JsonObjectCreationHandling.Populate,
         IgnoreReadOnlyFields = false,
+        ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve,
         DefaultBufferSize = 1024*1024*10,
     };
 
@@ -123,12 +126,12 @@ public partial class DeserializeComplexObjectTest
     }
 
     [Benchmark]
-    public void DeserializeComplexObject_FromStream_Feature2()
+    public void DeserializeComplexObject_FromStream_NoPopulate_NoStringCache()
     {
         for (int i = 0; i < iterations; i++)
         {
             memoryStream.Position = 0;
-            featureJsonDeserializer2.TryDeserialize(memoryStream, out ComplexObject result);
+            featureJsonDeserializer_NoPopulate_NoStringCache.TryDeserialize(memoryStream, out ComplexObject result);
         }
     }
 

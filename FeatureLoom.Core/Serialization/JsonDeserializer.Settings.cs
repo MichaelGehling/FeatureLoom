@@ -53,7 +53,7 @@ public sealed partial class JsonDeserializer
         /// <summary>
         /// Controls when reference tracking and <c>$ref</c>-based resolution are active.
         /// </summary>
-        public ReferenceResolutionMode referenceResolutionMode = ReferenceResolutionMode.OnlyPerType;
+        public ReferenceResolutionMode referenceResolutionMode = ReferenceResolutionMode.DisabledByDefault;
 
         /// <summary>
         /// Controls when proposed runtime types (for example from <c>$type</c>) are evaluated.
@@ -448,7 +448,7 @@ public sealed partial class JsonDeserializer
             /// This can be a good option to limit the performance overhead of reference resolution to only the types where it is actually needed, 
             /// while still allowing for reference resolution in those cases.
             /// </summary>
-            OnlyPerType = 1,
+            DisabledByDefault = 1,
             /// <summary>
             /// Indicates that the feature is enabled by default for all reference types, but can be disabled for specific types in TypeSettings.
             /// Performance overhead is higher but good as a starting point if you expect reference information in the JSON but are not sure for which types, 
@@ -981,7 +981,7 @@ public sealed partial class JsonDeserializer
                     allTypeSettings.AddRange(typeSettings.memberSettingsDict.Values);
                 }
             }
-            if (!anyTypeHasReferenceResolutionEnabled && referenceResolutionMode == ReferenceResolutionMode.OnlyPerType)
+            if (!anyTypeHasReferenceResolutionEnabled && referenceResolutionMode == ReferenceResolutionMode.DisabledByDefault)
             {
                 referenceResolutionMode = ReferenceResolutionMode.ForceDisabled;
             }

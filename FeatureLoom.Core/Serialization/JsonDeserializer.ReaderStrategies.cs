@@ -73,10 +73,46 @@ public partial class JsonDeserializer
         };
     }
 
-    private TypeReaderInitializer CreateGenericEnumerableTypeReaderViaStrategy<T, E, S, SV>(CachedTypeReader elementTypeReader, Func<IEnumerable<E>, T> constructor, Pool<List<E>> bufferPool, BaseTypeSettings typeSettings) where S : struct, IReaderStrategy<SV>
+    private TypeReaderInitializer CreateGenericMutableCollectionTypeReaderViaStrategy<T, E, S, SV>(CachedTypeReader elementTypeReader, Func<T> constructor, CachedTypeReader cachedTypeReader) 
+        where T:ICollection<E> 
+        where S : struct, IReaderStrategy<SV>
     {
+        bool setItemRef = true; //Always true, checked before in TryCreateEnumerableTypeReader
         var r = () =>
         {
+            if (TryReadNullValue()) return default;
+            var b = buffer.CurrentByte;
+            if (b != '[') throw new Exception("Failed reading Array");
+            if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+            T item = constructor();
+            if (setItemRef) SetRefInCurrentItemInfo(item);
+            while (true)
+            {
+                b = SkipWhiteSpaces();
+                if (b == ']') break;
+#if NET5_0_OR_GREATER
+                SV v = S.Read(elementTypeReader);
+#else
+                SV v = default(S).Read(elementTypeReader);
+#endif                
+                E value = Unsafe.As<SV, E>(ref v);
+                item.Add(value);
+                b = SkipWhiteSpaces();
+                if (b == ',') buffer.TryNextByte();
+                else if (b != ']') throw new Exception("Failed reading Array");
+            }
+            if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
+            buffer.TryNextByte();
+            return item;
+        };
+        return TypeReaderInitializer.Create(this, r, null, elementTypeReader.WriteRefPath, cachedTypeReader.TypeSettings);
+    }
+
+    private TypeReaderInitializer CreateGenericEnumerableTypeReaderViaStrategy<T, E, S, SV>(CachedTypeReader elementTypeReader, Func<IEnumerable<E>, T> constructor, Pool<List<E>> bufferPool, CachedTypeReader cachedTypeReader) where S : struct, IReaderStrategy<SV>
+    {
+        bool setItemRef = cachedTypeReader.ResolveRefs;
+        var r = () =>
+        {   
             if (TryReadNullValue()) return default;
             var b = buffer.CurrentByte;
             if (b != '[') throw new Exception("Failed reading Array");
@@ -98,17 +134,22 @@ public partial class JsonDeserializer
                 else if (b != ']') throw new Exception("Failed reading Array");
             }            
             T item = constructor(elementBuffer);
+            //TODO: Too late... the elements may already reference the item,
+            //so we would need to set the ref path for them as well.
+            //We should set the ref path for the item before reading the elements, but then we cannot use the constructor taking the element list,
+            //so we would need to use a parameterless constructor and add the elements to the collection after setting the ref path.
+            if (setItemRef) SetRefInCurrentItemInfo(item); 
             bufferPool.Return(elementBuffer);
             if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array");
             buffer.TryNextByte();
             return item;
         };
-        return TypeReaderInitializer.Create(this, r, null, elementTypeReader.WriteRefPath, typeSettings);
+        return TypeReaderInitializer.Create(this, r, null, elementTypeReader.WriteRefPath, cachedTypeReader.TypeSettings);
     }
 
-    private TypeReaderInitializer CreateGenericArrayTypeReaderViaStrategy<E, S, SV>(CachedTypeReader elementTypeReader, Pool<List<E>> bufferPool, BaseTypeSettings typeSettings) where S : struct, IReaderStrategy<SV>
+    private TypeReaderInitializer CreateGenericArrayTypeReaderViaStrategy<E, S, SV>(CachedTypeReader elementTypeReader, Pool<List<E>> bufferPool, CachedTypeReader cachedTypeReader) where S : struct, IReaderStrategy<SV>
     {
-        bool setItemRef = elementTypeReader.ResolveRefPath;
+        bool setItemRef = cachedTypeReader.ResolveRefs;
         var stringArrayReader = () =>
         {
             byte b = SkipWhiteSpaces();
@@ -131,12 +172,16 @@ public partial class JsonDeserializer
                 else if (b != ']') throw new Exception("Failed reading Array");
             }
             E[] item = elementBuffer.ToArray();
-            if (setItemRef) SetItemRefInCurrentItemInfo(item);
+            //TODO: Too late... the elements may already reference the item,
+            //so we would need to set the ref path for them as well.
+            //We should set the ref path for the item before reading the elements, but then we cannot use the constructor taking the element list,
+            //so we would need to use a parameterless constructor and add the elements to the collection after setting the ref path.                
+            if (setItemRef) SetRefInCurrentItemInfo(item);
             bufferPool.Return(elementBuffer);
             buffer.TryNextByte();
             return item;
         };
-        return TypeReaderInitializer.Create(this, stringArrayReader, null, elementTypeReader.WriteRefPath, typeSettings);
+        return TypeReaderInitializer.Create(this, stringArrayReader, null, cachedTypeReader.WriteRefPath, cachedTypeReader.TypeSettings);
     }
 
 

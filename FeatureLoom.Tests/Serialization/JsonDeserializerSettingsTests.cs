@@ -1450,7 +1450,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.OnlyPerType,
+                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.DisabledByDefault,
                 rethrowExceptions = false,
                 logCatchedExceptions = false
             };
@@ -1472,7 +1472,7 @@ namespace FeatureLoom.Serialization
         {
             var settings = new JsonDeserializer.Settings
             {
-                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.OnlyPerType
+                referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.DisabledByDefault
             };
             settings.ConfigureType<RefNode>(ts => ts.SetReferenceResolution(true));
 

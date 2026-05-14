@@ -41,6 +41,7 @@ public sealed partial class JsonDeserializer
     ByteSegment currentItemName = rootName;
     int currentItemInfoIndex = -1;
     List<ItemInfo> itemInfos = new List<ItemInfo>();
+    bool anyItemIdWritten = false;
     bool isPopulating = false;
 
     struct ItemInfo
@@ -48,11 +49,18 @@ public sealed partial class JsonDeserializer
         public readonly ByteSegment name;            
         public readonly int parentIndex;
         public object itemRef;
+        public ByteSegment id;
 
         public ItemInfo(ByteSegment name, int parentIndex)
         {
             this.name = name;
             this.parentIndex = parentIndex;
+        }
+
+        public ItemInfo(ByteSegment id)
+        {            
+            this.parentIndex = -1;
+            this.id = id;
         }
     }
 
@@ -143,7 +151,8 @@ public sealed partial class JsonDeserializer
             currentItemName = rootName;
             itemInfos.Clear();
             currentItemInfoIndex = -1;
-            refPathCache.Clear();
+            anyItemIdWritten = false;
+            refObjectCache.Clear();
         }
     }
 

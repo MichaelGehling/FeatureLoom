@@ -57,7 +57,7 @@ public sealed partial class JsonDeserializer
         }
         else if (b == '[')
         {
-            return byteArrayReader.ReadValue_CheckProposed<byte[]>();
+            return byteArrayReader.ReadValue_NoCheck<byte[]>();
         }
 
         throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
@@ -91,7 +91,7 @@ public sealed partial class JsonDeserializer
     private Dictionary<string, object> ReadObjectValueAsDictionary()
     {
         if (cachedStringObjectDictionaryReader == null) cachedStringObjectDictionaryReader = CreateCachedTypeReader(typeof(Dictionary<string, object>));
-        return cachedStringObjectDictionaryReader.ReadValue_CheckProposed<Dictionary<string, object>>();
+        return cachedStringObjectDictionaryReader.ReadValue_NoCheck<Dictionary<string, object>>();
     }
 
     CollectionCaster collectionCaster = new CollectionCaster();
@@ -100,7 +100,7 @@ public sealed partial class JsonDeserializer
     private object ReadArrayValue()
     {
         if (cachedObjectArrayReader == null) cachedObjectArrayReader = CreateCachedTypeReader(typeof(object[]));
-        var objectsArray = cachedObjectArrayReader.ReadValue_CheckProposed<object[]>();
+        var objectsArray = cachedObjectArrayReader.ReadValue_NoCheck<object[]>();
         if (!settings.castObjectArrayToCommonTypeArray || objectsArray.Length == 0) return objectsArray;
 
         var castedArray = collectionCaster.CastToCommonTypeArray(objectsArray, out _);
@@ -1983,166 +1983,6 @@ public sealed partial class JsonDeserializer
 #endif
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    bool TryFindProposedType(ref CachedTypeReader proposedTypeReaderRef, ref ByteSegment proposedTypeNameRef, Type expectedType, out bool foundValueField)
-    {
-        foundValueField = false;
-
-        // 1. find $type field
-
-        // Already skipped whitespace and checked for '{' in TryReadAsProposedType before calling this method,
-        // so we can skip it here to save some performance in the common case where no proposed type is provided.
-        // byte b = SkipWhiteSpaces();
-        // if (b != (byte)'{') return false;
-        buffer.TryNextByte();
-
-        // compare byte per byte to fail early            
-        byte b = SkipWhiteSpaces();
-        if (b != (byte)'"') return false;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (b != (byte)'$') return false;
-        // No inlining here to reduce code size of the main deserialization loop,
-        // since this code is only executed when a proposed type is provided, which is not the common case.
-        return FindProposedType_Continuation(ref proposedTypeReaderRef, ref proposedTypeNameRef, expectedType, ref foundValueField, out b);
-    }
-
-    private bool FindProposedType_Continuation(ref CachedTypeReader proposedTypeReaderRef, ref ByteSegment proposedTypeNameRef, Type expectedType, ref bool foundValueField, out byte b)
-    {
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'t') return false;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'y') return false;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'p') return false;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'e') return false;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'"') return false;
-        buffer.TryNextByte();
-
-        b = SkipWhiteSpaces();
-        if (b != (byte)':') return false;
-        buffer.TryNextByte();
-        var proposedTypeBytes = ReadStringBytes();
-
-        // 2. try get proposedTypeReader, first check if already present, if not check the cache, otherwise resolve type and get proposedTypeReader
-        // Skip finding proposed type if it already found the last time.
-        // This allows to avoid expensive type resolution and reader lookup in the common case where many objects of the same type are deserialized in a row.
-        bool isProposedTypeCompatible = true;
-        if (proposedTypeNameRef.IsValid && proposedTypeNameRef.Equals(proposedTypeBytes))
-        {
-            isProposedTypeCompatible = proposedTypeReaderRef != null && proposedTypeReaderRef.ReaderType.IsAssignableTo(expectedType);
-        }
-        else
-        {
-            proposedTypeBytes.EnsureHashCode();
-            // Force a copy of the proposedTypeBytes so it can be safely used as dictionary key without worrying about buffer changes.                
-            if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out var proposedTypeReader))
-            {
-                proposedTypeBytes = proposedTypeBytes.CropArray(true);
-                proposedTypeReader = null;
-                string proposedTypename = Encoding.UTF8.GetString(proposedTypeBytes.AsArraySegment.Array, proposedTypeBytes.AsArraySegment.Offset, proposedTypeBytes.AsArraySegment.Count);
-                var proposedType = TypeNameHelper.Shared.GetTypeFromSimplifiedName(proposedTypename);
-                if (proposedType == null)
-                {
-                    // Try old format with assembly name for backward compatibility
-                    try
-                    {
-                        proposedType = Type.GetType(proposedTypename, false, true);
-                    }
-                    catch
-                    {
-                        // Ignore any exceptions from Type.GetType and treat it as type not found, to be consistent with TypeNameHelper behavior.
-                    }
-                }
-
-                if (proposedType == null)
-                {
-                    proposedTypeReader = null;
-                }
-                else
-                {
-                    bool enforceWhitelist = settings.typeWhitelistMode != Settings.TypeWhitelistMode.Disabled;
-                    if (enforceWhitelist && !IsWhitelistedType(proposedType))
-                    {
-                        if (expectedType.IsInterface || expectedType.IsAbstract)
-                        {
-                            throw new Exception(
-                                $"Proposed type '{proposedTypename}' is not whitelisted and expected type '{expectedType.FullName}' is an interface or abstract class, " +
-                                "which is not allowed for security reasons. Consider changing the expected type to a concrete class or adjust the type whitelist settings.");
-                        }
-
-                        // No early return here:
-                        // proposed type is ignored, fallback to expected type reader later.
-                        proposedTypeReader = null;
-                    }
-                    else if (proposedType != expectedType && proposedType.IsAssignableTo(expectedType))
-                    {
-                        proposedTypeReader = GetCachedTypeReader(proposedType);
-                    }
-                }
-
-                proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
-            }
-            isProposedTypeCompatible = proposedTypeReader != null && proposedTypeReader.ReaderType.IsAssignableTo(expectedType);
-            if (isProposedTypeCompatible)
-            {
-                proposedTypeReaderRef = proposedTypeReader;
-                proposedTypeNameRef = proposedTypeBytes;
-            }
-        }
-
-        // 3. look if next is $value field
-        b = SkipWhiteSpaces();
-        if (b != ',') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-
-        // TODO compare byte per byte to fail early
-        b = SkipWhiteSpaces();
-        if (b != (byte)'"') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (b != (byte)'$') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'v') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'a') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'l') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'u') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) != (byte)'e') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-        b = buffer.CurrentByte;
-        if (FoldAsciiToLower(b) == (byte)'s')
-        {
-            buffer.TryNextByte();
-            b = buffer.CurrentByte;
-        }
-        if (FoldAsciiToLower(b) != (byte)'"') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-
-        b = SkipWhiteSpaces();
-        if (b != (byte)':') return isProposedTypeCompatible;
-        buffer.TryNextByte();
-
-        // 4. $value field found
-        foundValueField = true;
-        return isProposedTypeCompatible;
-    }
-
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void SkipRemainingFieldsOfObject()
     {
@@ -2210,174 +2050,6 @@ public sealed partial class JsonDeserializer
             return true;
         }
     }
-
-    static readonly ByteSegment refFieldName = new ByteSegment("$ref".ToByteArray(), true);
-    LazyList<ByteSegment> fieldPathSegments = new();
-    LazyDictionary<ByteSegment, object> refPathCache = new();
-
-    bool TryReadRefObject<T>(out bool pathIsValid, out bool typeIsCompatible, out T refObject)
-    {
-        pathIsValid = false;
-        typeIsCompatible = false;
-        refObject = default;
-        byte b = SkipWhiteSpaces();
-        // first char must be '{', otherwise it's not an object and we can directly return false
-        // without needing to reset buffer position
-        if (b != (byte)'{') return false;
-
-        using (var undoHandle = CreateUndoReadHandle())
-        {
-            bool refAttributeFound = Try(out pathIsValid, out typeIsCompatible, out refObject);
-            undoHandle.SetUndoReading(!refAttributeFound);
-            fieldPathSegments.Clear();
-            return refAttributeFound;
-        }
-
-        bool Try(out bool pathIsValid, out bool typeIsCompatible, out T itemRef)
-        {
-            pathIsValid = false;
-            typeIsCompatible = false;
-            itemRef = default;
-            // IMPORTANT: Currently, the ref-field must be the first, TODO: add option to allow it to be anywhere in the object (which is much slower)                                
-            buffer.TryNextByte();
-            // TODO compare byte per byte to fail early
-            if (!TryReadStringBytes(out var fieldName)) return false;
-            if (!refFieldName.Equals(fieldName)) return false;
-            b = SkipWhiteSpaces();
-            if (b != (byte)':') return false;
-            buffer.TryNextByte();
-            if (!TryReadStringBytes(out var refPath)) return false;
-
-            // We can directly return after reading refPath without needing to reset buffer position,
-            // because if refPath is valid, we want to keep the buffer position after the ref object for further deserialization,
-            if (!TrySkipRemainingFieldsOfObject()) return false;
-
-
-            // Check cache for refPath to avoid expensive path parsing and itemInfo lookup for already resolved refPaths
-            if (refPathCache.TryGetValue(refPath, out var cachedRef))
-            {
-                if (cachedRef is T compatibleCachedRef)
-                {
-                    typeIsCompatible = true;
-                    itemRef = compatibleCachedRef;
-                }
-                pathIsValid = true;
-                return true;
-            }
-
-            // Split refPath into segments by '.' and '[]' delimiters, to be able to compare it against itemInfos in a more efficient way than comparing the whole path as string for each itemInfo
-            if (refPath.Count <= 0) return true;
-            int pos = 0;
-            int startPos = 0;
-            int segmentLength = 0;
-            int refPathCount = refPath.Count;
-            b = refPath.AsArraySegment.Get(pos);
-
-            while (true)
-            {
-                if (b == '[')
-                {
-                    while (true)
-                    {
-                        pos++;
-                        if (pos >= refPathCount) return true;
-                        b = refPath.AsArraySegment.Get(pos);
-                        if (b == ']')
-                        {
-                            segmentLength = pos - startPos + 1;
-                            pos++;
-                            break;
-                        }
-                    }
-                    ByteSegment segment = refPath.AsArraySegment.Slice(startPos, segmentLength);
-                    fieldPathSegments.Add(segment);
-                    if (pos >= refPathCount) break;
-                    b = refPath.AsArraySegment.Get(pos);
-                    if (b == '.')
-                    {
-                        pos++;
-                        if (pos >= refPathCount) return true;
-                    }
-                }
-                else
-                {
-                    while (true)
-                    {
-                        pos++;
-                        if (pos >= refPathCount)
-                        {
-                            segmentLength = pos - startPos;
-                            break;
-                        }
-                        b = refPath.AsArraySegment.Get(pos);
-                        if (b == '.')
-                        {
-                            segmentLength = pos - startPos;
-                            pos++;
-                            break;
-                        }
-                        if (b == '[')
-                        {
-                            segmentLength = pos - startPos;
-                            break;
-                        }
-
-                    }
-                    ByteSegment segment = refPath.AsArraySegment.Slice(startPos, segmentLength);
-                    fieldPathSegments.Add(segment);
-                    if (pos >= refPathCount)
-                    {
-                        if (b == '.' || b == '[') return true;
-                        break;
-                    }
-                }
-                startPos = pos;
-                b = refPath.AsArraySegment.Get(pos);
-            }
-
-            // Compare path segments with itemInfos to find the referenced item.
-            // Start by comparing the last segment with item names, if it matches,
-            // continue comparing parent segments with parent itemInfos until the whole path is validated or invalidated.
-            object potentialItemRef = null;
-            int lastSegmentIndex = fieldPathSegments.Count - 1;
-            var referencedFieldName = fieldPathSegments[lastSegmentIndex];
-            foreach (var info in itemInfos)
-            {
-                if (info.name.Equals(referencedFieldName))
-                {
-                    potentialItemRef = info.itemRef;
-                    int segmentIndex = lastSegmentIndex - 1;
-                    int parentIndex = info.parentIndex;
-                    ItemInfo parentInfo;
-                    while (segmentIndex != -1 && parentIndex != -1)
-                    {
-                        var segment = fieldPathSegments[segmentIndex];
-                        parentInfo = itemInfos[parentIndex];
-                        if (!parentInfo.name.Equals(segment)) break;
-                        parentIndex = parentInfo.parentIndex;
-                        segmentIndex--;
-                    }
-
-                    pathIsValid = parentIndex == -1 && segmentIndex == -1;
-                    if (pathIsValid)
-                    {
-                        // Cache resolved refPath with itemRef for faster resolution next time
-                        refPathCache[refPath] = potentialItemRef;
-                        break;
-                    }
-                }
-            }
-
-            if (pathIsValid && potentialItemRef is T compatibleItemRef)
-            {
-                typeIsCompatible = true;
-                itemRef = compatibleItemRef;
-            }
-
-            return true;
-        }
-    }
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string DecodeUtf8Bytes(ArraySegment<byte> bytes)

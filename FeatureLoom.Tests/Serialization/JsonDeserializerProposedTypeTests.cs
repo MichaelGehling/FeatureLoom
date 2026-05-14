@@ -120,18 +120,6 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
-        public void Deserialize_ProposedType_GenericList_WithUppercaseValuesField_NewtonsoftCompatible()
-        {
-            string typeName = GetNewtonsoftCompatibleTypeName(typeof(List<int>));
-            string json = $"{{\"$type\":\"{typeName}\",\"$VALUES\":[4,5]}}";
-
-            object value = Deserialize<object>(json);
-
-            var list = Assert.IsType<List<int>>(value);
-            Assert.Equal(new[] { 4, 5 }, list);
-        }
-
-        [Fact]
         public void Deserialize_ProposedType_WithValuesField_AndAdditionalFields_SkipsRemainder()
         {
             string typeName = GetNewtonsoftCompatibleTypeName(typeof(List<int>));

@@ -7,7 +7,7 @@
 - Keep extension classes lightweight and move complex logic into dedicated helper classes.
 - For cloning/deserialization in this codebase, readonly instance fields should be written (do not skip IsInitOnly fields), while static fields should still be ignored. Note that init-only properties report `PropertyInfo.CanWrite == true` in this codebase/runtime context.
 - Avoid redundant hash precomputation in `ByteSegment` usage: `GetHashCode()` already computes/caches hash, and `Equals(ByteSegment)` utilizes the cached hash for a fast path.
-- Prioritize runtime performance in all implementations, especially in `ReadStringBytes`, avoiding optimizations that could sacrifice speed.
+- Prioritize runtime performance in all implementations, especially in `ReadStringBytes`. Consider string caching when payload values repeat; include benchmark scenarios with mixed recurring and varying strings. Avoid optimizations that could sacrifice speed.
 - Do not apply `map_IsFieldEnd` ref-based lookup optimization, as call sites are single non-loop lookups and likely not beneficial.
 - For coverage work, prefer tests-only changes (no production code changes) and prioritize low-hanging-fruit coverage first across related files. Stop `ArraySegmentBuilder` topics and continue with `FeatureJsonDeserializer` tests only.
 - When validating reference-resolution tests, treat assignment to `object` as type-compatible; use a truly incompatible target type for negative compatibility cases.
