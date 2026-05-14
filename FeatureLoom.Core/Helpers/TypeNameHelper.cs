@@ -163,7 +163,6 @@ namespace FeatureLoom.Helpers
                 }
                 else
                 {
-                    OptLog.ERROR()?.Build($"Could not find type '{genericTypeDefName}'.");
                     type = null;
                 }
             }
@@ -172,7 +171,12 @@ namespace FeatureLoom.Helpers
                 // It's a simple type
                 type = GetTypeFromAssemblies(typeName, AppDomain.CurrentDomain.GetAssemblies().OrderByDescending(ass => checkedAssemblies.TryGetValue(ass, out var count) ? count.value : 0));
                 if (type == null) type = LoadAndGetTypeFromSupplementaryAssemblies(typeName);
-                if (type == null) OptLog.ERROR()?.Build($"Could not find type '{typeName}'.");
+            }
+
+            if (type == null)
+            {
+                // Could not find type as Simplified, try normal type naming
+                type = Type.GetType(typeName, false, true);
             }
 
             if (type != null) nameToType[typeName] = type;
