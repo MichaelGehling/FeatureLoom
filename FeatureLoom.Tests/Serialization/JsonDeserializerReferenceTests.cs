@@ -434,7 +434,7 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
-        public void Deserialize_ReferenceResolution_IdRef_DuplicateId_FirstMatchWins()
+        public void Deserialize_ReferenceResolution_IdRef_DuplicateId_LastMatchWins()
         {
             const string json =
                 "{\"Child\":{\"$id\":\"n1\",\"Name\":\"first\"}," +
@@ -443,8 +443,8 @@ namespace FeatureLoom.Serialization
 
             var value = Deserialize<ThreeNodeContainer>(json);
 
-            Assert.Same(value.Child, value.Ref);
-            Assert.NotSame(value.Other, value.Ref);
+            Assert.Same(value.Other, value.Ref);
+            Assert.NotSame(value.Child, value.Ref);
         }
 
         [Fact]
