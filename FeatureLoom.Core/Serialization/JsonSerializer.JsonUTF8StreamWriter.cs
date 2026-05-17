@@ -10,6 +10,7 @@ using System.Linq;
 using System.Globalization;
 using System.Threading.Tasks;
 using FeatureLoom.Collections;
+using FeatureLoom.Synchronization;
 
 namespace FeatureLoom.Serialization;
 
@@ -1180,20 +1181,22 @@ public sealed partial class JsonSerializer
             }
         }
 
-            public void WriteRawJsonFragment(string json)
-            {
-                WriteString(json);
-            }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteRawJsonFragment(string json)
+        {
+            if (json != null) WriteString(json);
+            else WriteNullValue();
+        }
 
-            private void WriteString(string str)
+        private void WriteString(string str)
+        {
+            int charIndex = 0;
+            const int MAX_CHAR_LENGTH = 4;
+            while (charIndex < str.Length)
             {
-                int charIndex = 0;
-                const int MAX_CHAR_LENGTH = 4;
-                while (charIndex < str.Length)
-                {
-                    EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
-                    int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
-                    int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
+                EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
+                int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
+                int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
 
                 for (; charIndex < charIndexLimit; charIndex++)
                 {
