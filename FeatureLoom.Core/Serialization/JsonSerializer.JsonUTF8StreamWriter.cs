@@ -164,7 +164,6 @@ public sealed partial class JsonSerializer
             set => mainBufferCount = value;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteBufferToStream()
         {
             try
@@ -183,7 +182,7 @@ public sealed partial class JsonSerializer
         {
             try
             {
-                await stream.WriteAsync(mainBuffer, 0, mainBufferCount);
+                await stream.WriteAsync(mainBuffer, 0, mainBufferCount).ConfiguredAwait();
                 mainBufferCount = 0;
             }
             catch (Exception ex)

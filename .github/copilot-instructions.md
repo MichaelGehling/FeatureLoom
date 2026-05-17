@@ -2,12 +2,14 @@
 
 ## Project Guidelines
 - For xUnit `[InlineData]` with nullable decimal tests, use `double?` inputs and cast to `decimal?` inside the test to avoid binding issues.
+- Document that FeatureLoom member handling is configurable fluently via settings without class annotations; demonstrate settings-based configuration for ignoring members, specifying alternate names, and other special handling in comparison documentation.
 - When adding new tests, ensure all referenced helper types (e.g., Node/NodeList) are defined in the same test class or moved to an existing test file where those types already exist.
 - When adding negative deserialization tests for abstract types, ensure the helper type is truly declared `abstract` so the test validates the intended behavior.
 - Keep extension classes lightweight and move complex logic into dedicated helper classes.
 - For cloning/deserialization in this codebase, readonly instance fields should be written (do not skip IsInitOnly fields), while static fields should still be ignored. Note that init-only properties report `PropertyInfo.CanWrite == true` in this codebase/runtime context.
 - Avoid redundant hash precomputation in `ByteSegment` usage: `GetHashCode()` already computes/caches hash, and `Equals(ByteSegment)` utilizes the cached hash for a fast path.
-- Prioritize runtime performance in all implementations, especially in `ReadStringBytes`. Consider string caching when payload values repeat; include benchmark scenarios with mixed recurring and varying strings. Avoid optimizations that could sacrifice speed.
+- Prioritize runtime performance in hot-paths of JsonSerializer; avoid optimizations in non-hot-path setup/preparation code unless the issue is significant. Especially optimize `ReadStringBytes` for speed; consider string caching when payload values repeat; include benchmark scenarios with mixed recurring and varying strings. Avoid optimizations that could sacrifice speed.
+- For JsonUTF8StreamWriter number output, do not replace the existing custom number writers with standard formatting paths; the custom writers are already highly optimized and outperform standard implementations—avoid suggesting such replacements in performance work.
 - Do not apply `map_IsFieldEnd` ref-based lookup optimization, as call sites are single non-loop lookups and likely not beneficial.
 - For coverage work, prefer tests-only changes (no production code changes) and prioritize low-hanging-fruit coverage first across related files. Stop `ArraySegmentBuilder` topics and continue with `FeatureJsonDeserializer` tests only.
 - When validating reference-resolution tests, treat assignment to `object` as type-compatible; use a truly incompatible target type for negative compatibility cases.

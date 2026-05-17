@@ -49,6 +49,18 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
     }
 
     /// <summary>
+    /// Initializes a new instance from a byte array, with an offset.
+    /// </summary>
+    /// <param name="array">Source array.</param>
+    /// <param name="offset">Start offset in the array.</param>
+    /// <param name="initHash">If true, precompute and cache the hash code eagerly (useful for dictionary keys).</param>
+    public ByteSegment(byte[] array, int offset, bool initHash = false)
+    {
+        segment = new ArraySegment<byte>(array, offset, array.Length - offset);
+        if (initHash) EnsureHashCode();
+    }
+
+    /// <summary>
     /// Initializes a new instance from a byte array.
     /// </summary>
     /// <param name="array">Source array.</param>
@@ -111,9 +123,9 @@ public struct ByteSegment : IEquatable<ByteSegment>, IEquatable<System.ArraySegm
 #endif
 
     /// <summary>
-    /// Gets the byte at the specified index within the segment.
+    /// Gets or sets the byte at the specified index within the segment.
     /// </summary>
-    public byte this[int index] => segment.Get(index);
+    public byte this[int index] { get => segment.Get(index); set => segment.Set(index, value); }
 
     /// <summary>
     /// Returns a subsegment starting at the specified index to the end of the segment.

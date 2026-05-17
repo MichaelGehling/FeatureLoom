@@ -522,5 +522,42 @@ namespace FeatureLoom.Serialization
             One = 1,
             Two = 2
         }
+
+        [Fact]
+        public void Serialize_CustomTypeHandler_WriteRawJsonFragment_Null_WritesNullLiteral()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.AddCustomTypeHandlerCreator<RawJsonFragmentWrapper>(
+                JsonDataTypeCategory.Primitive,
+                api => value => api.Writer.WriteRawJsonFragment(value.RawJson));
+
+            var serializer = new JsonSerializer(settings);
+            var value = new RawJsonFragmentWrapper { RawJson = null };
+    
+            string json = serializer.Serialize(value);
+
+            Assert.Equal("null", json);
+        }
+
+        [Fact]
+        public void Serialize_CustomTypeHandler_WriteRawJsonFragment_DoesNotEscapeOrQuote()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.AddCustomTypeHandlerCreator<RawJsonFragmentWrapper>(
+                JsonDataTypeCategory.Primitive,
+                api => value => api.Writer.WriteRawJsonFragment(value.RawJson));
+
+            var serializer = new JsonSerializer(settings);
+            var value = new RawJsonFragmentWrapper { RawJson = "{\"text\":\"line1\\nline2\"}" };
+
+            string json = serializer.Serialize(value);
+
+            Assert.Equal("{\"text\":\"line1\\nline2\"}", json);
+        }
+
+        private class RawJsonFragmentWrapper
+        {
+            public string RawJson;
+        }
     }
 }

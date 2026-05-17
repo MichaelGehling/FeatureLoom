@@ -75,6 +75,12 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     public int Count => length;
 
     /// <summary>
+    /// Gets the number of characters in the segment (same as <see cref="Count"/>).
+    /// Can be used for compatibility with APIs expecting a "Length" property.
+    /// </summary>
+    public int Length => length;
+
+    /// <summary>
     /// Gets a value indicating whether the segment is valid (i.e., the underlying string is not null).
     /// </summary>
     public bool IsValid => text != null;
