@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using FeatureLoom.Collections;
 using FeatureLoom.Synchronization;
+using System.Xml;
 
 namespace FeatureLoom.Serialization;
 
@@ -755,9 +756,7 @@ public sealed partial class JsonSerializer
         {
             if (str != null)
             {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteEscapedString(str);
-                WriteToBufferWithoutCheck(QUOTES);
+                WriteEscapedStringWithQuotes(str);
             }
             else WriteNullValue();
         }
@@ -767,9 +766,7 @@ public sealed partial class JsonSerializer
         {
             if (textSegment.IsValid)
             {
-                WriteToBufferWithoutCheck(QUOTES);
-                WriteEscapedString(textSegment.UnderlyingString, textSegment.Offset, textSegment.Count);
-                WriteToBufferWithoutCheck(QUOTES);
+                WriteEscapedStringWithQuotes(textSegment.UnderlyingString, textSegment.Offset, textSegment.Count);
             }
             else WriteNullValue();
         }
@@ -785,26 +782,22 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ByteSegment WriteStringValueAsStringWithCopy(string str)
         {
-            WriteToBufferWithoutCheck(QUOTES);
-            EnsureFreeBufferSpace(64);
+
             var countBefore = mainBufferCount;
 
-            WriteEscapedString(str);
+            WriteEscapedStringWithQuotes(str);
 
-            var writtenBytes = mainBufferCount - countBefore;
-            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
-            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
-
-            WriteToBufferWithoutCheck(QUOTES);
+            // Quotes must be removed from string
+            var writtenBytes = mainBufferCount - countBefore - 2;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes - 2);
+            slice.CopyFrom(mainBuffer, countBefore+1, writtenBytes);
             return slice;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WritePrimitiveValueAsString(string str)
         {
-            WriteToBufferWithoutCheck(QUOTES);
-            WriteEscapedString(str);
-            WriteToBufferWithoutCheck(QUOTES);
+            WriteEscapedStringWithQuotes(str);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1111,74 +1104,69 @@ public sealed partial class JsonSerializer
             }
         }
 
-        private void WriteEscapedString(string str, int startIndex = 0, int length = -1)
+        private void WriteEscapedStringWithQuotes(string str, int startIndex = 0, int length = -1)
         {
             int charIndex = startIndex;
             int numChars = length >= 0 ? length : str.Length - startIndex;
             int endIndex = startIndex + numChars;
             const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
+            EnsureFreeBufferSpace((endIndex - charIndex) * MAX_CHAR_LENGTH + 2); // +2 for the surrounding quotes            
+            WriteToBufferWithoutCheck((byte)'"');
+            for (; charIndex < endIndex; charIndex++)
+            {                
+                var c = str[charIndex];
 
-            while (charIndex < endIndex)
-            {
-                EnsureFreeBufferSpace((endIndex - charIndex) * MAX_CHAR_LENGTH);
-                int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
-                int charIndexLimit = Math.Min(endIndex, charIndex + guaranteedCharSpace);
-
-                for (; charIndex < charIndexLimit; charIndex++)
+                // Handle escaped chars and control chars
+                byte[] escapeBytes = GetEscapeBytes(c); 
+                if (escapeBytes != null)
                 {
-                    var c = str[charIndex];
+                    WriteToBufferWithoutCheck(escapeBytes);
+                    continue;
+                }
 
-                    // Handle escaped chars and control chars
-                    byte[] escapeBytes = GetEscapeBytes(c);
-                    if (escapeBytes != null)
-                    {
-                        WriteToBufferWithoutCheck(escapeBytes);
-                        continue;
-                    }
+                int codepoint = c;
 
-                    int codepoint = c;
+                if (codepoint <= 0x7F)
+                {
+                    // 1-byte sequence
+                    WriteToBufferWithoutCheck((byte)codepoint);
+                }
+                else if (codepoint <= 0x7FF)
+                {
+                    // 2-byte sequence
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                }
+                else if (!char.IsSurrogate(c))
+                {
+                    // 3-byte sequence
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                }
+                else
+                {
+                    // Handle surrogate pairs
+                    if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                    {
+                        int highSurrogate = c;
+                        int lowSurrogate = str[charIndex + 1];
+                        int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
-                    if (codepoint <= 0x7F)
-                    {
-                        // 1-byte sequence
-                        WriteToBufferWithoutCheck((byte)codepoint);
-                    }
-                    else if (codepoint <= 0x7FF)
-                    {
-                        // 2-byte sequence
-                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                    }
-                    else if (!char.IsSurrogate(c))
-                    {
-                        // 3-byte sequence
-                        WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
+
+                        charIndex++; // Skip next character, it was part of the surrogate pair
                     }
                     else
                     {
-                        // Handle surrogate pairs
-                        if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
-                        {
-                            int highSurrogate = c;
-                            int lowSurrogate = str[charIndex + 1];
-                            int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-
-                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
-                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
-                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
-                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
-
-                            charIndex++; // Skip next character, it was part of the surrogate pair
-                        }
-                        else
-                        {
-                            throw new ArgumentException("Invalid surrogate pair in string.");
-                        }
+                        throw new ArgumentException("Invalid surrogate pair in string.");
                     }
                 }
             }
+            WriteToBufferWithoutCheck((byte)'"');
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1189,58 +1177,52 @@ public sealed partial class JsonSerializer
         }
 
         private void WriteString(string str)
-        {
+        {            
+            const int MAX_CHAR_LENGTH = 6;
+            EnsureFreeBufferSpace(str.Length * MAX_CHAR_LENGTH);
             int charIndex = 0;
-            const int MAX_CHAR_LENGTH = 4;
-            while (charIndex < str.Length)
-            {
-                EnsureFreeBufferSpace((str.Length - charIndex) * MAX_CHAR_LENGTH);
-                int guaranteedCharSpace = (mainBufferLimit - mainBufferCount) / MAX_CHAR_LENGTH;
-                int charIndexLimit = Math.Min(str.Length, charIndex + guaranteedCharSpace);
+            for (; charIndex < str.Length; charIndex++)
+            {                
+                var c = str[charIndex];
+                int codepoint = c;
 
-                for (; charIndex < charIndexLimit; charIndex++)
+                if (codepoint <= 0x7F)
                 {
-                    var c = str[charIndex];
-                    int codepoint = c;
+                    // 1-byte sequence
+                    WriteToBufferWithoutCheck((byte)codepoint);
+                }
+                else if (codepoint <= 0x7FF)
+                {
+                    // 2-byte sequence
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
+                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                }
+                else if (!char.IsSurrogate(c))
+                {
+                    // 3-byte sequence
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
+                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
+                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                }
+                else
+                {
+                    // Handle surrogate pairs
+                    if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                    {
+                        int highSurrogate = c;
+                        int lowSurrogate = str[charIndex + 1];
+                        int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
-                    if (codepoint <= 0x7F)
-                    {
-                        // 1-byte sequence
-                        WriteToBufferWithoutCheck((byte)codepoint);
-                    }
-                    else if (codepoint <= 0x7FF)
-                    {
-                        // 2-byte sequence
-                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                    }
-                    else if (!char.IsSurrogate(c))
-                    {
-                        // 3-byte sequence
-                        WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                        WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                        WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
+
+                        charIndex++; // Skip next character, it was part of the surrogate pair
                     }
                     else
                     {
-                        // Handle surrogate pairs
-                        if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
-                        {
-                            int highSurrogate = c;
-                            int lowSurrogate = str[charIndex + 1];
-                            int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-
-                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
-                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
-                            WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
-                            WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
-
-                            charIndex++; // Skip next character, it was part of the surrogate pair
-                        }
-                        else
-                        {
-                            throw new ArgumentException("Invalid surrogate pair in string.");
-                        }
+                        throw new ArgumentException("Invalid surrogate pair in string.");
                     }
                 }
             }
