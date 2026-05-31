@@ -54,16 +54,22 @@ namespace FeatureLoom.Synchronization
         /// <summary>
         /// AsyncManualResetEvent allows status based waiting (sync/async) and signalling between multiple threads.
         /// </summary>
+        /// <param name="initialState">If <c>true</c>, the event is set immediately upon construction; otherwise it starts in the reset state.</param>
         public AsyncManualResetEvent(bool initialState)
         {
             if (initialState) Set();
         }
 
+        /// <summary>
+        /// Gets a value indicating whether the event is currently set.
+        /// </summary>
         public bool IsSet => isSet;
 
         /// <summary>
-        /// Returns a task that will be completed when the state is set.
+        /// Returns a task that completes when the event is set.
+        /// If the event is already set, a cached completed task is returned immediately.
         /// </summary>
+        /// <value>A <see cref="Task"/> that completes when <see cref="Set"/> is called.</value>
         public Task WaitingTask
         {
             get
@@ -77,11 +83,20 @@ namespace FeatureLoom.Synchronization
             }
         }
 
+        /// <summary>
+        /// Gets the number of currently connected message sinks.
+        /// </summary>
         public int CountConnectedSinks => notifier.CountConnectedSinks;
 
-        /// <summary> Indicates whether there are no connected sinks. </summary>
+        /// <summary>
+        /// Gets a value indicating whether there are no connected message sinks.
+        /// </summary>
         public bool NoConnectedSinks => notifier.NoConnectedSinks;
 
+        /// <summary>
+        /// Gets the type of messages sent by this source (<see cref="bool"/>).
+        /// <c>true</c> is forwarded when the event is set; <c>false</c> when it is reset.
+        /// </summary>
         public Type SentMessageType => typeof(bool);
 
         /// <summary>
@@ -380,9 +395,10 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
-        /// Resets the event, so that threads will wait until thw evwnt is set again.
+        /// Resets the event so that threads will wait until the event is set again.
+        /// Has no effect if the event is already reset.
         /// </summary>
-        /// <returns>True if event was set before, false if it was already reset.</returns>
+        /// <returns><c>true</c> if the event was set before this call; <c>false</c> if it was already reset.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Reset()
         {
@@ -460,7 +476,7 @@ namespace FeatureLoom.Synchronization
         /// <summary>
         /// Indicates if a thread would actually wait if one of the wait methods was called. (Invert of IsSet)
         /// </summary>
-        /// <returns>False if event is set, false otherwise</returns>
+        /// <returns>True if event is not set (a caller would block); false if the event is already set.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool WouldWait()
         {
@@ -492,31 +508,58 @@ namespace FeatureLoom.Synchronization
             waitHandle?.Dispose();
         }
 
+        /// <summary>
+        /// Connects a message sink to receive state-change notifications (<c>true</c> on set, <c>false</c> on reset).
+        /// </summary>
+        /// <param name="sink">The sink to connect.</param>
+        /// <param name="weakReference">If <c>true</c>, the sink is held via a weak reference and will not prevent garbage collection.</param>
         public void ConnectTo(IMessageSink sink, bool weakReference = false)
         {
             notifier.ConnectTo(sink, weakReference);
         }
 
+        /// <summary>
+        /// Connects a message flow connection to receive state-change notifications and returns the next source in the pipeline.
+        /// </summary>
+        /// <param name="sink">The flow connection to connect.</param>
+        /// <param name="weakReference">If <c>true</c>, the connection is held via a weak reference.</param>
+        /// <returns>The <see cref="IMessageSource"/> that follows this connection in the pipeline.</returns>
         public IMessageSource ConnectTo(IMessageFlowConnection sink, bool weakReference = false)
         {
             return notifier.ConnectTo(sink, weakReference);
         }
 
+        /// <summary>
+        /// Disconnects the specified sink so it no longer receives state-change notifications.
+        /// </summary>
+        /// <param name="sink">The sink to disconnect.</param>
         public void DisconnectFrom(IMessageSink sink)
         {
             notifier.DisconnectFrom(sink);
         }
 
+        /// <summary>
+        /// Disconnects all connected sinks so none of them receive further state-change notifications.
+        /// </summary>
         public void DisconnectAll()
         {
             notifier.DisconnectAll();
         }
 
+        /// <summary>
+        /// Returns all currently connected message sinks.
+        /// </summary>
+        /// <returns>An array of connected <see cref="IMessageSink"/> instances.</returns>
         public IMessageSink[] GetConnectedSinks()
         {
             return notifier.GetConnectedSinks();
         }
 
+        /// <summary>
+        /// Determines whether the specified sink is currently connected to this event.
+        /// </summary>
+        /// <param name="sink">The sink to check.</param>
+        /// <returns><c>true</c> if the sink is connected; otherwise <c>false</c>.</returns>
         public bool IsConnected(IMessageSink sink)
         {
             return notifier.IsConnected(sink);

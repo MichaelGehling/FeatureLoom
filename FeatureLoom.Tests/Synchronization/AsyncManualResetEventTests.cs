@@ -356,4 +356,359 @@ public class AsyncManualResetEventTests
         public Type ConsumedMessageType => typeof(T);
     }
 
+    #region Construction and state
+
+    [Fact]
+    public void Constructor_DefaultState_IsNotSet()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+
+        Assert.False(mre.IsSet);
+        Assert.True(mre.WouldWait());
+    }
+
+    [Fact]
+    public void Constructor_InitialStateTrue_IsSet()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+
+        Assert.True(mre.IsSet);
+        Assert.False(mre.WouldWait());
+    }
+
+    [Fact]
+    public void Constructor_InitialStateFalse_IsNotSet()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+
+        Assert.False(mre.IsSet);
+        Assert.True(mre.WouldWait());
+    }
+
+    #endregion
+
+    #region Set / Reset return values and idempotency
+
+    [Fact]
+    public void Set_WhenNotSet_ReturnsTrueAndSetsFlag()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+
+        bool result = mre.Set();
+
+        Assert.True(result);
+        Assert.True(mre.IsSet);
+    }
+
+    [Fact]
+    public void Set_WhenAlreadySet_ReturnsFalse()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+
+        bool result = mre.Set();
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void Reset_WhenSet_ReturnsTrueAndClearsFlag()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+
+        bool result = mre.Reset();
+
+        Assert.True(result);
+        Assert.False(mre.IsSet);
+    }
+
+    [Fact]
+    public void Reset_WhenAlreadyReset_ReturnsFalse()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+
+        bool result = mre.Reset();
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void SetResetSet_CycleBehavesCorrectly()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+
+        Assert.False(mre.IsSet);
+        mre.Set();
+        Assert.True(mre.IsSet);
+        mre.Reset();
+        Assert.False(mre.IsSet);
+        mre.Set();
+        Assert.True(mre.IsSet);
+    }
+
+    #endregion
+
+    #region Wait return values
+
+    [Fact]
+    public void Wait_WhenAlreadySet_ReturnsTrueImmediately()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+
+        Assert.True(mre.Wait());
+        Assert.True(mre.Wait(1.Seconds()));
+        Assert.True(mre.Wait(CancellationToken.None));
+        Assert.True(mre.Wait(1.Seconds(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task WaitAsync_WhenAlreadySet_ReturnsTrueImmediately()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+
+        Assert.True(await mre.WaitAsync());
+        Assert.True(await mre.WaitAsync(1.Seconds()));
+        Assert.True(await mre.WaitAsync(CancellationToken.None));
+        Assert.True(await mre.WaitAsync(1.Seconds(), CancellationToken.None));
+    }
+
+    [Fact]
+    public void Wait_Timeout_ReturnsFalse()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+
+        Assert.False(mre.Wait(TimeSpan.FromMilliseconds(30)));
+        Assert.False(mre.Wait(TimeSpan.FromMilliseconds(30), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task WaitAsync_Timeout_ReturnsFalse()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+
+        Assert.False(await mre.WaitAsync(TimeSpan.FromMilliseconds(30)));
+        Assert.False(await mre.WaitAsync(TimeSpan.FromMilliseconds(30), CancellationToken.None));
+    }
+
+    [Fact]
+    public void Wait_Cancelled_ReturnsFalse()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+        using var cts = new CancellationTokenSource(30);
+
+        Assert.False(mre.Wait(cts.Token));
+    }
+
+    [Fact]
+    public void Wait_TimeoutAndCancellation_ReturnsFalseWhenCancelled()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+        using var cts = new CancellationTokenSource(30);
+
+        Assert.False(mre.Wait(2.Seconds(), cts.Token));
+    }
+
+    [Fact]
+    public async Task WaitAsync_Cancelled_ReturnsFalse()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+        using var cts = new CancellationTokenSource(30);
+
+        Assert.False(await mre.WaitAsync(cts.Token));
+    }
+
+    [Fact]
+    public async Task WaitAsync_TimeoutAndCancellation_ReturnsFalseWhenCancelled()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+        using var cts = new CancellationTokenSource(30);
+
+        Assert.False(await mre.WaitAsync(2.Seconds(), cts.Token));
+    }
+
+    [Fact]
+    public void Wait_SignalledBeforeTimeout_ReturnsTrue()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+        Task.Run(() => { Thread.Sleep(20); mre.Set(); });
+
+        Assert.True(mre.Wait(2.Seconds()));
+    }
+
+    [Fact]
+    public async Task WaitAsync_SignalledBeforeTimeout_ReturnsTrue()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent();
+        _ = Task.Run(async () => { await Task.Delay(20); mre.Set(); });
+
+        Assert.True(await mre.WaitAsync(2.Seconds()));
+    }
+
+    #endregion
+
+    #region WaitingTask
+
+    [Fact]
+    public void WaitingTask_WhenSet_ReturnsCompletedTask()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+
+        Assert.True(mre.WaitingTask.IsCompleted);
+    }
+
+    [Fact]
+    public void WaitingTask_WhenNotSet_ReturnsIncompleteTask()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+
+        Assert.False(mre.WaitingTask.IsCompleted);
+    }
+
+    [Fact]
+    public async Task WaitingTask_CompletesWhenSet()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        var task = mre.WaitingTask;
+
+        Assert.False(task.IsCompleted);
+
+        _ = Task.Run(async () => { await Task.Delay(20); mre.Set(); });
+
+        await task;
+        Assert.True(task.IsCompleted);
+    }
+
+    #endregion
+
+    #region WaitHandle lifecycle
+
+    [Fact]
+    public void TryConvertToWaitHandle_WhenSet_ReturnsSignalledHandle()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+        Assert.True(mre.TryConvertToWaitHandle(out WaitHandle wh));
+
+        Assert.True(wh.WaitOne(0));
+        mre.DetachAndDisposeWaitHandle();
+    }
+
+    [Fact]
+    public void TryConvertToWaitHandle_WhenNotSet_ReturnsUnsignalledHandle()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        Assert.True(mre.TryConvertToWaitHandle(out WaitHandle wh));
+
+        Assert.False(wh.WaitOne(0));
+        mre.DetachAndDisposeWaitHandle();
+    }
+
+    [Fact]
+    public void WaitHandle_TracksSetAndReset()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        Assert.True(mre.TryConvertToWaitHandle(out WaitHandle wh));
+
+        mre.Set();
+        Assert.True(wh.WaitOne(0));
+
+        mre.Reset();
+        Assert.False(wh.WaitOne(0));
+
+        mre.DetachAndDisposeWaitHandle();
+    }
+
+    [Fact]
+    public void DetachAndDisposeWaitHandle_SubsequentConvertCreatesNew()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+        mre.TryConvertToWaitHandle(out WaitHandle wh1);
+        mre.DetachAndDisposeWaitHandle();
+
+        mre.TryConvertToWaitHandle(out WaitHandle wh2);
+        Assert.NotSame(wh1, wh2);
+        mre.DetachAndDisposeWaitHandle();
+    }
+
+    #endregion
+
+    #region Notification — already-set / already-reset idempotency
+
+    [Fact]
+    public void Set_WhenAlreadySet_SendsNoNotification()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(true);
+        var sink = new TestMessageSink<bool>();
+        mre.ConnectTo(sink);
+
+        mre.Set();
+
+        Assert.Empty(sink.ReceivedMessages);
+    }
+
+    [Fact]
+    public void Reset_WhenAlreadyReset_SendsNoNotification()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        var sink = new TestMessageSink<bool>();
+        mre.ConnectTo(sink);
+
+        mre.Reset();
+
+        Assert.Empty(sink.ReceivedMessages);
+    }
+
+    #endregion
 }
