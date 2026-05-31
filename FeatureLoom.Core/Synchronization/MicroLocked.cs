@@ -1,27 +1,32 @@
 ﻿using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace FeatureLoom.Synchronization
 {
     /// <summary>
-    /// Thread-safe wrapper for a reference type, providing read and write locking semantics.
+    /// Thread-safe wrapper for a reference type, providing read and write locking semantics via
+    /// <see cref="MicroLock"/>.
     /// <para>
-    /// Supports both eager and lazy initialization. Use the constructor with a factory delegate to enable lazy creation of the wrapped object.
+    /// Supports both eager and lazy initialization. Use the constructor with a factory delegate to
+    /// enable lazy creation of the wrapped object.
     /// </para>
     /// <para>
     /// <b>Examples:</b>
     /// <code>
     /// // Eager initialization
-    /// var lockedObj = new Locked&lt;MyClass&gt;(new MyClass());
-    /// 
+    /// var lockedObj = new MicroLocked&lt;MyClass&gt;(new MyClass());
+    ///
     /// // Lazy initialization
-    /// var lockedLazy = new Locked&lt;MyClass&gt;(() =&gt; new MyClass());
+    /// var lockedLazy = new MicroLocked&lt;MyClass&gt;(() =&gt; new MyClass());
     /// </code>
     /// </para>
-    /// <b>Warning:</b> When using LINQ or deferred-execution queries on the protected object (e.g., collections), always materialize the result (e.g., with <c>.ToList()</c> or <c>.ToArray()</c>) inside the lock scope. Do not enumerate or use the query outside the lock, as this is not thread-safe.
+    /// <para>
+    /// <b>Warning:</b> When using LINQ or deferred-execution queries on the protected object
+    /// (e.g., collections), always materialize the result (e.g., with <c>.ToList()</c> or
+    /// <c>.ToArray()</c>) inside the lock scope. Do not enumerate or use the query outside the
+    /// lock, as this is not thread-safe.
+    /// </para>
     /// </summary>
     /// <typeparam name="T">Reference type to be protected by the lock.</typeparam>
     public class MicroLocked<T> where T : class
@@ -47,7 +52,7 @@ namespace FeatureLoom.Synchronization
         /// <param name="lazyFactory">A delegate that creates the object when first needed.</param>
         /// <example>
         /// <code>
-        /// var lockedLazy = new Locked&lt;MyClass&gt;(() =&gt; new MyClass());
+        /// var lockedLazy = new MicroLocked&lt;MyClass&gt;(() =&gt; new MyClass());
         /// using (lockedLazy.UseWriteLocked(out var obj))
         /// {
         ///     obj.SomeProperty = 42;
@@ -328,6 +333,23 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
+        /// Attempts to execute an action under a write lock within the specified timeout.
+        /// </summary>
+        /// <param name="action">The action to execute with the locked object.</param>
+        /// <param name="timeout">The maximum time to wait for the write lock.</param>
+        /// <returns>True if the lock was acquired and the action executed within the timeout; otherwise false.</returns>
+        public bool TryUseLocked(Action<T> action, TimeSpan timeout)
+        {
+            if (objLock.TryLock(out var lockHandle, timeout))
+            using (lockHandle)
+            {
+                action(lazy);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Attempts to execute a function under a write lock and returns its result.
         /// <para>
         /// <b>Usage:</b>
@@ -359,6 +381,26 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
+        /// Attempts to execute a function under a write lock within the specified timeout and returns its result.
+        /// </summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="func">The function to execute with the locked object.</param>
+        /// <param name="result">The result of the function if the lock was acquired; otherwise <c>default</c>.</param>
+        /// <param name="timeout">The maximum time to wait for the write lock.</param>
+        /// <returns>True if the lock was acquired and the function executed within the timeout; otherwise false.</returns>
+        public bool TryUseLocked<TResult>(Func<T, TResult> func, out TResult result, TimeSpan timeout)
+        {
+            if (objLock.TryLock(out var lockHandle, timeout))
+            using (lockHandle)
+            {
+                result = func(lazy);
+                return true;
+            }
+            result = default;
+            return false;
+        }
+
+        /// <summary>
         /// Attempts to execute an action under a read-only lock.
         /// <para>
         /// <b>Usage:</b>
@@ -377,6 +419,23 @@ namespace FeatureLoom.Synchronization
         public bool TryUseReadLocked(Action<T> action)
         {
             if (objLock.TryLockReadOnly(out var lockHandle))
+            using (lockHandle)
+            {
+                action(lazy);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Attempts to execute an action under a read-only lock within the specified timeout.
+        /// </summary>
+        /// <param name="action">The action to execute with the locked object.</param>
+        /// <param name="timeout">The maximum time to wait for a read lock.</param>
+        /// <returns>True if the lock was acquired and the action executed within the timeout; otherwise false.</returns>
+        public bool TryUseReadLocked(Action<T> action, TimeSpan timeout)
+        {
+            if (objLock.TryLockReadOnly(out var lockHandle, timeout))
             using (lockHandle)
             {
                 action(lazy);
@@ -417,7 +476,27 @@ namespace FeatureLoom.Synchronization
         }
 
         /// <summary>
-        /// Indicates whether the object is currently locked (read or write).
+        /// Attempts to execute a function under a read-only lock within the specified timeout and returns its result.
+        /// </summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="func">The function to execute with the locked object.</param>
+        /// <param name="result">The result of the function if the lock was acquired; otherwise <c>default</c>.</param>
+        /// <param name="timeout">The maximum time to wait for a read lock.</param>
+        /// <returns>True if the lock was acquired and the function executed within the timeout; otherwise false.</returns>
+        public bool TryUseReadLocked<TResult>(Func<T, TResult> func, out TResult result, TimeSpan timeout)
+        {
+            if (objLock.TryLockReadOnly(out var lockHandle, timeout))
+            using (lockHandle)
+            {
+                result = func(lazy);
+                return true;
+            }
+            result = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Indicates whether the object is currently locked
         /// <para>
         /// <b>Note:</b> This property is for diagnostics only and should not be used for lock-free logic.
         /// </para>
