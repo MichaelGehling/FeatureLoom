@@ -49,6 +49,24 @@ namespace FeatureLoom.Serialization
             return $"\"{text}\"";
         }
 
+        private static string FormatExpectedDateTimeOffset(DateTimeOffset value)
+        {
+            if (value == default) return "\"0001-01-01T00:00:00+00:00\"";
+
+            string text = value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
+            int fractionalTicks = (int)(value.Ticks % TimeSpan.TicksPerSecond);
+            if (fractionalTicks > 0)
+            {
+                text += "." + fractionalTicks.ToString("D7", CultureInfo.InvariantCulture);
+            }
+
+            TimeSpan offset = value.Offset;
+            string sign = offset.Ticks < 0 ? "-" : "+";
+            text += $"{sign}{Math.Abs(offset.Hours):00}:{Math.Abs(offset.Minutes):00}";
+
+            return $"\"{text}\"";
+        }
+
         [Fact]
         public void Serialize_NullReference_ReturnsNullLiteral()
         {
@@ -421,6 +439,65 @@ namespace FeatureLoom.Serialization
         }
 
         [Theory]
+        [InlineData("0001-01-01T00:00:00+00:00", "\"0001-01-01T00:00:00+00:00\"")]
+        [InlineData("2024-01-02T03:04:05+05:30", "\"2024-01-02T03:04:05+05:30\"")]
+        public void Serialize_DateTimeOffset(string valueText, string expected)
+        {
+            var value = DateTimeOffset.Parse(valueText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_DateTimeOffset_WithFractionalSeconds()
+        {
+            var value = new DateTimeOffset(2024, 1, 2, 3, 4, 5, TimeSpan.FromHours(-7)).AddTicks(1234567);
+            string expected = FormatExpectedDateTimeOffset(value);
+
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_NullableDateTimeOffset_Null()
+        {
+            DateTimeOffset? value = null;
+            AssertSerialized(value, "null");
+        }
+
+        [Fact]
+        public void Serialize_NullableDateTimeOffset_WithValue_AsObjectMember()
+        {
+            DateTimeOffset? memberValue = new DateTimeOffset(2024, 1, 2, 3, 4, 5, TimeSpan.FromHours(2)).AddTicks(7654321);
+            var value = new NullableDateTimeOffsetContainer { NullableDateTimeOffset = memberValue };
+            string expectedValue = FormatExpectedDateTimeOffset(memberValue.Value);
+            string expected = $"{{\"NullableDateTimeOffset\":{{\"$type\":\"System.DateTimeOffset\",\"$value\":{expectedValue}}}}}";
+
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Uri_UsesOriginalString()
+        {
+            var value = new Uri("path/%2fresource?x=1", UriKind.Relative);
+            AssertSerialized(value, "\"path/%2fresource?x=1\"");
+        }
+
+        [Fact]
+        public void Serialize_Uri_Null_WritesNullLiteral()
+        {
+            Uri value = null;
+            AssertSerialized(value, "null");
+        }
+
+        [Fact]
+        public void Serialize_Uri_AsObjectMember()
+        {
+            var value = new UriContainer { Uri = new Uri("path/%2fresource?x=1", UriKind.Relative) };
+            const string expected = "{\"Uri\":\"path/%2fresource?x=1\"}";
+
+            AssertSerialized(value, expected);
+        }
+
+        [Theory]
         [InlineData("00:00:00", "\"00:00:00\"")]
         [InlineData("01:02:03", "\"01:02:03\"")]
         [InlineData("2.03:04:05", "\"2.03:04:05\"")]
@@ -558,6 +635,16 @@ namespace FeatureLoom.Serialization
         private class RawJsonFragmentWrapper
         {
             public string RawJson;
+        }
+
+        private class NullableDateTimeOffsetContainer
+        {
+            public DateTimeOffset? NullableDateTimeOffset;
+        }
+
+        private class UriContainer
+        {
+            public Uri Uri;
         }
     }
 }

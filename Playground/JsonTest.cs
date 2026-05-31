@@ -240,11 +240,11 @@ namespace Playground
                     itemHandler = list =>
                     {
                         var count = list.Count;
-                        if (count >= 1) elementTypeHandler.HandleItem(list[0], default);
+                        if (count >= 1) elementTypeHandler.WriteItem(list[0], default);
                         for (int i = 1; i < count; i++)
                         {
                             api.Writer.WriteComma();
-                            elementTypeHandler.HandleItem(list[i], default);
+                            elementTypeHandler.WriteItem(list[i], default);
                         }
                     };                    
                 }
@@ -262,7 +262,7 @@ namespace Playground
                             {
                                 Type elementType = element.GetType();
                                 if (elementType != lastElementTypeHandler.HandlerType) lastElementTypeHandler = api.GetCachedTypeHandler(elementType);
-                                lastElementTypeHandler.HandleItem(element, api.Writer.GetCollectionIndexName(0));
+                                lastElementTypeHandler.WriteItem(element, api.Writer.GetCollectionIndexName(0));
                             }
                         }
                         for (int i = 1; i < count; i++)
@@ -274,7 +274,7 @@ namespace Playground
                             {
                                 Type elementType = element.GetType();
                                 if (elementType != lastElementTypeHandler.HandlerType) lastElementTypeHandler = api.GetCachedTypeHandler(elementType);
-                                lastElementTypeHandler.HandleItem(element, api.Writer.GetCollectionIndexName(i));
+                                lastElementTypeHandler.WriteItem(element, api.Writer.GetCollectionIndexName(i));
                             }
                         }
                     };                    

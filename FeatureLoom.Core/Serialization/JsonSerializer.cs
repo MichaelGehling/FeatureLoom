@@ -19,16 +19,15 @@ namespace FeatureLoom.Serialization
     {
         MicroValueLock serializerLock = new MicroValueLock();        
         LazyUnsafeValue<MemoryStream> memoryStream = new();
-        JsonUTF8StreamWriter writer;
+        readonly JsonUTF8StreamWriter writer;
         readonly CompiledSettings settings;
-        Dictionary<Type, CachedTypeHandler> typeHandlerCache = new();
-        readonly CachedTypeHandler[] typeHandlerLookup;
-        Dictionary<Type, CachedKeyWriter> keyWriterCache = new();
-        Dictionary<object, ItemInfo> objToItemInfo = new();
-        ItemInfoRecycler itemInfoRecycler;
+        readonly Dictionary<Type, CachedTypeWriter> typeWriterCache = new();
+        readonly Dictionary<Type, CachedKeyWriter> keyWriterCache = new();
+        readonly Dictionary<object, ItemInfo> objToItemInfo = new();
+        readonly ItemInfoRecycler itemInfoRecycler;
         private ByteSegment rootName;
         ItemInfo currentItemInfo;
-        ExtensionApi extensionApi;
+        readonly ExtensionApi extensionApi;
         public delegate void ItemHandler<T>(T item);
         public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
 
@@ -38,7 +37,6 @@ namespace FeatureLoom.Serialization
             writer = new JsonUTF8StreamWriter(this.settings);
             itemInfoRecycler = new ItemInfoRecycler(this.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef);
             rootName = new ByteSegment(writer.PrepareRootName());
-            typeHandlerLookup = CreateTypeHandlerLookup();
             this.extensionApi = new ExtensionApi(this);
         }
 
@@ -62,7 +60,7 @@ namespace FeatureLoom.Serialization
             itemInfoRecycler.ResetPooledItemInfos();            
         }
 
-        CachedTypeHandler lastTypeHandler = null;
+        CachedTypeWriter lastTypeHandler = null;
         Type lastTypeHandlerType = null;
 
         public string Serialize<T>(T item)
@@ -81,13 +79,13 @@ namespace FeatureLoom.Serialization
 
                 if (lastTypeHandlerType == itemType)
                 {                    
-                    lastTypeHandler.HandleItem(item, rootName);                    
+                    lastTypeHandler.WriteItem(item, rootName);                    
                 }
                 else
                 {
-                    var typeHandler = GetCachedTypeHandler(itemType);
+                    var typeHandler = GetCachedTypeWriter(itemType);
                     
-                    typeHandler.HandleItem(item, rootName);                    
+                    typeHandler.WriteItem(item, rootName);                    
 
                     lastTypeHandler = typeHandler;
                     lastTypeHandlerType = typeHandler.HandlerType;
@@ -167,13 +165,13 @@ namespace FeatureLoom.Serialization
 
                 if (lastTypeHandlerType == itemType)
                 {                    
-                    lastTypeHandler.HandleItem(item, rootName);                    
+                    lastTypeHandler.WriteItem(item, rootName);                    
                 }
                 else
                 {
-                    var typeHandler = GetCachedTypeHandler(itemType);
+                    var typeHandler = GetCachedTypeWriter(itemType);
                     
-                    typeHandler.HandleItem(item, rootName);                    
+                    typeHandler.WriteItem(item, rootName);                    
 
                     lastTypeHandler = typeHandler;
                     lastTypeHandlerType = typeHandler.HandlerType;
@@ -207,13 +205,13 @@ namespace FeatureLoom.Serialization
 
                 if (lastTypeHandlerType == itemType)
                 {
-                    lastTypeHandler.HandleItem(item, rootName);
+                    lastTypeHandler.WriteItem(item, rootName);
                 }
                 else
                 {
-                    var typeHandler = GetCachedTypeHandler(itemType);
+                    var typeHandler = GetCachedTypeWriter(itemType);
 
-                    typeHandler.HandleItem(item, rootName);
+                    typeHandler.WriteItem(item, rootName);
 
                     lastTypeHandler = typeHandler;
                     lastTypeHandlerType = typeHandler.HandlerType;
@@ -272,50 +270,19 @@ namespace FeatureLoom.Serialization
             return stringValueWriter.HasMethod;
         }
 
-        private CachedTypeHandler[] CreateTypeHandlerLookup()
-        {
-            var values = Enum.GetValues(typeof(TypeCode)).OfType<TypeCode>();
-            int count = values.Max(v => (int)v) + 1;
 
-            List<CachedTypeHandler> handlers = new();            
-            for(int i = 0; i < count; i++)
-            {
-                if (!EnumHelper.TryFromInt<TypeCode>(i, out TypeCode typeCode))
-                {
-                    handlers.Add(null);
-                    continue;
-                }
-
-                Type type = typeCode.GetTypeFromTypeCode();
-                if (type == null || type == typeof(object))
-                {
-                    handlers.Add(null);
-                }
-                else
-                {
-                    handlers.Add(CreateCachedTypeHandler(type));
-                }
-            }
-            return handlers.ToArray();
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private CachedTypeHandler GetCachedTypeHandler(Type itemType)
+        private CachedTypeWriter GetCachedTypeWriter(Type itemType)
         {            
-            if (!itemType.IsClass && !itemType.IsEnum)
-            {
-                int typeCode = (int)Type.GetTypeCode(itemType);
-                var handler = typeHandlerLookup[typeCode];
-                if (handler != null) return handler;
-            }
-            return typeHandlerCache.TryGetValue(itemType, out var cachedTypeHandler) ? cachedTypeHandler : CreateCachedTypeHandler(itemType);
+            return typeWriterCache.TryGetValue(itemType, out var cachedTypeHandler) ? cachedTypeHandler : CreateCachedTypeWriter(itemType);
         }
 
 
-        private CachedTypeHandler CreateCachedTypeHandler(Type itemType)
+        private CachedTypeWriter CreateCachedTypeWriter(Type itemType)
         {
-            CachedTypeHandler typeHandler = new CachedTypeHandler(this, itemType);            
-            typeHandlerCache[itemType] = typeHandler; // Typehandler must be added first for the case of recursion (type contains same type)
+            CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType);            
+            typeWriterCache[itemType] = typeHandler; // Typehandler must be added first for the case of recursion (type contains same type)
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
 
@@ -327,51 +294,33 @@ namespace FeatureLoom.Serialization
                 return typeHandler;
             }
 
-            if (itemType == typeof(int)) typeHandler.SetItemHandler_Primitive<int>(writer.WriteIntValue);
-            else if (itemType == typeof(uint)) typeHandler.SetItemHandler_Primitive<uint>(writer.WriteUintValue);
-            else if (itemType == typeof(long)) typeHandler.SetItemHandler_Primitive<long>(writer.WriteLongValue);
-            else if (itemType == typeof(ulong)) typeHandler.SetItemHandler_Primitive<ulong>(writer.WriteUlongValue);
-            else if (itemType == typeof(short)) typeHandler.SetItemHandler_Primitive<short>(writer.WriteShortValue);
-            else if (itemType == typeof(ushort)) typeHandler.SetItemHandler_Primitive<ushort>(writer.WriteUshortValue);
-            else if (itemType == typeof(sbyte)) typeHandler.SetItemHandler_Primitive<sbyte>(writer.WriteSbyteValue);
-            else if (itemType == typeof(byte)) typeHandler.SetItemHandler_Primitive<byte>(writer.WriteByteValue);
-            else if (itemType == typeof(string)) typeHandler.SetItemHandler_Primitive<string>(writer.WriteStringValue);
-            else if (itemType == typeof(float)) typeHandler.SetItemHandler_Primitive<float>(writer.WriteFloatValue);
-            else if (itemType == typeof(double)) typeHandler.SetItemHandler_Primitive<double>(writer.WriteDoubleValue);
-            else if (itemType == typeof(decimal)) typeHandler.SetItemHandler_Primitive<decimal>(writer.WriteDecimalValue);
-            else if (itemType == typeof(char)) typeHandler.SetItemHandler_Primitive<char>(writer.WriteCharValue);
-            else if (itemType == typeof(bool)) typeHandler.SetItemHandler_Primitive<bool>(writer.WriteBoolValue);
-            else if (itemType == typeof(IntPtr)) typeHandler.SetItemHandler_Primitive<IntPtr>(writer.WriteIntPtrValue);
-            else if (itemType == typeof(UIntPtr)) typeHandler.SetItemHandler_Primitive<UIntPtr>(writer.WriteUintPtrValue);
-            else if (itemType == typeof(Guid)) typeHandler.SetItemHandler_Primitive<Guid>(writer.WriteGuidValue);
-            else if (itemType == typeof(DateTime)) typeHandler.SetItemHandler_Primitive<DateTime>(writer.WriteDateTimeValue);
-            else if (itemType == typeof(TimeSpan)) typeHandler.SetItemHandler_Primitive<TimeSpan>(writer.WriteTimeSpanValue);
-            else if (itemType == typeof(JsonFragment)) typeHandler.SetItemHandler_Primitive<JsonFragment>(writer.WriteJsonFragmentValue);
-            else if (itemType == typeof(TextSegment)) typeHandler.SetItemHandler_Primitive<TextSegment>(writer.WriteTextSegmentValue);
+            bool isNullableValueType = itemType.IsValueType && itemType.IsNullable();
+            if (isNullableValueType) itemType = Nullable.GetUnderlyingType(itemType);
 
-            else if (itemType == typeof(int?)) typeHandler.SetItemHandler_Primitive<int?>(v => { if (v.HasValue) writer.WriteIntValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(uint?)) typeHandler.SetItemHandler_Primitive<uint?>(v => { if (v.HasValue) writer.WriteUintValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(long?)) typeHandler.SetItemHandler_Primitive<long?>(v => { if (v.HasValue) writer.WriteLongValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(ulong?)) typeHandler.SetItemHandler_Primitive<ulong?>(v => { if (v.HasValue) writer.WriteUlongValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(short?)) typeHandler.SetItemHandler_Primitive<short?>(v => { if (v.HasValue) writer.WriteShortValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(ushort?)) typeHandler.SetItemHandler_Primitive<ushort?>(v => { if (v.HasValue) writer.WriteUshortValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(sbyte?)) typeHandler.SetItemHandler_Primitive<sbyte?>(v => { if (v.HasValue) writer.WriteSbyteValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(byte?)) typeHandler.SetItemHandler_Primitive<byte?>(v => { if (v.HasValue) writer.WriteByteValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(float?)) typeHandler.SetItemHandler_Primitive<float?>(v => { if (v.HasValue) writer.WriteFloatValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(double?)) typeHandler.SetItemHandler_Primitive<double?>(v => { if (v.HasValue) writer.WriteDoubleValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(decimal?)) typeHandler.SetItemHandler_Primitive<decimal?>(v => { if (v.HasValue) writer.WriteDecimalValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(char?)) typeHandler.SetItemHandler_Primitive<char?>(v => { if (v.HasValue) writer.WriteCharValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(bool?)) typeHandler.SetItemHandler_Primitive<bool?>(v => { if (v.HasValue) writer.WriteBoolValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(IntPtr?)) typeHandler.SetItemHandler_Primitive<IntPtr?>(v => { if (v.HasValue) writer.WriteIntPtrValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(UIntPtr?)) typeHandler.SetItemHandler_Primitive<UIntPtr?>(v => { if (v.HasValue) writer.WriteUintPtrValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(Guid?)) typeHandler.SetItemHandler_Primitive<Guid?>(v => { if (v.HasValue) writer.WriteGuidValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(DateTime?)) typeHandler.SetItemHandler_Primitive<DateTime?>(v => { if (v.HasValue) writer.WriteDateTimeValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(TimeSpan?)) typeHandler.SetItemHandler_Primitive<TimeSpan?>(v => { if (v.HasValue) writer.WriteTimeSpanValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(JsonFragment?)) typeHandler.SetItemHandler_Primitive<JsonFragment?>(v => { if (v.HasValue) writer.WriteJsonFragmentValue(v.Value); else writer.WriteNullValue(); });
-            else if (itemType == typeof(TextSegment?)) typeHandler.SetItemHandler_Primitive<TextSegment?>(v => { if (v.HasValue) writer.WriteTextSegmentValue(v.Value); else writer.WriteNullValue(); });
-
-            else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, itemType, nameof(CreateEnumItemHandler), true);
-            else if (itemType.IsValueType && itemType.IsNullable() && Nullable.GetUnderlyingType(itemType).IsEnum) CreateAndSetItemHandlerViaReflection(typeHandler, Nullable.GetUnderlyingType(itemType), nameof(CreateNullableEnumItemHandler), true);
+            if (itemType == typeof(int)) CreateIntItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(uint)) CreateUIntItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(long)) CreateLongItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(ulong)) CreateULongItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(short)) CreateShortItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(ushort)) CreateUShortItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(sbyte)) CreateSByteItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(byte)) CreateByteItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(string)) CreateStringItemWriter(typeHandler);
+            else if (itemType == typeof(float)) CreateFloatItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(double)) CreateDoubleItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(decimal)) CreateDecimalItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(char)) CreateCharItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(bool)) CreateBoolItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(IntPtr)) CreateIntPtrItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(UIntPtr)) CreateUIntPtrItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(Guid)) CreateGuidItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(DateTime)) CreateDateTimeItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(DateTimeOffset)) CreateDateTimeOffsetItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(TimeSpan)) CreateTimeSpanItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(JsonFragment)) CreateJsonFragmentItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(TextSegment)) CreateTextSegmentItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(Uri)) CreateUriItemWriter(typeHandler);
+            else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(itemType, nameof(CreateEnumItemHandler), typeHandler, isNullableValueType);            
 
             else if (settings.writeByteArrayAsBase64String && itemType == typeof(ByteSegment)) typeHandler.SetItemHandler_Primitive<ByteSegment>(writer.WriteByteSegmentValueAsBase64);
             else if (settings.writeByteArrayAsBase64String && itemType == typeof(byte[])) typeHandler.SetItemHandler_Primitive<byte[]>(writer.WriteByteArrayValueAsBase64);
@@ -380,50 +329,53 @@ namespace FeatureLoom.Serialization
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) {/* do nothing */}
             else if (TryCreateListItemHandler(typeHandler, itemType)) {/* do nothing */}
             else if (TryCreateEnumerableItemHandler(typeHandler, itemType)) {/* do nothing */}
-            else CreateComplexItemHandler(typeHandler, itemType);           
+            else CreateComplexItemHandler(typeHandler, itemType, isNullableValueType);           
             
             return typeHandler;
 
-            void CreateAndSetItemHandlerViaReflection(CachedTypeHandler typeHandler, Type itemType, string getItemHandlerMethodName, bool isPrimitive)
+            void CreateAndSetItemHandlerViaReflection(Type itemType, string getItemHandlerMethodName, params object[] parameters)
             {
                 MethodInfo method = typeof(JsonSerializer).GetMethod(getItemHandlerMethodName, BindingFlags.NonPublic | BindingFlags.Instance);
-                MethodInfo generic = method.MakeGenericMethod(itemType);
-                generic.Invoke(this, new object[] { typeHandler });
-            }
-        }
-   
-
-        private void CreateEnumItemHandler<T>(CachedTypeHandler typeHandler) where T : struct, Enum
-        {
-            if (settings.enumAsString)
-            {
-                typeHandler.SetItemHandler_Primitive<T>(item => writer.WriteStringValue(item.ToName()));
-            }
-            else
-            {
-                typeHandler.SetItemHandler_Primitive<T>(item => writer.WriteIntValue(item.ToInt()));
+                MethodInfo generic = method.MakeGenericMethod(itemType);                
+                generic.Invoke(this, parameters);
             }
         }
 
-        private void CreateNullableEnumItemHandler<T>(CachedTypeHandler typeHandler) where T : struct, Enum
+
+        private void CreateEnumItemHandler<T>(CachedTypeWriter typeHandler, bool nullable) where T : struct, Enum
         {
-            if (settings.enumAsString)
+            if (!nullable)
             {
-                typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
+                if (settings.enumAsString)
                 {
-                    if (item.HasValue) writer.WriteStringValue(item.Value.ToName());
-                    else writer.WriteNullValue();
-                });
+                    typeHandler.SetItemHandler_Primitive<T>(item => writer.WriteStringValue(item.ToName()));
+                }
+                else
+                {
+                    typeHandler.SetItemHandler_Primitive<T>(item => writer.WriteIntValue(item.ToInt()));
+                }
             }
             else
             {
-                typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
+                if (settings.enumAsString)
                 {
-                    if (item.HasValue) writer.WriteIntValue(item.Value.ToInt());
-                    else writer.WriteNullValue();
-                });
+                    typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
+                    {
+                        if (item.HasValue) writer.WriteStringValue(item.Value.ToName());
+                        else writer.WriteNullValue();
+                    });
+                }
+                else
+                {
+                    typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
+                    {
+                        if (item.HasValue) writer.WriteIntValue(item.Value.ToInt());
+                        else writer.WriteNullValue();
+                    });
+                }
             }
         }
+
 
 
 
@@ -443,14 +395,14 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryHandleItemAsRef<T>(T item, Type itemType)
+        private bool TryHandleItemAsRef<T>(T item)
         {
-            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || currentItemInfo == null || item == null || !itemType.IsClass) return false;
-            return TryHandleObjAsRef(item, itemType);
+            if (settings.referenceCheck == ReferenceCheck.NoRefCheck || currentItemInfo == null || item == null || !typeof(T).IsClass) return false;
+            return TryHandleObjAsRef(item);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryHandleObjAsRef(object obj, Type itemType)
+        private bool TryHandleObjAsRef(object obj)
         {
             if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
             {
@@ -480,10 +432,10 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TypeInfoRequired(Type actualType, Type expectedType)
+        private bool TypeInfoRequired(bool typeDeviating)
         {
             if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo) return true;
-            if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && actualType != expectedType) return true;
+            if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeDeviating) return true;
             return false;
         }
 

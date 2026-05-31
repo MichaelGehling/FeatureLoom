@@ -140,5 +140,56 @@ namespace FeatureLoom.Serialization
         {
             public List<BaseType> Items;
         }
+
+        private struct TypeInfoStruct { public int Z; }
+
+        [Fact]
+        public void Serialize_TypeInfo_AddAllTypeInfo_Struct()
+        {
+            var value = new TypeInfoStruct { Z = 7 };
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(TypeInfoStruct));
+            string expected = $"{{\"$type\":\"{typeName}\",\"Z\":7}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
+            });
+        }
+
+        [Fact]
+        public void Serialize_TypeInfo_AddDeviatingTypeInfo_ExactRoot_NoTypeInfo()
+        {
+            BaseType value = new BaseType();
+            const string expected = "{\"BaseValue\":1}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
+            });
+        }
+
+        [Fact]
+        public void Serialize_TypeInfo_AddDeviatingTypeInfo_DictionaryValue_Derived()
+        {
+            var value = new SortedDictionary<string, BaseType> { ["x"] = new DerivedType() };
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(DerivedType));
+            string expected = $"{{\"x\":{{\"$type\":\"{typeName}\",\"DerivedValue\":2,\"BaseValue\":1}}}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
+            });
+        }
+
+        [Fact]
+        public void Serialize_TypeInfo_AddAllTypeInfo_CollectionElement_NonDeviating()
+        {
+            var value = new ContainerList { Items = new List<BaseType> { new BaseType() } };
+            string containerTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(ContainerList));
+            string listTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(List<BaseType>));
+            string baseTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(BaseType));
+            string expected = $"{{\"$type\":\"{containerTypeName}\",\"Items\":{{\"$type\":\"{listTypeName}\",\"$value\":[{{\"$type\":\"{baseTypeName}\",\"BaseValue\":1}}]}}}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
+            });
+        }
     }
 }

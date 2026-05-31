@@ -11,13 +11,10 @@ namespace FeatureLoom.Serialization
     public sealed partial class JsonSerializer
     {
 
-        private void CreateComplexItemHandler(CachedTypeHandler typeHandler, Type itemType)
-        {
-
-            bool isNullableStruct = itemType.IsValueType && itemType.IsNullable();
+        private void CreateComplexItemHandler(CachedTypeWriter typeHandler, Type itemType, bool isNullableStruct)
+        {            
             if (isNullableStruct)
             {
-                itemType = Nullable.GetUnderlyingType(itemType);
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateTypedComplexItemHandler_ForNullableStruct), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType);
                 genericCreateMethod.Invoke(this, new object[] { typeHandler, itemType });
@@ -31,7 +28,7 @@ namespace FeatureLoom.Serialization
             
         }
 
-        private void CreateTypedComplexItemHandler<T>(CachedTypeHandler typeHandler, Type itemType)
+        private void CreateTypedComplexItemHandler<T>(CachedTypeWriter typeHandler, Type itemType)
         {
             var memberInfos = new List<MemberInfo>();
             if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
@@ -120,7 +117,7 @@ namespace FeatureLoom.Serialization
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
-                var fieldTypeHandler = GetCachedTypeHandler(fieldType);
+                var fieldTypeHandler = GetCachedTypeWriter(fieldType);
                 allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
@@ -132,7 +129,7 @@ namespace FeatureLoom.Serialization
             typeHandler.SetItemHandler_Object(fieldValueWritersArray, allFieldsNoRefs);
         }
 
-        private void CreateTypedComplexItemHandler_ForNullableStruct<T>(CachedTypeHandler typeHandler, Type itemType) where T : struct
+        private void CreateTypedComplexItemHandler_ForNullableStruct<T>(CachedTypeWriter typeHandler, Type itemType) where T : struct
         {
             var memberInfos = new List<MemberInfo>();
             if (settings.dataSelection == DataSelection.PublicFieldsAndProperties)
@@ -160,7 +157,7 @@ namespace FeatureLoom.Serialization
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
-                var fieldTypeHandler = GetCachedTypeHandler(fieldType);
+                var fieldTypeHandler = GetCachedTypeWriter(fieldType);
                 allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
@@ -179,7 +176,7 @@ namespace FeatureLoom.Serialization
             throw new Exception("Not a FieldType or PropertyType");
         }
 
-        private Action<T> CreateFieldValueWriter<T, V>(CachedTypeHandler fieldTypeHandler, MemberInfo memberInfo)
+        private Action<T> CreateFieldValueWriter<T, V>(CachedTypeWriter fieldTypeHandler, MemberInfo memberInfo)
         {
             string fieldName = memberInfo.Name;
             if (settings.dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields &&
@@ -217,7 +214,7 @@ namespace FeatureLoom.Serialization
                 {
                     writer.WriteToBuffer(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
-                    fieldTypeHandler.HandleItem(value, default);
+                    fieldTypeHandler.WriteItem(value, default);
                 };
             }
             else
@@ -233,10 +230,10 @@ namespace FeatureLoom.Serialization
                     else
                     {
                         Type valueType = value.GetType();
-                        CachedTypeHandler actualHandler = fieldTypeHandler;
-                        if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
+                        CachedTypeWriter actualHandler = fieldTypeHandler;
+                        if (valueType != expectedValueType) actualHandler = GetCachedTypeWriter(valueType);
                         
-                        actualHandler.HandleItem(value, fieldNameBytes);                        
+                        actualHandler.WriteItem(value, fieldNameBytes);                        
                     }
                 };
             }

@@ -56,6 +56,7 @@ public sealed partial class JsonSerializer
             void WriteUshortValue(ushort value);
             void WriteGuidValue(Guid value);
             void WriteDateTimeValue(DateTime value);
+            void WriteUriValue(Uri value);
             void WriteBoolAsStringValue(bool value);
             void WriteByteAsStringValue(byte value);
             void WriteCharValueAsString(char value);
@@ -1793,47 +1794,47 @@ public sealed partial class JsonSerializer
             WriteToBufferWithoutCheck((byte)'"');
         }
 
-            private static readonly byte[] zeroDateTimeBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00\"");
-            public void WriteDateTimeValue(DateTime dateTime)
+        private static readonly byte[] zeroDateTimeBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00\"");
+        public void WriteDateTimeValue(DateTime dateTime)
+        {
+            if (dateTime == default)
             {
-                if (dateTime == default)
-                {
-                    WriteToBuffer(zeroDateTimeBytes);
-                    return;
-                }
+                WriteToBuffer(zeroDateTimeBytes);
+                return;
+            }
 
-                int fractualSeconds = (int)(dateTime.Ticks % TimeSpan.TicksPerSecond);
-                int bytesToReserve = zeroDateTimeBytes.Length;
-                if (fractualSeconds > 0) bytesToReserve += 8; // .fffffff
-                if (dateTime.Kind == DateTimeKind.Utc) bytesToReserve += 1; // Z
-                else if (dateTime.Kind == DateTimeKind.Local) bytesToReserve += 6; // e.g. +01:00
-                EnsureFreeBufferSpace(bytesToReserve);
+            int fractualSeconds = (int)(dateTime.Ticks % TimeSpan.TicksPerSecond);
+            int bytesToReserve = zeroDateTimeBytes.Length;
+            if (fractualSeconds > 0) bytesToReserve += 8; // .fffffff
+            if (dateTime.Kind == DateTimeKind.Utc) bytesToReserve += 1; // Z
+            else if (dateTime.Kind == DateTimeKind.Local) bytesToReserve += 6; // e.g. +01:00
+            EnsureFreeBufferSpace(bytesToReserve);
 
-                WriteToBufferWithoutCheck((byte)'"');
-                // Write Year
-                Write4Digits(dateTime.Year);
-                WriteToBufferWithoutCheck((byte)'-');
-                // Write Month
-                Write2Digits(dateTime.Month);
-                WriteToBufferWithoutCheck((byte)'-');
-                // Write Day
-                Write2Digits(dateTime.Day);
-                WriteToBufferWithoutCheck((byte)'T');
-                // Write Hour
-                Write2Digits(dateTime.Hour);
-                WriteToBufferWithoutCheck((byte)':');
-                // Write Minute
-                Write2Digits(dateTime.Minute);
-                WriteToBufferWithoutCheck((byte)':');
-                // Write Second
-                Write2Digits(dateTime.Second);
+            WriteToBufferWithoutCheck((byte)'"');
+            // Write Year
+            Write4Digits(dateTime.Year);
+            WriteToBufferWithoutCheck((byte)'-');
+            // Write Month
+            Write2Digits(dateTime.Month);
+            WriteToBufferWithoutCheck((byte)'-');
+            // Write Day
+            Write2Digits(dateTime.Day);
+            WriteToBufferWithoutCheck((byte)'T');
+            // Write Hour
+            Write2Digits(dateTime.Hour);
+            WriteToBufferWithoutCheck((byte)':');
+            // Write Minute
+            Write2Digits(dateTime.Minute);
+            WriteToBufferWithoutCheck((byte)':');
+            // Write Second
+            Write2Digits(dateTime.Second);
 
-                // Write Fractional second                
-                if (fractualSeconds > 0)
-                {
-                    WriteToBufferWithoutCheck((byte)'.');
-                    Write7Digits(fractualSeconds);
-                }
+            // Write Fractional second                
+            if (fractualSeconds > 0)
+            {
+                WriteToBufferWithoutCheck((byte)'.');
+                Write7Digits(fractualSeconds);
+            }
 
             if (dateTime.Kind == DateTimeKind.Utc)
             {
@@ -1851,55 +1852,111 @@ public sealed partial class JsonSerializer
             WriteToBufferWithoutCheck((byte)'"');
         }
 
-            private static readonly byte[] zeroTimespanBytes = System.Text.Encoding.UTF8.GetBytes("\"00:00:00\"");
-            public void WriteTimeSpanValue(TimeSpan value)
+        private static readonly byte[] zeroDateTimeOffsetBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00+00:00\"");
+        public void WriteDateTimeOffsetValue(DateTimeOffset dateTimeOffset)
+        {
+            if (dateTimeOffset == default)
             {
-                if (value == default)
-                {
-                    WriteToBuffer(zeroTimespanBytes);
-                    return;
-                }
-
-                bool isNegative = value.Ticks < 0;
-                if (isNegative) value = value.Negate(); // Make the TimeSpan positive for easier formatting
-
-                int numDays = value.Days;
-                int numFractualSeconds = (int)(value.Ticks % TimeSpan.TicksPerSecond);
-
-                int bytesToReserve = zeroTimespanBytes.Length; // "hh:mm:ss"
-                if (isNegative) bytesToReserve += 1; // '-' sign
-                if (numDays > 0) bytesToReserve += 11; // e.g. ddd.(max 10 digits + dot)
-                if (numFractualSeconds > 0) bytesToReserve += 8; // .fffffff
-
-                EnsureFreeBufferSpace(bytesToReserve);
-                WriteToBufferWithoutCheck((byte)'"');
-
-                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
-
-                if (numDays > 0)
-                {
-                    WriteSignedInteger(numDays);
-                    WriteToBufferWithoutCheck((byte)'.');
-                }
-
-                Write2Digits(value.Hours);
-                WriteToBufferWithoutCheck((byte)':');
-                Write2Digits(value.Minutes);
-                WriteToBufferWithoutCheck((byte)':');
-                Write2Digits(value.Seconds);
-
-                if (numFractualSeconds > 0)
-                {
-                    WriteToBufferWithoutCheck((byte)'.');
-                    Write7Digits(numFractualSeconds);
-                }
-
-                WriteToBufferWithoutCheck((byte)'"');
+                WriteToBuffer(zeroDateTimeOffsetBytes);
+                return;
             }
 
+            int fractualSeconds = (int)(dateTimeOffset.Ticks % TimeSpan.TicksPerSecond);
+            int bytesToReserve = zeroDateTimeOffsetBytes.Length;
+            if (fractualSeconds > 0) bytesToReserve += 8; // .fffffff
+            EnsureFreeBufferSpace(bytesToReserve);
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            WriteToBufferWithoutCheck((byte)'"');
+            // Write Year
+            Write4Digits(dateTimeOffset.Year);
+            WriteToBufferWithoutCheck((byte)'-');
+            // Write Month
+            Write2Digits(dateTimeOffset.Month);
+            WriteToBufferWithoutCheck((byte)'-');
+            // Write Day
+            Write2Digits(dateTimeOffset.Day);
+            WriteToBufferWithoutCheck((byte)'T');
+            // Write Hour
+            Write2Digits(dateTimeOffset.Hour);
+            WriteToBufferWithoutCheck((byte)':');
+            // Write Minute
+            Write2Digits(dateTimeOffset.Minute);
+            WriteToBufferWithoutCheck((byte)':');
+            // Write Second
+            Write2Digits(dateTimeOffset.Second);
 
+            // Write Fractional second
+            if (fractualSeconds > 0)
+            {
+                WriteToBufferWithoutCheck((byte)'.');
+                Write7Digits(fractualSeconds);
+            }
+
+            TimeSpan offsetSpan = dateTimeOffset.Offset;
+            bool isNegative = offsetSpan.Ticks < 0;
+            WriteToBufferWithoutCheck((byte)(isNegative ? '-' : '+'));
+            Write2Digits(Math.Abs(offsetSpan.Hours));
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(Math.Abs(offsetSpan.Minutes));
+
+            WriteToBufferWithoutCheck((byte)'"');
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUriValue(Uri value)
+        {
+            if (value != null) WriteEscapedStringWithQuotes(value.OriginalString);
+            else WriteNullValue();
+        }
+
+        private static readonly byte[] zeroTimespanBytes = System.Text.Encoding.UTF8.GetBytes("\"00:00:00\"");
+        public void WriteTimeSpanValue(TimeSpan value)
+        {
+            if (value == default)
+            {
+                WriteToBuffer(zeroTimespanBytes);
+                return;
+            }
+
+            bool isNegative = value.Ticks < 0;
+            if (isNegative) value = value.Negate(); // Make the TimeSpan positive for easier formatting
+
+            int numDays = value.Days;
+            int numFractualSeconds = (int)(value.Ticks % TimeSpan.TicksPerSecond);
+
+            int bytesToReserve = zeroTimespanBytes.Length; // "hh:mm:ss"
+            if (isNegative) bytesToReserve += 1; // '-' sign
+            if (numDays > 0) bytesToReserve += 11; // e.g. ddd.(max 10 digits + dot)
+            if (numFractualSeconds > 0) bytesToReserve += 8; // .fffffff
+
+            EnsureFreeBufferSpace(bytesToReserve);
+            WriteToBufferWithoutCheck((byte)'"');
+
+            if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+
+            if (numDays > 0)
+            {
+                WriteSignedInteger(numDays);
+                WriteToBufferWithoutCheck((byte)'.');
+            }
+
+            Write2Digits(value.Hours);
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(value.Minutes);
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(value.Seconds);
+
+            if (numFractualSeconds > 0)
+            {
+                WriteToBufferWithoutCheck((byte)'.');
+                Write7Digits(numFractualSeconds);
+            }
+
+            WriteToBufferWithoutCheck((byte)'"');
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Write4Digits(int value)
         {
             int temp;

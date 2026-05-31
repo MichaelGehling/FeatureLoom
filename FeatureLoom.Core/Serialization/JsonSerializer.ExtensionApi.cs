@@ -18,7 +18,7 @@ public sealed partial class JsonSerializer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public CachedTypeHandler GetCachedTypeHandler(Type type) => serializer.GetCachedTypeHandler(type);
+        public CachedTypeWriter GetCachedTypeHandler(Type type) => serializer.GetCachedTypeWriter(type);
 
         public IWriter Writer => writer;
         public bool RequiresItemNames => serializer.settings.requiresItemNames;

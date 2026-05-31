@@ -291,5 +291,104 @@ namespace FeatureLoom.Serialization
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
+
+        private struct CollectionTestStruct { public int N; }
+
+        [Fact]
+        public void Serialize_EmptyArray()
+        {
+            var value = new int[0];
+            const string expected = "[]";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_EmptyList()
+        {
+            var value = new List<int>();
+            const string expected = "[]";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_EmptyDictionary()
+        {
+            var value = new Dictionary<string, int>();
+            const string expected = "{}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_NullList()
+        {
+            List<int> value = null;
+            const string expected = "null";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_NestedList()
+        {
+            var value = new List<List<int>> { new List<int> { 1, 2 }, new List<int> { 3 } };
+            const string expected = "[[1,2],[3]]";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo
+            });
+        }
+
+        [Fact]
+        public void Serialize_JaggedArray()
+        {
+            var value = new int[][] { new[] { 1, 2 }, new[] { 3 } };
+            const string expected = "[[1,2],[3]]";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_ListOfStructs()
+        {
+            var value = new List<CollectionTestStruct>
+            {
+                new CollectionTestStruct { N = 1 },
+                new CollectionTestStruct { N = 2 }
+            };
+            const string expected = "[{\"N\":1},{\"N\":2}]";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_ListOfNullableStructs_WithNullElement()
+        {
+            var value = new List<CollectionTestStruct?>
+            {
+                new CollectionTestStruct { N = 5 },
+                null
+            };
+            const string expected = "[{\"N\":5},null]";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Dictionary_WithStructValues()
+        {
+            var value = new SortedDictionary<string, CollectionTestStruct>
+            {
+                ["a"] = new CollectionTestStruct { N = 3 }
+            };
+            const string expected = "{\"a\":{\"N\":3}}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_ListOfObjects_MixedPrimitiveTypes()
+        {
+            var value = new List<object> { 42, "hello", null };
+            const string expected = "[42,\"hello\",null]";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo
+            });
+        }
     }
 }

@@ -366,5 +366,92 @@ namespace FeatureLoom.Serialization
         {
             public int DerivedPublic = 1;
         }
+
+        [Fact]
+        public void Serialize_EmptyClass_ProducesEmptyObject()
+        {
+            var value = new EmptyClass();
+            const string expected = "{}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Class_AllFieldsIgnored_ProducesEmptyObject()
+        {
+            var value = new AllIgnoredFieldsClass();
+            const string expected = "{}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_ThreeLevelInheritance_AllLevelsIncluded()
+        {
+            var value = new LeafLevel();
+            const string expected = "{\"C\":3,\"B\":2,\"A\":1}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Class_WithStructField()
+        {
+            var value = new ClassWithStructField { S = new StructForField { X = 7 } };
+            const string expected = "{\"S\":{\"X\":7}}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Class_WithNullableStructField_HasValue()
+        {
+            var value = new ClassWithNullableStructField { S = new StructForField { X = 9 } };
+            const string expected = "{\"S\":{\"X\":9}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo
+            });
+        }
+
+        [Fact]
+        public void Serialize_Class_WithNullableStructField_IsNull()
+        {
+            var value = new ClassWithNullableStructField { S = null };
+            const string expected = "{\"S\":null}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Class_WithNullComplexField()
+        {
+            var value = new EmbeddedOuter { Id = 1, Inner = null };
+            const string expected = "{\"Id\":1,\"Inner\":null}";
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Class_WithObjectTypedField_WritesActualType()
+        {
+            var value = new ObjectFieldHolder { Data = new EmbeddedInner { Text = "hello" } };
+            const string expected = "{\"Data\":{\"Text\":\"hello\"}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo
+            });
+        }
+
+        private class EmptyClass { }
+
+        private class AllIgnoredFieldsClass
+        {
+            [JsonIgnore] public int A = 1;
+            [JsonIgnore] public string B = "x";
+        }
+
+        private class GrandBase { public int A = 1; }
+        private class MidLevel : GrandBase { public int B = 2; }
+        private class LeafLevel : MidLevel { public int C = 3; }
+
+        private struct StructForField { public int X; }
+        private class ClassWithStructField { public StructForField S; }
+        private class ClassWithNullableStructField { public StructForField? S; }
+        private class ObjectFieldHolder { public object Data; }
     }
 }

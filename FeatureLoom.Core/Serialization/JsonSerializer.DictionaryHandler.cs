@@ -10,7 +10,7 @@ namespace FeatureLoom.Serialization
     public sealed partial class JsonSerializer
     {
 
-        private bool TryCreateDictionaryItemHandler(CachedTypeHandler typeHandler, Type itemType)
+        private bool TryCreateDictionaryItemHandler(CachedTypeWriter typeHandler, Type itemType)
         {
             string methodName = null;
             if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type keyType, out Type valueType)) methodName = nameof(CreateIDictionaryItemHandler);
@@ -18,7 +18,7 @@ namespace FeatureLoom.Serialization
             else return false;
 
             if (!TryGetCachedKeyWriter(keyType, out CachedKeyWriter keyWriter)) return false;
-            CachedTypeHandler valueHandler = GetCachedTypeHandler(valueType);
+            CachedTypeWriter valueHandler = GetCachedTypeWriter(valueType);
 
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))             
             {
@@ -35,7 +35,7 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        private void CreateIDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedKeyWriter keyWriter) 
+        private void CreateIDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter valueHandler, CachedKeyWriter keyWriter) 
             where T : IDictionary<K, V> 
             where ENUM : IEnumerator<KeyValuePair<K,V>>
         {
@@ -54,7 +54,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
-                        valueHandler.HandleItem(pair.Value, default);
+                        valueHandler.WriteItem(pair.Value, default);
                     }
 
                     while (enumerator.MoveNext())
@@ -63,7 +63,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
-                        valueHandler.HandleItem(pair.Value, default);
+                        valueHandler.WriteItem(pair.Value, default);
                     }
                 };
                 typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
@@ -84,9 +84,9 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type valueType = value.GetType();
-                            CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);                                                        
-                            actualHandler.HandleItem(value, itemName);                            
+                            CachedTypeWriter actualHandler = valueHandler;
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeWriter(valueType);                                                        
+                            actualHandler.WriteItem(value, itemName);                            
                         }
                     }
 
@@ -102,9 +102,9 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type valueType = value.GetType();
-                            CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);                                                        
-                            actualHandler.HandleItem(value, itemName);                            
+                            CachedTypeWriter actualHandler = valueHandler;
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeWriter(valueType);                                                        
+                            actualHandler.WriteItem(value, itemName);                            
                         }
                     }
                 };
@@ -112,7 +112,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        private void CreateIReadOnlyDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeHandler typeHandler, CachedTypeHandler valueHandler, CachedKeyWriter keyWriter)
+        private void CreateIReadOnlyDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter valueHandler, CachedKeyWriter keyWriter)
             where T : IReadOnlyDictionary<K, V>
             where ENUM : IEnumerator<KeyValuePair<K, V>>
         {
@@ -131,7 +131,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
-                        valueHandler.HandleItem(pair.Value, default);
+                        valueHandler.WriteItem(pair.Value, default);
                     }
 
                     while (enumerator.MoveNext())
@@ -140,7 +140,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         keyWriter.WriteKeyAsString(pair.Key);
                         writer.WriteColon();
-                        valueHandler.HandleItem(pair.Value, default);
+                        valueHandler.WriteItem(pair.Value, default);
                     }
                 };
                 typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
@@ -161,9 +161,9 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type valueType = value.GetType();
-                            CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
-                            actualHandler.HandleItem(value, itemName);
+                            CachedTypeWriter actualHandler = valueHandler;
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeWriter(valueType);
+                            actualHandler.WriteItem(value, itemName);
                         }
                     }
 
@@ -179,9 +179,9 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type valueType = value.GetType();
-                            CachedTypeHandler actualHandler = valueHandler;
-                            if (valueType != expectedValueType) actualHandler = GetCachedTypeHandler(valueType);
-                            actualHandler.HandleItem(value, itemName);
+                            CachedTypeWriter actualHandler = valueHandler;
+                            if (valueType != expectedValueType) actualHandler = GetCachedTypeWriter(valueType);
+                            actualHandler.WriteItem(value, itemName);
                         }
                     }
                 };

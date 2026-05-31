@@ -16,28 +16,34 @@ namespace FeatureLoom.Serialization
             void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category, Type handlerType);
         }
 
-        public sealed class CachedTypeHandler : ICachedTypeHandler
+        public sealed class CachedTypeWriter : ICachedTypeHandler
         {
             private JsonSerializer serializer;
             private JsonUTF8StreamWriter writer;
-            private Delegate itemHandler;
-            private Action<object, Type, ByteSegment> objectItemHandler;
+            private Delegate itemWriter; // (T item, bool deviatingType, ByteSegment itemName)
+            private Action<object, bool, ByteSegment> objectItemWriter;
             private Type handlerType;
-            private bool isPrimitive;
             private bool noRefTypes;
             public byte[] preparedTypeInfo;
 
-            public CachedTypeHandler(JsonSerializer serializer, Type handlerType)
+            public CachedTypeWriter(JsonSerializer serializer, Type handlerType)
             {
                 this.serializer = serializer;
                 this.writer = serializer.writer;                
                 this.handlerType = handlerType;
             }
 
-            public bool IsPrimitive => isPrimitive;
             public bool NoRefTypes => noRefTypes;
 
             public Type HandlerType => handlerType;
+
+            public void SetItemWriter<T>(Action<T, bool, ByteSegment> itemWriter, bool childrenMustWriteRefPath)
+            {
+                this.handlerType = typeof(T);
+                this.noRefTypes = !childrenMustWriteRefPath && this.handlerType.IsValueType;
+                this.itemWriter = itemWriter;
+                this.objectItemWriter = (item, deviatingType, itemName) => itemWriter.Invoke((T)item, deviatingType, itemName);
+            }
 
             public void SetItemHandler<T>(ItemHandler<T> itemHandler, JsonDataTypeCategory category, Type handlerType)
             {
@@ -56,9 +62,8 @@ namespace FeatureLoom.Serialization
             public void SetItemHandler_Primitive<T>(ItemHandler<T> itemHandler)
             {
                 this.handlerType = typeof(T);
-                this.isPrimitive = true;
                 this.noRefTypes = true;
-                Action<T, Type, ByteSegment> temp;
+                Action<T, bool, ByteSegment> temp;
                 if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
                 {
                     temp = (item, _, _) =>
@@ -70,9 +75,9 @@ namespace FeatureLoom.Serialization
                 }
                 else if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
                 {
-                    temp = (item, callType, _) =>
+                    temp = (item, deviatingType, _) =>
                     {
-                        if (handlerType == callType)
+                        if (!deviatingType)
                         {
                             itemHandler.Invoke(item);
                         }
@@ -91,26 +96,25 @@ namespace FeatureLoom.Serialization
                         itemHandler.Invoke(item);
                     };
                 }
-                this.itemHandler = temp;
-                this.objectItemHandler = (item, callType, itemName) => temp.Invoke((T)item, callType, itemName);
+                this.itemWriter = temp;
+                this.objectItemWriter = (item, deviatingType, itemName) => temp.Invoke((T)item, deviatingType, itemName);
             }
 
             public void SetItemHandler_Array<T>(ItemHandler<T> itemHandler, bool noRefChildren)
             {
                 this.handlerType = typeof(T);
-                this.isPrimitive = false;
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
-                Action<T, Type, ByteSegment> temp;
+                Action<T, bool, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                     {
                         if (!this.handlerType.IsValueType)
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, _, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, callType))
+                                if (!serializer.TryHandleItemAsRef(item))
                                 {
                                     writer.OpenArray();
                                     itemHandler.Invoke(item);
@@ -121,7 +125,7 @@ namespace FeatureLoom.Serialization
                         }
                         else
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, _, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
                                 writer.OpenArray();
@@ -135,13 +139,13 @@ namespace FeatureLoom.Serialization
                     {
                         if (!this.handlerType.IsValueType)
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, deviatingType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, callType))
+                                if (!serializer.TryHandleItemAsRef(item))
                                 {
                                     Type itemType = item.GetType();
-                                    bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                                    bool writeTypeInfo = serializer.TypeInfoRequired(deviatingType);
                                     if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
                                     writer.OpenArray();
                                     itemHandler.Invoke(item);
@@ -153,11 +157,11 @@ namespace FeatureLoom.Serialization
                         }
                         else
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, deviatingType, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
                                 Type itemType = item.GetType();
-                                bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                                bool writeTypeInfo = serializer.TypeInfoRequired(deviatingType);
                                 if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
                                 writer.OpenArray();
                                 itemHandler.Invoke(item);
@@ -172,7 +176,7 @@ namespace FeatureLoom.Serialization
                 {
                     if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                     {
-                        temp = (item, callType, itemName) =>
+                        temp = (item, _, itemName) =>
                         {
                             writer.OpenArray();
                             itemHandler.Invoke(item);
@@ -181,10 +185,10 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        temp = (item, callType, itemName) =>
+                        temp = (item, deviatingType, itemName) =>
                         {
                             Type itemType = item.GetType();
-                            bool writeTypeInfo = serializer.TypeInfoRequired(itemType, callType);
+                            bool writeTypeInfo = serializer.TypeInfoRequired(deviatingType);
                             if (writeTypeInfo) serializer.StartTypeInfoObject(preparedTypeInfo);
                             writer.OpenArray();
                             itemHandler.Invoke(item);
@@ -193,26 +197,25 @@ namespace FeatureLoom.Serialization
                         };
                     }
                 }
-                this.itemHandler = temp;
-                this.objectItemHandler = (item, callType, itemName) => temp.Invoke((T)item, callType, itemName);
+                this.itemWriter = temp;
+                this.objectItemWriter = (item, deviatingType, itemName) => temp.Invoke((T)item, deviatingType, itemName);
             }
 
             public void SetItemHandler_Object<T>(ItemHandler<T> itemHandler, bool noRefChildren)
             {
-                this.handlerType = typeof(T);
-                this.isPrimitive = false;                
+                this.handlerType = typeof(T);               
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
-                Action<T, Type, ByteSegment> temp;
+                Action<T, bool, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (!this.handlerType.IsValueType)
                     {
                         if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, _, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, callType))
+                                if (!serializer.TryHandleItemAsRef(item))
                                 {
                                     writer.OpenObject();
                                     itemHandler.Invoke(item);                                    
@@ -223,16 +226,16 @@ namespace FeatureLoom.Serialization
                         }
                         else
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, deviatingType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, callType))
+                                if (!serializer.TryHandleItemAsRef(item))
                                 {
                                     Type itemType = item.GetType();
                                     writer.OpenObject();
                                     int tempBufferCount1 = -1;
                                     int tempBufferCount2 = -1;
-                                    if (serializer.TypeInfoRequired(itemType, callType))
+                                    if (serializer.TypeInfoRequired(deviatingType))
                                     {
                                         writer.WriteToBuffer(preparedTypeInfo);
                                         tempBufferCount1 = writer.BufferCount;
@@ -251,7 +254,7 @@ namespace FeatureLoom.Serialization
                     {
                         if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, _, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
                                 writer.OpenObject();
@@ -262,14 +265,14 @@ namespace FeatureLoom.Serialization
                         }
                         else
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, deviatingType, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
                                 Type itemType = item.GetType();
                                 writer.OpenObject();
                                 int tempBufferCount1 = -1;
                                 int tempBufferCount2 = -1;
-                                if (serializer.TypeInfoRequired(itemType, callType))
+                                if (serializer.TypeInfoRequired(deviatingType))
                                 {
                                     writer.WriteToBuffer(preparedTypeInfo);
                                     tempBufferCount1 = writer.BufferCount;
@@ -288,7 +291,7 @@ namespace FeatureLoom.Serialization
                 {
                     if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                     {
-                        temp = (item, callType, itemName) =>
+                        temp = (item, _, itemName) =>
                         {
                             writer.OpenObject();
                             itemHandler.Invoke(item);
@@ -297,13 +300,13 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        temp = (item, callType, itemName) =>
+                        temp = (item, deviatingType, itemName) =>
                         {
                             Type itemType = item.GetType();
                             writer.OpenObject();
                             int tempBufferCount1 = -1;
                             int tempBufferCount2 = -1;
-                            if (serializer.TypeInfoRequired(itemType, callType))
+                            if (serializer.TypeInfoRequired(deviatingType))
                             {
                                 writer.WriteToBuffer(preparedTypeInfo);
                                 tempBufferCount1 = writer.BufferCount;
@@ -317,27 +320,26 @@ namespace FeatureLoom.Serialization
                     } 
                 }
 
-                this.itemHandler = temp;
-                this.objectItemHandler = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
+                this.itemWriter = temp;
+                this.objectItemWriter = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
             }
 
 
             public void SetItemHandler_Object<T>(Action<T>[] fieldHandlers, bool noRefChildren)
             {
                 this.handlerType = typeof(T);
-                this.isPrimitive = false;
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
-                Action<T, Type, ByteSegment> temp;
+                Action<T, bool, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (!this.handlerType.IsValueType)
                     {
                         if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, _, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, callType))
+                                if (!serializer.TryHandleItemAsRef(item))
                                 {
                                     writer.OpenObject();
                                     if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
@@ -353,14 +355,14 @@ namespace FeatureLoom.Serialization
                         }
                         else
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, deviatingType, itemName) =>
                             {
                                 serializer.CreateItemInfoForClass(item, itemName);
-                                if (!serializer.TryHandleItemAsRef(item, callType))
+                                if (!serializer.TryHandleItemAsRef(item))
                                 {
                                     Type itemType = item.GetType();
                                     writer.OpenObject();
-                                    if (serializer.TypeInfoRequired(itemType, callType))
+                                    if (serializer.TypeInfoRequired(deviatingType))
                                     {
                                         writer.WriteToBuffer(preparedTypeInfo);
                                         if (fieldHandlers.Length >= 1) writer.WriteComma();
@@ -381,7 +383,7 @@ namespace FeatureLoom.Serialization
                     {
                         if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, _, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
                                 writer.OpenObject();
@@ -397,12 +399,12 @@ namespace FeatureLoom.Serialization
                         }
                         else
                         {
-                            temp = (item, callType, itemName) =>
+                            temp = (item, deviatingType, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
                                 Type itemType = item.GetType();
                                 writer.OpenObject();
-                                if (serializer.TypeInfoRequired(itemType, callType))
+                                if (serializer.TypeInfoRequired(deviatingType))
                                 {
                                     writer.WriteToBuffer(preparedTypeInfo);
                                     if (fieldHandlers.Length >= 1) writer.WriteComma();
@@ -423,7 +425,7 @@ namespace FeatureLoom.Serialization
                 {
                     if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddNoTypeInfo)
                     {
-                        temp = (item, callType, itemName) =>
+                        temp = (item, _, itemName) =>
                         {
                             writer.OpenObject();
                             if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
@@ -437,11 +439,11 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        temp = (item, callType, itemName) =>
+                        temp = (item, deviatingType, itemName) =>
                         {
                             Type itemType = item.GetType();
                             writer.OpenObject();
-                            if (serializer.TypeInfoRequired(itemType, callType))
+                            if (serializer.TypeInfoRequired(deviatingType))
                             {
                                 writer.WriteToBuffer(preparedTypeInfo);
                                 if (fieldHandlers.Length >= 1) writer.WriteComma();
@@ -457,26 +459,20 @@ namespace FeatureLoom.Serialization
                     }
                 }
 
-                this.itemHandler = temp;
-                this.objectItemHandler = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
+                this.itemWriter = temp;
+                this.objectItemWriter = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
             }
             public void SetItemHandler_Object_ForNullableStruct<T>(Action<T>[] fieldHandlers, bool noRefChildren) where T : struct
             {
                 this.handlerType = typeof(Nullable<T>);
-                this.isPrimitive = false;
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
-                Action<Nullable<T>, Type, ByteSegment> temp;
+                Action<Nullable<T>, bool, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
                     if (serializer.settings.typeInfoHandling != TypeInfoHandling.AddAllTypeInfo)
                     {
-                        temp = (nullableItem, callType, itemName) =>
+                        temp = (nullableItem, _, itemName) =>
                         {
-                            if (!nullableItem.HasValue)
-                            {
-                                writer.WriteNullValue();
-                                return;
-                            }
                             T item = nullableItem.Value;
                             serializer.CreateItemInfoForStruct(itemName);
                             writer.OpenObject();
@@ -492,18 +488,13 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        temp = (nullableItem, callType, itemName) =>
+                        temp = (nullableItem, deviatingType, itemName) =>
                         {
-                            if (!nullableItem.HasValue)
-                            {
-                                writer.WriteNullValue();
-                                return;
-                            }
                             T item = nullableItem.Value;
                             serializer.CreateItemInfoForStruct(itemName);
                             Type itemType = item.GetType();
                             writer.OpenObject();
-                            if (serializer.TypeInfoRequired(itemType, callType))
+                            if (serializer.TypeInfoRequired(deviatingType))
                             {
                                 writer.WriteToBuffer(preparedTypeInfo);
                                 if (fieldHandlers.Length >= 1) writer.WriteComma();
@@ -524,13 +515,8 @@ namespace FeatureLoom.Serialization
                 {
                     if (serializer.settings.typeInfoHandling != TypeInfoHandling.AddAllTypeInfo)
                     {
-                        temp = (nullableItem, callType, _) =>
+                        temp = (nullableItem, _, _) =>
                         {
-                            if (!nullableItem.HasValue)
-                            {
-                                writer.WriteNullValue();
-                                return;
-                            }
                             T item = nullableItem.Value;
                             writer.OpenObject();
                             if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
@@ -544,17 +530,12 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        temp = (nullableItem, callType, _) =>
+                        temp = (nullableItem, deviatingType, _) =>
                         {
-                            if (!nullableItem.HasValue)
-                            {
-                                writer.WriteNullValue();
-                                return;
-                            }
                             T item = nullableItem.Value;
                             Type itemType = item.GetType();
                             writer.OpenObject();
-                            if (serializer.TypeInfoRequired(itemType, callType))
+                            if (serializer.TypeInfoRequired(deviatingType))
                             {
                                 writer.WriteToBuffer(preparedTypeInfo);
                                 if (fieldHandlers.Length >= 1) writer.WriteComma();
@@ -570,22 +551,28 @@ namespace FeatureLoom.Serialization
                     }
                 }
 
-                this.itemHandler = temp;
-                this.objectItemHandler = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
+                this.itemWriter = temp;
+                this.objectItemWriter = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void HandleItem<T>(T item, ByteSegment fieldName)
+            public void WriteItem<T>(T item, ByteSegment fieldName)
             {
+                if (item == null)
+                {
+                    writer.WriteNullValue();
+                    return;
+                }
+
                 Type callType = typeof(T);
                 if (callType == handlerType)
                 {
-                    Action<T, Type, ByteSegment> typedItemHandler = (Action<T, Type, ByteSegment >)itemHandler;
-                    typedItemHandler.Invoke(item, callType, fieldName);
+                    Action<T, bool, ByteSegment> typedItemWriter = (Action<T, bool, ByteSegment>)itemWriter;
+                    typedItemWriter.Invoke(item, false, fieldName);
                 }
                 else
                 {
-                    objectItemHandler(item, callType, fieldName);
+                    objectItemWriter(item, true, fieldName);
                 }
             }
         }

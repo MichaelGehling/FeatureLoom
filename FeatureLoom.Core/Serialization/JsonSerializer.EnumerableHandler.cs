@@ -10,7 +10,7 @@ namespace FeatureLoom.Serialization
 {
     public sealed partial class JsonSerializer
     {
-        private bool TryCreateEnumerableItemHandler(CachedTypeHandler typeHandler, Type itemType)
+        private bool TryCreateEnumerableItemHandler(CachedTypeWriter typeHandler, Type itemType)
         {
             if (itemType != typeof(IEnumerable) && !itemType.ImplementsInterface(typeof(IEnumerable))) return false;
 
@@ -21,7 +21,7 @@ namespace FeatureLoom.Serialization
 
             if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))
             {
-                CachedTypeHandler elementHandler = GetCachedTypeHandler(elementType);
+                CachedTypeWriter elementHandler = GetCachedTypeWriter(elementType);
 
                 Type enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
                 MethodInfo getEnumeratorMethod = enumerableType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
@@ -42,7 +42,7 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        private void CreateGenericEnumerableItemHandler<T, E, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeHandler typeHandler, CachedTypeHandler defaultElementHandler) where T : IEnumerable<E> where ENUM : IEnumerator<E>
+        private void CreateGenericEnumerableItemHandler<T, E, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter defaultElementHandler) where T : IEnumerable<E> where ENUM : IEnumerator<E>
         {
             Type itemType = typeof(T);
 
@@ -58,13 +58,13 @@ namespace FeatureLoom.Serialization
                     if (enumerator.MoveNext())
                     {
                         E element = enumerator.Current;
-                        defaultElementHandler.HandleItem(element, default);
+                        defaultElementHandler.WriteItem(element, default);
                     }
                     while (enumerator.MoveNext())
                     {
                         writer.WriteComma();
                         E element = enumerator.Current;
-                        defaultElementHandler.HandleItem(element, default);
+                        defaultElementHandler.WriteItem(element, default);
                     }
                 };
 
@@ -75,7 +75,7 @@ namespace FeatureLoom.Serialization
             {
                 ItemHandler<T> itemHandler = (collection) =>
                 {
-                    CachedTypeHandler currentHandler = defaultElementHandler;
+                    CachedTypeWriter currentHandler = defaultElementHandler;
                     ENUM enumerator = getEnumerator(collection);
                     int index = 0;
                     if (enumerator.MoveNext())
@@ -98,7 +98,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private CachedTypeHandler HandleElement<E>(CachedTypeHandler defaultElementHandler, CachedTypeHandler currentHandler, int index, E element, Type expectedElementType)
+        private CachedTypeWriter HandleElement<E>(CachedTypeWriter defaultElementHandler, CachedTypeWriter currentHandler, int index, E element, Type expectedElementType)
         {
             if (element == null) writer.WriteNullValue();
             else
@@ -107,9 +107,9 @@ namespace FeatureLoom.Serialization
                 if (elementType != currentHandler.HandlerType)
                 {
                     if (elementType == defaultElementHandler.HandlerType) currentHandler = defaultElementHandler;
-                    else currentHandler = GetCachedTypeHandler(elementType);
+                    else currentHandler = GetCachedTypeWriter(elementType);
                 }             
-                currentHandler.HandleItem(element, writer.GetCollectionIndexName(index));                
+                currentHandler.WriteItem(element, writer.GetCollectionIndexName(index));                
             }
 
             return currentHandler;
@@ -117,7 +117,7 @@ namespace FeatureLoom.Serialization
 
 
 
-        private void CreateEnumerableItemHandler<T>(CachedTypeHandler typeHandler) where T : IEnumerable
+        private void CreateEnumerableItemHandler<T>(CachedTypeWriter typeHandler) where T : IEnumerable
         {
             bool requiresItemNames = settings.requiresItemNames;
             Type expectedElementType = typeof(object);
@@ -133,8 +133,8 @@ namespace FeatureLoom.Serialization
                     else
                     {
                         Type elementType = element.GetType();
-                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);                        
-                        actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                        
+                        CachedTypeWriter actualHandler = GetCachedTypeWriter(elementType);                        
+                        actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));                        
                     }
                     index++;
                 }
@@ -147,8 +147,8 @@ namespace FeatureLoom.Serialization
                     else
                     {
                         Type elementType = element.GetType();
-                        CachedTypeHandler actualHandler = GetCachedTypeHandler(elementType);                    
-                        actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                        
+                        CachedTypeWriter actualHandler = GetCachedTypeWriter(elementType);                    
+                        actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));                        
                     }
                     index++;
                 }

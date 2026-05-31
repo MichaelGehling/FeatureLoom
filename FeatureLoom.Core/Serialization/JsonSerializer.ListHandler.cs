@@ -8,14 +8,14 @@ namespace FeatureLoom.Serialization
     public sealed partial class JsonSerializer
     {
      
-        private bool TryCreateListItemHandler(CachedTypeHandler typeHandler, Type itemType)
+        private bool TryCreateListItemHandler(CachedTypeWriter typeHandler, Type itemType)
         {
             string methodName = null;
             if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IList<>), out Type elementType)) methodName = nameof(CreateIListItemHandler);
             else if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyList<>), out elementType)) methodName = nameof(CreateIReadOnlyListItemHandler);
             else return false;
 
-            CachedTypeHandler elementHandler = GetCachedTypeHandler(elementType);
+            CachedTypeWriter elementHandler = GetCachedTypeWriter(elementType);
 
             MethodInfo createMethod = typeof(JsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
             MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, elementType);
@@ -24,26 +24,26 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        private void CreateIListItemHandler<T, E>(CachedTypeHandler typeHandler, CachedTypeHandler elementHandler) where T : IList<E>
+        private void CreateIListItemHandler<T, E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler) where T : IList<E>
         {
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
-            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType)
-            {
+            if (elementHandler.HandlerType.IsValueType)
+            {                
                 ItemHandler<T> itemHandler = (list) =>
                 {
                     int currentIndex = 0;
                     if (currentIndex < list.Count)
                     {
                         E element = list[currentIndex++];
-                        elementHandler.HandleItem(element, default);
+                        elementHandler.WriteItem(element, default);
                     }
                     while (currentIndex < list.Count)
                     {
                         writer.WriteComma();
                         E element = list[currentIndex++];
-                        elementHandler.HandleItem(element, default);
+                        elementHandler.WriteItem(element, default);
                     }
                 };
 
@@ -53,7 +53,8 @@ namespace FeatureLoom.Serialization
             {
                 ItemHandler<T> itemHandler = (list) =>
                 {
-                    int index = 0;
+                    CachedTypeWriter alternativeHandler = elementHandler;
+                    int index = 0;                    
                     if (index < list.Count)
                     {
                         E element = list[index];
@@ -61,9 +62,12 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type elementType = element.GetType();
-                            CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);                            
-                            actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                            
+                            if (elementType == elementHandler.HandlerType) elementHandler.WriteItem(element, writer.GetCollectionIndexName(index));
+                            else
+                            {
+                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = GetCachedTypeWriter(elementType);
+                                alternativeHandler.WriteItem(element, writer.GetCollectionIndexName(index));
+                            }
                         }
                         index++;
                     }
@@ -76,9 +80,12 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type elementType = element.GetType();
-                            CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);                            
-                            actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));                            
+                            if (elementType == elementHandler.HandlerType) elementHandler.WriteItem(element, writer.GetCollectionIndexName(index));
+                            else
+                            {
+                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = GetCachedTypeWriter(elementType);
+                                alternativeHandler.WriteItem(element, writer.GetCollectionIndexName(index));
+                            }
                         }
                         index++;
                     }
@@ -88,7 +95,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        private void CreateIReadOnlyListItemHandler<T, E>(CachedTypeHandler typeHandler, CachedTypeHandler elementHandler) where T : IReadOnlyList<E>
+        private void CreateIReadOnlyListItemHandler<T, E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler) where T : IReadOnlyList<E>
         {
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
@@ -101,13 +108,13 @@ namespace FeatureLoom.Serialization
                     if (currentIndex < list.Count)
                     {
                         E element = list[currentIndex++];
-                        elementHandler.HandleItem(element, default);
+                        elementHandler.WriteItem(element, default);
                     }
                     while (currentIndex < list.Count)
                     {
                         writer.WriteComma();
                         E element = list[currentIndex++];
-                        elementHandler.HandleItem(element, default);
+                        elementHandler.WriteItem(element, default);
                     }
                 };
 
@@ -125,9 +132,9 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type elementType = element.GetType();
-                            CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
-                            actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));
+                            CachedTypeWriter actualHandler = elementHandler;
+                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeWriter(elementType);
+                            actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                         }
                         index++;
                     }
@@ -140,9 +147,9 @@ namespace FeatureLoom.Serialization
                         else
                         {
                             Type elementType = element.GetType();
-                            CachedTypeHandler actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeHandler(elementType);
-                            actualHandler.HandleItem(element, writer.GetCollectionIndexName(index));
+                            CachedTypeWriter actualHandler = elementHandler;
+                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeWriter(elementType);
+                            actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                         }
                         index++;
                     }
