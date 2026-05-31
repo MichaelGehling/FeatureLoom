@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
@@ -139,12 +140,20 @@ public static class AwaitConfig
         }
         else
         {
-            task.AsTask().Wait();
+            if (task.IsCompleted)
+            {
+                try { task.GetAwaiter().GetResult(); }
+                catch (Exception ex) { throw new AggregateException(ex); }
+            }
+            else
+            {
+                task.AsTask().Wait();
+            }
         }
     }
 
     /// <summary>
-    /// Synchronously waits for the ValueTask to complete and returns the result, using the configured default or an explicit override for exception unwrapping.
+    /// Synchronously waits for the ValueTask to complete and returns the result
     /// </summary>
     /// <typeparam name="T">The result type of the ValueTask.</typeparam>
     /// <param name="task">The ValueTask to wait on.</param>
@@ -162,7 +171,15 @@ public static class AwaitConfig
         }
         else
         {
-            return task.AsTask().Result;
+            if (task.IsCompleted)
+            {
+                try { return task.GetAwaiter().GetResult(); }
+                catch (Exception ex) { throw new AggregateException(ex); }
+            }
+            else
+            {
+                return task.AsTask().Result;
+            }
         }
     }
 #endif
