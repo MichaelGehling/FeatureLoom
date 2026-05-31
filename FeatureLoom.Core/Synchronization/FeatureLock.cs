@@ -450,10 +450,12 @@ namespace FeatureLoom.Synchronization
 
         // Used to check if a candidate must go to the waiting cycle, before trying to acquire the lock.
         // Prioritized candidates may always try for queue jumping, others only if configured so and no prioritized candidate is waiting.
+        // NOTE: firstRankTicket is checked before Settings.restrictQueueJumping so that the Settings lazy-chain access is
+        // skipped entirely in the common uncontended case where firstRankTicket == 0.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
-            return !prioritized && (prioritizedWaiting || IsScheduleActive || (Settings.restrictQueueJumping && firstRankTicket != 0));
+            return !prioritized && (prioritizedWaiting || IsScheduleActive || (firstRankTicket != 0 && Settings.restrictQueueJumping));
         }
 
         // Invalidates the current reentrancyIndicator by changing the reentrancy ID.
@@ -593,6 +595,7 @@ namespace FeatureLoom.Synchronization
         }
 
         // Increases the waitCounter while avoiding a possible overflow
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void IncWaitCounter(ushort increment = 1)
         {            
             if (ushort.MaxValue - increment <= waitCounter) waitCounter = ushort.MaxValue;
@@ -628,6 +631,7 @@ namespace FeatureLoom.Synchronization
         }
 
         // Checks if the candidate must go to sleep based on its rank
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWaitSleeping(int rank, bool readOnly)
         {            
             if (readOnly && IsReadOnlyLocked) return false;            
@@ -637,6 +641,7 @@ namespace FeatureLoom.Synchronization
         }
 
         // Checks if the candidate must go to sleep based on its rank
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustWaitAsyncSleeping(int rank, bool readOnly)
         {
             if (readOnly && IsReadOnlyLocked) return false;
@@ -646,6 +651,7 @@ namespace FeatureLoom.Synchronization
         }
 
         // Checks if a sleeping candidate may be waked up
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustAwake(int rank, bool readOnly)
         {
             if (readOnly && IsReadOnlyLocked) return true;
@@ -1571,7 +1577,6 @@ namespace FeatureLoom.Synchronization
             if (IsScheduleActive) privateScheduler.Obj.InterruptWaiting();
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
         private bool TryUpgrade(ref LockMode currentLockMode)
         {
             if (lockIndicator == FIRST_READ_LOCK)
@@ -1600,7 +1605,6 @@ namespace FeatureLoom.Synchronization
             else return false;
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
         private void Upgrade(ref LockMode currentLockMode)
         {
             if (TryUpgrade(ref currentLockMode)) return;
@@ -1624,7 +1628,6 @@ namespace FeatureLoom.Synchronization
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
         private bool TryDowngrade(ref LockMode currentLockMode)
         {
             if (lockIndicator == WRITE_LOCK)
@@ -1775,10 +1778,15 @@ namespace FeatureLoom.Synchronization
                         lastAwaking = candidate;
                     }
 
-                    if (awake || IsReadOnlyLocked) candidate = candidate.Next;
+                    if (awake)
+                    {
+                        // Advance and immediately sever the link so the awaking list
+                        // is never connected to the remainder of the sleep queue.
+                        candidate = candidate.Next;
+                        lastAwaking.Next = null;
+                    }
+                    else if (IsReadOnlyLocked) candidate = candidate.Next;
                     else candidate = null;
-
-                    if (lastAwaking != null) lastAwaking.Next = null;
                 }
             }
             finally
@@ -1920,7 +1928,6 @@ namespace FeatureLoom.Synchronization
             volatile internal SleepHandle Next;
             volatile internal bool sleeping = true;
 
-            [MethodImpl(MethodImplOptions.NoOptimization)]
             internal void WakeUp()
             {
                 sleeping = false;

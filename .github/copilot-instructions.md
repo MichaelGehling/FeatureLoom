@@ -19,6 +19,7 @@
 - In this codebase, `populateExistingMembers` applies to deserialization of newly created objects and preinitialized member instances, not to `TryPopulate(...)` flows (which always run in populate mode and force populate behavior).
 - In this codebase, removing a generic type setting (e.g., for `IEnumerable<>`) also removes constructor-default mappings for that generic type, so tests must not expect fallback to default mapping after explicit removal.
 - The project intentionally removed `ReferenceResolutionMode.EnabledByDefaultPlusStrings`; string reference-resolution coverage is not required and should not be proposed as a missing test gap.
+- In FeatureLock.cs hot-path optimization work, reorder short-circuit operands to avoid lazy property chains, add `AggressiveInlining` to all wait-loop helpers, and remove `NoOptimization` from methods that already use volatile fields to yield a 10-20% hot-path improvement.
 
 ## Parser Guidelines
 - When proposing parser fast-path substitutions, only mark call sites as safe if they preserve whitespace tolerance (e.g., account for pretty-printed JSON whitespace after '{', ',', or ':').
