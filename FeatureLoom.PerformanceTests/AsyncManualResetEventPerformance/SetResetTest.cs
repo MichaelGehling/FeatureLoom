@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BenchmarkDotNet.Attributes;
+﻿using BenchmarkDotNet.Attributes;
+using FeatureLoom.Synchronization;
+using System.Threading;
 
 namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
 {
@@ -14,27 +11,21 @@ namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
     [HtmlExporter]
     public class SetResetTest
     {
-        void RunTest(IMreSubject subject)
-        {
-            subject.Set1();
-            subject.Reset1();
-        }
-
-        AsyncManualResetEventSubjects asyncManualResetEventSubjects = new AsyncManualResetEventSubjects();
-        AsyncExManualResetEventSubjects asyncExManualResetEventSubjects = new AsyncExManualResetEventSubjects();
-        ManualResetEventSlimSubjects manualResetEventSlimSubjects = new ManualResetEventSlimSubjects();
-        ManualResetEventSubjects manualResetEventSubjects = new ManualResetEventSubjects();
+        FeatureLoom.Synchronization.AsyncManualResetEvent _amre = new FeatureLoom.Synchronization.AsyncManualResetEvent();
+        Nito.AsyncEx.AsyncManualResetEvent _asyncEx = new Nito.AsyncEx.AsyncManualResetEvent(false);
+        ManualResetEventSlim _mres = new ManualResetEventSlim(false);
+        ManualResetEvent _mre = new ManualResetEvent(false);
 
         [Benchmark(Baseline = true)]
-        public void AsyncManualResetEvent() => RunTest(asyncManualResetEventSubjects);
+        public void AsyncManualResetEvent() { _amre.Set(); _amre.Reset(); }
 
         [Benchmark]
-        public void AsyncExManualResetEvent() => RunTest(asyncExManualResetEventSubjects);
+        public void AsyncExManualResetEvent() { _asyncEx.Set(); _asyncEx.Reset(); }
 
         [Benchmark]
-        public void ManualResetEventSlim() => RunTest(manualResetEventSlimSubjects);
+        public void ManualResetEventSlim() { _mres.Set(); _mres.Reset(); }
 
         [Benchmark]
-        public void ManualResetEvent() => RunTest(manualResetEventSubjects);
+        public void ManualResetEvent() { _mre.Set(); _mre.Reset(); }
     }
 }

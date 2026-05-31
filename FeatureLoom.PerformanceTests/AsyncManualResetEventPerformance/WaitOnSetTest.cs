@@ -1,4 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
+using FeatureLoom.Synchronization;
+using System.Threading;
 
 namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
 {
@@ -9,35 +11,21 @@ namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
     [HtmlExporter]
     public class WaitOnSetTest
     {
-        void RunTest(IMreSubject subject)
-        {
-            subject.Wait1();
-        }
-
-        [GlobalSetup]
-        public void GlobalSetup()
-        {
-            asyncManualResetEventSubjects.Set1();
-            asyncExManualResetEventSubjects.Set1();
-            manualResetEventSlimSubjects.Set1();
-            manualResetEventSubjects.Set1();
-        }
-
-        AsyncManualResetEventSubjects asyncManualResetEventSubjects = new AsyncManualResetEventSubjects();
-        AsyncExManualResetEventSubjects asyncExManualResetEventSubjects = new AsyncExManualResetEventSubjects();
-        ManualResetEventSlimSubjects manualResetEventSlimSubjects = new ManualResetEventSlimSubjects();
-        ManualResetEventSubjects manualResetEventSubjects = new ManualResetEventSubjects();
+        FeatureLoom.Synchronization.AsyncManualResetEvent _amre = new FeatureLoom.Synchronization.AsyncManualResetEvent(true);
+        Nito.AsyncEx.AsyncManualResetEvent _asyncEx = new Nito.AsyncEx.AsyncManualResetEvent(true);
+        ManualResetEventSlim _mres = new ManualResetEventSlim(true);
+        ManualResetEvent _mre = new ManualResetEvent(true);
 
         [Benchmark(Baseline = true)]
-        public void AsyncManualResetEvent() => RunTest(asyncManualResetEventSubjects);
+        public void AsyncManualResetEvent() => _amre.Wait();
 
         [Benchmark]
-        public void AsyncExManualResetEvent() => RunTest(asyncExManualResetEventSubjects);
+        public void AsyncExManualResetEvent() => _asyncEx.Wait();
 
         [Benchmark]
-        public void ManualResetEventSlim() => RunTest(manualResetEventSlimSubjects);
+        public void ManualResetEventSlim() => _mres.Wait();
 
         [Benchmark]
-        public void ManualResetEvent() => RunTest(manualResetEventSubjects);
+        public void ManualResetEvent() => _mre.WaitOne();
     }
 }

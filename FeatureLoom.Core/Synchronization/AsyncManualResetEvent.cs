@@ -10,15 +10,15 @@ namespace FeatureLoom.Synchronization
 {
 
     /// <summary>
-    /// AsyncManualResetEvent allows status based waiting (sync/async) and signalling between multiple threads.
+    /// AsyncManualResetEvent allows status based waiting (sync/async, also mixed) and signalling between multiple threads.
     /// It can be used as a replacement for the ManualResetEvent/-Slim, but also supporting async waiting.
     /// With an actually waiting thread, performance is comparable to ManualResetEventSlim, setting/resetting 
     /// without any waiting thread and waiting in already set state is significantly faster than ManualResetEventSlim.
     /// </summary>
     public sealed class AsyncManualResetEvent : IAsyncWaitHandle, IMessageSource<bool>
     {
-        private static Task<bool> storedResult_true = Task.FromResult(true);
-        private static Task<bool> storedResult_false = Task.FromResult(false);
+        private static readonly Task<bool> storedResult_true = Task.FromResult(true);
+        private static readonly Task<bool> storedResult_false = Task.FromResult(false);
 
         private volatile TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private object monitorObj = new object();
@@ -106,18 +106,26 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait()
         {
+            if (isSet) return true;
+            return WaitSlow();
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool WaitSlow()
+        {
             var lastSetCount = setCounter;
             if (isSet) return true;
 
-            for(int i=0; i < YieldCyclesForSyncWait; i++)
+            var yieldCycles = YieldCyclesForSyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (setCounter != lastSetCount) return true;
             }
 
             anySyncWaiter = true;
-            Thread.MemoryBarrier();    
-            
+            Thread.MemoryBarrier();
+
             lock (monitorObj)
             {
                 if (setCounter != lastSetCount) return true;
@@ -134,14 +142,20 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout)
         {
+            if (isSet) return true;
+            if (timeout <= TimeSpan.Zero) return false;
+            return WaitSlow(timeout);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool WaitSlow(TimeSpan timeout)
+        {
             var lastSetCount = setCounter;
             if (isSet) return true;
 
-            if (setCounter != lastSetCount) return true;
-            if (timeout <= TimeSpan.Zero) return false;
-
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < YieldCyclesForSyncWait; i++)
+            var yieldCycles = YieldCyclesForSyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (setCounter != lastSetCount) return true;
@@ -166,13 +180,20 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(CancellationToken cancellationToken)
         {
+            if (isSet) return true;
+            if (cancellationToken.IsCancellationRequested) return false;
+            return WaitSlow(cancellationToken);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool WaitSlow(CancellationToken cancellationToken)
+        {
             var lastSetCount = setCounter;
             if (isSet) return true;
-
             if (cancellationToken.IsCancellationRequested) return false;
-            if (setCounter != lastSetCount) return true;
 
-            for (int i = 0; i < YieldCyclesForSyncWait; i++)
+            var yieldCycles = YieldCyclesForSyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return false;
@@ -180,11 +201,11 @@ namespace FeatureLoom.Synchronization
             }
 
             anySyncWaiter = true;
-            Thread.MemoryBarrier();            
+            Thread.MemoryBarrier();
 
-            do
+            using (cancellationToken.Register(Cancellation, this))
             {
-                using (cancellationToken.Register(Cancellation, this))
+                do
                 {
                     lock (monitorObj)
                     {
@@ -192,8 +213,8 @@ namespace FeatureLoom.Synchronization
                         Monitor.Wait(monitorObj);
                     }
                 }
+                while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
             }
-            while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
             return !cancellationToken.IsCancellationRequested;
         }
 
@@ -206,13 +227,22 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Wait(TimeSpan timeout, CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested) return false;
+            if (isSet) return true;
+            if (timeout <= TimeSpan.Zero) return false;
+            return WaitSlow(timeout, cancellationToken);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool WaitSlow(TimeSpan timeout, CancellationToken cancellationToken)
+        {
             var lastSetCount = setCounter;
             if (cancellationToken.IsCancellationRequested) return false;
-            if (isSet) return true;            
-            if (timeout <= TimeSpan.Zero) return false;
+            if (isSet) return true;
 
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < YieldCyclesForSyncWait; i++)
+            var yieldCycles = YieldCyclesForSyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return false;
@@ -221,11 +251,11 @@ namespace FeatureLoom.Synchronization
             }
 
             anySyncWaiter = true;
-            Thread.MemoryBarrier();            
+            Thread.MemoryBarrier();
 
-            do
+            using (cancellationToken.Register(Cancellation, this))
             {
-                using (cancellationToken.Register(Cancellation, this))
+                do
                 {
                     lock (monitorObj)
                     {
@@ -233,8 +263,8 @@ namespace FeatureLoom.Synchronization
                         if (!Monitor.Wait(monitorObj, timer.Remaining())) return false;
                     }
                 }
+                while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
             }
-            while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
             return !cancellationToken.IsCancellationRequested;
         }
 
@@ -251,10 +281,18 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync()
         {
+            if (isSet) return storedResult_true;
+            return WaitAsyncSlow();
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private Task<bool> WaitAsyncSlow()
+        {
             var lastSetCount = setCounter;
             if (isSet) return storedResult_true;
 
-            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
+            var yieldCycles = YieldCyclesForAsyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (setCounter != lastSetCount) return storedResult_true;
@@ -276,12 +314,20 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(TimeSpan timeout)
         {
-            var lastSetCount = setCounter;
             if (isSet) return storedResult_true;
             if (timeout <= TimeSpan.Zero) return storedResult_false;
+            return WaitAsyncSlow(timeout);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private Task<bool> WaitAsyncSlow(TimeSpan timeout)
+        {
+            var lastSetCount = setCounter;
+            if (isSet) return storedResult_true;
 
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
+            var yieldCycles = YieldCyclesForAsyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (setCounter != lastSetCount) return storedResult_true;
@@ -304,11 +350,20 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested) return storedResult_false;
+            if (isSet) return storedResult_true;
+            return WaitAsyncSlow(cancellationToken);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private Task<bool> WaitAsyncSlow(CancellationToken cancellationToken)
+        {
             var lastSetCount = setCounter;
             if (cancellationToken.IsCancellationRequested) return storedResult_false;
             if (isSet) return storedResult_true;
 
-            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
+            var yieldCycles = YieldCyclesForAsyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return storedResult_false;
@@ -332,13 +387,22 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
-            var lastSetCount = setCounter;
             if (cancellationToken.IsCancellationRequested) return storedResult_false;
             if (isSet) return storedResult_true;
             if (timeout <= TimeSpan.Zero) return storedResult_false;
+            return WaitAsyncSlow(timeout, cancellationToken);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private Task<bool> WaitAsyncSlow(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            var lastSetCount = setCounter;
+            if (cancellationToken.IsCancellationRequested) return storedResult_false;
+            if (isSet) return storedResult_true;
 
             TimeFrame timer = new TimeFrame(timeout);
-            for (int i = 0; i < YieldCyclesForAsyncWait; i++)
+            var yieldCycles = YieldCyclesForAsyncWait;
+            for (int i = 0; i < yieldCycles; i++)
             {
                 Thread.Yield();
                 if (cancellationToken.IsCancellationRequested) return storedResult_false;

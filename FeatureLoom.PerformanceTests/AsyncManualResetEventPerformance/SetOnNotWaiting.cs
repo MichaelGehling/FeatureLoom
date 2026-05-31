@@ -1,11 +1,12 @@
 ﻿using BenchmarkDotNet.Attributes;
-using FeatureLoom.Time;
-using System.Collections.Generic;
+using FeatureLoom.Synchronization;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
 {
+    // Each benchmark pre-resets a batch of N events in IterationSetup, then sets them all
+    // in one invocation. OperationsPerInvoke = N lets BenchmarkDotNet report per-Set() time
+    // without the 1-op-per-iteration measurement overhead that IterationSetup would otherwise force.
     [MaxIterationCount(100)]
     [MinIterationCount(80)]
     [MemoryDiagnoser]
@@ -14,60 +15,57 @@ namespace FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance
     [HtmlExporter]
     public class SetOnNotWaitingTest
     {
-        void RunTest(IMreSubject subject)
-        {
-            subject.Set1();
-        }
+        private const int N = 1024 * 100;
+
+        private FeatureLoom.Synchronization.AsyncManualResetEvent[] _amreBatch;
+        private Nito.AsyncEx.AsyncManualResetEvent[] _asyncExBatch;
+        private ManualResetEventSlim[] _mresBatch;
+        private ManualResetEvent[] _mreBatch;
 
         [GlobalSetup]
         public void GlobalSetup()
         {
-            asyncManualResetEventSubjects.Set1();
-            asyncExManualResetEventSubjects.Set1();
-            manualResetEventSlimSubjects.Set1();
-            manualResetEventSubjects.Set1();
+            _amreBatch   = new FeatureLoom.Synchronization.AsyncManualResetEvent[N];
+            _asyncExBatch = new Nito.AsyncEx.AsyncManualResetEvent[N];
+            _mresBatch   = new ManualResetEventSlim[N];
+            _mreBatch    = new ManualResetEvent[N];
+            for (int i = 0; i < N; i++)
+            {
+                _amreBatch[i]   = new FeatureLoom.Synchronization.AsyncManualResetEvent(false);
+                _asyncExBatch[i] = new Nito.AsyncEx.AsyncManualResetEvent(false);
+                _mresBatch[i]   = new ManualResetEventSlim(false);
+                _mreBatch[i]    = new ManualResetEvent(false);
+            }
         }
 
         [IterationSetup(Target = nameof(AsyncManualResetEvent0))]
-        public void ItSetup_AsyncManualResetEvent0() => Prepare(asyncManualResetEventSubjects);
+        public void ItSetup_AsyncManualResetEvent0() { foreach (var e in _amreBatch) e.Reset(); }
 
         [IterationSetup(Target = nameof(AsyncManualResetEvent))]
-        public void ItSetup_AsyncManualResetEvent() => Prepare(asyncManualResetEventSubjects);
+        public void ItSetup_AsyncManualResetEvent() { foreach (var e in _amreBatch) e.Reset(); }
 
         [IterationSetup(Target = nameof(AsyncExManualResetEvent))]
-        public void ItSetup_AsyncExManualResetEvent() => Prepare(asyncExManualResetEventSubjects);
+        public void ItSetup_AsyncExManualResetEvent() { foreach (var e in _asyncExBatch) e.Reset(); }
 
         [IterationSetup(Target = nameof(ManualResetEventSlim))]
-        public void ItSetup_ManualResetEventSlim() => Prepare(manualResetEventSlimSubjects);
+        public void ItSetup_ManualResetEventSlim() { foreach (var e in _mresBatch) e.Reset(); }
 
         [IterationSetup(Target = nameof(ManualResetEvent))]
-        public void ItSetup_ManualResetEvent() => Prepare(manualResetEventSubjects);
+        public void ItSetup_ManualResetEvent() { foreach (var e in _mreBatch) e.Reset(); }
 
-        private static void Prepare(IMreSubject subject)
-        {
-            subject.Reset1();
-            subject.Reset2();
+        [Benchmark(OperationsPerInvoke = N)]
+        public void AsyncManualResetEvent0() { foreach (var e in _amreBatch) e.Set(); }
 
-        }
+        [Benchmark(Baseline = true, OperationsPerInvoke = N)]
+        public void AsyncManualResetEvent() { foreach (var e in _amreBatch) e.Set(); }
 
-        AsyncManualResetEventSubjects asyncManualResetEventSubjects = new AsyncManualResetEventSubjects();
-        AsyncExManualResetEventSubjects asyncExManualResetEventSubjects = new AsyncExManualResetEventSubjects();
-        ManualResetEventSlimSubjects manualResetEventSlimSubjects = new ManualResetEventSlimSubjects();
-        ManualResetEventSubjects manualResetEventSubjects = new ManualResetEventSubjects();
+        [Benchmark(OperationsPerInvoke = N)]
+        public void AsyncExManualResetEvent() { foreach (var e in _asyncExBatch) e.Set(); }
 
-        [Benchmark]
-        public void AsyncManualResetEvent0() => RunTest(asyncManualResetEventSubjects);        
+        [Benchmark(OperationsPerInvoke = N)]
+        public void ManualResetEventSlim() { foreach (var e in _mresBatch) e.Set(); }
 
-        [Benchmark]
-        public void AsyncExManualResetEvent() => RunTest(asyncExManualResetEventSubjects);
-
-        [Benchmark]
-        public void ManualResetEventSlim() => RunTest(manualResetEventSlimSubjects);
-
-        [Benchmark]
-        public void ManualResetEvent() => RunTest(manualResetEventSubjects);
-
-        [Benchmark(Baseline = true)]
-        public void AsyncManualResetEvent() => RunTest(asyncManualResetEventSubjects);
+        [Benchmark(OperationsPerInvoke = N)]
+        public void ManualResetEvent() { foreach (var e in _mreBatch) e.Set(); }
     }
 }
