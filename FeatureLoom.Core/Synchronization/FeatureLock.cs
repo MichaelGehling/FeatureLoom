@@ -6,8 +6,6 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using FeatureLoom.DependencyInversion;
-
 namespace FeatureLoom.Synchronization
 {
 
@@ -150,6 +148,13 @@ namespace FeatureLoom.Synchronization
         // Used to safely manage Sleephandles
         private MicroValueLock sleepLock = new();
 
+        // Private static scheduler used exclusively for waking up sleeping FeatureLock waiters.
+        // Kept separate from the application-level SchedulerService so that heavy external scheduler
+        // load cannot delay lock-wakeup timing.
+        // NOTE: Must NOT be readonly — LazyValue<T> is a struct, and readonly would cause defensive
+        // copies on every access, so each call would see obj==null and create a fresh, discarded instance.
+        private static LazyValue<SchedulerService> privateScheduler = new();
+
         // the main lock variable, indicating current locking state:
         // 0 means no lock
         // -1 means write lock
@@ -177,7 +182,7 @@ namespace FeatureLoom.Synchronization
         // it must set it back to true in its next cycle. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
         private volatile bool prioritizedWaiting = false;
 
-        private bool reentrancyActive = false;
+        private volatile bool reentrancyActive = false;
 
         // Indicates if scheduler is currently observing SleepHandles to wake up the candidates on time
         private bool IsScheduleActive => queueHead != null;
@@ -896,7 +901,7 @@ namespace FeatureLoom.Synchronization
                     var lazyObj = lazy.Obj;
 
                     // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
-                    if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+                    if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new InvalidOperationException("Deadlock: two threads concurrently upgrading a shared read lock on the same FeatureLock.");
                     // Waiting for upgrade to writeLock
                     while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
                     {
@@ -954,7 +959,7 @@ namespace FeatureLoom.Synchronization
             var lazyObj = lazy.Obj;
             int counter = 0;
             // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
-            if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+            if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new InvalidOperationException("Deadlock: two threads concurrently upgrading a shared read lock on the same FeatureLock.");
             // Waiting for upgrade to writeLock
             while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
             {
@@ -1390,7 +1395,7 @@ namespace FeatureLoom.Synchronization
             var lazyObj = lazy.Obj;
             TimeFrame timer = new(timeout);
             // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
-            if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+            if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new InvalidOperationException("Deadlock: two threads concurrently upgrading a shared read lock on the same FeatureLock.");
 
             // Waiting for upgrade to writeLock
             while (FIRST_READ_LOCK != Interlocked.CompareExchange(ref lockIndicator, WRITE_LOCK, FIRST_READ_LOCK))
@@ -1439,7 +1444,7 @@ namespace FeatureLoom.Synchronization
             var lazyObj = lazy.Obj;
             TimeFrame timer = new(timeout);
             // set flag that we are trying to upgrade... if anybody else already had set it: DEADLOCK, buhuuu!
-            if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new Exception("Deadlock! Two threads trying to upgrade a shared readLock in parallel!");
+            if (TRUE == Interlocked.CompareExchange(ref lazyObj.waitingForUpgrade, TRUE, FALSE)) throw new InvalidOperationException("Deadlock: two threads concurrently upgrading a shared read lock on the same FeatureLock.");
 
             int counter = 0;
             // Waiting for upgrade to writeLock
@@ -1522,14 +1527,15 @@ namespace FeatureLoom.Synchronization
         private void ExitReadLock()
         {
             Interlocked.Decrement(ref lockIndicator);
-            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
+            if (IsScheduleActive) privateScheduler.Obj.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitWriteLock()
         {
+            // Release store: volatile write acts as release fence (stlr on ARM, plain MOV on x86 TSO).
             lockIndicator = NO_LOCK;
-            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
+            if (IsScheduleActive) privateScheduler.Obj.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1539,30 +1545,30 @@ namespace FeatureLoom.Synchronization
             RenewReentrancyId();
             reentrancyActive = false;
             lockIndicator = NO_LOCK;
-            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
+            if (IsScheduleActive) privateScheduler.Obj.InterruptWaiting();
         }
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReentrantReadLock()
         {
             // We must clear the ReentrancyContext, because the lock might be used by multiple reader, so we can't change the current reentrancyId, though it would be cheaper.
             RemoveReentrancyContext();            
             reentrancyActive = Interlocked.Decrement(ref lockIndicator) > 0;
-            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
+            if (IsScheduleActive) privateScheduler.Obj.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ExitReenteredLock()
         {
             // Nothing to do!
-            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
+            if (IsScheduleActive) privateScheduler.Obj.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DowngradeReentering()
         {
             lockIndicator = FIRST_READ_LOCK;
-            if (IsScheduleActive) Service<SchedulerService>.Instance.InterruptWaiting();
+            if (IsScheduleActive) privateScheduler.Obj.InterruptWaiting();
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
@@ -1682,9 +1688,9 @@ namespace FeatureLoom.Synchronization
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit()
             {
-                // This check is removed, because the *possible* exception nearly doubles run time for the optimal fast-path.
-                // Anyway, an NULL-exception will be thrown, in case of re-exit, because the parentlock cannot be accessed.
-                //if (parentLock == null) throw new Exception("Lock was already released or wasn't successfully acquired!");
+                // Null-check is a silent no-op (not an exception) to keep the fast-path cost minimal while
+                // still making double-dispose and dispose-of-failed-attempt safe.
+                if (parentLock == null) return;
 
                 if (mode == LockMode.WriteLock) parentLock.ExitWriteLock();
                 else if (mode == LockMode.ReadLock) parentLock.ExitReadLock();
@@ -1895,7 +1901,7 @@ namespace FeatureLoom.Synchronization
             finally
             {
                 sleepLock.Exit();
-                if (activateSchedule) Service<SchedulerService>.Instance.AddSchedule(this);
+                if (activateSchedule) privateScheduler.Obj.AddSchedule(this);
             }
         }
 
