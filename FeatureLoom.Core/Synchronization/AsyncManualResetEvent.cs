@@ -433,6 +433,7 @@ namespace FeatureLoom.Synchronization
             //SET            
             isSet = true;
             setCounter++;
+            Thread.MemoryBarrier();
 
             bool yield = false;
             if (anyAsyncWaiter)
@@ -443,7 +444,7 @@ namespace FeatureLoom.Synchronization
                 yield = true;
             }
 
-            
+
             if (anySyncWaiter)
             {
                 anySyncWaiter = false;
@@ -456,7 +457,6 @@ namespace FeatureLoom.Synchronization
             }            
 
             //RESET
-            Thread.MemoryBarrier();
             isSet = false;
             if (eventWaitHandle != null)
             {
