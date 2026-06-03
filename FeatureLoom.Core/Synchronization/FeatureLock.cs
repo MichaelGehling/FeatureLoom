@@ -31,7 +31,12 @@ namespace FeatureLoom.Synchronization
         /// </summary>
         public FeatureLock(FeatureLockSettings settings = null)
         {
-            if (settings != null) lazy.Obj.settings.Obj = settings;
+            if (settings != null)
+            {
+                lazy.Obj.settings.Obj = settings;
+                restrictQueueJumping = settings.restrictQueueJumping;
+            }
+            
         }
 
         // Several configuration settings for the FeatureLock
@@ -129,7 +134,8 @@ namespace FeatureLoom.Synchronization
         #endregion Constants
 
         #region Variables
-        // NOTE: The order of the variables matters for performance.
+        // NOTE: All variables currently fit into a single cache line, so they are not separated into different classes to avoid false sharing,
+        // but if more variables are added in the future, it should be considered to optimize the memory layout.
 
 
         // Additional variables that are used less often, so they are kept in an extra object which is only loaded as required 
@@ -182,7 +188,13 @@ namespace FeatureLoom.Synchronization
         // it must set it back to true in its next cycle. So there can ba a short time when another non-priority candidate might acquire the lock nevertheless.
         private volatile bool prioritizedWaiting = false;
 
+        // Used to avoid that a candidate that already acquired the lock reenters the lock acquiring cycle and thus blocks other candidates, even if the lock is not released yet.
         private volatile bool reentrancyActive = false;
+
+        // If true, avoids (in nearly all cases) that a new candidate may acquire a recently released lock before one of the waiting candidates gets it.
+        // Comes with a quite noticeable performance cost, especially for high frequency locking.
+        private readonly bool restrictQueueJumping = false;
+
 
         // Indicates if scheduler is currently observing SleepHandles to wake up the candidates on time
         private bool IsScheduleActive => queueHead != null;
@@ -455,7 +467,7 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustGoToWaiting(bool prioritized)
         {
-            return !prioritized && (prioritizedWaiting || IsScheduleActive || (firstRankTicket != 0 && Settings.restrictQueueJumping));
+            return !prioritized && ((firstRankTicket != 0 && restrictQueueJumping) || prioritizedWaiting || IsScheduleActive);
         }
 
         // Invalidates the current reentrancyIndicator by changing the reentrancy ID.
@@ -467,8 +479,31 @@ namespace FeatureLoom.Synchronization
             if (++obj.reentrancyId == 0) ++obj.reentrancyId;
         }
 
+        // Cached ThreadPool saturation result shared across all FeatureLock instances.
+        // ThreadPool state changes at a coarse granularity, so a slightly stale value is fine for this heuristic.
+        // Both fields are intentionally non-volatile/non-Interlocked: torn reads are harmless.
+        private static int threadPoolSaturationCheckCounter;
+        private static bool cachedThreadPoolSaturated;
+
+        // Returns whether the ThreadPool is saturated, refreshing the cached value every 64 calls.
+        // The three ThreadPool.Get*Threads() calls are amortised across all waiters on all locks.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsThreadPoolSaturated()
+        {
+            // Increment without Interlocked — occasional double-refresh under contention is acceptable.
+            if ((threadPoolSaturationCheckCounter++ & 63) == 0)
+            {
+                ThreadPool.GetAvailableThreads(out int availableThreads, out _);
+                ThreadPool.GetMaxThreads(out int maxThreads, out _);
+                ThreadPool.GetMinThreads(out int minThreads, out _);
+                cachedThreadPoolSaturated = (maxThreads - availableThreads) >= minThreads;
+            }
+            return cachedThreadPoolSaturated;
+        }
+
         // Yielding a task is very expensive, but must be done to avoid blocking the thread pool threads.
         // This method checks if the task should be yielded or the thread can still be blocked.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustYieldAsyncThread(int rank, bool prioritized, int counter)
         {
             // If a special synchronization context is set (e.g. UI-Thread) the task must always be yielded to avoid blocking
@@ -481,13 +516,7 @@ namespace FeatureLoom.Synchronization
             if (counter % asyncYieldFrequency.ClampLow(1) != 0) return false;
 
             // If it is time to yield, we might still be able to skip yielding if the thread pool is barely used.
-            ThreadPool.GetAvailableThreads(out int availableThreads, out _);
-            ThreadPool.GetMaxThreads(out int maxThreads, out _);
-            ThreadPool.GetMinThreads(out int minThreads, out _);
-            var usedThreads = maxThreads - availableThreads;
-
-            // If all minimum available thread pool threads are used, we must yield the task
-            return usedThreads >= minThreads;
+            return IsThreadPoolSaturated();
         }
 
 
@@ -615,7 +644,6 @@ namespace FeatureLoom.Synchronization
         {
             if (prioritized) return false;
             if (readOnly && IsReadOnlyLocked) return false;
-            //if (IsLocked) rank++;
             if (rank * averageWaitCount <= Settings.passiveWaitThreshold) return false;
             return true;
         }
@@ -625,7 +653,6 @@ namespace FeatureLoom.Synchronization
         {
             if (prioritized) return false;
             if (readOnly && IsReadOnlyLocked) return false;
-            //if (IsLocked) rank++;
             if (rank * averageWaitCount <= Settings.passiveWaitThresholdAsync) return false;
             return true;
         }
@@ -636,7 +663,6 @@ namespace FeatureLoom.Synchronization
         {            
             if (readOnly && IsReadOnlyLocked) return false;            
             if (sleepLock.IsLocked) return false;
-            //if (IsLocked) rank++;
             return rank * averageWaitCount > Settings.sleepWaitThreshold;
         }
 
@@ -646,7 +672,6 @@ namespace FeatureLoom.Synchronization
         {
             if (readOnly && IsReadOnlyLocked) return false;
             if (sleepLock.IsLocked) return false;
-            //if (IsLocked) rank++;
             return rank * averageWaitCount > Settings.sleepWaitThresholdAsync;
         }
 
@@ -655,7 +680,6 @@ namespace FeatureLoom.Synchronization
         private bool MustAwake(int rank, bool readOnly)
         {
             if (readOnly && IsReadOnlyLocked) return true;
-            //if (IsLocked) rank++;
             uint waitFactor = Math.Max(averageWaitCount, waitCounter);
             return rank * waitFactor <= Settings.awakeThreshold;
         }
@@ -981,19 +1005,8 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool MustYieldAsyncThread_ForReentranceUpgrade(int counter)
         {
-            if (SynchronizationContext.Current == null)
-            {
-                ThreadPool.GetAvailableThreads(out int availableThreads, out _);
-                ThreadPool.GetMaxThreads(out int maxThreads, out _);
-                ThreadPool.GetMinThreads(out int minThreads, out _);
-                var usedThreads = maxThreads - availableThreads;
-                if (usedThreads >= minThreads)
-                {
-                    return (counter % 100) == 0;
-                }
-                else return false;
-            }
-            else return true;
+            if (SynchronizationContext.Current != null) return true;
+            return IsThreadPoolSaturated() && (counter % 100) == 0;
         }
 
         #endregion LockReentrantAsync
