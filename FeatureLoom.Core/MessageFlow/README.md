@@ -46,34 +46,69 @@ sender.Send("System started");
 
 ### Common Contracts and Types
 
-- `IMessageFlow`, `IMessageSink`, `IMessageSource`
-- `ITypedMessageSink`, `IMessageSink<T>`, `ITypedMessageSource`, `IMessageSource<T>`
-- `IMessageFlowConnection`, `IMessageFlowConnection<T>`, `IMessageFlowConnection<I, O>`
-- `IAlternativeMessageSource`, `IRequester`, `IReplier`
-- `IRequestMessage<T>`, `IResponseMessage<T>`, `RequestMessage<T>`, `ResponseMessage<T>`
-- `IMessageWrapper`, `IMessageWrapper<T>`, `TopicMessageWrapper<T>`, `ITopicMessage`
-- `ISender`, `ISender<T>`, `IReceiver<T>`
-- `ForwardingMethod`
+- `IMessageFlow`: Marker interface for all MessageFlow elements.
+- `IMessageSink`: Receives messages via `Post`, `Post by ref`, and `PostAsync`.
+- `IMessageSource`: Manages downstream connections and forwards messages.
+- `ITypedMessageSink`: Sink that exposes its consumed CLR type.
+- `IMessageSink<T>`: Typed sink marker built on `ITypedMessageSink`.
+- `ITypedMessageSource`: Source that exposes its emitted CLR type.
+- `IMessageSource<T>`: Typed source marker built on `ITypedMessageSource`.
+- `IMessageFlowConnection`: Combined sink and source role.
+- `IMessageFlowConnection<T>`: Typed combined sink/source with same input and output type.
+- `IMessageFlowConnection<I, O>`: Typed combined sink/source with different input/output types.
+- `IAlternativeMessageSource`: Optional `Else` route for non-matching/rejected messages.
+- `IRequester`: Request-side contract for request/reply interactions.
+- `IReplier`: Reply-side contract for request/reply interactions.
+- `IRequestMessage<T>`: Request envelope with `RequestId` and `Content`.
+- `IResponseMessage<T>`: Response envelope with `RequestId` and `Content`.
+- `RequestMessage<T>`: Concrete request envelope with generated or explicit request id.
+- `ResponseMessage<T>`: Concrete response envelope correlated by request id.
+- `IMessageWrapper`: Untyped wrapper contract with unwrap-and-send helpers.
+- `IMessageWrapper<T>`: Typed wrapper contract exposing `TypedMessage`.
+- `ITopicMessage`: Contract for messages carrying a `Topic`.
+- `TopicMessageWrapper<T>`: Wrapper that combines typed payload with topic metadata.
+- `ISender`: Untyped sender abstraction (sync/by-ref/async).
+- `ISender<T>`: Typed sender abstraction.
+- `IReceiver<T>`: Typed receiver abstraction with wait/peek/receive APIs.
+- `ForwardingMethod`: Forwarding mode enum (`Synchronous`, `SynchronousByRef`, `Asynchronous`).
 
 ### Connectors
 
-- `Forwarder`, `Forwarder<T>`
-- `Filter<T>`, `MessageConverter<I, O>`, `Splitter<T, E>`
-- `Aggregator<T>`
-- `AsyncForwarder`, `QueueForwarder`, `CurrentContextForwarder<T>`
-- `BufferingForwarder<T>`
-- `DeactivatableForwarder`
-- `DelayingForwarder`, `DuplicateMessageSuppressor<T>`
-- `Hub`, `Hub.Socket`, `Junction`
+- `Forwarder`: Untyped pass-through connector.
+- `Forwarder<T>`: Typed pass-through connector that ignores non-`T` messages.
+- `Filter<T>`: Predicate/type-based filter with optional `Else` branch.
+- `MessageConverter<I, O>`: Converts input type `I` to output type `O`.
+- `Splitter<T, E>`: Splits one input message into multiple output messages.
+- `Aggregator<T>`: Delegate-driven stateful connector for batching/coalescing/timeout flush.
+- `AsyncForwarder`: Fire-and-forget asynchronous forwarding connector.
+- `QueueForwarder`: Queue-backed forwarding connector with worker scaling.
+- `CurrentContextForwarder<T>`: Forwards on captured synchronization context.
+- `BufferingForwarder<T>`: Replays buffered recent messages to newly connected sinks.
+- `DeactivatableForwarder`: Runtime gate that can enable/disable forwarding.
+- `DelayingForwarder`: Applies fixed delay before forwarding.
+- `DuplicateMessageSuppressor<T>`: Suppresses duplicates within a time window.
+- `Hub`: Broadcast group container for interconnected sockets.
+- `Hub.Socket`: Hub endpoint that broadcasts to all other sockets.
+- `Junction`: Rule-based multi-route dispatcher with priorities and optional multi-cast mode.
 
 ### Endpoints
 
-- `Sender`, `Sender<T>`, `RequestSender<REQ, RESP>`
-- `QueueReceiver<T>`, `PriorityQueueReceiver<T>`, `LatestMessageReceiver<T>`, `PriorityMessageReceiver<T>`
-- `ReceiverBuffer<T>`, `ValueWrappingQueueReceiver`
-- `MessageTrigger`, `ConditionalTrigger<T, R>`, `MessageCounter`
-- `MessageLog<T>`, `MessageLogReader<T>`
-- `ProcessingEndpoint<T>`, `StatisticsMessageProbe<T1, T2>`
+- `Sender`: Untyped broadcast sender endpoint.
+- `Sender<T>`: Typed broadcast sender endpoint.
+- `RequestSender<REQ, RESP>`: Correlated request/reply endpoint with timeout handling.
+- `QueueReceiver<T>`: FIFO queue receiver with bounded capacity and configurable full-queue behavior.
+- `PriorityQueueReceiver<T>`: Priority-based queue receiver with bounded capacity.
+- `LatestMessageReceiver<T>`: Keeps only latest accepted message and exposes wait/peek/receive APIs.
+- `PriorityMessageReceiver<T>`: Accepts only latest-highest-priority message, routes lower ones to `Else`.
+- `ReceiverBuffer<T>`: Local prefetching wrapper around `IReceiver<T>` for lower overhead consumption.
+- `ValueWrappingQueueReceiver`: Object queue receiver that wraps value types to reduce boxing allocations.
+- `MessageTrigger`: Waitable trigger sink with `ManualReset`, `InstantReset`, and `Toggle` modes.
+- `ConditionalTrigger<T, R>`: Triggers on `T` and optionally resets on `R` conditions.
+- `MessageCounter`: Counts incoming messages and supports async threshold waiting.
+- `MessageLog<T>`: Circular log sink with id-based reads and wait-for-id semantics.
+- `MessageLogReader<T>`: Reads from log buffers and forwards entries in id order.
+- `ProcessingEndpoint<T>`: Delegate-based processing sink (sync/async, optional reject route).
+- `StatisticsMessageProbe<T1, T2>`: Probe endpoint for filtering, conversion, buffering, and time-slice statistics.
 
 ### Extension APIs
 
@@ -585,31 +620,80 @@ Console.WriteLine($"Received: {ok}, Value: {value}");
 ### Advantages
 
 1. Unified abstraction for pipeline construction.
-2. Strong composition with explicit routing semantics.
-3. Built-in operational patterns (queueing, delay, dedup, triggering, probing).
-4. Performance-oriented forwarding paths and low-allocation helper patterns.
-5. Runtime-flexible graph rewiring, including weak links.
-6. Testability and diagnosability through composable endpoints.
-7. Thread-safe n-to-m connectability patterns.
+2. Everything can be a message: no framework-specific base class or special message type is required.
+3. Strong composition with explicit routing semantics.
+4. Built-in operational patterns (queueing, delay, dedup, triggering, probing).
+5. Performance-oriented forwarding paths and low-allocation helper patterns.
+6. First-class sync plus async/await support in the same flow model.
+7. Runtime-flexible graph rewiring, including weak links.
+8. Testability and diagnosability through composable endpoints.
+9. Thread-safe n-to-m connectability patterns.
+
+### Performance Highlights
+
+- High-throughput in-process forwarding:
+    MessageFlow is optimized for fast, in-memory dispatch without network or broker overhead.
+- Sync and async/await without model switching:
+    You can combine direct synchronous forwarding with `Task`-based async stages in one topology, enabling low-latency fast paths and non-blocking awaits where needed.
+- Low-allocation design in hot paths:
+    Forwarding helpers and typed APIs are built to minimize runtime overhead in common flow operations.
+- Efficient fan-out/fan-in composition:
+    Complex n-to-m topologies can be composed while keeping execution local and lightweight.
+- Operational controls without external infrastructure:
+    Queueing, delay, deduplication, and routing are implemented as composable in-process nodes rather than expensive distributed hops.
+- Performance and clarity together:
+    You keep explicit topology modeling (`Hub`, `Junction`, connectors) without sacrificing runtime efficiency.
+
+### Most Outstanding Features in Practice
+
+1. First-class routing with explicit topology components:
+    `Hub` and `Junction` let you model broadcast, prioritized routing, and multi-match routing directly in code instead of scattering logic across handlers.
+2. Everything can be a message:
+    You can send plain domain objects, primitives, DTOs, or wrappers without inheriting from framework-specific message base types.
+3. Rich operational connectors out of the box:
+    Components like `QueueForwarder`, `DelayingForwarder`, `DuplicateMessageSuppressor<T>`, `BatchMessages`, and `DeactivatableForwarder` cover many production patterns without extra frameworks.
+4. Unified sync and async/await execution model:
+    MessageFlow supports synchronous posting and asynchronous awaiting (`PostAsync`, `WaitAsync`, `TryReceiveAsync`, async request/reply) without forcing separate frameworks or duplicated pipelines.
+5. Unified request/reply and fire-and-forget model:
+    `RequestSender<REQ, RESP>`, `IRequestMessage<T>`, and `IResponseMessage<T>` allow correlated request/response inside the same composable graph used for normal event flow.
+6. Concurrency-friendly dynamic wiring:
+    MessageFlow is designed for thread-safe posting and n-to-m graph composition, while still allowing runtime connect/disconnect for evolving system state.
+7. Built-in observability primitives:
+    `MessageCounter`, `MessageLog<T>`, `ConditionalTrigger<T, R>`, and `StatisticsMessageProbe<T1, T2>` make it easier to measure and test behavior without intrusive instrumentation.
+8. Low-friction custom extensions:
+    `SourceHelper`/`TypedSourceHelper<T>` and extension APIs (`MessageFlowExtensions`, `SenderExtensions`, `ReceiverExtensions`) reduce boilerplate when building custom components.
+9. Topic-aware and wrapper-aware message handling:
+    `TopicMessageWrapper<T>`, `FilterByTopic(...)`, and unwrap helpers support metadata-rich messaging while preserving strongly typed payload pipelines.
 
 ### Comparison with common alternatives
 
 - Versus C# events/delegates:
-  MessageFlow adds richer routing, transformations, queueing, and operational control.
+    Events are lightweight for simple pub/sub, but become hard to manage for complex flows. MessageFlow adds explicit routing (`Hub`, `Junction`), typed transformations, queueing/backpressure, and operational connectors while still maintaining high in-process performance.
 
 - Versus `System.Threading.Channels` only:
-  Channels are excellent transport primitives; MessageFlow layers graph composition and routing connectors.
+    Channels are excellent transport primitives for producer/consumer pipelines. MessageFlow preserves in-process performance characteristics while adding graph-level composition, dynamic fan-out/fan-in wiring, conditional routing, request/reply correlation, and seamless sync plus async/await usage in one model.
 
 - Versus Reactive Extensions (Rx):
-  Rx is query-centric; MessageFlow is graph-and-endpoint-centric with explicit operational primitives.
+    Rx is powerful for declarative stream queries. MessageFlow is often simpler when your architecture is endpoint-and-connector oriented and you need explicit operational nodes (queues, delay gates, dedup, triggers, probes), runtime rewiring, and predictable low-overhead in-process execution.
 
 - Versus MediatR-style dispatch:
-  MediatR focuses on handler dispatch; MessageFlow focuses on composable flow topologies.
+    MediatR focuses on request/notification dispatch to handlers. MessageFlow focuses on composable topologies where transformation, routing, throttling, buffering, and observation are first-class pipeline elements, with efficient forwarding for high-frequency internal message traffic.
+
+- Versus broker-based messaging systems (e.g., RabbitMQ/Kafka) for in-process scenarios:
+    External brokers provide durability and inter-process distribution, but add operational complexity and network boundaries. MessageFlow is ideal when you need very fast, in-memory, in-process composition with rich control flow, low latency, and minimal infrastructure.
 
 ### When to choose MessageFlow
 
 Use MessageFlow when you need:
 - explicit in-process message pipelines with dynamic wiring
-- mixed sync and async stages with bounded queues
+- high-performance, low-latency in-process messaging on hot paths
+- mixed synchronous and async/await stages with bounded queues
 - request/reply and broadcast in one architecture
 - operational connectors without external infrastructure
+- explicit routing semantics via `Hub`/`Junction` rather than ad-hoc branching
+- built-in diagnostics and flow control as composable nodes
+
+Use alternatives when you need:
+- durable cross-process/event-stream guarantees (choose broker/event-stream platforms)
+- pure async queue transport without rich graph/routing semantics (channels may be enough)
+- highly query-driven stream transformations as the central paradigm (Rx may fit better)
