@@ -32,6 +32,76 @@ namespace FeatureLoom.Extensions
             return encoding.GetBytes(str);
         }
 
+        /// <summary>
+        /// Builds the final string from the <see cref="StringBuilder"/> while deduplicating it through
+        /// a <see cref="StringInternCache"/>. When the same content has been built before, the shared
+        /// cached instance is returned instead of a freshly allocated string, reducing heap usage and
+        /// GC pressure in scenarios where identical strings are produced repeatedly.
+        /// </summary>
+        /// <param name="sb">The source <see cref="StringBuilder"/>.</param>
+        /// <param name="cache">
+        /// The cache to use. If <c>null</c>, <see cref="StringInternCache.Shared"/> is used.
+        /// </param>
+        /// <returns>The deduplicated string value (value-equal to the builder's content).</returns>
+        /// <remarks>
+        /// On frameworks that support copying a <see cref="StringBuilder"/> into a
+        /// <see cref="Span{Char}"/>, a cache hit for short content avoids allocating a new string
+        /// entirely. Only value equality is guaranteed, not stable reference identity (see
+        /// <see cref="StringInternCache"/>).
+        /// </remarks>
+        public static string BuildWithCache(this StringBuilder sb, StringInternCache cache = null)
+        {
+            if (sb == null) return null;
+
+            cache = cache ?? StringInternCache.Shared;
+
+            int len = sb.Length;
+            if (len == 0) return string.Empty;
+
+#if !NETSTANDARD2_0 && !NETFRAMEWORK
+            // Allocation-free on a cache hit: copy into a stack buffer for reasonably small content
+            // and let the cache deduplicate directly from the span.
+            const int stackLimit = 256;
+            if (len <= stackLimit)
+            {
+                Span<char> buffer = stackalloc char[len];
+                sb.CopyTo(0, buffer, len);
+                return cache.Intern(buffer);
+            }
+#endif
+            return cache.Intern(sb.ToString());
+        }
+
+        /// <summary>
+        /// Deduplicates this string through a <see cref="StringInternCache"/>, returning a shared
+        /// instance that is value-equal to <paramref name="str"/>. When the same content has been
+        /// seen before, the cached instance is returned so repeated equal strings can share a single
+        /// instance, reducing retained heap usage. This is a bounded, lock-free alternative to
+        /// <see cref="string.Intern(string)"/>.
+        /// </summary>
+        /// <param name="str">The string to deduplicate.</param>
+        /// <param name="cache">
+        /// The cache to use. If <c>null</c>, <see cref="StringInternCache.Shared"/> is used.
+        /// </param>
+        /// <returns>
+        /// The shared cached instance, or <paramref name="str"/> itself; <c>null</c> if
+        /// <paramref name="str"/> is <c>null</c>.
+        /// </returns>
+        /// <remarks>
+        /// Because the string already exists, this overload cannot avoid the original allocation; it
+        /// only reduces storage if the returned instance is kept and the original is discarded. To
+        /// avoid allocating the duplicate in the first place, prefer the
+        /// <see cref="StringInternCache.Intern(ReadOnlySpan{char})"/>, <see cref="BuildWithCache"/>
+        /// or <see cref="TextSegment.ToStringCached"/> paths. Only value equality is guaranteed, not
+        /// stable reference identity (see <see cref="StringInternCache"/>).
+        /// </remarks>
+        public static string Intern(this string str, StringInternCache cache = null)
+        {
+            if (str == null) return null;
+            cache = cache ?? StringInternCache.Shared;
+            return cache.Intern(str);
+        }
+
 
         public static string AddToPath(this string pathBase, string pathExtension, char seperator = '\\')
         {

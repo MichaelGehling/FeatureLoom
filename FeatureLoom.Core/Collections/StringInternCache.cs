@@ -33,6 +33,45 @@ namespace FeatureLoom.Collections;
 /// store into the same slot, or a lost <c>stamp</c> update that slightly perturbs victim selection.
 /// None of these affect correctness of the returned strings.
 /// </para>
+/// <para>
+/// Why prefer this over <see cref="string.Intern(string)"/>? Despite the name, this is best
+/// understood as a bounded, lock-free string DEDUPLICATION cache rather than a true intern pool,
+/// and that gives it a much lower risk profile:
+/// </para>
+/// <list type="bullet">
+/// <item><description>
+/// Bounded and reclaimable: <see cref="string.Intern(string)"/> stores strings permanently in a
+/// process-wide pool that is never collected, so interning high-cardinality or attacker-controlled
+/// data is effectively an unbounded memory leak. This cache has a fixed capacity, evicts old
+/// entries and can be <see cref="Clear"/>ed, so its worst case degrades to "no benefit" (extra
+/// churn / lower hit ratio) instead of "unbounded leak".
+/// </description></item>
+/// <item><description>
+/// Scoped, not global: it is an ordinary instance (or an opt-in <see cref="Shared"/> instance)
+/// with no process-wide side effects, and it is lock-free with no global-table contention.
+/// </description></item>
+/// <item><description>
+/// Saves memory on repeated content: in the many scenarios where the same string is rebuilt over
+/// and over (JSON/XML parsing with recurring property names and categorical values, logging,
+/// protocol tokens, repeated DB column values, etc.) it collapses duplicate instances into one,
+/// reducing heap usage and GC pressure.
+/// </description></item>
+/// <item><description>
+/// Can avoid the allocation entirely: the <see cref="Intern(ReadOnlySpan{char})"/> overload
+/// deduplicates directly from a character buffer, so on a cache hit no new string is allocated at
+/// all - something <see cref="string.Intern(string)"/> cannot do because it requires an existing
+/// <see cref="string"/> instance first.
+/// </description></item>
+/// </list>
+/// <para>
+/// IMPORTANT limitation: only VALUE equality of the returned string is guaranteed, not stable
+/// reference identity. Because entries can be evicted between calls, two value-equal strings may
+/// still coexist as separate instances, and the specific instance returned for a given content may
+/// change over time. Therefore this type is NOT a drop-in replacement for
+/// <see cref="string.Intern(string)"/> when correctness relies on reference-equality (e.g. using
+/// <see cref="object.ReferenceEquals(object, object)"/> as a fast identity check). Use it purely to
+/// deduplicate string storage.
+/// </para>
 /// </remarks>
 public sealed class StringInternCache
 {

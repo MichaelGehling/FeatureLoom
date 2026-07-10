@@ -111,6 +111,39 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         else return text.Substring(startIndex, length);
     }
 
+    /// <summary>
+    /// Returns the string represented by this segment, deduplicated through a
+    /// <see cref="StringInternCache"/>. When the same content has been produced before, the shared
+    /// cached instance is returned instead of allocating a new substring, reducing heap usage and
+    /// GC pressure when identical segments are converted repeatedly (e.g. recurring tokens while
+    /// parsing).
+    /// </summary>
+    /// <param name="cache">
+    /// The cache to use. If <c>null</c>, <see cref="StringInternCache.Shared"/> is used.
+    /// </param>
+    /// <returns>The deduplicated string value (value-equal to <see cref="ToString"/>).</returns>
+    /// <remarks>
+    /// On frameworks that support spans, a cache hit avoids allocating a new substring entirely.
+    /// Only value equality is guaranteed, not stable reference identity (see
+    /// <see cref="StringInternCache"/>).
+    /// </remarks>
+    public string ToStringCached(StringInternCache cache = null)
+    {
+        if (length == 0) return "";
+
+        cache = cache ?? StringInternCache.Shared;
+
+        // If the segment covers the whole underlying string, deduplicate that instance directly:
+        // no substring/span materialization is needed and the existing string can become the shared one.
+        if (startIndex == 0 && length == text.Length) return cache.Intern(text);
+
+#if !NETSTANDARD2_0
+        return cache.Intern(AsSpan());
+#else
+        return cache.Intern(ToString());
+#endif
+    }
+
 #if !NETSTANDARD2_0
     /// <summary>
     /// Returns the segment as a <see cref="ReadOnlySpan{T}"/> (only available on supported frameworks).

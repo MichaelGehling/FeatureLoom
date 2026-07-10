@@ -558,4 +558,56 @@ public class TextSegmentTests
         Assert.NotNull(result);
         Assert.Equal("b[START]c", result.Value.ToString());
     }
+
+    [Fact]
+    public void ToStringCached_ReturnsContentValue()
+    {
+        var cache = new StringInternCache(8, 1024);
+        var seg = new TextSegment("hello world", 6, 5); // "world"
+
+        Assert.Equal("world", seg.ToStringCached(cache));
+    }
+
+    [Fact]
+    public void ToStringCached_EmptySegment_ReturnsEmptyString()
+    {
+        var cache = new StringInternCache(8, 1024);
+        var seg = TextSegment.Empty;
+
+        Assert.Equal("", seg.ToStringCached(cache));
+    }
+
+    [Fact]
+    public void ToStringCached_ReturnsSameInstance_ForEqualContentFromDifferentSources()
+    {
+        var cache = new StringInternCache(8, 1024);
+
+        var seg1 = new TextSegment("abc123");
+        var seg2 = new TextSegment("xx-abc123-yy", 3, 6); // "abc123" from a different backing string
+
+        string first = seg1.ToStringCached(cache);
+        string second = seg2.ToStringCached(cache);
+
+        Assert.Equal("abc123", first);
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void ToStringCached_UsesSharedCache_WhenCacheIsNull()
+    {
+        var previous = StringInternCache.Shared;
+        try
+        {
+            StringInternCache.Shared = new StringInternCache(8, 1024);
+
+            string viaSegment = new TextSegment("shared_segment").ToStringCached();
+            string viaShared = StringInternCache.Shared.Intern("shared_segment");
+
+            Assert.Same(viaSegment, viaShared);
+        }
+        finally
+        {
+            StringInternCache.Shared = previous;
+        }
+    }
 }
