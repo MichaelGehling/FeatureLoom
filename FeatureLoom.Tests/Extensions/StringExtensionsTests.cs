@@ -202,5 +202,51 @@ namespace FeatureLoom.Extensions
             Assert.False(TestHelper.HasAnyLogError());
         }
 
+        [Fact]
+        public void Append_TextSegment_AppendsSegmentContent()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var segment = new Collections.TextSegment("hello world", 6, 5); // "world"
+            var sb = new StringBuilder("say ");
+
+            sb.Append(segment);
+
+            Assert.Equal("say world", sb.ToString());
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
+        [Fact]
+        public void Append_TextSegment_IgnoresEmptyOrInvalidSegment()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var sb = new StringBuilder("base");
+
+            sb.Append(Collections.TextSegment.Empty);
+            sb.Append(default(Collections.TextSegment));
+
+            Assert.Equal("base", sb.ToString());
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
+        [Fact]
+        public void Append_TextSegment_ReturnsSameBuilder_ForChaining()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var sb = new StringBuilder();
+
+            var result = sb.Append(new Collections.TextSegment("ab"))
+                           .Append(new Collections.TextSegment("xcdy", 1, 2)); // "cd"
+
+            Assert.Same(sb, result);
+            Assert.Equal("abcd", sb.ToString());
+
+            Assert.False(TestHelper.HasAnyLogError());
+        }
+
     }
 }

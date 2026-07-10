@@ -102,6 +102,31 @@ namespace FeatureLoom.Extensions
             return cache.Intern(str);
         }
 
+        /// <summary>
+        /// Appends the content of a <see cref="TextSegment"/> to the <see cref="StringBuilder"/>
+        /// without allocating an intermediate substring.
+        /// </summary>
+        /// <param name="sb">The target <see cref="StringBuilder"/>.</param>
+        /// <param name="segment">The segment to append.</param>
+        /// <returns>The same <see cref="StringBuilder"/> instance for chaining.</returns>
+        /// <remarks>
+        /// On frameworks that provide <c>StringBuilder.Append(ReadOnlySpan&lt;char&gt;)</c> the segment
+        /// is appended via its span; otherwise the allocation-free
+        /// <c>StringBuilder.Append(string, startIndex, count)</c> overload is used. Invalid or empty
+        /// segments are ignored.
+        /// </remarks>
+        public static StringBuilder Append(this StringBuilder sb, TextSegment segment)
+        {
+            if (sb == null) throw new NullReferenceException();
+            if (segment.IsEmptyOrInvalid) return sb;
+
+#if NETSTANDARD2_1_OR_GREATER || NET
+            return sb.Append(segment.AsSpan());
+#else
+            return sb.Append(segment.UnderlyingString, segment.Offset, segment.Count);
+#endif
+        }
+
 
         public static string AddToPath(this string pathBase, string pathExtension, char seperator = '\\')
         {
