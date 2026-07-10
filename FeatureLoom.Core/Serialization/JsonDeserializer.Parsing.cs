@@ -141,7 +141,7 @@ public sealed partial class JsonDeserializer
         return true;
     }
 
-    readonly QuickStringCache stringCache;
+    readonly Utf8StringCache stringCache;
     readonly bool useStringCache;
 
 

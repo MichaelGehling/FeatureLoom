@@ -112,7 +112,7 @@ public sealed partial class JsonDeserializer
 
         if (settings.anyUsesStringCache)
         {
-            stringCache = new QuickStringCache(settings.stringCacheBitSize, settings.stringCacheMaxLength);
+            stringCache = new Utf8StringCache(settings.stringCacheBitSize, settings.stringCacheMaxLength);
         }
     }
 

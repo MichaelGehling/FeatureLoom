@@ -7,15 +7,15 @@ using Xunit;
 
 namespace FeatureLoom.Collections
 {
-    public class QuickStringCacheTests
+    public class Utf8tringCacheTests
     {
         [Fact]
         public void Constructor_ClampsHashSizeInBits()
         {
-            var small = new QuickStringCache(1, 1024);
-            var large = new QuickStringCache(99, 1024);
+            var small = new Utf8StringCache(1, 1024);
+            var large = new Utf8StringCache(99, 1024);
 
-            var cacheField = typeof(QuickStringCache).GetField("cache", BindingFlags.Instance | BindingFlags.NonPublic);
+            var cacheField = typeof(Utf8StringCache).GetField("cache", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(cacheField);
 
             var smallArray = (Array)cacheField.GetValue(small);
@@ -28,7 +28,7 @@ namespace FeatureLoom.Collections
         [Fact]
         public void GetOrCreate_ReturnsSameReference_ForRepeatedLookup()
         {
-            var cache = new QuickStringCache(hashSizeInBits: 8, 1024);
+            var cache = new Utf8StringCache(hashSizeInBits: 8, 1024);
             ByteSegment key = new ByteSegment("hello");
 
             string first = cache.GetOrCreate(key);
@@ -40,7 +40,7 @@ namespace FeatureLoom.Collections
         [Fact]
         public void GetOrCreate_ReturnsSameReference_ForEqualContentDifferentBacking()
         {
-            var cache = new QuickStringCache(hashSizeInBits: 8, 1024);
+            var cache = new Utf8StringCache(hashSizeInBits: 8, 1024);
 
             ByteSegment key1 = new ByteSegment("abc123");
             ByteSegment key2 = new ByteSegment("abc123"); // different backing array, same content
@@ -54,7 +54,7 @@ namespace FeatureLoom.Collections
         [Fact]
         public void GetOrCreate_DoesNotCache_WhenSegmentExceedsMaxStringLength()
         {
-            var cache = new QuickStringCache(hashSizeInBits: 8, maxStringLength: 4);
+            var cache = new Utf8StringCache(hashSizeInBits: 8, maxStringLength: 4);
             ByteSegment longKey = new ByteSegment("this_is_longer_than_4");
 
             _ = cache.GetOrCreate(longKey);
@@ -67,7 +67,7 @@ namespace FeatureLoom.Collections
         [Fact]
         public void Clear_ResetsCacheAndStampCounter()
         {
-            var cache = new QuickStringCache(hashSizeInBits: 8, maxStringLength: 1024);
+            var cache = new Utf8StringCache(hashSizeInBits: 8, maxStringLength: 1024);
 
             _ = cache.GetOrCreate(new ByteSegment("a"));
             _ = cache.GetOrCreate(new ByteSegment("b"));
@@ -84,7 +84,7 @@ namespace FeatureLoom.Collections
         [Fact]
         public void GetOrCreate_UsesSecondProbeSlot_ForCollision()
         {
-            var cache = new QuickStringCache(hashSizeInBits: 8, maxStringLength: 1024);
+            var cache = new Utf8StringCache(hashSizeInBits: 8, maxStringLength: 1024);
             var (a, b) = FindCollidingKeyPair(cache);
 
             string a1 = cache.GetOrCreate(a);
@@ -97,7 +97,7 @@ namespace FeatureLoom.Collections
             Assert.Same(b1, b2);
         }
 
-        static List<ByteSegment> FindCollidingKeys(QuickStringCache cache, int needed)
+        static List<ByteSegment> FindCollidingKeys(Utf8StringCache cache, int needed)
         {
             var list = new List<ByteSegment>();
             int? targetIndex = null;
@@ -122,13 +122,13 @@ namespace FeatureLoom.Collections
             throw new InvalidOperationException("Could not find enough colliding keys.");
         }
 
-        static (ByteSegment, ByteSegment) FindCollidingKeyPair(QuickStringCache cache)
+        static (ByteSegment, ByteSegment) FindCollidingKeyPair(Utf8StringCache cache)
         {
             var list = FindCollidingKeys(cache, 2);
             return (list[0], list[1]);
         }
 
-        static int GetPrimaryIndex(QuickStringCache cache, ByteSegment segment)
+        static int GetPrimaryIndex(Utf8StringCache cache, ByteSegment segment)
         {
             int hash = InvokeComputeFastHash(segment);
             var cacheArray = (Array)GetField(cache, "cache");
@@ -138,14 +138,14 @@ namespace FeatureLoom.Collections
 
         static int InvokeComputeFastHash(ByteSegment segment)
         {
-            var method = typeof(QuickStringCache).GetMethod("ComputeFastHash", BindingFlags.Static | BindingFlags.NonPublic);
+            var method = typeof(Utf8StringCache).GetMethod("ComputeFastHash", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(method);
             return (int)method.Invoke(null, new object[] { segment });
         }
 
-        static uint GetStampCounter(QuickStringCache cache) => (uint)GetField(cache, "stampCounter");
+        static uint GetStampCounter(Utf8StringCache cache) => (uint)GetField(cache, "stampCounter");
 
-        static int CountValidEntries(QuickStringCache cache)
+        static int CountValidEntries(Utf8StringCache cache)
         {
             var cacheArray = (Array)GetField(cache, "cache");
             var entryType = cacheArray.GetType().GetElementType();

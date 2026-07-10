@@ -16,7 +16,7 @@ namespace FeatureLoom.Collections;
 /// This cache is optimized for throughput and low allocation behavior, not for perfect hit ratio.
 /// Capacity is fixed at construction time as <c>2^hashSizeInBits</c>.
 /// </remarks>
-public sealed class QuickStringCache
+public sealed class Utf8StringCache
 {
     /// <summary>
     /// Cache entry containing key/value and metadata for fast lookup/replacement.
@@ -45,7 +45,7 @@ public sealed class QuickStringCache
     uint stampCounter;
 
     /// <summary>
-    /// Initializes a new <see cref="QuickStringCache"/>.
+    /// Initializes a new <see cref="Utf8StringCache"/>.
     /// </summary>
     /// <param name="hashSizeInBits">
     /// Cache size exponent. Effective size is <c>2^hashSizeInBits</c>, e.g. 8 for 256 entries, 10 for 1024 entries, 16 for 65536 entries.
@@ -61,7 +61,7 @@ public sealed class QuickStringCache
     /// <param name="maxStringLength">
     /// Maximum length of strings to cache. Strings longer than this will not be cached.
     /// </param>
-    public QuickStringCache(int hashSizeInBits, int maxStringLength)
+    public Utf8StringCache(int hashSizeInBits, int maxStringLength)
     {
         hashSizeInBits = hashSizeInBits.Clamp(8, 16);
         cache = new CacheEntry[1 << hashSizeInBits];
