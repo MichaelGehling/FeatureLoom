@@ -73,6 +73,31 @@ namespace FeatureLoom.Extensions
         }
 
         /// <summary>
+        /// Builds the final string from the <see cref="StringBuilder"/> while deduplicating it through
+        /// a <see cref="StringInternCache"/>. When the same content has been built before, the shared
+        /// cached instance is returned instead of a freshly allocated string, reducing heap usage and
+        /// GC pressure in scenarios where identical strings are produced repeatedly.
+        /// The <see cref="StringBuilder"/> is cleared after the string is built.
+        /// </summary>
+        /// <param name="sb">The source <see cref="StringBuilder"/>.</param>
+        /// <param name="cache">
+        /// The cache to use. If <c>null</c>, <see cref="StringInternCache.Shared"/> is used.
+        /// </param>
+        /// <returns>The deduplicated string value (value-equal to the builder's content).</returns>
+        /// <remarks>
+        /// On frameworks that support copying a <see cref="StringBuilder"/> into a
+        /// <see cref="Span{Char}"/>, a cache hit for short content avoids allocating a new string
+        /// entirely. Only value equality is guaranteed, not stable reference identity (see
+        /// <see cref="StringInternCache"/>).
+        /// </remarks>
+        public static string BuildWithCacheAndClear(this StringBuilder sb, StringInternCache cache = null)
+        {
+            var str = sb.BuildWithCache(cache);
+            sb?.Clear();
+            return str;
+        }
+
+        /// <summary>
         /// Deduplicates this string through a <see cref="StringInternCache"/>, returning a shared
         /// instance that is value-equal to <paramref name="str"/>. When the same content has been
         /// seen before, the cached instance is returned so repeated equal strings can share a single
