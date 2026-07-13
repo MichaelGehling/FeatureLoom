@@ -151,10 +151,11 @@ public partial class JsonDeserializer
     {
         bool setItemRef = cachedTypeReader.ResolveRefs;
         var stringArrayReader = () =>
-        {
-            byte b = SkipWhiteSpaces();
-            if (b != '[') throw new Exception("Failed reading Array");
-            if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
+        {            
+            if (TryReadNullValue()) return default;
+            byte b = buffer.CurrentByte;
+            if (b != '[') throw new Exception($"Failed reading Array: Array didn't start with '[', but with '{(char)b}'");
+            if (!buffer.TryNextByte()) throw new Exception("Failed reading Array: Unexpected end of input");
             List<E> elementBuffer = bufferPool.Take();
             while (true)
             {
@@ -169,7 +170,7 @@ public partial class JsonDeserializer
                 elementBuffer.Add(value);
                 b = SkipWhiteSpaces();
                 if (b == ',') buffer.TryNextByte();
-                else if (b != ']') throw new Exception("Failed reading Array");
+                else if (b != ']') throw new Exception($"Failed reading Array: Unexpected character encountered '{(char)b}'");
             }
             E[] item = elementBuffer.ToArray();
             //TODO: Too late... the elements may already reference the item,

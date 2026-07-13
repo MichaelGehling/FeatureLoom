@@ -1037,7 +1037,9 @@ public sealed partial class JsonDeserializer
         Func<PreparationApi, Func<ExtensionApi, T, T>> prepareReader;
 
         /// <summary>Cached constructor delegate for creating new instances.</summary>
-        Func<T> construct;
+        Func<T> constructor;
+
+        public void SetConstructor(Func<T> constructor) => this.constructor = constructor;
 
         /// <summary>
         /// Initializes from a preparation delegate that returns a populate delegate.
@@ -1083,15 +1085,16 @@ public sealed partial class JsonDeserializer
         /// <param name="api">Preparation API.</param>
         /// <exception cref="Exception">Thrown if no valid read/populate delegate is available.</exception>
         public void PrepareReader(PreparationApi api)
-        {
-            construct = api.GetContructor<T>();
+        {            
             if (prepareReader != null)
             {
+                var construct = constructor ?? api.GetContructor<T>();
                 populateValue = prepareReader(api);
                 readValue = (api) => populateValue(api, construct());
             }
             else if (populateValue != null)
             {
+                var construct = constructor ?? api.GetContructor<T>();
                 readValue = (api) => populateValue(api, construct());
             }
             else if (readValue != null)
