@@ -1,5 +1,4 @@
 using FeatureLoom.Time;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using System;
 using System.Collections.Generic;
 using System.Threading;
