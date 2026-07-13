@@ -137,14 +137,28 @@ source.Send("not an int");
 // Rejected: not an int
 ```
 
-### Convert and Split
+### Convert Message
 
 ```csharp
 IMessageSource source = new Sender<string>();
 
 source
-    .ConvertMessage<string, string[]>(line => line.Split(','))
-    .SplitMessage<string[], string>(parts => parts)
+    .ConvertMessage<string, int>(text => int.Parse(text))
+    .ProcessMessage<int>(number => Console.WriteLine(number * 2));
+
+source.Send("21");
+
+// Expected output:
+// 42
+```
+
+### Split Message
+
+```csharp
+IMessageSource source = new Sender<string>();
+
+source
+    .SplitMessage<string, string>(line => line.Split(','))
     .ProcessMessage<string>(part => Console.WriteLine(part.Trim()));
 
 source.Send("alpha,beta,gamma");
@@ -155,16 +169,12 @@ source.Send("alpha,beta,gamma");
 // gamma
 ```
 
-### Request/Response with Correlation
+### Request/Response
 
 ```csharp
 var requester = new RequestSender<string, int>(timeout: TimeSpan.FromSeconds(2));
 
-requester.ProcessMessage<IRequestMessage<string>>(request =>
-{
-    var response = new ResponseMessage<int>(request.Content.Length, request.RequestId);
-    requester.Post(response);
-});
+requester.Respond<string, int>(text => text.Length);
 
 int length = await requester.SendRequestAsync("FeatureLoom");
 Console.WriteLine(length);
