@@ -9,36 +9,38 @@ namespace FeatureLoom.PerformanceTests.StringBuilderExtensions;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(100)]
+[MinIterationCount(50)]
 [MaxIterationCount(500)]
 public class StringInterpolationTest
 {
-    // A realistic mix of names/identifiers as they might appear in log messages: short first
-    // names, full names, e-mail addresses, service/host identifiers, etc. Lengths vary but stay
-    // well within typical caching thresholds. Picking cyclically from this pool gives a natural
-    // "categorical value" access pattern (a limited set of distinct values, repeated many times)
-    // instead of an artificial single-value or fully-unique extreme.
-    static readonly string[] realisticNames =
+    // Models a typical telemetry/logging workload: 20% low-cardinality categorical values, 30%
+    // medium-cardinality tenant/user identifiers, and 50% request-like values from a long tail.
+    // The corpus is pre-built so input generation is not included in the interpolation benchmark.
+    const int WorkloadSize = 65_536;
+
+    static readonly string[] commonValues =
     [
-        "Alice",
-        "Bob",
-        "Christopher",
-        "Dr. Elizabeth Montgomery",
-        "svc-billing-worker-03",
-        "user.smith@example.com",
+        "anonymous",
+        "authenticated",
+        "checkout-service",
+        "catalog-service",
+        "payment-worker-03",
         "Node-EU-West-1a",
-        "Jean-Pierre",
-        "田中太郎",
-        "OrderProcessingService",
-        "guest",
-        "admin@company.internal",
         "10.0.42.17",
-        "Sarah O'Connor",
-        "background-job-scheduler"
+        "guest@example.com",
+        "admin@company.internal",
+        "OrderProcessingService",
+        "background-job-scheduler",
+        "cache-miss",
+        "rate-limited",
+        "success",
+        "retrying",
+        "田中太郎"
     ];
 
     int count = 42;
     double value = 3.14159;
+    string[] workload;
 
     // Pre-created, reusable StringBuilder for the "cached" scenario, so that
     // preparing/resetting the builder is not part of the measured work.
@@ -46,10 +48,34 @@ public class StringInterpolationTest
 
     // Dedicated, individual cache instance instead of StringInternCache.Shared, so that
     // this benchmark's cache contents/pressure don't affect (or get affected by) other tests.
-    StringInternCache internCache = new StringInternCache(13, 128);
+    StringInternCache internCache = new StringInternCache(16, 256);
 
     [Params(1_000_000, 10_000, 100, 1)]
     public int iterations;
+
+    [GlobalSetup]
+    public void CreateWorkload()
+    {
+        workload = new string[WorkloadSize];
+        for (int i = 0; i < workload.Length; i++)
+        {
+            int bucket = i % 10;
+            if (bucket < 2)
+            {
+                workload[i] = commonValues[i % commonValues.Length];
+            }
+            else if (bucket < 5)
+            {
+                workload[i] = $"customer-{i % 4_096:D4}@tenant-{i % 64:D2}.example.com";
+            }
+            else
+            {
+                workload[i] = $"POST /v2/orders/{i:D8}/items?region=eu-west-{(i % 3) + 1}&trace={i * 2_654_435_761u:X8}";
+            }
+        }
+
+        internCache.Clear();
+    }
 
     [IterationSetup]
     public void Prepare()
@@ -58,15 +84,14 @@ public class StringInterpolationTest
         preparedBuilder.Clear();
     }
 
-    // Cycles through the realistic name pool, giving a repeating, categorical-value-like pattern.
-    string GetName(int i) => realisticNames[i % realisticNames.Length];
+    string GetWorkloadValue(int i) => workload[i % workload.Length];
 
     [Benchmark(Baseline = true)]
     public void StandardInterpolation()
     {
         for (int i = 0; i < iterations; i++)
         {
-            string result = $"Hello {GetName(i)}, you have {count} messages (value: {value:F2})";
+            string result = $"Hello {GetWorkloadValue(i)}, you have {count} messages (value: {value:F2})";
         }
     }
 
@@ -75,7 +100,7 @@ public class StringInterpolationTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            string result = string.Format("Hello {0}, you have {1} messages (value: {2:F2})", GetName(i), count, value);
+            string result = string.Format("Hello {0}, you have {1} messages (value: {2:F2})", GetWorkloadValue(i), count, value);
         }
     }
 
@@ -84,7 +109,7 @@ public class StringInterpolationTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            string result = StringBuilder.BuildString($"Hello {GetName(i)}, you have {count} messages (value: {value:F2})");
+            string result = StringBuilder.BuildString($"Hello {GetWorkloadValue(i)}, you have {count} messages (value: {value:F2})");
         }
     }
 
@@ -93,7 +118,7 @@ public class StringInterpolationTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            string result = StringBuilder.BuildCachedString($"Hello {GetName(i)}, you have {count} messages (value: {value:F2})", internCache);
+            string result = StringBuilder.BuildCachedString($"Hello {GetWorkloadValue(i)}, you have {count} messages (value: {value:F2})", internCache);
         }
     }
 
@@ -102,7 +127,7 @@ public class StringInterpolationTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            preparedBuilder.Append($"Hello {GetName(i)}, you have {count} messages (value: {value:F2})");
+            preparedBuilder.Append($"Hello {GetWorkloadValue(i)}, you have {count} messages (value: {value:F2})");
             string result = preparedBuilder.BuildWithCacheAndClear(internCache);
         }
     }
