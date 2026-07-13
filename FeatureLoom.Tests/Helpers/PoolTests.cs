@@ -96,6 +96,49 @@ public class PoolTests
     }
 
     [Fact]
+    public void TakeScoped_ReturnsItemToPool_OnDispose()
+    {
+        var pool = new Pool<TestObject>(() => new TestObject());
+
+        TestObject obj;
+        using (pool.TakeScoped(out obj))
+        {
+            Assert.NotNull(obj);
+            Assert.Equal(0, pool.Count); // taken, not yet returned
+        }
+
+        Assert.Equal(1, pool.Count); // returned on dispose
+
+        var again = pool.Take();
+        Assert.Same(obj, again);
+    }
+
+    [Fact]
+    public void TakeScoped_CallsResetOnDispose()
+    {
+        bool resetCalled = false;
+        var pool = new Pool<TestObject>(
+            () => new TestObject(),
+            obj => resetCalled = true);
+
+        using (pool.TakeScoped(out _)) { }
+
+        Assert.True(resetCalled);
+    }
+
+    [Fact]
+    public void TakeScoped_DoubleDispose_ReturnsOnlyOnce()
+    {
+        var pool = new Pool<TestObject>(() => new TestObject());
+
+        var handle = pool.TakeScoped(out _);
+        handle.Dispose();
+        handle.Dispose(); // second dispose must be a no-op
+
+        Assert.Equal(1, pool.Count);
+    }
+
+    [Fact]
     public void Pool_IsThreadSafe_WhenThreadSafeIsTrue()
     {
         var pool = new Pool<TestObject>(() => new TestObject(), maxSize: 100, threadSafe: true);

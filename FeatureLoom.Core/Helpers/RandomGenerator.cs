@@ -86,10 +86,9 @@ public static class RandomGenerator
     {
         if (crypto)
         {
-            byte[] bytes = fourBytesPool.Take();
+            using var _ = fourBytesPool.TakeScoped(out byte[] bytes);
             CryptoRng.GetBytes(bytes);
             int result = BitConverter.ToInt32(bytes, 0);
-            fourBytesPool.Return(bytes);
             return result;
         }
         else
@@ -140,10 +139,9 @@ public static class RandomGenerator
     {
         if (crypto)
         {
-            byte[] bytes = eightBytesPool.Take();
+            using var _ = eightBytesPool.TakeScoped(out byte[] bytes);
             CryptoRng.GetBytes(bytes);
             var result = BitConverter.ToInt64(bytes, 0);
-            eightBytesPool.Return(bytes);
             return result;
         }
         else
@@ -151,10 +149,9 @@ public static class RandomGenerator
 #if NET6_0_OR_GREATER
             return Rng.NextInt64(long.MinValue, long.MaxValue);
 #else
-            byte[] bytes = eightBytesPool.Take();
+            using var _ = eightBytesPool.TakeScoped(out byte[] bytes);
             Rng.NextBytes(bytes);
             var result = BitConverter.ToInt64(bytes, 0);
-            eightBytesPool.Return(bytes);
             return result;
 #endif
         }
@@ -179,7 +176,7 @@ public static class RandomGenerator
         if (min > max) throw new ArgumentOutOfRangeException(nameof(min), "min must be less than or equal to max");
         ulong range = (ulong)(max - min) + 1UL;
         ulong ulongRand;
-        byte[] buf = eightBytesPool.Take();
+        using var _ = eightBytesPool.TakeScoped(out byte[] buf);
         ulong limit = ulong.MaxValue - (ulong.MaxValue % range);
         do
         {
@@ -187,7 +184,6 @@ public static class RandomGenerator
             ulongRand = BitConverter.ToUInt64(buf, 0);
         }
         while (ulongRand >= limit);
-        eightBytesPool.Return(buf);
         return (long)(ulongRand % range) + min;
 #endif
     }
@@ -201,10 +197,9 @@ public static class RandomGenerator
     {
         if (crypto)
         {
-            byte[] bytes = eightBytesPool.Take();
+            using var _ = eightBytesPool.TakeScoped(out byte[] bytes);
             CryptoRng.GetBytes(bytes);
             var result = BitConverter.ToDouble(bytes, 0);
-            eightBytesPool.Return(bytes);
             return result;
         }
         else
@@ -254,10 +249,9 @@ public static class RandomGenerator
     {
         if (crypto)
         {
-            byte[] bytes = sixteenBytesPool.Take();
+            using var _ = sixteenBytesPool.TakeScoped(out byte[] bytes);
             CryptoRng.GetBytes(bytes);
             var result = new Guid(bytes);
-            sixteenBytesPool.Return(bytes);
             return result;
         }
         else

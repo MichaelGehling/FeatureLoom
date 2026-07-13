@@ -282,5 +282,63 @@ namespace FeatureLoom.Helpers
             // Intentionally do not init this type.
             Assert.Throws<InvalidOperationException>(() => SharedPool<NotInitializedItem>.Take());
         }
+
+        class ScopedItem { }
+        [Fact]
+        public void TakeScoped_ReturnsItemToPool_OnDispose()
+        {
+            SharedPool<ScopedItem>.TryInit(
+                () => new ScopedItem(),
+                _ => { },
+                globalCapacity: 10,
+                localCapacity: 5);
+
+            ScopedItem obj;
+            using (SharedPool<ScopedItem>.TakeScoped(out obj))
+            {
+                Assert.NotNull(obj);
+            }
+
+            Assert.True(SharedPool<ScopedItem>.LocalCount > 0); // returned on dispose
+
+            var again = SharedPool<ScopedItem>.Take();
+            Assert.Same(obj, again); // reused from local stack
+        }
+
+        class ScopedResetItem { public int State; }
+        [Fact]
+        public void TakeScoped_CallsResetOnDispose()
+        {
+            bool resetCalled = false;
+            SharedPool<ScopedResetItem>.TryInit(
+                () => new ScopedResetItem(),
+                r => { r.State = 0; resetCalled = true; },
+                globalCapacity: 10,
+                localCapacity: 5);
+
+            using (SharedPool<ScopedResetItem>.TakeScoped(out var item))
+            {
+                item.State = 42;
+            }
+
+            Assert.True(resetCalled);
+        }
+
+        class ScopedDoubleItem { }
+        [Fact]
+        public void TakeScoped_DoubleDispose_ReturnsOnlyOnce()
+        {
+            SharedPool<ScopedDoubleItem>.TryInit(
+                () => new ScopedDoubleItem(),
+                _ => { },
+                globalCapacity: 10,
+                localCapacity: 5);
+
+            var handle = SharedPool<ScopedDoubleItem>.TakeScoped(out _);
+            handle.Dispose();
+            handle.Dispose(); // second dispose must be a no-op
+
+            Assert.Equal(1, SharedPool<ScopedDoubleItem>.LocalCount);
+        }
     }
 }

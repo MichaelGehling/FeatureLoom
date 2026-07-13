@@ -109,6 +109,46 @@ public sealed class Pool<T> where T : class
     public T Take() => take();
 
     /// <summary>
+    /// Takes an item from the pool and returns a disposable handle that will return the item when disposed.
+    /// </summary>
+    /// <remarks>
+    /// The handle should be disposed as soon as the item is no longer needed to return it to the pool.
+    /// Do not hold the item beyond the scope of the handle's lifetime and do not return the item to the pool manually.
+    /// This pattern is useful for ensuring items are returned even in the presence of exceptions.
+    /// </remarks>
+    /// <param name="item">The obtained item.</param>
+    /// <returns>A disposable handle that will return the item to the pool when disposed.</returns>
+    public ReturnHandle TakeScoped(out T item)
+    {
+        item = Take();
+        return new ReturnHandle(item, this);
+    }
+
+    /// <summary>
+    /// Returns an item to the pool and provides a disposable handle that will return the item when disposed.
+    /// </summary>
+    public struct ReturnHandle : IDisposable
+    {
+        private T item;
+        private Pool<T> pool;
+        private bool disposed;
+        public ReturnHandle(T item, Pool<T> pool)
+        {
+            this.item = item;
+            this.pool = pool;
+            this.disposed = false;
+        }
+        public void Dispose()
+        {
+            if (!disposed)
+            {
+                pool.Return(item);
+                disposed = true;
+            }
+        }
+    }
+
+    /// <summary>
     /// Returns an object to the pool. Optionally resets the object before returning.
     /// If the pool has reached its maximum size, the object is not added.
     /// </summary>

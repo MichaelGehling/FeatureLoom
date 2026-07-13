@@ -158,6 +158,46 @@ namespace FeatureLoom.Helpers
         }
 
         /// <summary>
+        /// Obtains an item from the pool and returns a disposable handle that will return the item when disposed.
+        /// Item comes from the thread-local stack if available; otherwise attempts a batched fetch
+        /// from the global stack. If the global stack is empty, a new item is created via the factory.
+        /// </summary>
+        /// <remarks>
+        /// The handle should be disposed as soon as the item is no longer needed to return it to the pool.
+        /// Do not hold the item beyond the scope of the handle's lifetime and do not return the item to the pool manually.
+        /// This pattern is useful for ensuring items are returned even in the presence of exceptions.
+        /// </remarks>
+        /// <param name="item">The obtained item.</param>
+        /// <returns>A disposable handle that will return the item to the pool when disposed.</returns>
+        public static ReturnHandle TakeScoped(out T item)
+        {
+            item = Take();
+            return new ReturnHandle(item);
+        }
+
+        /// <summary>
+        /// Returns an item to the pool and provides a disposable handle that will return the item when disposed.
+        /// </summary>
+        public struct ReturnHandle : IDisposable
+        {
+            private T item;
+            private bool disposed;
+            public ReturnHandle(T item)
+            {
+                this.item = item;
+                this.disposed = false;
+            }
+            public void Dispose()
+            {
+                if (!disposed)
+                {
+                    SharedPool<T>.Return(item);
+                    disposed = true;
+                }
+            }
+        }
+
+        /// <summary>
         /// Returns an item to the pool, invoking the reset callback (if provided), then pushing to the
         /// thread-local stack. On local overflow, spills excess to the global stack or discards items
         /// down to <see cref="keepOnFull"/>.
