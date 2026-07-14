@@ -20,10 +20,10 @@ namespace FeatureLoom.Logging
         {
             public string logFilePath = "logs/log.txt";
             public bool newFileOnStartup = true;
-
-            public string archiveFilePath = "logs/logArchive.zip";
-            public int logFilesArchiveLimitInMB = 100;
+            public bool compressedArchive = true;
             public float logFileSizeLimitInMB = 5;
+            public string archiveFilePath = "logs/logArchive.zip";
+            public int logFilesArchiveLimitInMB = 100;            
             public CompressionLevel compressionLevel = CompressionLevel.Fastest;
             public int delayAfterWritingInMs = 1000;
             public Loglevel skipDelayLogLevel = Loglevel.ERROR;
@@ -77,8 +77,15 @@ namespace FeatureLoom.Logging
 
             var logHandle = this.GetType().Name + this.GetHandle().ToString();
 
-            await UpdateConfigAsync().ConfiguredAwait();
-            if (config.newFileOnStartup) ArchiveCurrentLogfile();
+            try
+            {
+                await UpdateConfigAsync().ConfiguredAwait();
+                if (config.newFileOnStartup) await ArchiveCurrentLogfileAsync().ConfiguredAwait();
+            }
+            catch (Exception e)
+            {
+                OptLog.ERROR(logHandle)?.Build($"Initializing file logger failed.", e);
+            }
             while(true)
             {
                 await UpdateConfigAsync().ConfiguredAwait();
@@ -93,7 +100,7 @@ namespace FeatureLoom.Logging
                 }
                 try
                 {
-                    if (config.logFileSizeLimitInMB * 1024 * 1024 <= GetLogFileSize()) ArchiveCurrentLogfile();
+                    if (config.logFileSizeLimitInMB * 1024 * 1024 <= GetLogFileSize()) await ArchiveCurrentLogfileAsync().ConfiguredAwait();
                 }
                 catch(Exception e)
                 {
@@ -124,7 +131,7 @@ namespace FeatureLoom.Logging
 
             
             var logFileInfo = new FileInfo(config.logFilePath);
-            logFileInfo.Directory.Create();
+            logFileInfo.Directory?.Create();
 
             bool updateCreationTime = !logFileInfo.Exists;
 
@@ -146,40 +153,87 @@ namespace FeatureLoom.Logging
             delayBypass.Reset();
         }
 
-        // TODO: Make async
-        private void ArchiveCurrentLogfile()
+        private Task ArchiveCurrentLogfileAsync()
+        {
+            return Task.Run(() =>
+            {
+                var logFileInfo = new FileInfo(config.logFilePath);
+                logFileInfo.Directory?.Create();
+                var archiveInfo = new FileInfo(config.archiveFilePath);
+                archiveInfo.Directory?.Create();
+
+                logFileInfo.Refresh();
+                if (!logFileInfo.Exists) return;
+
+                if (config.compressedArchive)
+                {
+                    using (var fileStream = new FileStream(archiveInfo.FullName, FileMode.OpenOrCreate))
+                    {
+                        using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                        {
+                            archive.CreateEntryFromFile(logFileInfo.FullName, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
+                        }
+
+                        using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                        {
+                            List<ZipArchiveEntry> entries = new List<ZipArchiveEntry>(archive.Entries);
+                            entries.Sort(nameComparer);
+                            long overallLength = 0;
+                            foreach (var entry in entries)
+                            {
+                                if (overallLength > (long)config.logFilesArchiveLimitInMB * 1024 * 1024)
+                                {
+                                    entry.Delete();
+                                }
+                                else overallLength += entry.CompressedLength;
+                            }
+                        }
+                    }
+                    logFileInfo.Delete();
+                }
+                else
+                {
+                    string postfix = "_" + logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss");
+                    string archiveFilePath = config.logFilePath;
+                    if (archiveFilePath.Contains('.')) archiveFilePath = archiveFilePath.InsertBefore(".", postfix);                
+                    else archiveFilePath += postfix;
+
+                    logFileInfo.MoveTo(archiveFilePath);
+
+                    CleanupUncompressedArchiveFiles();
+                }
+            });
+        }
+
+        private void CleanupUncompressedArchiveFiles()
         {
             var logFileInfo = new FileInfo(config.logFilePath);
-            logFileInfo.Directory.Create();
-            var archiveInfo = new FileInfo(config.archiveFilePath);
-            archiveInfo.Directory.Create();
+            var directory = logFileInfo.Directory;
+            if (directory == null || !directory.Exists) return;
 
-            logFileInfo.Refresh();
-            if (!logFileInfo.Exists) return;
+            string fileName = logFileInfo.Name;
+            string extension = Path.GetExtension(fileName);
+            string prefix = string.IsNullOrEmpty(extension) ? fileName : fileName.Substring(0, fileName.Length - extension.Length);
+            string searchPattern = prefix + "*" + extension;
 
-            using (var fileStream = new FileStream(archiveInfo.FullName, FileMode.OpenOrCreate))
+            List<FileInfo> archiveFiles = new List<FileInfo>();
+            foreach (var file in directory.GetFiles(searchPattern))
             {
-                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
-                {
-                    archive.CreateEntryFromFile(logFileInfo.FullName, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
-                }
-
-                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
-                {
-                    List<ZipArchiveEntry> entries = new List<ZipArchiveEntry>(archive.Entries);
-                    entries.Sort(nameComparer);
-                    long overallLength = 0;
-                    foreach (var entry in entries)
-                    {
-                        if (overallLength > config.logFilesArchiveLimitInMB * 1024 * 1024)
-                        {
-                            entry.Delete();
-                        }
-                        else overallLength += entry.CompressedLength;
-                    }
-                }
+                // Skip the active log file that may get recreated concurrently.
+                if (file.FullName.Equals(logFileInfo.FullName, StringComparison.OrdinalIgnoreCase)) continue;
+                archiveFiles.Add(file);
             }
-            logFileInfo.Delete();
+
+            // Newest first, so oldest files are the ones deleted when the limit is exceeded.
+            archiveFiles.Sort((f1, f2) => f2.LastWriteTimeUtc.CompareTo(f1.LastWriteTimeUtc));
+
+            long limit = (long)config.logFilesArchiveLimitInMB * 1024 * 1024;
+            long overallLength = 0;
+            foreach (var file in archiveFiles)
+            {
+                if (overallLength > limit) file.Delete();
+                else overallLength += file.Length;
+            }
         }
     }
 }
