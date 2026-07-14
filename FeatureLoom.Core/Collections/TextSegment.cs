@@ -121,7 +121,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// <param name="cache">
     /// The cache to use. If <c>null</c>, <see cref="StringInternCache.Shared"/> is used.
     /// </param>
-    /// <returns>The deduplicated string value (value-equal to <see cref="ToString"/>).</returns>
+    /// <returns>The deduplicated string value (value-equal to <see cref="TextSegment.ToString"/>).</returns>
     /// <remarks>
     /// On frameworks that support spans, a cache hit avoids allocating a new substring entirely.
     /// Only value equality is guaranteed, not stable reference identity (see

@@ -38,6 +38,7 @@ namespace FeatureLoom.Extensions
             /// <example>
             /// <code>string s = StringBuilder.BuildCachedString($"Hello {name}, you have {count} messages");</code>
             /// </example>
+            /// <param name="handler">The <see cref="PooledStringBuilderInterpolationHandler"/> that received the interpolated parts.</param>
             /// <param name="cache">Optional <see cref="StringInternCache"/> to use for deduplicating the resulting string. If null, the shared cache is used.</param>
             /// <returns>The (possibly cache-shared) resulting string.</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
