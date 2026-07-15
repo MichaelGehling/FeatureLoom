@@ -69,13 +69,14 @@ namespace FeatureLoom.Logging
             config = config ?? new Config();
             this.config = config;
             innerReceiver = new QueueReceiver<LogMessage>(config.maxQueueSize);
-            receiver = new ReceiverBuffer<LogMessage>(innerReceiver);            
+            receiver = new ReceiverBuffer<LogMessage>(innerReceiver);
+            Start();
             this.AttachDestructor(_ => this.Stop());
         }
 
         public void Stop() => cts.Cancel();
         public void Start()
-        {
+        {            
             cts = new CancellationTokenSource();
             Task.Run(Run);
         }
