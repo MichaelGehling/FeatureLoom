@@ -34,6 +34,8 @@ namespace FeatureLoom.Storages
 
         [JsonIgnore]
         private string configUri;
+        [JsonIgnore]
+        public bool skipLogging = false;
 
         public static async Task DeleteAllConfigAsync()
         {
@@ -53,7 +55,7 @@ namespace FeatureLoom.Storages
         }
 
         [JsonIgnore]
-        public bool IsUriDefault => configUri == default;
+        public bool IsUriDefault => configUri == default;        
 
         [JsonIgnore]
         public virtual string ConfigCategory => defaultCategory;
@@ -93,7 +95,7 @@ namespace FeatureLoom.Storages
 
             if (!Reader.TrySubscribeForChangeUpdate<string>(Uri, subscriptionReceiver.Obj))
             {
-                OptLog.ERROR()?.Build("Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
+                if (!skipLogging) OptLog.ERROR()?.Build("Starting subscription for config object failed.", $"category={ConfigCategory} uri={Uri}");
             }
         }
 
@@ -112,7 +114,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception ex)
             {
-                OptLog.ERROR()?.Build($"Failed writing configuration {this.GetType().GetSimplifiedTypeName()} to storage", ex);
+                if (!skipLogging) OptLog.ERROR()?.Build($"Failed writing configuration {this.GetType().GetSimplifiedTypeName()} to storage", ex);
                 return Task.FromResult(false);
             }
         }
@@ -126,7 +128,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception ex)
             {
-                OptLog.ERROR()?.Build($"Failed writing configuration {this.GetType().GetSimplifiedTypeName()} to storage", ex);
+                if (!skipLogging) OptLog.ERROR()?.Build($"Failed writing configuration {this.GetType().GetSimplifiedTypeName()} to storage", ex);
                 return false;
             }
         }
@@ -165,12 +167,12 @@ namespace FeatureLoom.Storages
                 
                 }
 
-                if (success) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");            
+                if (success && !skipLogging) OptLog.INFO()?.Build($"Configuration loaded for {Uri}!");            
                 return success;
             }
             catch (Exception ex)
             {
-                OptLog.ERROR()?.Build($"Failed updating configuration {this.GetType().GetSimplifiedTypeName()}", ex);
+                if (!skipLogging) OptLog.ERROR()?.Build($"Failed updating configuration {this.GetType().GetSimplifiedTypeName()}", ex);
                 return false;
             }
         }
@@ -211,7 +213,7 @@ namespace FeatureLoom.Storages
             }
             catch (Exception ex)
             {
-                OptLog.ERROR()?.Build($"Failed updating configuration {this.GetType().GetSimplifiedTypeName()}", ex);
+                if (!skipLogging) OptLog.ERROR()?.Build($"Failed updating configuration {this.GetType().GetSimplifiedTypeName()}", ex);
                 return false;
             }
         }

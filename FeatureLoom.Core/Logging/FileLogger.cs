@@ -10,6 +10,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System;
+using System.Threading;
+using FeatureLoom.Helpers;
 
 namespace FeatureLoom.Logging
 {
@@ -29,7 +31,7 @@ namespace FeatureLoom.Logging
             public Loglevel skipDelayLogLevel = Loglevel.ERROR;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
-            public int maxQueueSize = 10000;            
+            public int maxQueueSize = 10000;
         }
 
         public Config config;
@@ -38,6 +40,7 @@ namespace FeatureLoom.Logging
         private ReceiverBuffer<LogMessage> receiver = null;
         private StringBuilder stringBuilder = new StringBuilder();
         private AsyncManualResetEvent delayBypass = new AsyncManualResetEvent(false);
+        private CancellationTokenSource cts = new CancellationTokenSource();
 
         public void Post<M>(in M message)
         {
@@ -66,15 +69,23 @@ namespace FeatureLoom.Logging
             config = config ?? new Config();
             this.config = config;
             innerReceiver = new QueueReceiver<LogMessage>(config.maxQueueSize);
-            receiver = new ReceiverBuffer<LogMessage>(innerReceiver);
+            receiver = new ReceiverBuffer<LogMessage>(innerReceiver);            
+            this.AttachDestructor(_ => this.Stop());
+        }
+
+        public void Stop() => cts.Cancel();
+        public void Start()
+        {
+            cts = new CancellationTokenSource();
             Task.Run(Run);
         }
 
         async Task Run()
-        {
-            await Task.Yield();
-            this.config.TryUpdateFromStorage(false);
+        {            
+            await AppTime.WaitAsync(200.Milliseconds()).ConfiguredAwait(); // wait a bit to let the system start up and avoid file access issues
+            if (cts.IsCancellationRequested) return;
 
+            this.config.TryUpdateFromStorage(false);
             var logHandle = this.GetType().Name + this.GetHandle().ToString();
 
             try
@@ -86,10 +97,11 @@ namespace FeatureLoom.Logging
             {
                 OptLog.ERROR(logHandle)?.Build($"Initializing file logger failed.", e);
             }
-            while(true)
+            while(!cts.IsCancellationRequested)
             {
                 await UpdateConfigAsync().ConfiguredAwait();
-                await receiver.WaitHandle.WaitAsync().ConfiguredAwait();
+                await receiver.WaitHandle.WaitAsync(cts.Token).ConfiguredAwait();
+                if (cts.IsCancellationRequested) break;
                 try
                 {
                     await WriteToLogFileAsync().ConfiguredAwait();

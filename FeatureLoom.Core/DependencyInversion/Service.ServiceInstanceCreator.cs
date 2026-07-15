@@ -45,7 +45,7 @@ namespace FeatureLoom.DependencyInversion
                 S service = creatorAction(name) as S;                
                 if (service is IDisposable disposableService)
                 {
-                    disposableService.AttachDetructor(s => s.Dispose());                    
+                    disposableService.AttachDestructor(s => s.Dispose());                    
                 }                
                 return service;
             }

@@ -112,7 +112,7 @@ namespace FeatureLoom.DependencyInversion
         /// </remarks>
         public static void Set(T serviceInstance)
         {
-            if (serviceInstance is IDisposable disposableService) disposableService.AttachDetructor(_ => disposableService.Dispose());
+            if (serviceInstance is IDisposable disposableService) disposableService.AttachDestructor(_ => disposableService.Dispose());
             if (unnamedInstanceContainer != null)
             {
                 unnamedInstanceContainer.Instance = serviceInstance;
@@ -150,7 +150,7 @@ namespace FeatureLoom.DependencyInversion
         /// </remarks>
         public static void Set(string serviceInstanceName, T serviceInstance)
         {
-            if (serviceInstance is IDisposable disposableService) disposableService.AttachDetructor(_ => disposableService.Dispose());
+            if (serviceInstance is IDisposable disposableService) disposableService.AttachDestructor(_ => disposableService.Dispose());
 
             if (serviceInstanceName.EmptyOrNull())
             {
@@ -240,7 +240,7 @@ namespace FeatureLoom.DependencyInversion
         /// </remarks>
         public static void CreateLocalServiceInstance(string serviceInstanceName, T localServiceInstance = null)
         {
-            if (localServiceInstance is IDisposable disposableService) disposableService.AttachDetructor(_ => disposableService.Dispose());
+            if (localServiceInstance is IDisposable disposableService) disposableService.AttachDestructor(_ => disposableService.Dispose());
 
             if (serviceInstanceName == "")
             {
