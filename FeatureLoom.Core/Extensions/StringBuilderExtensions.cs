@@ -8,6 +8,29 @@ namespace FeatureLoom.Extensions
 {
     public static class StringBuilderExtensions
     {
+
+#if NET5_0_OR_GREATER
+        public static bool TryAsSpan(this StringBuilder sb, out ReadOnlySpan<char> span)
+        {
+            span = new ReadOnlySpan<char>();
+            foreach (ReadOnlyMemory<char> chunk in sb.GetChunks())
+            {
+                if (span.IsEmpty)
+                {
+                    // First chunk, that is good, we can use it if no other chunks follow
+                    span = chunk.Span; 
+                }
+                else
+                {
+                    // second chunk is bad and we return false, because we cannot return a span that is not contiguous
+                    span = default;
+                    return false;
+                }
+            }
+            return true;
+        }
+#endif
+
         /// <summary>
         /// Appends an interpolated string directly to the <see cref="StringBuilder"/> buffer without
         /// creating an intermediate string. Each literal part and interpolated value is appended

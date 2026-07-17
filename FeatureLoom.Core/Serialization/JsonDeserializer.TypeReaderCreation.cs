@@ -1565,7 +1565,8 @@ public sealed partial class JsonDeserializer
             bool setItemRef = elementTypeReader.ResolveRefs;
             var reader = () =>
             {
-                byte b = SkipWhiteSpaces();
+                if (TryReadNullValue()) return default;
+                byte b = buffer.CurrentByte;
                 if (b != '[') throw new Exception("Failed reading Array");
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading Array");
                 List<E> elementBuffer = pool.Take();
