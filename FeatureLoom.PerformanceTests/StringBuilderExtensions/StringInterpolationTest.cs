@@ -60,13 +60,13 @@ public class StringInterpolationTest
         for (int i = 0; i < workload.Length; i++)
         {
             int bucket = i % 10;
-            if (bucket < 2)
+            if (bucket < 3)
             {
                 workload[i] = commonValues[i % commonValues.Length];
             }
-            else if (bucket < 5)
+            else if (bucket < 7)
             {
-                workload[i] = $"customer-{i % 4_096:D4}@tenant-{i % 64:D2}.example.com";
+                workload[i] = $"customer-{i % 512:D4}@tenant-{i % 32:D2}.example.com";
             }
             else
             {
