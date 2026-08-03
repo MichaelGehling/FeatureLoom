@@ -1749,12 +1749,25 @@ public sealed partial class JsonSerializer
                 }
 
                 int firstFractionalDigitIndex = mainBufferCount;
+                bool tailIsAllZeros = false;
                 for (int i = 0; i <= numFractionalDigits; i++)
                 {
                     fractionalPart *= 10;
                     byte digit = (byte)fractionalPart;
                     fractionalPart -= digit;
                     WriteToBufferWithoutCheck((byte)('0' + digit));
+
+                    // If the remainder is too small to yield a non-zero digit within the
+                    // remaining budget, all remaining digits would be '0' and would be
+                    // trimmed away again. Skipping them saves the bulk of the work for
+                    // typical short decimal values. The 0.5 margin keeps the test robust
+                    // against the rounding error of the scaling multiplication.
+                    int remainingDigits = numFractionalDigits - i;
+                    if (remainingDigits > 0 && fractionalPart * POW10[remainingDigits] < 0.5)
+                    {
+                        tailIsAllZeros = true;
+                        break;
+                    }
                 }
 
                 int correctionIndex = mainBufferCount - 1;
@@ -1764,8 +1777,10 @@ public sealed partial class JsonSerializer
                 }
                 int oldMainBufferCount = mainBufferCount;
                 mainBufferCount = correctionIndex + 1;
-                if (oldMainBufferCount != mainBufferCount)
+                if (oldMainBufferCount != mainBufferCount || tailIsAllZeros)
                 {
+                    // Trailing zeros were dropped (either written or skipped), so the digit
+                    // budget was not fully consumed and the value round-trips as written.
                     return;
                 }
 
@@ -1788,6 +1803,12 @@ public sealed partial class JsonSerializer
             }
 
         }
+
+        private static readonly double[] POW10 = new double[]
+        {
+            1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
+            1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18
+        };
 
         double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed, int MAX_SIGNIFICANT_DIGITS)
         {
