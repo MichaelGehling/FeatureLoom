@@ -16,7 +16,8 @@ public class ComplexObject
     public int? myNullableInt = null;
     public float myFloat = 123.456f;
     public EmbeddedStruct myEmbeddedStruct = new EmbeddedStruct("Another string", 99);
-    public IList<int> myBytesList = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };    
+    public IList<int> myIntList = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };    
+    public byte[] myByteArray = new byte[] { 123, 0, 255, 42, 99, 100, 101, 102, 103, 104 };
     public MyEnum myEnum = MyEnum.Val5;
     public SimpleObject embeddedSimple1 = new SimpleObject() { id = 1, name = "one", value = 1.11 };
     public SimpleObject embeddedSimple2 = new SimpleObject() { id = 2, name = "two", value = 2.22 };
