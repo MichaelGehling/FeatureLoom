@@ -526,7 +526,7 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteByteValue(byte value)
         {
-            WriteUnsignedInteger(value);
+            WriteByte(value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -835,37 +835,61 @@ public sealed partial class JsonSerializer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteByteSegmentValueAsBase64(ByteSegment value)
+        public void WriteBytesAsBase64(ByteSegment value)
         {
             if (value.IsValid) WriteBase64(value);
             else WriteNullValue();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteByteArrayValueAsBase64(byte[] value)
+        public void WriteBytesAsArray(ByteSegment value)
         {
-            if (value != null) WriteBase64(value);
+            if (value.IsValid) WriteByteArray(value);
             else WriteNullValue();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteByteArraySegmentValueAsBase64(ArraySegment<byte> value)
+        private void WriteByteArray(ByteSegment value)
         {
-            if (value != null) WriteBase64(value);
-            else WriteNullValue();
-        }
+            int numInputBytes = value.Count;
+            int bytesToReserve = 2 + (numInputBytes) * 3;
+            EnsureFreeBufferSpace(bytesToReserve);
+#if !NETSTANDARD2_0
+            var bytes = value.AsSpan();
+#else
+            var bytes = value;
+#endif            
+            if (numInputBytes == 0)
+            {
+                WriteToBufferWithoutCheck((byte)'[');
+                WriteToBufferWithoutCheck((byte)']');
+                return;
+            }
 
+            WriteToBufferWithoutCheck((byte)'[');
+            WriteByte(bytes[0]);
+            for (int i = 1; i < bytes.Length; i++)
+            {
+                WriteToBufferWithoutCheck((byte)',');
+                WriteByte(bytes[i]);
+            }
+            WriteToBufferWithoutCheck((byte)']');
+        }
 
         private static readonly byte[] Base64Chars = System.Text.Encoding.ASCII.GetBytes("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
-        private void WriteBase64(ByteSegment bytes)
+        private void WriteBase64(ByteSegment value)
         {
-            int numInputBytes = bytes.Count;            
+            int numInputBytes = value.Count;            
             int fullBlocks = numInputBytes / 3;                        
             int bytesToReserve = 2 + (fullBlocks+1) * 4;
             EnsureFreeBufferSpace(bytesToReserve);
 
-            WriteToBufferWithoutCheck((byte)'"');
+#if !NETSTANDARD2_0
+            var bytes = value.AsSpan();
+#else
+            var bytes = value;
+#endif
 
+            WriteToBufferWithoutCheck((byte)'"');
             int inputIndex = 0;            
             for (int i = 0; i < fullBlocks; i++)
             {
@@ -1010,6 +1034,7 @@ public sealed partial class JsonSerializer
 
         private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
         private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
+        private static readonly byte[][] BytesLookup = InitBytesLookup(true);
         private static readonly byte[] Int32MinValueBytes = int.MinValue.ToString().ToByteArray();
         private static readonly byte[] Int64MinValueBytes = long.MinValue.ToString().ToByteArray();
 
@@ -1023,6 +1048,16 @@ public sealed partial class JsonSerializer
                 lookup[i] = Encoding.ASCII.GetBytes((i * factor).ToString());
             }
 
+            return lookup;
+        }
+
+        private static byte[][] InitBytesLookup(bool negative)
+        {
+            byte[][] lookup = new byte[256][];
+            for (int i = 0; i < 256; i++)
+            {
+                lookup[i] = Encoding.ASCII.GetBytes(i.ToString());
+            }
             return lookup;
         }
 
@@ -1273,6 +1308,11 @@ public sealed partial class JsonSerializer
             WriteToBuffer(tempBuffer, index + 1, maxDigits - index);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteByte(byte inputValue)
+        {
+            WriteToBuffer(BytesLookup[inputValue]);
+        }
 
         private void WriteSignedInteger(int inputValue)
         {

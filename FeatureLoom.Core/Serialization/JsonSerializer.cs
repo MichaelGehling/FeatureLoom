@@ -320,11 +320,10 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(JsonFragment)) CreateJsonFragmentItemWriter(typeHandler, isNullableValueType);
             else if (itemType == typeof(TextSegment)) CreateTextSegmentItemWriter(typeHandler, isNullableValueType);
             else if (itemType == typeof(Uri)) CreateUriItemWriter(typeHandler);
-            else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(itemType, nameof(CreateEnumItemHandler), typeHandler, isNullableValueType);            
-
-            else if (settings.writeByteArrayAsBase64String && itemType == typeof(ByteSegment)) typeHandler.SetItemHandler_Primitive<ByteSegment>(writer.WriteByteSegmentValueAsBase64);
-            else if (settings.writeByteArrayAsBase64String && itemType == typeof(byte[])) typeHandler.SetItemHandler_Primitive<byte[]>(writer.WriteByteArrayValueAsBase64);
-            else if (settings.writeByteArrayAsBase64String && itemType == typeof(ArraySegment<byte>)) typeHandler.SetItemHandler_Primitive<ArraySegment<byte>>(writer.WriteByteArraySegmentValueAsBase64);
+            else if (itemType.IsEnum) CreateAndSetItemHandlerViaReflection(itemType, nameof(CreateEnumItemHandler), typeHandler, isNullableValueType);
+            else if (itemType == typeof(ByteSegment)) CreateByteSegmentWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(byte[])) CreateByteArrayWriter(typeHandler);
+            else if (itemType == typeof(ArraySegment<byte>)) CreateByteArraySegmentWriter(typeHandler, isNullableValueType);
 
             else if (TryCreateDictionaryItemHandler(typeHandler, itemType)) {/* do nothing */}
             else if (TryCreateListItemHandler(typeHandler, itemType)) {/* do nothing */}

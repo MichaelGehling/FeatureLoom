@@ -24,6 +24,7 @@ namespace FeatureLoom.Serialization
             public int maxIndentationDepth = 50;
             public int indentationFactor = 2;
             public bool writeByteArrayAsBase64String = true;
+            public bool writeArraySegmentsAsArrays = true;
             public List<ITypeHandlerCreator> customTypeHandlerCreators = new List<ITypeHandlerCreator>();
 
             public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, bool onlyExactType = true)
@@ -83,6 +84,7 @@ namespace FeatureLoom.Serialization
             public readonly bool requiresItemNames;
             public readonly bool requiresItemInfos;
             public readonly bool writeByteArrayAsBase64String = false;
+            public readonly bool writeArraySegmentsAsArrays = false;
 
             public CompiledSettings(Settings settings)
             {
@@ -101,6 +103,7 @@ namespace FeatureLoom.Serialization
                 requiresItemNames = referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef;
                 requiresItemInfos = referenceCheck != ReferenceCheck.NoRefCheck;
                 writeByteArrayAsBase64String = settings.writeByteArrayAsBase64String;
+                writeArraySegmentsAsArrays = settings.writeArraySegmentsAsArrays;
             }
 
         }
