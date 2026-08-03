@@ -240,6 +240,31 @@ public sealed partial class JsonSerializer
             mainBuffer[mainBufferCount++] = data;
         }
 
+        /// <summary>
+        /// Writes a short, pre-encoded byte sequence (e.g. a field name incl. quotes, colon and
+        /// optional leading comma). For such small blobs a simple copy loop is cheaper than the
+        /// call overhead of Array.Copy, which dominates the per-field cost when serializing objects.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WritePreparedBytes(byte[] data)
+        {
+            int count = data.Length;
+            if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
+            byte[] buffer = mainBuffer;
+            int pos = mainBufferCount;
+            if (count <= 16)
+            {
+                for (int i = 0; i < count; i++) buffer[pos + i] = data[i];
+            }
+            else
+            {
+                Array.Copy(data, 0, buffer, pos, count);
+            }
+            mainBufferCount = pos + count;
+        }
+
+        public static readonly MethodInfo WritePreparedBytesMethod = typeof(JsonUTF8StreamWriter).GetMethod(nameof(WritePreparedBytes), BindingFlags.Public | BindingFlags.Instance);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
         {
@@ -318,6 +343,20 @@ public sealed partial class JsonSerializer
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Like <see cref="TryPreparePrimitiveWriteDelegate{T}"/>, but returns the MethodInfo instead of a
+        /// bound delegate, so callers can emit a direct call into a compiled expression tree.
+        /// </summary>
+        public bool TryGetPrimitiveWriteMethod<T>(out MethodInfo methodInfo)
+        {
+            Type type = typeof(T);
+            methodInfo = null;
+            if (settings.itemHandlerCreators.Any(creator => creator.SupportsType(type))) return false;
+            if (!typeMap.TryGetValue(type, out string methodName)) return false;
+            methodInfo = GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+            return methodInfo != null;
         }
 
         static readonly byte[] NULL = "null".ToByteArray();

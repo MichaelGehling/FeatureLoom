@@ -325,10 +325,33 @@ namespace FeatureLoom.Serialization
             }
 
 
-            public void SetItemHandler_Object<T>(Action<T>[] fieldHandlers, bool noRefChildren)
+            public void SetItemHandler_Object<T>(Action<T>[] fieldHandlers, bool noRefChildren, bool commasIncluded)
             {
                 this.handlerType = typeof(T);
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
+
+                var w = writer;
+                int fieldCount = fieldHandlers.Length;
+                // When commasIncluded is set, the separating comma is already part of the prepared
+                // field name bytes of each field handler, so no extra write is needed per field.
+                void WriteFields(T item)
+                {
+                    if (fieldCount == 0) return;
+                    fieldHandlers[0].Invoke(item);
+                    if (commasIncluded)
+                    {
+                        for (int i = 1; i < fieldCount; i++) fieldHandlers[i].Invoke(item);
+                    }
+                    else
+                    {
+                        for (int i = 1; i < fieldCount; i++)
+                        {
+                            w.WriteComma();
+                            fieldHandlers[i].Invoke(item);
+                        }
+                    }
+                }
+
                 Action<T, bool, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
@@ -341,14 +364,9 @@ namespace FeatureLoom.Serialization
                                 serializer.CreateItemInfoForClass(item, itemName);
                                 if (!serializer.TryHandleItemAsRef(item))
                                 {
-                                    writer.OpenObject();
-                                    if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                                    for (int i = 1; i< fieldHandlers.Length; i++)
-                                    {
-                                        writer.WriteComma();
-                                        fieldHandlers[i].Invoke(item);
-                                    }
-                                    writer.CloseObject();
+                                    w.OpenObject();
+                                    WriteFields(item);
+                                    w.CloseObject();
                                 }
                                 serializer.UseParentItemInfo();
                             };
@@ -360,20 +378,14 @@ namespace FeatureLoom.Serialization
                                 serializer.CreateItemInfoForClass(item, itemName);
                                 if (!serializer.TryHandleItemAsRef(item))
                                 {
-                                    Type itemType = item.GetType();
-                                    writer.OpenObject();
+                                    w.OpenObject();
                                     if (serializer.TypeInfoRequired(deviatingType))
                                     {
-                                        writer.WriteToBuffer(preparedTypeInfo);
-                                        if (fieldHandlers.Length >= 1) writer.WriteComma();
+                                        w.WriteToBuffer(preparedTypeInfo);
+                                        if (fieldCount >= 1) w.WriteComma();
                                     }
-                                    if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                                    for (int i = 1; i < fieldHandlers.Length; i++)
-                                    {
-                                        writer.WriteComma();
-                                        fieldHandlers[i].Invoke(item);
-                                    }
-                                    writer.CloseObject();
+                                    WriteFields(item);
+                                    w.CloseObject();
                                 }
                                 serializer.UseParentItemInfo();
                             };
@@ -386,14 +398,9 @@ namespace FeatureLoom.Serialization
                             temp = (item, _, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
-                                writer.OpenObject();
-                                if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                                for (int i = 1; i < fieldHandlers.Length; i++)
-                                {
-                                    writer.WriteComma();
-                                    fieldHandlers[i].Invoke(item);
-                                }
-                                writer.CloseObject();
+                                w.OpenObject();
+                                WriteFields(item);
+                                w.CloseObject();
                                 serializer.UseParentItemInfo();
                             };
                         }
@@ -402,20 +409,14 @@ namespace FeatureLoom.Serialization
                             temp = (item, deviatingType, itemName) =>
                             {
                                 serializer.CreateItemInfoForStruct(itemName);
-                                Type itemType = item.GetType();
-                                writer.OpenObject();
+                                w.OpenObject();
                                 if (serializer.TypeInfoRequired(deviatingType))
                                 {
-                                    writer.WriteToBuffer(preparedTypeInfo);
-                                    if (fieldHandlers.Length >= 1) writer.WriteComma();
+                                    w.WriteToBuffer(preparedTypeInfo);
+                                    if (fieldCount >= 1) w.WriteComma();
                                 }
-                                if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                                for (int i = 1; i < fieldHandlers.Length; i++)
-                                {
-                                    writer.WriteComma();
-                                    fieldHandlers[i].Invoke(item);
-                                }
-                                writer.CloseObject();
+                                WriteFields(item);
+                                w.CloseObject();
                                 serializer.UseParentItemInfo();
                             };
                         }
@@ -427,34 +428,34 @@ namespace FeatureLoom.Serialization
                     {
                         temp = (item, _, itemName) =>
                         {
-                            writer.OpenObject();
-                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                            for (int i = 1; i < fieldHandlers.Length; i++)
+                            w.OpenObject();
+                            WriteFields(item);
+                            w.CloseObject();
+                        };
+                    }
+                    else if (serializer.settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+                    {
+                        temp = (item, deviatingType, itemName) =>
+                        {
+                            w.OpenObject();
+                            if (deviatingType)
                             {
-                                writer.WriteComma();
-                                fieldHandlers[i].Invoke(item);
+                                w.WriteToBuffer(preparedTypeInfo);
+                                if (fieldCount >= 1) w.WriteComma();
                             }
-                            writer.CloseObject();
+                            WriteFields(item);
+                            w.CloseObject();
                         };
                     }
                     else
                     {
                         temp = (item, deviatingType, itemName) =>
                         {
-                            Type itemType = item.GetType();
-                            writer.OpenObject();
-                            if (serializer.TypeInfoRequired(deviatingType))
-                            {
-                                writer.WriteToBuffer(preparedTypeInfo);
-                                if (fieldHandlers.Length >= 1) writer.WriteComma();
-                            }
-                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                            for (int i = 1; i < fieldHandlers.Length; i++)
-                            {
-                                writer.WriteComma();
-                                fieldHandlers[i].Invoke(item);
-                            }
-                            writer.CloseObject();
+                            w.OpenObject();
+                            w.WriteToBuffer(preparedTypeInfo);
+                            if (fieldCount >= 1) w.WriteComma();
+                            WriteFields(item);
+                            w.CloseObject();
                         };
                     }
                 }
@@ -462,10 +463,31 @@ namespace FeatureLoom.Serialization
                 this.itemWriter = temp;
                 this.objectItemWriter = (item, _, fieldName) => temp.Invoke((T)item, _, fieldName);
             }
-            public void SetItemHandler_Object_ForNullableStruct<T>(Action<T>[] fieldHandlers, bool noRefChildren) where T : struct
+            public void SetItemHandler_Object_ForNullableStruct<T>(Action<T>[] fieldHandlers, bool noRefChildren, bool commasIncluded) where T : struct
             {
                 this.handlerType = typeof(Nullable<T>);
                 this.noRefTypes = noRefChildren && this.handlerType.IsValueType;
+
+                var w = writer;
+                int fieldCount = fieldHandlers.Length;
+                void WriteFields(T item)
+                {
+                    if (fieldCount == 0) return;
+                    fieldHandlers[0].Invoke(item);
+                    if (commasIncluded)
+                    {
+                        for (int i = 1; i < fieldCount; i++) fieldHandlers[i].Invoke(item);
+                    }
+                    else
+                    {
+                        for (int i = 1; i < fieldCount; i++)
+                        {
+                            w.WriteComma();
+                            fieldHandlers[i].Invoke(item);
+                        }
+                    }
+                }
+
                 Action<Nullable<T>, bool, ByteSegment> temp;
                 if (serializer.settings.requiresItemInfos)
                 {
@@ -475,14 +497,9 @@ namespace FeatureLoom.Serialization
                         {
                             T item = nullableItem.Value;
                             serializer.CreateItemInfoForStruct(itemName);
-                            writer.OpenObject();
-                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                            for (int i = 1; i < fieldHandlers.Length; i++)
-                            {
-                                writer.WriteComma();
-                                fieldHandlers[i].Invoke(item);
-                            }
-                            writer.CloseObject();
+                            w.OpenObject();
+                            WriteFields(item);
+                            w.CloseObject();
                             serializer.UseParentItemInfo();
                         };
                     }
@@ -492,24 +509,18 @@ namespace FeatureLoom.Serialization
                         {
                             T item = nullableItem.Value;
                             serializer.CreateItemInfoForStruct(itemName);
-                            Type itemType = item.GetType();
-                            writer.OpenObject();
+                            w.OpenObject();
                             if (serializer.TypeInfoRequired(deviatingType))
                             {
-                                writer.WriteToBuffer(preparedTypeInfo);
-                                if (fieldHandlers.Length >= 1) writer.WriteComma();
+                                w.WriteToBuffer(preparedTypeInfo);
+                                if (fieldCount >= 1) w.WriteComma();
                             }
-                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                            for (int i = 1; i < fieldHandlers.Length; i++)
-                            {
-                                writer.WriteComma();
-                                fieldHandlers[i].Invoke(item);
-                            }
-                            writer.CloseObject();
+                            WriteFields(item);
+                            w.CloseObject();
                             serializer.UseParentItemInfo();
                         };
                     }
-                    
+
                 }
                 else
                 {
@@ -518,14 +529,9 @@ namespace FeatureLoom.Serialization
                         temp = (nullableItem, _, _) =>
                         {
                             T item = nullableItem.Value;
-                            writer.OpenObject();
-                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                            for (int i = 1; i < fieldHandlers.Length; i++)
-                            {
-                                writer.WriteComma();
-                                fieldHandlers[i].Invoke(item);
-                            }
-                            writer.CloseObject();
+                            w.OpenObject();
+                            WriteFields(item);
+                            w.CloseObject();
                         };
                     }
                     else
@@ -533,20 +539,11 @@ namespace FeatureLoom.Serialization
                         temp = (nullableItem, deviatingType, _) =>
                         {
                             T item = nullableItem.Value;
-                            Type itemType = item.GetType();
-                            writer.OpenObject();
-                            if (serializer.TypeInfoRequired(deviatingType))
-                            {
-                                writer.WriteToBuffer(preparedTypeInfo);
-                                if (fieldHandlers.Length >= 1) writer.WriteComma();
-                            }
-                            if (fieldHandlers.Length >= 1) fieldHandlers[0].Invoke(item);
-                            for (int i = 1; i < fieldHandlers.Length; i++)
-                            {
-                                writer.WriteComma();
-                                fieldHandlers[i].Invoke(item);
-                            }
-                            writer.CloseObject();
+                            w.OpenObject();
+                            w.WriteToBuffer(preparedTypeInfo);
+                            if (fieldCount >= 1) w.WriteComma();
+                            WriteFields(item);
+                            w.CloseObject();
                         };
                     }
                 }
