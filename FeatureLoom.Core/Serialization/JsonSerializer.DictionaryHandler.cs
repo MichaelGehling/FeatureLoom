@@ -66,7 +66,7 @@ namespace FeatureLoom.Serialization
                         valueHandler.WriteItem(pair.Value, default);
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
+                typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);
             }
             else
             {
@@ -108,7 +108,7 @@ namespace FeatureLoom.Serialization
                         }
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
+                typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);
             }
         }
 
@@ -143,7 +143,7 @@ namespace FeatureLoom.Serialization
                         valueHandler.WriteItem(pair.Value, default);
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
+                typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);
             }
             else
             {
@@ -185,7 +185,7 @@ namespace FeatureLoom.Serialization
                         }
                     }
                 };
-                typeHandler.SetItemHandler_Object(itemHandler, valueHandler.NoRefTypes);
+                typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);
             }
         }
 

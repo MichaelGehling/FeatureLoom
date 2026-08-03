@@ -139,6 +139,61 @@ namespace FeatureLoom.Serialization
             currentItemInfo = itemInfoRecycler.TakeItemInfo(currentItemInfo, null, itemName);
         }
 
+        /// <summary>
+        /// Builds the object wrapper (item info handling, reference check, type info) around a
+        /// custom item handler. Used by the public extension API, where the item handler is a
+        /// delegate and its indirection cannot be avoided. Internal call sites build the
+        /// equivalent wrapper around a local function instead, saving one delegate invocation.
+        /// </summary>
+        internal Action<T, bool, ByteSegment> CreateObjectItemWriter<T>(CachedTypeWriter typeHandler, ItemHandler<T> itemHandler)
+        {
+            if (settings.requiresItemInfos)
+            {
+                return (item, deviatingType, itemName) =>
+                {
+                    // TryHandleItemAsRef already returns false for value types, so no separate
+                    // struct variant is needed; only the item info creation differs.
+                    if (typeof(T).IsValueType) CreateItemInfoForStruct(itemName);
+                    else CreateItemInfoForClass(item, itemName);
+                    if (!TryHandleItemAsRef(item))
+                    {
+                        writer.OpenObject();
+                        WriteTypeInfoAndBody(item, deviatingType, typeHandler, itemHandler);
+                        writer.CloseObject();
+                    }
+                    UseParentItemInfo();
+                };
+            }
+            else
+            {
+                return (item, deviatingType, _) =>
+                {
+                    writer.OpenObject();
+                    WriteTypeInfoAndBody(item, deviatingType, typeHandler, itemHandler);
+                    writer.CloseObject();
+                };
+            }
+        }
+
+        /// <summary>
+        /// Writes the optional type info followed by the object body. If the body turns out to be
+        /// empty, the separating comma written after the type info is rolled back again.
+        /// </summary>
+        private void WriteTypeInfoAndBody<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, ItemHandler<T> itemHandler)
+        {
+            int countBeforeComma = -1;
+            int countAfterComma = -1;
+            if (TypeInfoRequired(deviatingType))
+            {
+                writer.WriteToBuffer(typeHandler.preparedTypeInfo);
+                countBeforeComma = writer.BufferCount;
+                writer.WriteComma();
+                countAfterComma = writer.BufferCount;
+            }
+            itemHandler.Invoke(item);
+            if (writer.BufferCount == countAfterComma) writer.BufferCount = countBeforeComma;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void UseParentItemInfo()
         {

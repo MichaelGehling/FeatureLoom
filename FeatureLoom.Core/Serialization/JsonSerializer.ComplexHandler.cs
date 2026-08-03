@@ -128,7 +128,30 @@ namespace FeatureLoom.Serialization
             }
 
             var fieldValueWritersArray = fieldValueWriters.ToArray();
-            typeHandler.SetItemHandler_Object(fieldValueWritersArray, allFieldsNoRefs, mergeCommas);
+            int fieldCount = fieldValueWritersArray.Length;
+            var w = writer;
+
+            // When mergeCommas is set, the separating comma is already part of the prepared field
+            // name bytes of each field handler, so no extra write is needed per field.
+            void WriteFields(T item)
+            {
+                if (fieldCount == 0) return;
+                fieldValueWritersArray[0].Invoke(item);
+                if (mergeCommas)
+                {
+                    for (int i = 1; i < fieldCount; i++) fieldValueWritersArray[i].Invoke(item);
+                }
+                else
+                {
+                    for (int i = 1; i < fieldCount; i++)
+                    {
+                        w.WriteComma();
+                        fieldValueWritersArray[i].Invoke(item);
+                    }
+                }
+            }
+
+            typeHandler.SetItemWriter(CreateObjectItemWriter<T>(typeHandler, WriteFields), !allFieldsNoRefs);
         }
 
         private void CreateTypedComplexItemHandler_ForNullableStruct<T>(CachedTypeWriter typeHandler, Type itemType) where T : struct
@@ -170,7 +193,29 @@ namespace FeatureLoom.Serialization
             }
 
             var fieldValueWritersArray = fieldValueWriters.ToArray();
-            typeHandler.SetItemHandler_Object_ForNullableStruct(fieldValueWritersArray, allFieldsNoRefs, mergeCommas);
+            int fieldCount = fieldValueWritersArray.Length;
+            var w = writer;
+
+            void WriteFields(T? nullableItem)
+            {
+                if (fieldCount == 0) return;
+                T item = nullableItem.Value;
+                fieldValueWritersArray[0].Invoke(item);
+                if (mergeCommas)
+                {
+                    for (int i = 1; i < fieldCount; i++) fieldValueWritersArray[i].Invoke(item);
+                }
+                else
+                {
+                    for (int i = 1; i < fieldCount; i++)
+                    {
+                        w.WriteComma();
+                        fieldValueWritersArray[i].Invoke(item);
+                    }
+                }
+            }
+
+            typeHandler.SetItemWriter(CreateObjectItemWriter<T?>(typeHandler, WriteFields), !allFieldsNoRefs);
         }
 
         private Type GetFieldOrPropertyType(MemberInfo fieldOrPropertyInfo)
