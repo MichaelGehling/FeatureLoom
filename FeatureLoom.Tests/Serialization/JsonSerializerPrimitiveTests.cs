@@ -270,6 +270,8 @@ namespace FeatureLoom.Serialization
         [InlineData(0.1d, "0.1")]
         [InlineData(0.01234d, "0.01234")]
         [InlineData(0.00001d, "0.00001")]
+        [InlineData(-0.00015890432405285535d, "-0.00015890432405285535")]
+        [InlineData(0.100001d, "0.100001")]
         public void Serialize_Double(double value, string expected)
         {
             AssertSerialized(value, expected);

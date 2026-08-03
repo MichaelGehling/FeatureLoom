@@ -114,6 +114,7 @@ namespace FeatureLoom.Serialization
 
             List<Action<T>> fieldValueWriters = new();
             bool allFieldsNoRefs = true;
+            bool mergeCommas = !settings.indent;
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
@@ -121,12 +122,13 @@ namespace FeatureLoom.Serialization
                 allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
-                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
+                bool withLeadingComma = mergeCommas && fieldValueWriters.Count > 0;
+                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo, withLeadingComma });
                 fieldValueWriters.Add(writer);
             }
 
             var fieldValueWritersArray = fieldValueWriters.ToArray();
-            typeHandler.SetItemHandler_Object(fieldValueWritersArray, allFieldsNoRefs);
+            typeHandler.SetItemHandler_Object(fieldValueWritersArray, allFieldsNoRefs, mergeCommas);
         }
 
         private void CreateTypedComplexItemHandler_ForNullableStruct<T>(CachedTypeWriter typeHandler, Type itemType) where T : struct
@@ -154,6 +156,7 @@ namespace FeatureLoom.Serialization
 
             List<Action<T>> fieldValueWriters = new();
             bool allFieldsNoRefs = true;
+            bool mergeCommas = !settings.indent;
             foreach (var memberInfo in memberInfos)
             {
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
@@ -161,12 +164,13 @@ namespace FeatureLoom.Serialization
                 allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
-                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo });
+                bool withLeadingComma = mergeCommas && fieldValueWriters.Count > 0;
+                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo, withLeadingComma });
                 fieldValueWriters.Add(writer);
             }
 
             var fieldValueWritersArray = fieldValueWriters.ToArray();
-            typeHandler.SetItemHandler_Object_ForNullableStruct(fieldValueWritersArray, allFieldsNoRefs);
+            typeHandler.SetItemHandler_Object_ForNullableStruct(fieldValueWritersArray, allFieldsNoRefs, mergeCommas);
         }
 
         private Type GetFieldOrPropertyType(MemberInfo fieldOrPropertyInfo)
@@ -176,7 +180,7 @@ namespace FeatureLoom.Serialization
             throw new Exception("Not a FieldType or PropertyType");
         }
 
-        private Action<T> CreateFieldValueWriter<T, V>(CachedTypeWriter fieldTypeHandler, MemberInfo memberInfo)
+        private Action<T> CreateFieldValueWriter<T, V>(CachedTypeWriter fieldTypeHandler, MemberInfo memberInfo, bool withLeadingComma)
         {
             string fieldName = memberInfo.Name;
             if (settings.dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields &&
@@ -186,42 +190,52 @@ namespace FeatureLoom.Serialization
                 fieldName = fieldName.Substring("<", ">");
             }
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
+            if (withLeadingComma)
+            {
+                // Merge the separating comma into the prepared bytes so that comma, field name and
+                // colon are emitted with a single buffer copy instead of an extra WriteComma call.
+                var withComma = new byte[fieldNameAndColonBytes.Length + 1];
+                withComma[0] = (byte)',';
+                Array.Copy(fieldNameAndColonBytes, 0, withComma, 1, fieldNameAndColonBytes.Length);
+                fieldNameAndColonBytes = withComma;
+            }
             var fieldNameBytes = new ByteSegment(JsonUTF8StreamWriter.PreparePrimitiveToBytes(fieldName), true);
 
-            
+
             Type itemType = typeof(T);
             var parameter = Expression.Parameter(itemType, "param");
 
             var fieldAccess = memberInfo is FieldInfo field ? Expression.Field(parameter, field) :
                               memberInfo is PropertyInfo property ? Expression.Property(parameter, property) : null;
-            var lambda = Expression.Lambda<Func<T, V>>(fieldAccess, parameter);
-            var getValue = lambda.Compile();
-            
+
             Type expectedValueType = typeof(V);
 
-            if (writer.TryPreparePrimitiveWriteDelegate<V>(out var primitiveWriteDelegate))
+            var writerConst = Expression.Constant(writer);
+            var writeFieldName = Expression.Call(writerConst, JsonUTF8StreamWriter.WritePreparedBytesMethod, Expression.Constant(fieldNameAndColonBytes));
+
+            // Where possible, the field name write and the value write are fused into a single
+            // compiled delegate. This removes the nested delegate invocations (getter delegate plus
+            // value writer delegate) from the hot path and lets the JIT inline the writer calls.
+            if (writer.TryGetPrimitiveWriteMethod<V>(out MethodInfo primitiveWriteMethod))
             {
-                return (parentItem) =>
-                {
-                    writer.WriteToBuffer(fieldNameAndColonBytes);
-                    V value = getValue(parentItem);
-                    primitiveWriteDelegate(value);
-                };
+                var body = Expression.Block(writeFieldName, Expression.Call(writerConst, primitiveWriteMethod, fieldAccess));
+                return Expression.Lambda<Action<T>>(body, parameter).Compile();
             }
             else if (!fieldTypeHandler.HandlerType?.IsNullable() ?? false)
             {
-                return (parentItem) =>
-                {
-                    writer.WriteToBuffer(fieldNameAndColonBytes);
-                    V value = getValue(parentItem);
-                    fieldTypeHandler.WriteItem(value, default);
-                };
+                MethodInfo writeItemMethod = typeof(CachedTypeWriter)
+                    .GetMethod(nameof(CachedTypeWriter.WriteItem), BindingFlags.Public | BindingFlags.Instance)
+                    .MakeGenericMethod(expectedValueType);
+                var body = Expression.Block(writeFieldName,
+                    Expression.Call(Expression.Constant(fieldTypeHandler), writeItemMethod, fieldAccess, Expression.Default(typeof(ByteSegment))));
+                return Expression.Lambda<Action<T>>(body, parameter).Compile();
             }
             else
             {
+                var getValue = Expression.Lambda<Func<T, V>>(fieldAccess, parameter).Compile();
                 return (parentItem) =>
                 {
-                    writer.WriteToBuffer(fieldNameAndColonBytes);
+                    writer.WritePreparedBytes(fieldNameAndColonBytes);
                     V value = getValue(parentItem);
                     if (value == null)
                     {
@@ -232,7 +246,7 @@ namespace FeatureLoom.Serialization
                         Type valueType = value.GetType();
                         CachedTypeWriter actualHandler = fieldTypeHandler;
                         if (valueType != expectedValueType) actualHandler = GetCachedTypeWriter(valueType);
-                        
+
                         actualHandler.WriteItem(value, fieldNameBytes);                        
                     }
                 };

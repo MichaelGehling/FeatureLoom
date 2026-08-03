@@ -3,6 +3,9 @@ using FeatureLoom.Extensions;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System;
+#if !NETSTANDARD2_0
+using System.Buffers.Text;
+#endif
 using System.Collections.Generic;
 using FeatureLoom.Helpers;
 using System.Reflection;
@@ -202,11 +205,47 @@ public sealed partial class JsonSerializer
             currentIndentionDepth = 0;
         }
 
+        /// <summary>
+        /// Copies a byte range into the target buffer. For short blobs a simple copy loop is
+        /// cheaper than the call overhead of Array.Copy, which dominates the per-field cost
+        /// when serializing objects with many small values (field names, quotes, digits).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void CopyBytes(byte[] source, int sourceOffset, byte[] target, int targetOffset, int count)
+        {
+            if (count <= 16)
+            {
+                for (int i = 0; i < count; i++) target[targetOffset + i] = source[sourceOffset + i];
+            }
+            else
+            {
+                Array.Copy(source, sourceOffset, target, targetOffset, count);
+            }
+        }
+
+        /// <summary>
+        /// Copies a complete array into the target buffer. Bounding the loop directly by the
+        /// source length (instead of a separate count) allows the JIT to elide the source
+        /// bounds check and avoids the per-element source offset arithmetic.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void CopyBytes(byte[] source, byte[] target, int targetOffset)
+        {
+            if (source.Length <= 16)
+            {
+                for (int i = 0; i < source.Length; i++) target[targetOffset + i] = source[i];
+            }
+            else
+            {
+                Array.Copy(source, 0, target, targetOffset, source.Length);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBuffer(byte[] data, int offset, int count)
         {
             if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
-            Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
+            CopyBytes(data, offset, mainBuffer, mainBufferCount, count);
             mainBufferCount += count;
         }
 
@@ -219,7 +258,9 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBuffer(byte[] data)
         {
-            WriteToBuffer(data, 0, data.Length);
+            if (mainBufferCount + data.Length > mainBufferLimit) WriteBufferToStream();
+            CopyBytes(data, mainBuffer, mainBufferCount);
+            mainBufferCount += data.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -237,10 +278,22 @@ public sealed partial class JsonSerializer
             mainBuffer[mainBufferCount++] = data;
         }
 
+        /// <summary>
+        /// Writes a short, pre-encoded byte sequence (e.g. a field name incl. quotes, colon and
+        /// optional leading comma).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WritePreparedBytes(byte[] data)
+        {
+            WriteToBuffer(data);
+        }
+
+        public static readonly MethodInfo WritePreparedBytesMethod = typeof(JsonUTF8StreamWriter).GetMethod(nameof(WritePreparedBytes), BindingFlags.Public | BindingFlags.Instance);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
         {
-            Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
+            CopyBytes(data, offset, mainBuffer, mainBufferCount, count);
             mainBufferCount += count;
         }
 
@@ -253,7 +306,8 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBufferWithoutCheck(byte[] data)
         {
-            WriteToBufferWithoutCheck(data, 0, data.Length);
+            CopyBytes(data, mainBuffer, mainBufferCount);
+            mainBufferCount += data.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -315,6 +369,20 @@ public sealed partial class JsonSerializer
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Like <see cref="TryPreparePrimitiveWriteDelegate{T}"/>, but returns the MethodInfo instead of a
+        /// bound delegate, so callers can emit a direct call into a compiled expression tree.
+        /// </summary>
+        public bool TryGetPrimitiveWriteMethod<T>(out MethodInfo methodInfo)
+        {
+            Type type = typeof(T);
+            methodInfo = null;
+            if (settings.itemHandlerCreators.Any(creator => creator.SupportsType(type))) return false;
+            if (!typeMap.TryGetValue(type, out string methodName)) return false;
+            methodInfo = GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+            return methodInfo != null;
         }
 
         static readonly byte[] NULL = "null".ToByteArray();
@@ -1546,7 +1614,7 @@ public sealed partial class JsonSerializer
         {
 
 #if NETSTANDARD2_0
-            return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent, out failed);
+            return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent, out failed, 16);
 #else
             const int MAX_SIGNIFICANT_DIGITS = 7;
             const int POS_EXPONENT_LIMIT = 7;
@@ -1598,35 +1666,98 @@ public sealed partial class JsonSerializer
             EnsureFreeBufferSpace(100);
 
             bool isNegative = value < 0;
-            if (isNegative) value = -value;                
+            if (isNegative) value = -value;
 
-            value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
-            if (failed)
+            double absValue = value;
+            bool bodyFailed = false;
+            bool usedFullPrecision = false;
+
+            int numberStart = mainBufferCount;
+
+            // Fast path: 16 significant digits never introduces spurious ("noise")
+            // digits, so its output is trusted directly. It can only be too short for
+            // the rare values that genuinely need 17 digits, which is exactly the case
+            // where the fractional part consumes its full digit budget (no trailing
+            // zeros to trim, flagged by usedFullPrecision). Only then do we verify the
+            // result and, if it does not round-trip, escalate to 17 digits.
+            WriteNumberBody(16);
+
+            if (bodyFailed)
             {
-                WriteString(inputValue.ToString(CultureInfo.InvariantCulture));
+                // Fast path could not produce a representation (e.g. extreme
+                // exponents); fall back to the framework round-trip formatter.
+                mainBufferCount = numberStart;
+                WriteString(inputValue.ToString("R", CultureInfo.InvariantCulture));
                 return;
             }
 
-            if (isNegative) WriteToBufferWithoutCheck((byte)'-');
-
-            double integralPart = Math.Floor(value);
-            double fractionalPart = value - integralPart;
-
-            WriteIntegralPart(numIntegralDigits, integralPart);
-
-            if (fractionalPart > 0)
+            if (usedFullPrecision && !RoundTrips(numberStart, mainBufferCount, inputValue))
             {
-                WriteToBufferWithoutCheck((byte)'.');
-                WriteFractionalPart(numFractionalDigits, fractionalPart);
-            }
+                // 16 digits truncated a value that needs 17; retry with one more digit.
+                mainBufferCount = numberStart;
+                bodyFailed = false;
+                WriteNumberBody(17);
 
-            if (printExponent)
-            {
-                WriteToBuffer((byte)'E');
-                WriteSignedInteger(exponent);
+                if (bodyFailed || !RoundTrips(numberStart, mainBufferCount, inputValue))
+                {
+                    // Extraction could not produce an exact representation; fall back.
+                    mainBufferCount = numberStart;
+                    WriteString(inputValue.ToString("R", CultureInfo.InvariantCulture));
+                }
             }
+            return;
 
             // Local Functions
+
+            void WriteNumberBody(int maxSignificantDigits)
+            {
+                usedFullPrecision = false;
+                double bodyValue = CalculateNumDigits(absValue, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed, maxSignificantDigits);
+                if (failed)
+                {
+                    bodyFailed = true;
+                    return;
+                }
+
+                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+
+                double integralPart = Math.Floor(bodyValue);
+                double fractionalPart = bodyValue - integralPart;
+
+                WriteIntegralPart(numIntegralDigits, integralPart);
+
+                if (fractionalPart > 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'.');
+                    WriteFractionalPart(numFractionalDigits, fractionalPart);
+                }
+
+                if (printExponent)
+                {
+                    WriteToBuffer((byte)'E');
+                    WriteSignedInteger(exponent);
+                }
+            }
+
+            bool RoundTrips(int start, int end, double original)
+            {
+                int length = end - start;
+#if NETSTANDARD2_0
+                string text = Encoding.ASCII.GetString(mainBuffer, start, length);
+                if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
+                {
+                    return parsed == original;
+                }
+                return false;
+#else
+                var span = new ReadOnlySpan<byte>(mainBuffer, start, length);
+                if (Utf8Parser.TryParse(span, out double parsed, out int consumed) && consumed == length)
+                {
+                    return parsed == original;
+                }
+                return false;
+#endif
+            }
 
             bool HandleSpecialCases(double value)
             {
@@ -1677,18 +1808,32 @@ public sealed partial class JsonSerializer
             {
                 if (numFractionalDigits == 0)
                 {
+                    usedFullPrecision = true;
                     if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
                     else WriteToBufferWithoutCheck((byte)'0');
                     return;
                 }
 
                 int firstFractionalDigitIndex = mainBufferCount;
+                bool tailIsAllZeros = false;
                 for (int i = 0; i <= numFractionalDigits; i++)
                 {
                     fractionalPart *= 10;
                     byte digit = (byte)fractionalPart;
                     fractionalPart -= digit;
                     WriteToBufferWithoutCheck((byte)('0' + digit));
+
+                    // If the remainder is too small to yield a non-zero digit within the
+                    // remaining budget, all remaining digits would be '0' and would be
+                    // trimmed away again. Skipping them saves the bulk of the work for
+                    // typical short decimal values. The 0.5 margin keeps the test robust
+                    // against the rounding error of the scaling multiplication.
+                    int remainingDigits = numFractionalDigits - i;
+                    if (remainingDigits > 0 && fractionalPart * POW10[remainingDigits] < 0.5)
+                    {
+                        tailIsAllZeros = true;
+                        break;
+                    }
                 }
 
                 int correctionIndex = mainBufferCount - 1;
@@ -1698,10 +1843,17 @@ public sealed partial class JsonSerializer
                 }
                 int oldMainBufferCount = mainBufferCount;
                 mainBufferCount = correctionIndex + 1;
-                if (oldMainBufferCount != mainBufferCount)
+                if (oldMainBufferCount != mainBufferCount || tailIsAllZeros)
                 {
+                    // Trailing zeros were dropped (either written or skipped), so the digit
+                    // budget was not fully consumed and the value round-trips as written.
                     return;
                 }
+
+                // No trailing zeros were trimmed: the full digit budget was consumed,
+                // so this value may need more precision to round-trip. Flag it so the
+                // caller can verify and, if necessary, escalate to more digits.
+                usedFullPrecision = true;
 
                 while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
                 {
@@ -1718,9 +1870,14 @@ public sealed partial class JsonSerializer
 
         }
 
-        double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed)
+        private static readonly double[] POW10 = new double[]
         {
-            const int MAX_SIGNIFICANT_DIGITS = 16;
+            1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
+            1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18
+        };
+
+        double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed, int MAX_SIGNIFICANT_DIGITS)
+        {
             const int POS_EXPONENT_LIMIT = 13;
             const int NEG_EXPONENT_LIMIT = -5;
 

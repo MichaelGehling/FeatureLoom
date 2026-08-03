@@ -54,7 +54,7 @@ namespace FeatureLoom.Extensions
         /// <typeparam name="T">The type of the object.</typeparam>
         /// <param name="obj">The object to attach the destructor to.</param>
         /// <param name="destructor">The action to invoke during finalization.</param>
-        public static void AttachDetructor<T>(this T obj, Action<T> destructor) where T : class
+        public static void AttachDestructor<T>(this T obj, Action<T> destructor) where T : class
         {
             MetaData.GetOrCreate(obj).MetaDataUpdateSender.ProcessMessage<MetaData.DestructionInfo>(_ => destructor(obj));
         }

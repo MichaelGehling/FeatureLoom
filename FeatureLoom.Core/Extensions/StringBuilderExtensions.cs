@@ -8,6 +8,29 @@ namespace FeatureLoom.Extensions
 {
     public static class StringBuilderExtensions
     {
+
+#if NET5_0_OR_GREATER
+        public static bool TryAsSpan(this StringBuilder sb, out ReadOnlySpan<char> span)
+        {
+            span = new ReadOnlySpan<char>();
+            foreach (ReadOnlyMemory<char> chunk in sb.GetChunks())
+            {
+                if (span.IsEmpty)
+                {
+                    // First chunk, that is good, we can use it if no other chunks follow
+                    span = chunk.Span; 
+                }
+                else
+                {
+                    // second chunk is bad and we return false, because we cannot return a span that is not contiguous
+                    span = default;
+                    return false;
+                }
+            }
+            return true;
+        }
+#endif
+
         /// <summary>
         /// Appends an interpolated string directly to the <see cref="StringBuilder"/> buffer without
         /// creating an intermediate string. Each literal part and interpolated value is appended
@@ -38,6 +61,7 @@ namespace FeatureLoom.Extensions
             /// <example>
             /// <code>string s = StringBuilder.BuildCachedString($"Hello {name}, you have {count} messages");</code>
             /// </example>
+            /// <param name="handler">The <see cref="PooledStringBuilderInterpolationHandler"/> that received the interpolated parts.</param>
             /// <param name="cache">Optional <see cref="StringInternCache"/> to use for deduplicating the resulting string. If null, the shared cache is used.</param>
             /// <returns>The (possibly cache-shared) resulting string.</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
