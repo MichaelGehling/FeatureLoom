@@ -53,19 +53,19 @@ namespace FeatureLoom.Serialization
         public class TypeHandlerCreator<T> : ITypeHandlerCreator
         {
             JsonDataTypeCategory category;
-            Func<ExtensionApi, ItemHandler<T>> creator;
+            Func<ExtensionApi, Action<T>> creator;
             bool onlyExactType;
             Func<Type, bool> supports;
 
 
-            public TypeHandlerCreator(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, bool onlyExactType = true)
+            public TypeHandlerCreator(JsonDataTypeCategory category, Func<ExtensionApi, Action<T>> creator, bool onlyExactType = true)
             {
                 this.category = category;
                 this.creator = creator;
                 this.onlyExactType = onlyExactType;
             }
 
-            public TypeHandlerCreator(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, Func<Type, bool> supportsType)
+            public TypeHandlerCreator(JsonDataTypeCategory category, Func<ExtensionApi, Action<T>> creator, Func<Type, bool> supportsType)
             {
                 this.category = category;
                 this.creator = creator;
@@ -76,7 +76,7 @@ namespace FeatureLoom.Serialization
             public void CreateTypeHandler(ExtensionApi api, ICachedTypeHandler cachedTypeHandler, Type itemType)
             {
                 var itemHandler = creator.Invoke(api);
-                cachedTypeHandler.SetItemHandler(itemHandler, category, itemType);
+                api.SetItemHandler(cachedTypeHandler, itemHandler, category, itemType);
             }
 
             public bool SupportsType(Type type)

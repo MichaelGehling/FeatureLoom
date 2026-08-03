@@ -28,8 +28,7 @@ namespace FeatureLoom.Serialization
         private ByteSegment rootName;
         ItemInfo currentItemInfo;
         readonly ExtensionApi extensionApi;
-        public delegate void ItemHandler<T>(T item);
-        public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out ItemHandler<T> itemHandler, out JsonDataTypeCategory category);
+        public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out Action<T> itemHandler, out JsonDataTypeCategory category);
 
         public JsonSerializer(Settings settings = null)
         {           
@@ -140,12 +139,91 @@ namespace FeatureLoom.Serialization
         }
 
         /// <summary>
+        /// Builds the primitive wrapper (optional type info object) around a custom item handler.
+        /// Used by the public extension API, where the item handler is a delegate and its
+        /// indirection cannot be avoided. Internal primitive writers build the equivalent wrapper
+        /// around a local function instead, saving one delegate invocation.
+        /// </summary>
+        internal Action<T, bool, ByteSegment> CreatePrimitiveItemWriter<T>(CachedTypeWriter typeHandler, Action<T> itemHandler)
+        {
+            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                return (item, _, _) =>
+                {
+                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    itemHandler.Invoke(item);
+                    FinishTypeInfoObject();
+                };
+            }
+            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            {
+                return (item, deviatingType, _) =>
+                {
+                    if (!deviatingType)
+                    {
+                        itemHandler.Invoke(item);
+                    }
+                    else
+                    {
+                        StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                        itemHandler.Invoke(item);
+                        FinishTypeInfoObject();
+                    }
+                };
+            }
+            else
+            {
+                return (item, _, _) => itemHandler.Invoke(item);
+            }
+        }
+
+        /// <summary>
+        /// Builds the array wrapper (item info handling, reference check, type info) around a
+        /// custom item handler, which is expected to write the array elements incl. separators.
+        /// </summary>
+        internal Action<T, bool, ByteSegment> CreateArrayItemWriter<T>(CachedTypeWriter typeHandler, Action<T> itemHandler)
+        {
+            if (settings.requiresItemInfos)
+            {
+                return (item, deviatingType, itemName) =>
+                {
+                    // TryHandleItemAsRef already returns false for value types, so no separate
+                    // struct variant is needed; only the item info creation differs.
+                    if (typeof(T).IsValueType) CreateItemInfoForStruct(itemName);
+                    else CreateItemInfoForClass(item, itemName);
+                    if (!TryHandleItemAsRef(item))
+                    {
+                        WriteArrayWithTypeInfo(item, deviatingType, typeHandler, itemHandler);
+                    }
+                    UseParentItemInfo();
+                };
+            }
+            else
+            {
+                return (item, deviatingType, _) => WriteArrayWithTypeInfo(item, deviatingType, typeHandler, itemHandler);
+            }
+        }
+
+        /// <summary>
+        /// Writes the array body, wrapped in a type info object if required.
+        /// </summary>
+        private void WriteArrayWithTypeInfo<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, Action<T> itemHandler)
+        {
+            bool writeTypeInfo = TypeInfoRequired(deviatingType);
+            if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+            writer.OpenArray();
+            itemHandler.Invoke(item);
+            writer.CloseArray();
+            if (writeTypeInfo) FinishTypeInfoObject();
+        }
+
+        /// <summary>
         /// Builds the object wrapper (item info handling, reference check, type info) around a
         /// custom item handler. Used by the public extension API, where the item handler is a
         /// delegate and its indirection cannot be avoided. Internal call sites build the
         /// equivalent wrapper around a local function instead, saving one delegate invocation.
         /// </summary>
-        internal Action<T, bool, ByteSegment> CreateObjectItemWriter<T>(CachedTypeWriter typeHandler, ItemHandler<T> itemHandler)
+        internal Action<T, bool, ByteSegment> CreateObjectItemWriter<T>(CachedTypeWriter typeHandler, Action<T> itemHandler)
         {
             if (settings.requiresItemInfos)
             {
@@ -179,7 +257,7 @@ namespace FeatureLoom.Serialization
         /// Writes the optional type info followed by the object body. If the body turns out to be
         /// empty, the separating comma written after the type info is rolled back again.
         /// </summary>
-        private void WriteTypeInfoAndBody<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, ItemHandler<T> itemHandler)
+        private void WriteTypeInfoAndBody<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, Action<T> itemHandler)
         {
             int countBeforeComma = -1;
             int countAfterComma = -1;
@@ -392,41 +470,6 @@ namespace FeatureLoom.Serialization
                 MethodInfo method = typeof(JsonSerializer).GetMethod(getItemHandlerMethodName, BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo generic = method.MakeGenericMethod(itemType);                
                 generic.Invoke(this, parameters);
-            }
-        }
-
-
-        private void CreateEnumItemHandler<T>(CachedTypeWriter typeHandler, bool nullable) where T : struct, Enum
-        {
-            if (!nullable)
-            {
-                if (settings.enumAsString)
-                {
-                    typeHandler.SetItemHandler_Primitive<T>(item => writer.WriteStringValue(item.ToName()));
-                }
-                else
-                {
-                    typeHandler.SetItemHandler_Primitive<T>(item => writer.WriteIntValue(item.ToInt()));
-                }
-            }
-            else
-            {
-                if (settings.enumAsString)
-                {
-                    typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
-                    {
-                        if (item.HasValue) writer.WriteStringValue(item.Value.ToName());
-                        else writer.WriteNullValue();
-                    });
-                }
-                else
-                {
-                    typeHandler.SetItemHandler_Primitive<Nullable<T>>(item =>
-                    {
-                        if (item.HasValue) writer.WriteIntValue(item.Value.ToInt());
-                        else writer.WriteNullValue();
-                    });
-                }
             }
         }
 

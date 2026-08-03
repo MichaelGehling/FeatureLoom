@@ -27,12 +27,12 @@ namespace FeatureLoom.Serialization
             public bool writeArraySegmentsAsArrays = true;
             public List<ITypeHandlerCreator> customTypeHandlerCreators = new List<ITypeHandlerCreator>();
 
-            public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator, bool onlyExactType = true)
+            public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, Action<T>> creator, bool onlyExactType = true)
             {
                 customTypeHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, onlyExactType));
             }
 
-            public void AddCustomTypeHandlerCreator<T>(Func<Type, bool> supportsType, JsonDataTypeCategory category, Func<ExtensionApi, ItemHandler<T>> creator)
+            public void AddCustomTypeHandlerCreator<T>(Func<Type, bool> supportsType, JsonDataTypeCategory category, Func<ExtensionApi, Action<T>> creator)
             {
                 customTypeHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, supportsType));
             }

@@ -1,4 +1,5 @@
 ﻿using FeatureLoom.Collections;
+using FeatureLoom.Extensions;
 using System;
 using System.Xml.Serialization;
 
@@ -1386,6 +1387,80 @@ public sealed partial class JsonSerializer
             {
                 writer.WriteUriValue(item);
             }, false);
+        }
+    }
+
+    private void CreateEnumItemHandler<T>(CachedTypeWriter typeHandler, bool nullable) where T : struct, Enum
+    {
+        // Captured once at setup, so the per-item check is a well-predicted branch on a readonly
+        // local instead of a settings lookup. Spelling out all string/int combinations separately
+        // would double the number of variants below without a measurable benefit.
+        bool asString = settings.enumAsString;
+
+        if (!nullable)
+        {
+            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                typeHandler.SetItemWriter<T>((item, _, _) =>
+                {
+                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    if (asString) writer.WritePreparedStringValue(item.ToUtf8Name());
+                    else writer.WriteIntValue(item.ToInt());
+                    FinishTypeInfoObject();
+                }, false);
+            }
+            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            {
+                typeHandler.SetItemWriter<T>((item, deviatingType, _) =>
+                {
+                    if (deviatingType) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    if (asString) writer.WritePreparedStringValue(item.ToUtf8Name());
+                    else writer.WriteIntValue(item.ToInt());
+                    if (deviatingType) FinishTypeInfoObject();
+                }, false);
+            }
+            else
+            {
+                typeHandler.SetItemWriter<T>((item, _, _) =>
+                {
+                    if (asString) writer.WritePreparedStringValue(item.ToUtf8Name());
+                    else writer.WriteIntValue(item.ToInt());
+                }, false);
+            }
+        }
+        else
+        {
+            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                typeHandler.SetItemWriter<T?>((item, _, _) =>
+                {
+                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    if (!item.HasValue) writer.WriteNullValue();
+                    else if (asString) writer.WritePreparedStringValue(item.Value.ToUtf8Name());
+                    else writer.WriteIntValue(item.Value.ToInt());
+                    FinishTypeInfoObject();
+                }, false);
+            }
+            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            {
+                typeHandler.SetItemWriter<T?>((item, deviatingType, _) =>
+                {
+                    if (deviatingType) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    if (!item.HasValue) writer.WriteNullValue();
+                    else if (asString) writer.WritePreparedStringValue(item.Value.ToUtf8Name());
+                    else writer.WriteIntValue(item.Value.ToInt());
+                    if (deviatingType) FinishTypeInfoObject();
+                }, false);
+            }
+            else
+            {
+                typeHandler.SetItemWriter<T?>((item, _, _) =>
+                {
+                    if (!item.HasValue) writer.WriteNullValue();
+                    else if (asString) writer.WritePreparedStringValue(item.Value.ToUtf8Name());
+                    else writer.WriteIntValue(item.Value.ToInt());
+                }, false);
+            }
         }
     }
 }

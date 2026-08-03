@@ -46,7 +46,7 @@ namespace FeatureLoom.Serialization
 
             if (!valueHandler.HandlerType.IsNullable() || valueHandler.HandlerType.IsValueType)
             {
-                ItemHandler<T> itemHandler = (dict) =>
+                Action<T> itemHandler = (dict) =>
                 {
                     ENUM enumerator = getEnumerator(dict);
                     if (enumerator.MoveNext())
@@ -70,7 +70,7 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                ItemHandler<T> itemHandler = (dict) =>
+                Action<T> itemHandler = (dict) =>
                 {
                     ENUM enumerator = getEnumerator(dict);
                     if (enumerator.MoveNext())
@@ -123,7 +123,7 @@ namespace FeatureLoom.Serialization
 
             if (!valueHandler.HandlerType.IsNullable() || valueHandler.HandlerType.IsValueType)
             {
-                ItemHandler<T> itemHandler = (dict) =>
+                Action<T> itemHandler = (dict) =>
                 {
                     ENUM enumerator = getEnumerator(dict);
                     if (enumerator.MoveNext())
@@ -147,7 +147,7 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                ItemHandler<T> itemHandler = (dict) =>
+                Action<T> itemHandler = (dict) =>
                 {
                     ENUM enumerator = getEnumerator(dict);
                     if (enumerator.MoveNext())

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using FeatureLoom.Extensions;
@@ -31,7 +31,7 @@ namespace FeatureLoom.Serialization
             bool requiresItemNames = settings.requiresItemNames;
             if (elementHandler.HandlerType.IsValueType)
             {                
-                ItemHandler<T> itemHandler = (list) =>
+                Action<T> itemHandler = (list) =>
                 {
                     int currentIndex = 0;
                     if (currentIndex < list.Count)
@@ -47,11 +47,11 @@ namespace FeatureLoom.Serialization
                     }
                 };
 
-                typeHandler.SetItemHandler_Array(itemHandler, true);
+                typeHandler.SetItemWriter(CreateArrayItemWriter(typeHandler, itemHandler), false);
             }
             else
             {
-                ItemHandler<T> itemHandler = (list) =>
+                Action<T> itemHandler = (list) =>
                 {
                     CachedTypeWriter alternativeHandler = elementHandler;
                     int index = 0;                    
@@ -90,7 +90,7 @@ namespace FeatureLoom.Serialization
                         index++;
                     }
                 };
-                typeHandler.SetItemHandler_Array(itemHandler, false);
+                typeHandler.SetItemWriter(CreateArrayItemWriter(typeHandler, itemHandler), true);
 
             }
         }
@@ -102,7 +102,7 @@ namespace FeatureLoom.Serialization
             bool requiresItemNames = settings.requiresItemNames;
             if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType)
             {
-                ItemHandler<T> itemHandler = (list) =>
+                Action<T> itemHandler = (list) =>
                 {
                     int currentIndex = 0;
                     if (currentIndex < list.Count)
@@ -118,11 +118,11 @@ namespace FeatureLoom.Serialization
                     }
                 };
 
-                typeHandler.SetItemHandler_Array(itemHandler, true);
+                typeHandler.SetItemWriter(CreateArrayItemWriter(typeHandler, itemHandler), false);
             }
             else
             {
-                ItemHandler<T> itemHandler = (list) =>
+                Action<T> itemHandler = (list) =>
                 {
                     int index = 0;
                     if (index < list.Count)
@@ -154,7 +154,7 @@ namespace FeatureLoom.Serialization
                         index++;
                     }
                 };
-                typeHandler.SetItemHandler_Array(itemHandler, false);
+                typeHandler.SetItemWriter(CreateArrayItemWriter(typeHandler, itemHandler), true);
 
             }
         }

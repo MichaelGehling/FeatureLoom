@@ -830,6 +830,21 @@ public sealed partial class JsonSerializer
             else WriteNullValue();
         }
 
+        /// <summary>
+        /// Writes a pre-encoded UTF-8 string value, wrapping it in quotes without escaping.
+        /// Only valid for content known to be free of characters requiring escaping,
+        /// e.g. enum names, which are always valid C# identifiers.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WritePreparedStringValue(byte[] utf8Bytes)
+        {
+            if (mainBufferCount + utf8Bytes.Length + 2 > mainBufferLimit) WriteBufferToStream();
+            mainBuffer[mainBufferCount++] = QUOTES;
+            CopyBytes(utf8Bytes, mainBuffer, mainBufferCount);
+            mainBufferCount += utf8Bytes.Length;
+            mainBuffer[mainBufferCount++] = QUOTES;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteTextSegmentValue(TextSegment textSegment)
         {

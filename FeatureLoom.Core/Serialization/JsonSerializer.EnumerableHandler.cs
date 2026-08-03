@@ -52,7 +52,7 @@ namespace FeatureLoom.Serialization
             
             if (!defaultElementHandler.HandlerType.IsNullable() || defaultElementHandler.HandlerType.IsValueType)
             {
-                ItemHandler<T> itemHandler = (collection) =>
+                Action<T> itemHandler = (collection) =>
                 {
                     ENUM enumerator = getEnumerator(collection);
                     if (enumerator.MoveNext())
@@ -68,12 +68,12 @@ namespace FeatureLoom.Serialization
                     }
                 };
 
-                typeHandler.SetItemHandler_Array(itemHandler, true);
- 
+                typeHandler.SetItemWriter(CreateArrayItemWriter(typeHandler, itemHandler), false);
+
             }
             else
             {
-                ItemHandler<T> itemHandler = (collection) =>
+                Action<T> itemHandler = (collection) =>
                 {
                     CachedTypeWriter currentHandler = defaultElementHandler;
                     ENUM enumerator = getEnumerator(collection);
@@ -93,7 +93,7 @@ namespace FeatureLoom.Serialization
                         index++;
                     }                    
                 };
-                typeHandler.SetItemHandler_Array(itemHandler, false);
+                typeHandler.SetItemWriter(CreateArrayItemWriter(typeHandler, itemHandler), true);
             }
         }
 
@@ -122,7 +122,7 @@ namespace FeatureLoom.Serialization
             bool requiresItemNames = settings.requiresItemNames;
             Type expectedElementType = typeof(object);
 
-            ItemHandler<T> itemHandler = (collection) =>
+            Action<T> itemHandler = (collection) =>
             {
                 var enumerator = collection.GetEnumerator();
                 int index = 0;
@@ -153,7 +153,7 @@ namespace FeatureLoom.Serialization
                     index++;
                 }
             };
-            typeHandler.SetItemHandler_Array(itemHandler, false);
+            typeHandler.SetItemWriter(CreateArrayItemWriter(typeHandler, itemHandler), true);
 
         }
     }

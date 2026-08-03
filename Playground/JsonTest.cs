@@ -221,7 +221,7 @@ namespace Playground
             protected override void CreateAndSetGenericTypeHandler<ARG1>(FeatureLoom.Serialization.JsonSerializer.ExtensionApi api, FeatureLoom.Serialization.JsonSerializer.ICachedTypeHandler cachedTypeHandler)
             {                
                 var elementTypeHandler = api.GetCachedTypeHandler(typeof(ARG1));
-                FeatureLoom.Serialization.JsonSerializer.ItemHandler<IList<ARG1>> itemHandler;
+                Action<IList<ARG1>> itemHandler;
                 if (!api.RequiresHandler && api.Writer.TryPreparePrimitiveWriteDelegate<ARG1>(out var primitiveWrite))
                 {
                     itemHandler = list =>
@@ -281,7 +281,7 @@ namespace Playground
                 }
 
                 JsonDataTypeCategory typeCategory = elementTypeHandler.NoRefTypes ? JsonDataTypeCategory.Array_WithoutRefChildren : JsonDataTypeCategory.Array;
-                cachedTypeHandler.SetItemHandler(itemHandler, typeCategory, typeof(ARG1));
+                api.SetItemHandler(cachedTypeHandler, itemHandler, typeCategory, typeof(ARG1));
             }
         }
 
