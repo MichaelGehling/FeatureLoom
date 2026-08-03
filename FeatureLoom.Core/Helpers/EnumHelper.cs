@@ -78,6 +78,7 @@ namespace FeatureLoom.Helpers
 
         // Caches for enum value-to-name and value-to-enum lookups
         static volatile IReadOnlyDictionary<int, string> intToName;
+        static volatile IReadOnlyDictionary<int, byte[]> intToUtf8Name;
         static volatile IReadOnlyDictionary<int, T> intToEnum = new Dictionary<int, T>();
 
         // Delegate for fast, boxing-free enum-to-int conversion
@@ -122,6 +123,7 @@ namespace FeatureLoom.Helpers
                 // Build lookup tables for enum value <-> name and value <-> enum
                 var values = Enum.GetValues(typeof(T));
                 var intToNameDict = new Dictionary<int, string>();
+                var intToUtf8NameDict = new Dictionary<int, byte[]>();
                 var intToEnumDict = new Dictionary<int, T>();
                 foreach (var value in values)
                 {                    
@@ -129,6 +131,7 @@ namespace FeatureLoom.Helpers
                     int intValue = convertToInt(enumValue);
                     string name = value.ToString();
                     intToNameDict[intValue] = name;
+                    intToUtf8NameDict[intValue] = Encoding.UTF8.GetBytes(name);
                     intToEnumDict[intValue] = enumValue;
                 }
 
@@ -144,11 +147,13 @@ namespace FeatureLoom.Helpers
                 {
                     int minKey = keys.First();
                     intToName = new ListDictionary<string>(keys.Select(k => intToNameDict[k]), minKey);
+                    intToUtf8Name = new ListDictionary<byte[]>(keys.Select(k => intToUtf8NameDict[k]), minKey);
                     intToEnum = new ListDictionary<T>(keys.Select(k => intToEnumDict[k]), minKey);
                 }
                 else
                 {
                     intToName = intToNameDict;
+                    intToUtf8Name = intToUtf8NameDict;
                     intToEnum = intToEnumDict;
                 }
 
@@ -176,6 +181,19 @@ namespace FeatureLoom.Helpers
             if (!initialized) Init();
             int intValue = convertToInt(enumValue);
             return intToName[intValue];
+        }
+
+        /// <summary>
+        /// Gets the name of the enum value as a cached UTF-8 encoded byte array, avoiding the
+        /// string-to-UTF8 conversion at the call site. Enum names are valid C# identifiers and
+        /// therefore pure ASCII, so the returned bytes never require escaping.
+        /// WARNING: The returned array is the shared cached instance and MUST NOT be modified.
+        /// </summary>
+        public static byte[] ToUtf8Name(T enumValue)
+        {
+            if (!initialized) Init();
+            int intValue = convertToInt(enumValue);
+            return intToUtf8Name[intValue];
         }
 
         /// <summary>
@@ -228,6 +246,12 @@ namespace FeatureLoom.Helpers
         /// Gets the name of the enum value.
         /// </summary>
         public static string ToName<T>(T enumValue) where T : struct, Enum => EnumHelper<T>.ToName(enumValue);
+
+        /// <summary>
+        /// Gets the name of the enum value as a cached UTF-8 encoded byte array.
+        /// WARNING: The returned array is the shared cached instance and MUST NOT be modified.
+        /// </summary>
+        public static byte[] ToUtf8Name<T>(T enumValue) where T : struct, Enum => EnumHelper<T>.ToUtf8Name(enumValue);
 
         /// <summary>
         /// Converts the enum value to its underlying integer value.

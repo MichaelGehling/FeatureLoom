@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 using FeatureLoom.Helpers;
 using Xunit;
 
@@ -23,6 +24,29 @@ public class EnumHelperTests
         Assert.Equal("B", EnumHelper.ToName(DuplicateEnum.B));
         Assert.Equal("C", EnumHelper.ToName(ByteEnum.C));
         Assert.Equal("A", EnumHelper.ToName(ShortEnum.A));
+    }
+
+    [Fact]
+    public void ToUtf8Name_ReturnsUtf8EncodedName()
+    {
+        Assert.Equal("A"u8.ToArray(), EnumHelper.ToUtf8Name(SequentialIntEnum.A));
+        Assert.Equal("Y"u8.ToArray(), EnumHelper.ToUtf8Name(OffsetIntEnum.Y));
+        Assert.Equal("B"u8.ToArray(), EnumHelper.ToUtf8Name(DuplicateEnum.B));
+        Assert.Equal("C"u8.ToArray(), EnumHelper.ToUtf8Name(ByteEnum.C));
+        Assert.Equal("A"u8.ToArray(), EnumHelper.ToUtf8Name(ShortEnum.A));
+    }
+
+    [Fact]
+    public void ToUtf8Name_MatchesToName()
+    {
+        Assert.Equal(EnumHelper.ToName(FlagEnum.AB), Encoding.UTF8.GetString(EnumHelper.ToUtf8Name(FlagEnum.AB)));
+        Assert.Equal(EnumHelper.ToName(ShortEnum.B), Encoding.UTF8.GetString(EnumHelper.ToUtf8Name(ShortEnum.B)));
+    }
+
+    [Fact]
+    public void ToUtf8Name_ReturnsCachedInstance()
+    {
+        Assert.Same(EnumHelper.ToUtf8Name(OffsetIntEnum.Z), EnumHelper.ToUtf8Name(OffsetIntEnum.Z));
     }
 
     [Fact]

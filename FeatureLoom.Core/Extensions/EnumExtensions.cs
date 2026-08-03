@@ -6,6 +6,13 @@ namespace FeatureLoom.Extensions
     public static class EnumExtensions
     {
         public static string ToName<T>(this T enumValue) where T : struct, Enum => EnumHelper<T>.ToName(enumValue);
+
+        /// <summary>
+        /// Gets the name of the enum value as a cached UTF-8 encoded byte array.
+        /// WARNING: The returned array is the shared cached instance and MUST NOT be modified.
+        /// </summary>
+        public static byte[] ToUtf8Name<T>(this T enumValue) where T : struct, Enum => EnumHelper<T>.ToUtf8Name(enumValue);
+
         public static int ToInt<T>(this T enumValue) where T : struct, Enum => EnumHelper<T>.ToInt(enumValue);
 
         public static bool IsFlagSet<T>(this T enumValue, T enumFlag) where T : struct, Enum => EnumHelper<T>.IsFlagSet(enumValue, enumFlag);
