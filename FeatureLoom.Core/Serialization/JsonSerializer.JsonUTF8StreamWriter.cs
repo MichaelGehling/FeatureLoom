@@ -205,11 +205,47 @@ public sealed partial class JsonSerializer
             currentIndentionDepth = 0;
         }
 
+        /// <summary>
+        /// Copies a byte range into the target buffer. For short blobs a simple copy loop is
+        /// cheaper than the call overhead of Array.Copy, which dominates the per-field cost
+        /// when serializing objects with many small values (field names, quotes, digits).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void CopyBytes(byte[] source, int sourceOffset, byte[] target, int targetOffset, int count)
+        {
+            if (count <= 16)
+            {
+                for (int i = 0; i < count; i++) target[targetOffset + i] = source[sourceOffset + i];
+            }
+            else
+            {
+                Array.Copy(source, sourceOffset, target, targetOffset, count);
+            }
+        }
+
+        /// <summary>
+        /// Copies a complete array into the target buffer. Bounding the loop directly by the
+        /// source length (instead of a separate count) allows the JIT to elide the source
+        /// bounds check and avoids the per-element source offset arithmetic.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void CopyBytes(byte[] source, byte[] target, int targetOffset)
+        {
+            if (source.Length <= 16)
+            {
+                for (int i = 0; i < source.Length; i++) target[targetOffset + i] = source[i];
+            }
+            else
+            {
+                Array.Copy(source, 0, target, targetOffset, source.Length);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBuffer(byte[] data, int offset, int count)
         {
             if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
-            Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
+            CopyBytes(data, offset, mainBuffer, mainBufferCount, count);
             mainBufferCount += count;
         }
 
@@ -222,7 +258,9 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBuffer(byte[] data)
         {
-            WriteToBuffer(data, 0, data.Length);
+            if (mainBufferCount + data.Length > mainBufferLimit) WriteBufferToStream();
+            CopyBytes(data, mainBuffer, mainBufferCount);
+            mainBufferCount += data.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -242,25 +280,12 @@ public sealed partial class JsonSerializer
 
         /// <summary>
         /// Writes a short, pre-encoded byte sequence (e.g. a field name incl. quotes, colon and
-        /// optional leading comma). For such small blobs a simple copy loop is cheaper than the
-        /// call overhead of Array.Copy, which dominates the per-field cost when serializing objects.
+        /// optional leading comma).
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WritePreparedBytes(byte[] data)
         {
-            int count = data.Length;
-            if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
-            byte[] buffer = mainBuffer;
-            int pos = mainBufferCount;
-            if (count <= 16)
-            {
-                for (int i = 0; i < count; i++) buffer[pos + i] = data[i];
-            }
-            else
-            {
-                Array.Copy(data, 0, buffer, pos, count);
-            }
-            mainBufferCount = pos + count;
+            WriteToBuffer(data);
         }
 
         public static readonly MethodInfo WritePreparedBytesMethod = typeof(JsonUTF8StreamWriter).GetMethod(nameof(WritePreparedBytes), BindingFlags.Public | BindingFlags.Instance);
@@ -268,7 +293,7 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
         {
-            Array.Copy(data, offset, mainBuffer, mainBufferCount, count);
+            CopyBytes(data, offset, mainBuffer, mainBufferCount, count);
             mainBufferCount += count;
         }
 
@@ -281,7 +306,8 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBufferWithoutCheck(byte[] data)
         {
-            WriteToBufferWithoutCheck(data, 0, data.Length);
+            CopyBytes(data, mainBuffer, mainBufferCount);
+            mainBufferCount += data.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
