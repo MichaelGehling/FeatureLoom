@@ -6,6 +6,11 @@ using System;
 #if !NETSTANDARD2_0
 using System.Buffers.Text;
 #endif
+#if NET7_0_OR_GREATER
+using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+#endif
 using System.Collections.Generic;
 using FeatureLoom.Helpers;
 using System.Reflection;
@@ -1223,6 +1228,77 @@ public sealed partial class JsonSerializer
             }
         }
 
+        /// <summary>
+        /// Minimum length of an unescaped character run for which the bulk UTF-8 encoder
+        /// is used. Below that, its call overhead outweighs its vectorization benefit.
+        /// </summary>
+        const int MIN_BULK_ENCODE_LENGTH = 16;
+
+#if NET7_0_OR_GREATER
+        /// <summary>
+        /// Returns the index of the first character that needs special handling
+        /// (control char, quote, backslash or surrogate) or the length if there is none.
+        /// Uses SIMD to scan multiple characters at once, which dominates the cost for longer strings.
+        /// </summary>
+        private static int FindNextSpecialChar(ReadOnlySpan<char> chars)
+        {
+            int i = 0;
+            if (Vector128.IsHardwareAccelerated && chars.Length >= Vector128<ushort>.Count)
+            {
+                var space = Vector128.Create((ushort)' ');
+                var quote = Vector128.Create((ushort)'"');
+                var backslash = Vector128.Create((ushort)'\\');
+                var surrogateStart = Vector128.Create((ushort)0xD800);
+                var surrogateRange = Vector128.Create((ushort)0x0800);
+                ref ushort start = ref Unsafe.As<char, ushort>(ref MemoryMarshal.GetReference(chars));
+                int limit = chars.Length - Vector128<ushort>.Count;
+                for (; i <= limit; i += Vector128<ushort>.Count)
+                {
+                    var v = Vector128.LoadUnsafe(ref start, (nuint)i);
+                    var special = Vector128.LessThan(v, space)
+                                | Vector128.Equals(v, quote)
+                                | Vector128.Equals(v, backslash)
+                                | Vector128.LessThan(v - surrogateStart, surrogateRange);
+                    uint mask = special.ExtractMostSignificantBits();
+                    if (mask != 0) return i + BitOperations.TrailingZeroCount(mask);
+                }
+            }
+            for (; i < chars.Length; i++)
+            {
+                char c = chars[i];
+                if (c < ' ' || c == '"' || c == '\\' || char.IsSurrogate(c)) return i;
+            }
+            return chars.Length;
+        }
+
+        /// <summary>
+        /// Returns the index of the first surrogate character or the length if there is none.
+        /// Uses SIMD to scan multiple characters at once.
+        /// </summary>
+        private static int FindNextSurrogate(ReadOnlySpan<char> chars)
+        {
+            int i = 0;
+            if (Vector128.IsHardwareAccelerated && chars.Length >= Vector128<ushort>.Count)
+            {
+                var surrogateStart = Vector128.Create((ushort)0xD800);
+                var surrogateRange = Vector128.Create((ushort)0x0800);
+                ref ushort start = ref Unsafe.As<char, ushort>(ref MemoryMarshal.GetReference(chars));
+                int limit = chars.Length - Vector128<ushort>.Count;
+                for (; i <= limit; i += Vector128<ushort>.Count)
+                {
+                    var v = Vector128.LoadUnsafe(ref start, (nuint)i);
+                    uint mask = Vector128.LessThan(v - surrogateStart, surrogateRange).ExtractMostSignificantBits();
+                    if (mask != 0) return i + BitOperations.TrailingZeroCount(mask);
+                }
+            }
+            for (; i < chars.Length; i++)
+            {
+                if (char.IsSurrogate(chars[i])) return i;
+            }
+            return chars.Length;
+        }
+#endif
+
         private void WriteEscapedStringWithQuotes(string str, int startIndex = 0, int length = -1)
         {
             int charIndex = startIndex;
@@ -1231,59 +1307,98 @@ public sealed partial class JsonSerializer
             const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
             EnsureFreeBufferSpace((endIndex - charIndex) * MAX_CHAR_LENGTH + 2); // +2 for the surrounding quotes            
             WriteToBufferWithoutCheck((byte)'"');
-            for (; charIndex < endIndex; charIndex++)
-            {                
-                var c = str[charIndex];
+#if !NETSTANDARD2_0
+            // Using a span lets the JIT drop the repeated bounds checks of the scan loop,
+            // which dominates the cost for longer strings.
+            ReadOnlySpan<char> chars = str.AsSpan();
+#else
+            string chars = str;
+#endif
+            while (charIndex < endIndex)
+            {
+                // Fast path: find the longest run of characters that need no escaping and
+                // are no surrogates, then transcode the whole run in one vectorized call.
+                // Writing byte by byte through the general path costs several branches, a
+                // lookup and a call per character, which dominates the runtime for longer
+                // strings.
+                int runStart = charIndex;
+#if NET7_0_OR_GREATER
+                charIndex = runStart + FindNextSpecialChar(chars.Slice(runStart, endIndex - runStart));
+#else
+                while (charIndex < endIndex)
+                {
+                    char runChar = chars[charIndex];
+                    if (runChar < ' ' || runChar == '"' || runChar == '\\' || char.IsSurrogate(runChar)) break;
+                    charIndex++;
+                }
+#endif
+
+                int runLength = charIndex - runStart;
+                if (runLength > 0)
+                {
+                    if (runLength < MIN_BULK_ENCODE_LENGTH)
+                    {
+                        // For short runs the encoder call overhead outweighs its benefit.
+                        for (int i = runStart; i < charIndex; i++)
+                        {
+                            char runChar = chars[i];
+                            if (runChar <= 0x7F)
+                            {
+                                WriteToBufferWithoutCheck((byte)runChar);
+                            }
+                            else if (runChar <= 0x7FF)
+                            {
+                                WriteToBufferWithoutCheck((byte)(((runChar >> 6) & 0x1F) | 0xC0));
+                                WriteToBufferWithoutCheck((byte)((runChar & 0x3F) | 0x80));
+                            }
+                            else
+                            {
+                                WriteToBufferWithoutCheck((byte)(((runChar >> 12) & 0x0F) | 0xE0));
+                                WriteToBufferWithoutCheck((byte)(((runChar >> 6) & 0x3F) | 0x80));
+                                WriteToBufferWithoutCheck((byte)((runChar & 0x3F) | 0x80));
+                            }
+                        }
+                    }
+                    else
+                    {
+#if !NETSTANDARD2_0
+                        mainBufferCount += Encoding.UTF8.GetBytes(chars.Slice(runStart, runLength), new Span<byte>(mainBuffer, mainBufferCount, mainBuffer.Length - mainBufferCount));
+#else
+                        mainBufferCount += Encoding.UTF8.GetBytes(str, runStart, runLength, mainBuffer, mainBufferCount);
+#endif
+                    }
+
+                    if (charIndex >= endIndex) break;
+                }
+
+                char c = chars[charIndex];
 
                 // Handle escaped chars and control chars
                 byte[] escapeBytes = GetEscapeBytes(c); 
                 if (escapeBytes != null)
                 {
                     WriteToBufferWithoutCheck(escapeBytes);
+                    charIndex++;
                     continue;
                 }
 
-                int codepoint = c;
+                // Handle surrogate pairs
+                if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                {
+                    int highSurrogate = c;
+                    int lowSurrogate = str[charIndex + 1];
+                    int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
-                if (codepoint <= 0x7F)
-                {
-                    // 1-byte sequence
-                    WriteToBufferWithoutCheck((byte)codepoint);
-                }
-                else if (codepoint <= 0x7FF)
-                {
-                    // 2-byte sequence
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                }
-                else if (!char.IsSurrogate(c))
-                {
-                    // 3-byte sequence
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                }
-                else
-                {
-                    // Handle surrogate pairs
-                    if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
-                    {
-                        int highSurrogate = c;
-                        int lowSurrogate = str[charIndex + 1];
-                        int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
+                    WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                    WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                    WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                    WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
 
-                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
-                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
-                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
-                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
-
-                        charIndex++; // Skip next character, it was part of the surrogate pair
-                    }
-                    else
-                    {
-                        throw new ArgumentException("Invalid surrogate pair in string.");
-                    }
+                    charIndex += 2; // The next character was part of the surrogate pair
+                    continue;
                 }
+
+                throw new ArgumentException("Invalid surrogate pair in string.");
             }
             WriteToBufferWithoutCheck((byte)'"');
         }
@@ -1300,50 +1415,82 @@ public sealed partial class JsonSerializer
             const int MAX_CHAR_LENGTH = 6;
             EnsureFreeBufferSpace(str.Length * MAX_CHAR_LENGTH);
             int charIndex = 0;
-            for (; charIndex < str.Length; charIndex++)
-            {                
-                var c = str[charIndex];
-                int codepoint = c;
+            int endIndex = str.Length;
+#if !NETSTANDARD2_0
+            // Using a span lets the JIT drop the repeated bounds checks of the scan loop,
+            // which dominates the cost for longer strings.
+            ReadOnlySpan<char> chars = str.AsSpan();
+#else
+            string chars = str;
+#endif
+            while (charIndex < endIndex)
+            {
+                // Fast path: find the longest run of non-surrogate characters and transcode
+                // it in one vectorized call instead of writing byte by byte.
+                int runStart = charIndex;
+#if NET7_0_OR_GREATER
+                charIndex = runStart + FindNextSurrogate(chars.Slice(runStart, endIndex - runStart));
+#else
+                while (charIndex < endIndex && !char.IsSurrogate(chars[charIndex])) charIndex++;
+#endif
 
-                if (codepoint <= 0x7F)
+                int runLength = charIndex - runStart;
+                if (runLength > 0)
                 {
-                    // 1-byte sequence
-                    WriteToBufferWithoutCheck((byte)codepoint);
-                }
-                else if (codepoint <= 0x7FF)
-                {
-                    // 2-byte sequence
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x1F) | 0xC0));
-                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                }
-                else if (!char.IsSurrogate(c))
-                {
-                    // 3-byte sequence
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 12) & 0x0F) | 0xE0));
-                    WriteToBufferWithoutCheck((byte)(((codepoint >> 6) & 0x3F) | 0x80));
-                    WriteToBufferWithoutCheck((byte)((codepoint & 0x3F) | 0x80));
-                }
-                else
-                {
-                    // Handle surrogate pairs
-                    if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                    if (runLength < MIN_BULK_ENCODE_LENGTH)
                     {
-                        int highSurrogate = c;
-                        int lowSurrogate = str[charIndex + 1];
-                        int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-
-                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
-                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
-                        WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
-                        WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
-
-                        charIndex++; // Skip next character, it was part of the surrogate pair
+                        // For short runs the encoder call overhead outweighs its benefit.
+                        for (int i = runStart; i < charIndex; i++)
+                        {
+                            char runChar = chars[i];
+                            if (runChar <= 0x7F)
+                            {
+                                WriteToBufferWithoutCheck((byte)runChar);
+                            }
+                            else if (runChar <= 0x7FF)
+                            {
+                                WriteToBufferWithoutCheck((byte)(((runChar >> 6) & 0x1F) | 0xC0));
+                                WriteToBufferWithoutCheck((byte)((runChar & 0x3F) | 0x80));
+                            }
+                            else
+                            {
+                                WriteToBufferWithoutCheck((byte)(((runChar >> 12) & 0x0F) | 0xE0));
+                                WriteToBufferWithoutCheck((byte)(((runChar >> 6) & 0x3F) | 0x80));
+                                WriteToBufferWithoutCheck((byte)((runChar & 0x3F) | 0x80));
+                            }
+                        }
                     }
                     else
                     {
-                        throw new ArgumentException("Invalid surrogate pair in string.");
+#if !NETSTANDARD2_0
+                        mainBufferCount += Encoding.UTF8.GetBytes(chars.Slice(runStart, runLength), new Span<byte>(mainBuffer, mainBufferCount, mainBuffer.Length - mainBufferCount));
+#else
+                        mainBufferCount += Encoding.UTF8.GetBytes(str, runStart, runLength, mainBuffer, mainBufferCount);
+#endif
                     }
+
+                    if (charIndex >= endIndex) break;
                 }
+
+                char c = chars[charIndex];
+
+                // Handle surrogate pairs
+                if (char.IsHighSurrogate(c) && charIndex + 1 < endIndex && char.IsLowSurrogate(str[charIndex + 1]))
+                {
+                    int highSurrogate = c;
+                    int lowSurrogate = str[charIndex + 1];
+                    int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
+
+                    WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
+                    WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 12) & 0x3F) | 0x80));
+                    WriteToBufferWithoutCheck((byte)(((surrogateCodePoint >> 6) & 0x3F) | 0x80));
+                    WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
+
+                    charIndex += 2; // The next character was part of the surrogate pair
+                    continue;
+                }
+
+                throw new ArgumentException("Invalid surrogate pair in string.");
             }
         }
 
@@ -1508,6 +1655,18 @@ public sealed partial class JsonSerializer
             bool isNegative = value < 0;
             if (isNegative) value = -value;
 
+            // Fastest path: values without a fractional part below 2^24 are exactly
+            // representable as int, so their decimal digits can be produced without any
+            // scaling, remainder extraction or rounding correction. Their
+            // trailing-zero-trimmed digits are also the shortest round-trippable
+            // representation, because below 2^24 every integer maps to its own float.
+            if (value < MAX_EXACT_INTEGRAL_FLOAT && (float)Math.Floor(value) == value)
+            {
+                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+                WriteExactIntegral((int)value, FLOAT_POS_EXPONENT_LIMIT);
+                return;
+            }
+
             value = CalculateNumDigits(value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed);
             if (failed)
             {
@@ -1632,7 +1791,7 @@ public sealed partial class JsonSerializer
             return (float)CalculateNumDigits((double)value, out exponent, out numIntegralDigits, out numFractionalDigits, out printExponent, out failed, 16);
 #else
             const int MAX_SIGNIFICANT_DIGITS = 7;
-            const int POS_EXPONENT_LIMIT = 7;
+            const int POS_EXPONENT_LIMIT = FLOAT_POS_EXPONENT_LIMIT;
             const int NEG_EXPONENT_LIMIT = -5;
 
             int bits = BitConverter.SingleToInt32Bits(value);
@@ -1673,6 +1832,28 @@ public sealed partial class JsonSerializer
 #endif
         }
 
+        /// <summary>
+        /// Writes the shortest round-trippable representation of the value using the
+        /// framework formatter. Used as fallback when the fast digit extraction cannot
+        /// produce an exact result. Avoids string allocation where possible.
+        /// </summary>
+        private void WriteRoundTripFallback(double value)
+        {
+            EnsureFreeBufferSpace(32);
+#if NETSTANDARD2_0
+            WriteString(value.ToString("R", CultureInfo.InvariantCulture));
+#else
+            if (Utf8Formatter.TryFormat(value, new Span<byte>(mainBuffer, mainBufferCount, mainBuffer.Length - mainBufferCount), out int written))
+            {
+                mainBufferCount += written;
+            }
+            else
+            {
+                WriteString(value.ToString("R", CultureInfo.InvariantCulture));
+            }
+#endif
+        }
+
         private void WriteDouble(double inputValue)
         {
             var value = inputValue;
@@ -1685,40 +1866,36 @@ public sealed partial class JsonSerializer
 
             double absValue = value;
             bool bodyFailed = false;
-            bool usedFullPrecision = false;
+            bool needsFallback = false;
+            bool digitsAreExact = false;
 
-            int numberStart = mainBufferCount;
-
-            // Fast path: 16 significant digits never introduces spurious ("noise")
-            // digits, so its output is trusted directly. It can only be too short for
-            // the rare values that genuinely need 17 digits, which is exactly the case
-            // where the fractional part consumes its full digit budget (no trailing
-            // zeros to trim, flagged by usedFullPrecision). Only then do we verify the
-            // result and, if it does not round-trip, escalate to 17 digits.
-            WriteNumberBody(16);
-
-            if (bodyFailed)
+            // Fastest path: values without a fractional part below 2^53 are exactly
+            // representable as long, so their decimal digits can be produced without any
+            // scaling, remainder extraction or verification. Their trailing-zero-trimmed
+            // digits are also the shortest round-trippable representation, because below
+            // 2^53 every integer maps to its own double.
+            if (absValue < MAX_EXACT_INTEGRAL_DOUBLE && Math.Floor(absValue) == absValue)
             {
-                // Fast path could not produce a representation (e.g. extreme
-                // exponents); fall back to the framework round-trip formatter.
-                mainBufferCount = numberStart;
-                WriteString(inputValue.ToString("R", CultureInfo.InvariantCulture));
+                if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+                WriteExactIntegral((long)absValue, POS_EXPONENT_LIMIT);
                 return;
             }
 
-            if (usedFullPrecision && !RoundTrips(numberStart, mainBufferCount, inputValue))
-            {
-                // 16 digits truncated a value that needs 17; retry with one more digit.
-                mainBufferCount = numberStart;
-                bodyFailed = false;
-                WriteNumberBody(17);
+            int numberStart = mainBufferCount;
 
-                if (bodyFailed || !RoundTrips(numberStart, mainBufferCount, inputValue))
-                {
-                    // Extraction could not produce an exact representation; fall back.
-                    mainBufferCount = numberStart;
-                    WriteString(inputValue.ToString("R", CultureInfo.InvariantCulture));
-                }
+            // Fast path: extract the digits directly. It is limited to 16 significant
+            // digits and the extraction accumulates rounding errors in its last digits,
+            // so a truncated value can look valid (its dropped tail may even be zeros).
+            // Therefore the result is verified by parsing it back, unless the extraction
+            // consumed the value without any remainder (digitsAreExact). Whenever the
+            // fast path is not exact, the framework formatter produces the exact
+            // shortest representation.
+            WriteNumberBody(16);
+
+            if (bodyFailed || needsFallback || (!digitsAreExact && !RoundTrips(numberStart, mainBufferCount, inputValue)))
+            {
+                mainBufferCount = numberStart;
+                WriteRoundTripFallback(inputValue);
             }
             return;
 
@@ -1726,7 +1903,7 @@ public sealed partial class JsonSerializer
 
             void WriteNumberBody(int maxSignificantDigits)
             {
-                usedFullPrecision = false;
+                needsFallback = false;
                 double bodyValue = CalculateNumDigits(absValue, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed, maxSignificantDigits);
                 if (failed)
                 {
@@ -1741,10 +1918,16 @@ public sealed partial class JsonSerializer
 
                 WriteIntegralPart(numIntegralDigits, integralPart);
 
+                // Without a fractional part and without scaling, the written digits
+                // represent the value exactly, so no verification is needed.
+                digitsAreExact = !printExponent;
+
                 if (fractionalPart > 0)
                 {
                     WriteToBufferWithoutCheck((byte)'.');
                     WriteFractionalPart(numFractionalDigits, fractionalPart);
+                    // The written digits are discarded by the caller, so skip the rest.
+                    if (needsFallback) return;
                 }
 
                 if (printExponent)
@@ -1786,14 +1969,14 @@ public sealed partial class JsonSerializer
                     if (Double.IsNaN(value)) WriteToBuffer(NAN);
                     else if (Double.IsNegativeInfinity(value)) WriteToBuffer(NEG_INFINITY);
                     else if (Double.IsPositiveInfinity(value)) WriteToBuffer(POS_INFINITY);
-                    else WriteString(value.ToString(CultureInfo.InvariantCulture)); // Then it must be subnormal
+                    else WriteRoundTripFallback(value); // Then it must be subnormal
                     return true;
                 }
 
                 return false;
             }
 
-            
+
 
             void WriteIntegralPart(int numIntegralDigits, double integralPart)
             {
@@ -1823,7 +2006,7 @@ public sealed partial class JsonSerializer
             {
                 if (numFractionalDigits == 0)
                 {
-                    usedFullPrecision = true;
+                    needsFallback = true;
                     if (fractionalPart >= 0.5f) WriteToBufferWithoutCheck((byte)'1');
                     else WriteToBufferWithoutCheck((byte)'0');
                     return;
@@ -1838,18 +2021,23 @@ public sealed partial class JsonSerializer
                     fractionalPart -= digit;
                     WriteToBufferWithoutCheck((byte)('0' + digit));
 
-                    // If the remainder is too small to yield a non-zero digit within the
-                    // remaining budget, all remaining digits would be '0' and would be
-                    // trimmed away again. Skipping them saves the bulk of the work for
-                    // typical short decimal values. The 0.5 margin keeps the test robust
-                    // against the rounding error of the scaling multiplication.
+                    // If the scaled remainder is below 1, no remaining digit can become
+                    // non-zero anymore, so all of them would be '0' and would be trimmed
+                    // away again. Skipping them saves the bulk of the work for typical
+                    // short decimal values whose remainder keeps a tiny but non-zero
+                    // residue (e.g. 3.33 -> 0.33000000000000007).
                     int remainingDigits = numFractionalDigits - i;
-                    if (remainingDigits > 0 && fractionalPart * POW10[remainingDigits] < 0.5)
+                    if (remainingDigits > 0 && fractionalPart * POW10[remainingDigits] < 1.0)
                     {
                         tailIsAllZeros = true;
                         break;
                     }
                 }
+
+                // Only a remainder of exactly zero proves that the digits represent the
+                // value without any loss. Any other remainder is too inaccurate to decide
+                // it, because the extraction amplifies its rounding error by 10 per digit.
+                digitsAreExact &= fractionalPart == 0;
 
                 int correctionIndex = mainBufferCount - 1;
                 while (mainBuffer[correctionIndex] == '0' && correctionIndex > firstFractionalDigitIndex)
@@ -1860,27 +2048,16 @@ public sealed partial class JsonSerializer
                 mainBufferCount = correctionIndex + 1;
                 if (oldMainBufferCount != mainBufferCount || tailIsAllZeros)
                 {
-                    // Trailing zeros were dropped (either written or skipped), so the digit
-                    // budget was not fully consumed and the value round-trips as written.
+                    // Trailing zeros were dropped (either written or skipped), so the
+                    // digit budget was not fully consumed. The digits may still be a
+                    // truncation, which the caller detects by parsing them back.
                     return;
                 }
 
                 // No trailing zeros were trimmed: the full digit budget was consumed,
-                // so this value may need more precision to round-trip. Flag it so the
-                // caller can verify and, if necessary, escalate to more digits.
-                usedFullPrecision = true;
-
-                while (mainBuffer[correctionIndex] == '9' && correctionIndex > firstFractionalDigitIndex)
-                {
-                    correctionIndex--;
-                }
-
-                if (mainBuffer[correctionIndex] < '9')
-                {
-                    mainBuffer[correctionIndex] += 1;
-                    mainBufferCount = correctionIndex + 1;
-                    return;
-                }
+                // so this value may need more precision to round-trip. Flag it, so the
+                // caller discards the digits and uses the exact framework formatter.
+                needsFallback = true;
             }
 
         }
@@ -1891,9 +2068,74 @@ public sealed partial class JsonSerializer
             1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18
         };
 
+        /// <summary>
+        /// Highest decimal exponent that is still written in plain notation.
+        /// </summary>
+        private const int POS_EXPONENT_LIMIT = 13;
+
+        /// <summary>
+        /// Highest decimal exponent that is still written in plain notation for float.
+        /// On NETSTANDARD2_0 the float path delegates to the double digit calculation,
+        /// so it uses the same limit there.
+        /// </summary>
+#if NETSTANDARD2_0
+        private const int FLOAT_POS_EXPONENT_LIMIT = POS_EXPONENT_LIMIT;
+#else
+        private const int FLOAT_POS_EXPONENT_LIMIT = 7;
+#endif
+
+        /// <summary>
+        /// 2^53: below that, every integral double is exactly representable as long and
+        /// no two integers share the same double.
+        /// </summary>
+        private const double MAX_EXACT_INTEGRAL_DOUBLE = 9007199254740992d;
+
+        /// <summary>
+        /// 2^24: below that, every integral float is exactly representable as int and
+        /// no two integers share the same float.
+        /// </summary>
+        private const float MAX_EXACT_INTEGRAL_FLOAT = 16777216f;
+
+        /// <summary>
+        /// Writes an integral value that is exactly representable as long. The digits are
+        /// taken from the integer directly, so they are exact and need neither rounding
+        /// correction nor round-trip verification. The notation matches the one used by
+        /// the generic digit extraction path.
+        /// </summary>
+        private void WriteExactIntegral(long integralValue, int posExponentLimit)
+        {
+            int digitCount = 0;
+            do
+            {
+                integralValue = Math.DivRem(integralValue, 10, out long digit);
+                tempBuffer[digitCount++] = (byte)('0' + (byte)digit);
+            }
+            while (integralValue > 0);
+
+            int exponent = digitCount - 1;
+            if (exponent <= posExponentLimit)
+            {
+                for (int i = digitCount - 1; i >= 0; i--) WriteToBufferWithoutCheck(tempBuffer[i]);
+                return;
+            }
+
+            // Scientific notation: a single leading digit, then the remaining significant
+            // digits without their trailing zeros.
+            int lastSignificant = 0;
+            while (lastSignificant < exponent && tempBuffer[lastSignificant] == '0') lastSignificant++;
+
+            WriteToBufferWithoutCheck(tempBuffer[exponent]);
+            if (lastSignificant < exponent)
+            {
+                WriteToBufferWithoutCheck((byte)'.');
+                for (int i = exponent - 1; i >= lastSignificant; i--) WriteToBufferWithoutCheck(tempBuffer[i]);
+            }
+            WriteToBufferWithoutCheck((byte)'E');
+            WriteSignedInteger(exponent);
+        }
+
         double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed, int MAX_SIGNIFICANT_DIGITS)
         {
-            const int POS_EXPONENT_LIMIT = 13;
             const int NEG_EXPONENT_LIMIT = -5;
 
             failed = false;

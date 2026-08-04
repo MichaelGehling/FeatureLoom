@@ -294,6 +294,46 @@ namespace FeatureLoom.Serialization
             AssertSerialized(value, expected);
         }
 
+        [Fact]
+        public void Serialize_Double_RoundTripsExactly()
+        {
+            var serializer = new JsonSerializer();
+            var random = new Random(12345);
+            var buffer = new byte[8];
+
+            void AssertRoundTrip(double value)
+            {
+                string json = serializer.Serialize(value);
+                Assert.True(double.TryParse(json, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed), json);
+                Assert.Equal(value, parsed);
+            }
+
+            foreach (double value in new[]
+            {
+                1d/3d, 3.33d, 0.1d, 1e-7d, 1e21d, 12345678.9d, 1234567890123456d,
+                double.Epsilon, double.MaxValue, double.MinValue, -1d, 1d
+            })
+            {
+                AssertRoundTrip(value);
+            }
+
+            for (int i = 0; i < 10000; i++)
+            {
+                random.NextBytes(buffer);
+                double value = BitConverter.ToDouble(buffer, 0);
+                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
+                AssertRoundTrip(value);
+            }
+
+            // Values within the range that is written in fixed point notation.
+            for (int i = 0; i < 10000; i++)
+            {
+                double value = (random.NextDouble() - 0.5) * Math.Pow(10, random.Next(-5, 14));
+                AssertRoundTrip(value);
+                AssertRoundTrip(Math.Round(value, random.Next(0, 10)));
+            }
+        }
+
         [Theory]
         [InlineData(null, "null")]
         [InlineData(0d, "0")]
