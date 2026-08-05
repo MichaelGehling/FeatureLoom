@@ -67,7 +67,9 @@ public class SerializeSimpleObjectTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            var jsonBytes = SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(obj, memoryStream);
+            // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
+            // so blocking here adds no measurable overhead but ensures the write actually happened.
+            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(obj, memoryStream).GetAwaiter().GetResult();
         }
     }
 #endif

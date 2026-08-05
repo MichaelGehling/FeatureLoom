@@ -90,7 +90,9 @@ public class SerializeContainerTypesTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            var jsonBytes = SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(array, memoryStream);
+            // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
+            // so blocking here adds no measurable overhead but ensures the write actually happened.
+            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(array, memoryStream).GetAwaiter().GetResult();
         }
     }
 #endif
@@ -119,7 +121,7 @@ public class SerializeContainerTypesTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            var jsonBytes = SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(list, memoryStream);
+            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(list, memoryStream).GetAwaiter().GetResult();
         }
     }
 #endif
@@ -148,7 +150,7 @@ public class SerializeContainerTypesTest
     {
         for (int i = 0; i < iterations; i++)
         {
-            var jsonBytes = SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(enumerable, memoryStream);
+            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(enumerable, memoryStream).GetAwaiter().GetResult();
         }
     }
 #endif

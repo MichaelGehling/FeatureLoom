@@ -470,8 +470,7 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteUintPtrValue(UIntPtr value)
         {
-            if ((long)value <= long.MaxValue) WriteUnsignedInteger((long)value);
-            else WriteString(value.ToString());
+            WriteUnsignedInteger((ulong)value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -503,8 +502,7 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteUlongValue(ulong value)
         {
-            if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
-            else WriteString(value.ToString());
+            WriteUnsignedInteger(value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -514,8 +512,7 @@ public sealed partial class JsonSerializer
             EnsureFreeBufferSpace(64);
             var countBefore = mainBufferCount;
 
-            if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
-            else WriteString(value.ToString());
+            WriteUnsignedInteger(value);
 
             var writtenBytes = mainBufferCount - countBefore;
             var slice = tempSlicedBuffer.GetSlice(writtenBytes);
@@ -529,8 +526,7 @@ public sealed partial class JsonSerializer
         public void WriteUlongValueAsString(ulong value)
         {
             WriteToBufferWithoutCheck(QUOTES);
-            if (value <= long.MaxValue) WriteUnsignedInteger((long)value);
-            else WriteString(value.ToString());
+            WriteUnsignedInteger(value);
             WriteToBufferWithoutCheck(QUOTES);
         }
 
@@ -1494,6 +1490,131 @@ public sealed partial class JsonSerializer
             }
         }
 
+        /// <summary>
+        /// Lookup table holding the two ASCII digits of every value from 00 to 99, so the
+        /// digit loop can emit two digits per division instead of one.
+        /// </summary>
+        private static readonly byte[] DigitPairsLookup = InitDigitPairsLookup();
+
+        private static byte[] InitDigitPairsLookup()
+        {
+            var lookup = new byte[200];
+            for (int i = 0; i < 100; i++)
+            {
+                lookup[i * 2] = (byte)('0' + (i / 10));
+                lookup[i * 2 + 1] = (byte)('0' + (i % 10));
+            }
+            return lookup;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int CountDigits(uint value)
+        {
+            if (value < 10U) return 1;
+            if (value < 100U) return 2;
+            if (value < 1000U) return 3;
+            if (value < 10000U) return 4;
+            if (value < 100000U) return 5;
+            if (value < 1000000U) return 6;
+            if (value < 10000000U) return 7;
+            if (value < 100000000U) return 8;
+            if (value < 1000000000U) return 9;
+            return 10;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int CountDigits(ulong value)
+        {
+            if (value <= uint.MaxValue) return CountDigits((uint)value);
+            if (value < 10000000000UL) return 10;
+            if (value < 100000000000UL) return 11;
+            if (value < 1000000000000UL) return 12;
+            if (value < 10000000000000UL) return 13;
+            if (value < 100000000000000UL) return 14;
+            if (value < 1000000000000000UL) return 15;
+            if (value < 10000000000000000UL) return 16;
+            if (value < 100000000000000000UL) return 17;
+            if (value < 1000000000000000000UL) return 18;
+            if (value < 10000000000000000000UL) return 19;
+            return 20;
+        }
+
+        /// <summary>
+        /// Writes the decimal digits of a value directly into the main buffer, filling it from
+        /// the back. The caller must have reserved <paramref name="digits"/> bytes beforehand.
+        /// This avoids the detour over the temp buffer and the additional copy it requires.
+        /// </summary>
+        private void WriteDigits(uint value, int digits)
+        {
+            var buffer = mainBuffer;
+            int pos = mainBufferCount + digits;
+            mainBufferCount = pos;
+            while (value >= 100)
+            {
+                uint quotient = value / 100;
+                int pairIndex = (int)(value - quotient * 100) * 2;
+                value = quotient;
+                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
+                buffer[--pos] = DigitPairsLookup[pairIndex];
+            }
+            if (value < 10)
+            {
+                buffer[--pos] = (byte)('0' + value);
+            }
+            else
+            {
+                int pairIndex = (int)value * 2;
+                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
+                buffer[--pos] = DigitPairsLookup[pairIndex];
+            }
+        }
+
+        /// <summary>
+        /// Writes the decimal digits of a value directly into the main buffer, filling it from
+        /// the back. Once the remaining value fits into 32 bit, it switches to the cheaper
+        /// 32 bit division path.
+        /// </summary>
+        private void WriteDigits(ulong value, int digits)
+        {
+            if (value <= uint.MaxValue)
+            {
+                WriteDigits((uint)value, digits);
+                return;
+            }
+
+            var buffer = mainBuffer;
+            int pos = mainBufferCount + digits;
+            mainBufferCount = pos;
+            while (value > uint.MaxValue)
+            {
+                ulong quotient = value / 100;
+                int pairIndex = (int)(value - quotient * 100) * 2;
+                value = quotient;
+                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
+                buffer[--pos] = DigitPairsLookup[pairIndex];
+            }
+
+            uint rest = (uint)value;
+            while (rest >= 100)
+            {
+                uint quotient = rest / 100;
+                int pairIndex = (int)(rest - quotient * 100) * 2;
+                rest = quotient;
+                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
+                buffer[--pos] = DigitPairsLookup[pairIndex];
+            }
+            if (rest < 10)
+            {
+                buffer[--pos] = (byte)('0' + rest);
+            }
+            else
+            {
+                int pairIndex = (int)rest * 2;
+                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
+                buffer[--pos] = DigitPairsLookup[pairIndex];
+            }
+        }
+
         private void WriteSignedInteger(long inputValue)
         {
             var value = inputValue;
@@ -1518,24 +1639,19 @@ public sealed partial class JsonSerializer
                     }
                 }
             }
-            if (value < PositiveNumberBytesLookup.Length)
+            else if (value < PositiveNumberBytesLookup.Length)
             {
                 var bytes = PositiveNumberBytesLookup[value];
                 WriteToBuffer(bytes);
                 return;
             }
 
-            const int maxDigits = 25;
-            int index = maxDigits;
-            while (value >= 10)
-            {
-                value = Math.DivRem(value, 10, out long digit);
-                tempBuffer[index--] = (byte)('0' + digit);
-            }
-            if (value > 0) tempBuffer[index--] = (byte)('0' + value);
-            if (isNegative) tempBuffer[index--] = (byte)'-';
-
-            WriteToBuffer(tempBuffer, index + 1, maxDigits - index);
+            ulong magnitude = (ulong)value;
+            int digits = CountDigits(magnitude);
+            int requiredBytes = isNegative ? digits + 1 : digits;
+            if (mainBufferCount + requiredBytes > mainBufferLimit) WriteBufferToStream();
+            if (isNegative) mainBuffer[mainBufferCount++] = (byte)'-';
+            WriteDigits(magnitude, digits);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1575,17 +1691,12 @@ public sealed partial class JsonSerializer
                 return;
             }
 
-            const int maxDigits = 25;
-            int index = maxDigits;
-            while (value >= 10)
-            {
-                value = Math.DivRem(value, 10, out int digit);
-                tempBuffer[index--] = (byte)('0' + digit);
-            }
-            if (value > 0) tempBuffer[index--] = (byte)('0' + value);
-            if (isNegative) tempBuffer[index--] = (byte)'-';
-
-            WriteToBuffer(tempBuffer, index + 1, maxDigits - index);
+            uint magnitude = (uint)value;
+            int digits = CountDigits(magnitude);
+            int requiredBytes = isNegative ? digits + 1 : digits;
+            if (mainBufferCount + requiredBytes > mainBufferLimit) WriteBufferToStream();
+            if (isNegative) mainBuffer[mainBufferCount++] = (byte)'-';
+            WriteDigits(magnitude, digits);
         }
 
         private void WriteUnsignedInteger(long inputValue)
@@ -1598,19 +1709,25 @@ public sealed partial class JsonSerializer
                 return;
             }
 
-            const int maxDigits = 25;
-            int index = maxDigits;
-            while (value >= 10)
-            {
-                value = Math.DivRem(value, 10, out long digit);
-                tempBuffer[index--] = (byte)('0' + digit);
-            }
-            if (value > 0) tempBuffer[index--] = (byte)('0' + value);
-
-            WriteToBuffer(tempBuffer, index + 1, maxDigits - index);
+            ulong magnitude = (ulong)value;
+            int digits = CountDigits(magnitude);
+            if (mainBufferCount + digits > mainBufferLimit) WriteBufferToStream();
+            WriteDigits(magnitude, digits);
         }
 
-        //static readonly byte[] ZERO_FLOAT = "0.0".ToByteArray();
+        private void WriteUnsignedInteger(ulong value)
+        {
+            if (value < (ulong)PositiveNumberBytesLookup.Length)
+            {
+                var bytes = PositiveNumberBytesLookup[value];
+                WriteToBuffer(bytes, 0, bytes.Length);
+                return;
+            }
+
+            int digits = CountDigits(value);
+            if (mainBufferCount + digits > mainBufferLimit) WriteBufferToStream();
+            WriteDigits(value, digits);
+        }
         static readonly byte ZERO_FLOAT = (byte)'0';
         static readonly byte[] NAN = "\"NaN\"".ToByteArray();
         static readonly byte[] POS_INFINITY = "\"Infinity\"".ToByteArray();

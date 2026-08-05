@@ -39,6 +39,13 @@ namespace FeatureLoom.Serialization
 
             public Type HandlerType => handlerType;
 
+            /// <summary>
+            /// True if <see cref="WriteItem_NoCheck{T}"/> may be used instead of <see cref="WriteItem{T}"/>,
+            /// i.e. the call type matches the handler type and no item info bookkeeping is required.
+            /// Mirrors CachedTypeReader.IsNoCheckPossible on the deserializer side.
+            /// </summary>
+            public bool IsNoCheckPossible<T>() => typeof(T) == handlerType && !serializer.settings.requiresItemInfos;
+
             public void SetItemWriter<T>(Action<T, bool, ByteSegment> itemWriter, bool childrenMustWriteRefPath)
             {
                 this.handlerType = typeof(T);
@@ -72,6 +79,18 @@ namespace FeatureLoom.Serialization
                 {
                     objectItemWriter(item, true, fieldName);
                 }
+            }
+
+            /// <summary>
+            /// Writes an item without the null check, the call type check and without an item name.
+            /// Only valid if <see cref="IsNoCheckPossible{T}"/> returned true and the item is not null.
+            /// Mirrors CachedTypeReader.ReadValue_NoCheck on the deserializer side.
+            /// </summary>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void WriteItem_NoCheck<T>(T item)
+            {
+                Action<T, bool, ByteSegment> typedItemWriter = (Action<T, bool, ByteSegment>)itemWriter;
+                typedItemWriter.Invoke(item, false, default);
             }
         }
     }
