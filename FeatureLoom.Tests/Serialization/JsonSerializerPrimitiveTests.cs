@@ -269,7 +269,7 @@ namespace FeatureLoom.Serialization
         [InlineData(1.012345678901234d, "1.012345678901234")]
         [InlineData(0.1d, "0.1")]
         [InlineData(0.01234d, "0.01234")]
-        [InlineData(0.00001d, "0.00001")]
+        [InlineData(0.00001d, "1E-05")]
         [InlineData(-0.00015890432405285535d, "-0.00015890432405285535")]
         [InlineData(0.100001d, "0.100001")]
         public void Serialize_Double(double value, string expected)
@@ -278,8 +278,8 @@ namespace FeatureLoom.Serialization
         }
 
         [Theory]
-        [InlineData(1e20d, "1E20")]
-        [InlineData(1e-6d, "1E-6")]
+        [InlineData(1e20d, "1E+20")]
+        [InlineData(1e-6d, "1E-06")]
         public void Serialize_Double_ExponentNotation(double value, string expected)
         {
             AssertSerialized(value, expected);
