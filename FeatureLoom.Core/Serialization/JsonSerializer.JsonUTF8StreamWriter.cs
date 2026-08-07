@@ -2529,7 +2529,11 @@ public sealed partial class JsonSerializer
         private static readonly double[] POW10 = new double[]
         {
             1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
-            1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18
+            1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18,
+            // Values below 1 extend the fractional digit budget by up to
+            // -NEG_EXPONENT_LIMIT - 1 leading zeros, so the tail-is-zero probe can index
+            // beyond 1e18.
+            1e19, 1e20, 1e21, 1e22
         };
 
         /// <summary>
@@ -2607,7 +2611,13 @@ public sealed partial class JsonSerializer
             int binaryExponent = (int)((bits >> 52) & 0x7FF) - 1023;
             exponent = (int)(binaryExponent * 0.34f);
             numIntegralDigits = Math.Max(0, exponent + 1);
-            numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits);
+            // For values below 1 the leading zeros right after the decimal point occupy
+            // fractional digit slots without carrying any significant digit. They must be
+            // added on top of the budget, otherwise such values receive fewer significant
+            // digits than intended and the fast path falls back on values it could have
+            // represented exactly (e.g. 0.0001589 got only 12 of the 16 digits).
+            int numLeadingFractionalZeros = numIntegralDigits == 0 ? -exponent - 1 : 0;
+            numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits + numLeadingFractionalZeros);
             printExponent = false;
 
             if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
