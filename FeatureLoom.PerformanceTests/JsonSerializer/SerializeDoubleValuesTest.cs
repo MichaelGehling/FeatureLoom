@@ -6,6 +6,13 @@ using System.Text.Json;
 
 namespace FeatureLoom.PerformanceTests.JsonSerializer;
 
+/// <summary>
+/// Compares the serialization performance for double values of different magnitudes and
+/// precisions, covering the short round-trippable cases as well as the ones requiring
+/// exponent notation or full 17-digit precision.
+/// Each case is measured as a single value (dominated by the per-serialization overhead)
+/// and as an array of that value (dominated by the actual number formatting).
+/// </summary>
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
@@ -13,15 +20,9 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MaxIterationCount(5000)]
 public class SerializeDoubleValuesTest
 {
-    static Serialization.JsonSerializer featureJsonSerializer = new Serialization.JsonSerializer(new Serialization.JsonSerializer.Settings()
-    {
+    static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
 
-    });
-
-    static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
-    {
-        IncludeFields = true,
-    };
+    static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
     MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
 
@@ -46,8 +47,16 @@ public class SerializeDoubleValuesTest
     [ParamsSource(nameof(DoubleValues))]
     public double value;
 
-    [Params(1000)]
-    public int iterations;
+    private double[] array;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        array = new double[BenchmarkSettings.ArraySize];
+        for (int i = 0; i < array.Length; i++) array[i] = value;
+
+        SampleOutput.Collect($"Double({value:R})", value, featureJsonSerializer, systemTextJsonSerializerSettings);
+    }
 
     [IterationSetup]
     public void Prepare()
@@ -56,18 +65,18 @@ public class SerializeDoubleValuesTest
     }
 
     [Benchmark]
-    public void SerializeDouble_ToStream_Feature()
+    public void SerializeDouble_Single_Feature()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, value);
         }
     }
 
     [Benchmark(Baseline = true)]
-    public void SerializeDouble_ToStream_SystemText()
+    public void SerializeDouble_Single_SystemText()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, value, systemTextJsonSerializerSettings);
         }
@@ -75,13 +84,42 @@ public class SerializeDoubleValuesTest
 
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void SerializeDouble_ToStream_SpanJson()
+    public void SerializeDouble_Single_SpanJson()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
             // so blocking here adds no measurable overhead but ensures the write actually happened.
-            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(value, memoryStream).GetAwaiter().GetResult();
+            SerializerConfigs.SerializeWithSpanJson(value, memoryStream);
+        }
+    }
+#endif
+
+    [Benchmark]
+    public void SerializeDouble_Array_Feature()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureJsonSerializer.Serialize(memoryStream, array);
+        }
+    }
+
+    [Benchmark]
+    public void SerializeDouble_Array_SystemText()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
+        }
+    }
+
+#if NET6_0_OR_GREATER
+    [Benchmark]
+    public void SerializeDouble_Array_SpanJson()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            SerializerConfigs.SerializeWithSpanJson(array, memoryStream);
         }
     }
 #endif

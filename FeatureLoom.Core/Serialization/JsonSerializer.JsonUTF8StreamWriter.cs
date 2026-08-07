@@ -211,39 +211,32 @@ public sealed partial class JsonSerializer
         }
 
         /// <summary>
-        /// Copies a byte range into the target buffer. For short blobs a simple copy loop is
-        /// cheaper than the call overhead of Array.Copy, which dominates the per-field cost
-        /// when serializing objects with many small values (field names, quotes, digits).
+        /// Copies a byte range into the target buffer. Delegates to the runtime's memmove,
+        /// which already handles short blobs with a couple of overlapping wide moves and needs
+        /// only a single length check, so a hand-written loop with its per-element bounds
+        /// checks cannot beat it.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void CopyBytes(byte[] source, int sourceOffset, byte[] target, int targetOffset, int count)
         {
-            if (count <= 16)
-            {
-                for (int i = 0; i < count; i++) target[targetOffset + i] = source[sourceOffset + i];
-            }
-            else
-            {
-                Array.Copy(source, sourceOffset, target, targetOffset, count);
-            }
+#if !NETSTANDARD2_0
+            new ReadOnlySpan<byte>(source, sourceOffset, count).CopyTo(new Span<byte>(target, targetOffset, count));
+#else
+            System.Buffer.BlockCopy(source, sourceOffset, target, targetOffset, count);
+#endif
         }
 
         /// <summary>
-        /// Copies a complete array into the target buffer. Bounding the loop directly by the
-        /// source length (instead of a separate count) allows the JIT to elide the source
-        /// bounds check and avoids the per-element source offset arithmetic.
+        /// Copies a complete array into the target buffer.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void CopyBytes(byte[] source, byte[] target, int targetOffset)
         {
-            if (source.Length <= 16)
-            {
-                for (int i = 0; i < source.Length; i++) target[targetOffset + i] = source[i];
-            }
-            else
-            {
-                Array.Copy(source, 0, target, targetOffset, source.Length);
-            }
+#if !NETSTANDARD2_0
+            new ReadOnlySpan<byte>(source).CopyTo(new Span<byte>(target, targetOffset, source.Length));
+#else
+            System.Buffer.BlockCopy(source, 0, target, targetOffset, source.Length);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -271,9 +264,11 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBuffer(ByteSegment data)
         {
-            if (mainBufferCount + data.Count > mainBufferLimit) WriteBufferToStream();
-            data.AsArraySegment.CopyTo(mainBuffer, mainBufferCount);
-            mainBufferCount += data.Count;
+            var segment = data.AsArraySegment;
+            int count = segment.Count;
+            if (mainBufferCount + count > mainBufferLimit) WriteBufferToStream();
+            CopyBytes(segment.Array, segment.Offset, mainBuffer, mainBufferCount, count);
+            mainBufferCount += count;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -935,7 +930,9 @@ public sealed partial class JsonSerializer
         private void WriteByteArray(ByteSegment value)
         {
             int numInputBytes = value.Count;
-            int bytesToReserve = 2 + (numInputBytes) * 3;
+            // Each element needs at most 3 digits plus a separator, and the lookup always
+            // writes a full 4-byte chunk, so a little extra slack is reserved for the last one.
+            int bytesToReserve = 2 + numInputBytes * 4 + 4;
             EnsureFreeBufferSpace(bytesToReserve);
 #if !NETSTANDARD2_0
             var bytes = value.AsSpan();
@@ -950,16 +947,55 @@ public sealed partial class JsonSerializer
             }
 
             WriteToBufferWithoutCheck((byte)'[');
-            WriteByte(bytes[0]);
+            WriteFromNumberLookupWithoutCheck(bytes[0]);
             for (int i = 1; i < bytes.Length; i++)
             {
                 WriteToBufferWithoutCheck((byte)',');
-                WriteByte(bytes[i]);
+                WriteFromNumberLookupWithoutCheck(bytes[i]);
             }
             WriteToBufferWithoutCheck((byte)']');
         }
 
         private static readonly byte[] Base64Chars = System.Text.Encoding.ASCII.GetBytes("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+
+        /// <summary>
+        /// Contains the two base64 characters for every 12-bit group, stored in 2-byte chunks,
+        /// so a 3-byte input block can be written as two 2-byte blocks.
+        /// </summary>
+        private static readonly byte[] Base64PairLookup = CreateBase64PairLookup();
+
+        private static byte[] CreateBase64PairLookup()
+        {
+            var lookup = new byte[4096 * 2];
+            for (int i = 0; i < 4096; i++)
+            {
+                lookup[i * 2] = Base64Chars[(i >> 6) & 0x3F];
+                lookup[i * 2 + 1] = Base64Chars[i & 0x3F];
+            }
+            return lookup;
+        }
+
+        /// <summary>
+        /// Writes the two base64 characters of a 12-bit group as one 2-byte block. The caller
+        /// must have ensured the free space.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteBase64Pair(int group12Bit)
+        {
+            var lookup = Base64PairLookup;
+            var buffer = mainBuffer;
+            int offset = group12Bit * 2;
+            int pos = mainBufferCount;
+#if NET7_0_OR_GREATER
+            ushort chunk = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(lookup), offset));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(buffer), pos), chunk);
+#else
+            buffer[pos] = lookup[offset];
+            buffer[pos + 1] = lookup[offset + 1];
+#endif
+            mainBufferCount = pos + 2;
+        }
+
         private void WriteBase64(ByteSegment value)
         {
             int numInputBytes = value.Count;            
@@ -980,18 +1016,15 @@ public sealed partial class JsonSerializer
                 int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
                 bufferValue |= (bytes[inputIndex++] << 8);
                 bufferValue |= bytes[inputIndex++];
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 18) & 0x3F]);
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 12) & 0x3F]);
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 6) & 0x3F]);
-                WriteToBufferWithoutCheck(Base64Chars[bufferValue & 0x3F]);
+                WriteBase64Pair((bufferValue >> 12) & 0xFFF);
+                WriteBase64Pair(bufferValue & 0xFFF);
             }
 
             int remainingBytes = numInputBytes - inputIndex;
             if (remainingBytes == 1)
             {
                 int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 18) & 0x3F]);
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 12) & 0x3F]);
+                WriteBase64Pair((bufferValue >> 12) & 0xFFF);
                 WriteToBufferWithoutCheck((byte)'=');
                 WriteToBufferWithoutCheck((byte)'=');
             }
@@ -999,8 +1032,7 @@ public sealed partial class JsonSerializer
             {
                 int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
                 bufferValue |= (bytes[inputIndex++] << 8);
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 18) & 0x3F]);
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 12) & 0x3F]);
+                WriteBase64Pair((bufferValue >> 12) & 0xFFF);
                 WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 6) & 0x3F]);
                 WriteToBufferWithoutCheck((byte)'=');
             }
@@ -1116,33 +1148,224 @@ public sealed partial class JsonSerializer
             return indexNameList[index];
         }
 
-        private static readonly byte[][] PositiveNumberBytesLookup = InitNumberBytesLookup(false, 256);
-        private static readonly byte[][] NegativeNumberBytesLookup = InitNumberBytesLookup(true, 128);
-        private static readonly byte[][] BytesLookup = InitBytesLookup(true);
+        /// <summary>
+        /// Exclusive upper bound of the values covered by <see cref="NumberLookup"/>.
+        /// </summary>
+        private const int NUMBER_LOOKUP_LIMIT = 10000;
+
+        /// <summary>
+        /// Fill byte of the unused trailing bytes of a lookup chunk. It is below any ASCII
+        /// digit, so it marks the end of the digits without needing their count.
+        /// </summary>
+        private const byte NUMBER_LOOKUP_PADDING = 0;
+
+        /// <summary>
+        /// Single flat table holding the ASCII digits of all values from 0 to 9999 in
+        /// left-aligned 4-byte chunks (unused trailing bytes hold <see cref="NUMBER_LOOKUP_PADDING"/>).
+        /// A single array avoids the per-value array objects and the extra indirection of a
+        /// jagged lookup, and the left alignment makes the chunk start a plain value*4, so a
+        /// number is written by copying a fixed 4-byte block and advancing only by its digit count.
+        /// </summary>
+        private static readonly byte[] NumberLookup = InitNumberLookup();
+
+        /// <summary>
+        /// Same layout as <see cref="NumberLookup"/>, but the chunks are right-aligned and
+        /// filled with '0'. Used for the trailing 4-digit groups of larger numbers, where the
+        /// leading zeros are significant, so a group is written as one unconditional 4-byte block.
+        /// </summary>
+        private static readonly byte[] NumberLookupZeroPadded = InitNumberLookupZeroPadded();
+
         private static readonly byte[] Int32MinValueBytes = int.MinValue.ToString().ToByteArray();
         private static readonly byte[] Int64MinValueBytes = long.MinValue.ToString().ToByteArray();
 
-        private static byte[][] InitNumberBytesLookup(bool negative, int size)
+        private static byte[] InitNumberLookup()
         {
-            byte[][] lookup = new byte[size][];
-            int factor = negative ? -1 : 1;
-
-            for (int i = 0; i < size; i++)
+            byte[] lookup = new byte[NUMBER_LOOKUP_LIMIT * 4];
+            for (int i = 0; i < NUMBER_LOOKUP_LIMIT; i++)
             {
-                lookup[i] = Encoding.ASCII.GetBytes((i * factor).ToString());
+                int digits = CountDigits((uint)i);
+                int chunkStart = i * 4;
+                int pos = chunkStart + digits;
+                for (int p = pos; p < chunkStart + 4; p++) lookup[p] = NUMBER_LOOKUP_PADDING;
+                int value = i;
+                do
+                {
+                    lookup[--pos] = (byte)('0' + (value % 10));
+                    value /= 10;
+                }
+                while (value > 0);
             }
-
             return lookup;
         }
 
-        private static byte[][] InitBytesLookup(bool negative)
+        private static byte[] InitNumberLookupZeroPadded()
         {
-            byte[][] lookup = new byte[256][];
-            for (int i = 0; i < 256; i++)
+            byte[] lookup = new byte[NUMBER_LOOKUP_LIMIT * 4];
+            for (int i = 0; i < NUMBER_LOOKUP_LIMIT; i++)
             {
-                lookup[i] = Encoding.ASCII.GetBytes(i.ToString());
+                int pos = i * 4 + 4;
+                int value = i;
+                for (int d = 0; d < 4; d++)
+                {
+                    lookup[--pos] = (byte)('0' + (value % 10));
+                    value /= 10;
+                }
             }
             return lookup;
+        }
+
+        /// <summary>
+        /// Writes a value below <see cref="NUMBER_LOOKUP_LIMIT"/> by copying its 4-byte chunk
+        /// out of <see cref="NumberLookup"/>. The trailing padding bytes are written too, but
+        /// are not counted and are overwritten by the next write. The digit count is derived
+        /// from the already loaded padding bytes, so no separate digit calculation is needed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteFromNumberLookup(uint value)
+        {
+            if (mainBufferCount + 4 > mainBufferLimit) WriteBufferToStream();
+            WriteFromNumberLookupWithoutCheck(value);
+        }
+
+        /// <summary>
+        /// Same as <see cref="WriteFromNumberLookup(uint)"/>, but the caller must have ensured
+        /// space for 4 bytes, even if fewer digits are counted.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteFromNumberLookupWithoutCheck(uint value)
+        {
+            var lookup = NumberLookup;
+            var buffer = mainBuffer;
+            int offset = (int)value * 4;
+            int pos = mainBufferCount;
+#if NET7_0_OR_GREATER
+            // The whole chunk is moved as a single 4-byte load/store, which also removes the
+            // bounds checks of the byte-wise accesses. The free space was ensured above.
+            uint chunk = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(lookup), offset));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(buffer), pos), chunk);
+
+            // The padding bytes are zero, so the digit count follows from the position of the
+            // highest non-zero byte. The chunk is never zero, because the first digit is always
+            // written.
+            int digits = BitConverter.IsLittleEndian
+                ? 4 - (BitOperations.LeadingZeroCount(chunk) >> 3)
+                : 4 - (BitOperations.TrailingZeroCount(chunk) >> 3);
+#else
+            byte b0 = lookup[offset];
+            byte b1 = lookup[offset + 1];
+            byte b2 = lookup[offset + 2];
+            byte b3 = lookup[offset + 3];
+            buffer[pos] = b0;
+            buffer[pos + 1] = b1;
+            buffer[pos + 2] = b2;
+            buffer[pos + 3] = b3;
+
+            // Copying and counting are kept branchless on purpose: the digit count is
+            // data-dependent, so branches on it would mispredict often, which costs far
+            // more than the few extra padding-byte stores they could save.
+            int digits = 1;
+            if (b1 != NUMBER_LOOKUP_PADDING) digits++;
+            if (b2 != NUMBER_LOOKUP_PADDING) digits++;
+            if (b3 != NUMBER_LOOKUP_PADDING) digits++;
+#endif
+            mainBufferCount = pos + digits;
+        }
+
+        /// <summary>
+        /// Writes a 4-digit group including its leading zeros as one unconditional 4-byte
+        /// block. The caller must have ensured the free space.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteFullNumberChunk(uint value)
+        {
+            var lookup = NumberLookupZeroPadded;
+            var buffer = mainBuffer;
+            int offset = (int)value * 4;
+            int pos = mainBufferCount;
+#if NET7_0_OR_GREATER
+            uint chunk = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(lookup), offset));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(buffer), pos), chunk);
+#else
+            buffer[pos] = lookup[offset];
+            buffer[pos + 1] = lookup[offset + 1];
+            buffer[pos + 2] = lookup[offset + 2];
+            buffer[pos + 3] = lookup[offset + 3];
+#endif
+            mainBufferCount = pos + 4;
+        }
+
+        /// <summary>
+        /// Writes an 8-digit group including its leading zeros. The caller must have ensured
+        /// the free space.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteFullNumberChunk8(uint value)
+        {
+            uint high = value / 10000;
+            WriteFullNumberChunk(high);
+            WriteFullNumberChunk(value - high * 10000);
+        }
+
+        /// <summary>
+        /// Writes a value in groups of 4 digits, each taken from the lookup tables. This
+        /// replaces the digit-by-digit division loop by a few divisions and a handful of
+        /// 4-byte block writes.
+        /// </summary>
+        private void WriteUnsignedInteger32(uint value)
+        {
+            if (value < NUMBER_LOOKUP_LIMIT)
+            {
+                WriteFromNumberLookup(value);
+                return;
+            }
+
+            // Worst case: leading group writes 4 bytes (incl. padding) plus two full groups.
+            if (mainBufferCount + 12 > mainBufferLimit) WriteBufferToStream();
+
+            if (value < 100000000u)
+            {
+                uint high = value / 10000;
+                WriteFromNumberLookup(high);
+                WriteFullNumberChunk(value - high * 10000);
+            }
+            else
+            {
+                uint high = value / 100000000u;
+                uint rest = value - high * 100000000u;
+                WriteFromNumberLookup(high);
+                WriteFullNumberChunk8(rest);
+            }
+        }
+
+        /// <summary>
+        /// Writes a value in groups of 4 digits, splitting off 8 digits at a time to stay in
+        /// the cheaper 32 bit arithmetic for the groups.
+        /// </summary>
+        private void WriteUnsignedInteger64(ulong value)
+        {
+            if (value <= uint.MaxValue)
+            {
+                WriteUnsignedInteger32((uint)value);
+                return;
+            }
+
+            // Worst case: leading group writes 4 bytes (incl. padding) plus four full groups.
+            if (mainBufferCount + 20 > mainBufferLimit) WriteBufferToStream();
+
+            ulong rest = value / 100000000UL;
+            uint low8 = (uint)(value - rest * 100000000UL);
+            if (rest < 100000000UL)
+            {
+                WriteUnsignedInteger32((uint)rest);
+            }
+            else
+            {
+                ulong high = rest / 100000000UL;
+                uint mid8 = (uint)(rest - high * 100000000UL);
+                WriteFromNumberLookup((uint)high); // At most 4 digits for ulong.MaxValue
+                WriteFullNumberChunk8(mid8);
+            }
+            WriteFullNumberChunk8(low8);
         }
 
         private static readonly byte[] BackSlashEscapeBytes = "\\\\".ToByteArray();
@@ -1490,23 +1713,6 @@ public sealed partial class JsonSerializer
             }
         }
 
-        /// <summary>
-        /// Lookup table holding the two ASCII digits of every value from 00 to 99, so the
-        /// digit loop can emit two digits per division instead of one.
-        /// </summary>
-        private static readonly byte[] DigitPairsLookup = InitDigitPairsLookup();
-
-        private static byte[] InitDigitPairsLookup()
-        {
-            var lookup = new byte[200];
-            for (int i = 0; i < 100; i++)
-            {
-                lookup[i * 2] = (byte)('0' + (i / 10));
-                lookup[i * 2 + 1] = (byte)('0' + (i % 10));
-            }
-            return lookup;
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int CountDigits(uint value)
         {
@@ -1522,211 +1728,58 @@ public sealed partial class JsonSerializer
             return 10;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int CountDigits(ulong value)
-        {
-            if (value <= uint.MaxValue) return CountDigits((uint)value);
-            if (value < 10000000000UL) return 10;
-            if (value < 100000000000UL) return 11;
-            if (value < 1000000000000UL) return 12;
-            if (value < 10000000000000UL) return 13;
-            if (value < 100000000000000UL) return 14;
-            if (value < 1000000000000000UL) return 15;
-            if (value < 10000000000000000UL) return 16;
-            if (value < 100000000000000000UL) return 17;
-            if (value < 1000000000000000000UL) return 18;
-            if (value < 10000000000000000000UL) return 19;
-            return 20;
-        }
-
-        /// <summary>
-        /// Writes the decimal digits of a value directly into the main buffer, filling it from
-        /// the back. The caller must have reserved <paramref name="digits"/> bytes beforehand.
-        /// This avoids the detour over the temp buffer and the additional copy it requires.
-        /// </summary>
-        private void WriteDigits(uint value, int digits)
-        {
-            var buffer = mainBuffer;
-            int pos = mainBufferCount + digits;
-            mainBufferCount = pos;
-            while (value >= 100)
-            {
-                uint quotient = value / 100;
-                int pairIndex = (int)(value - quotient * 100) * 2;
-                value = quotient;
-                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
-                buffer[--pos] = DigitPairsLookup[pairIndex];
-            }
-            if (value < 10)
-            {
-                buffer[--pos] = (byte)('0' + value);
-            }
-            else
-            {
-                int pairIndex = (int)value * 2;
-                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
-                buffer[--pos] = DigitPairsLookup[pairIndex];
-            }
-        }
-
-        /// <summary>
-        /// Writes the decimal digits of a value directly into the main buffer, filling it from
-        /// the back. Once the remaining value fits into 32 bit, it switches to the cheaper
-        /// 32 bit division path.
-        /// </summary>
-        private void WriteDigits(ulong value, int digits)
-        {
-            if (value <= uint.MaxValue)
-            {
-                WriteDigits((uint)value, digits);
-                return;
-            }
-
-            var buffer = mainBuffer;
-            int pos = mainBufferCount + digits;
-            mainBufferCount = pos;
-            while (value > uint.MaxValue)
-            {
-                ulong quotient = value / 100;
-                int pairIndex = (int)(value - quotient * 100) * 2;
-                value = quotient;
-                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
-                buffer[--pos] = DigitPairsLookup[pairIndex];
-            }
-
-            uint rest = (uint)value;
-            while (rest >= 100)
-            {
-                uint quotient = rest / 100;
-                int pairIndex = (int)(rest - quotient * 100) * 2;
-                rest = quotient;
-                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
-                buffer[--pos] = DigitPairsLookup[pairIndex];
-            }
-            if (rest < 10)
-            {
-                buffer[--pos] = (byte)('0' + rest);
-            }
-            else
-            {
-                int pairIndex = (int)rest * 2;
-                buffer[--pos] = DigitPairsLookup[pairIndex + 1];
-                buffer[--pos] = DigitPairsLookup[pairIndex];
-            }
-        }
-
         private void WriteSignedInteger(long inputValue)
         {
             var value = inputValue;
-            bool isNegative = value < 0;
-            if (isNegative)
+            if (value < 0)
             {
-                value = -value;
-                if (value < NegativeNumberBytesLookup.Length)
+                // If the value was long.MinValue negating it will cause an overflow and resulting again in long.MinValue,
+                // so we handle it as a special number
+                if (value == long.MinValue)
                 {
-                    // If the value was long.MinValue negating it will cause an overflow and resulting again in long.MinValue,
-                    // so we handle it as a special number
-                    if (value == long.MinValue)
-                    {
-                        WriteToBuffer(Int64MinValueBytes);
-                        return;
-                    }
-                    else
-                    {
-                        var bytes = NegativeNumberBytesLookup[value];
-                        WriteToBuffer(bytes);
-                        return;
-                    }
+                    WriteToBuffer(Int64MinValueBytes);
+                    return;
                 }
-            }
-            else if (value < PositiveNumberBytesLookup.Length)
-            {
-                var bytes = PositiveNumberBytesLookup[value];
-                WriteToBuffer(bytes);
-                return;
+                value = -value;
+                WriteToBuffer((byte)'-');
             }
 
-            ulong magnitude = (ulong)value;
-            int digits = CountDigits(magnitude);
-            int requiredBytes = isNegative ? digits + 1 : digits;
-            if (mainBufferCount + requiredBytes > mainBufferLimit) WriteBufferToStream();
-            if (isNegative) mainBuffer[mainBufferCount++] = (byte)'-';
-            WriteDigits(magnitude, digits);
+            WriteUnsignedInteger64((ulong)value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteByte(byte inputValue)
         {
-            WriteToBuffer(BytesLookup[inputValue]);
+            WriteFromNumberLookup(inputValue);
         }
 
         private void WriteSignedInteger(int inputValue)
         {
             var value = inputValue;
-            bool isNegative = value < 0;
-            if (isNegative)
+            if (value < 0)
             {
-                value = -value;
-                if (value < NegativeNumberBytesLookup.Length)
+                // If the value was int.MinValue negating it will cause an overflow and resulting again in int.MinValue,
+                // so we handle it as a special number
+                if (value == int.MinValue)
                 {
-                    // If the value was int.MinValue negating it will cause an overflow and resulting again in int.MinValue,
-                    // so we handle it as a special number
-                    if (value == int.MinValue)
-                    {
-                        WriteToBuffer(Int32MinValueBytes);
-                        return;
-                    }
-                    else
-                    {
-                        var bytes = NegativeNumberBytesLookup[value];
-                        WriteToBuffer(bytes);
-                        return;
-                    }
+                    WriteToBuffer(Int32MinValueBytes);
+                    return;
                 }
-            }
-            else if (value < PositiveNumberBytesLookup.Length)
-            {
-                var bytes = PositiveNumberBytesLookup[value];
-                WriteToBuffer(bytes);
-                return;
+                value = -value;
+                WriteToBuffer((byte)'-');
             }
 
-            uint magnitude = (uint)value;
-            int digits = CountDigits(magnitude);
-            int requiredBytes = isNegative ? digits + 1 : digits;
-            if (mainBufferCount + requiredBytes > mainBufferLimit) WriteBufferToStream();
-            if (isNegative) mainBuffer[mainBufferCount++] = (byte)'-';
-            WriteDigits(magnitude, digits);
+            WriteUnsignedInteger32((uint)value);
         }
 
         private void WriteUnsignedInteger(long inputValue)
         {
-            var value = inputValue;
-            if (value < PositiveNumberBytesLookup.Length)
-            {
-                var bytes = PositiveNumberBytesLookup[value];
-                WriteToBuffer(bytes, 0, bytes.Length);
-                return;
-            }
-
-            ulong magnitude = (ulong)value;
-            int digits = CountDigits(magnitude);
-            if (mainBufferCount + digits > mainBufferLimit) WriteBufferToStream();
-            WriteDigits(magnitude, digits);
+            WriteUnsignedInteger64((ulong)inputValue);
         }
 
         private void WriteUnsignedInteger(ulong value)
         {
-            if (value < (ulong)PositiveNumberBytesLookup.Length)
-            {
-                var bytes = PositiveNumberBytesLookup[value];
-                WriteToBuffer(bytes, 0, bytes.Length);
-                return;
-            }
-
-            int digits = CountDigits(value);
-            if (mainBufferCount + digits > mainBufferLimit) WriteBufferToStream();
-            WriteDigits(value, digits);
+            WriteUnsignedInteger64(value);
         }
         static readonly byte ZERO_FLOAT = (byte)'0';
         static readonly byte[] NAN = "\"NaN\"".ToByteArray();
@@ -2292,40 +2345,52 @@ public sealed partial class JsonSerializer
             return value;
         }
 
-        /*
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool IsSubnormal(double value)
-        {
-#if NETSTANDARD2_0
-            long bits = BitConverter.DoubleToInt64Bits(value);
-            const long exponentMask = 0x7FF0000000000000L;  // Exponent bits
-            const long fractionMask = 0x000FFFFFFFFFFFFFL;  // Fraction bits
 
-            long exponent = bits & exponentMask;
-            long fraction = bits & fractionMask;
-
-            // Subnormal numbers have an exponent of 0 but a non-zero fraction
-            return exponent == 0 && fraction != 0;
-#else
-            return Double.IsSubnormal(value);                
-#endif
-        }
-        */
 
 
         private static readonly byte[] HexMap = System.Text.Encoding.UTF8.GetBytes("0123456789abcdef");
+
+        /// <summary>
+        /// Contains the two lowercase hex characters for every byte value, stored in 2-byte
+        /// chunks, so a byte can be written as a single 2-byte block.
+        /// </summary>
+        private static readonly byte[] HexPairLookup = CreateHexPairLookup();
+
+        private static byte[] CreateHexPairLookup()
+        {
+            var lookup = new byte[256 * 2];
+            for (int i = 0; i < 256; i++)
+            {
+                lookup[i * 2] = HexMap[i >> 4];
+                lookup[i * 2 + 1] = HexMap[i & 0xF];
+            }
+            return lookup;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteByteAsHexWithoutCheck(byte value)
         {
-            WriteToBufferWithoutCheck(HexMap[value >> 4]);
-            WriteToBufferWithoutCheck(HexMap[value & 0xF]);
+            var lookup = HexPairLookup;
+            var buffer = mainBuffer;
+            int offset = value * 2;
+            int pos = mainBufferCount;
+#if NET7_0_OR_GREATER
+            // Both hex characters are moved as a single 2-byte load/store, which also removes
+            // the bounds checks of the byte-wise accesses. The free space was ensured by the caller.
+            ushort chunk = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(lookup), offset));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(buffer), pos), chunk);
+#else
+            buffer[pos] = lookup[offset];
+            buffer[pos + 1] = lookup[offset + 1];
+#endif
+            mainBufferCount = pos + 2;
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteByteAsHex(byte value)
         {
             EnsureFreeBufferSpace(2);
-            WriteToBufferWithoutCheck(HexMap[value >> 4]);
-            WriteToBufferWithoutCheck(HexMap[value & 0xF]);
+            WriteByteAsHexWithoutCheck(value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2530,56 +2595,52 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Write4Digits(int value)
         {
-            int temp;
-            temp = Math.DivRem(value, 1000, out value);
-            WriteDigit(temp);
+            WriteFullNumberChunk((uint)value);
+        }
 
-            temp = Math.DivRem(value, 100, out value);
-            WriteDigit(temp);
-
-            temp = Math.DivRem(value, 10, out value);
-            WriteDigit(temp);
-            WriteDigit(value);
+        /// <summary>
+        /// Writes the last <paramref name="digits"/> characters of the zero-padded 4-digit
+        /// representation of <paramref name="value"/>. The caller must have ensured the free space.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteNumberChunkTail(uint value, int digits)
+        {
+            var lookup = NumberLookupZeroPadded;
+            var buffer = mainBuffer;
+            int offset = (int)value * 4 + (4 - digits);
+            int pos = mainBufferCount;
+            for (int i = 0; i < digits; i++) buffer[pos + i] = lookup[offset + i];
+            mainBufferCount = pos + digits;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Write2Digits(int value)
         {
-            int div;
-            div = Math.DivRem(value, 10, out value);
-            WriteDigit(div);
-            WriteDigit(value);
+            var lookup = NumberLookupZeroPadded;
+            var buffer = mainBuffer;
+            int offset = value * 4 + 2;
+            int pos = mainBufferCount;
+#if NET7_0_OR_GREATER
+            // Both digits are moved as a single 2-byte load/store, which also removes the
+            // bounds checks of the byte-wise accesses. The free space was ensured by the caller.
+            ushort chunk = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(lookup), offset));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(buffer), pos), chunk);
+#else
+            buffer[pos] = lookup[offset];
+            buffer[pos + 1] = lookup[offset + 1];
+#endif
+            mainBufferCount = pos + 2;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Write7Digits(int value)
         {
-            // First digit
-            int digit = Math.DivRem(value, 1000000, out value);
-            WriteDigit(digit);
-
-            // Second digit
-            digit = Math.DivRem(value, 100000, out value);
-            WriteDigit(digit);
-
-            // Third digit
-            digit = Math.DivRem(value, 10000, out value);
-            WriteDigit(digit);
-
-            // Fourth digit
-            digit = Math.DivRem(value, 1000, out value);
-            WriteDigit(digit);
-
-            // Fifth digit
-            digit = Math.DivRem(value, 100, out value);
-            WriteDigit(digit);
-
-            // Sixth digit
-            digit = Math.DivRem(value, 10, out value);
-            WriteDigit(digit);
-
-            // Seventh digit
-            WriteDigit(value);
+            // Split into the leading 3 digits and a full 4-digit group, so only two lookups
+            // are needed instead of seven divisions.
+            uint high = (uint)value / 10000;
+            uint low = (uint)value % 10000;
+            WriteNumberChunkTail(high, 3);
+            WriteFullNumberChunk(low);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

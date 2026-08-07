@@ -10,6 +10,8 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 /// The values are chosen to cover the distinct code paths: the cached byte lookup for
 /// small values, the digit extraction loop for larger values and the negative variants,
 /// including long.MinValue which cannot be negated.
+/// Each case is measured as a single value (dominated by the per-serialization overhead)
+/// and as an array of that value (dominated by the actual number formatting).
 /// </summary>
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
@@ -18,15 +20,9 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MaxIterationCount(5000)]
 public class SerializeLongValuesTest
 {
-    static Serialization.JsonSerializer featureJsonSerializer = new Serialization.JsonSerializer(new Serialization.JsonSerializer.Settings()
-    {
+    static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
 
-    });
-
-    static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
-    {
-        IncludeFields = true,
-    };
+    static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
     MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
 
@@ -49,8 +45,16 @@ public class SerializeLongValuesTest
     [ParamsSource(nameof(LongValues))]
     public long value;
 
-    [Params(1000)]
-    public int iterations;
+    private long[] array;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        array = new long[BenchmarkSettings.ArraySize];
+        for (int i = 0; i < array.Length; i++) array[i] = value;
+
+        SampleOutput.Collect($"Long({value})", value, featureJsonSerializer, systemTextJsonSerializerSettings);
+    }
 
     [IterationSetup]
     public void Prepare()
@@ -59,18 +63,18 @@ public class SerializeLongValuesTest
     }
 
     [Benchmark]
-    public void SerializeLong_ToStream_Feature()
+    public void SerializeLong_Single_Feature()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, value);
         }
     }
 
     [Benchmark(Baseline = true)]
-    public void SerializeLong_ToStream_SystemText()
+    public void SerializeLong_Single_SystemText()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, value, systemTextJsonSerializerSettings);
         }
@@ -78,13 +82,42 @@ public class SerializeLongValuesTest
 
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void SerializeLong_ToStream_SpanJson()
+    public void SerializeLong_Single_SpanJson()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
             // so blocking here adds no measurable overhead but ensures the write actually happened.
-            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(value, memoryStream).GetAwaiter().GetResult();
+            SerializerConfigs.SerializeWithSpanJson(value, memoryStream);
+        }
+    }
+#endif
+
+    [Benchmark]
+    public void SerializeLong_Array_Feature()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureJsonSerializer.Serialize(memoryStream, array);
+        }
+    }
+
+    [Benchmark]
+    public void SerializeLong_Array_SystemText()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
+        }
+    }
+
+#if NET6_0_OR_GREATER
+    [Benchmark]
+    public void SerializeLong_Array_SpanJson()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            SerializerConfigs.SerializeWithSpanJson(array, memoryStream);
         }
     }
 #endif

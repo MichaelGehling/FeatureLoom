@@ -13,6 +13,7 @@ namespace FeatureLoom.PerformanceTests
             //Process.GetCurrentProcess().ProcessorAffinity = (IntPtr)0b000000000101;
             BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new DebugInProcessConfig());
 
+            JsonSerializer.SampleOutput.PrintAll();
         }
     }
 }

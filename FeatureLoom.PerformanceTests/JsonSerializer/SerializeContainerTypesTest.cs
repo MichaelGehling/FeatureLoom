@@ -12,6 +12,7 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 /// indexed access or a known Count) holding int values, across different element counts.
 /// Int is used as the element type since it is cheap to serialize and keeps the comparison
 /// focused on the container overhead rather than element-serialization cost.
+/// This test only has an array-like case by nature, so it uses the shared array workload.
 /// </summary>
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
@@ -20,15 +21,9 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MaxIterationCount(5000)]
 public class SerializeContainerTypesTest
 {
-    static Serialization.JsonSerializer featureJsonSerializer = new Serialization.JsonSerializer(new Serialization.JsonSerializer.Settings()
-    {
+    static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
 
-    });
-
-    static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
-    {
-        IncludeFields = true,
-    };
+    static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
     MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
 
@@ -36,18 +31,16 @@ public class SerializeContainerTypesTest
     List<int> list;
     IEnumerable<int> enumerable;
 
-    [Params(10, 100, 1000, 10000)]
-    public int size;
-
-    [Params(100)]
-    public int iterations;
-
     [GlobalSetup]
     public void Setup()
     {
-        array = System.Linq.Enumerable.Range(0, size).ToArray();
+        array = System.Linq.Enumerable.Range(0, BenchmarkSettings.ArraySize).ToArray();
         list = new List<int>(array);
         enumerable = CreateEnumerable(array);
+
+        SampleOutput.Collect($"Container(Array,{BenchmarkSettings.ArraySize})", array, featureJsonSerializer, systemTextJsonSerializerSettings, maxLength: 200);
+        SampleOutput.Collect($"Container(List,{BenchmarkSettings.ArraySize})", list, featureJsonSerializer, systemTextJsonSerializerSettings, maxLength: 200);
+        SampleOutput.Collect($"Container(Enumerable,{BenchmarkSettings.ArraySize})", enumerable, featureJsonSerializer, systemTextJsonSerializerSettings, maxLength: 200);
     }
 
     // A lazily evaluated iterator that is neither an array nor a list, so it does not
@@ -69,7 +62,7 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeArray_ToStream_Feature()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, array);
         }
@@ -78,7 +71,7 @@ public class SerializeContainerTypesTest
     [Benchmark(Baseline = true)]
     public void SerializeArray_ToStream_SystemText()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
         }
@@ -88,11 +81,11 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeArray_ToStream_SpanJson()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
             // so blocking here adds no measurable overhead but ensures the write actually happened.
-            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(array, memoryStream).GetAwaiter().GetResult();
+            SerializerConfigs.SerializeWithSpanJson(array, memoryStream);
         }
     }
 #endif
@@ -100,7 +93,7 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeList_ToStream_Feature()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, list);
         }
@@ -109,7 +102,7 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeList_ToStream_SystemText()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, list, systemTextJsonSerializerSettings);
         }
@@ -119,9 +112,9 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeList_ToStream_SpanJson()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
-            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(list, memoryStream).GetAwaiter().GetResult();
+            SerializerConfigs.SerializeWithSpanJson(list, memoryStream);
         }
     }
 #endif
@@ -129,7 +122,7 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeEnumerable_ToStream_Feature()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, enumerable);
         }
@@ -138,7 +131,7 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeEnumerable_ToStream_SystemText()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, enumerable, systemTextJsonSerializerSettings);
         }
@@ -148,9 +141,9 @@ public class SerializeContainerTypesTest
     [Benchmark]
     public void SerializeEnumerable_ToStream_SpanJson()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
-            SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync(enumerable, memoryStream).GetAwaiter().GetResult();
+            SerializerConfigs.SerializeWithSpanJson(enumerable, memoryStream);
         }
     }
 #endif

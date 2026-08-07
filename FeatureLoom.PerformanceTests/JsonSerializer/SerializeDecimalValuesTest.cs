@@ -1,38 +1,55 @@
 using BenchmarkDotNet.Attributes;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
 namespace FeatureLoom.PerformanceTests.JsonSerializer;
 
 /// <summary>
-/// Compares the serialization performance for a small object with only three fields.
-/// It serves as the low-overhead reference next to <see cref="SerializeComplexObjectTest"/>:
-/// the single-object case is dominated by the per-serialization overhead, while the
-/// array case shows the cost of the actual field writing.
+/// Compares the serialization performance for decimal values. The cases cover the cheap
+/// small values as well as high-precision and extreme values, which take the slow
+/// formatting path.
+/// Each case is measured as a single value (dominated by the per-serialization overhead)
+/// and as an array of that value (dominated by the actual number formatting).
 /// </summary>
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
 [MinIterationCount(500)]
 [MaxIterationCount(5000)]
-public class SerializeSimpleObjectTest
+public class SerializeDecimalValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
-    MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 100);
+    MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
 
-    SimpleObject single = new SimpleObject();
-    SimpleObject[] array;
+    public static IEnumerable<decimal> DecimalValues => new decimal[]
+    {
+        0m,
+        1m,
+        -1m,
+        1.25m,
+        12345.6789m,
+        0.0000000000000000000000000001m,
+        decimal.MaxValue,
+        decimal.MinValue,
+    };
+
+    [ParamsSource(nameof(DecimalValues))]
+    public decimal value;
+
+    private decimal[] array;
 
     [GlobalSetup]
     public void Setup()
     {
-        array = new SimpleObject[BenchmarkSettings.ArraySize];
-        for (int i = 0; i < array.Length; i++) array[i] = new SimpleObject() { id = i };
+        array = new decimal[BenchmarkSettings.ArraySize];
+        for (int i = 0; i < array.Length; i++) array[i] = value;
 
-        SampleOutput.Collect("SimpleObject", single, featureJsonSerializer, systemTextJsonSerializerSettings);
+        SampleOutput.Collect($"Decimal({value})", value, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
     [IterationSetup]
@@ -42,38 +59,38 @@ public class SerializeSimpleObjectTest
     }
 
     [Benchmark]
-    public void SerializeSimpleObject_Single_Feature()
+    public void SerializeDecimal_Single_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
-            featureJsonSerializer.Serialize(memoryStream, single);
+            featureJsonSerializer.Serialize(memoryStream, value);
         }
     }
 
     [Benchmark(Baseline = true)]
-    public void SerializeSimpleObject_Single_SystemText()
+    public void SerializeDecimal_Single_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
-            System.Text.Json.JsonSerializer.Serialize(memoryStream, single, systemTextJsonSerializerSettings);
+            System.Text.Json.JsonSerializer.Serialize(memoryStream, value, systemTextJsonSerializerSettings);
         }
     }
 
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void SerializeSimpleObject_Single_SpanJson()
+    public void SerializeDecimal_Single_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
             // so blocking here adds no measurable overhead but ensures the write actually happened.
-            SerializerConfigs.SerializeWithSpanJson(single, memoryStream);
+            SerializerConfigs.SerializeWithSpanJson(value, memoryStream);
         }
     }
 #endif
 
     [Benchmark]
-    public void SerializeSimpleObject_Array_Feature()
+    public void SerializeDecimal_Array_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
@@ -82,7 +99,7 @@ public class SerializeSimpleObjectTest
     }
 
     [Benchmark]
-    public void SerializeSimpleObject_Array_SystemText()
+    public void SerializeDecimal_Array_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
@@ -92,7 +109,7 @@ public class SerializeSimpleObjectTest
 
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void SerializeSimpleObject_Array_SpanJson()
+    public void SerializeDecimal_Array_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {

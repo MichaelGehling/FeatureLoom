@@ -1,24 +1,24 @@
 using BenchmarkDotNet.Attributes;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Text.Json;
 
 namespace FeatureLoom.PerformanceTests.JsonSerializer;
 
 /// <summary>
-/// Compares the serialization performance for strings of different shapes. The cases
-/// cover the distinct cost factors of the escaping writer: length, the ratio of
-/// characters requiring escaping and the UTF-8 encoding width (1, 2, 3 and 4 bytes).
+/// Compares the serialization performance for TimeSpan values. The cases cover the
+/// distinct code paths of the writer: the zero shortcut, negative values, values with
+/// and without a day part and values with fractional seconds.
 /// Each case is measured as a single value (dominated by the per-serialization overhead)
-/// and as an array of that value (dominated by the actual string writing).
+/// and as an array of that value (dominated by the actual formatting).
 /// </summary>
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
 [MinIterationCount(500)]
 [MaxIterationCount(5000)]
-public class SerializeStringValuesTest
+public class SerializeTimeSpanValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
 
@@ -26,59 +26,46 @@ public class SerializeStringValuesTest
 
     MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
 
-    public static IEnumerable<StringCase> StringValues => new StringCase[]
+    public static IEnumerable<TimeSpanCase> TimeSpanValues => new TimeSpanCase[]
     {
-        new StringCase("Empty", ""),
-        new StringCase("Short", "id"),
-        new StringCase("Ascii", "The quick brown fox jumps over the lazy dog."),
-        new StringCase("LongAscii", new string('a', 1000)),
-        new StringCase("Escaped", "Line1\r\nLine2\t\"quoted\"\\path"),
-        new StringCase("EscapedHeavy", new string('"', 200)),
-        new StringCase("ControlChars", new string('\u0001', 200)),
-        new StringCase("Latin1", new string('ä', 200)),
-        new StringCase("Cjk", new string('漢', 200)),
-        new StringCase("Emoji", Repeat("\U0001F600", 200)),
+        new TimeSpanCase("Zero", TimeSpan.Zero),
+        new TimeSpanCase("Time", new TimeSpan(1, 2, 3)),
+        new TimeSpanCase("WithDays", new TimeSpan(2, 3, 4, 5)),
+        new TimeSpanCase("WithFraction", new TimeSpan(2, 3, 4, 5, 6)),
+        new TimeSpanCase("Negative", new TimeSpan(2, 3, 4, 5).Negate()),
     };
 
-    private static string Repeat(string text, int count)
-    {
-        var builder = new StringBuilder(text.Length * count);
-        for (int i = 0; i < count; i++) builder.Append(text);
-        return builder.ToString();
-    }
-
     /// <summary>
-    /// Wraps the string so that BenchmarkDotNet shows a readable case name instead of
-    /// the (potentially very long) string content.
+    /// Wraps the value so that BenchmarkDotNet shows a readable case name.
     /// </summary>
-    public class StringCase
+    public class TimeSpanCase
     {
         public readonly string Name;
-        public readonly string Value;
+        public readonly TimeSpan Value;
 
-        public StringCase(string name, string value)
+        public TimeSpanCase(string name, TimeSpan value)
         {
             Name = name;
             Value = value;
         }
 
-        public override string ToString() => $"{Name}({Value.Length})";
+        public override string ToString() => Name;
     }
 
-    [ParamsSource(nameof(StringValues))]
-    public StringCase stringCase;
+    [ParamsSource(nameof(TimeSpanValues))]
+    public TimeSpanCase timeSpanCase;
 
-    private string value;
-    private string[] array;
+    private TimeSpan value;
+    private TimeSpan[] array;
 
     [GlobalSetup]
     public void Setup()
     {
-        value = stringCase.Value;
-        array = new string[BenchmarkSettings.ArraySize];
+        value = timeSpanCase.Value;
+        array = new TimeSpan[BenchmarkSettings.ArraySize];
         for (int i = 0; i < array.Length; i++) array[i] = value;
 
-        SampleOutput.Collect($"String({stringCase})", value, featureJsonSerializer, systemTextJsonSerializerSettings, maxLength: 200);
+        SampleOutput.Collect($"TimeSpan({timeSpanCase})", value, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
     [IterationSetup]
@@ -88,7 +75,7 @@ public class SerializeStringValuesTest
     }
 
     [Benchmark]
-    public void SerializeString_Single_Feature()
+    public void SerializeTimeSpan_Single_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
@@ -97,7 +84,7 @@ public class SerializeStringValuesTest
     }
 
     [Benchmark(Baseline = true)]
-    public void SerializeString_Single_SystemText()
+    public void SerializeTimeSpan_Single_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
@@ -107,7 +94,7 @@ public class SerializeStringValuesTest
 
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void SerializeString_Single_SpanJson()
+    public void SerializeTimeSpan_Single_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
@@ -119,7 +106,7 @@ public class SerializeStringValuesTest
 #endif
 
     [Benchmark]
-    public void SerializeString_Array_Feature()
+    public void SerializeTimeSpan_Array_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
@@ -128,7 +115,7 @@ public class SerializeStringValuesTest
     }
 
     [Benchmark]
-    public void SerializeString_Array_SystemText()
+    public void SerializeTimeSpan_Array_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
@@ -138,7 +125,7 @@ public class SerializeStringValuesTest
 
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void SerializeString_Array_SpanJson()
+    public void SerializeTimeSpan_Array_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
