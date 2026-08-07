@@ -43,6 +43,10 @@ public class SerializeByteArrayValuesTest
     private byte[] value;
     private byte[][] array;
 
+    // The large case uses a smaller outer array, so the iteration count is scaled up to
+    // keep the total number of serialized byte arrays identical for all sizes.
+    private int arrayIterations;
+
     [GlobalSetup]
     public void Setup()
     {
@@ -55,6 +59,7 @@ public class SerializeByteArrayValuesTest
         int outerSize = size > 16 ? BenchmarkSettings.ArraySize / 100 : BenchmarkSettings.ArraySize;
         array = new byte[outerSize][];
         for (int i = 0; i < array.Length; i++) array[i] = value;
+        arrayIterations = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations / outerSize;
 
         SampleOutput.Collect($"ByteArray({size},Base64)", value, featureJsonSerializer, systemTextJsonSerializerSettings, maxLength: 200);
         SampleOutput.Collect($"ByteArray({size},Numbers)", value, featureJsonSerializerNumbers, systemTextJsonSerializerSettingsNumbers, maxLength: 200);
@@ -118,7 +123,7 @@ public class SerializeByteArrayValuesTest
     [Benchmark]
     public void SerializeByteArray_Array_Base64_Feature()
     {
-        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        for (int i = 0; i < arrayIterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, array);
         }
@@ -127,7 +132,7 @@ public class SerializeByteArrayValuesTest
     [Benchmark]
     public void SerializeByteArray_Array_Base64_SystemText()
     {
-        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        for (int i = 0; i < arrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
         }
@@ -136,7 +141,7 @@ public class SerializeByteArrayValuesTest
     [Benchmark]
     public void SerializeByteArray_Array_Numbers_Feature()
     {
-        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        for (int i = 0; i < arrayIterations; i++)
         {
             featureJsonSerializerNumbers.Serialize(memoryStream, array);
         }
@@ -145,7 +150,7 @@ public class SerializeByteArrayValuesTest
     [Benchmark]
     public void SerializeByteArray_Array_Numbers_SystemText()
     {
-        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        for (int i = 0; i < arrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettingsNumbers);
         }
@@ -155,7 +160,7 @@ public class SerializeByteArrayValuesTest
     [Benchmark]
     public void SerializeByteArray_Array_Numbers_SpanJson()
     {
-        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        for (int i = 0; i < arrayIterations; i++)
         {
             SerializerConfigs.SerializeWithSpanJson(array, memoryStream);
         }

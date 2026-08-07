@@ -34,6 +34,72 @@ public sealed partial class JsonSerializer
 #endif
     }
 
+    /// <summary>
+    /// Writes a byte array as a base64 string, bypassing the CachedTypeWriter delegate.
+    /// Only selected when the serializer is configured for base64 output.
+    /// </summary>
+    struct ByteArrayBase64WriterStrategy : IWriterStrategy<byte[]>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value)
+#else
+        public void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value)
+#endif
+        {
+            if (value == null) writer.WriteNullValue();
+            else writer.WriteBytesAsBase64(value);
+        }
+    }
+
+    /// <summary>
+    /// Writes a byte array as a JSON number array, bypassing the CachedTypeWriter delegate.
+    /// Only selected when the serializer is configured for number array output.
+    /// </summary>
+    struct ByteArrayNumbersWriterStrategy : IWriterStrategy<byte[]>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value)
+#else
+        public void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value)
+#endif
+        {
+            if (value == null) writer.WriteNullValue();
+            else writer.WriteBytesAsArray(value);
+        }
+    }
+
+    struct GuidWriterStrategy : IWriterStrategy<Guid>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, Guid value) => writer.WriteGuidValue(value);
+#else
+        public void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, Guid value) => writer.WriteGuidValue(value);
+#endif
+    }
+
+    struct DateTimeWriterStrategy : IWriterStrategy<DateTime>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, DateTime value) => writer.WriteDateTimeValue(value);
+#else
+        public void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, DateTime value) => writer.WriteDateTimeValue(value);
+#endif
+    }
+
+    struct TimeSpanWriterStrategy : IWriterStrategy<TimeSpan>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, TimeSpan value) => writer.WriteTimeSpanValue(value);
+#else
+        public void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, TimeSpan value) => writer.WriteTimeSpanValue(value);
+#endif
+    }
+
     struct StringWriterStrategy : IWriterStrategy<string>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -270,6 +336,17 @@ public sealed partial class JsonSerializer
     }
 
     /// <summary>
+    /// Reference element types only bypass the CachedTypeWriter path if a dedicated,
+    /// null-safe writer strategy exists for them (the generic fallback strategy does not
+    /// handle nulls itself).
+    /// </summary>
+    private bool CanUseDirectReferenceStrategy(CachedTypeWriter elementHandler, Type elementType)
+    {
+        if (elementType != typeof(string) && elementType != typeof(byte[])) return false;
+        return CanUseDirectValueStrategy(elementHandler, elementType);
+    }
+
+    /// <summary>
     /// Shared entry point for all indexed container shapes. Selects the element writer strategy
     /// once at handler creation time and hands it to the single, shape-agnostic element loop.
     /// </summary>
@@ -292,6 +369,17 @@ public sealed partial class JsonSerializer
             if (typeof(E) == typeof(sbyte)) { CreateIndexedItemHandlerViaStrategy<T, E, ACC, SByteWriterStrategy, sbyte>(typeHandler, elementHandler); return; }
             if (typeof(E) == typeof(byte)) { CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteWriterStrategy, byte>(typeHandler, elementHandler); return; }
             if (typeof(E) == typeof(char)) { CreateIndexedItemHandlerViaStrategy<T, E, ACC, CharWriterStrategy, char>(typeHandler, elementHandler); return; }
+            if (typeof(E) == typeof(Guid)) { CreateIndexedItemHandlerViaStrategy<T, E, ACC, GuidWriterStrategy, Guid>(typeHandler, elementHandler); return; }
+            if (typeof(E) == typeof(DateTime)) { CreateIndexedItemHandlerViaStrategy<T, E, ACC, DateTimeWriterStrategy, DateTime>(typeHandler, elementHandler); return; }
+            if (typeof(E) == typeof(TimeSpan)) { CreateIndexedItemHandlerViaStrategy<T, E, ACC, TimeSpanWriterStrategy, TimeSpan>(typeHandler, elementHandler); return; }
+            if (typeof(E) == typeof(byte[]))
+            {
+                // The output format is fixed by the settings, so the strategy can be selected here
+                // and the per-element format branch disappears completely.
+                if (settings.writeByteArrayAsBase64String) CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayBase64WriterStrategy, byte[]>(typeHandler, elementHandler);
+                else CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayNumbersWriterStrategy, byte[]>(typeHandler, elementHandler);
+                return;
+            }
         }
 
         CreateIndexedItemHandlerViaStrategy<T, E, ACC, GenericWriterStrategy<E>, E>(typeHandler, elementHandler);
@@ -314,22 +402,27 @@ public sealed partial class JsonSerializer
 #endif
             if (count == 0) return;
 
-            WriteElement(collection, 0);
+            // The writer and the element handler live in closure fields. Loading them once keeps
+            // them in registers for the whole loop instead of re-reading the closure per element.
+            var w = writer;
+            var eh = elementHandler;
+
+            WriteElement(w, eh, collection, 0);
             for (int i = 1; i < count; i++)
             {
-                writer.WriteComma();
-                WriteElement(collection, i);
+                w.WriteComma();
+                WriteElement(w, eh, collection, i);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            void WriteElement(T c, int index)
+            static void WriteElement(JsonUTF8StreamWriter w, CachedTypeWriter eh, T c, int index)
             {
 #if NET5_0_OR_GREATER
                 E element = ACC.GetElement(c, index);
-                S.Write(writer, elementHandler, Unsafe.As<E, SV>(ref element));
+                S.Write(w, eh, Unsafe.As<E, SV>(ref element));
 #else
                 E element = default(ACC).GetElement(c, index);
-                default(S).Write(writer, elementHandler, Unsafe.As<E, SV>(ref element));
+                default(S).Write(w, eh, Unsafe.As<E, SV>(ref element));
 #endif
             }
         };

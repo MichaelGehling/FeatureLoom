@@ -49,7 +49,7 @@ namespace FeatureLoom.Serialization
 
         private void CreateArrayItemHandler<E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler)
         {
-            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType)
+            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType || CanUseDirectReferenceStrategy(elementHandler, typeof(E)))
             {
                 CreateIndexedItemHandler<E[], E, ArrayAccessor<E>>(typeHandler, elementHandler);
             }
@@ -83,7 +83,7 @@ namespace FeatureLoom.Serialization
 
         private void CreateListItemHandler<E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler)
         {
-            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType)
+            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType || CanUseDirectReferenceStrategy(elementHandler, typeof(E)))
             {
                 CreateIndexedItemHandler<List<E>, E, ListAccessor<E>>(typeHandler, elementHandler);
             }
@@ -121,7 +121,7 @@ namespace FeatureLoom.Serialization
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
-            if (elementHandler.HandlerType.IsValueType)
+            if (elementHandler.HandlerType.IsValueType || CanUseDirectReferenceStrategy(elementHandler, typeof(E)))
             {
                 CreateIndexedItemHandler<T, E, IListAccessor<T, E>>(typeHandler, elementHandler);
             }
@@ -177,7 +177,7 @@ namespace FeatureLoom.Serialization
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
             bool requiresItemNames = settings.requiresItemNames;
-            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType)
+            if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType || CanUseDirectReferenceStrategy(elementHandler, typeof(E)))
             {
                 CreateIndexedItemHandler<T, E, IReadOnlyListAccessor<T, E>>(typeHandler, elementHandler);
             }

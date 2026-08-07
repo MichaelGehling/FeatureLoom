@@ -976,16 +976,15 @@ public sealed partial class JsonSerializer
         }
 
         /// <summary>
-        /// Writes the two base64 characters of a 12-bit group as one 2-byte block. The caller
+        /// Writes the two base64 characters of a 12-bit group as one 2-byte block into the
+        /// given buffer and returns the new position. Works on locals only, so the caller can
+        /// keep the buffer position in a register across a whole encoding loop. The caller
         /// must have ensured the free space.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void WriteBase64Pair(int group12Bit)
+        private static int WriteBase64Pair(byte[] buffer, int pos, byte[] lookup, int group12Bit)
         {
-            var lookup = Base64PairLookup;
-            var buffer = mainBuffer;
             int offset = group12Bit * 2;
-            int pos = mainBufferCount;
 #if NET7_0_OR_GREATER
             ushort chunk = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(lookup), offset));
             Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(buffer), pos), chunk);
@@ -993,52 +992,90 @@ public sealed partial class JsonSerializer
             buffer[pos] = lookup[offset];
             buffer[pos + 1] = lookup[offset + 1];
 #endif
-            mainBufferCount = pos + 2;
+            return pos + 2;
         }
 
         private void WriteBase64(ByteSegment value)
         {
-            int numInputBytes = value.Count;            
-            int fullBlocks = numInputBytes / 3;                        
-            int bytesToReserve = 2 + (fullBlocks+1) * 4;
+            int numInputBytes = value.Count;
+            int fullBlocks = numInputBytes / 3;
+            int bytesToReserve = 2 + (fullBlocks + 1) * 4;
             EnsureFreeBufferSpace(bytesToReserve);
 
+            // An empty payload is a common case (e.g. an empty byte array member) and must not
+            // pay for the setup of the encoding paths below.
+            if (numInputBytes == 0)
+            {
+                WriteToBufferWithoutCheck((byte)'"');
+                WriteToBufferWithoutCheck((byte)'"');
+                return;
+            }
+
 #if !NETSTANDARD2_0
+            // The runtime encoder is vectorized and clearly beats the scalar lookup loop for
+            // larger payloads. For short inputs the call overhead dominates, so the lookup loop
+            // is kept for those. The threshold was determined by measurement.
+            if (numInputBytes >= 64 && TryWriteBase64Vectorized(value)) return;
+
             var bytes = value.AsSpan();
 #else
             var bytes = value;
 #endif
 
             WriteToBufferWithoutCheck((byte)'"');
-            int inputIndex = 0;            
+            var buffer = mainBuffer;
+            var lookup = Base64PairLookup;
+            int pos = mainBufferCount;
+            int inputIndex = 0;
             for (int i = 0; i < fullBlocks; i++)
             {
                 int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
                 bufferValue |= (bytes[inputIndex++] << 8);
                 bufferValue |= bytes[inputIndex++];
-                WriteBase64Pair((bufferValue >> 12) & 0xFFF);
-                WriteBase64Pair(bufferValue & 0xFFF);
+                pos = WriteBase64Pair(buffer, pos, lookup, (bufferValue >> 12) & 0xFFF);
+                pos = WriteBase64Pair(buffer, pos, lookup, bufferValue & 0xFFF);
             }
 
             int remainingBytes = numInputBytes - inputIndex;
             if (remainingBytes == 1)
             {
                 int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
-                WriteBase64Pair((bufferValue >> 12) & 0xFFF);
-                WriteToBufferWithoutCheck((byte)'=');
-                WriteToBufferWithoutCheck((byte)'=');
+                pos = WriteBase64Pair(buffer, pos, lookup, (bufferValue >> 12) & 0xFFF);
+                buffer[pos++] = (byte)'=';
+                buffer[pos++] = (byte)'=';
             }
             else if(remainingBytes == 2)
             {
                 int bufferValue = (bytes[inputIndex++] << 16) & 0xFFFFFF;
                 bufferValue |= (bytes[inputIndex++] << 8);
-                WriteBase64Pair((bufferValue >> 12) & 0xFFF);
-                WriteToBufferWithoutCheck(Base64Chars[(bufferValue >> 6) & 0x3F]);
-                WriteToBufferWithoutCheck((byte)'=');
+                pos = WriteBase64Pair(buffer, pos, lookup, (bufferValue >> 12) & 0xFFF);
+                buffer[pos++] = Base64Chars[(bufferValue >> 6) & 0x3F];
+                buffer[pos++] = (byte)'=';
             }
 
-            WriteToBufferWithoutCheck((byte)'"');
+            buffer[pos++] = (byte)'"';
+            mainBufferCount = pos;
         }
+
+#if !NETSTANDARD2_0
+        /// <summary>
+        /// Writes the quoted base64 representation using the vectorized runtime encoder.
+        /// Returns false without changing the buffer if the remaining space is not sufficient,
+        /// so the caller can fall back to the scalar loop.
+        /// </summary>
+        private bool TryWriteBase64Vectorized(ByteSegment value)
+        {
+            int pos = mainBufferCount;
+            var destination = new Span<byte>(mainBuffer, pos + 1, mainBuffer.Length - pos - 1);
+            if (Base64.EncodeToUtf8(value.AsSpan(), destination, out _, out int written) != System.Buffers.OperationStatus.Done) return false;
+
+            mainBuffer[pos] = (byte)'"';
+            pos += 1 + written;
+            mainBuffer[pos] = (byte)'"';
+            mainBufferCount = pos + 1;
+            return true;
+        }
+#endif
 
         static readonly byte[] REFOBJECT_PRE = "{\"$ref\":\"".ToByteArray();
         static readonly byte[] REFOBJECT_POST = "\"}".ToByteArray();
@@ -2397,6 +2434,62 @@ public sealed partial class JsonSerializer
         public void WriteGuidValue(Guid guid)
         {
             EnsureFreeBufferSpace(38);  // GUID string length + 4 hyphens + 2 "
+#if NET7_0_OR_GREATER
+            // The Guid is read directly by reference, so the detour through tempBuffer and the
+            // bounds checked array loads disappear. The destination reference and the lookup
+            // reference are computed once and all 38 positions are constant offsets, which lets
+            // the JIT emit plain stores without any position arithmetic.
+            if (BitConverter.IsLittleEndian)
+            {
+                ref byte src = ref Unsafe.As<Guid, byte>(ref guid);
+                ref byte lut = ref MemoryMarshal.GetArrayDataReference(HexPairLookup);
+                ref byte dst = ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(mainBuffer), mainBufferCount);
+
+                dst = (byte)'"';
+                WriteHexPairAt(ref dst, 1, ref lut, Unsafe.Add(ref src, 3));
+                WriteHexPairAt(ref dst, 3, ref lut, Unsafe.Add(ref src, 2));
+                WriteHexPairAt(ref dst, 5, ref lut, Unsafe.Add(ref src, 1));
+                WriteHexPairAt(ref dst, 7, ref lut, src);
+                Unsafe.Add(ref dst, 9) = (byte)'-';
+                WriteHexPairAt(ref dst, 10, ref lut, Unsafe.Add(ref src, 5));
+                WriteHexPairAt(ref dst, 12, ref lut, Unsafe.Add(ref src, 4));
+                Unsafe.Add(ref dst, 14) = (byte)'-';
+                WriteHexPairAt(ref dst, 15, ref lut, Unsafe.Add(ref src, 7));
+                WriteHexPairAt(ref dst, 17, ref lut, Unsafe.Add(ref src, 6));
+                Unsafe.Add(ref dst, 19) = (byte)'-';
+                WriteHexPairAt(ref dst, 20, ref lut, Unsafe.Add(ref src, 8));
+                WriteHexPairAt(ref dst, 22, ref lut, Unsafe.Add(ref src, 9));
+                Unsafe.Add(ref dst, 24) = (byte)'-';
+                WriteHexPairAt(ref dst, 25, ref lut, Unsafe.Add(ref src, 10));
+                WriteHexPairAt(ref dst, 27, ref lut, Unsafe.Add(ref src, 11));
+                WriteHexPairAt(ref dst, 29, ref lut, Unsafe.Add(ref src, 12));
+                WriteHexPairAt(ref dst, 31, ref lut, Unsafe.Add(ref src, 13));
+                WriteHexPairAt(ref dst, 33, ref lut, Unsafe.Add(ref src, 14));
+                WriteHexPairAt(ref dst, 35, ref lut, Unsafe.Add(ref src, 15));
+                Unsafe.Add(ref dst, 37) = (byte)'"';
+
+                mainBufferCount += 38;
+                return;
+            }
+#endif
+            WriteGuidValuePortable(guid);
+        }
+
+#if NET7_0_OR_GREATER
+        /// <summary>
+        /// Writes the two hex characters of a byte at a constant offset from the destination.
+        /// Both characters are moved as a single 2-byte load/store. Free space was ensured by the caller.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void WriteHexPairAt(ref byte dst, int offset, ref byte lookup, byte value)
+        {
+            ushort chunk = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref lookup, value * 2));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref dst, offset), chunk);
+        }
+#endif
+
+        private void WriteGuidValuePortable(Guid guid)
+        {
 #if NETSTANDARD2_0
             // Fallback for .NET Standard 2.0 using ToByteArray and manual byte processing
             byte[] guidBytes = guid.ToByteArray();
@@ -2406,28 +2499,58 @@ public sealed partial class JsonSerializer
             guid.TryWriteBytes(guidBytesSpan); // loacalBuffer is always bigger than 16 bytes
             byte[] guidBytes = tempBuffer;
 #endif
-            WriteToBufferWithoutCheck((byte)'"');
-            WriteByteAsHexWithoutCheck(guidBytes[3]);
-            WriteByteAsHexWithoutCheck(guidBytes[2]);
-            WriteByteAsHexWithoutCheck(guidBytes[1]);
-            WriteByteAsHexWithoutCheck(guidBytes[0]);
-            WriteToBufferWithoutCheck((byte)'-');
-            WriteByteAsHexWithoutCheck(guidBytes[5]);
-            WriteByteAsHexWithoutCheck(guidBytes[4]);
-            WriteToBufferWithoutCheck((byte)'-');
-            WriteByteAsHexWithoutCheck(guidBytes[7]);
-            WriteByteAsHexWithoutCheck(guidBytes[6]);
-            WriteToBufferWithoutCheck((byte)'-');
-            WriteByteAsHexWithoutCheck(guidBytes[8]);
-            WriteByteAsHexWithoutCheck(guidBytes[9]);
-            WriteToBufferWithoutCheck((byte)'-');
-            WriteByteAsHexWithoutCheck(guidBytes[10]);
-            WriteByteAsHexWithoutCheck(guidBytes[11]);
-            WriteByteAsHexWithoutCheck(guidBytes[12]);
-            WriteByteAsHexWithoutCheck(guidBytes[13]);
-            WriteByteAsHexWithoutCheck(guidBytes[14]);
-            WriteByteAsHexWithoutCheck(guidBytes[15]);
-            WriteToBufferWithoutCheck((byte)'"');
+            // The whole GUID is written through locals and the write position is only stored
+            // back once. Going through the fields for each of the 21 chunks was the dominant
+            // cost here, because the JIT cannot keep the position in a register across the
+            // field accesses.
+            var lookup = HexPairLookup;
+            var buffer = mainBuffer;
+            int pos = mainBufferCount;
+
+            buffer[pos++] = (byte)'"';
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[3]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[2]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[1]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[0]);
+            buffer[pos++] = (byte)'-';
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[5]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[4]);
+            buffer[pos++] = (byte)'-';
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[7]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[6]);
+            buffer[pos++] = (byte)'-';
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[8]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[9]);
+            buffer[pos++] = (byte)'-';
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[10]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[11]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[12]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[13]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[14]);
+            pos = WriteHexPair(buffer, pos, lookup, guidBytes[15]);
+            buffer[pos++] = (byte)'"';
+
+            mainBufferCount = pos;
+        }
+
+        /// <summary>
+        /// Writes the two hex characters of a byte at the given position and returns the new
+        /// position. Works on locals only, so no field access happens per chunk.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int WriteHexPair(byte[] buffer, int pos, byte[] lookup, byte value)
+        {
+            int offset = value * 2;
+#if NET7_0_OR_GREATER
+            // Both hex characters are moved as a single 2-byte load/store, which also removes
+            // the bounds checks of the byte-wise accesses. The free space was ensured by the caller.
+            ushort chunk = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(lookup), offset));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(buffer), pos), chunk);
+#else
+            buffer[pos] = lookup[offset];
+            buffer[pos + 1] = lookup[offset + 1];
+#endif
+            return pos + 2;
         }
 
         private static readonly byte[] zeroDateTimeBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00\"");
