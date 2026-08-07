@@ -120,6 +120,54 @@ public sealed partial class JsonSerializer
         private readonly byte[][] indentationLookup;
         const int BUFFER_LIMIT_MARGIN = 64; // Margin to avoid frequent buffer checks
 
+        /// <summary>Maximum number of bytes a single GUID value can occupy: 32 hex chars + 4 hyphens + 2 quotes.</summary>
+        public const int GUID_MAX_BYTES = 38;
+
+        // The number writers copy whole 4-digit chunks (including padding/leading zeros) into the
+        // buffer, even if fewer bytes are counted. The reservation sizes therefore reflect the
+        // physically written bytes, not the number of digits.
+        /// <summary>Maximum number of bytes physically written for a byte value.</summary>
+        public const int BYTE_MAX_BYTES = 4;
+        /// <summary>Maximum number of bytes physically written for an sbyte value.</summary>
+        public const int SBYTE_MAX_BYTES = 5;
+        /// <summary>Maximum number of bytes physically written for a ushort value.</summary>
+        public const int UINT16_MAX_BYTES = 8;
+        /// <summary>Maximum number of bytes physically written for a short value.</summary>
+        public const int INT16_MAX_BYTES = 9;
+        /// <summary>Maximum number of bytes physically written for a uint value.</summary>
+        public const int UINT32_MAX_BYTES = 12;
+        /// <summary>Maximum number of bytes physically written for an int value.</summary>
+        public const int INT32_MAX_BYTES = 13;
+        /// <summary>Maximum number of bytes physically written for a ulong value.</summary>
+        public const int UINT64_MAX_BYTES = 20;
+        /// <summary>Maximum number of bytes physically written for a long value.</summary>
+        public const int INT64_MAX_BYTES = 21;
+        /// <summary>Maximum number of bytes written for a bool value ("false").</summary>
+        public const int BOOL_MAX_BYTES = 5;
+
+        /// <summary>
+        /// Prepares a batch of fixed size elements and returns how many of them are guaranteed to
+        /// fit into the remaining buffer space. Only flushes if not even one element fits, so the
+        /// buffer is always filled completely before it is written to the stream. Always >= 1.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int BeginFixedSizeBatch(int bytesPerElement)
+        {
+            int free = mainBufferLimit - mainBufferCount;
+            if (free <= bytesPerElement)
+            {
+                EnsureFreeBufferSpace(bytesPerElement);
+                free = mainBufferLimit - mainBufferCount;
+            }
+            return free / bytesPerElement;
+        }
+
+        /// <summary>
+        /// True if the writer emits indentation. Batched writing is only valid without indentation,
+        /// because indentation adds a variable number of bytes per separator.
+        /// </summary>
+        public bool IsIndenting => indent;
+
         public JsonUTF8StreamWriter(CompiledSettings settings)
         {
             // We lower the limit by a small margin in order to not always check remaining space
@@ -319,7 +367,17 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnsureFreeBufferSpace(int freeBytes)
         {
-            if (mainBufferCount + freeBytes >= mainBufferLimit) WriteBufferToStream();
+            // mainBufferLimit is always mainBuffer.Length - BUFFER_LIMIT_MARGIN, so as long as the
+            // limit is not reached, the buffer length check cannot trigger either. That makes the
+            // common case a single comparison and keeps the rare handling out of the inlined body.
+            if (mainBufferCount + freeBytes < mainBufferLimit) return;
+            EnsureFreeBufferSpaceSlow(freeBytes);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void EnsureFreeBufferSpaceSlow(int freeBytes)
+        {
+            WriteBufferToStream();
             if (mainBufferCount + freeBytes >= mainBuffer.Length) ExtendBufferLimit(mainBufferCount + freeBytes);
         }
 
@@ -779,6 +837,36 @@ public sealed partial class JsonSerializer
             WriteToBufferWithoutCheck(QUOTES);
         }
 
+        // Unchecked variants of the fixed size value writers. The caller must have reserved the
+        // corresponding *_MAX_BYTES, e.g. via BeginFixedSizeBatch in an array loop.
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteLongValueWithoutCheck(long value) => WriteSignedIntegerWithoutCheck(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUlongValueWithoutCheck(ulong value) => WriteUnsignedInteger64WithoutCheck(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteIntValueWithoutCheck(int value) => WriteSignedIntegerWithoutCheck(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUintValueWithoutCheck(uint value) => WriteUnsignedInteger32WithoutCheck(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteShortValueWithoutCheck(short value) => WriteSignedIntegerWithoutCheck((int)value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUshortValueWithoutCheck(ushort value) => WriteUnsignedInteger32WithoutCheck(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteByteValueWithoutCheck(byte value) => WriteFromNumberLookupWithoutCheck(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteSbyteValueWithoutCheck(sbyte value) => WriteSignedIntegerWithoutCheck((int)value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteBoolValueWithoutCheck(bool value) => WriteToBufferWithoutCheck(value ? BOOLVALUE_TRUE : BOOLVALUE_FALSE);
+
         static readonly byte[] BOOLVALUE_TRUE = "true".ToByteArray();
         static readonly byte[] BOOLVALUE_FALSE = "false".ToByteArray();
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1137,6 +1225,13 @@ public sealed partial class JsonSerializer
             if (indent) WriteNextLine();                
         }
 
+        /// <summary>
+        /// Writes the separating comma without any buffer check and without indentation.
+        /// Only valid inside a reserved batch, which is only used when indentation is off.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteCommaWithoutCheck() => WriteToBufferWithoutCheck(COMMA);
+
         static readonly byte DOT = (byte)'.';
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteDot() => WriteToBufferWithoutCheck(DOT);
@@ -1348,7 +1443,17 @@ public sealed partial class JsonSerializer
         /// replaces the digit-by-digit division loop by a few divisions and a handful of
         /// 4-byte block writes.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteUnsignedInteger32(uint value)
+        {
+            // Single digits are the most common case in typical payloads. Writing them directly
+            // avoids the 4-byte chunk copy and the digit-count derivation of the lookup path.
+            // The sign was already stripped by the callers, so this cannot hit negative values.
+            if (value < 10) WriteToBuffer((byte)('0' + value));
+            else WriteUnsignedInteger32Slow(value);
+        }
+
+        private void WriteUnsignedInteger32Slow(uint value)
         {
             if (value < NUMBER_LOOKUP_LIMIT)
             {
@@ -1375,14 +1480,55 @@ public sealed partial class JsonSerializer
         }
 
         /// <summary>
+        /// Same as <see cref="WriteUnsignedInteger32(uint)"/>, but the caller must have reserved
+        /// <see cref="UINT32_MAX_BYTES"/> bytes.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteUnsignedInteger32WithoutCheck(uint value)
+        {
+            if (value < 10) WriteToBufferWithoutCheck((byte)('0' + value));
+            else WriteUnsignedInteger32WithoutCheckSlow(value);
+        }
+
+        private void WriteUnsignedInteger32WithoutCheckSlow(uint value)
+        {
+            if (value < NUMBER_LOOKUP_LIMIT)
+            {
+                WriteFromNumberLookupWithoutCheck(value);
+                return;
+            }
+
+            if (value < 100000000u)
+            {
+                uint high = value / 10000;
+                WriteFromNumberLookupWithoutCheck(high);
+                WriteFullNumberChunk(value - high * 10000);
+            }
+            else
+            {
+                uint high = value / 100000000u;
+                uint rest = value - high * 100000000u;
+                WriteFromNumberLookupWithoutCheck(high);
+                WriteFullNumberChunk8(rest);
+            }
+        }
+
+        /// <summary>
         /// Writes a value in groups of 4 digits, splitting off 8 digits at a time to stay in
         /// the cheaper 32 bit arithmetic for the groups.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteUnsignedInteger64(ulong value)
+        {
+            if (value < 10) WriteToBuffer((byte)('0' + (uint)value));
+            else WriteUnsignedInteger64Slow(value);
+        }
+
+        private void WriteUnsignedInteger64Slow(ulong value)
         {
             if (value <= uint.MaxValue)
             {
-                WriteUnsignedInteger32((uint)value);
+                WriteUnsignedInteger32Slow((uint)value);
                 return;
             }
 
@@ -1400,6 +1546,41 @@ public sealed partial class JsonSerializer
                 ulong high = rest / 100000000UL;
                 uint mid8 = (uint)(rest - high * 100000000UL);
                 WriteFromNumberLookup((uint)high); // At most 4 digits for ulong.MaxValue
+                WriteFullNumberChunk8(mid8);
+            }
+            WriteFullNumberChunk8(low8);
+        }
+
+        /// <summary>
+        /// Same as <see cref="WriteUnsignedInteger64(ulong)"/>, but the caller must have reserved
+        /// <see cref="UINT64_MAX_BYTES"/> bytes.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteUnsignedInteger64WithoutCheck(ulong value)
+        {
+            if (value < 10) WriteToBufferWithoutCheck((byte)('0' + (uint)value));
+            else WriteUnsignedInteger64WithoutCheckSlow(value);
+        }
+
+        private void WriteUnsignedInteger64WithoutCheckSlow(ulong value)
+        {
+            if (value <= uint.MaxValue)
+            {
+                WriteUnsignedInteger32WithoutCheckSlow((uint)value);
+                return;
+            }
+
+            ulong rest = value / 100000000UL;
+            uint low8 = (uint)(value - rest * 100000000UL);
+            if (rest < 100000000UL)
+            {
+                WriteUnsignedInteger32WithoutCheck((uint)rest);
+            }
+            else
+            {
+                ulong high = rest / 100000000UL;
+                uint mid8 = (uint)(rest - high * 100000000UL);
+                WriteFromNumberLookupWithoutCheck((uint)high); // At most 4 digits for ulong.MaxValue
                 WriteFullNumberChunk8(mid8);
             }
             WriteFullNumberChunk8(low8);
@@ -1765,7 +1946,20 @@ public sealed partial class JsonSerializer
             return 10;
         }
 
+        /// <summary>
+        /// Only the single digit case is inlined into the caller. Everything else lives in a
+        /// separate non-inlined method, so the call sites stay small and the hot path is a
+        /// single compare plus a byte store. Negative values wrap to a huge unsigned value by
+        /// the cast, so they fall through to the slow path.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteSignedInteger(long inputValue)
+        {
+            if ((ulong)inputValue < 10) WriteToBuffer((byte)('0' + (uint)inputValue));
+            else WriteSignedIntegerSlow(inputValue);
+        }
+
+        private void WriteSignedIntegerSlow(long inputValue)
         {
             var value = inputValue;
             if (value < 0)
@@ -1784,13 +1978,48 @@ public sealed partial class JsonSerializer
             WriteUnsignedInteger64((ulong)value);
         }
 
+        /// <summary>
+        /// Same as <see cref="WriteSignedInteger(long)"/>, but the caller must have reserved
+        /// <see cref="INT64_MAX_BYTES"/> bytes.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteSignedIntegerWithoutCheck(long inputValue)
+        {
+            if ((ulong)inputValue < 10) WriteToBufferWithoutCheck((byte)('0' + (uint)inputValue));
+            else WriteSignedIntegerWithoutCheckSlow(inputValue);
+        }
+
+        private void WriteSignedIntegerWithoutCheckSlow(long inputValue)
+        {
+            var value = inputValue;
+            if (value < 0)
+            {
+                if (value == long.MinValue)
+                {
+                    WriteToBufferWithoutCheck(Int64MinValueBytes);
+                    return;
+                }
+                value = -value;
+                WriteToBufferWithoutCheck((byte)'-');
+            }
+
+            WriteUnsignedInteger64WithoutCheck((ulong)value);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteByte(byte inputValue)
         {
             WriteFromNumberLookup(inputValue);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteSignedInteger(int inputValue)
+        {
+            if ((uint)inputValue < 10) WriteToBuffer((byte)('0' + (uint)inputValue));
+            else WriteSignedIntegerSlow(inputValue);
+        }
+
+        private void WriteSignedIntegerSlow(int inputValue)
         {
             var value = inputValue;
             if (value < 0)
@@ -1807,6 +2036,34 @@ public sealed partial class JsonSerializer
             }
 
             WriteUnsignedInteger32((uint)value);
+        }
+
+        /// <summary>
+        /// Same as <see cref="WriteSignedInteger(int)"/>, but the caller must have reserved
+        /// <see cref="INT32_MAX_BYTES"/> bytes.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteSignedIntegerWithoutCheck(int inputValue)
+        {
+            if ((uint)inputValue < 10) WriteToBufferWithoutCheck((byte)('0' + (uint)inputValue));
+            else WriteSignedIntegerWithoutCheckSlow(inputValue);
+        }
+
+        private void WriteSignedIntegerWithoutCheckSlow(int inputValue)
+        {
+            var value = inputValue;
+            if (value < 0)
+            {
+                if (value == int.MinValue)
+                {
+                    WriteToBufferWithoutCheck(Int32MinValueBytes);
+                    return;
+                }
+                value = -value;
+                WriteToBufferWithoutCheck((byte)'-');
+            }
+
+            WriteUnsignedInteger32WithoutCheck((uint)value);
         }
 
         private void WriteUnsignedInteger(long inputValue)
@@ -2432,8 +2689,17 @@ public sealed partial class JsonSerializer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteGuidValue(Guid guid)
+        {            EnsureFreeBufferSpace(GUID_MAX_BYTES);  // GUID string length + 4 hyphens + 2 "
+            WriteGuidValueWithoutCheck(guid);
+        }
+
+        /// <summary>
+        /// Writes a GUID without ensuring buffer space. The caller must have reserved
+        /// <see cref="GUID_MAX_BYTES"/> bytes, e.g. via a batched reservation in an array loop.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteGuidValueWithoutCheck(Guid guid)
         {
-            EnsureFreeBufferSpace(38);  // GUID string length + 4 hyphens + 2 "
 #if NET7_0_OR_GREATER
             // The Guid is read directly by reference, so the detour through tempBuffer and the
             // bounds checked array loads disappear. The destination reference and the lookup

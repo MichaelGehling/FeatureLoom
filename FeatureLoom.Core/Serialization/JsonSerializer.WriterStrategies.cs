@@ -14,7 +14,19 @@ public sealed partial class JsonSerializer
     interface IWriterStrategy<TValue>
     {
 #if NET5_0_OR_GREATER
+        /// <summary>
+        /// Upper bound of bytes a single value can occupy, or 0 if the size is unbounded/variable.
+        /// Only strategies with a positive bound can be written in a reserved batch.
+        /// </summary>
+        static abstract int MaxBytesPerValue { get; }
+
         static abstract void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, TValue value);
+
+        /// <summary>
+        /// Writes the value without ensuring buffer space. Only called when the caller reserved
+        /// at least <see cref="MaxBytesPerValue"/> bytes.
+        /// </summary>
+        static abstract void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, TValue value);
 #else
         void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, TValue value);
 #endif
@@ -26,6 +38,10 @@ public sealed partial class JsonSerializer
     /// </summary>
     struct GenericWriterStrategy<E> : IWriterStrategy<E>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, E value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, E value) => typeWriter.WriteItem(value, default);
@@ -40,6 +56,10 @@ public sealed partial class JsonSerializer
     /// </summary>
     struct ByteArrayBase64WriterStrategy : IWriterStrategy<byte[]>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value)
@@ -58,6 +78,10 @@ public sealed partial class JsonSerializer
     /// </summary>
     struct ByteArrayNumbersWriterStrategy : IWriterStrategy<byte[]>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte[] value)
@@ -72,6 +96,12 @@ public sealed partial class JsonSerializer
 
     struct GuidWriterStrategy : IWriterStrategy<Guid>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.GUID_MAX_BYTES;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, Guid value) => writer.WriteGuidValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, Guid value) => writer.WriteGuidValue(value);
@@ -82,6 +112,10 @@ public sealed partial class JsonSerializer
 
     struct DateTimeWriterStrategy : IWriterStrategy<DateTime>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, DateTime value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, DateTime value) => writer.WriteDateTimeValue(value);
@@ -92,6 +126,10 @@ public sealed partial class JsonSerializer
 
     struct TimeSpanWriterStrategy : IWriterStrategy<TimeSpan>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, TimeSpan value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, TimeSpan value) => writer.WriteTimeSpanValue(value);
@@ -102,6 +140,10 @@ public sealed partial class JsonSerializer
 
     struct StringWriterStrategy : IWriterStrategy<string>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, string value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, string value)
@@ -116,6 +158,10 @@ public sealed partial class JsonSerializer
 
     struct SByteWriterStrategy : IWriterStrategy<sbyte>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.SBYTE_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, sbyte value) => writer.WriteSbyteValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, sbyte value) => writer.WriteSbyteValue(value);
@@ -126,6 +172,10 @@ public sealed partial class JsonSerializer
 
     struct ByteWriterStrategy : IWriterStrategy<byte>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.BYTE_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte value) => writer.WriteByteValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, byte value) => writer.WriteByteValue(value);
@@ -136,6 +186,10 @@ public sealed partial class JsonSerializer
 
     struct Int16WriterStrategy : IWriterStrategy<short>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.INT16_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, short value) => writer.WriteShortValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, short value) => writer.WriteShortValue(value);
@@ -146,6 +200,10 @@ public sealed partial class JsonSerializer
 
     struct UInt16WriterStrategy : IWriterStrategy<ushort>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.UINT16_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, ushort value) => writer.WriteUshortValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, ushort value) => writer.WriteUshortValue(value);
@@ -156,6 +214,10 @@ public sealed partial class JsonSerializer
 
     struct Int32WriterStrategy : IWriterStrategy<int>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.INT32_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, int value) => writer.WriteIntValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, int value) => writer.WriteIntValue(value);
@@ -166,6 +228,10 @@ public sealed partial class JsonSerializer
 
     struct UInt32WriterStrategy : IWriterStrategy<uint>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.UINT32_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, uint value) => writer.WriteUintValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, uint value) => writer.WriteUintValue(value);
@@ -176,6 +242,10 @@ public sealed partial class JsonSerializer
 
     struct Int64WriterStrategy : IWriterStrategy<long>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.INT64_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, long value) => writer.WriteLongValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, long value) => writer.WriteLongValue(value);
@@ -186,6 +256,10 @@ public sealed partial class JsonSerializer
 
     struct UInt64WriterStrategy : IWriterStrategy<ulong>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.UINT64_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, ulong value) => writer.WriteUlongValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, ulong value) => writer.WriteUlongValue(value);
@@ -196,6 +270,10 @@ public sealed partial class JsonSerializer
 
     struct FloatWriterStrategy : IWriterStrategy<float>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, float value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, float value) => writer.WriteFloatValue(value);
@@ -206,6 +284,10 @@ public sealed partial class JsonSerializer
 
     struct DoubleWriterStrategy : IWriterStrategy<double>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, double value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, double value) => writer.WriteDoubleValue(value);
@@ -216,6 +298,10 @@ public sealed partial class JsonSerializer
 
     struct DecimalWriterStrategy : IWriterStrategy<decimal>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, decimal value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, decimal value) => writer.WriteDecimalValue(value);
@@ -226,6 +312,10 @@ public sealed partial class JsonSerializer
 
     struct BoolWriterStrategy : IWriterStrategy<bool>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => JsonUTF8StreamWriter.BOOL_MAX_BYTES;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, bool value) => writer.WriteBoolValueWithoutCheck(value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, bool value) => writer.WriteBoolValue(value);
@@ -236,6 +326,10 @@ public sealed partial class JsonSerializer
 
     struct CharWriterStrategy : IWriterStrategy<char>
     {
+#if NET5_0_OR_GREATER
+        public static int MaxBytesPerValue => 0;
+        public static void WriteWithoutCheck(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, char value) => Write(writer, typeWriter, value);
+#endif
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #if NET5_0_OR_GREATER
         public static void Write(JsonUTF8StreamWriter writer, CachedTypeWriter typeWriter, char value) => writer.WriteCharValue(value);
@@ -406,6 +500,40 @@ public sealed partial class JsonSerializer
             // them in registers for the whole loop instead of re-reading the closure per element.
             var w = writer;
             var eh = elementHandler;
+
+#if NET5_0_OR_GREATER
+            // Strategies with a known maximum size can reserve space for many elements at once,
+            // so the per-element buffer check disappears. MaxBytesPerValue is a constant of the
+            // struct type parameter, so the JIT folds this branch away for the other strategies.
+            // Indentation is excluded because it emits a variable number of bytes per separator.
+            if (S.MaxBytesPerValue > 0 && !w.IsIndenting)
+            {
+                int perElement = S.MaxBytesPerValue + 1; // + 1 for the separating comma
+
+                // The very first element has no leading comma. Writing it outside keeps the
+                // inner loop free of any per-element index test.
+                w.EnsureFreeBufferSpace(S.MaxBytesPerValue);
+                {
+                    E first = ACC.GetElement(collection, 0);
+                    S.WriteWithoutCheck(w, eh, Unsafe.As<E, SV>(ref first));
+                }
+
+                int i = 1;
+                while (i < count)
+                {
+                    // The batch is sized from the space that is actually left, so the buffer still
+                    // fills up completely before it is flushed.
+                    int end = Math.Min(i + w.BeginFixedSizeBatch(perElement), count);
+                    for (; i < end; i++)
+                    {
+                        w.WriteCommaWithoutCheck();
+                        E element = ACC.GetElement(collection, i);
+                        S.WriteWithoutCheck(w, eh, Unsafe.As<E, SV>(ref element));
+                    }
+                }
+                return;
+            }
+#endif
 
             WriteElement(w, eh, collection, 0);
             for (int i = 1; i < count; i++)
