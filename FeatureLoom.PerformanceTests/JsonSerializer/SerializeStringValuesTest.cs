@@ -38,6 +38,10 @@ public class SerializeStringValuesTest
         new StringCase("Latin1", new string('ä', 200)),
         new StringCase("Cjk", new string('漢', 200)),
         new StringCase("Emoji", Repeat("\U0001F600", 200)),
+        // A long ASCII run followed by a single wide char. The writer cannot know that the
+        // string is not plain ASCII before it reaches the very end, so this is the worst case
+        // for any strategy that assumes ASCII and has to give up late.
+        new StringCase("AsciiThenWide", new string('a', 999) + "漢"),
     };
 
     private static string Repeat(string text, int count)

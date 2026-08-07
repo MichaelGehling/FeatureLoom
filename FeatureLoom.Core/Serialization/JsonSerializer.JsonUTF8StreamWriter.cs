@@ -904,6 +904,7 @@ public sealed partial class JsonSerializer
         }
 
         static readonly byte QUOTES = (byte)'\"';
+        static readonly byte[] EMPTY_STRING = new byte[] { (byte)'\"', (byte)'\"' };
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteStringValue(string str)
         {
@@ -1626,6 +1627,66 @@ public sealed partial class JsonSerializer
             return null;
         }
 
+#if NET7_0_OR_GREATER
+        /// <summary>
+        /// Exclusive upper bound of the characters covered by the escape lookups.
+        /// '\\' (92) is the highest character that needs escaping.
+        /// </summary>
+        private const int ESCAPE_LOOKUP_LIMIT = 93;
+
+        /// <summary>
+        /// Width of one chunk in <see cref="EscapeFlatLookup"/>. The longest escape is the
+        /// 6-byte \uXXXX form, but the chunks are padded to 8 so that one escape can be
+        /// written as a single unaligned 64-bit store instead of a variable length copy.
+        /// </summary>
+        private const int ESCAPE_CHUNK_SIZE = 8;
+
+        /// <summary>
+        /// Escape sequences of all characters below <see cref="ESCAPE_LOOKUP_LIMIT"/> in flat
+        /// 8-byte chunks. A single array avoids the per-character array objects and the null
+        /// check of the jagged lookup, which dominate the cost for escape dense strings.
+        /// </summary>
+        private static readonly byte[] EscapeFlatLookup = InitEscapeFlatLookup();
+
+        /// <summary>
+        /// Length of the escape sequence of each character, or 0 if it needs no escaping.
+        /// </summary>
+        private static readonly byte[] EscapeLengthLookup = InitEscapeLengthLookup();
+
+        private static byte[] InitEscapeFlatLookup()
+        {
+            byte[] lookup = new byte[ESCAPE_LOOKUP_LIMIT * ESCAPE_CHUNK_SIZE];
+            for (int i = 0; i < ESCAPE_LOOKUP_LIMIT; i++)
+            {
+                byte[] escapeBytes = GetEscapeBytes((char)i);
+                if (escapeBytes == null) continue;
+                Array.Copy(escapeBytes, 0, lookup, i * ESCAPE_CHUNK_SIZE, escapeBytes.Length);
+            }
+            return lookup;
+        }
+
+        private static byte[] InitEscapeLengthLookup()
+        {
+            byte[] lookup = new byte[ESCAPE_LOOKUP_LIMIT];
+            for (int i = 0; i < ESCAPE_LOOKUP_LIMIT; i++)
+            {
+                lookup[i] = (byte)(GetEscapeBytes((char)i)?.Length ?? 0);
+            }
+            return lookup;
+        }
+
+        /// <summary>
+        /// Returns the length of the escape sequence of the given character, or 0 if it needs
+        /// no escaping. Only a bounds compare and a byte load, so it replaces the array deref
+        /// and null check of <see cref="GetEscapeBytes"/> in the hot escaping loop.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int GetEscapeLength(char c)
+        {
+            return c < ESCAPE_LOOKUP_LIMIT ? EscapeLengthLookup[c] : 0;
+        }
+#endif
+
         private void WriteChar(char c)
         {
             // Check if the character is in the EscapeByteLookup table
@@ -1671,41 +1732,258 @@ public sealed partial class JsonSerializer
         /// </summary>
         const int MIN_BULK_ENCODE_LENGTH = 16;
 
+        /// <summary>
+        /// Maximum length of a known ASCII run that is narrowed inline instead of being
+        /// passed to the bulk UTF-8 encoder. The encoder's ASCII narrowing is unrolled and
+        /// better tuned, so it wins for longer runs despite scanning the run a second time.
+        /// Below that its call overhead dominates, so narrowing inline is faster.
+        /// </summary>
+        const int MAX_ASCII_NARROW_LENGTH = 128;
+
 #if NET7_0_OR_GREATER
         /// <summary>
         /// Returns the index of the first character that needs special handling
         /// (control char, quote, backslash or surrogate) or the length if there is none.
         /// Uses SIMD to scan multiple characters at once, which dominates the cost for longer strings.
+        /// Also reports whether the skipped run consists of ASCII characters only, so that the
+        /// caller can transcode it by simply narrowing the chars instead of calling the encoder.
         /// </summary>
-        private static int FindNextSpecialChar(ReadOnlySpan<char> chars)
+        private static int FindNextSpecialChar(ReadOnlySpan<char> chars, out bool allAscii)
         {
+            allAscii = true;
             int i = 0;
-            if (Vector128.IsHardwareAccelerated && chars.Length >= Vector128<ushort>.Count)
+            ref ushort start = ref Unsafe.As<char, ushort>(ref MemoryMarshal.GetReference(chars));
+            if (Vector256.IsHardwareAccelerated && chars.Length >= Vector256<ushort>.Count)
+            {
+                var space = Vector256.Create((ushort)' ');
+                var quote = Vector256.Create((ushort)'"');
+                var backslash = Vector256.Create((ushort)'\\');
+                var surrogateStart = Vector256.Create((ushort)0xD800);
+                var surrogateRange = Vector256.Create((ushort)0x0800);
+                var maxAscii = Vector256.Create((ushort)0x7F);
+                int limit = chars.Length - Vector256<ushort>.Count;
+                for (; i <= limit; i += Vector256<ushort>.Count)
+                {
+                    var v = Vector256.LoadUnsafe(ref start, (nuint)i);
+                    var escapes = Vector256.LessThan(v, space)
+                                | Vector256.Equals(v, quote)
+                                | Vector256.Equals(v, backslash);
+                    var nonAscii = Vector256.GreaterThan(v, maxAscii);
+                    // Plain ASCII without anything to escape is by far the most common case,
+                    // so the loop is kept down to a single mask extraction for it. Only when
+                    // something was found the individual masks are extracted to tell apart
+                    // what it was.
+                    if ((escapes | nonAscii).ExtractMostSignificantBits() == 0) continue;
+
+                    // A surrogate is never ASCII, so it only has to be tested here.
+                    uint mask = (escapes | Vector256.LessThan(v - surrogateStart, surrogateRange)).ExtractMostSignificantBits();
+                    uint nonAsciiMask = nonAscii.ExtractMostSignificantBits();
+                    if (mask != 0)
+                    {
+                        int index = BitOperations.TrailingZeroCount(mask);
+                        // Only the characters before the stop index belong to the run.
+                        if ((nonAsciiMask & ((1u << index) - 1)) != 0) allAscii = false;
+                        return i + index;
+                    }
+                    // Nothing to escape was found, so the hit came from a non ASCII char.
+                    allAscii = false;
+                }
+            }
+            if (Vector128.IsHardwareAccelerated && chars.Length - i >= Vector128<ushort>.Count)
             {
                 var space = Vector128.Create((ushort)' ');
                 var quote = Vector128.Create((ushort)'"');
                 var backslash = Vector128.Create((ushort)'\\');
                 var surrogateStart = Vector128.Create((ushort)0xD800);
                 var surrogateRange = Vector128.Create((ushort)0x0800);
-                ref ushort start = ref Unsafe.As<char, ushort>(ref MemoryMarshal.GetReference(chars));
+                var maxAscii = Vector128.Create((ushort)0x7F);
                 int limit = chars.Length - Vector128<ushort>.Count;
                 for (; i <= limit; i += Vector128<ushort>.Count)
                 {
                     var v = Vector128.LoadUnsafe(ref start, (nuint)i);
-                    var special = Vector128.LessThan(v, space)
+                    var escapes = Vector128.LessThan(v, space)
                                 | Vector128.Equals(v, quote)
-                                | Vector128.Equals(v, backslash)
-                                | Vector128.LessThan(v - surrogateStart, surrogateRange);
-                    uint mask = special.ExtractMostSignificantBits();
-                    if (mask != 0) return i + BitOperations.TrailingZeroCount(mask);
+                                | Vector128.Equals(v, backslash);
+                    var nonAscii = Vector128.GreaterThan(v, maxAscii);
+                    if ((escapes | nonAscii).ExtractMostSignificantBits() == 0) continue;
+
+                    uint mask = (escapes | Vector128.LessThan(v - surrogateStart, surrogateRange)).ExtractMostSignificantBits();
+                    uint nonAsciiMask = nonAscii.ExtractMostSignificantBits();
+                    if (mask != 0)
+                    {
+                        int index = BitOperations.TrailingZeroCount(mask);
+                        if ((nonAsciiMask & ((1u << index) - 1)) != 0) allAscii = false;
+                        return i + index;
+                    }
+                    allAscii = false;
                 }
             }
             for (; i < chars.Length; i++)
             {
                 char c = chars[i];
                 if (c < ' ' || c == '"' || c == '\\' || char.IsSurrogate(c)) return i;
+                if (c > 0x7F) allAscii = false;
             }
             return chars.Length;
+        }
+
+        /// <summary>
+        /// Transcodes a run of known ASCII characters by narrowing them directly into the
+        /// buffer. Saves the call into the UTF8 encoder, which would scan the run a second
+        /// time to discover what is already known here.
+        /// The caller must have reserved space for the whole run.
+        /// </summary>
+        private void WriteAsciiRun(ReadOnlySpan<char> chars)
+        {
+            // The destination offset is kept in a local instead of the mainBufferCount field,
+            // because updating the field inside the loop forces a store through "this" on
+            // every iteration and prevents the JIT from keeping the offset in a register.
+            int pos = mainBufferCount;
+            int i = 0;
+            int length = chars.Length;
+            // Taking refs once lets all accesses below use unchecked offsets, so the bounds
+            // checks of span and array indexing disappear from the loops.
+            ref ushort src = ref Unsafe.As<char, ushort>(ref MemoryMarshal.GetReference(chars));
+            ref byte dst = ref MemoryMarshal.GetArrayDataReference(mainBuffer);
+            if (length >= Vector128<ushort>.Count)
+            {
+                if (Vector256.IsHardwareAccelerated && length >= Vector256<ushort>.Count)
+                {
+                    int wideLimit = length - Vector256<ushort>.Count;
+                    for (; i <= wideLimit; i += Vector256<ushort>.Count)
+                    {
+                        var v = Vector256.LoadUnsafe(ref src, (nuint)i);
+                        // Narrow duplicates the input, so only the lower half is the result.
+                        Vector256.Narrow(v, v).GetLower().StoreUnsafe(ref dst, (nuint)pos);
+                        pos += Vector256<ushort>.Count;
+                    }
+                }
+                int limit = length - Vector128<ushort>.Count;
+                for (; i <= limit; i += Vector128<ushort>.Count)
+                {
+                    var v = Vector128.LoadUnsafe(ref src, (nuint)i);
+                    Vector128.Narrow(v, v).GetLower().StoreUnsafe(ref dst, (nuint)pos);
+                    pos += Vector128<ushort>.Count;
+                }
+                if (i < length)
+                {
+                    // The remaining 1..7 chars are written by one more vector store that
+                    // overlaps the previous one instead of a scalar loop. Rewriting a few
+                    // bytes with the same values is cheaper than the leftover iterations,
+                    // and it stays in bounds because the run is at least a vector long.
+                    int tailStart = length - Vector128<ushort>.Count;
+                    var v = Vector128.LoadUnsafe(ref src, (nuint)tailStart);
+                    Vector128.Narrow(v, v).GetLower().StoreUnsafe(ref dst, (nuint)(pos - (i - tailStart)));
+                    pos += length - i;
+                }
+            }
+            else
+            {
+                // Runs shorter than a vector are rare and at most 7 chars long.
+                for (; i < length; i++)
+                {
+                    Unsafe.Add(ref dst, pos++) = (byte)Unsafe.Add(ref src, i);
+                }
+            }
+            mainBufferCount = pos;
+        }
+
+        /// <summary>
+        /// Transcodes a run that is already known to be ASCII only.
+        /// Short runs are narrowed inline, because there the call overhead of the bulk
+        /// routines dominates. Longer runs are handed to the runtime's ASCII narrowing,
+        /// which is more aggressively unrolled than the loop above. The general UTF-8
+        /// encoder is avoided, because it would re-derive that the run is ASCII and carry
+        /// the transcoding and validation machinery that is not needed here.
+        /// The caller must have reserved one byte per character.
+        /// </summary>
+        private void WriteKnownAsciiRun(ReadOnlySpan<char> chars)
+        {
+            if (chars.Length < MAX_ASCII_NARROW_LENGTH)
+            {
+                WriteAsciiRun(chars);
+                return;
+            }
+            var destination = new Span<byte>(mainBuffer, mainBufferCount, mainBuffer.Length - mainBufferCount);
+#if NET8_0_OR_GREATER
+            Ascii.FromUtf16(chars, destination, out int written);
+            mainBufferCount += written;
+#else
+            mainBufferCount += Encoding.UTF8.GetBytes(chars, destination);
+#endif
+        }
+
+        /// <summary>
+        /// Writes the quoted string in a single fused pass that scans and narrows each vector
+        /// in one go, so plain ASCII content is touched only once instead of being scanned for
+        /// the reservation and then transcoded again.
+        /// Returns false without changing the buffer as soon as a character is found that needs
+        /// escaping or transcoding, so the caller can fall back to the scanning path.
+        /// Every character it writes becomes exactly one byte, so the caller only has to ensure
+        /// that one byte per character plus the two quotes fit. That keeps the buffer from being
+        /// flushed in between, so the written bytes stay contiguous for callers that read them back.
+        /// </summary>
+        private bool TryWriteFusedAsciiWithQuotes(ReadOnlySpan<char> chars, int startIndex, int endIndex)
+        {
+            int pos = mainBufferCount;
+            ref ushort src = ref Unsafe.As<char, ushort>(ref MemoryMarshal.GetReference(chars));
+            ref byte dst = ref MemoryMarshal.GetArrayDataReference(mainBuffer);
+            Unsafe.Add(ref dst, pos++) = (byte)'"';
+
+            int i = startIndex;
+            // Anything below the space, the quote, the backslash and everything above
+            // plain ASCII needs special handling. Checking against the highest ASCII char
+            // covers surrogates and multi byte chars in the same compare.
+            if (Vector256.IsHardwareAccelerated && endIndex - i >= Vector256<ushort>.Count)
+            {
+                var space = Vector256.Create((ushort)' ');
+                var quote = Vector256.Create((ushort)'"');
+                var backslash = Vector256.Create((ushort)'\\');
+                var maxAscii = Vector256.Create((ushort)0x7F);
+                int limit = endIndex - Vector256<ushort>.Count;
+                for (; i <= limit; i += Vector256<ushort>.Count)
+                {
+                    var v = Vector256.LoadUnsafe(ref src, (nuint)i);
+                    var special = Vector256.LessThan(v, space)
+                                | Vector256.Equals(v, quote)
+                                | Vector256.Equals(v, backslash)
+                                | Vector256.GreaterThan(v, maxAscii);
+                    if (special.ExtractMostSignificantBits() != 0) return false;
+                    // The vector is known to be plain ASCII, so it can be narrowed and stored
+                    // right away, without loading it a second time in a separate write pass.
+                    Vector256.Narrow(v, v).GetLower().StoreUnsafe(ref dst, (nuint)pos);
+                    pos += Vector256<ushort>.Count;
+                }
+            }
+            if (Vector128.IsHardwareAccelerated)
+            {
+                var space = Vector128.Create((ushort)' ');
+                var quote = Vector128.Create((ushort)'"');
+                var backslash = Vector128.Create((ushort)'\\');
+                var maxAscii = Vector128.Create((ushort)0x7F);
+                int limit = endIndex - Vector128<ushort>.Count;
+                for (; i <= limit; i += Vector128<ushort>.Count)
+                {
+                    var v = Vector128.LoadUnsafe(ref src, (nuint)i);
+                    var special = Vector128.LessThan(v, space)
+                                | Vector128.Equals(v, quote)
+                                | Vector128.Equals(v, backslash)
+                                | Vector128.GreaterThan(v, maxAscii);
+                    if (special.ExtractMostSignificantBits() != 0) return false;
+                    Vector128.Narrow(v, v).GetLower().StoreUnsafe(ref dst, (nuint)pos);
+                    pos += Vector128<ushort>.Count;
+                }
+            }
+            for (; i < endIndex; i++)
+            {
+                char c = (char)Unsafe.Add(ref src, i);
+                if (c < ' ' || c == '"' || c == '\\' || c > 0x7F) return false;
+                Unsafe.Add(ref dst, pos++) = (byte)c;
+            }
+
+            Unsafe.Add(ref dst, pos++) = (byte)'"';
+            mainBufferCount = pos;
+            return true;
         }
 
         /// <summary>
@@ -1741,15 +2019,64 @@ public sealed partial class JsonSerializer
             int charIndex = startIndex;
             int numChars = length >= 0 ? length : str.Length - startIndex;
             int endIndex = startIndex + numChars;
-            const int MAX_CHAR_LENGTH = 6; // Escaped characters may have up to 6 Bytes
-            EnsureFreeBufferSpace((endIndex - charIndex) * MAX_CHAR_LENGTH + 2); // +2 for the surrounding quotes            
-            WriteToBufferWithoutCheck((byte)'"');
 #if !NETSTANDARD2_0
             // Using a span lets the JIT drop the repeated bounds checks of the scan loop,
             // which dominates the cost for longer strings.
             ReadOnlySpan<char> chars = str.AsSpan();
 #else
             string chars = str;
+#endif
+            // Empty strings are common enough to be worth skipping the whole machinery below.
+            if (numChars == 0)
+            {
+                WriteToBuffer(EMPTY_STRING);
+                return;
+            }
+
+            // The reservation has to cover the whole string, because the buffer must not be
+            // flushed while writing: callers like WriteStringValueAsStringWithCopy read the
+            // written bytes back and rely on them being contiguous.
+            // Reserving the worst case of 6 bytes per char would demand six times the space
+            // an ASCII string actually needs, which forces premature flushes and buffer
+            // resizes for longer strings. So the first special char is located up front and
+            // the reservation is sized by what was actually found.
+            const int MAX_CHAR_LENGTH = 6; // A control char escape (\uXXXX) is the longest
+#if NET7_0_OR_GREATER
+            // Plain ASCII without anything to escape is the most common case by far, so it is
+            // attempted first in a fused pass that scans and narrows in one go, touching the
+            // data only once instead of scanning it for the reservation and transcoding it
+            // afterwards.
+            // The fused path narrows every character to a single byte and bails out before it
+            // writes anything that would need more, so it only needs one byte per character
+            // instead of the worst case. That keeps it reachable for long strings, where the
+            // saved second pass matters most. A failed attempt writes through a local position
+            // and only commits it on success, so it leaves the buffer untouched.
+            if (mainBufferCount + numChars + 2 < mainBufferLimit)
+            {
+                if (TryWriteFusedAsciiWithQuotes(chars, startIndex, endIndex)) return;
+            }
+
+            int firstSpecial = FindNextSpecialChar(chars.Slice(startIndex, numChars), out bool firstRunIsAscii);
+            bool plainAscii = firstRunIsAscii && firstSpecial == numChars;
+            // An all ASCII string without any special char needs exactly one byte per char.
+            EnsureFreeBufferSpace(plainAscii ? numChars + 2 : numChars * MAX_CHAR_LENGTH + 2);
+            if (plainAscii)
+            {
+                // Nothing to escape and nothing to transcode: the scan above already learned
+                // everything, so the whole string can be written in one go without entering
+                // the run loop.
+                WriteToBufferWithoutCheck((byte)'"');
+                WriteKnownAsciiRun(chars.Slice(startIndex, numChars));
+                WriteToBufferWithoutCheck((byte)'"');
+                return;
+            }
+#else
+            EnsureFreeBufferSpace(numChars * MAX_CHAR_LENGTH + 2); // +2 for the surrounding quotes
+#endif
+            WriteToBufferWithoutCheck((byte)'"');
+#if NET7_0_OR_GREATER
+            int nextSpecial = firstSpecial;
+            bool nextRunIsAscii = firstRunIsAscii;
 #endif
             while (charIndex < endIndex)
             {
@@ -1760,7 +2087,11 @@ public sealed partial class JsonSerializer
                 // strings.
                 int runStart = charIndex;
 #if NET7_0_OR_GREATER
-                charIndex = runStart + FindNextSpecialChar(chars.Slice(runStart, endIndex - runStart));
+                // The scan result is carried in locals rather than recomputed here, so that
+                // the initial scan done for the reservation can be reused without testing for
+                // the first iteration inside this loop, which runs once per escaped char.
+                charIndex = runStart + nextSpecial;
+                bool runIsAscii = nextRunIsAscii;
 #else
                 while (charIndex < endIndex)
                 {
@@ -1773,6 +2104,13 @@ public sealed partial class JsonSerializer
                 int runLength = charIndex - runStart;
                 if (runLength > 0)
                 {
+#if NET7_0_OR_GREATER
+                    if (runIsAscii)
+                    {
+                        WriteKnownAsciiRun(chars.Slice(runStart, runLength));
+                    }
+                    else
+#endif
                     if (runLength < MIN_BULK_ENCODE_LENGTH)
                     {
                         // For short runs the encoder call overhead outweighs its benefit.
@@ -1810,14 +2148,51 @@ public sealed partial class JsonSerializer
 
                 char c = chars[charIndex];
 
-                // Handle escaped chars and control chars
-                byte[] escapeBytes = GetEscapeBytes(c); 
-                if (escapeBytes != null)
+                // Handle escaped chars and control chars. Consecutive ones are consumed by
+                // this tight loop instead of returning to the scan above, because that scan
+                // sets up its vector constants on every call and would immediately report
+                // the very next character again. For escape dense strings that setup, not
+                // the escaping itself, dominates the runtime.
+#if NET7_0_OR_GREATER
+                int escapeLength = GetEscapeLength(c);
+                if (escapeLength != 0)
                 {
-                    WriteToBufferWithoutCheck(escapeBytes);
-                    charIndex++;
+                    // Each escape is written as one unaligned 8-byte store from the flat
+                    // lookup and the position is then advanced by the real escape length.
+                    // The padding bytes beyond it are overwritten by the next write, which
+                    // is cheaper than a variable length copy per character. The reservation
+                    // of 6 bytes per char plus the closing quote covers the overhang.
+                    ref byte lookup = ref MemoryMarshal.GetArrayDataReference(EscapeFlatLookup);
+                    ref byte dst = ref MemoryMarshal.GetArrayDataReference(mainBuffer);
+                    int pos = mainBufferCount;
+                    do
+                    {
+                        ulong chunk = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref lookup, c * ESCAPE_CHUNK_SIZE));
+                        Unsafe.WriteUnaligned(ref Unsafe.Add(ref dst, pos), chunk);
+                        pos += escapeLength;
+                        charIndex++;
+                        if (charIndex >= endIndex) break;
+                        c = chars[charIndex];
+                        escapeLength = GetEscapeLength(c);
+                    } while (escapeLength != 0);
+                    mainBufferCount = pos;
+                    if (charIndex < endIndex) nextSpecial = FindNextSpecialChar(chars.Slice(charIndex, endIndex - charIndex), out nextRunIsAscii);
                     continue;
                 }
+#else
+                byte[] escapeBytes = GetEscapeBytes(c);
+                if (escapeBytes != null)
+                {
+                    do
+                    {
+                        WriteToBufferWithoutCheck(escapeBytes);
+                        charIndex++;
+                        if (charIndex >= endIndex) break;
+                        escapeBytes = GetEscapeBytes(chars[charIndex]);
+                    } while (escapeBytes != null);
+                    continue;
+                }
+#endif
 
                 // Handle surrogate pairs
                 if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
@@ -1832,6 +2207,9 @@ public sealed partial class JsonSerializer
                     WriteToBufferWithoutCheck((byte)((surrogateCodePoint & 0x3F) | 0x80));
 
                     charIndex += 2; // The next character was part of the surrogate pair
+#if NET7_0_OR_GREATER
+                    if (charIndex < endIndex) nextSpecial = FindNextSpecialChar(chars.Slice(charIndex, endIndex - charIndex), out nextRunIsAscii);
+#endif
                     continue;
                 }
 
