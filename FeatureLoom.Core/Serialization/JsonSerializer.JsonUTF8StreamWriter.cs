@@ -3219,6 +3219,40 @@ public sealed partial class JsonSerializer
         }
 
         private static readonly byte[] zeroDateTimeBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00\"");
+
+        // Caches the already encoded "yyyy-MM-dd" bytes of the last written day number.
+        // Serialized date collections usually share the same or only a few distinct days,
+        // so the calendar decomposition and the digit lookups are done once per day instead
+        // of once per value. The mapping is constant, so the cache never needs invalidation.
+        private int cachedDateDayNumber = -1;
+        private ulong cachedDateChunkLow;   // "yyyy-MM-" 
+        private ushort cachedDateChunkHigh; // "dd"
+
+        /// <summary>
+        /// Splits the days since 0001-01-01 into year, month and day in a single pass.
+        /// DateTime.Year, .Month and .Day each redo the whole calendar decomposition from the
+        /// ticks, so asking for all three costs three times the divisions this needs.
+        /// Uses the shifted-era approach, which moves the leap day to the end of the year and
+        /// thereby removes the case distinctions of a calendar based calculation.
+        /// </summary>
+        private static void GetDateParts(int days, out int year, out int month, out int day)
+        {
+            // Shift the epoch from 0001-01-01 to 0000-03-01, so that the leap day becomes the
+            // last day of the year and the month lengths follow a regular pattern.
+            days += 306;
+            int era = days / 146097;        // 146097 days per 400 years
+            int dayOfEra = days - era * 146097;
+            // Subtracting the leap days of the century and 4-year cycles yields the year of the era.
+            int yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096) / 365;
+            int dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100);
+            // The regular month pattern of the shifted year allows a direct calculation.
+            int shiftedMonth = (5 * dayOfYear + 2) / 153;
+            day = dayOfYear - (153 * shiftedMonth + 2) / 5 + 1;
+            // Shift March..February back to January..December.
+            month = shiftedMonth < 10 ? shiftedMonth + 3 : shiftedMonth - 9;
+            year = yearOfEra + era * 400 + (shiftedMonth < 10 ? 0 : 1);
+        }
+
         public void WriteDateTimeValue(DateTime dateTime)
         {
             if (dateTime == default)
@@ -3227,54 +3261,161 @@ public sealed partial class JsonSerializer
                 return;
             }
 
-            int fractualSeconds = (int)(dateTime.Ticks % TimeSpan.TicksPerSecond);
+            long ticks = dateTime.Ticks;
+            int fractualSeconds = (int)(ticks % TimeSpan.TicksPerSecond);
+            var kind = dateTime.Kind;
             int bytesToReserve = zeroDateTimeBytes.Length;
             if (fractualSeconds > 0) bytesToReserve += 8; // .fffffff
-            if (dateTime.Kind == DateTimeKind.Utc) bytesToReserve += 1; // Z
-            else if (dateTime.Kind == DateTimeKind.Local) bytesToReserve += 6; // e.g. +01:00
+            if (kind == DateTimeKind.Utc) bytesToReserve += 1; // Z
+            else if (kind == DateTimeKind.Local) bytesToReserve += 6; // e.g. +01:00
             EnsureFreeBufferSpace(bytesToReserve);
 
-            WriteToBufferWithoutCheck((byte)'"');
-            // Write Year
-            Write4Digits(dateTime.Year);
-            WriteToBufferWithoutCheck((byte)'-');
-            // Write Month
-            Write2Digits(dateTime.Month);
-            WriteToBufferWithoutCheck((byte)'-');
-            // Write Day
-            Write2Digits(dateTime.Day);
-            WriteToBufferWithoutCheck((byte)'T');
-            // Write Hour
-            Write2Digits(dateTime.Hour);
-            WriteToBufferWithoutCheck((byte)':');
-            // Write Minute
-            Write2Digits(dateTime.Minute);
-            WriteToBufferWithoutCheck((byte)':');
-            // Write Second
-            Write2Digits(dateTime.Second);
+            WriteDateAndTime(ticks);
 
             // Write Fractional second                
-            if (fractualSeconds > 0)
-            {
-                WriteToBufferWithoutCheck((byte)'.');
-                Write7Digits(fractualSeconds);
-            }
+            if (fractualSeconds > 0) WriteFractionalSeconds(fractualSeconds);
 
-            if (dateTime.Kind == DateTimeKind.Utc)
+            if (kind == DateTimeKind.Utc)
             {
                 WriteToBufferWithoutCheck((byte)'Z');
             }
-            else if (dateTime.Kind == DateTimeKind.Local)
+            else if (kind == DateTimeKind.Local)
             {
                 TimeSpan offsetSpan = TimeZoneInfo.Local.GetUtcOffset(dateTime);
-                bool isNegative = offsetSpan.Ticks < 0;
-                WriteToBufferWithoutCheck((byte)(isNegative ? '-' : '+'));
-                Write2Digits(Math.Abs(offsetSpan.Hours));
-                WriteToBufferWithoutCheck((byte)':');
-                Write2Digits(Math.Abs(offsetSpan.Minutes));
+                WriteUtcOffset(offsetSpan);
             }
             WriteToBufferWithoutCheck((byte)'"');
         }
+
+        /// <summary>
+        /// Writes the opening quote and the "yyyy-MM-ddTHH:mm:ss" part of the given ticks.
+        /// The whole block has a fixed size, so it is composed in one go and the write position
+        /// is only stored back once instead of once per chunk. The free space was ensured by the caller.
+        /// </summary>
+        private void WriteDateAndTime(long ticks)
+        {
+            long totalDays = ticks / TimeSpan.TicksPerDay;
+            int timeOfDay = (int)((ticks - totalDays * TimeSpan.TicksPerDay) / TimeSpan.TicksPerSecond);
+            // A single division yields both the hour and the remaining seconds of the hour.
+            int hour = timeOfDay / 3600;
+            int secondOfHour = timeOfDay - hour * 3600;
+            int minute = secondOfHour / 60;
+            int second = secondOfHour - minute * 60;
+
+            int pos = mainBufferCount;
+#if NET7_0_OR_GREATER
+            int dayNumber = (int)totalDays;
+            if (dayNumber != cachedDateDayNumber) UpdateDateCache(dayNumber);
+
+            ref byte dst = ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(mainBuffer), pos);
+            dst = (byte)'"';
+            // The whole "yyyy-MM-dd" comes from the cache as one 8-byte and one 2-byte store.
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref dst, 1), cachedDateChunkLow);
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref dst, 9), cachedDateChunkHigh);
+            Unsafe.Add(ref dst, 11) = (byte)'T';
+            mainBufferCount = pos + 12;
+            WriteTimeOfDay(hour, minute, second);
+#else
+            GetDateParts((int)totalDays, out int year, out int month, out int day);
+            mainBuffer[pos] = (byte)'"';
+            mainBufferCount = pos + 1;
+            Write4Digits(year);
+            WriteToBufferWithoutCheck((byte)'-');
+            Write2Digits(month);
+            WriteToBufferWithoutCheck((byte)'-');
+            Write2Digits(day);
+            WriteToBufferWithoutCheck((byte)'T');
+            Write2Digits(hour);
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(minute);
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(second);
+#endif
+        }
+
+#if NET7_0_OR_GREATER
+        /// <summary>
+        /// Decomposes the given day number and encodes it as the "yyyy-MM-dd" byte chunks of the cache.
+        /// Only called when a day differs from the previously written one.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void UpdateDateCache(int dayNumber)
+        {
+            GetDateParts(dayNumber, out int year, out int month, out int day);
+            Span<byte> tmp = stackalloc byte[16];
+            ref byte tmpRef = ref MemoryMarshal.GetReference(tmp);
+            ref byte lut = ref MemoryMarshal.GetArrayDataReference(NumberLookupZeroPadded);
+            // The year is a full 4-digit group, month and day are the last 2 digits of one.
+            Write4DigitsAt(ref tmpRef, 0, ref lut, year);
+            Unsafe.Add(ref tmpRef, 4) = (byte)'-';
+            Write2DigitsAt(ref tmpRef, 5, ref lut, month);
+            Unsafe.Add(ref tmpRef, 7) = (byte)'-';
+            Write2DigitsAt(ref tmpRef, 8, ref lut, day);
+            cachedDateChunkLow = Unsafe.ReadUnaligned<ulong>(ref tmpRef);
+            cachedDateChunkHigh = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref tmpRef, 8));
+            cachedDateDayNumber = dayNumber;
+        }
+#endif
+
+        /// <summary>
+        /// Writes the "+HH:mm" / "-HH:mm" suffix of a local time or a DateTimeOffset.
+        /// The free space was ensured by the caller.
+        /// </summary>
+        private void WriteUtcOffset(TimeSpan offsetSpan)
+        {
+            // A single decomposition of the total minutes replaces the separate .Hours/.Minutes
+            // properties, which each redo the division chain from the ticks.
+            int offsetMinutes = (int)(offsetSpan.Ticks / TimeSpan.TicksPerMinute);
+            bool isNegative = offsetMinutes < 0;
+            if (isNegative) offsetMinutes = -offsetMinutes;
+            int offsetHour = offsetMinutes / 60;
+            int offsetMinute = offsetMinutes - offsetHour * 60;
+
+            int pos = mainBufferCount;
+#if NET7_0_OR_GREATER
+            if (BitConverter.IsLittleEndian)
+            {
+                ref byte lut = ref MemoryMarshal.GetArrayDataReference(NumberLookupZeroPadded);
+                uint h = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref lut, offsetHour * 4 + 2));
+                uint m = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref lut, offsetMinute * 4 + 2));
+                // "+HH:" and "mm" as one 4-byte and one 2-byte store.
+                uint head = (uint)(isNegative ? '-' : '+') | (h << 8) | ((uint)':' << 24);
+                ref byte dst = ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(mainBuffer), pos);
+                Unsafe.WriteUnaligned(ref dst, head);
+                Unsafe.WriteUnaligned(ref Unsafe.Add(ref dst, 4), (ushort)m);
+                mainBufferCount = pos + 6;
+                return;
+            }
+#endif
+            WriteToBufferWithoutCheck((byte)(isNegative ? '-' : '+'));
+            Write2Digits(offsetHour);
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(offsetMinute);
+        }
+
+#if NET7_0_OR_GREATER
+        /// <summary>
+        /// Writes the last two digits of the zero-padded 4-digit representation of the value at a
+        /// constant offset from the destination, as a single 2-byte load/store.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void Write2DigitsAt(ref byte dst, int offset, ref byte lookup, int value)
+        {
+            ushort chunk = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref lookup, value * 4 + 2));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref dst, offset), chunk);
+        }
+
+        /// <summary>
+        /// Writes the full zero-padded 4-digit representation of the value at a constant offset
+        /// from the destination, as a single 4-byte load/store.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void Write4DigitsAt(ref byte dst, int offset, ref byte lookup, int value)
+        {
+            uint chunk = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref lookup, value * 4));
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref dst, offset), chunk);
+        }
+#endif
 
         private static readonly byte[] zeroDateTimeOffsetBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01T00:00:00+00:00\"");
         public void WriteDateTimeOffsetValue(DateTimeOffset dateTimeOffset)
@@ -3290,38 +3431,12 @@ public sealed partial class JsonSerializer
             if (fractualSeconds > 0) bytesToReserve += 8; // .fffffff
             EnsureFreeBufferSpace(bytesToReserve);
 
-            WriteToBufferWithoutCheck((byte)'"');
-            // Write Year
-            Write4Digits(dateTimeOffset.Year);
-            WriteToBufferWithoutCheck((byte)'-');
-            // Write Month
-            Write2Digits(dateTimeOffset.Month);
-            WriteToBufferWithoutCheck((byte)'-');
-            // Write Day
-            Write2Digits(dateTimeOffset.Day);
-            WriteToBufferWithoutCheck((byte)'T');
-            // Write Hour
-            Write2Digits(dateTimeOffset.Hour);
-            WriteToBufferWithoutCheck((byte)':');
-            // Write Minute
-            Write2Digits(dateTimeOffset.Minute);
-            WriteToBufferWithoutCheck((byte)':');
-            // Write Second
-            Write2Digits(dateTimeOffset.Second);
+            WriteDateAndTime(dateTimeOffset.Ticks);
 
             // Write Fractional second
-            if (fractualSeconds > 0)
-            {
-                WriteToBufferWithoutCheck((byte)'.');
-                Write7Digits(fractualSeconds);
-            }
+            if (fractualSeconds > 0) WriteFractionalSeconds(fractualSeconds);
 
-            TimeSpan offsetSpan = dateTimeOffset.Offset;
-            bool isNegative = offsetSpan.Ticks < 0;
-            WriteToBufferWithoutCheck((byte)(isNegative ? '-' : '+'));
-            Write2Digits(Math.Abs(offsetSpan.Hours));
-            WriteToBufferWithoutCheck((byte)':');
-            Write2Digits(Math.Abs(offsetSpan.Minutes));
+            WriteUtcOffset(dateTimeOffset.Offset);
 
             WriteToBufferWithoutCheck((byte)'"');
         }
@@ -3343,10 +3458,18 @@ public sealed partial class JsonSerializer
             }
 
             bool isNegative = value.Ticks < 0;
-            if (isNegative) value = value.Negate(); // Make the TimeSpan positive for easier formatting
+            long ticks = isNegative ? -value.Ticks : value.Ticks; // Make it positive for easier formatting
 
-            int numDays = value.Days;
-            int numFractualSeconds = (int)(value.Ticks % TimeSpan.TicksPerSecond);
+            // A single decomposition yields all parts. TimeSpan.Days, .Hours, .Minutes and .Seconds
+            // each redo the division chain from the ticks, so asking for all four costs a multiple.
+            int numDays = (int)(ticks / TimeSpan.TicksPerDay);
+            long restOfDay = ticks - numDays * TimeSpan.TicksPerDay;
+            int secondOfDay = (int)(restOfDay / TimeSpan.TicksPerSecond);
+            int numFractualSeconds = (int)(restOfDay - secondOfDay * TimeSpan.TicksPerSecond);
+            int hour = secondOfDay / 3600;
+            int secondOfHour = secondOfDay - hour * 3600;
+            int minute = secondOfHour / 60;
+            int second = secondOfHour - minute * 60;
 
             int bytesToReserve = zeroTimespanBytes.Length; // "hh:mm:ss"
             if (isNegative) bytesToReserve += 1; // '-' sign
@@ -3364,19 +3487,40 @@ public sealed partial class JsonSerializer
                 WriteToBufferWithoutCheck((byte)'.');
             }
 
-            Write2Digits(value.Hours);
-            WriteToBufferWithoutCheck((byte)':');
-            Write2Digits(value.Minutes);
-            WriteToBufferWithoutCheck((byte)':');
-            Write2Digits(value.Seconds);
+            WriteTimeOfDay(hour, minute, second);
 
-            if (numFractualSeconds > 0)
-            {
-                WriteToBufferWithoutCheck((byte)'.');
-                Write7Digits(numFractualSeconds);
-            }
+            if (numFractualSeconds > 0) WriteFractionalSeconds(numFractualSeconds);
 
             WriteToBufferWithoutCheck((byte)'"');
+        }
+
+        /// <summary>
+        /// Writes the "hh:mm:ss" part. The block has a fixed size of exactly 8 bytes, so it is
+        /// composed in one go and stored as a single 8-byte write instead of three lookups plus
+        /// two separator writes. The free space was ensured by the caller.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteTimeOfDay(int hour, int minute, int second)
+        {
+#if NET7_0_OR_GREATER
+            if (BitConverter.IsLittleEndian)
+            {
+                ref byte lut = ref MemoryMarshal.GetArrayDataReference(NumberLookupZeroPadded);
+                ulong h = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref lut, hour * 4 + 2));
+                ulong m = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref lut, minute * 4 + 2));
+                ulong s = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref lut, second * 4 + 2));
+                ulong block = h | ((ulong)':' << 16) | (m << 24) | ((ulong)':' << 40) | (s << 48);
+                int pos = mainBufferCount;
+                Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(mainBuffer), pos), block);
+                mainBufferCount = pos + 8;
+                return;
+            }
+#endif
+            Write2Digits(hour);
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(minute);
+            WriteToBufferWithoutCheck((byte)':');
+            Write2Digits(second);
         }
 
 
@@ -3429,6 +3573,35 @@ public sealed partial class JsonSerializer
             uint low = (uint)value % 10000;
             WriteNumberChunkTail(high, 3);
             WriteFullNumberChunk(low);
+        }
+
+        /// <summary>
+        /// Writes the ".fffffff" fractional second part. The whole block has a fixed size, so it is
+        /// composed in one go and stored as a single 8-byte write instead of a byte-wise loop.
+        /// The free space was ensured by the caller.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void WriteFractionalSeconds(int fractionalSeconds)
+        {
+#if NET7_0_OR_GREATER
+            if (BitConverter.IsLittleEndian)
+            {
+                uint high = (uint)fractionalSeconds / 10000;
+                uint low = (uint)fractionalSeconds % 10000;
+                ref byte lut = ref MemoryMarshal.GetArrayDataReference(NumberLookupZeroPadded);
+                // The 4-digit chunk of the 3-digit high part starts with a padding zero,
+                // which is exactly the slot the decimal point has to occupy.
+                uint highChunk = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref lut, (int)high * 4));
+                uint lowChunk = Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref lut, (int)low * 4));
+                ulong block = ((ulong)lowChunk << 32) | (highChunk & 0xFFFFFF00u) | (byte)'.';
+                int pos = mainBufferCount;
+                Unsafe.WriteUnaligned(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(mainBuffer), pos), block);
+                mainBufferCount = pos + 8;
+                return;
+            }
+#endif
+            WriteToBufferWithoutCheck((byte)'.');
+            Write7Digits(fractionalSeconds);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
