@@ -809,7 +809,7 @@ public sealed partial class JsonSerializer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteDecimalValue(decimal value)
         {
-            WriteDouble((double)value);
+            WriteDecimal(value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2532,7 +2532,7 @@ public sealed partial class JsonSerializer
             if (printExponent)
             {
                 WriteToBuffer((byte)'E');
-                WriteSignedInteger(exponent);
+                WriteExponent(exponent);
             }
 
             // Local Functions
@@ -2815,7 +2815,7 @@ public sealed partial class JsonSerializer
                 if (printExponent)
                 {
                     WriteToBuffer((byte)'E');
-                    WriteSignedInteger(exponent);
+                    WriteExponent(exponent);
                 }
             }
 
@@ -2970,7 +2970,16 @@ public sealed partial class JsonSerializer
             while (integralValue > 0);
 
             int exponent = digitCount - 1;
-            if (exponent <= posExponentLimit)
+
+            // Index of the lowest significant digit: everything below it is a trailing zero.
+            int lastSignificant = 0;
+            while (lastSignificant < exponent && tempBuffer[lastSignificant] == '0') lastSignificant++;
+
+            // Plain notation is used while the exponent stays within the limit, and also when
+            // the value has no trailing zeros at all. In the latter case scientific notation
+            // would not be shorter, and the runtime (and other JSON writers) keep such values
+            // in plain notation as well, e.g. 1234567890123456 instead of 1.234567890123456E15.
+            if (exponent <= posExponentLimit || lastSignificant == 0)
             {
                 for (int i = digitCount - 1; i >= 0; i--) WriteToBufferWithoutCheck(tempBuffer[i]);
                 return;
@@ -2978,8 +2987,6 @@ public sealed partial class JsonSerializer
 
             // Scientific notation: a single leading digit, then the remaining significant
             // digits without their trailing zeros.
-            int lastSignificant = 0;
-            while (lastSignificant < exponent && tempBuffer[lastSignificant] == '0') lastSignificant++;
 
             WriteToBufferWithoutCheck(tempBuffer[exponent]);
             if (lastSignificant < exponent)
@@ -2988,7 +2995,112 @@ public sealed partial class JsonSerializer
                 for (int i = exponent - 1; i >= lastSignificant; i--) WriteToBufferWithoutCheck(tempBuffer[i]);
             }
             WriteToBufferWithoutCheck((byte)'E');
-            WriteSignedInteger(exponent);
+            WriteExponent(exponent);
+        }
+
+        /// <summary>
+        /// Writes the exponent part of a scientific notation number using the same convention
+        /// as .NET's round-trip formatting: an explicit sign followed by at least two digits
+        /// (e.g. "+15", "-05", "+308").
+        /// </summary>
+        private void WriteExponent(int exponent)
+        {
+            uint magnitude;
+            if (exponent < 0)
+            {
+                WriteToBuffer((byte)'-');
+                magnitude = (uint)(-(long)exponent);
+            }
+            else
+            {
+                WriteToBuffer((byte)'+');
+                magnitude = (uint)exponent;
+            }
+
+            if (magnitude < 10) WriteToBuffer((byte)'0');
+            WriteUnsignedInteger32(magnitude);
+        }
+
+        // Longest decimal output: sign + "0." + 28 fractional digits, or 29 integral digits.
+        private const int DECIMAL_MAX_BYTES = 32;
+
+        /// <summary>
+        /// Writes a decimal exactly, in plain notation and preserving the value's scale
+        /// (e.g. 1.250 stays "1.250"), matching decimal.ToString(InvariantCulture) and the
+        /// output of System.Text.Json. Decimal is a base-10 type, so its digits can be
+        /// emitted directly from the 96-bit mantissa without any rounding, round-trip
+        /// verification, or scientific notation.
+        /// </summary>
+        private void WriteDecimal(decimal value)
+        {
+            EnsureFreeBufferSpace(DECIMAL_MAX_BYTES);
+
+            // Bits 16-23 of the flags hold the scale (0-28), bit 31 holds the sign.
+            int[] bits = decimal.GetBits(value);
+            int flags = bits[3];
+            int scale = (flags >> 16) & 0xFF;
+
+            // Render the 96-bit mantissa as decimal digits, least significant first.
+            uint lo = (uint)bits[0];
+            uint mid = (uint)bits[1];
+            uint hi = (uint)bits[2];
+
+            if ((lo | mid | hi) == 0)
+            {
+                // Plain zero is by far the most common decimal value, so it skips the
+                // division loop entirely. A zero mantissa never carries a sign, so even
+                // decimal.Negate(0m) is written as "0", matching decimal.ToString().
+                if (scale == 0)
+                {
+                    WriteToBufferWithoutCheck((byte)'0');
+                    return;
+                }
+
+                // A scaled zero still keeps its trailing zeros, e.g. 0.00m stays "0.00".
+                WriteToBufferWithoutCheck((byte)'0');
+                WriteToBufferWithoutCheck((byte)'.');
+                for (int i = scale; i > 0; i--) WriteToBufferWithoutCheck((byte)'0');
+                return;
+            }
+
+            bool isNegative = flags < 0;
+
+            int digitCount = 0;
+            do
+            {
+                // Long division of the 96-bit mantissa by 10, from the most significant word down.
+                ulong rest = hi;
+                hi = (uint)(rest / 10);
+                rest = ((rest - hi * 10) << 32) | mid;
+                mid = (uint)(rest / 10);
+                rest = ((rest - mid * 10) << 32) | lo;
+                lo = (uint)(rest / 10);
+                tempBuffer[digitCount++] = (byte)('0' + (rest - lo * 10));
+            }
+            while ((lo | mid | hi) != 0);
+
+            if (isNegative) WriteToBufferWithoutCheck((byte)'-');
+
+            if (scale == 0)
+            {
+                for (int i = digitCount - 1; i >= 0; i--) WriteToBufferWithoutCheck(tempBuffer[i]);
+                return;
+            }
+
+            if (digitCount > scale)
+            {
+                for (int i = digitCount - 1; i >= scale; i--) WriteToBufferWithoutCheck(tempBuffer[i]);
+            }
+            else
+            {
+                // Value is below 1, so the integral part is a single zero and the fractional
+                // part needs leading zeros to reach the scale.
+                WriteToBufferWithoutCheck((byte)'0');
+            }
+
+            WriteToBufferWithoutCheck((byte)'.');
+            for (int i = scale - digitCount; i > 0; i--) WriteToBufferWithoutCheck((byte)'0');
+            for (int i = Math.Min(scale, digitCount) - 1; i >= 0; i--) WriteToBufferWithoutCheck(tempBuffer[i]);
         }
 
         double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed, int MAX_SIGNIFICANT_DIGITS)

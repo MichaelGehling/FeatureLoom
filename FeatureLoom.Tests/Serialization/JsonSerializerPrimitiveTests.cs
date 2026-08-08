@@ -272,6 +272,8 @@ namespace FeatureLoom.Serialization
         [InlineData(0.00001d, "1E-05")]
         [InlineData(-0.00015890432405285535d, "-0.00015890432405285535")]
         [InlineData(0.100001d, "0.100001")]
+        [InlineData(1234567890123456d, "1234567890123456")]
+        [InlineData(999999999999999d, "999999999999999")]
         public void Serialize_Double(double value, string expected)
         {
             AssertSerialized(value, expected);
@@ -280,6 +282,8 @@ namespace FeatureLoom.Serialization
         [Theory]
         [InlineData(1e20d, "1E+20")]
         [InlineData(1e-6d, "1E-06")]
+        [InlineData(1e15d, "1E+15")]
+        [InlineData(1.23e15d, "1.23E+15")]
         public void Serialize_Double_ExponentNotation(double value, string expected)
         {
             AssertSerialized(value, expected);
@@ -359,6 +363,34 @@ namespace FeatureLoom.Serialization
         public void Serialize_Decimal_AsDouble(decimal value, string expected)
         {
             AssertSerialized(value, expected);
+        }
+
+        [Theory]
+        [InlineData("0", "0")]
+        [InlineData("-1", "-1")]
+        [InlineData("1.25", "1.25")]
+        [InlineData("12345.6789", "12345.6789")]
+        // The scale is part of the value, so trailing zeros are preserved.
+        [InlineData("1.250", "1.250")]
+        [InlineData("0.00", "0.00")]
+        [InlineData("0.0000", "0.0000")]
+        // Values below 1 need leading zeros in the fractional part.
+        [InlineData("0.0000000000000000000000000001", "0.0000000000000000000000000001")]
+        [InlineData("-0.5", "-0.5")]
+        // Full 96-bit mantissa, which cannot be represented exactly as a double.
+        [InlineData("79228162514264337593543950335", "79228162514264337593543950335")]
+        [InlineData("-79228162514264337593543950335", "-79228162514264337593543950335")]
+        public void Serialize_Decimal_ExactPrecision(string valueText, string expected)
+        {
+            decimal value = decimal.Parse(valueText, CultureInfo.InvariantCulture);
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_Decimal_NegativeZero_WritesUnsignedZero()
+        {
+            // A zero mantissa carries no sign, matching decimal.ToString().
+            AssertSerialized(decimal.Negate(0m), "0");
         }
 
         [Theory]
