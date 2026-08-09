@@ -1283,6 +1283,36 @@ public sealed partial class JsonSerializer
             WriteToBuffer(REFOBJECT_POST);
         }
 
+        static readonly byte[] IDFIELDNAME = "\"$id\":".ToByteArray();
+        static readonly byte[] VALUESFIELDNAME = "\"$values\":".ToByteArray();
+
+        /// <summary>
+        /// Writes the "$id":"N" member used by the id based (System.Text.Json compatible)
+        /// reference format. The caller is responsible for the separating comma.
+        /// </summary>
+        public void WriteItemId(int id)
+        {
+            WriteToBuffer(IDFIELDNAME);
+            WriteIntValueAsString(id);
+        }
+
+        /// <summary>
+        /// Writes a reference in the id based format, e.g. {"$ref":"1"}.
+        /// </summary>
+        public void WriteRefObjectById(int id)
+        {
+            WriteToBuffer(REFOBJECT_PRE);
+            WriteIntValue(id);
+            WriteToBuffer(REFOBJECT_POST);
+        }
+
+        /// <summary>
+        /// Writes the "$values": field name that precedes the array body when an array has to be
+        /// wrapped into an object to carry its "$id".
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteValuesFieldName() => WriteToBuffer(VALUESFIELDNAME);
+
         static readonly byte OPENARRAY = (byte)'[';
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void OpenArray()

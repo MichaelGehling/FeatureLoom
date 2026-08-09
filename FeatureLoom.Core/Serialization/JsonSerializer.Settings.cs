@@ -16,6 +16,7 @@ namespace FeatureLoom.Serialization
             public TypeInfoHandling typeInfoHandling = TypeInfoHandling.AddDeviatingTypeInfo;
             public DataSelection dataSelection = DataSelection.PublicAndPrivateFields_CleanBackingFields;
             public ReferenceCheck referenceCheck = ReferenceCheck.NoRefCheck;
+            public ReferenceFormat referenceFormat = ReferenceFormat.JsonPath;
             public bool enumAsString = false;
             public bool treatEnumerablesAsCollections = true;
             public int writeBufferChunkSize = 64 * 1024;
@@ -51,13 +52,88 @@ namespace FeatureLoom.Serialization
             PublicFieldsAndProperties = 3,
         }
 
+        /// <summary>
+        /// Determines if and how repeated or circular object references are detected while writing.
+        /// <para>
+        /// Performance note: the loop detecting modes are not a cheap middle ground between
+        /// <see cref="NoRefCheck"/> and <see cref="AlwaysReplaceByRef"/>. They pay the full
+        /// bookkeeping cost (item infos and, in <see cref="ReferenceFormat.JsonPath"/> mode, item
+        /// names) but only shrink the output when a loop is actually present. On acyclic graphs
+        /// <see cref="AlwaysReplaceByRef"/> is therefore typically faster, because writing repeated
+        /// objects as refs saves more output than the tracking costs.
+        /// See SerializeReferenceHandlingTest in FeatureLoom.PerformanceTests.
+        /// </para>
+        /// </summary>
         public enum ReferenceCheck
         {
+            /// <summary>
+            /// No reference tracking at all. Fastest option, but shared objects are written
+            /// repeatedly and circular references cause an endless loop / stack overflow.
+            /// Only use this if the object graph is known to be a tree.
+            /// </summary>
             NoRefCheck = 0,
+
+            /// <summary>
+            /// Detects circular references and throws an exception instead of writing them.
+            /// </summary>
             OnLoopThrowException = 1,
+
+            /// <summary>
+            /// Detects circular references and writes null in place of the looping object,
+            /// breaking the cycle without adding any ref syntax to the output.
+            /// </summary>
             OnLoopReplaceByNull = 2,
+
+            /// <summary>
+            /// Detects circular references and writes a ref (see <see cref="ReferenceFormat"/>) in
+            /// place of the looping object. Repeated but non-circular occurrences are still written
+            /// out in full.
+            /// <para>
+            /// Beware: on graphs without loops this produces exactly the same output as
+            /// <see cref="NoRefCheck"/> while still paying the tracking overhead, which makes it
+            /// the slowest mode in that case. Prefer <see cref="AlwaysReplaceByRef"/> unless
+            /// duplicated objects really have to be materialized as separate instances.
+            /// </para>
+            /// </summary>
             OnLoopReplaceByRef = 3,
+
+            /// <summary>
+            /// Every object is written only once; each repeated occurrence becomes a ref (see
+            /// <see cref="ReferenceFormat"/>). This preserves object identity on deserialization
+            /// and usually shrinks the output noticeably, which often compensates the tracking cost.
+            /// </summary>
             AlwaysReplaceByRef = 4
+        }
+
+        /// <summary>
+        /// Determines how references to already serialized objects are represented.
+        /// </summary>
+        public enum ReferenceFormat
+        {
+            /// <summary>
+            /// References are written as a JSONPath pointing at the location of the first
+            /// occurrence, e.g. {"$ref":"$.Items[0]"}. This produces clean, human readable output
+            /// and requires no additional members on the referenced objects, but it is specific to
+            /// this serializer.
+            /// <para>
+            /// This format needs the name of every written item to build the paths, so it is
+            /// slightly slower than <see cref="IdBased"/> even though it produces less output.
+            /// </para>
+            /// </summary>
+            JsonPath = 0,
+
+            /// <summary>
+            /// References use the id based format established by System.Text.Json
+            /// (ReferenceHandler.Preserve) and Newtonsoft.Json (PreserveReferencesHandling).
+            /// Every reference tracked object gets an "$id" member and repeated occurrences are
+            /// written as {"$ref":"1"}. Arrays are wrapped as {"$id":"1","$values":[...]}.
+            /// Use this mode when the JSON has to be read by those serializers.
+            /// <para>
+            /// Writes a few more bytes than <see cref="JsonPath"/>, but is faster because no item
+            /// names have to be tracked.
+            /// </para>
+            /// </summary>
+            IdBased = 1
         }
 
         public enum TypeInfoHandling
@@ -72,6 +148,7 @@ namespace FeatureLoom.Serialization
             public readonly TypeInfoHandling typeInfoHandling;
             public readonly DataSelection dataSelection;
             public readonly ReferenceCheck referenceCheck;
+            public readonly ReferenceFormat referenceFormat;
             public readonly bool enumAsString;
             public readonly bool treatEnumerablesAsCollections;
             public readonly int writeBufferChunkSize;
@@ -83,6 +160,7 @@ namespace FeatureLoom.Serialization
 
             public readonly bool requiresItemNames;
             public readonly bool requiresItemInfos;
+            public readonly bool writeItemIds;
             public readonly bool writeByteArrayAsBase64String = false;
             public readonly bool writeArraySegmentsAsArrays = false;
 
@@ -91,6 +169,7 @@ namespace FeatureLoom.Serialization
                 typeInfoHandling = settings.typeInfoHandling;
                 dataSelection = settings.dataSelection;
                 referenceCheck = settings.referenceCheck;
+                referenceFormat = settings.referenceFormat;
                 enumAsString = settings.enumAsString;
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
                 writeBufferChunkSize = settings.writeBufferChunkSize;
@@ -100,8 +179,13 @@ namespace FeatureLoom.Serialization
                 indentationFactor = settings.indentationFactor;
                 itemHandlerCreators = settings.customTypeHandlerCreators.Where(creator => creator != null).ToArray();
 
-                requiresItemNames = referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef;
+                // Item names are only needed to build JSONPath ref values. The id based format
+                // identifies objects by an explicit "$id" member, so the path is irrelevant there.
+                requiresItemNames = referenceFormat == ReferenceFormat.JsonPath &&
+                                    (referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef);
                 requiresItemInfos = referenceCheck != ReferenceCheck.NoRefCheck;
+                writeItemIds = referenceFormat == ReferenceFormat.IdBased &&
+                               (referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef);
                 writeByteArrayAsBase64String = settings.writeByteArrayAsBase64String;
                 writeArraySegmentsAsArrays = settings.writeArraySegmentsAsArrays;
             }

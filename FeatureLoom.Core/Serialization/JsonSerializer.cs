@@ -23,6 +23,10 @@ namespace FeatureLoom.Serialization
         readonly CompiledSettings settings;
         readonly Dictionary<Type, CachedTypeWriter> typeWriterCache = new();
         readonly Dictionary<object, ItemInfo> objToItemInfo = new();
+        readonly Dictionary<object, int> objToRefId = new();
+        int nextRefId = 1;
+        // Id assigned to the item currently being written, or 0 if the item is not id-tracked.
+        int currentItemId;
         readonly ItemInfoRecycler itemInfoRecycler;
         private ByteSegment rootName;
         ItemInfo currentItemInfo;
@@ -33,7 +37,9 @@ namespace FeatureLoom.Serialization
         {           
             this.settings = new CompiledSettings(settings ?? new Settings());
             writer = new JsonUTF8StreamWriter(this.settings);
-            itemInfoRecycler = new ItemInfoRecycler(this.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef);
+            // Only the JSONPath format keeps ItemInfos alive beyond their scope, because the ref
+            // values are built from the item name chain. The id based format does not need them.
+            itemInfoRecycler = new ItemInfoRecycler(this.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && !this.settings.writeItemIds);
             rootName = new ByteSegment(writer.PrepareRootName());
             this.extensionApi = new ExtensionApi(this);
         }
@@ -55,6 +61,8 @@ namespace FeatureLoom.Serialization
             }
             writer.stream = null;
             if (objToItemInfo.Count > 0) objToItemInfo.Clear();
+            if (objToRefId.Count > 0) objToRefId.Clear();
+            nextRefId = 1;
             itemInfoRecycler.ResetPooledItemInfos();            
         }
 
@@ -190,9 +198,25 @@ namespace FeatureLoom.Serialization
                     // struct variant is needed; only the item info creation differs.
                     if (typeof(T).IsValueType) CreateItemInfoForStruct(itemName);
                     else CreateItemInfoForClass(item, itemName);
+                    currentItemId = 0;
                     if (!TryHandleItemAsRef(item))
                     {
-                        WriteArrayWithTypeInfo(item, deviatingType, typeHandler, itemHandler);
+                        int id = currentItemId;
+                        if (id != 0)
+                        {
+                            // The array itself must carry the "$id", so it is wrapped into an
+                            // object with the actual elements moved into "$values".
+                            writer.OpenObject();
+                            writer.WriteItemId(id);
+                            writer.WriteComma();
+                            writer.WriteValuesFieldName();
+                            WriteArrayWithTypeInfo(item, deviatingType, typeHandler, itemHandler);
+                            writer.CloseObject();
+                        }
+                        else
+                        {
+                            WriteArrayWithTypeInfo(item, deviatingType, typeHandler, itemHandler);
+                        }
                     }
                     UseParentItemInfo();
                 };
@@ -232,10 +256,12 @@ namespace FeatureLoom.Serialization
                     // struct variant is needed; only the item info creation differs.
                     if (typeof(T).IsValueType) CreateItemInfoForStruct(itemName);
                     else CreateItemInfoForClass(item, itemName);
+                    currentItemId = 0;
                     if (!TryHandleItemAsRef(item))
                     {
+                        int id = currentItemId;
                         writer.OpenObject();
-                        WriteTypeInfoAndBody(item, deviatingType, typeHandler, itemHandler);
+                        WriteTypeInfoAndBody(item, deviatingType, typeHandler, itemHandler, id);
                         writer.CloseObject();
                     }
                     UseParentItemInfo();
@@ -256,10 +282,18 @@ namespace FeatureLoom.Serialization
         /// Writes the optional type info followed by the object body. If the body turns out to be
         /// empty, the separating comma written after the type info is rolled back again.
         /// </summary>
-        private void WriteTypeInfoAndBody<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, Action<T> itemHandler)
+        private void WriteTypeInfoAndBody<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, Action<T> itemHandler, int itemId = 0)
         {
             int countBeforeComma = -1;
             int countAfterComma = -1;
+            if (itemId != 0)
+            {
+                // "$id" has to be the first member so that other serializers recognize it.
+                writer.WriteItemId(itemId);
+                countBeforeComma = writer.BufferCount;
+                writer.WriteComma();
+                countAfterComma = writer.BufferCount;
+            }
             if (TypeInfoRequired(deviatingType))
             {
                 writer.WriteToBuffer(typeHandler.preparedTypeInfo);
@@ -601,6 +635,26 @@ namespace FeatureLoom.Serialization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryHandleObjAsRef(object obj)
         {
+            if (settings.writeItemIds)
+            {
+                // Id based format: the first occurrence gets a fresh id, which the object/array
+                // writer emits as "$id", every repeated occurrence becomes {"$ref":"<id>"}.
+                if (objToRefId.TryGetValue(obj, out int existingId))
+                {
+                    if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef || IsAncestor(obj))
+                    {
+                        writer.WriteRefObjectById(existingId);
+                        return true;
+                    }
+                    currentItemId = existingId;
+                    return false;
+                }
+
+                currentItemId = nextRefId++;
+                objToRefId[obj] = currentItemId;
+                return false;
+            }
+
             if (settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef)
             {
                 if (!objToItemInfo.TryAdd(obj, currentItemInfo))
@@ -625,6 +679,21 @@ namespace FeatureLoom.Serialization
                 }
             }
 
+            return false;
+        }
+
+        /// <summary>
+        /// Checks whether the given object is currently being written further up the stack, which
+        /// means writing it again would create an endless loop.
+        /// </summary>
+        private bool IsAncestor(object obj)
+        {
+            var itemInfo = currentItemInfo?.parentInfo;
+            while (itemInfo != null)
+            {
+                if (itemInfo.objItem == obj) return true;
+                itemInfo = itemInfo.parentInfo;
+            }
             return false;
         }
 
