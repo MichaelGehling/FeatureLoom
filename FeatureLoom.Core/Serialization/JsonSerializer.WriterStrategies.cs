@@ -470,7 +470,7 @@ public sealed partial class JsonSerializer
             {
                 // The output format is fixed by the settings, so the strategy can be selected here
                 // and the per-element format branch disappears completely.
-                if (settings.writeByteArrayAsBase64String) CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayBase64WriterStrategy, byte[]>(typeHandler, elementHandler);
+                if (settings.ResolveWriteByteArrayAsBase64String(typeof(byte[]))) CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayBase64WriterStrategy, byte[]>(typeHandler, elementHandler);
                 else CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayNumbersWriterStrategy, byte[]>(typeHandler, elementHandler);
                 return;
             }

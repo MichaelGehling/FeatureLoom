@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Collections;
+using FeatureLoom.Collections;
 using FeatureLoom.Extensions;
 using System;
 using System.Xml.Serialization;
@@ -11,7 +11,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<int>((item, _, _) =>
                 {
@@ -20,7 +20,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<int>((item, deviatingType, _) =>
                 {
@@ -39,7 +39,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<int?>((item, _, _) =>
                 {
@@ -49,7 +49,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<int?>((item, deviatingType, _) =>
                 {
@@ -74,7 +74,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<uint>((item, _, _) =>
                 {
@@ -83,7 +83,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<uint>((item, deviatingType, _) =>
                 {
@@ -102,7 +102,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<uint?>((item, _, _) =>
                 {
@@ -112,7 +112,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<uint?>((item, deviatingType, _) =>
                 {
@@ -137,7 +137,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<long>((item, _, _) =>
                 {
@@ -146,7 +146,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<long>((item, deviatingType, _) =>
                 {
@@ -165,7 +165,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<long?>((item, _, _) =>
                 {
@@ -175,7 +175,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<long?>((item, deviatingType, _) =>
                 {
@@ -200,7 +200,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<ulong>((item, _, _) =>
                 {
@@ -209,7 +209,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ulong>((item, deviatingType, _) =>
                 {
@@ -228,7 +228,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<ulong?>((item, _, _) =>
                 {
@@ -238,7 +238,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ulong?>((item, deviatingType, _) =>
                 {
@@ -263,7 +263,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<short>((item, _, _) =>
                 {
@@ -272,7 +272,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<short>((item, deviatingType, _) =>
                 {
@@ -291,7 +291,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<short?>((item, _, _) =>
                 {
@@ -301,7 +301,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<short?>((item, deviatingType, _) =>
                 {
@@ -326,7 +326,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<ushort>((item, _, _) =>
                 {
@@ -335,7 +335,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ushort>((item, deviatingType, _) =>
                 {
@@ -354,7 +354,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<ushort?>((item, _, _) =>
                 {
@@ -364,7 +364,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ushort?>((item, deviatingType, _) =>
                 {
@@ -389,7 +389,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<sbyte>((item, _, _) =>
                 {
@@ -398,7 +398,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<sbyte>((item, deviatingType, _) =>
                 {
@@ -417,7 +417,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<sbyte?>((item, _, _) =>
                 {
@@ -427,7 +427,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<sbyte?>((item, deviatingType, _) =>
                 {
@@ -452,7 +452,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<byte>((item, _, _) =>
                 {
@@ -461,7 +461,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<byte>((item, deviatingType, _) =>
                 {
@@ -480,7 +480,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<byte?>((item, _, _) =>
                 {
@@ -490,7 +490,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<byte?>((item, deviatingType, _) =>
                 {
@@ -515,7 +515,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<double>((item, _, _) =>
                 {
@@ -524,7 +524,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<double>((item, deviatingType, _) =>
                 {
@@ -543,7 +543,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<double?>((item, _, _) =>
                 {
@@ -553,7 +553,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<double?>((item, deviatingType, _) =>
                 {
@@ -578,7 +578,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<float>((item, _, _) =>
                 {
@@ -587,7 +587,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<float>((item, deviatingType, _) =>
                 {
@@ -606,7 +606,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<float?>((item, _, _) =>
                 {
@@ -616,7 +616,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<float?>((item, deviatingType, _) =>
                 {
@@ -642,7 +642,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<decimal>((item, _, _) =>
                 {
@@ -651,7 +651,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<decimal>((item, deviatingType, _) =>
                 {
@@ -670,7 +670,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<decimal?>((item, _, _) =>
                 {
@@ -680,7 +680,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<decimal?>((item, deviatingType, _) =>
                 {
@@ -705,7 +705,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<char>((item, _, _) =>
                 {
@@ -714,7 +714,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<char>((item, deviatingType, _) =>
                 {
@@ -733,7 +733,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<char?>((item, _, _) =>
                 {
@@ -743,7 +743,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<char?>((item, deviatingType, _) =>
                 {
@@ -766,7 +766,7 @@ public sealed partial class JsonSerializer
 
     void CreateStringItemWriter(CachedTypeWriter typeWriter)
     {
-        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+        if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
         {
             typeWriter.SetItemWriter<string>((item, _, _) =>
             {
@@ -775,7 +775,7 @@ public sealed partial class JsonSerializer
                 FinishTypeInfoObject();
             }, false);
         }
-        else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+        else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
         {
             typeWriter.SetItemWriter<string>((item, deviatingType, _) =>
             {
@@ -797,7 +797,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<bool>((item, _, _) =>
                 {
@@ -806,7 +806,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<bool>((item, deviatingType, _) =>
                 {
@@ -825,7 +825,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<bool?>((item, _, _) =>
                 {
@@ -835,7 +835,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<bool?>((item, deviatingType, _) =>
                 {
@@ -861,7 +861,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<nint>((item, _, _) =>
                 {
@@ -870,7 +870,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<nint>((item, deviatingType, _) =>
                 {
@@ -889,7 +889,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<IntPtr?>((item, _, _) =>
                 {
@@ -899,7 +899,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<IntPtr?>((item, deviatingType, _) =>
                 {
@@ -924,7 +924,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<nuint>((item, _, _) =>
                 {
@@ -933,7 +933,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<nuint>((item, deviatingType, _) =>
                 {
@@ -952,7 +952,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<UIntPtr?>((item, _, _) =>
                 {
@@ -962,7 +962,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<UIntPtr?>((item, deviatingType, _) =>
                 {
@@ -987,7 +987,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<Guid>((item, _, _) =>
                 {
@@ -996,7 +996,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<Guid>((item, deviatingType, _) =>
                 {
@@ -1015,7 +1015,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<Guid?>((item, _, _) =>
                 {
@@ -1025,7 +1025,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<Guid?>((item, deviatingType, _) =>
                 {
@@ -1050,7 +1050,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTime>((item, _, _) =>
                 {
@@ -1059,7 +1059,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTime>((item, deviatingType, _) =>
                 {
@@ -1078,7 +1078,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTime?>((item, _, _) =>
                 {
@@ -1088,7 +1088,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTime?>((item, deviatingType, _) =>
                 {
@@ -1113,7 +1113,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTimeOffset>((item, _, _) =>
                 {
@@ -1122,7 +1122,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTimeOffset>((item, deviatingType, _) =>
                 {
@@ -1141,7 +1141,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTimeOffset?>((item, _, _) =>
                 {
@@ -1151,7 +1151,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTimeOffset?>((item, deviatingType, _) =>
                 {
@@ -1176,7 +1176,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeSpan>((item, _, _) =>
                 {
@@ -1185,7 +1185,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeSpan>((item, deviatingType, _) =>
                 {
@@ -1204,7 +1204,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeSpan?>((item, _, _) =>
                 {
@@ -1214,7 +1214,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeSpan?>((item, deviatingType, _) =>
                 {
@@ -1239,7 +1239,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<JsonFragment>((item, _, _) =>
                 {
@@ -1248,7 +1248,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<JsonFragment>((item, deviatingType, _) =>
                 {
@@ -1267,7 +1267,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<JsonFragment?>((item, _, _) =>
                 {
@@ -1277,7 +1277,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<JsonFragment?>((item, deviatingType, _) =>
                 {
@@ -1302,7 +1302,7 @@ public sealed partial class JsonSerializer
     {
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<TextSegment>((item, _, _) =>
                 {
@@ -1311,7 +1311,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TextSegment>((item, deviatingType, _) =>
                 {
@@ -1330,7 +1330,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeWriter.SetItemWriter<TextSegment?>((item, _, _) =>
                 {
@@ -1340,7 +1340,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TextSegment?>((item, deviatingType, _) =>
                 {
@@ -1363,7 +1363,7 @@ public sealed partial class JsonSerializer
 
     void CreateUriItemWriter(CachedTypeWriter typeWriter)
     {
-        if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+        if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
         {
             typeWriter.SetItemWriter<Uri>((item, _, _) =>
             {
@@ -1372,7 +1372,7 @@ public sealed partial class JsonSerializer
                 FinishTypeInfoObject();
             }, false);
         }
-        else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+        else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
         {
             typeWriter.SetItemWriter<Uri>((item, deviatingType, _) =>
             {
@@ -1395,11 +1395,11 @@ public sealed partial class JsonSerializer
         // Captured once at setup, so the per-item check is a well-predicted branch on a readonly
         // local instead of a settings lookup. Spelling out all string/int combinations separately
         // would double the number of variants below without a measurable benefit.
-        bool asString = settings.enumAsString;
+        bool asString = settings.ResolveEnumAsString(typeof(T));
 
         if (!nullable)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeHandler.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeHandler.SetItemWriter<T>((item, _, _) =>
                 {
@@ -1409,7 +1409,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeHandler.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeHandler.SetItemWriter<T>((item, deviatingType, _) =>
                 {
@@ -1430,7 +1430,7 @@ public sealed partial class JsonSerializer
         }
         else
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeHandler.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 typeHandler.SetItemWriter<T?>((item, _, _) =>
                 {
@@ -1441,7 +1441,7 @@ public sealed partial class JsonSerializer
                     FinishTypeInfoObject();
                 }, false);
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeHandler.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeHandler.SetItemWriter<T?>((item, deviatingType, _) =>
                 {

@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Collections;
+using FeatureLoom.Collections;
 using System;
 using System.Xml.Serialization;
 
@@ -8,8 +8,8 @@ public sealed partial class JsonSerializer
 {
     void CreateByteArrayWriter(CachedTypeWriter typeWriter)
     {
-        var useBase64 = settings.writeByteArrayAsBase64String;
-        var typeInfo = settings.typeInfoHandling;
+        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.HandlerType);
+        var typeInfo = typeWriter.typeInfoHandling;
 
         typeWriter.SetItemWriter<byte[]>(BuildWriter(), false);
 
@@ -30,8 +30,8 @@ public sealed partial class JsonSerializer
 
     void CreateByteSegmentWriter(CachedTypeWriter typeWriter, bool nullable)
     {
-        var useBase64 = settings.writeByteArrayAsBase64String;
-        var typeInfo = settings.typeInfoHandling;
+        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.HandlerType);
+        var typeInfo = typeWriter.typeInfoHandling;
 
         Action configureWriter = (nullable, typeInfo, useBase64) switch
         {
@@ -62,8 +62,8 @@ public sealed partial class JsonSerializer
 
     void CreateByteArraySegmentWriter(CachedTypeWriter typeWriter, bool nullable)
     {
-        var useBase64 = settings.writeByteArrayAsBase64String;
-        var typeInfo = settings.typeInfoHandling;
+        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.HandlerType);
+        var typeInfo = typeWriter.typeInfoHandling;
 
         Action configureWriter = (nullable, typeInfo, useBase64) switch
         {

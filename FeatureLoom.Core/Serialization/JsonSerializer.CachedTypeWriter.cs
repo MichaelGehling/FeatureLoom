@@ -28,11 +28,19 @@ namespace FeatureLoom.Serialization
             private bool noRefTypes;
             public byte[] preparedTypeInfo;
 
+            /// <summary>
+            /// Type info handling for this type, resolved once from the global setting and the
+            /// optional per-type override. Because a writer is cached per type, this can be
+            /// decided at creation time and never has to be resolved on the write path.
+            /// </summary>
+            public readonly TypeInfoHandling typeInfoHandling;
+
             public CachedTypeWriter(JsonSerializer serializer, Type handlerType)
             {
                 this.serializer = serializer;
                 this.writer = serializer.writer;                
                 this.handlerType = handlerType;
+                this.typeInfoHandling = serializer.settings.ResolveTypeInfoHandling(handlerType);
             }
 
             public bool NoRefTypes => noRefTypes;
@@ -75,10 +83,27 @@ namespace FeatureLoom.Serialization
                     Action<T, bool, ByteSegment> typedItemWriter = (Action<T, bool, ByteSegment>)itemWriter;
                     typedItemWriter.Invoke(item, false, fieldName);
                 }
+                else if (NullableInfo<T>.underlyingType == handlerType)
+                {
+                    // The call type is the nullable version of the handler type, e.g. int? handled
+                    // by the int handler. Boxing a Nullable<T> yields the underlying type, so this
+                    // is not a type deviation and must not produce a $type/$value envelope.
+                    objectItemWriter(item, false, fieldName);
+                }
                 else
                 {
                     objectItemWriter(item, true, fieldName);
                 }
+            }
+
+            /// <summary>
+            /// Caches the underlying type of a nullable value type per generic instantiation, so
+            /// the nullable check in <see cref="WriteItem{T}"/> is a plain reference comparison
+            /// against a static readonly field instead of a repeated reflection call.
+            /// </summary>
+            private static class NullableInfo<T>
+            {
+                public static readonly Type underlyingType = Nullable.GetUnderlyingType(typeof(T));
             }
 
             /// <summary>

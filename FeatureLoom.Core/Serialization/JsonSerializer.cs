@@ -153,7 +153,7 @@ namespace FeatureLoom.Serialization
         /// </summary>
         internal Action<T, bool, ByteSegment> CreatePrimitiveItemWriter<T>(CachedTypeWriter typeHandler, Action<T> itemHandler)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            if (typeHandler.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
             {
                 return (item, _, _) =>
                 {
@@ -162,7 +162,7 @@ namespace FeatureLoom.Serialization
                     FinishTypeInfoObject();
                 };
             }
-            else if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            else if (typeHandler.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 return (item, deviatingType, _) =>
                 {
@@ -232,7 +232,7 @@ namespace FeatureLoom.Serialization
         /// </summary>
         private void WriteArrayWithTypeInfo<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, Action<T> itemHandler)
         {
-            bool writeTypeInfo = TypeInfoRequired(deviatingType);
+            bool writeTypeInfo = TypeInfoRequired(typeHandler, deviatingType);
             if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
             writer.OpenArray();
             itemHandler.Invoke(item);
@@ -294,7 +294,7 @@ namespace FeatureLoom.Serialization
                 writer.WriteComma();
                 countAfterComma = writer.BufferCount;
             }
-            if (TypeInfoRequired(deviatingType))
+            if (TypeInfoRequired(typeHandler, deviatingType))
             {
                 writer.WriteToBuffer(typeHandler.preparedTypeInfo);
                 countBeforeComma = writer.BufferCount;
@@ -541,13 +541,16 @@ namespace FeatureLoom.Serialization
 
         /// <summary>
         /// Determines the name written into the "$type" member of the given type.
-        /// A registered custom name always wins; otherwise generic types use
-        /// genericTypeNameFormat and all other types use typeNameFormat.
+        /// Precedence: a per-type name set via ConfigureType wins, then a globally registered
+        /// custom name, then the format setting, where generic types use genericTypeNameFormat and
+        /// all other types use typeNameFormat.
         /// Only called while creating a CachedTypeWriter, so the result is cached per type and
         /// does not add any cost to the actual serialization.
         /// </summary>
         private string ResolveTypeName(Type itemType)
         {
+            if (settings.TryGetCustomTypeName(itemType, out string perTypeName)) return perTypeName;
+
             if (settings.customTypeNames != null &&
                 settings.customTypeNames.TryGetValue(itemType, out string customName)) return customName;
 
@@ -720,10 +723,10 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TypeInfoRequired(bool typeDeviating)
+        private static bool TypeInfoRequired(CachedTypeWriter typeHandler, bool typeDeviating)
         {
-            if (settings.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo) return true;
-            if (settings.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeDeviating) return true;
+            if (typeHandler.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo) return true;
+            if (typeHandler.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo && typeDeviating) return true;
             return false;
         }
 

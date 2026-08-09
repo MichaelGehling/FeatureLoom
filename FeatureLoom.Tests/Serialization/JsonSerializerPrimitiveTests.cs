@@ -543,7 +543,8 @@ namespace FeatureLoom.Serialization
             DateTimeOffset? memberValue = new DateTimeOffset(2024, 1, 2, 3, 4, 5, TimeSpan.FromHours(2)).AddTicks(7654321);
             var value = new NullableDateTimeOffsetContainer { NullableDateTimeOffset = memberValue };
             string expectedValue = FormatExpectedDateTimeOffset(memberValue.Value);
-            string expected = $"{{\"NullableDateTimeOffset\":{{\"$type\":\"System.DateTimeOffset\",\"$value\":{expectedValue}}}}}";
+            // A nullable value type is not a deviating type, so no $type/$value envelope is written.
+            string expected = $"{{\"NullableDateTimeOffset\":{expectedValue}}}";
 
             AssertSerialized(value, expected);
         }
