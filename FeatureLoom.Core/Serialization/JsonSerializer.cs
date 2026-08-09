@@ -539,6 +539,28 @@ namespace FeatureLoom.Serialization
 
 
 
+        /// <summary>
+        /// Determines the name written into the "$type" member of the given type.
+        /// A registered custom name always wins; otherwise generic types use
+        /// genericTypeNameFormat and all other types use typeNameFormat.
+        /// Only called while creating a CachedTypeWriter, so the result is cached per type and
+        /// does not add any cost to the actual serialization.
+        /// </summary>
+        private string ResolveTypeName(Type itemType)
+        {
+            if (settings.customTypeNames != null &&
+                settings.customTypeNames.TryGetValue(itemType, out string customName)) return customName;
+
+            var format = itemType.IsGenericType ? settings.genericTypeNameFormat : settings.typeNameFormat;
+
+            switch (format)
+            {
+                case TypeNameFormat.FullName: return TypeNameHelper.Shared.GetFullTypeName(itemType);
+                case TypeNameFormat.AssemblyQualified: return TypeNameHelper.Shared.GetAssemblyQualifiedTypeName(itemType);
+                default: return itemType.GetSimplifiedTypeName();
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private CachedTypeWriter GetCachedTypeWriter(Type itemType)
         {            
@@ -551,7 +573,7 @@ namespace FeatureLoom.Serialization
             CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType);            
             typeWriterCache[itemType] = typeHandler; // Typehandler must be added first for the case of recursion (type contains same type)
 
-            typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(itemType.GetSimplifiedTypeName());
+            typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(ResolveTypeName(itemType));
 
             foreach(var creator in settings.itemHandlerCreators)
             {

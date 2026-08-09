@@ -235,6 +235,123 @@ namespace FeatureLoom.Helpers
             return null;
         }
 
+        readonly private Dictionary<Type, string> typeToFullName = new Dictionary<Type, string>();
+        readonly private Dictionary<Type, string> typeToAssemblyQualifiedName = new Dictionary<Type, string>();
+
+        /// <summary>
+        /// Creates the plain CLR full name of a type, without any assembly information.
+        /// For generic types this keeps the CLR notation, e.g.
+        /// "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]]".
+        /// <example>
+        /// <code>
+        /// typeof(int) -> "System.Int32"
+        /// typeof(Customer) -> "MyApp.Models.Customer"
+        /// </code>
+        /// </example>
+        /// </summary>
+        /// <param name="type">The type to get the full name for.</param>
+        /// <returns>The full name, or the type's Name if no full name is available.</returns>
+        public string GetFullTypeName(Type type)
+        {
+            if (type == null) return null;
+
+            if (typeToNameLock == null) return LockedGetFullTypeName(type);
+
+            using (var lockHandle = typeToNameLock.LockReadOnly())
+            {
+                if (typeToFullName.TryGetValue(type, out string typeName)) return typeName;
+
+                lockHandle.UpgradeToWriteMode();
+
+                return LockedGetFullTypeName(type);
+            }
+        }
+
+        private string LockedGetFullTypeName(Type type)
+        {
+            if (typeToFullName.TryGetValue(type, out string typeName)) return typeName;
+
+            // FullName is null for open generic parameters, so fall back to the plain name.
+            typeName = type.FullName ?? type.Name;
+            typeToFullName[type] = typeName;
+            return typeName;
+        }
+
+        /// <summary>
+        /// Creates the assembly qualified name of a type using the short assembly name, which is
+        /// the format Newtonsoft.Json writes when TypeNameHandling is enabled.
+        /// Version, culture and public key token are stripped, also from generic arguments.
+        /// <example>
+        /// <code>
+        /// typeof(Customer) -> "MyApp.Models.Customer, MyApp"
+        /// typeof(List&lt;string&gt;) -> "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]], System.Private.CoreLib"
+        /// </code>
+        /// </example>
+        /// </summary>
+        /// <param name="type">The type to get the assembly qualified name for.</param>
+        /// <returns>The assembly qualified name using the short assembly name.</returns>
+        public string GetAssemblyQualifiedTypeName(Type type)
+        {
+            if (type == null) return null;
+
+            if (typeToNameLock == null) return LockedGetAssemblyQualifiedTypeName(type);
+
+            using (var lockHandle = typeToNameLock.LockReadOnly())
+            {
+                if (typeToAssemblyQualifiedName.TryGetValue(type, out string typeName)) return typeName;
+
+                lockHandle.UpgradeToWriteMode();
+
+                return LockedGetAssemblyQualifiedTypeName(type);
+            }
+        }
+
+        private string LockedGetAssemblyQualifiedTypeName(Type type)
+        {
+            if (typeToAssemblyQualifiedName.TryGetValue(type, out string typeName)) return typeName;
+
+            typeName = BuildAssemblyQualifiedTypeName(type);
+            typeToAssemblyQualifiedName[type] = typeName;
+            return typeName;
+        }
+
+        /// <summary>
+        /// Builds "Namespace.Type, Assembly" and recurses into generic arguments, so that the
+        /// nested generic arguments are shortened the same way Newtonsoft.Json does it.
+        /// </summary>
+        private static string BuildAssemblyQualifiedTypeName(Type type)
+        {
+            string assemblyName = type.Assembly.GetName().Name;
+
+            if (type.IsArray)
+            {
+                // Arrays keep their suffix, but the element type has to be shortened as well.
+                var elementName = BuildAssemblyQualifiedTypeName(type.GetElementType());
+                int elementAssemblySeparator = elementName.LastIndexOf(", ", StringComparison.Ordinal);
+                if (elementAssemblySeparator > 0) elementName = elementName.Substring(0, elementAssemblySeparator);
+
+                int rank = type.GetArrayRank();
+                string suffix = rank == 1 ? "[]" : "[" + new string(',', rank - 1) + "]";
+                return elementName + suffix + ", " + assemblyName;
+            }
+
+            if (!type.IsGenericType || type.IsGenericTypeDefinition)
+            {
+                return (type.FullName ?? type.Name) + ", " + assemblyName;
+            }
+
+            var genericDefName = type.GetGenericTypeDefinition().FullName;
+            var builder = new StringBuilder(genericDefName).Append('[');
+            var args = type.GetGenericArguments();
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (i > 0) builder.Append(',');
+                builder.Append('[').Append(BuildAssemblyQualifiedTypeName(args[i])).Append(']');
+            }
+            builder.Append(']').Append(", ").Append(assemblyName);
+            return builder.ToString();
+        }
+
     }
 }
 

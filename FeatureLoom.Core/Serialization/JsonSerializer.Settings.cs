@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Helpers;
+﻿using FeatureLoom.Extensions;
+using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using System;
 using System.Collections.Generic;
@@ -27,6 +28,51 @@ namespace FeatureLoom.Serialization
             public bool writeByteArrayAsBase64String = true;
             public bool writeArraySegmentsAsArrays = true;
             public List<ITypeHandlerCreator> customTypeHandlerCreators = new List<ITypeHandlerCreator>();
+
+            /// <summary>
+            /// Determines how type names are written into "$type" members, unless a custom name was
+            /// registered via <see cref="AddCustomTypeName(Type, string)"/> for the specific type.
+            /// </summary>
+            public TypeNameFormat typeNameFormat = TypeNameFormat.Simplified;
+
+            /// <summary>
+            /// Optional separate format for generic types. If null, <see cref="typeNameFormat"/> is
+            /// used for generic types as well. Set this to
+            /// <see cref="TypeNameFormat.AssemblyQualified"/> to write the nested generic form
+            /// understood by Newtonsoft.Json while keeping simple types in another format.
+            /// Custom type names always take precedence over both settings.
+            /// </summary>
+            public TypeNameFormat? genericTypeNameFormat = null;
+
+            internal Dictionary<Type, string> customTypeNames = new();
+
+            /// <summary>
+            /// Adds or replaces a custom type name, which is written instead of the name that
+            /// <see cref="typeNameFormat"/> would produce. Custom names take precedence over every
+            /// other naming option, including <see cref="genericTypeNameFormat"/>.
+            /// <para>
+            /// Note that the JsonDeserializer keeps its own, independent name-to-type mapping. To
+            /// read such JSON back, register the counterpart there via its AddCustomTypeName method.
+            /// </para>
+            /// </summary>
+            /// <param name="type">The type to write the custom name for.</param>
+            /// <param name="customTypeName">The name to write into the "$type" member.</param>
+            public void AddCustomTypeName(Type type, string customTypeName)
+            {
+                if (type == null || customTypeName.EmptyOrNull()) return;
+                customTypeNames[type] = customTypeName;
+            }
+
+            /// <summary>
+            /// Adds or replaces a custom type name for <typeparamref name="T"/>.
+            /// See <see cref="AddCustomTypeName(Type, string)"/>.
+            /// </summary>
+            public void AddCustomTypeName<T>(string customTypeName) => AddCustomTypeName(typeof(T), customTypeName);
+
+            /// <summary>
+            /// Removes all custom type name mappings.
+            /// </summary>
+            public void ClearCustomTypeNames() => customTypeNames.Clear();
 
             public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, Action<T>> creator, bool onlyExactType = true)
             {
@@ -143,12 +189,49 @@ namespace FeatureLoom.Serialization
             AddAllTypeInfo = 2,
         }
 
+        /// <summary>
+        /// Determines how the type name written into a "$type" member is built.
+        /// The JsonDeserializer reads all of these formats.
+        /// </summary>
+        public enum TypeNameFormat
+        {
+            /// <summary>
+            /// The simplified, human readable FeatureLoom format, e.g.
+            /// "System.Collections.Generic.List&lt;System.String&gt;". Omits assembly information,
+            /// which keeps the output short but requires the type to be findable in the loaded
+            /// assemblies when reading it back.
+            /// </summary>
+            Simplified = 0,
+
+            /// <summary>
+            /// The plain CLR full name without assembly information, e.g. "MyApp.Models.Customer".
+            /// For generic types this is the CLR form, e.g.
+            /// "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib]]".
+            /// </summary>
+            FullName = 1,
+
+            /// <summary>
+            /// The assembly qualified name using the short assembly name, e.g.
+            /// "MyApp.Models.Customer, MyApp". This is the format written by Newtonsoft.Json when
+            /// TypeNameHandling is enabled, so use it when the JSON has to be read by Newtonsoft.
+            /// <para>
+            /// Beware: because the name contains the assembly, output is not identical across
+            /// target frameworks (e.g. corlib is "mscorlib" on .NET Framework and
+            /// "System.Private.CoreLib" on .NET 8/10).
+            /// </para>
+            /// </summary>
+            AssemblyQualified = 2
+        }
+
         private readonly struct CompiledSettings
         {
             public readonly TypeInfoHandling typeInfoHandling;
             public readonly DataSelection dataSelection;
             public readonly ReferenceCheck referenceCheck;
             public readonly ReferenceFormat referenceFormat;
+            public readonly TypeNameFormat typeNameFormat;
+            public readonly TypeNameFormat genericTypeNameFormat;
+            public readonly Dictionary<Type, string> customTypeNames;
             public readonly bool enumAsString;
             public readonly bool treatEnumerablesAsCollections;
             public readonly int writeBufferChunkSize;
@@ -170,6 +253,9 @@ namespace FeatureLoom.Serialization
                 dataSelection = settings.dataSelection;
                 referenceCheck = settings.referenceCheck;
                 referenceFormat = settings.referenceFormat;
+                typeNameFormat = settings.typeNameFormat;
+                genericTypeNameFormat = settings.genericTypeNameFormat ?? settings.typeNameFormat;
+                customTypeNames = settings.customTypeNames.Count > 0 ? new Dictionary<Type, string>(settings.customTypeNames) : null;
                 enumAsString = settings.enumAsString;
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
                 writeBufferChunkSize = settings.writeBufferChunkSize;
