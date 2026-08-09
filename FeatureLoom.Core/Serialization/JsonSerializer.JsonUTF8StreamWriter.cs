@@ -837,6 +837,84 @@ public sealed partial class JsonSerializer
             WriteToBufferWithoutCheck(QUOTES);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteDecimalValueAsString(decimal value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            WriteDecimal(value);
+            WriteToBufferWithoutCheck(QUOTES);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteDecimalValueAsStringWithCopy(decimal value)
+        {
+            WriteToBufferWithoutCheck(QUOTES);
+            EnsureFreeBufferSpace(64);
+            var countBefore = mainBufferCount;
+
+            WriteDecimal(value);
+
+            var writtenBytes = mainBufferCount - countBefore;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore, writtenBytes);
+
+            WriteToBufferWithoutCheck(QUOTES);
+            return slice;
+        }
+
+        // The Guid and the temporal writers already write the surrounding quotes themselves, so
+        // their copy variants reserve the space up front, let the writer run and then copy back
+        // the written range without the quotes.
+
+        /// <summary>Maximum byte length of any value written by the temporal writers.</summary>
+        private const int TEMPORAL_MAX_BYTES = 64;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ByteSegment CopyLastWrittenWithoutQuotes(int countBefore)
+        {
+            // The leading and the trailing quote are not part of the key.
+            var writtenBytes = mainBufferCount - countBefore - 2;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore + 1, writtenBytes);
+            return slice;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteGuidValueWithCopy(Guid guid)
+        {
+            EnsureFreeBufferSpace(GUID_MAX_BYTES);
+            var countBefore = mainBufferCount;
+            WriteGuidValueWithoutCheck(guid);
+            return CopyLastWrittenWithoutQuotes(countBefore);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteDateTimeValueWithCopy(DateTime value)
+        {
+            EnsureFreeBufferSpace(TEMPORAL_MAX_BYTES);
+            var countBefore = mainBufferCount;
+            WriteDateTimeValue(value);
+            return CopyLastWrittenWithoutQuotes(countBefore);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteDateTimeOffsetValueWithCopy(DateTimeOffset value)
+        {
+            EnsureFreeBufferSpace(TEMPORAL_MAX_BYTES);
+            var countBefore = mainBufferCount;
+            WriteDateTimeOffsetValue(value);
+            return CopyLastWrittenWithoutQuotes(countBefore);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteTimeSpanValueWithCopy(TimeSpan value)
+        {
+            EnsureFreeBufferSpace(TEMPORAL_MAX_BYTES);
+            var countBefore = mainBufferCount;
+            WriteTimeSpanValue(value);
+            return CopyLastWrittenWithoutQuotes(countBefore);
+        }
+
         // Unchecked variants of the fixed size value writers. The caller must have reserved the
         // corresponding *_MAX_BYTES, e.g. via BeginFixedSizeBatch in an array loop.
 
@@ -948,18 +1026,29 @@ public sealed partial class JsonSerializer
             else WriteNullValue();
         }
 
+        /// <summary>
+        /// Writes the string as a quoted JSON string and returns the written content without the
+        /// quotes as a copy, so it can be used as an item name after the buffer moved on.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ByteSegment WriteStringValueAsStringWithCopy(string str)
         {
+            // The whole worst case has to be reserved up front, before the start position is
+            // taken: WriteEscapedStringWithQuotes may otherwise flush the buffer to the stream
+            // while writing, which resets the write position and would turn countBefore into a
+            // stale index pointing at unrelated data.
+            // A control char escape (\uXXXX) is the longest encoding of a single char.
+            const int MAX_CHAR_LENGTH = 6;
+            EnsureFreeBufferSpace(str.Length * MAX_CHAR_LENGTH + 2); // +2 for the surrounding quotes
 
             var countBefore = mainBufferCount;
 
             WriteEscapedStringWithQuotes(str);
 
-            // Quotes must be removed from string
+            // The quotes are not part of the item name, so they are excluded on both ends.
             var writtenBytes = mainBufferCount - countBefore - 2;
-            var slice = tempSlicedBuffer.GetSlice(writtenBytes - 2);
-            slice.CopyFrom(mainBuffer, countBefore+1, writtenBytes);
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore + 1, writtenBytes);
             return slice;
         }
 

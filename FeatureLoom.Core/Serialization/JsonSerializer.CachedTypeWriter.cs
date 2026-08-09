@@ -95,43 +95,38 @@ namespace FeatureLoom.Serialization
         }
     }
 
+    /// <summary>
+    /// Holds the delegates that write a dictionary key as a JSON string.
+    /// It is only used while a dictionary type handler is created, never on the write path
+    /// itself: the handler resolves the typed delegate once via <see cref="GetWriter{T}"/> or
+    /// <see cref="GetWriterWithCopy{T}"/> and calls it directly afterwards. That keeps the
+    /// delegate cast and the mode selection out of the per-entry loop.
+    /// </summary>
     sealed class CachedKeyWriter
     {
         private Delegate writerDelegateWithCopy;
         private Delegate writerDelegate;
-        private bool skipCopy;
-
-        public CachedKeyWriter(bool skipCopy)
-        {
-            this.skipCopy = skipCopy;
-        }
 
         public bool HasMethod => writerDelegate != null;
 
-        public void SetWriterMethod<T>(Func<T, ByteSegment> writerDelegate) => this.writerDelegateWithCopy = writerDelegate;
+        /// <summary>
+        /// True if a writer is available that also returns the written key, which is required
+        /// when keys are used as item names for reference handling.
+        /// </summary>
+        public bool HasMethodWithCopy => writerDelegateWithCopy != null;
+
+        public void SetWriterWithCopyMethod<T>(Func<T, ByteSegment> writerDelegate) => this.writerDelegateWithCopy = writerDelegate;
         public void SetWriterMethod<T>(Action<T> writerDelegate) => this.writerDelegate = writerDelegate;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ByteSegment WriteKeyAsStringWithCopy<T>(T item)
-        {
-            if (skipCopy)
-            {
-                var write = (Action<T>)writerDelegate;
-                write(item);
-                return default;
-            }
-            else
-            {
-                var write = (Func<T, ByteSegment>)writerDelegateWithCopy;
-                return write(item);
-            }
-        }
+        /// <summary>
+        /// Returns the writer that writes the key without providing a copy of it.
+        /// </summary>
+        public Action<T> GetWriter<T>() => (Action<T>)writerDelegate;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteKeyAsString<T>(T item)
-        {
-            var write = (Action<T>)writerDelegate;
-            write(item);
-        }
+        /// <summary>
+        /// Returns the writer that writes the key and returns it as a copy, so it stays valid
+        /// after the write buffer moved on.
+        /// </summary>
+        public Func<T, ByteSegment> GetWriterWithCopy<T>() => (Func<T, ByteSegment>)writerDelegateWithCopy;
     }
 }

@@ -22,7 +22,6 @@ namespace FeatureLoom.Serialization
         readonly JsonUTF8StreamWriter writer;
         readonly CompiledSettings settings;
         readonly Dictionary<Type, CachedTypeWriter> typeWriterCache = new();
-        readonly Dictionary<Type, CachedKeyWriter> keyWriterCache = new();
         readonly Dictionary<object, ItemInfo> objToItemInfo = new();
         readonly ItemInfoRecycler itemInfoRecycler;
         private ByteSegment rootName;
@@ -359,48 +358,149 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryGetCachedKeyWriter(Type itemType, out CachedKeyWriter stringValueWriter)
+        /// <summary>
+        /// Creates the writer that writes a dictionary key of the given type as a JSON string.
+        /// This is only called while a dictionary type handler is created, so it is not on the
+        /// write path and needs no caching.
+        /// Returns false if the type is not supported as a key, in which case the dictionary is
+        /// not written as a JSON object.
+        /// </summary>
+        private bool TryCreateKeyWriter(Type keyType, out CachedKeyWriter keyWriter)
         {
-            return keyWriterCache.TryGetValue(itemType, out stringValueWriter) || 
-                   TryCreateKeyWriter(itemType, out stringValueWriter);
+            keyWriter = new CachedKeyWriter();
+
+            // Enums are written via their underlying representation, which the generic helper
+            // resolves, so they are handled before the concrete type checks.
+            if (keyType.IsEnum)
+            {
+                CreateAndSetKeyWriterViaReflection(keyType, keyWriter);
+                return keyWriter.HasMethod;
+            }
+
+            if (keyType == typeof(string))
+            {
+                keyWriter.SetWriterMethod<string>(writer.WritePrimitiveValueAsString);
+                keyWriter.SetWriterWithCopyMethod<string>(writer.WriteStringValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(bool))
+            {
+                keyWriter.SetWriterMethod<bool>(writer.WriteBoolAsStringValue);
+                keyWriter.SetWriterWithCopyMethod<bool>(writer.WriteBoolValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(char))
+            {
+                keyWriter.SetWriterMethod<char>(writer.WriteCharValueAsString);
+                keyWriter.SetWriterWithCopyMethod<char>(writer.WriteCharValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(sbyte))
+            {
+                keyWriter.SetWriterMethod<sbyte>(writer.WriteSbyteValueAsString);
+                keyWriter.SetWriterWithCopyMethod<sbyte>(writer.WriteSbyteValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(short))
+            {
+                keyWriter.SetWriterMethod<short>(writer.WriteShortValueAsString);
+                keyWriter.SetWriterWithCopyMethod<short>(writer.WriteShortValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(int))
+            {
+                keyWriter.SetWriterMethod<int>(writer.WriteIntValueAsString);
+                keyWriter.SetWriterWithCopyMethod<int>(writer.WriteIntValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(long))
+            {
+                keyWriter.SetWriterMethod<long>(writer.WriteLongValueAsString);
+                keyWriter.SetWriterWithCopyMethod<long>(writer.WriteLongValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(byte))
+            {
+                keyWriter.SetWriterMethod<byte>(writer.WriteByteAsStringValue);
+                keyWriter.SetWriterWithCopyMethod<byte>(writer.WriteByteValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(ushort))
+            {
+                keyWriter.SetWriterMethod<ushort>(writer.WriteUshortValueAsString);
+                keyWriter.SetWriterWithCopyMethod<ushort>(writer.WriteUshortValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(uint))
+            {
+                keyWriter.SetWriterMethod<uint>(writer.WriteUintValueAsString);
+                keyWriter.SetWriterWithCopyMethod<uint>(writer.WriteUintValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(ulong))
+            {
+                keyWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsString);
+                keyWriter.SetWriterWithCopyMethod<ulong>(writer.WriteUlongValueAsStringWithCopy);
+            }
+            // Floating point keys are unusual, because their text representation makes them
+            // fragile to match again. But whether that is acceptable is the user's decision.
+            else if (keyType == typeof(float))
+            {
+                keyWriter.SetWriterMethod<float>(writer.WriteFloatValueAsString);
+                keyWriter.SetWriterWithCopyMethod<float>(writer.WriteFloatValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(double))
+            {
+                keyWriter.SetWriterMethod<double>(writer.WriteDoubleValueAsString);
+                keyWriter.SetWriterWithCopyMethod<double>(writer.WriteDoubleValueAsStringWithCopy);
+            }
+            else if (keyType == typeof(decimal))
+            {
+                keyWriter.SetWriterMethod<decimal>(writer.WriteDecimalValueAsString);
+                keyWriter.SetWriterWithCopyMethod<decimal>(writer.WriteDecimalValueAsStringWithCopy);
+            }
+            // The temporal and Guid types use the dedicated writers instead of ToString(), so
+            // keys get the same culture independent round-trip format as values.
+            else if (keyType == typeof(Guid))
+            {
+                keyWriter.SetWriterMethod<Guid>(writer.WriteGuidValue);
+                keyWriter.SetWriterWithCopyMethod<Guid>(writer.WriteGuidValueWithCopy);
+            }
+            else if (keyType == typeof(DateTime))
+            {
+                keyWriter.SetWriterMethod<DateTime>(writer.WriteDateTimeValue);
+                keyWriter.SetWriterWithCopyMethod<DateTime>(writer.WriteDateTimeValueWithCopy);
+            }
+            else if (keyType == typeof(DateTimeOffset))
+            {
+                keyWriter.SetWriterMethod<DateTimeOffset>(writer.WriteDateTimeOffsetValue);
+                keyWriter.SetWriterWithCopyMethod<DateTimeOffset>(writer.WriteDateTimeOffsetValueWithCopy);
+            }
+            else if (keyType == typeof(TimeSpan))
+            {
+                keyWriter.SetWriterMethod<TimeSpan>(writer.WriteTimeSpanValue);
+                keyWriter.SetWriterWithCopyMethod<TimeSpan>(writer.WriteTimeSpanValueWithCopy);
+            }
+
+            return keyWriter.HasMethod;
         }
 
-        private bool TryCreateKeyWriter(Type itemType, out CachedKeyWriter stringValueWriter)
+        /// <summary>
+        /// Creates the key writer for an enum type, which requires the enum type as a generic
+        /// type parameter and can therefore only be reached via reflection.
+        /// </summary>
+        private void CreateAndSetKeyWriterViaReflection(Type keyType, CachedKeyWriter keyWriter)
         {
-            stringValueWriter = new(!settings.requiresItemNames);
+            MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateEnumKeyWriter), BindingFlags.NonPublic | BindingFlags.Instance);
+            createMethod.MakeGenericMethod(keyType).Invoke(this, new object[] { keyWriter });
+        }
 
-            if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WritePrimitiveValueAsString);
-            else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WriteBoolAsStringValue);
-            else if (itemType == typeof(char)) stringValueWriter.SetWriterMethod<char>(writer.WriteCharValueAsString);
-            else if (itemType == typeof(sbyte)) stringValueWriter.SetWriterMethod<sbyte>(writer.WriteSbyteValueAsString);
-            else if (itemType == typeof(short)) stringValueWriter.SetWriterMethod<short>(writer.WriteShortValueAsString);
-            else if (itemType == typeof(int)) stringValueWriter.SetWriterMethod<int>(writer.WriteIntValueAsString);
-            else if (itemType == typeof(long)) stringValueWriter.SetWriterMethod<long>(writer.WriteLongValueAsString);
-            else if (itemType == typeof(byte)) stringValueWriter.SetWriterMethod<byte>(writer.WriteByteAsStringValue);
-            else if (itemType == typeof(ushort)) stringValueWriter.SetWriterMethod<ushort>(writer.WriteUshortValueAsString);
-            else if (itemType == typeof(uint)) stringValueWriter.SetWriterMethod<uint>(writer.WriteUintValueAsString);
-            else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsString);
-            else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WritePrimitiveValueAsString(value.ToString()));
-            else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WritePrimitiveValueAsString(value.ToString()));
-            else if (itemType == typeof(TimeSpan)) stringValueWriter.SetWriterMethod<TimeSpan>(value => writer.WritePrimitiveValueAsString(value.ToString()));
-
-            if (itemType == typeof(string)) stringValueWriter.SetWriterMethod<string>(writer.WriteStringValueAsStringWithCopy);
-            else if (itemType == typeof(bool)) stringValueWriter.SetWriterMethod<bool>(writer.WriteBoolValueAsStringWithCopy);
-            else if (itemType == typeof(char)) stringValueWriter.SetWriterMethod<char>(writer.WriteCharValueAsStringWithCopy);
-            else if (itemType == typeof(sbyte)) stringValueWriter.SetWriterMethod<sbyte>(writer.WriteSbyteValueAsStringWithCopy);
-            else if (itemType == typeof(short)) stringValueWriter.SetWriterMethod<short>(writer.WriteShortValueAsStringWithCopy);
-            else if (itemType == typeof(int)) stringValueWriter.SetWriterMethod<int>(writer.WriteIntValueAsStringWithCopy);
-            else if (itemType == typeof(long)) stringValueWriter.SetWriterMethod<long>(writer.WriteLongValueAsStringWithCopy);
-            else if (itemType == typeof(byte)) stringValueWriter.SetWriterMethod<byte>(writer.WriteByteValueAsStringWithCopy);
-            else if (itemType == typeof(ushort)) stringValueWriter.SetWriterMethod<ushort>(writer.WriteUshortValueAsStringWithCopy);
-            else if (itemType == typeof(uint)) stringValueWriter.SetWriterMethod<uint>(writer.WriteUintValueAsStringWithCopy);
-            else if (itemType == typeof(ulong)) stringValueWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsStringWithCopy);
-            else if (itemType == typeof(Guid)) stringValueWriter.SetWriterMethod<Guid>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
-            else if (itemType == typeof(DateTime)) stringValueWriter.SetWriterMethod<DateTime>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
-            else if (itemType == typeof(TimeSpan)) stringValueWriter.SetWriterMethod<TimeSpan>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
-
-            return stringValueWriter.HasMethod;
+        /// <summary>
+        /// Enum keys are written by their name, matching how enums are written as values when
+        /// enumAsString is set. Otherwise the numeric value is used.
+        /// </summary>
+        private void CreateEnumKeyWriter<T>(CachedKeyWriter keyWriter) where T : struct, Enum
+        {
+            if (settings.enumAsString)
+            {
+                keyWriter.SetWriterMethod<T>(value => writer.WritePrimitiveValueAsString(value.ToString()));
+                keyWriter.SetWriterWithCopyMethod<T>(value => writer.WriteStringValueAsStringWithCopy(value.ToString()));
+            }
+            else
+            {
+                keyWriter.SetWriterMethod<T>(value => writer.WriteLongValueAsString(Convert.ToInt64(value)));
+                keyWriter.SetWriterWithCopyMethod<T>(value => writer.WriteLongValueAsStringWithCopy(Convert.ToInt64(value)));
+            }
         }
 
 

@@ -55,16 +55,19 @@ namespace FeatureLoom.Serialization
                 Action<T> itemHandler = (collection) =>
                 {
                     ENUM enumerator = getEnumerator(collection);
+                    int index = 0;
                     if (enumerator.MoveNext())
                     {
                         E element = enumerator.Current;
-                        defaultElementHandler.WriteItem(element, default);
+                        defaultElementHandler.WriteItem(element, writer.GetCollectionIndexName(index));
+                        index++;
                     }
                     while (enumerator.MoveNext())
                     {
                         writer.WriteComma();
                         E element = enumerator.Current;
-                        defaultElementHandler.WriteItem(element, default);
+                        defaultElementHandler.WriteItem(element, writer.GetCollectionIndexName(index));
+                        index++;
                     }
                 };
 
