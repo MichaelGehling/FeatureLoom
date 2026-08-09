@@ -1,161 +1,137 @@
-﻿using BenchmarkDotNet.Attributes;
-using FeatureLoom.Helpers;
-using FeatureLoom.PerformanceTests.AsyncManualResetEventPerformance;
+using BenchmarkDotNet.Attributes;
 using FeatureLoom.Serialization;
-using FeatureLoom.Time;
-using SpanJson.Resolvers;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace FeatureLoom.PerformanceTests.JsonSerializer;
 
+/// <summary>
+/// Compares the deserialization performance for a balanced object covering all commonly
+/// used field types. The single-object case shows the per-deserialization overhead, while
+/// the array case makes the actual value parsing dominate the measurement.
+/// <para>
+/// SpanJson cannot parse a base64-encoded byte array (it only understands its own
+/// number-array representation), so its fixture is serialized with SpanJson itself
+/// instead of being shared with the other serializers.
+/// </para>
+/// </summary>
 [MemoryDiagnoser]
-[CsvMeasurementsExporter]    
+[CsvMeasurementsExporter]
 [HtmlExporter]
 [MinIterationCount(500)]
 [MaxIterationCount(5000)]
-public partial class DeserializeComplexObjectTest
+public class DeserializeComplexObjectTest
 {
-    static Serialization.JsonSerializer featureJsonSerializer = new Serialization.JsonSerializer(new Serialization.JsonSerializer.Settings()
-    {
-        //indent = true,
-        dataSelection = Serialization.JsonSerializer.DataSelection.PublicAndPrivateFields,
-        typeInfoHandling = Serialization.JsonSerializer.TypeInfoHandling.AddNoTypeInfo
-    });
+    static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
 
     static JsonDeserializer featureJsonDeserializer = new JsonDeserializer(settings =>
     {
-        settings.initialBufferSize = 1024 * 1024 * 10;
         settings.dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields;
         settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
-        //settings.strict = false;
-        //settings.proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable;
         settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
-        settings.populateExistingMembers = true;        
-        settings.useStringCache = true;
-        /*settings.ConfigureType<SimpleObject>(typeSettings =>
-        {
-            typeSettings.ConfigureMember<string>("name", memberSettings =>
-            {
-                memberSettings.SetUseStringCache(true);                   
-            });
-        });*/
     });
 
-    static JsonDeserializer featureJsonDeserializer_NoPopulate_NoStringCache = new JsonDeserializer(settings =>
-    {
-        settings.initialBufferSize = 1024 * 1024 * 10;
-        settings.dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields;
-        settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
-        //settings.strict = true;
-        //settings.proposedTypeHandling = FeatureJsonDeserializer.Settings.ProposedTypeHandling.CheckWhereReasonable;
-        settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
-        settings.populateExistingMembers = false;
-        settings.useStringCache = false;
-        settings.ConfigureGenericType(typeof(List<>), typeSettings =>
-        {
-            typeSettings.SetReferenceResolution(false);
-        });
-    });
+    static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
-    static JsonSerializerOptions systemTextJsonSerializerSettings = new JsonSerializerOptions()
-    {
-        IncludeFields = true,        
-        //PreferredObjectCreationHandling = System.Text.Json.Serialization.JsonObjectCreationHandling.Populate,
-        IgnoreReadOnlyFields = false,
-        ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve,
-        DefaultBufferSize = 1024*1024*10,
-    };
+    MemoryStream featureStream_Single = new MemoryStream();
+    MemoryStream featureStream_Array = new MemoryStream();
 
-    public sealed class MyResolver<TSymbol> : SpanJson.Resolvers.ResolverBase<TSymbol, MyResolver<TSymbol>> where TSymbol : struct
-    {
-        public MyResolver() : base(new SpanJsonOptions
-        {
-            EnumOption = EnumOptions.Integer,            
-        })
-        {
-        }
-    }
+#if NET6_0_OR_GREATER
+    MemoryStream spanJsonStream_Single = new MemoryStream();
+    MemoryStream spanJsonStream_Array = new MemoryStream();
+#endif
 
-    MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 10);
-    ComplexObject complexObject = new ComplexObject();
-
-    [Params(-10000, -1000, -100, -10, -1)]
-    public int iterations;
+    ComplexObject single = new ComplexObject();
+    ComplexObject[] array;
 
     [GlobalSetup]
-    public void GlobalPrepare()
+    public void Setup()
     {
-        /*for (int i = 0; i < 10; i++)
-        {
-            complexObject.id = i;
-            complexObject.myInt = RandomGenerator.Int32();
-            complexObject.myString = RandomGenerator.String(20, false);
-            complexObject.myString2 = RandomGenerator.String(40, false);
-            complexObject.myString3 = RandomGenerator.String(80, false);
-            complexObject.myString4 = RandomGenerator.String(160, false);
-            featureJsonSerializer.Serialize(memoryStream, complexObject);
-            memoryStream.WriteByte((byte)'\n');
-        }*/
-        featureJsonSerializer.Serialize(memoryStream, complexObject);
-        string x = featureJsonSerializer.Serialize(complexObject);
-        ConsoleHelper.WriteLine(x);
-        //AppTime.Wait(1.Seconds());
+        array = new ComplexObject[BenchmarkSettings.ArraySize];
+        for (int i = 0; i < array.Length; i++) array[i] = new ComplexObject(i);
+
+        featureJsonSerializer.Serialize(featureStream_Single, single);
+        featureJsonSerializer.Serialize(featureStream_Array, array);
+
+#if NET6_0_OR_GREATER
+        SerializerConfigs.SerializeWithSpanJson(single, spanJsonStream_Single);
+        SerializerConfigs.SerializeWithSpanJson(array, spanJsonStream_Array);
+#endif
+
+        SampleOutput.Collect("ComplexObject", single, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
     [IterationSetup]
     public void Prepare()
     {
-        memoryStream.Position = 0;
-        iterations = Math.Abs(iterations);
+        featureStream_Single.Position = 0;
+        featureStream_Array.Position = 0;
+#if NET6_0_OR_GREATER
+        spanJsonStream_Single.Position = 0;
+        spanJsonStream_Array.Position = 0;
+#endif
     }
 
     [Benchmark]
-    public void DeserializeComplexObject_FromStream_Feature()
+    public void DeserializeComplexObject_Single_Feature()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
-            memoryStream.Position = 0;
-            featureJsonDeserializer.TryDeserialize(memoryStream, out ComplexObject result);
+            featureStream_Single.Position = 0;
+            featureJsonDeserializer.TryDeserialize(featureStream_Single, out ComplexObject result);
         }
     }
-
-    [Benchmark]
-    public void DeserializeComplexObject_FromStream_NoPopulate_NoStringCache()
-    {
-        for (int i = 0; i < iterations; i++)
-        {
-            memoryStream.Position = 0;
-            featureJsonDeserializer_NoPopulate_NoStringCache.TryDeserialize(memoryStream, out ComplexObject result);
-        }
-    }
-
 
     [Benchmark(Baseline = true)]
-    public void DeserializeComplexObject_FromStream_SystemText()
+    public void DeserializeComplexObject_Single_SystemText()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
-            memoryStream.Position = 0;
-            ComplexObject result = System.Text.Json.JsonSerializer.Deserialize<ComplexObject>(memoryStream, systemTextJsonSerializerSettings);
+            featureStream_Single.Position = 0;
+            ComplexObject result = System.Text.Json.JsonSerializer.Deserialize<ComplexObject>(featureStream_Single, systemTextJsonSerializerSettings);
         }
     }
 
 #if NET6_0_OR_GREATER
     [Benchmark]
-    public void DeserializeComplexObject_FromStream_SpanJson()
+    public void DeserializeComplexObject_Single_SpanJson()
     {
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
-            memoryStream.Position = 0;
-            var result = SpanJson.JsonSerializer.Generic.Utf8
-                .DeserializeAsync<ComplexObject, MyResolver<byte>>(memoryStream)
-                .Result;
+            spanJsonStream_Single.Position = 0;
+            ComplexObject result = SerializerConfigs.DeserializeWithSpanJson<ComplexObject>(spanJsonStream_Single);
+        }
+    }
+#endif
+
+    [Benchmark]
+    public void DeserializeComplexObject_Array_Feature()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureStream_Array.Position = 0;
+            featureJsonDeserializer.TryDeserialize(featureStream_Array, out ComplexObject[] result);
+        }
+    }
+
+    [Benchmark]
+    public void DeserializeComplexObject_Array_SystemText()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureStream_Array.Position = 0;
+            ComplexObject[] result = System.Text.Json.JsonSerializer.Deserialize<ComplexObject[]>(featureStream_Array, systemTextJsonSerializerSettings);
+        }
+    }
+
+#if NET6_0_OR_GREATER
+    [Benchmark]
+    public void DeserializeComplexObject_Array_SpanJson()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            spanJsonStream_Array.Position = 0;
+            ComplexObject[] result = SerializerConfigs.DeserializeWithSpanJson<ComplexObject[]>(spanJsonStream_Array);
         }
     }
 #endif

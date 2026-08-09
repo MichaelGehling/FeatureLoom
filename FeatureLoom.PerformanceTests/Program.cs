@@ -19,6 +19,8 @@ namespace FeatureLoom.PerformanceTests
             // benchmark class choose its own job, while "--inProcess" still restores the previous
             // in-process behaviour for debugging sessions.
             IConfig config = args.Contains("--inProcess") ? new DebugInProcessConfig() : DefaultConfig.Instance;
+
+            JsonSerializer.SampleOutput.Reset();
             BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
 
             JsonSerializer.SampleOutput.PrintAll();

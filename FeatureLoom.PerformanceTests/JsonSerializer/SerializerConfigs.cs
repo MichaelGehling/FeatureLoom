@@ -1,3 +1,4 @@
+using FeatureLoom.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,6 +50,13 @@ public static class SerializerConfigs
         return options;
     }
 
+    /// <summary>
+    /// Creates a deserializer with default settings for the value-type benchmarks. The
+    /// byte array reader auto-detects base64 vs. number-array input, so a single instance
+    /// handles both byte array representations.
+    /// </summary>
+    public static JsonDeserializer CreateFeatureDeserializer() => new JsonDeserializer();
+
 #if NET6_0_OR_GREATER
     /// <summary>
     /// Serializes with SpanJson using the include-nulls resolver, so its output matches
@@ -56,6 +64,13 @@ public static class SerializerConfigs
     /// </summary>
     public static void SerializeWithSpanJson<T>(T value, Stream stream) =>
         SpanJson.JsonSerializer.Generic.Utf8.SerializeAsync<T, SpanJson.Resolvers.IncludeNullsOriginalCaseResolver<byte>>(value, stream).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Deserializes with SpanJson using the include-nulls resolver, matching
+    /// <see cref="SerializeWithSpanJson{T}"/>.
+    /// </summary>
+    public static T DeserializeWithSpanJson<T>(Stream stream) =>
+        SpanJson.JsonSerializer.Generic.Utf8.DeserializeAsync<T, SpanJson.Resolvers.IncludeNullsOriginalCaseResolver<byte>>(stream).GetAwaiter().GetResult();
 #endif
 
     /// <summary>

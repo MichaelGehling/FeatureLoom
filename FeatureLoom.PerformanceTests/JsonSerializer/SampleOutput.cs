@@ -19,15 +19,35 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 /// payload, since the array payload just repeats it. They are printed after the whole
 /// benchmark run, so they appear directly with the summary instead of far above it.
 /// </para>
+/// <para>
+/// BenchmarkDotNet runs each benchmark class in a separate out-of-process worker by
+/// default, so an in-memory dictionary populated by <see cref="Collect"/> would never be
+/// visible to the host process that calls <see cref="PrintAll"/>. Samples are therefore
+/// exchanged through a shared temp file instead of a static field.
+/// </para>
 /// </summary>
 public static class SampleOutput
 {
-    static readonly Dictionary<string, string> samples = new Dictionary<string, string>();
+    const string CaseMarker = "###CASE:";
+    const string EndMarker = "###END###";
+
+    static readonly string sampleFilePath = Path.Combine(Path.GetTempPath(), "FeatureLoom.PerformanceTests.SampleOutput.tmp");
+
+    /// <summary>
+    /// Deletes any leftover samples from a previous run. Call this once before the
+    /// benchmark switcher runs, so <see cref="PrintAll"/> only shows samples from the
+    /// current run.
+    /// </summary>
+    public static void Reset()
+    {
+        try { File.Delete(sampleFilePath); } catch { /* best effort */ }
+    }
 
     /// <summary>
     /// Records the JSON produced by each serializer for the given value. The samples are
-    /// not printed immediately, because the setup runs long before the summary; use
-    /// <see cref="PrintAll"/> after the benchmark run to show them next to the results.
+    /// not printed immediately, because the setup runs long before the summary and in a
+    /// different process; use <see cref="PrintAll"/> after the benchmark run to show them
+    /// next to the results.
     /// <para>
     /// The serializer instances of the benchmark itself must be passed, so the shown
     /// output uses exactly the same configuration as the measured calls.
@@ -46,9 +66,20 @@ public static class SampleOutput
                   $"//   SpanJson   : {Truncate(SerializeWithSpanJson(value), maxLength)}";
 #endif
 
-        lock (samples)
+        string entry = CaseMarker + caseName + Environment.NewLine + sample + Environment.NewLine + EndMarker + Environment.NewLine;
+
+        // Multiple benchmark processes may append concurrently, so retry on sharing violations.
+        for (int attempt = 0; attempt < 20; attempt++)
         {
-            samples[caseName] = sample;
+            try
+            {
+                File.AppendAllText(sampleFilePath, entry);
+                return;
+            }
+            catch (IOException)
+            {
+                System.Threading.Thread.Sleep(10);
+            }
         }
     }
 
@@ -58,17 +89,30 @@ public static class SampleOutput
     /// </summary>
     public static void PrintAll()
     {
-        KeyValuePair<string, string>[] collected;
-        lock (samples)
+        if (!File.Exists(sampleFilePath)) return;
+
+        string content = File.ReadAllText(sampleFilePath);
+        var samples = new Dictionary<string, string>();
+        foreach (string block in content.Split(new[] { EndMarker }, StringSplitOptions.RemoveEmptyEntries))
         {
-            if (samples.Count == 0) return;
-            collected = new List<KeyValuePair<string, string>>(samples).ToArray();
+            int markerIndex = block.IndexOf(CaseMarker, StringComparison.Ordinal);
+            if (markerIndex < 0) continue;
+            string afterMarker = block.Substring(markerIndex + CaseMarker.Length);
+            int newlineIndex = afterMarker.IndexOf(Environment.NewLine, StringComparison.Ordinal);
+            if (newlineIndex < 0) continue;
+            string caseName = afterMarker.Substring(0, newlineIndex);
+            string sample = afterMarker.Substring(newlineIndex + Environment.NewLine.Length).Trim(Environment.NewLine.ToCharArray());
+            samples[caseName] = sample;
         }
+
+        try { File.Delete(sampleFilePath); } catch { /* best effort */ }
+
+        if (samples.Count == 0) return;
 
         Console.WriteLine();
         Console.WriteLine("// ===== Serializer output samples (sanity check) =====");
         Console.WriteLine("// The benchmark results are only comparable if all serializers produce equivalent output.");
-        foreach (var entry in collected)
+        foreach (var entry in samples)
         {
             Console.WriteLine();
             Console.WriteLine($"// [{entry.Key}]");
