@@ -13,7 +13,7 @@ public static class JsonHelper
 
 public class JsonHelperService
 {
-    JsonSerializer serializer = new(new()
+    JsonSerializer serializer = new(new JsonSerializer.Settings()
     {
         indent = true
     });

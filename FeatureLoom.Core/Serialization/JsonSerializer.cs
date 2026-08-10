@@ -33,6 +33,22 @@ namespace FeatureLoom.Serialization
         readonly ExtensionApi extensionApi;
         public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out Action<T> itemHandler, out JsonDataTypeCategory category);
 
+        /// <summary>
+        /// Creates a serializer and configures its settings with a callback, so an instance can be
+        /// built in a single expression without preparing a <see cref="Settings"/> object first.
+        /// </summary>
+        /// <param name="buildSettings">Configuration action; may be <see langword="null"/>.</param>
+        public JsonSerializer(Action<Settings> buildSettings) : this(Settings.Build(buildSettings))
+        {
+
+        }
+
+        /// <summary>
+        /// Creates a serializer from the given settings, or from the defaults if none are provided.
+        /// The settings are compiled on construction, so later changes to the passed instance have
+        /// no effect on this serializer.
+        /// </summary>
+        /// <param name="settings">Settings to use; may be <see langword="null"/>.</param>
         public JsonSerializer(Settings settings = null)
         {           
             this.settings = new CompiledSettings(settings ?? new Settings());

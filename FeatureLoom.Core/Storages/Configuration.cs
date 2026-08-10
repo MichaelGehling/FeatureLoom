@@ -23,7 +23,7 @@ namespace FeatureLoom.Storages
             settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;            
         });
 
-        public static JsonSerializer serializer = new JsonSerializer(new()
+        public static JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
         {
             indent = true,
             enumAsString = true,

@@ -9,7 +9,7 @@ namespace FeatureLoom.TCP
 {
     public class TypedJsonMessageStreamWriter : ISpecificMessageStreamWriter
     {
-        JsonSerializer serializer = new JsonSerializer(new()
+        JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
         {
             enumAsString = true,
             indent = true,

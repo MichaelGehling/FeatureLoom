@@ -92,12 +92,6 @@ namespace FeatureLoom.Serialization
             public bool writeByteArrayAsBase64String = true;
 
             /// <summary>
-            /// Reserved for writing ArraySegment values as plain arrays. Currently without effect,
-            /// because array segments are always written as arrays.
-            /// </summary>
-            public bool writeArraySegmentsAsArrays = true;
-
-            /// <summary>
             /// Custom handlers that take precedence over the built-in ones. The first creator that
             /// supports a type determines how values of that type are written.
             /// Use the AddCustomTypeHandlerCreator overloads to add entries.
@@ -121,6 +115,18 @@ namespace FeatureLoom.Serialization
             public TypeNameFormat? genericTypeNameFormat = null;
 
             internal Dictionary<Type, string> customTypeNames = new();
+
+            /// <summary>
+            /// Builds a new settings instance and applies a configuration callback.
+            /// </summary>
+            /// <param name="configure">Configuration action; may be <see langword="null"/>.</param>
+            /// <returns>A configured settings instance.</returns>
+            public static Settings Build(Action<Settings> configure)
+            {
+                var settings = new Settings();
+                configure?.Invoke(settings);
+                return settings;
+            }
 
             /// <summary>
             /// Adds or replaces a custom type name, which is written instead of the name that
@@ -675,7 +681,6 @@ namespace FeatureLoom.Serialization
             public readonly bool requiresItemInfos;
             public readonly bool writeItemIds;
             public readonly bool writeByteArrayAsBase64String = false;
-            public readonly bool writeArraySegmentsAsArrays = false;
 
             /// <summary>Compiled type/generic-type settings map.</summary>
             public readonly Dictionary<Type, BaseTypeWriteSettings> typeSettingsDict;
@@ -712,7 +717,6 @@ namespace FeatureLoom.Serialization
                 writeItemIds = referenceFormat == ReferenceFormat.IdBased &&
                                (referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef);
                 writeByteArrayAsBase64String = settings.writeByteArrayAsBase64String;
-                writeArraySegmentsAsArrays = settings.writeArraySegmentsAsArrays;
 
                 typeSettingsDict = new Dictionary<Type, BaseTypeWriteSettings>(settings.typeSettingsDict);
                 hasTypeSettings = typeSettingsDict.Count > 0;
