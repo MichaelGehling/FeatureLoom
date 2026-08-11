@@ -20,6 +20,16 @@ public class DeserializeStringValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
     static JsonDeserializer featureJsonDeserializer = SerializerConfigs.CreateFeatureDeserializer();
+
+    /// <summary>
+    /// Second deserializer instance with the string cache / deduplication feature disabled,
+    /// so its effect can be measured separately for each string shape.
+    /// </summary>
+    static JsonDeserializer featureJsonDeserializer_NoStringCache = new JsonDeserializer(new JsonDeserializer.Settings()
+    {
+        useStringCache = false
+    });
+
     static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
     public static IEnumerable<SerializeStringValuesTest.StringCase> StringValues => new SerializeStringValuesTest.StringCase[]
@@ -83,6 +93,16 @@ public class DeserializeStringValuesTest
         }
     }
 
+    [Benchmark]
+    public void DeserializeString_Single_Feature_NoStringCache()
+    {
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
+        {
+            featureStream_Single.Position = 0;
+            featureJsonDeserializer_NoStringCache.TryDeserialize(featureStream_Single, out string result);
+        }
+    }
+
     [Benchmark(Baseline = true)]
     public void DeserializeString_Single_SystemText()
     {
@@ -112,6 +132,16 @@ public class DeserializeStringValuesTest
         {
             featureStream_Array.Position = 0;
             featureJsonDeserializer.TryDeserialize(featureStream_Array, out string[] result);
+        }
+    }
+
+    [Benchmark]
+    public void DeserializeString_Array_Feature_NoStringCache()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureStream_Array.Position = 0;
+            featureJsonDeserializer_NoStringCache.TryDeserialize(featureStream_Array, out string[] result);
         }
     }
 

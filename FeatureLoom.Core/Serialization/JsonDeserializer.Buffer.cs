@@ -39,11 +39,12 @@ public sealed partial class JsonDeserializer
 
         public void SetSource(Stream stream)
         {            
-            if (stream == this.stream && (!stream.CanSeek || lastStreamPosition == stream.Position)) return;
+            bool canSeek = stream.CanSeek;
+            if (stream == this.stream && (!canSeek || lastStreamPosition == stream.Position)) return;
 
             ResetBuffer(false, false);
             this.stream = stream;
-            if (stream.CanSeek) lastStreamPosition = stream.Position;
+            lastStreamPosition = canSeek ? stream.Position : -1;
         }
 
         public void SetSource(string str)
@@ -74,7 +75,10 @@ public sealed partial class JsonDeserializer
             if (size < buffer.Length) ResetBuffer(false, false);
             else ResetBuffer(false, true, size);
 
-            bytes.CopyToArray(buffer, size);
+            // Bulk copy: ByteSegment is backed by a contiguous ArraySegment, so the generic
+            // IEnumerable-based CopyToArray (which copies byte by byte) must be avoided here.
+            var source = bytes.AsArraySegment;
+            Array.Copy(source.Array, source.Offset, buffer, 0, size);
             bufferFillLevel = size;
         }
 
@@ -189,7 +193,7 @@ public sealed partial class JsonDeserializer
 
         public void ResetAfterReading()
         {
-            if (!(this.stream?.CanRead ?? false))
+            if (this.stream != null && !this.stream.CanRead)
             {
                 this.stream = null;
             }

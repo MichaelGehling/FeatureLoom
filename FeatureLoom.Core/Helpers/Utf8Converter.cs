@@ -1,6 +1,12 @@
 ﻿using FeatureLoom.Collections;
 using System;
 using System.Text;
+#if !(NETSTANDARD2_0 || NETFRAMEWORK)
+using System.Runtime.InteropServices;
+#endif
+#if NET8_0_OR_GREATER
+using System.Runtime.Intrinsics;
+#endif
 
 namespace FeatureLoom.Helpers;
 
@@ -17,6 +23,26 @@ public static class Utf8Converter
     static SlicedBuffer<byte> sharedSlicedByteBuffer = new SlicedBuffer<byte>(1024, 1024 * 80, 4, true, true);
     // Pool for reusing StringBuilder instances.
     static Pool<StringBuilder> stringBuilderPool = new Pool<StringBuilder>(() => new StringBuilder(1024), sb => sb.Clear());
+
+#if NET7_0_OR_GREATER
+    // Bytes that end a plain ASCII run: the escape marker and every byte that starts a
+    // multi-byte UTF-8 sequence (0x80-0xFF). Enables a vectorized scan for the run length.
+    static readonly System.Buffers.SearchValues<byte> plainAsciiStoppers = System.Buffers.SearchValues.Create(CreatePlainAsciiStoppers());
+
+    static byte[] CreatePlainAsciiStoppers()
+    {
+        var stoppers = new byte[129];
+        stoppers[0] = (byte)'\\';
+        for (int i = 0; i < 128; i++) stoppers[i + 1] = (byte)(0x80 + i);
+        return stoppers;
+    }
+#endif
+
+#if !(NETSTANDARD2_0 || NETFRAMEWORK)
+    // Chunk size for stack-based ASCII widening. Keeps the stack usage bounded (512 bytes)
+    // while still amortizing the per-append overhead over many characters.
+    const int AsciiChunkSize = 256;
+#endif
 
     /// <summary>
     /// Decodes a UTF-8 encoded <see cref="ByteSegment"/> into a <see cref="StringBuilder"/>, handling escape sequences.
@@ -211,6 +237,42 @@ public static class Utf8Converter
     /// <returns>The decoded string.</returns>
     public static string DecodeUtf8ToString(this ByteSegment bytes, StringBuilder stringBuilder = null)
     {
+        var segment = bytes.AsArraySegment;
+        byte[] buffer = segment.Array;
+        int count = bytes.Count;
+
+        if (count == 0) return string.Empty;
+
+        if (buffer != null)
+        {
+            int offset = segment.Offset;
+            // Scan for the first byte that needs real decoding work. Mirrors the serializer's
+            // run-based strategy: the scan result is never thrown away, it either completes the
+            // whole string or marks where the general decoder has to take over.
+            int asciiRun = CountPlainAsciiRun(buffer, offset, count);
+
+            if (asciiRun == count) return CreateStringFromAscii(buffer, offset, count);
+
+            StringBuilder fastSb;
+            if (stringBuilder == null) fastSb = stringBuilderPool.Take();
+            else
+            {
+                stringBuilder.Clear();
+                fastSb = stringBuilder;
+            }
+
+            fastSb.EnsureCapacity(count);
+            // Bulk-append the already scanned ASCII prefix, then decode only the remainder,
+            // so no byte is ever inspected twice.
+            AppendAsciiRun(fastSb, buffer, offset, asciiRun);
+            DecodeUtf8ToStringBuilder(new ByteSegment(buffer, offset + asciiRun, count - asciiRun), fastSb);
+
+            string fastStr = fastSb.ToString();
+            if (stringBuilder == null) stringBuilderPool.Return(fastSb);
+            else fastSb.Clear();
+            return fastStr;
+        }
+
         StringBuilder sb;
         if (stringBuilder == null) sb = stringBuilderPool.Take();
         else
@@ -227,6 +289,103 @@ public static class Utf8Converter
 
         return str;
     }
+
+    /// <summary>
+    /// Returns the number of leading bytes that are plain ASCII, i.e. neither part of a
+    /// multi-byte sequence nor the start of an escape sequence.
+    /// </summary>
+    private static int CountPlainAsciiRun(byte[] buffer, int offset, int count)
+    {
+#if NET7_0_OR_GREATER
+        var span = new ReadOnlySpan<byte>(buffer, offset, count);
+        int index = span.IndexOfAny(plainAsciiStoppers);
+        return index < 0 ? count : index;
+#else
+        for (int i = 0; i < count; i++)
+        {
+            byte b = buffer[offset + i];
+            if (b >= 0x80 || b == (byte)'\\') return i;
+        }
+        return count;
+#endif
+    }
+
+    /// <summary>
+    /// Creates a string from a range of bytes that is known to contain only plain ASCII.
+    /// </summary>
+    private static string CreateStringFromAscii(byte[] buffer, int offset, int count)
+    {
+#if NETSTANDARD2_0 || NETFRAMEWORK
+        return Encoding.ASCII.GetString(buffer, offset, count);
+#else
+        return string.Create(count, (buffer, offset), static (chars, state) =>
+        {
+            var (src, srcOffset) = state;
+            WidenAsciiToChars(new ReadOnlySpan<byte>(src, srcOffset, chars.Length), chars);
+        });
+#endif
+    }
+
+    /// <summary>
+    /// Appends a range of bytes that is known to contain only plain ASCII to a StringBuilder.
+    /// </summary>
+    private static void AppendAsciiRun(StringBuilder stringBuilder, byte[] buffer, int offset, int count)
+    {
+#if NETSTANDARD2_0 || NETFRAMEWORK
+        for (int i = 0; i < count; i++) stringBuilder.Append((char)buffer[offset + i]);
+#else
+        // Widen through a small stack chunk, so the run is appended with a few span appends
+        // instead of one virtual Append call per character, without allocating a scratch buffer.
+        Span<char> chunk = stackalloc char[AsciiChunkSize];
+        int done = 0;
+        while (done < count)
+        {
+            int length = Math.Min(AsciiChunkSize, count - done);
+            Span<char> target = chunk.Slice(0, length);
+            WidenAsciiToChars(new ReadOnlySpan<byte>(buffer, offset + done, length), target);
+            stringBuilder.Append(target);
+            done += length;
+        }
+#endif
+    }
+
+#if !(NETSTANDARD2_0 || NETFRAMEWORK)
+    /// <summary>
+    /// Widens a span of ASCII bytes into chars, using the widest available SIMD path.
+    /// </summary>
+    private static void WidenAsciiToChars(ReadOnlySpan<byte> source, Span<char> destination)
+    {
+        int i = 0;
+
+#if NET8_0_OR_GREATER
+        if (Vector256.IsHardwareAccelerated && source.Length >= Vector256<byte>.Count)
+        {
+            int limit = source.Length - Vector256<byte>.Count;
+            for (; i <= limit; i += Vector256<byte>.Count)
+            {
+                Vector256<byte> block = Vector256.Create(source.Slice(i, Vector256<byte>.Count));
+                // Each 256-bit byte block widens into two 256-bit char blocks.
+                (Vector256<ushort> lower, Vector256<ushort> upper) = Vector256.Widen(block);
+                lower.CopyTo(MemoryMarshal.Cast<char, ushort>(destination.Slice(i, Vector256<ushort>.Count)));
+                upper.CopyTo(MemoryMarshal.Cast<char, ushort>(destination.Slice(i + Vector256<ushort>.Count, Vector256<ushort>.Count)));
+            }
+        }
+        else if (Vector128.IsHardwareAccelerated && source.Length >= Vector128<byte>.Count)
+        {
+            int limit = source.Length - Vector128<byte>.Count;
+            for (; i <= limit; i += Vector128<byte>.Count)
+            {
+                Vector128<byte> block = Vector128.Create(source.Slice(i, Vector128<byte>.Count));
+                (Vector128<ushort> lower, Vector128<ushort> upper) = Vector128.Widen(block);
+                lower.CopyTo(MemoryMarshal.Cast<char, ushort>(destination.Slice(i, Vector128<ushort>.Count)));
+                upper.CopyTo(MemoryMarshal.Cast<char, ushort>(destination.Slice(i + Vector128<ushort>.Count, Vector128<ushort>.Count)));
+            }
+        }
+#endif
+
+        for (; i < source.Length; i++) destination[i] = (char)source[i];
+    }
+#endif
 
     /// <summary>
     /// Decodes a UTF-8 encoded <see cref="ByteSegment"/> into a pooled char array segment, handling escape sequences.

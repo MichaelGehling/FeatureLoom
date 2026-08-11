@@ -167,6 +167,12 @@ public static class SampleOutput
     {
         if (text == null) return "<null>";
         if (maxLength <= 0 || text.Length <= maxLength) return text;
-        return text.Substring(0, maxLength) + $"... (+{text.Length - maxLength} chars)";
+
+        // Never cut inside a surrogate pair, otherwise a lone surrogate would be written to
+        // the console and corrupt the output stream that BenchmarkDotNet parses.
+        int cut = maxLength;
+        if (char.IsHighSurrogate(text[cut - 1])) cut--;
+
+        return text.Substring(0, cut) + $"... (+{text.Length - cut} chars)";
     }
 }

@@ -81,13 +81,17 @@ public sealed class Utf8StringCache
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string GetOrCreate(ByteSegment segment, StringBuilder stringBuilder = null)
     {
-        int len = segment.Count;
+        // Small, inlinable gate: strings that are too long to be cached must not pay for the
+        // call into the (much larger, non-inlinable) lookup/insert path.
+        if (segment.Count > maxStringLength) return Utf8Converter.DecodeUtf8ToString(segment, stringBuilder);
 
-        if (len > maxStringLength)
-        {
-            // Too long to cache, decode directly without caching
-            return Utf8Converter.DecodeUtf8ToString(segment, stringBuilder);
-        }
+        return GetOrCreateCached(segment, stringBuilder);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private string GetOrCreateCached(ByteSegment segment, StringBuilder stringBuilder)
+    {
+        int len = segment.Count;
 
         int hash = ComputeFastHash(segment);
         segment.SetCustomHashCode(hash);     

@@ -171,28 +171,103 @@ public sealed partial class JsonDeserializer
     }
 
     CachedTypeReader lastTypeReader = null;
+    Type lastTypeReaderType = null;
 
+    /// <summary>
+    /// Fast path of the generic deserialization. It is kept free of a retry loop and of a
+    /// finally-funclet, because both add fixed cost to every single call. Reset() is invoked
+    /// explicitly on each exit instead, and the rare recovery/retry handling is delegated to
+    /// the cold <see cref="TryDeserializeLockedAfterBufferExceeded{T}(out T)"/>.
+    /// </summary>
     private bool TryDeserializeLocked<T>(out T item)
     {
-        item = default;
-        bool retry = false;
-        do
+        try
         {
-            retry = false;
+            if (!buffer.TryPrepareDeserialization())
+            {
+                item = default;
+                Reset();
+                return false;
+            }
+
+            // Return false if only whitespaces are left (otherwise we would throw an exception)
+            byte b = SkipWhiteSpaces();
+            if (IsWhiteSpace(b))
+            {
+                item = default;
+                Reset();
+                return false;
+            }
+
+            var itemType = typeof(T);
+            if (lastTypeReaderType == itemType)
+            {
+                item = lastTypeReader.ReadFieldValue<T>(rootName);
+            }
+            else
+            {
+                var reader = GetCachedTypeReader(itemType);
+                lastTypeReader = reader;
+                lastTypeReaderType = reader.ReaderType;
+                item = reader.ReadFieldValue<T>(rootName);
+            }
+            Reset();
+            return true;
+        }
+        catch (BufferExceededException)
+        {
+            return TryDeserializeLockedAfterBufferExceeded(out item);
+        }
+        catch (Exception e)
+        {
+            if (settings.logCatchedExceptions) OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+            Reset();
+            if (settings.rethrowExceptions) throw;
+            item = default;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Cold continuation of <see cref="TryDeserializeLocked{T}(out T)"/> that refills the buffer
+    /// and retries after a <see cref="BufferExceededException"/>.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private bool TryDeserializeLockedAfterBufferExceeded<T>(out T item)
+    {
+        while (true)
+        {
+            buffer.ResetAfterBufferExceededException();
+
+            ResetRefResolutionHelper();
+
+            if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
+            {
+                item = default;
+                Reset();
+                return false;
+            }
+
             try
             {
                 if (!buffer.TryPrepareDeserialization())
                 {
                     item = default;
+                    Reset();
                     return false;
                 }
 
                 // Return false if only whitespaces are left (otherwise we would throw an exception)
-                byte b = SkipWhiteSpaces();  
-                if (IsWhiteSpace(b)) return false;
+                byte b = SkipWhiteSpaces();
+                if (IsWhiteSpace(b))
+                {
+                    item = default;
+                    Reset();
+                    return false;
+                }
 
                 var itemType = typeof(T);
-                if (lastTypeReader?.ReaderType == itemType)
+                if (lastTypeReaderType == itemType)
                 {
                     item = lastTypeReader.ReadFieldValue<T>(rootName);
                 }
@@ -200,41 +275,25 @@ public sealed partial class JsonDeserializer
                 {
                     var reader = GetCachedTypeReader(itemType);
                     lastTypeReader = reader;
+                    lastTypeReaderType = reader.ReaderType;
                     item = reader.ReadFieldValue<T>(rootName);
                 }
+                Reset();
                 return true;
             }
             catch (BufferExceededException)
             {
-
-                buffer.ResetAfterBufferExceededException();
-
-                ResetRefResolutionHelper();
-
-
-                if (!buffer.TryReadFromStream() && !IsAnyDataLeftUnlocked())
-                {
-                    item = default;
-                    return false;
-                }
-
-                retry = true;
+                continue;
             }
             catch (Exception e)
             {
                 if (settings.logCatchedExceptions) OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                Reset();
                 if (settings.rethrowExceptions) throw;
+                item = default;
+                return false;
             }
-            finally
-            {
-                if (!retry)
-                {
-                    Reset();
-                }
-            }
-        } while (retry);
-
-        return false;
+        }
     }
 
     private bool TryDeserializeLocked(Type itemType, out object item)
@@ -256,7 +315,7 @@ public sealed partial class JsonDeserializer
                 byte b = SkipWhiteSpaces();
                 if (IsWhiteSpace(b)) return false;
 
-                if (lastTypeReader?.ReaderType == itemType)
+                if (lastTypeReaderType == itemType)
                 {
                     item = lastTypeReader.ReadFieldValue<object>(rootName);
                 }
@@ -264,6 +323,7 @@ public sealed partial class JsonDeserializer
                 {
                     var reader = GetCachedTypeReader(itemType);
                     lastTypeReader = reader;
+                    lastTypeReaderType = reader.ReaderType;
                     item = reader.ReadFieldValue<object>(rootName);
                 }
                 return true;
@@ -319,7 +379,7 @@ public sealed partial class JsonDeserializer
                 if (IsWhiteSpace(b)) return false;
                 
                 var itemType = item != null ? item.GetType() : typeof(T);
-                if (lastTypeReader?.ReaderType == itemType)
+                if (lastTypeReaderType == itemType)
                 {
                     item = lastTypeReader.ReadFieldValue(rootName, item);
                 }
@@ -327,6 +387,7 @@ public sealed partial class JsonDeserializer
                 {
                     var reader = GetCachedTypeReader(itemType);
                     lastTypeReader = reader;
+                    lastTypeReaderType = reader.ReaderType;
                     item = reader.ReadFieldValue(rootName, item);
                 }
                 return true;
