@@ -34,7 +34,7 @@ namespace FeatureLoom.Serialization;
 public sealed partial class JsonDeserializer
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte[] ReadByteArray(CachedTypeReader byteArrayReader)
+    private byte[] ReadByteArray(CachedTypeReader byteArrayReader, bool useFastNumberArrayReader = false)
     {
         //SkipWhiteSpaces(); //Whitespaces are already skipped by the caller, so we can expect to be exactly at the start of the value
         byte b = buffer.CurrentByte;
@@ -46,10 +46,27 @@ public sealed partial class JsonDeserializer
             return Convert.FromBase64String(base64String);
 #else
             ReadOnlySpan<byte> utf8Base64 = base64Uft8.AsArraySegment.AsSpan();
-            int maxDecodedLength = Base64.GetMaxDecodedFromUtf8Length(utf8Base64.Length);
-            byte[] bytes = new byte[maxDecodedLength];
-            Span<byte> decodedSpan = bytes;
-            OperationStatus status = Base64.DecodeFromUtf8(utf8Base64, decodedSpan, out int bytesConsumed, out int bytesWritten);
+            int encodedLength = utf8Base64.Length;
+            if (encodedLength == 0) return Array.Empty<byte>();
+
+            byte[] bytes;
+            if ((encodedLength & 3) == 0)
+            {
+                // Well-formed base64: the exact decoded length is known upfront,
+                // so a single right-sized array can be allocated without a resize/copy afterwards.
+                int padding = 0;
+                if (utf8Base64[encodedLength - 1] == (byte)'=')
+                {
+                    padding = utf8Base64[encodedLength - 2] == (byte)'=' ? 2 : 1;
+                }
+                bytes = new byte[(encodedLength / 4) * 3 - padding];
+            }
+            else
+            {
+                bytes = new byte[Base64.GetMaxDecodedFromUtf8Length(encodedLength)];
+            }
+
+            OperationStatus status = Base64.DecodeFromUtf8(utf8Base64, bytes, out int bytesConsumed, out int bytesWritten);
             if (status != OperationStatus.Done) throw new FormatException($"Invalid Base64 sequence (status = {status}).");
             if (bytesWritten != bytes.Length) Array.Resize(ref bytes, bytesWritten);
             return bytes;
@@ -57,11 +74,134 @@ public sealed partial class JsonDeserializer
         }
         else if (b == '[')
         {
+            if (useFastNumberArrayReader) return ReadByteArrayFromNumbers();
             return byteArrayReader.ReadValue_NoCheck<byte[]>();
         }
 
         throw new Exception("Expected byte array, but didn't got an array nor an Base64 string");
     }
+
+    private byte[] numberArrayScratch;
+
+    /// <summary>
+    /// Reads a JSON number array directly into a reusable scratch buffer and copies it into an
+    /// exactly sized result array. Avoids the generic array reader's per-element delegate
+    /// indirection and the pooled <see cref="List{T}"/> intermediate.
+    /// </summary>
+    private byte[] ReadByteArrayFromNumbers()
+    {
+        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array: Unexpected end of input");
+
+        byte[] scratch = numberArrayScratch ?? new byte[256];
+        int count = 0;
+        while (true)
+        {
+            byte b = SkipWhiteSpaces();
+            if (b == ']') break;
+
+#if !NETSTANDARD2_0
+            // Bulk fast path: consume as many compact "digits," elements as are fully contained in
+            // the current buffer window, using a single span acquisition instead of paying
+            // SkipWhiteSpaces/TryEnsureBuffered/GetRemainingSpan/TrySkipBytes per element.
+            if (BulkReadByteElements(ref scratch, ref count, out bool reachedArrayEnd))
+            {
+                if (reachedArrayEnd) break;
+                continue;
+            }
+#endif
+
+            byte value = ReadByteValue();
+            if (count == scratch.Length) Array.Resize(ref scratch, scratch.Length * 2);
+            scratch[count++] = value;
+
+            b = SkipWhiteSpaces();
+            if (b == ',') buffer.TryNextByte();
+            else if (b != ']') throw new Exception($"Failed reading Array: Unexpected character encountered '{(char)b}'");
+        }
+        buffer.TryNextByte();
+        // No try/finally: the method never re-enters itself, and on a parsing exception the
+        // deserializer state is invalid anyway, so preserving the scratch buffer is pointless.
+        numberArrayScratch = scratch;
+
+        if (count == 0) return Array.Empty<byte>();
+        byte[] result = new byte[count];
+        Array.Copy(scratch, 0, result, 0, count);
+        return result;
+    }
+
+#if !NETSTANDARD2_0
+    /// <summary>
+    /// Consumes as many complete byte elements as are fully contained in the currently buffered
+    /// window, using one span acquisition for all of them. Returns false if nothing could be
+    /// consumed safely, in which case the caller must fall back to the general per-element path.
+    /// </summary>
+    private bool BulkReadByteElements(ref byte[] scratch, ref int count, out bool reachedArrayEnd)
+    {
+        reachedArrayEnd = false;
+        ReadOnlySpan<byte> span = buffer.GetRemainingSpan();
+        if (span.Length < 2) return false;
+
+        int pos = 0;
+        byte[] target = scratch;
+        int written = count;
+
+        // Only positions guaranteed to be a valid, fully parsed element boundary inside the current
+        // window are committed, so a truncated tail always falls back to the general path.
+        int commitPos = -1;
+        int commitWritten = count;
+        bool commitIsArrayEnd = false;
+
+        while (true)
+        {
+            // digits
+            int digitStart = pos;
+            uint value = 0;
+            while (pos < span.Length)
+            {
+                uint digit = (uint)(span[pos] - (byte)'0');
+                if (digit > 9u) break;
+                value = value * 10 + digit;
+                pos++;
+            }
+            if (pos == digitStart) break;              // not a plain integer -> general path
+            if (pos == span.Length) break;             // element may be truncated by the buffer window
+            if (pos - digitStart > 3 || value > byte.MaxValue) break; // out of range -> general path reports it
+
+            // optional whitespace before the separator
+            while (pos < span.Length && IsWhiteSpace(span[pos])) pos++;
+            if (pos == span.Length) break;
+
+            byte sep = span[pos];
+            if (sep != (byte)',' && sep != (byte)']') break;
+
+            if (written == target.Length) Array.Resize(ref target, target.Length * 2);
+            target[written++] = (byte)value;
+
+            if (sep == (byte)']')
+            {
+                commitPos = pos;                        // leave position on ']' for the caller
+                commitWritten = written;
+                commitIsArrayEnd = true;
+                break;
+            }
+
+            pos++;                                      // consume ','
+            while (pos < span.Length && IsWhiteSpace(span[pos])) pos++;
+            if (pos == span.Length) break;
+
+            commitPos = pos;                            // start of the next element
+            commitWritten = written;
+        }
+
+        if (commitPos < 0) return false;
+
+        scratch = target;
+        count = commitWritten;
+        reachedArrayEnd = commitIsArrayEnd;
+        buffer.BufferPos += commitPos;
+        return true;
+    }
+#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private object ReadUnknownValue()

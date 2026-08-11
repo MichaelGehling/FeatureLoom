@@ -270,10 +270,13 @@ public sealed partial class JsonDeserializer
     {
         var byteTypeReader = GetCachedTypeReader(typeof(byte));
         var byteArrayReader = new CachedTypeReader((_) => this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { typeof(byte) }, cachedTypeReader));
+        // The specialized number-array reader does not set reference paths for the created array,
+        // so it may only be used when reference resolution is not required.
+        bool useFastNumberArrayReader = !cachedTypeReader.ResolveRefs;
         var reader = () =>
         {
             if (TryReadNullValue()) return default;
-            return ReadByteArray(byteArrayReader);
+            return ReadByteArray(byteArrayReader, useFastNumberArrayReader);
         };
 
         return TypeReaderInitializer.Create(this, reader, null, false, cachedTypeReader.TypeSettings);

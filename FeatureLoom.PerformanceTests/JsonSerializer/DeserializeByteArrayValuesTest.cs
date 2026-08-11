@@ -18,7 +18,7 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
+[MinIterationCount(200)]
 [MaxIterationCount(5000)]
 public class DeserializeByteArrayValuesTest
 {
