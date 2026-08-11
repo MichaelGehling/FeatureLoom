@@ -39,13 +39,13 @@ public struct MicroValueLock
     // NOTE: The order of the variables matters for performance.
     private volatile bool readerBlocked;
     private volatile bool prioritizedWaiting;
-    private volatile int lockIndicator;
+    private int lockIndicator;
 
     /// <summary>
     /// Gets a value indicating whether the lock is currently held by any reader or writer.
     /// This is a non-atomic snapshot and should be used for diagnostics only.
     /// </summary>
-    public bool IsLocked => lockIndicator != NO_LOCK;
+    public bool IsLocked => Volatile.Read(ref lockIndicator) != NO_LOCK;
 
     /// <summary>
     /// Attempts to acquire the write lock without blocking.
@@ -144,7 +144,7 @@ public struct MicroValueLock
     {
         if (readerBlocked && !prioritized) return false;
 
-        int currentLockIndicator = lockIndicator;
+        int currentLockIndicator = Volatile.Read(ref lockIndicator);
         int newLockIndicator = currentLockIndicator + 1;
         return newLockIndicator >= FIRST_READ_LOCK && (prioritized || !prioritizedWaiting) && currentLockIndicator == Interlocked.CompareExchange(ref lockIndicator, newLockIndicator, currentLockIndicator);
     }
@@ -208,7 +208,7 @@ public struct MicroValueLock
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint HandleReaderBlocking(uint blockedByReaderCounter)
     {
-        if (lockIndicator >= FIRST_READ_LOCK) blockedByReaderCounter++;
+        if (Volatile.Read(ref lockIndicator) >= FIRST_READ_LOCK) blockedByReaderCounter++;
         else blockedByReaderCounter = 0;
         readerBlocked = blockedByReaderCounter > 1;
 
