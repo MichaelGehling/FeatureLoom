@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Collections;
+using FeatureLoom.Collections;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
@@ -1530,10 +1530,74 @@ public sealed partial class JsonDeserializer
         {
             return CreateByteArrayTypeReader(cachedTypeReader);
         }
+        else if (!cachedTypeReader.ResolveRefs &&
+                 TryCreateNumberContainerReader(arrayType.GetElementType(), false, cachedTypeReader, out var integerInitializer))
+        {
+            return integerInitializer;
+        }
         else
         {
             return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { arrayType.GetElementType() }, cachedTypeReader);
         }
+    }
+
+    /// <summary>
+    /// Creates a reader that uses the shared number bulk parser for the given element type, either
+    /// producing an array or a <see cref="List{T}"/>. Returns false for non-number element types.
+    /// </summary>
+    private bool TryCreateNumberContainerReader(Type elementType, bool asList, CachedTypeReader cachedTypeReader, out TypeReaderInitializer initializer)
+    {
+        Type parserType = null;
+        if (elementType == typeof(sbyte)) parserType = typeof(SByteElementParser);
+        else if (elementType == typeof(byte)) parserType = typeof(ByteElementParser);
+        else if (elementType == typeof(short)) parserType = typeof(Int16ElementParser);
+        else if (elementType == typeof(ushort)) parserType = typeof(UInt16ElementParser);
+        else if (elementType == typeof(int)) parserType = typeof(Int32ElementParser);
+        else if (elementType == typeof(uint)) parserType = typeof(UInt32ElementParser);
+        else if (elementType == typeof(long)) parserType = typeof(Int64ElementParser);
+        else if (elementType == typeof(ulong)) parserType = typeof(UInt64ElementParser);
+        else if (elementType == typeof(double)) parserType = typeof(DoubleElementParser);
+        else if (elementType == typeof(float)) parserType = typeof(SingleElementParser);
+
+        if (parserType == null)
+        {
+            initializer = null;
+            return false;
+        }
+
+        string methodName = asList ? nameof(CreateNumberListTypeReader) : nameof(CreateNumberArrayTypeReader);
+        initializer = this.InvokeGenericMethod<TypeReaderInitializer>(methodName, new Type[] { elementType, parserType }, cachedTypeReader);
+        return true;
+    }
+
+    private TypeReaderInitializer CreateNumberArrayTypeReader<E, TParser>(CachedTypeReader cachedTypeReader)
+        where E : struct
+        where TParser : struct, INumberElementParser<E>
+    {
+        // The specialized number-array reader does not set reference paths for the created container,
+        // so it may only be used when reference resolution is not required.
+        var scratch = new NumberScratch<E>();
+        var reader = () =>
+        {
+            if (TryReadNullValue()) return default;
+            return ReadArrayFromNumbers<E, TParser>(scratch);
+        };
+
+        return TypeReaderInitializer.Create(this, reader, null, false, cachedTypeReader.TypeSettings);
+    }
+
+    private TypeReaderInitializer CreateNumberListTypeReader<E, TParser>(CachedTypeReader cachedTypeReader)
+        where E : struct
+        where TParser : struct, INumberElementParser<E>
+    {
+        var scratch = new NumberScratch<E>();
+        var reader = () =>
+        {
+            if (TryReadNullValue()) return default;
+            return ReadListFromNumbers<E, TParser>(scratch);
+        };
+
+        return TypeReaderInitializer.Create(this, reader, null, false, cachedTypeReader.TypeSettings);
     }
 
     private TypeReaderInitializer CreateGenericArrayTypeReader<E>(CachedTypeReader cachedTypeReader)
@@ -1594,6 +1658,13 @@ public sealed partial class JsonDeserializer
 
     private bool TryCreateEnumerableTypeReader(Type itemType, CachedTypeReader cachedTypeReader, out TypeReaderInitializer initializer)
     {        
+        if (!cachedTypeReader.ResolveRefs && // The bulk reader does not set reference paths
+            itemType.IsGenericType && itemType.GetGenericTypeDefinition() == typeof(List<>) &&
+            TryCreateNumberContainerReader(itemType.GetGenericArguments()[0], true, cachedTypeReader, out initializer))
+        {
+            return true;
+        }
+
         if (cachedTypeReader.ResolveRefs && // We only do the special handling if required, due to reference resolution
             itemType.TryGetTypeParamsOfGenericInterface(typeof(ICollection<>), out Type elementType) &&            
             this.InvokeGenericMethod<bool>(nameof(IsMutableCollectionType), [itemType, elementType], []))
