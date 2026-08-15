@@ -2,6 +2,7 @@
 using System;
 using System.Text;
 #if !(NETSTANDARD2_0 || NETFRAMEWORK)
+using System.Buffers;
 using System.Runtime.InteropServices;
 #endif
 #if NET8_0_OR_GREATER
@@ -42,6 +43,8 @@ public static class Utf8Converter
     // Chunk size for stack-based ASCII widening. Keeps the stack usage bounded (512 bytes)
     // while still amortizing the per-append overhead over many characters.
     const int AsciiChunkSize = 256;
+    // Above this length the decode target is rented from the array pool instead of the stack.
+    const int MaxStackDecodeChars = 512;
 #endif
 
     /// <summary>
@@ -253,6 +256,25 @@ public static class Utf8Converter
 
             if (asciiRun == count) return CreateStringFromAscii(buffer, offset, count);
 
+#if !(NETSTANDARD2_0 || NETFRAMEWORK)
+            // Decoding never produces more chars than input bytes, so the output size is known
+            // up front. Decode straight into a char span and build the string in a single copy,
+            // avoiding the StringBuilder growth (ExpandByABlock) and its extra ToString() copy.
+            char[] rented = count > MaxStackDecodeChars ? ArrayPool<char>.Shared.Rent(count) : null;
+            try
+            {
+                Span<char> chars = rented != null
+                    ? rented.AsSpan(0, count)
+                    : stackalloc char[count];
+
+                int written = DecodeUtf8ToChars(buffer, offset, count, asciiRun, chars);
+                return new string(chars.Slice(0, written));
+            }
+            finally
+            {
+                if (rented != null) ArrayPool<char>.Shared.Return(rented);
+            }
+#else
             StringBuilder fastSb;
             if (stringBuilder == null) fastSb = stringBuilderPool.Take();
             else
@@ -271,6 +293,7 @@ public static class Utf8Converter
             if (stringBuilder == null) stringBuilderPool.Return(fastSb);
             else fastSb.Clear();
             return fastStr;
+#endif
         }
 
         StringBuilder sb;
@@ -289,6 +312,172 @@ public static class Utf8Converter
 
         return str;
     }
+
+    #if !(NETSTANDARD2_0 || NETFRAMEWORK)
+    /// <summary>
+    /// Decodes UTF-8 bytes directly into a char span, handling escape sequences.
+    /// The already-scanned plain ASCII prefix is bulk-widened, so no byte is inspected twice.
+    /// </summary>
+    /// <returns>The number of chars written to <paramref name="destination"/>.</returns>
+    private static int DecodeUtf8ToChars(byte[] buffer, int offset, int count, int asciiRun, Span<char> destination)
+    {
+        WidenAsciiToChars(new ReadOnlySpan<byte>(buffer, offset, asciiRun), destination.Slice(0, asciiRun));
+
+        int w = asciiRun;
+        int i = offset + asciiRun;
+        int end = offset + count;
+
+        while (i < end)
+        {
+            byte b = buffer[i++];
+
+            if (b == '\\')
+            {
+                i = HandleEscapeSequence(buffer, i, end, destination, ref w);
+            }
+            else if (b < 0x80)
+            {
+                destination[w++] = (char)b;
+
+                // A single non-ASCII byte usually does not mean the rest is non-ASCII too,
+                // so re-scan for the next stopper and bulk-widen the run that follows.
+                int run = CountPlainAsciiRun(buffer, i, end - i);
+                if (run > 0)
+                {
+                    WidenAsciiToChars(new ReadOnlySpan<byte>(buffer, i, run), destination.Slice(w, run));
+                    w += run;
+                    i += run;
+                }
+            }
+            else if (b < 0xE0)
+            {
+                if (i >= end) break;
+                byte b2 = buffer[i++];
+                destination[w++] = (char)(((b & 0x1F) << 6) | (b2 & 0x3F));
+            }
+            else if (b < 0xF0)
+            {
+                if (i + 2 > end) break;
+                byte b2 = buffer[i++];
+                byte b3 = buffer[i++];
+                destination[w++] = (char)(((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F));
+            }
+            else
+            {
+                if (i + 3 > end) break;
+                byte b2 = buffer[i++];
+                byte b3 = buffer[i++];
+                byte b4 = buffer[i++];
+                int codepoint = ((b & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
+
+                if (codepoint > 0xFFFF)
+                {
+                    codepoint -= 0x10000;
+                    destination[w++] = (char)(0xD800 | (codepoint >> 10));
+                    destination[w++] = (char)(0xDC00 | (codepoint & 0x3FF));
+                }
+                else
+                {
+                    destination[w++] = (char)codepoint;
+                }
+            }
+        }
+
+        return w;
+    }
+
+    /// <summary>
+    /// Span-based counterpart of the StringBuilder escape handling. Writes the decoded
+    /// character(s) at <paramref name="w"/> and returns the updated buffer index.
+    /// </summary>
+    private static int HandleEscapeSequence(byte[] buffer, int i, int end, Span<char> destination, ref int w)
+    {
+        if (i >= end)
+        {
+            destination[w++] = '\\';
+            return i;
+        }
+
+        byte b = buffer[i++];
+
+        switch (b)
+        {
+            case (byte)'\\': destination[w++] = '\\'; break;
+            case (byte)'b': destination[w++] = '\b'; break;
+            case (byte)'f': destination[w++] = '\f'; break;
+            case (byte)'n': destination[w++] = '\n'; break;
+            case (byte)'r': destination[w++] = '\r'; break;
+            case (byte)'t': destination[w++] = '\t'; break;
+            case (byte)'u':
+                if (i + 4 > end)
+                {
+                    destination[w++] = '\\';
+                    destination[w++] = 'u';
+                    while (i < end) destination[w++] = (char)buffer[i++];
+                    return end;
+                }
+                int codepoint = 0;
+                int start = i;
+                int invalidAt = -1;
+                for (int j = 0; j < 4; j++)
+                {
+                    byte hex = buffer[i++];
+                    codepoint <<= 4;
+                    if (hex >= '0' && hex <= '9') codepoint |= (hex - '0');
+                    else if (hex >= 'A' && hex <= 'F') codepoint |= (hex - 'A' + 10);
+                    else if (hex >= 'a' && hex <= 'f') codepoint |= (hex - 'a' + 10);
+                    else if (invalidAt == -1) invalidAt = j;
+                }
+                if (invalidAt != -1)
+                {
+                    destination[w++] = '\\';
+                    destination[w++] = 'u';
+                    for (int j = 0; j < 4; j++) destination[w++] = (char)buffer[start + j];
+                }
+                else if (codepoint >= 0xD800 &&
+                         codepoint <= 0xDBFF &&
+                         i + 6 <= end &&
+                         buffer[i] == '\\' &&
+                         buffer[i + 1] == 'u')
+                {
+                    int lowSurrogate = 0;
+                    int lowStart = i + 2;
+                    bool lowValid = true;
+                    for (int j = 0; j < 4; j++)
+                    {
+                        byte hex = buffer[lowStart + j];
+                        lowSurrogate <<= 4;
+                        if (hex >= '0' && hex <= '9') lowSurrogate |= (hex - '0');
+                        else if (hex >= 'A' && hex <= 'F') lowSurrogate |= (hex - 'A' + 10);
+                        else if (hex >= 'a' && hex <= 'f') lowSurrogate |= (hex - 'a' + 10);
+                        else { lowValid = false; break; }
+                    }
+                    if (lowValid && lowSurrogate >= 0xDC00 && lowSurrogate <= 0xDFFF)
+                    {
+                        destination[w++] = (char)codepoint;
+                        destination[w++] = (char)lowSurrogate;
+                    }
+                    else
+                    {
+                        destination[w++] = (char)codepoint;
+                        destination[w++] = '\\';
+                        destination[w++] = 'u';
+                        for (int j = 0; j < 4; j++) destination[w++] = (char)buffer[lowStart + j];
+                    }
+                    i += 6;
+                }
+                else
+                {
+                    destination[w++] = (char)codepoint;
+                }
+                break;
+            default:
+                destination[w++] = (char)b;
+                break;
+        }
+        return i;
+    }
+#endif
 
     /// <summary>
     /// Returns the number of leading bytes that are plain ASCII, i.e. neither part of a

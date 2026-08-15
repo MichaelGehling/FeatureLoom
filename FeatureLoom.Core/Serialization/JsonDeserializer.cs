@@ -84,6 +84,9 @@ public sealed partial class JsonDeserializer
     }
 
     readonly CompiledSettings settings;
+    // Cached once, because it is checked on every single deserialization. Reading it from the
+    // settings object each time is a dependent load on the entry path.
+    readonly bool refResolutionEnabled;
 
     public JsonDeserializer(Action<Settings> buildSettings) : this(Settings.Build(buildSettings))
     {
@@ -94,6 +97,7 @@ public sealed partial class JsonDeserializer
     {
         deserializerSettings = deserializerSettings ?? new Settings();
         this.settings = new CompiledSettings(deserializerSettings);            
+        this.refResolutionEnabled = settings.referenceResolutionMode != Settings.ReferenceResolutionMode.ForceDisabled;
         buffer.Init(settings.initialBufferSize);            
         preparationApi = new PreparationApi(this);
         extensionApi = new ExtensionApi(this);
@@ -144,16 +148,18 @@ public sealed partial class JsonDeserializer
         ResetRefResolutionHelper();
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ResetRefResolutionHelper()
     {
-        if (settings.referenceResolutionMode != Settings.ReferenceResolutionMode.ForceDisabled)
-        {
-            currentItemName = rootName;
-            itemInfos.Clear();
-            currentItemInfoIndex = -1;
-            anyItemIdWritten = false;
-            refObjectCache.Clear();
-        }
+        if (!refResolutionEnabled) return;
+
+        currentItemName = rootName;
+        currentItemInfoIndex = -1;
+        anyItemIdWritten = false;
+        // Clearing an already empty collection is the common case on the entry path, so the
+        // non-inlined Clear() calls are skipped unless something was actually recorded.
+        if (itemInfos.Count > 0) itemInfos.Clear();
+        if (refObjectCache.Count > 0) refObjectCache.Clear();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

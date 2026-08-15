@@ -12,7 +12,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 public class DeserializeEntryOverheadTest
 {
     static JsonDeserializer featureJsonDeserializer = SerializerConfigs.CreateFeatureDeserializer();
-    const int Iterations = 1000;
+    // High iteration count so the fixed per-invoke harness cost (IterationSetup, timer
+    // resolution) is amortized far below the measured per-operation cost. At 1000 the
+    // measurement noise was larger than the entry-path differences being investigated.
+    const int Iterations = 50000;
     // Smallest possible payloads: parsing cost is near zero, so the entry path dominates.
     string json_Int = "0";
     string json_Bool = "true";

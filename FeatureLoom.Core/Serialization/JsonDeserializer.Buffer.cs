@@ -22,6 +22,9 @@ public sealed partial class JsonDeserializer
         int bufferFillLevel = 0;
         long totalBytesRead = 0;
         Stream stream;
+        // Stream.CanSeek/CanRead are virtual calls whose result does not change while the same
+        // source is used, so they are cached when the source is set.
+        bool streamCanSeek = false;
         long lastStreamPosition = -1;
         bool bufferReadTillEnd = false;
 
@@ -44,6 +47,7 @@ public sealed partial class JsonDeserializer
 
             ResetBuffer(false, false);
             this.stream = stream;
+            this.streamCanSeek = canSeek;
             lastStreamPosition = canSeek ? stream.Position : -1;
         }
 
@@ -126,7 +130,11 @@ public sealed partial class JsonDeserializer
                 int bytesRead = stream.Read(buffer, bufferFillLevel, bufferSizeLeft);
                 totalBytesRead += bytesRead;
                 bufferFillLevel += bytesRead;
-                if (stream.CanSeek) lastStreamPosition = stream.Position;
+                // This is the only place that advances the stream, so the position can be tracked
+                // incrementally instead of querying the virtual Stream.Position on every read.
+                // SetSource() still detects an external seek, because any position change that did
+                // not originate here will differ from the tracked value.
+                if (streamCanSeek) lastStreamPosition += bytesRead;
                 result = bytesRead > 0;
             }
             catch
