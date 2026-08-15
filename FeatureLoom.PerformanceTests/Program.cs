@@ -21,9 +21,11 @@ namespace FeatureLoom.PerformanceTests
             IConfig config = args.Contains("--inProcess") ? new DebugInProcessConfig() : DefaultConfig.Instance;
 
             JsonSerializer.SampleOutput.Reset();
+            JsonSerializer.DeferredReport.Reset();
             BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
 
             JsonSerializer.SampleOutput.PrintAll();
+            JsonSerializer.DeferredReport.PrintAll();
         }
     }
 }

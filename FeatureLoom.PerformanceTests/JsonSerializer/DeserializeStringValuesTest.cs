@@ -45,6 +45,10 @@ public class DeserializeStringValuesTest
         new SerializeStringValuesTest.StringCase("Cjk", new string('漢', 200)),
         new SerializeStringValuesTest.StringCase("Emoji", Repeat("\U0001F600", 200)),
         new SerializeStringValuesTest.StringCase("AsciiThenWide", new string('a', 999) + "漢"),
+        // Mirrors AsciiThenWide, but the trailing char forces an escape sequence. This is the
+        // direct A/B for whether skipping the already-scanned prefix pays off: identical
+        // 999-byte ASCII run, but this one leaves the escape-free fast path.
+        new SerializeStringValuesTest.StringCase("AsciiThenSpecial", new string('a', 999) + "\""),
     };
 
     private static string Repeat(string text, int count)

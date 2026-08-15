@@ -252,6 +252,48 @@ public sealed partial class JsonDeserializer
         public int CountRemainingBytes => bufferFillLevel - bufferPos;
         public int CountSizeLeft => buffer.Length - bufferFillLevel;
 
+#if NET5_0_OR_GREATER
+        /// <summary>
+        /// Resolves a complete string value that is already fully buffered and contains no
+        /// escape sequence, advancing the position past the closing quote. The current byte
+        /// must be the opening quote.
+        /// <para>
+        /// This is the common case by far, and handling it here allows the whole string to be
+        /// located with a single vectorized scan and a single position update, instead of
+        /// going through TryNextByte/TrySkipBytes round trips. Returns false without changing
+        /// any state when the string is escaped or not fully buffered, so the caller can fall
+        /// back to the general loop.
+        /// </para>
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryReadSimpleStringBytes(out ByteSegment stringBytes)
+        {
+            int contentStart = bufferPos + 1;
+            int available = bufferFillLevel - contentStart;
+            if (available > 0)
+            {
+                var span = new ReadOnlySpan<byte>(buffer, contentStart, available);
+                int specialIndex = span.IndexOfAny((byte)'"', (byte)'\\');
+                if (specialIndex >= 0 && span[specialIndex] == (byte)'"')
+                {
+                    // The closing quote was found inside the buffered data, so the value is
+                    // complete and escape-free. Leave the position on the byte after the quote,
+                    // matching what the general loop's trailing TryNextByte would produce.
+                    int closingQuotePos = contentStart + specialIndex;
+                    if (closingQuotePos + 1 < bufferFillLevel)
+                    {
+                        stringBytes = new ByteSegment(buffer, contentStart, specialIndex);
+                        bufferPos = closingQuotePos + 1;
+                        return true;
+                    }
+                }
+            }
+
+            stringBytes = default;
+            return false;
+        }
+#endif
+
         public bool IsBufferCompletelyFilled => bufferFillLevel == buffer.Length;
         public bool IsBufferReadToEnd => bufferFillLevel == 0 || bufferPos >= bufferFillLevel - 1;
 

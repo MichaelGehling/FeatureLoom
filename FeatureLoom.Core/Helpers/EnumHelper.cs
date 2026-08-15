@@ -81,6 +81,16 @@ namespace FeatureLoom.Helpers
         static volatile IReadOnlyDictionary<int, byte[]> intToUtf8Name;
         static volatile IReadOnlyDictionary<int, T> intToEnum = new Dictionary<int, T>();
 
+        // Names sorted by their UTF-8 bytes, so a name can be resolved directly from UTF-8
+        // input without allocating a string first. Entries are ordered by length and then
+        // by byte content, which allows a binary search over the whole table.
+        static volatile Utf8NameEntry[] utf8NameEntries;
+
+        // Direct array lookup for enums with contiguous int values, avoiding the interface
+        // dispatch of the IReadOnlyDictionary above. Null when the values are not contiguous.
+        static volatile T[] sequentialIntToEnum;
+        static int sequentialOffset;
+
         // Delegate for fast, boxing-free enum-to-int conversion
         static Func<T, int> convertToInt = _ => 0;
 
@@ -149,6 +159,9 @@ namespace FeatureLoom.Helpers
                     intToName = new ListDictionary<string>(keys.Select(k => intToNameDict[k]), minKey);
                     intToUtf8Name = new ListDictionary<byte[]>(keys.Select(k => intToUtf8NameDict[k]), minKey);
                     intToEnum = new ListDictionary<T>(keys.Select(k => intToEnumDict[k]), minKey);
+
+                    sequentialOffset = minKey;
+                    sequentialIntToEnum = keys.Select(k => intToEnumDict[k]).ToArray();
                 }
                 else
                 {
@@ -156,6 +169,16 @@ namespace FeatureLoom.Helpers
                     intToUtf8Name = intToUtf8NameDict;
                     intToEnum = intToEnumDict;
                 }
+
+                // Build the searchable UTF-8 name table. All int keys are included, so aliases
+                // (several names mapping to the same value) stay resolvable.
+                var entries = new List<Utf8NameEntry>();
+                foreach (var pair in intToUtf8NameDict)
+                {
+                    entries.Add(new Utf8NameEntry(pair.Value, intToEnumDict[pair.Key]));
+                }
+                entries.Sort((x, y) => CompareUtf8(x.name, y.name));
+                utf8NameEntries = entries.ToArray();
 
                 initialized = true;
             }
@@ -215,12 +238,101 @@ namespace FeatureLoom.Helpers
             return Enum.TryParse(enumString, true, out enumValue);
         }
 
+        private struct Utf8NameEntry
+        {
+            public readonly byte[] name;
+            public readonly T value;
+
+            public Utf8NameEntry(byte[] name, T value)
+            {
+                this.name = name;
+                this.value = value;
+            }
+        }
+
+        /// <summary>
+        /// Orders UTF-8 names by length first and then by byte content, so a lookup can reject
+        /// a candidate by its length before comparing any bytes.
+        /// </summary>
+        private static int CompareUtf8(byte[] left, byte[] right)
+        {
+            if (left.Length != right.Length) return left.Length - right.Length;
+            for (int i = 0; i < left.Length; i++)
+            {
+                int diff = left[i] - right[i];
+                if (diff != 0) return diff;
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Tries to resolve an enum value directly from the UTF-8 bytes of its name, without
+        /// allocating an intermediate string. The match is case-sensitive, so callers must fall
+        /// back to <see cref="TryFromString(string, out T)"/> when this returns false.
+        /// </summary>
+        public static bool TryFromUtf8Name(ArraySegment<byte> utf8Name, out T enumValue)
+        {
+            if (!initialized) Init();
+
+            var entries = utf8NameEntries;
+            byte[] array = utf8Name.Array;
+            if (array != null && entries != null)
+            {
+                int offset = utf8Name.Offset;
+                int count = utf8Name.Count;
+                int low = 0;
+                int high = entries.Length - 1;
+                while (low <= high)
+                {
+                    int mid = (int)(((uint)(low + high)) >> 1);
+                    byte[] candidate = entries[mid].name;
+
+                    int diff = candidate.Length - count;
+                    if (diff == 0)
+                    {
+                        for (int i = 0; i < count; i++)
+                        {
+                            diff = candidate[i] - array[offset + i];
+                            if (diff != 0) break;
+                        }
+                    }
+
+                    if (diff == 0)
+                    {
+                        enumValue = entries[mid].value;
+                        return true;
+                    }
+                    if (diff < 0) low = mid + 1;
+                    else high = mid - 1;
+                }
+            }
+
+            enumValue = default;
+            return false;
+        }
+
         /// <summary>
         /// Tries to get the enum value from its integer representation.
         /// </summary>
         public static bool TryFromInt(int intValue, out T enumValue)
         {
             if (!initialized) Init();
+
+            // Contiguous enums resolve through a plain array, which avoids the interface
+            // dispatch that a dictionary lookup would cost on this hot path.
+            var sequential = sequentialIntToEnum;
+            if (sequential != null)
+            {
+                int index = intValue - sequentialOffset;
+                if ((uint)index < (uint)sequential.Length)
+                {
+                    enumValue = sequential[index];
+                    return true;
+                }
+                enumValue = default;
+                return false;
+            }
+
             return intToEnum.TryGetValue(intValue, out enumValue);
         }
 
@@ -262,6 +374,11 @@ namespace FeatureLoom.Helpers
         /// Tries to parse an enum value from a string (case-insensitive).
         /// </summary>
         public static bool TryFromString<T>(string enumString, out T enumValue) where T : struct, Enum => EnumHelper<T>.TryFromString(enumString, out enumValue);
+
+        /// <summary>
+        /// Tries to resolve an enum value directly from the UTF-8 bytes of its name.
+        /// </summary>
+        public static bool TryFromUtf8Name<T>(ArraySegment<byte> utf8Name, out T enumValue) where T : struct, Enum => EnumHelper<T>.TryFromUtf8Name(utf8Name, out enumValue);
 
         /// <summary>
         /// Tries to get the enum value from its integer representation.

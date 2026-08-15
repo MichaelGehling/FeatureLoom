@@ -120,6 +120,34 @@ public sealed partial class JsonDeserializer
         }
     }
 
+    /// <summary>
+    /// Number of string-cache lookups that were resolved from an existing entry, avoiding a new
+    /// string allocation. Zero when string caching is not used.
+    /// </summary>
+    public long StringCacheHitCount => stringCache?.HitCount ?? 0;
+
+    /// <summary>
+    /// Number of string-cache lookups that had to decode and store a new string.
+    /// Zero when string caching is not used.
+    /// </summary>
+    public long StringCacheMissCount => stringCache?.MissCount ?? 0;
+
+    /// <summary>
+    /// Ratio of string-cache hits to total lookups in the range [0..1].
+    /// <para>
+    /// This is the main indicator for tuning string-cache usage: a low ratio means the cached
+    /// members mostly carry unique values, paying hashing, probing and eviction cost without
+    /// saving allocations. Those members can be excluded individually via
+    /// <c>ConfigureMember(..., ms =&gt; ms.SetUseStringCache(false))</c>.
+    /// </para>
+    /// </summary>
+    public double StringCacheHitRatio => stringCache?.HitRatio ?? 0d;
+
+    /// <summary>
+    /// Resets the string-cache hit/miss statistics without dropping the cached strings.
+    /// </summary>
+    public void ResetStringCacheStatistics() => stringCache?.ResetStatistics();
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void AddCustomTypeNameToProposedCache(string customTypeName, CachedTypeReader cachedTypeReader, bool addCaseVariants)
     {

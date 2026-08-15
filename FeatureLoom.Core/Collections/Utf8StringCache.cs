@@ -43,6 +43,46 @@ public sealed class Utf8StringCache
     readonly int mask;
     readonly int maxStringLength;
     uint stampCounter;
+    long hitCount;
+    long missCount;
+
+    /// <summary>
+    /// Number of lookups that were resolved from an existing cache entry, so no new string had to
+    /// be allocated.
+    /// </summary>
+    public long HitCount => hitCount;
+
+    /// <summary>
+    /// Number of lookups that had to decode and store a new string. Strings longer than the
+    /// configured maximum bypass the cache entirely and are not counted here.
+    /// </summary>
+    public long MissCount => missCount;
+
+    /// <summary>
+    /// Ratio of hits to total lookups in the range [0..1], or 0 when nothing was looked up yet.
+    /// <para>
+    /// A low ratio means the cached members carry mostly unique values, which costs hashing,
+    /// probing and eviction without saving allocations. Such members are candidates for disabling
+    /// the string cache individually.
+    /// </para>
+    /// </summary>
+    public double HitRatio
+    {
+        get
+        {
+            long total = hitCount + missCount;
+            return total == 0 ? 0d : (double)hitCount / total;
+        }
+    }
+
+    /// <summary>
+    /// Resets the hit/miss statistics without touching the cached entries.
+    /// </summary>
+    public void ResetStatistics()
+    {
+        hitCount = 0;
+        missCount = 0;
+    }
 
     /// <summary>
     /// Initializes a new <see cref="Utf8StringCache"/>.
@@ -113,6 +153,7 @@ public sealed class Utf8StringCache
 #endif
             {
                 entry1.stamp = ++stampCounter;
+                hitCount++;
                 return entry1.value;
             }
         }
@@ -131,11 +172,13 @@ public sealed class Utf8StringCache
 #endif
             {
                 entry2.stamp = ++stampCounter;
+                hitCount++;
                 return entry2.value;
             }
         }
 
         // Cache miss → create new entry
+        missCount++;
         ByteSegment cropped = segment.CropArray(true);
         string value = Utf8Converter.DecodeUtf8ToString(cropped, stringBuilder);
 
@@ -174,6 +217,8 @@ public sealed class Utf8StringCache
     {
         Array.Clear(cache, 0, cache.Length);
         stampCounter = 0;
+        hitCount = 0;
+        missCount = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

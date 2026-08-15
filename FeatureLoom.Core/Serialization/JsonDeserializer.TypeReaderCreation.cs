@@ -400,8 +400,13 @@ public sealed partial class JsonDeserializer
             }
             else if (valueType == TypeResult.String)
             {
-                string s = ReadStringValue();
-                if (!EnumHelper.TryFromString(s, out T value)) throw new Exception("Invalid string for enum value");
+                // Try to match the raw UTF-8 name first, which avoids materializing a string.
+                // Escaped or differently cased names fail here and use the string path below.
+                var stringBytes = ReadStringBytes();
+                if (EnumHelper<T>.TryFromUtf8Name(stringBytes.AsArraySegment, out T value)) return value;
+
+                string s = DecodeStringBytes(stringBytes);
+                if (!EnumHelper.TryFromString(s, out value)) throw new Exception("Invalid string for enum value");
                 return value;
             }
             else throw new Exception("Invalid character for determining enum value");
@@ -432,8 +437,11 @@ public sealed partial class JsonDeserializer
             }
             else if (valueType == TypeResult.String)
             {
-                string s = ReadStringValue();
-                if (!EnumHelper.TryFromString(s, out T value)) throw new Exception("Invalid string for enum value");
+                var stringBytes = ReadStringBytes();
+                if (EnumHelper<T>.TryFromUtf8Name(stringBytes.AsArraySegment, out T value)) return (T?)value;
+
+                string s = DecodeStringBytes(stringBytes);
+                if (!EnumHelper.TryFromString(s, out value)) throw new Exception("Invalid string for enum value");
                 return (T?)value;
             }
             else throw new Exception("Invalid character for determining enum value");

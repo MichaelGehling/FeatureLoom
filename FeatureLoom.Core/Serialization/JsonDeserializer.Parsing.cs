@@ -197,6 +197,23 @@ public sealed partial class JsonDeserializer
         return result;
     }
 
+    /// <summary>
+    /// Turns already read string bytes into a string, using the same caching rules as
+    /// <see cref="ReadStringValue"/>. Used by readers that first try to interpret the raw
+    /// UTF-8 bytes and only need a string when that fast path fails.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private string DecodeStringBytes(ByteSegment stringBytes)
+    {
+        string result;
+
+        if (useStringCache) result = stringCache.GetOrCreate(stringBytes, stringBuilder);
+        else result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
+
+        stringBuilder.Clear();
+        return result;
+    }
+
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string ReadStringValueOrNull()
@@ -2457,12 +2474,29 @@ public sealed partial class JsonDeserializer
     ByteSegment ReadStringBytes()
     {
         byte b = SkipWhiteSpaces();
-        if (b != (byte)'"') throw new Exception("Failed reading string value: No starting quote found.");
+        if (b != (byte)'"') ThrowMissingStartQuote();
 
+#if NET5_0_OR_GREATER
+        // Fast path: the whole value is buffered and contains no escape sequence. Only the
+        // check and the return stay inlined at the call site; everything else is out of line.
+        if (buffer.TryReadSimpleStringBytes(out ByteSegment simpleBytes)) return simpleBytes;
+#endif
+
+        return ReadStringBytes_Slow();
+    }
+
+    /// <summary>
+    /// General string reading path, used when the value contains escape sequences or is not
+    /// fully buffered. Kept as a separate non-inlined method so that its loop and its throw
+    /// sites do not bloat every <see cref="ReadStringBytes"/> call site.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    ByteSegment ReadStringBytes_Slow()
+    {
         var recording = buffer.StartRecording(true);
 
 #if NET5_0_OR_GREATER
-        if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: No ending quote found.");
+        if (!buffer.TryNextByte()) ThrowMissingEndQuote();
 
         while (true)
         {
@@ -2473,7 +2507,7 @@ public sealed partial class JsonDeserializer
             {
                 int jump = remaining.Length - 1;
                 if (jump > 0) buffer.TrySkipBytes(jump);
-                if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: No ending quote found.");
+                if (!buffer.TryNextByte()) ThrowMissingEndQuote();
                 continue;
             }
 
@@ -2492,10 +2526,11 @@ public sealed partial class JsonDeserializer
                 continue;
             }
 
-            if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: Invalid escape sequence.");
-            if (!buffer.TryNextByte()) throw new Exception("Failed reading string value: No ending quote found.");
+            if (!buffer.TryNextByte()) ThrowIncompleteEscapeSequence();
+            if (!buffer.TryNextByte()) ThrowMissingEndQuote();
         }
 #else
+        byte b;
         while (buffer.TryNextByte())
         {
             b = buffer.CurrentByte;
@@ -2506,12 +2541,25 @@ public sealed partial class JsonDeserializer
                 buffer.TryNextByte();
                 return stringBytes;
             }
-            else if (!HandleSpecialChars(b)) throw new Exception("Failed reading string value: Invalid character found.");
+            else if (!HandleSpecialChars(b)) ThrowInvalidCharacter();
         }
 
-        throw new Exception("Failed reading string value: No ending quote found.");
+        ThrowMissingEndQuote();
+        return default;
 #endif
     }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void ThrowMissingStartQuote() => throw new Exception("Failed reading string value: No starting quote found.");
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void ThrowMissingEndQuote() => throw new Exception("Failed reading string value: No ending quote found.");
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void ThrowIncompleteEscapeSequence() => throw new Exception("Failed reading string value: Incomplete escape sequence.");
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void ThrowInvalidCharacter() => throw new Exception("Failed reading string value: Invalid character found.");
 
 
 
@@ -2522,6 +2570,26 @@ public sealed partial class JsonDeserializer
         byte b = SkipWhiteSpaces();
 
         if (b != (byte)'"') return false;
+
+#if NET5_0_OR_GREATER
+        // Fast path: fully buffered and escape-free. It cannot fail halfway through, so no
+        // undo handle is needed here.
+        if (buffer.TryReadSimpleStringBytes(out stringBytes)) return true;
+#endif
+
+        return TryReadStringBytes_Slow(out stringBytes);
+    }
+
+    /// <summary>
+    /// General path for <see cref="TryReadStringBytes"/>, used when the value contains escape
+    /// sequences or is not fully buffered. Kept separate so the undo handle and the loop stay
+    /// out of the inlined fast path.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    bool TryReadStringBytes_Slow(out ByteSegment stringBytes)
+    {
+        stringBytes = default;
+        byte b = default;
         using (var undoHandle = CreateUndoReadHandle())
         {
             var recording = buffer.StartRecording(true);
