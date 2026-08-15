@@ -41,10 +41,13 @@ public sealed partial class JsonDeserializer
         }
 
         public void SetSource(Stream stream)
-        {            
-            bool canSeek = stream.CanSeek;
-            if (stream == this.stream && (!canSeek || lastStreamPosition == stream.Position)) return;
+        {
+            // When the same stream is reused, the cached streamCanSeek is used instead of querying
+            // the virtual Stream.CanSeek again. On a FileStream that property is backed by a
+            // SafeFileHandle check and is surprisingly expensive to call on every deserialization.
+            if (stream == this.stream && (!streamCanSeek || lastStreamPosition == stream.Position)) return;
 
+            bool canSeek = stream.CanSeek;
             ResetBuffer(false, false);
             this.stream = stream;
             this.streamCanSeek = canSeek;

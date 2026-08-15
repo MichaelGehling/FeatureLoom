@@ -307,6 +307,12 @@ public sealed partial class JsonDeserializer
             return default;
         }
 
+        // Fast path: the overwhelming majority of JSON date-times are plain ASCII ISO-8601 of a
+        // fixed layout. Parsing those directly from the UTF-8 bytes avoids both the UTF-8 decode
+        // and System.DateTimeParse, which is a format-flexible state machine that repeatedly
+        // consults DateTimeFormatInfo (separators, designators, era data) that cannot apply here.
+        if (TryParseIso8601DateTime(stringBytes, out DateTime fastResult)) return fastResult;
+
         DateTime result;
 #if NET5_0_OR_GREATER
         Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
@@ -341,6 +347,323 @@ public sealed partial class JsonDeserializer
         return result;
     }
 
+    /// <summary>
+    /// Parses the strict ISO-8601 layouts that JSON date-times almost always use, directly from
+    /// the UTF-8 bytes:
+    /// <c>yyyy-MM-dd</c>, optionally followed by <c>THH:mm</c>, <c>:ss</c>, a fractional part and
+    /// a <c>Z</c> / <c>+HH:mm</c> / <c>-HH:mm</c> offset.
+    /// Returns false for anything that deviates even slightly, so the caller falls back to the
+    /// culture-aware <see cref="DateTime.Parse(string, IFormatProvider, DateTimeStyles)"/> and
+    /// behaviour is preserved for all other inputs.
+    /// </summary>
+    private static bool TryParseIso8601DateTime(ByteSegment bytes, out DateTime result)
+    {
+        result = default;
+        if (!TryParseIso8601Core(bytes, out long ticks, out DateTimeKind kind, out int offsetMinutes)) return false;
+
+        if (kind == DateTimeKind.Local)
+        {
+            // Matches DateTimeStyles.RoundtripKind: an explicit offset is normalised to UTC and
+            // then converted to local time.
+            long utcTicks = ticks - offsetMinutes * TimeSpan.TicksPerMinute;
+            if ((ulong)utcTicks > MaxTicks) return false;
+            result = new DateTime(utcTicks, DateTimeKind.Utc).ToLocalTime();
+        }
+        else
+        {
+            result = new DateTime(ticks, kind);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Shared scanner for the strict ISO-8601 layouts. Produces the wall clock tick count together
+    /// with the kind implied by the trailing designator: <see cref="DateTimeKind.Utc"/> for
+    /// <c>Z</c>, <see cref="DateTimeKind.Local"/> plus <paramref name="offsetMinutes"/> for an
+    /// explicit numeric offset and <see cref="DateTimeKind.Unspecified"/> when no designator is
+    /// present.
+    /// </summary>
+    private static bool TryParseIso8601Core(ByteSegment bytes, out long resultTicks, out DateTimeKind resultKind, out int resultOffsetMinutes)
+    {
+        resultTicks = 0;
+        resultKind = DateTimeKind.Unspecified;
+        resultOffsetMinutes = 0;
+        int len = bytes.Count;
+        // "yyyy-MM-dd" is the shortest accepted form, the longest handled here is
+        // "yyyy-MM-ddTHH:mm:ss.fffffff+HH:mm".
+        if (len < 10 || len > 33) return false;
+
+        var seg = bytes.AsArraySegment;
+        byte[] a = seg.Array;
+        int o = seg.Offset;
+
+        if (a[o + 4] != (byte)'-' || a[o + 7] != (byte)'-') return false;
+
+        if (!TryRead4Digits(a, o, out int year)) return false;
+        if (!TryRead2Digits(a, o + 5, out int month)) return false;
+        if (!TryRead2Digits(a, o + 8, out int day)) return false;
+
+        int hour = 0, minute = 0, second = 0;
+        long subTicks = 0;
+        int pos = 10;
+
+        if (pos < len)
+        {
+            byte sep = a[o + pos];
+            if (sep != (byte)'T' && sep != (byte)' ') return false;
+            // A time part requires at least "HH:mm".
+            if (pos + 6 > len) return false;
+            if (a[o + pos + 3] != (byte)':') return false;
+            if (!TryRead2Digits(a, o + pos + 1, out hour)) return false;
+            if (!TryRead2Digits(a, o + pos + 4, out minute)) return false;
+            pos += 6;
+
+            if (pos < len && a[o + pos] == (byte)':')
+            {
+                if (pos + 3 > len) return false;
+                if (!TryRead2Digits(a, o + pos + 1, out second)) return false;
+                pos += 3;
+
+                if (pos < len && a[o + pos] == (byte)'.')
+                {
+                    pos++;
+                    int fracStart = pos;
+                    // Accumulate up to 7 fractional digits (100ns tick resolution); any further
+                    // digits are valid ISO-8601 but cannot be represented, so they are skipped.
+                    while (pos < len)
+                    {
+                        byte d = a[o + pos];
+                        if (d < (byte)'0' || d > (byte)'9') break;
+                        if (pos - fracStart < 7) subTicks = subTicks * 10 + (d - (byte)'0');
+                        pos++;
+                    }
+                    int digits = pos - fracStart;
+                    if (digits == 0) return false;
+                    for (int i = digits; i < 7; i++) subTicks *= 10;
+                }
+            }
+        }
+
+        DateTimeKind kind = DateTimeKind.Unspecified;
+        int offsetMinutes = 0;
+        if (pos < len)
+        {
+            byte c = a[o + pos];
+            if (c == (byte)'Z' || c == (byte)'z')
+            {
+                if (pos + 1 != len) return false;
+                kind = DateTimeKind.Utc;
+                pos = len;
+            }
+            else if (c == (byte)'+' || c == (byte)'-')
+            {
+                // Only "+HH:mm" / "-HH:mm" is handled; other offset spellings fall back.
+                if (pos + 6 != len || a[o + pos + 3] != (byte)':') return false;
+                if (!TryRead2Digits(a, o + pos + 1, out int offHour)) return false;
+                if (!TryRead2Digits(a, o + pos + 4, out int offMinute)) return false;
+                if (offHour > 14 || offMinute > 59) return false;
+                offsetMinutes = offHour * 60 + offMinute;
+                if (c == (byte)'-') offsetMinutes = -offsetMinutes;
+                kind = DateTimeKind.Local;
+                pos = len;
+            }
+            else return false;
+        }
+        if (pos != len) return false;
+
+        if (year < 1 || year > 9999 || month < 1 || month > 12 || day < 1) return false;
+        // A leap second (or 24:00) is legal ISO-8601 but not representable, so fall back.
+        if (hour > 23 || minute > 59 || second > 59) return false;
+
+        // Days in month without a calendar lookup. February is corrected via the leap year rule.
+        int maxDay = DaysInMonthTable[month];
+        if (month == 2 && (year & 3) == 0 && (year % 100 != 0 || year % 400 == 0)) maxDay = 29;
+        if (day > maxDay) return false;
+
+        // Compute the tick count directly instead of using the DateTime(y,m,d,...) constructor,
+        // which re-derives the day number through the calendar and throws on invalid input. All
+        // components are already validated above, so the result is guaranteed to be in range and
+        // no exception handling is needed on this path.
+        int era = (month <= 2 ? year - 1 : year);
+        long days = era * 365L + era / 4 - era / 100 + era / 400 + DayOfYearTable[month] + day - 1;
+        long ticks = (days - DaysToEpoch) * TimeSpan.TicksPerDay
+                   + hour * TimeSpan.TicksPerHour
+                   + minute * TimeSpan.TicksPerMinute
+                   + second * TimeSpan.TicksPerSecond
+                   + subTicks;
+
+        resultTicks = ticks;
+        resultKind = kind;
+        resultOffsetMinutes = offsetMinutes;
+        return true;
+    }
+
+    /// <summary>
+    /// Parses the strict ISO-8601 layouts directly from the UTF-8 bytes into a
+    /// <see cref="DateTimeOffset"/>, avoiding both the UTF-8 decode and the culture-aware parser.
+    /// Returns false for anything that deviates, so the caller falls back and behaviour is
+    /// preserved for all other inputs.
+    /// </summary>
+    private static bool TryParseIso8601DateTimeOffset(ByteSegment bytes, out DateTimeOffset result)
+    {
+        result = default;
+        if (!TryParseIso8601Core(bytes, out long ticks, out DateTimeKind kind, out int offsetMinutes)) return false;
+
+        if (kind == DateTimeKind.Unspecified)
+        {
+            // Without a designator the local offset of that very instant applies. Determining it
+            // needs the time zone rules, so only the safely convertible range is handled here.
+            if (ticks < TimeSpan.TicksPerDay || (ulong)(ticks + TimeSpan.TicksPerDay) > MaxTicks) return false;
+            result = new DateTimeOffset(new DateTime(ticks, DateTimeKind.Unspecified));
+            return true;
+        }
+
+        if (kind == DateTimeKind.Utc) offsetMinutes = 0;
+
+        long utcTicks = ticks - offsetMinutes * TimeSpan.TicksPerMinute;
+        if ((ulong)utcTicks > MaxTicks) return false;
+        result = new DateTimeOffset(ticks, new TimeSpan(offsetMinutes * TimeSpan.TicksPerMinute));
+        return true;
+    }
+
+    /// <summary>
+    /// Parses the invariant <c>[-][d.]hh:mm[:ss[.fffffff]]</c> layouts (and the bare day count)
+    /// directly from the UTF-8 bytes. Anything else falls back to <see cref="TimeSpan.Parse(string, IFormatProvider)"/>,
+    /// whose format-flexible matching dominates the deserialization cost.
+    /// </summary>
+    private static bool TryParseTimeSpan(ByteSegment bytes, out TimeSpan result)
+    {
+        result = default;
+        int len = bytes.Count;
+        // The longest accepted form is "-10675199.02:48:05.4775807".
+        if (len < 1 || len > 26) return false;
+
+        var seg = bytes.AsArraySegment;
+        byte[] a = seg.Array;
+        int o = seg.Offset;
+
+        int pos = 0;
+        bool negative = a[o] == (byte)'-';
+        if (negative) pos = 1;
+
+        if (!TryReadDigitRun(a, o, ref pos, len, 8, out long first)) return false;
+
+        long days = 0, hours = 0, minutes = 0, seconds = 0, subTicks = 0;
+
+        if (pos == len)
+        {
+            days = first; // A lone number is a day count.
+        }
+        else
+        {
+            if (a[o + pos] == (byte)'.')
+            {
+                days = first;
+                pos++;
+                if (!TryReadDigitRun(a, o, ref pos, len, 2, out hours)) return false;
+                if (pos >= len || a[o + pos] != (byte)':') return false;
+            }
+            else if (a[o + pos] == (byte)':')
+            {
+                hours = first;
+            }
+            else return false;
+
+            pos++; // consume the ':' before the minutes
+            if (!TryReadDigitRun(a, o, ref pos, len, 2, out minutes)) return false;
+
+            if (pos < len && a[o + pos] == (byte)':')
+            {
+                pos++;
+                if (!TryReadDigitRun(a, o, ref pos, len, 2, out seconds)) return false;
+
+                if (pos < len && a[o + pos] == (byte)'.')
+                {
+                    pos++;
+                    int fracStart = pos;
+                    while (pos < len)
+                    {
+                        byte d = a[o + pos];
+                        if (d < (byte)'0' || d > (byte)'9') break;
+                        subTicks = subTicks * 10 + (d - (byte)'0');
+                        pos++;
+                    }
+                    int digits = pos - fracStart;
+                    // More than tick resolution is rejected, exactly like the framework parser.
+                    if (digits == 0 || digits > 7) return false;
+                    for (int i = digits; i < 7; i++) subTicks *= 10;
+                }
+            }
+        }
+
+        if (pos != len) return false;
+        if (hours > 23 || minutes > 59 || seconds > 59) return false;
+        if (days > 10675199) return false;
+
+        long ticks = days * TimeSpan.TicksPerDay
+                   + hours * TimeSpan.TicksPerHour
+                   + minutes * TimeSpan.TicksPerMinute
+                   + seconds * TimeSpan.TicksPerSecond
+                   + subTicks;
+        if (ticks < 0) return false;
+
+        result = new TimeSpan(negative ? -ticks : ticks);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a run of at least one and at most <paramref name="maxDigits"/> ASCII digits.
+    /// </summary>
+    private static bool TryReadDigitRun(byte[] a, int o, ref int pos, int len, int maxDigits, out long value)
+    {
+        value = 0;
+        int start = pos;
+        while (pos < len)
+        {
+            byte d = a[o + pos];
+            if (d < (byte)'0' || d > (byte)'9') break;
+            value = value * 10 + (d - (byte)'0');
+            pos++;
+            if (pos - start > maxDigits) return false;
+        }
+        return pos > start;
+    }
+
+    // Days from the March-based day number
+    // maps to tick 0. January and February are treated as months 13/14 of the previous year, which
+    // is why 0001-01-01 starts at day 306 in this numbering.
+    private const long DaysToEpoch = 306;
+    private const ulong MaxTicks = 3155378975999999999UL;
+
+    private static readonly int[] DaysInMonthTable = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    // Cumulative days before each month for a March-based year, matching the era shift above.
+    private static readonly int[] DayOfYearTable = { 0, 306, 337, 0, 31, 61, 92, 122, 153, 184, 214, 245, 275 };
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryRead2Digits(byte[] a, int i, out int value)
+    {
+        // Both digits are read as one 16 bit load. A lane is a digit exactly when its high nibble
+        // is 3 and adding 6 does not carry into that nibble, so two masked tests cover both lanes.
+        ushort pair = Unsafe.ReadUnaligned<ushort>(ref a[i]);
+        bool valid = ((pair & 0xF0F0) == 0x3030) && (((pair + 0x0606) & 0xF0F0) == 0x3030);
+        uint d = (uint)(pair - 0x3030);
+        value = (int)(((d & 0xFF) * 10) + ((d >> 8) & 0xFF));
+        return valid;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryRead4Digits(byte[] a, int i, out int value)
+    {
+        // All four digits are read as one 32 bit load. Each lane must be in '0'..'9', which is
+        // checked with two masked comparisons instead of four separate range tests.
+        uint quad = Unsafe.ReadUnaligned<uint>(ref a[i]);
+        bool valid = ((quad & 0xF0F0F0F0) == 0x30303030) && (((quad + 0x06060606) & 0xF0F0F0F0) == 0x30303030);
+        uint d = quad - 0x30303030;
+        value = (int)(((d & 0xFF) * 1000) + (((d >> 8) & 0xFF) * 100) + (((d >> 16) & 0xFF) * 10) + ((d >> 24) & 0xFF));
+        return valid;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private DateTime? ReadNullableDateTimeValue()
     {
@@ -358,6 +681,8 @@ public sealed partial class JsonDeserializer
         {
             return default;
         }
+
+        if (TryParseIso8601DateTimeOffset(stringBytes, out DateTimeOffset fastResult)) return fastResult;
 
         DateTimeOffset result;
 #if NET5_0_OR_GREATER
@@ -410,6 +735,8 @@ public sealed partial class JsonDeserializer
         {
             return default;
         }
+
+        if (TryParseTimeSpan(stringBytes, out TimeSpan fastResult)) return fastResult;
 
         TimeSpan result;
 #if NET5_0_OR_GREATER
@@ -1109,9 +1436,142 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public decimal ReadDecimalValue()
     {
+        // A decimal carries a 96 bit mantissa, so routing it through double would silently drop
+        // precision for anything beyond ~17 significant digits and would additionally hit the
+        // exception based overflow path of the ulong digit reader. Parsing the digits straight
+        // into the decimal mantissa is both exact and allocation free.
+        byte b = SkipWhiteSpaces();
+        if (b != (byte)'"' && TryDecimalFastPath(out decimal fastResult)) return fastResult;
+
         double dbl = ReadDoubleValue();
         if (double.IsNaN(dbl) || double.IsInfinity(dbl)) throw new Exception("Decimals cannot be NaN or Infinity");
         return (decimal)dbl;
+    }
+
+    /// <summary>
+    /// Parses a JSON number token directly into a <see cref="decimal"/> by accumulating the
+    /// significant digits into the 96 bit mantissa and deriving the scale from the decimal point
+    /// and the exponent. Returns false whenever the token does not fit this representation (too
+    /// many significant digits, a scale outside 0..28, or a token that is not fully buffered), so
+    /// the caller falls back to the previous behaviour.
+    /// </summary>
+    private bool TryDecimalFastPath(out decimal value)
+    {
+        const int MaxNumberTokenBytes = 64;
+        buffer.TryEnsureBuffered(MaxNumberTokenBytes);
+        value = default;
+
+#if NETSTANDARD2_0
+        var remaining = buffer.GetRemainingBytes();
+#else
+        var remaining = buffer.GetRemainingSpan();
+#endif
+        int len = remaining.Length;
+        if (len == 0) return false;
+
+        int pos = 0;
+        bool isNegative = remaining[0] == (byte)'-';
+        if (isNegative) pos++;
+
+        uint lo = 0, mid = 0, hi = 0;
+        int digitCount = 0;      // significant digits folded into the mantissa
+        int fractionDigits = 0;  // digits seen after the decimal point
+        bool anyDigit = false;
+        bool sawNonZero = false;
+
+        while (pos < len)
+        {
+            uint d = (uint)(remaining[pos] - (byte)'0');
+            if (d > 9u) break;
+            anyDigit = true;
+            pos++;
+            // Leading zeros carry no information and must not consume mantissa capacity.
+            if (d == 0 && !sawNonZero) continue;
+            sawNonZero = true;
+            if (!TryMul10Add(ref lo, ref mid, ref hi, d)) return false;
+            digitCount++;
+        }
+
+        if (pos < len && remaining[pos] == (byte)'.')
+        {
+            pos++;
+            while (pos < len)
+            {
+                uint d = (uint)(remaining[pos] - (byte)'0');
+                if (d > 9u) break;
+                anyDigit = true;
+                pos++;
+                fractionDigits++;
+                if (d == 0 && !sawNonZero) continue;
+                sawNonZero = true;
+                if (!TryMul10Add(ref lo, ref mid, ref hi, d)) return false;
+                digitCount++;
+            }
+        }
+
+        if (!anyDigit) return false;
+
+        int exponent = 0;
+        if (pos < len && (remaining[pos] == (byte)'e' || remaining[pos] == (byte)'E'))
+        {
+            pos++;
+            if (pos >= len) return false;
+            bool expNegative = remaining[pos] == (byte)'-';
+            if (expNegative || remaining[pos] == (byte)'+') pos++;
+
+            int expDigits = 0;
+            while (pos < len)
+            {
+                uint d = (uint)(remaining[pos] - (byte)'0');
+                if (d > 9u) break;
+                exponent = exponent * 10 + (int)d;
+                pos++;
+                if (++expDigits > 4) return false; // far outside the decimal range anyway
+            }
+            if (expDigits == 0) return false;
+            if (expNegative) exponent = -exponent;
+        }
+
+        // The token must be terminated by a field end. Running out of buffered bytes here means
+        // real end of input, because MaxNumberTokenBytes exceeds the longest decimal token.
+        if (pos < len && map_IsFieldEnd[remaining[pos]] != FilterResult.Found) return false;
+
+        int scale = fractionDigits - exponent;
+        if (scale < 0)
+        {
+            // A positive net exponent is folded into the mantissa as trailing zeros.
+            if (digitCount == 0) scale = 0; // the value is zero, the exponent is irrelevant
+            else
+            {
+                while (scale < 0)
+                {
+                    if (!TryMul10Add(ref lo, ref mid, ref hi, 0)) return false;
+                    scale++;
+                }
+            }
+        }
+        if (scale > 28) return false;
+
+        value = new decimal((int)lo, (int)mid, (int)hi, isNegative, (byte)scale);
+
+        buffer.TrySkipBytes(pos - 1);
+        buffer.TryNextByte();
+        return true;
+    }
+
+    /// <summary>
+    /// Multiplies the 96 bit mantissa by ten and adds a digit. Returns false on overflow.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryMul10Add(ref uint lo, ref uint mid, ref uint hi, uint digit)
+    {
+        ulong t = (ulong)lo * 10 + digit;
+        lo = (uint)t;
+        t = (ulong)mid * 10 + (t >> 32);
+        mid = (uint)t;
+        t = (ulong)hi * 10 + (t >> 32);
+        hi = (uint)t;
+        return (t >> 32) == 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1988,9 +2448,22 @@ public sealed partial class JsonDeserializer
     static readonly SearchValues<byte> jsonWhitespaceSearchValues = SearchValues.Create(" \t\n\r"u8);
 #endif
 
+    // Fast path wrapper: on compact JSON the next byte is almost never whitespace, so the common
+    // case is a single byte test. Contains no loop, so the JIT can actually inline it, leaving the
+    // scanning loop outlined in SkipWhiteSpaces(). Safe because SkipWhiteSpaces() re-reads
+    // CurrentByte and consumes nothing when the byte is not whitespace.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     byte SkipWhiteSpaces()
     {
+        byte b = buffer.CurrentByte;
+        if (b != (byte)' ' && b != (byte)'\t' && b != (byte)'\n' && b != (byte)'\r') return b;
+        return SkipWhiteSpaces_Loop();
+    }
+
+    // Should only be called by SkipWhiteSpaces(), because it expects the current byte as already checked to be a whitespace and skips it.
+    byte SkipWhiteSpaces_Loop()
+    {
+        buffer.TryNextByte();
         byte b = buffer.CurrentByte;
 
 #if NET5_0_OR_GREATER

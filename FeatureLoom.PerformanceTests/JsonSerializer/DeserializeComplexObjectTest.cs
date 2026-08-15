@@ -31,6 +31,18 @@ public class DeserializeComplexObjectTest
         settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
     });
 
+    /// <summary>
+    /// Second deserializer instance with the string cache / deduplication feature disabled,
+    /// so its effect on a realistic object graph can be measured separately.
+    /// </summary>
+    static JsonDeserializer featureJsonDeserializer_NoStringCache = new JsonDeserializer(settings =>
+    {
+        settings.dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields;
+        settings.proposedTypeMode = JsonDeserializer.Settings.ProposedTypeMode.Ignore;
+        settings.referenceResolutionMode = JsonDeserializer.Settings.ReferenceResolutionMode.ForceDisabled;
+        settings.useStringCache = false;
+    });
+
     static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
     MemoryStream featureStream_Single = new MemoryStream();
@@ -82,6 +94,16 @@ public class DeserializeComplexObjectTest
         }
     }
 
+    [Benchmark]
+    public void DeserializeComplexObject_Single_Feature_NoStringCache()
+    {
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
+        {
+            featureStream_Single.Position = 0;
+            featureJsonDeserializer_NoStringCache.TryDeserialize(featureStream_Single, out ComplexObject result);
+        }
+    }
+
     [Benchmark(Baseline = true)]
     public void DeserializeComplexObject_Single_SystemText()
     {
@@ -111,6 +133,16 @@ public class DeserializeComplexObjectTest
         {
             featureStream_Array.Position = 0;
             featureJsonDeserializer.TryDeserialize(featureStream_Array, out ComplexObject[] result);
+        }
+    }
+
+    [Benchmark]
+    public void DeserializeComplexObject_Array_Feature_NoStringCache()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureStream_Array.Position = 0;
+            featureJsonDeserializer_NoStringCache.TryDeserialize(featureStream_Array, out ComplexObject[] result);
         }
     }
 
