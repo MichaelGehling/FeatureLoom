@@ -206,6 +206,74 @@ namespace FeatureLoom.Serialization
             AssertDeserialized("\"6f9619ff-8b86-d011-b42d-00c04fc964ff\"", expected);
         }
 
+        [Theory]
+        // "D" (hyphenated) and "N" (compact) forms take the direct UTF-8 fast path.
+        [InlineData("6f9619ff-8b86-d011-b42d-00c04fc964ff")]
+        [InlineData("6F9619FF-8B86-D011-B42D-00C04FC964FF")]
+        [InlineData("6f9619FF-8B86-d011-B42D-00c04fc964ff")]
+        [InlineData("6f9619ff8b86d011b42d00c04fc964ff")]
+        [InlineData("6F9619FF8B86D011B42D00C04FC964FF")]
+        // Formats with braces/parentheses must still work via the general parser.
+        [InlineData("{6f9619ff-8b86-d011-b42d-00c04fc964ff}")]
+        [InlineData("(6f9619ff-8b86-d011-b42d-00c04fc964ff)")]
+        public void Deserialize_Guid_SupportedFormats(string text)
+        {
+            var expected = Guid.Parse("6F9619FF-8B86-D011-B42D-00C04FC964FF");
+            AssertDeserialized($"\"{text}\"", expected);
+        }
+
+        [Theory]
+        [InlineData("00000000-0000-0000-0000-000000000000")]
+        [InlineData("ffffffff-ffff-ffff-ffff-ffffffffffff")]
+        [InlineData("00000000000000000000000000000000")]
+        [InlineData("ffffffffffffffffffffffffffffffff")]
+        public void Deserialize_Guid_EdgeValues(string text)
+        {
+            AssertDeserialized($"\"{text}\"", Guid.Parse(text));
+        }
+
+        [Fact]
+        public void Deserialize_Guid_RandomValues_MatchFrameworkParse()
+        {
+            var deserializer = new JsonDeserializer();
+            for (int i = 0; i < 200; i++)
+            {
+                var expected = Guid.NewGuid();
+                Assert.True(deserializer.TryDeserialize($"\"{expected:D}\"", out Guid hyphenated));
+                Assert.Equal(expected, hyphenated);
+                Assert.True(deserializer.TryDeserialize($"\"{expected:N}\"", out Guid compact));
+                Assert.Equal(expected, compact);
+            }
+        }
+
+        [Theory]
+        // Correct length but invalid content must not be silently accepted by the fast path.
+        [InlineData("6f9619ff-8b86-d011-b42d-00c04fc964fg")]
+        [InlineData("6f9619ff8b86d011b42d00c04fc964fg")]
+        [InlineData("6f9619ff:8b86:d011:b42d:00c04fc964ff")]
+        [InlineData("not-a-guid")]
+        public void Deserialize_Guid_InvalidValues_Fail(string text)
+        {
+            var deserializer = new JsonDeserializer();
+            Assert.False(deserializer.TryDeserialize($"\"{text}\"", out Guid _));
+        }
+
+        [Fact]
+        public void Deserialize_Guid_Array_MatchesFrameworkParse()
+        {
+            var expected = new Guid[64];
+            var parts = new string[expected.Length];
+            for (int i = 0; i < expected.Length; i++)
+            {
+                expected[i] = Guid.NewGuid();
+                parts[i] = $"\"{expected[i]:D}\"";
+            }
+
+            var deserializer = new JsonDeserializer();
+            Assert.True(deserializer.TryDeserialize($"[{string.Join(",", parts)}]", out Guid[] value));
+            Assert.Equal(expected, value);
+        }
+
         [Fact]
         public void Deserialize_DateTime()
         {

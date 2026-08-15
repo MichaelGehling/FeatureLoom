@@ -20,6 +20,16 @@ public class DeserializeDictionaryValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
     static JsonDeserializer featureJsonDeserializer = SerializerConfigs.CreateFeatureDeserializer();
+
+    /// <summary>
+    /// Second deserializer instance with the string cache / deduplication feature disabled,
+    /// so its effect on dictionary keys and values can be measured separately.
+    /// </summary>
+    static JsonDeserializer featureJsonDeserializer_NoStringCache = new JsonDeserializer(settings =>
+    {
+        settings.useStringCache = false;
+    });
+
     static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
     const int EntryCount = 20;
@@ -40,8 +50,10 @@ public class DeserializeDictionaryValuesTest
     MemoryStream arrayStream = new MemoryStream();
 
     Action deserializeSingleFeature;
+    Action deserializeSingleFeatureNoStringCache;
     Action deserializeSingleSystemText;
     Action deserializeArrayFeature;
+    Action deserializeArrayFeatureNoStringCache;
     Action deserializeArraySystemText;
 #if NET6_0_OR_GREATER
     Action deserializeSingleSpanJson;
@@ -79,8 +91,10 @@ public class DeserializeDictionaryValuesTest
         featureJsonSerializer.Serialize(arrayStream, array);
 
         deserializeSingleFeature = () => featureJsonDeserializer.TryDeserialize(singleStream, out Dictionary<K, V> _);
+        deserializeSingleFeatureNoStringCache = () => featureJsonDeserializer_NoStringCache.TryDeserialize(singleStream, out Dictionary<K, V> _);
         deserializeSingleSystemText = () => System.Text.Json.JsonSerializer.Deserialize<Dictionary<K, V>>(singleStream, systemTextJsonSerializerSettings);
         deserializeArrayFeature = () => featureJsonDeserializer.TryDeserialize(arrayStream, out Dictionary<K, V>[] _);
+        deserializeArrayFeatureNoStringCache = () => featureJsonDeserializer_NoStringCache.TryDeserialize(arrayStream, out Dictionary<K, V>[] _);
         deserializeArraySystemText = () => System.Text.Json.JsonSerializer.Deserialize<Dictionary<K, V>[]>(arrayStream, systemTextJsonSerializerSettings);
 #if NET6_0_OR_GREATER
         deserializeSingleSpanJson = () => SerializerConfigs.DeserializeWithSpanJson<Dictionary<K, V>>(singleStream);
@@ -142,6 +156,16 @@ public class DeserializeDictionaryValuesTest
         }
     }
 
+    [Benchmark]
+    public void DeserializeDictionary_Single_Feature_NoStringCache()
+    {
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
+        {
+            singleStream.Position = 0;
+            deserializeSingleFeatureNoStringCache();
+        }
+    }
+
     [Benchmark(Baseline = true)]
     public void DeserializeDictionary_Single_SystemText()
     {
@@ -171,6 +195,16 @@ public class DeserializeDictionaryValuesTest
         {
             arrayStream.Position = 0;
             deserializeArrayFeature();
+        }
+    }
+
+    [Benchmark]
+    public void DeserializeDictionary_Array_Feature_NoStringCache()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            arrayStream.Position = 0;
+            deserializeArrayFeatureNoStringCache();
         }
     }
 

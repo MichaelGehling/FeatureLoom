@@ -784,6 +784,11 @@ public sealed partial class JsonDeserializer
     private Guid ReadGuidValue()
     {
         var stringBytes = ReadStringBytes();
+
+        // A GUID is plain ASCII hex in a fixed layout, so the canonical forms can be decoded
+        // straight from the UTF-8 bytes without materialising an intermediate string.
+        if (TryParseGuidFromUtf8(stringBytes, out Guid fastResult)) return fastResult;
+
         Guid result;
 #if NET5_0_OR_GREATER
         Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
@@ -816,6 +821,86 @@ public sealed partial class JsonDeserializer
 #endif
         stringBuilder.Clear();
         return result;
+    }
+
+    /// <summary>
+    /// Decodes the two canonical GUID spellings directly from UTF-8 bytes: the hyphenated
+    /// "D" form (36 bytes, 8-4-4-4-12) and the compact "N" form (32 bytes). Anything else
+    /// (braces, parentheses, non-ASCII) returns false so the caller can use the general parser.
+    /// </summary>
+    private static bool TryParseGuidFromUtf8(ByteSegment stringBytes, out Guid result)
+    {
+        result = default;
+        if (!stringBytes.IsValid) return false;
+
+        var segment = stringBytes.AsArraySegment;
+        byte[] array = segment.Array;
+        int offset = segment.Offset;
+        int count = segment.Count;
+
+        if (count == 36)
+        {
+            if (array[offset + 8] != (byte)'-' || array[offset + 13] != (byte)'-' ||
+                array[offset + 18] != (byte)'-' || array[offset + 23] != (byte)'-') return false;
+        }
+        else if (count != 32) return false;
+
+        int p0 = offset;
+        int p1 = offset + (count == 36 ? 9 : 8);
+        int p2 = offset + (count == 36 ? 14 : 12);
+        int p3 = offset + (count == 36 ? 19 : 16);
+        int p4 = offset + (count == 36 ? 24 : 20);
+
+        // Decode straight into the Guid fields, so no intermediate buffer is needed and the
+        // result is independent of machine endianness. Invalid digits are accumulated instead
+        // of branched on, so a bad character only costs a single check at the end.
+        uint bad = 0;
+        uint a = ReadHex8(array, p0, ref bad);
+        uint b = ReadHex4(array, p1, ref bad);
+        uint c = ReadHex4(array, p2, ref bad);
+        uint d = ReadHex4(array, p3, ref bad);
+        uint e = ReadHex8(array, p4, ref bad);
+        uint f = ReadHex4(array, p4 + 8, ref bad);
+        if (bad > 0xF) return false;
+
+        result = new Guid((int)a, (short)b, (short)c,
+            (byte)(d >> 8), (byte)d,
+            (byte)(e >> 24), (byte)(e >> 16), (byte)(e >> 8), (byte)e,
+            (byte)(f >> 8), (byte)f);
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint ReadHex4(byte[] array, int pos, ref uint bad)
+    {
+        uint d0 = hexLookup[array[pos]];
+        uint d1 = hexLookup[array[pos + 1]];
+        uint d2 = hexLookup[array[pos + 2]];
+        uint d3 = hexLookup[array[pos + 3]];
+        bad |= d0 | d1 | d2 | d3;
+        return (d0 << 12) | (d1 << 8) | (d2 << 4) | d3;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint ReadHex8(byte[] array, int pos, ref uint bad)
+    {
+        return (ReadHex4(array, pos, ref bad) << 16) | ReadHex4(array, pos + 4, ref bad);
+    }
+
+    /// <summary>
+    /// Maps an ASCII byte to its hex value, or 0xFF for anything that is not a hex digit.
+    /// Invalid entries stay above 0xF so callers can detect them by OR-ing results together.
+    /// </summary>
+    private static readonly byte[] hexLookup = CreateHexLookup();
+
+    private static byte[] CreateHexLookup()
+    {
+        var table = new byte[256];
+        for (int i = 0; i < table.Length; i++) table[i] = 0xFF;
+        for (int i = '0'; i <= '9'; i++) table[i] = (byte)(i - '0');
+        for (int i = 'a'; i <= 'f'; i++) table[i] = (byte)(i - 'a' + 10);
+        for (int i = 'A'; i <= 'F'; i++) table[i] = (byte)(i - 'A' + 10);
+        return table;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1095,22 +1180,19 @@ public sealed partial class JsonDeserializer
     private object ReadNumberValueAsObject()
     {
         ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
-            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.all);
+            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.all,
+            out int droppedIntegerDigits);
 
-        if (hasDecimalPart || isExponentNegative)
+        if (hasDecimalPart || isExponentNegative || droppedIntegerDigits > 0)
         {
-            double value = ApplyExponent((double)decimalPart, -numDecimalDigits);
-            value += integerPart;
-            if (isNegative) value *= -1;
-
+            int exp = 0;
             if (hasExponentPart)
             {
-                int exp = (int)exponentPart;
+                exp = (int)exponentPart;
                 if (isExponentNegative) exp = -exp;
-                value = ApplyExponent(value, exp);
             }
 
-            return value;
+            return ComposeDouble(isNegative, integerPart, decimalPart, numDecimalDigits, exp, droppedIntegerDigits);
         }
         else
         {
@@ -1148,7 +1230,11 @@ public sealed partial class JsonDeserializer
         if (TrySignedIntFastPath(out long fastPathValue)) return fastPathValue;
 
         ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
-            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.signedInteger);
+            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.signedInteger,
+            out int droppedIntegerDigits);
+
+        // Digits that did not fit the accumulator mean the value exceeds the integer range.
+        if (droppedIntegerDigits > 0) throw new Exception("Value is out of bounds.");
 
         if (hasExponentPart)
         {
@@ -1265,7 +1351,11 @@ public sealed partial class JsonDeserializer
         if (TryUnsignedIntFastPath(out ulong fastPathValue)) return fastPathValue;
 
         ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
-            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.unsignedInteger);
+            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.unsignedInteger,
+            out int droppedIntegerDigits);
+
+        // Digits that did not fit the accumulator mean the value exceeds the integer range.
+        if (droppedIntegerDigits > 0) throw new Exception("Value is out of bounds.");
 
         var value = integerPart;
 
@@ -1372,20 +1462,17 @@ public sealed partial class JsonDeserializer
             if (SPECIAL_NUMBER_NEG_INFINITY.Equals(str)) return double.NegativeInfinity;
         }
         ReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var numDecimalDigits,
-            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber);
+            out var exponentPart, out bool isExponentNegative, out bool hasDecimalPart, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber,
+            out int droppedIntegerDigits);
 
-        double value = ApplyExponent((double)decimalPart, -numDecimalDigits);
-        value += integerPart;
-        if (isNegative) value *= -1;
-
+        int exponent = 0;
         if (hasExponentPart)
         {
-            int exp = (int)exponentPart;
-            if (isExponentNegative) exp = -exp;
-            value = ApplyExponent(value, exp);
+            exponent = (int)exponentPart;
+            if (isExponentNegative) exponent = -exponent;
         }
 
-        return value;
+        return ComposeDouble(isNegative, integerPart, decimalPart, numDecimalDigits, exponent, droppedIntegerDigits);
     }
 
     public bool TryReadFloatingPointValue(out double value)
@@ -1406,22 +1493,20 @@ public sealed partial class JsonDeserializer
         }
 
         if (!TryReadNumberParts(out var isNegative, out var integerPart, out var decimalPart, out var decimalDigits,
-            out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber))
+            out var exponentPart, out bool isExponentNegative, out _, out bool hasExponentPart, ValidNumberComponents.floatingPointNumber,
+            out int droppedIntegerDigits))
         {
             return false;
         }
 
-        value = ApplyExponent((double)decimalPart, -decimalDigits);
-        value += integerPart;
-        if (isNegative) value *= -1;
-
+        int exponent = 0;
         if (hasExponentPart)
         {
-            int exp = (int)exponentPart;
-            if (isExponentNegative) exp = -exp;
-            value = ApplyExponent(value, exp);
+            exponent = (int)exponentPart;
+            if (isExponentNegative) exponent = -exponent;
         }
 
+        value = ComposeDouble(isNegative, integerPart, decimalPart, decimalDigits, exponent, droppedIntegerDigits);
         return true;
     }
 
@@ -1715,6 +1800,113 @@ public sealed partial class JsonDeserializer
         _ = ReadStringBytes();
     }
 
+    /// <summary>
+    /// Decimal exponent below which <see cref="ComposeDouble"/> switches to a correctly-rounded
+    /// conversion. Repeated division by powers of ten loses precision as the intermediate result
+    /// approaches the subnormal range, where the gap between representable doubles is enormous
+    /// relative to the value. Above this threshold the arithmetic path stays within a few ULP.
+    /// </summary>
+    const int correctlyRoundedExponentThreshold = -290;
+
+    /// <summary>
+    /// Combines the parsed number components into a double.
+    /// <para>
+    /// The common case scales the accumulated mantissa arithmetically, which is fast and accurate
+    /// to about 1 ULP for ordinary magnitudes. Values that scale down into the subnormal range are
+    /// recomposed and parsed with a correctly-rounded conversion instead, because there the
+    /// arithmetic path can be off by a large fraction of the value rather than a few ULP.
+    /// </para>
+    /// </summary>
+    double ComposeDouble(bool isNegative, ulong integerPart, ulong decimalPart, int numDecimalDigits,
+        int exponent, int droppedIntegerDigits)
+    {
+        int effectiveExponent = exponent + droppedIntegerDigits - numDecimalDigits;
+        if (effectiveExponent < correctlyRoundedExponentThreshold)
+        {
+            return ComposeDoubleCorrectlyRounded(isNegative, integerPart, decimalPart,
+                numDecimalDigits, effectiveExponent);
+        }
+
+        double value = ApplyExponent((double)decimalPart, -numDecimalDigits);
+        value += integerPart;
+        if (isNegative) value *= -1;
+
+        // Integer digits that exceeded the accumulator were dropped from the low end, so the
+        // accumulated value has to be scaled back up by that many powers of ten.
+        if (droppedIntegerDigits > 0) value = ApplyExponent(value, droppedIntegerDigits);
+        if (exponent != 0) value = ApplyExponent(value, exponent);
+        return value;
+    }
+
+    /// <summary>
+    /// Rebuilds the significant digits and defers to the framework parser, which performs a
+    /// correctly-rounded decimal to binary conversion. Only reached for the rare subnormal range.
+    /// <para>
+    /// The digits are written into a stack buffer so the conversion stays allocation free on
+    /// targets that can parse from a span. A ulong mantissa is at most 20 digits, plus sign,
+    /// decimal point, exponent marker and a 4 character exponent, so 48 chars is always enough.
+    /// </para>
+    /// </summary>
+    static double ComposeDoubleCorrectlyRounded(bool isNegative, ulong integerPart, ulong decimalPart,
+        int numDecimalDigits, int effectiveExponent)
+    {
+#if !NETSTANDARD2_0
+        Span<char> buffer = stackalloc char[48];
+        int pos = 0;
+
+        if (isNegative) buffer[pos++] = '-';
+
+        integerPart.TryFormat(buffer.Slice(pos), out int written, default, CultureInfo.InvariantCulture);
+        pos += written;
+
+        if (numDecimalDigits > 0)
+        {
+            // The accumulator drops leading zeros of the fraction, so restore them.
+            int fractionDigits = CountDigits(decimalPart);
+            for (int i = fractionDigits; i < numDecimalDigits; i++) buffer[pos++] = '0';
+            decimalPart.TryFormat(buffer.Slice(pos), out written, default, CultureInfo.InvariantCulture);
+            pos += written;
+        }
+
+        buffer[pos++] = 'E';
+        effectiveExponent.TryFormat(buffer.Slice(pos), out written, default, CultureInfo.InvariantCulture);
+        pos += written;
+
+        if (double.TryParse(buffer.Slice(0, pos), NumberStyles.Float, CultureInfo.InvariantCulture, out double result))
+        {
+            return result;
+        }
+#else
+        var sb = new StringBuilder(48);
+        if (isNegative) sb.Append('-');
+        sb.Append(integerPart.ToString(CultureInfo.InvariantCulture));
+        if (numDecimalDigits > 0)
+        {
+            string fraction = decimalPart.ToString(CultureInfo.InvariantCulture);
+            for (int i = fraction.Length; i < numDecimalDigits; i++) sb.Append('0');
+            sb.Append(fraction);
+        }
+        sb.Append('E');
+        sb.Append(effectiveExponent.ToString(CultureInfo.InvariantCulture));
+
+        if (double.TryParse(sb.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double result))
+        {
+            return result;
+        }
+#endif
+        // Underflow past double.Epsilon: preserve the sign of the zero.
+        return isNegative ? -0.0 : 0.0;
+    }
+
+#if !NETSTANDARD2_0
+    static int CountDigits(ulong value)
+    {
+        int digits = 1;
+        while (value >= 10) { value /= 10; digits++; }
+        return digits;
+    }
+#endif
+
     double ApplyExponent(double value, int exponent)
     {
         int maxExponentFactorLookup = exponentFactorMap.Length - 1;
@@ -1932,11 +2124,22 @@ public sealed partial class JsonDeserializer
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ulong ReadDigitSegmentAsUInt64(out int digitCount, out bool couldNotSkip)
+    /// <summary>
+    /// Reads a run of ASCII digits into a <see cref="ulong"/>.
+    /// <para>
+    /// JSON places no limit on the number of digits, so a run that exceeds the capacity of a
+    /// <see cref="ulong"/> is not an error by itself: the surplus digits are counted via
+    /// <paramref name="droppedDigits"/> and discarded instead of throwing. The caller knows the
+    /// target type and decides whether the dropped digits merely shift the scale (floating point)
+    /// or constitute an out-of-range value (integers).
+    /// </para>
+    /// </summary>
+    private ulong ReadDigitSegmentAsUInt64(out int digitCount, out bool couldNotSkip, out int droppedDigits)
     {
         ulong value = 0;
         digitCount = 0;
         couldNotSkip = false;
+        droppedDigits = 0;
 
 #if NETSTANDARD2_0
         ByteSegment remaining = buffer.GetRemainingBytes();
@@ -1961,7 +2164,7 @@ public sealed partial class JsonDeserializer
         }
         else
         {
-            value = Handle20OrMoreDigits(value, remaining, len);
+            value = HandleManyDigits(value, remaining, len, out droppedDigits);
         }
 
         digitCount = len;
@@ -1980,26 +2183,23 @@ public sealed partial class JsonDeserializer
         }
 
 #if NETSTANDARD2_0
-        static ulong Handle20OrMoreDigits(ulong value, ByteSegment remaining, int len)
+        static ulong HandleManyDigits(ulong value, ByteSegment remaining, int len, out int droppedDigits)
 #else
-        static ulong Handle20OrMoreDigits(ulong value, ReadOnlySpan<byte> remaining, int len)
+        static ulong HandleManyDigits(ulong value, ReadOnlySpan<byte> remaining, int len, out int droppedDigits)
 #endif
         {
-            if (len == 20)
+            // Accumulate as many leading digits as fit without overflowing, then count the rest.
+            const ulong maxDiv10 = ulong.MaxValue / 10;
+            const byte maxLast = (byte)(ulong.MaxValue % 10);
+
+            int i = 0;
+            for (; i < len; i++)
             {
-                var digits = remaining.Slice(0, 20);
-                for (int i = 0; i < 19; i++)
-                {
-                    unchecked { value = value * 10 + (uint)(digits[i] - (byte)'0'); }
-                }
-                // For the 20th digit we need to check for overflow since the value could exceed ulong.MaxValue
-                const ulong maxDiv10 = ulong.MaxValue / 10;
-                const byte maxLast = (byte)(ulong.MaxValue % 10);
-                byte last = (byte)(remaining[19] - (byte)'0');
-                if (value > maxDiv10 || (value == maxDiv10 && last > maxLast)) throw new Exception("Number is too large");
-                unchecked { value = value * 10 + last; }
+                byte d = (byte)(remaining[i] - (byte)'0');
+                if (value > maxDiv10 || (value == maxDiv10 && d > maxLast)) break;
+                unchecked { value = value * 10 + d; }
             }
-            else throw new Exception("Too many digits in number");
+            droppedDigits = len - i;
             return value;
         }
         return value;
@@ -2015,6 +2215,21 @@ public sealed partial class JsonDeserializer
         out bool hasDecimalPart,
         out bool hasExponentPart,
         ValidNumberComponents validComponents)
+        => ReadNumberParts(out isNegative, out integerPart, out decimalPart, out decimalDigits,
+            out exponentPart, out isExponentNegative, out hasDecimalPart, out hasExponentPart,
+            validComponents, out _);
+
+    void ReadNumberParts(
+        out bool isNegative,
+        out ulong integerPart,
+        out ulong decimalPart,
+        out int decimalDigits,
+        out ulong exponentPart,
+        out bool isExponentNegative,
+        out bool hasDecimalPart,
+        out bool hasExponentPart,
+        ValidNumberComponents validComponents,
+        out int droppedIntegerDigits)
     {
         const int MaxNumberTokenBytes = 52;  // int(20) + dec(20) + exp(8) + signs/dot/delimiter(4)
         _ = buffer.TryEnsureBuffered(MaxNumberTokenBytes);
@@ -2029,6 +2244,7 @@ public sealed partial class JsonDeserializer
         isExponentNegative = false;
         hasDecimalPart = false;
         hasExponentPart = false;
+        droppedIntegerDigits = 0;
 
         bool allowNegative = validComponents.IsFlagSet(ValidNumberComponents.negativeSign);
         bool allowDecimal = validComponents.IsFlagSet(ValidNumberComponents.decimalPart);
@@ -2056,7 +2272,7 @@ public sealed partial class JsonDeserializer
             if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
         }
 
-        integerPart = ReadDigitSegmentAsUInt64(out int intDigits, out bool couldNotSkip);
+        integerPart = ReadDigitSegmentAsUInt64(out int intDigits, out bool couldNotSkip, out droppedIntegerDigits);
         b = buffer.CurrentByte;
 
         if (intDigits == 0)
@@ -2071,7 +2287,11 @@ public sealed partial class JsonDeserializer
             if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
 
             hasDecimalPart = true;
-            decimalPart = ReadDigitSegmentAsUInt64(out decimalDigits, out couldNotSkip);
+            decimalPart = ReadDigitSegmentAsUInt64(out decimalDigits, out couldNotSkip, out int droppedDecimalDigits);
+
+            // Surplus fraction digits are beyond the precision of the accumulator and only the
+            // digits that were actually folded in may count towards the scale.
+            decimalDigits -= droppedDecimalDigits;
 
             // semantic: "." counts like ".0"
             if (decimalDigits == 0) decimalDigits = 1;
@@ -2090,7 +2310,7 @@ public sealed partial class JsonDeserializer
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading number");
             }
 
-            exponentPart = ReadDigitSegmentAsUInt64(out int expDigits, out couldNotSkip);
+            exponentPart = ReadDigitSegmentAsUInt64(out int expDigits, out couldNotSkip, out _);
             if (expDigits == 0) exponentPart = 0; // semantic: "e+" => exponent 0                
         }
 
@@ -2114,11 +2334,27 @@ public sealed partial class JsonDeserializer
         out bool hasDecimalPart,
         out bool hasExponentPart,
         ValidNumberComponents validComponents)
+        => TryReadNumberParts(out isNegative, out integerPart, out decimalPart, out decimalDigits,
+            out exponentPart, out isExponentNegative, out hasDecimalPart, out hasExponentPart,
+            validComponents, out _);
+
+    bool TryReadNumberParts(
+        out bool isNegative,
+        out ulong integerPart,
+        out ulong decimalPart,
+        out int decimalDigits,
+        out ulong exponentPart,
+        out bool isExponentNegative,
+        out bool hasDecimalPart,
+        out bool hasExponentPart,
+        ValidNumberComponents validComponents,
+        out int droppedIntegerDigits)
     {
         const int MaxNumberTokenBytes = 52;  // int(20) + dec(20) + exp(8) + signs/dot/delimiter(4)
         _ = buffer.TryEnsureBuffered(MaxNumberTokenBytes);
 
         bool stringAsNumberStarted = false;
+        droppedIntegerDigits = 0;
 
         using (var undoHandle = CreateUndoReadHandle())
         {
@@ -2158,7 +2394,7 @@ public sealed partial class JsonDeserializer
                 if (!buffer.TryNextByte()) return false;
             }
 
-            integerPart = ReadDigitSegmentAsUInt64(out int intDigits, out _);
+            integerPart = ReadDigitSegmentAsUInt64(out int intDigits, out _, out droppedIntegerDigits);
             b = buffer.CurrentByte;
 
             if (intDigits == 0)
@@ -2179,7 +2415,10 @@ public sealed partial class JsonDeserializer
                 if (!buffer.TryNextByte()) return false;
 
                 hasDecimalPart = true;
-                decimalPart = ReadDigitSegmentAsUInt64(out decimalDigits, out _);
+                decimalPart = ReadDigitSegmentAsUInt64(out decimalDigits, out _, out int droppedDecimalDigits);
+
+                // Only the digits actually folded into the accumulator may count towards the scale.
+                decimalDigits -= droppedDecimalDigits;
 
                 // semantic: "." counts like ".0"
                 if (decimalDigits == 0) decimalDigits = 1;
@@ -2197,7 +2436,7 @@ public sealed partial class JsonDeserializer
                     if (!buffer.TryNextByte()) return false;
                 }
 
-                exponentPart = ReadDigitSegmentAsUInt64(out int expDigits, out _);
+                exponentPart = ReadDigitSegmentAsUInt64(out int expDigits, out _, out _);
                 if (expDigits == 0) exponentPart = 0; // semantic: "e+" => exponent 0
             }
 
