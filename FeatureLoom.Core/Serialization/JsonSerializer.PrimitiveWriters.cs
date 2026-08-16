@@ -1235,6 +1235,134 @@ public sealed partial class JsonSerializer
         }
     }
 
+    #if NET6_0_OR_GREATER
+    void CreateDateOnlyItemWriter(CachedTypeWriter typeWriter, bool nullable)
+    {
+        if (!nullable)
+        {
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                typeWriter.SetItemWriter<DateOnly>((item, _, _) =>
+                {
+                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    writer.WriteDateOnlyValue(item);
+                    FinishTypeInfoObject();
+                }, false);
+            }
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            {
+                typeWriter.SetItemWriter<DateOnly>((item, deviatingType, _) =>
+                {
+                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    writer.WriteDateOnlyValue(item);
+                    if (deviatingType) FinishTypeInfoObject();
+                }, false);
+            }
+            else
+            {
+                typeWriter.SetItemWriter<DateOnly>((item, _, _) =>
+                {
+                    writer.WriteDateOnlyValue(item);
+                }, false);
+            }
+        }
+        else
+        {
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                typeWriter.SetItemWriter<DateOnly?>((item, _, _) =>
+                {
+                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (item.HasValue) writer.WriteDateOnlyValue(item.Value);
+                    else writer.WriteNullValue();
+                    FinishTypeInfoObject();
+                }, false);
+            }
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            {
+                typeWriter.SetItemWriter<DateOnly?>((item, deviatingType, _) =>
+                {
+                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (item.HasValue) writer.WriteDateOnlyValue(item.Value);
+                    else writer.WriteNullValue();
+                    if (deviatingType) FinishTypeInfoObject();
+                }, false);
+            }
+            else
+            {
+                typeWriter.SetItemWriter<DateOnly?>((item, _, _) =>
+                {
+                    if (item.HasValue) writer.WriteDateOnlyValue(item.Value);
+                    else writer.WriteNullValue();
+                }, false);
+            }
+        }
+    }
+
+    void CreateTimeOnlyItemWriter(CachedTypeWriter typeWriter, bool nullable)
+    {
+        if (!nullable)
+        {
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                typeWriter.SetItemWriter<TimeOnly>((item, _, _) =>
+                {
+                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    writer.WriteTimeOnlyValue(item);
+                    FinishTypeInfoObject();
+                }, false);
+            }
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            {
+                typeWriter.SetItemWriter<TimeOnly>((item, deviatingType, _) =>
+                {
+                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    writer.WriteTimeOnlyValue(item);
+                    if (deviatingType) FinishTypeInfoObject();
+                }, false);
+            }
+            else
+            {
+                typeWriter.SetItemWriter<TimeOnly>((item, _, _) =>
+                {
+                    writer.WriteTimeOnlyValue(item);
+                }, false);
+            }
+        }
+        else
+        {
+            if (typeWriter.typeInfoHandling == TypeInfoHandling.AddAllTypeInfo)
+            {
+                typeWriter.SetItemWriter<TimeOnly?>((item, _, _) =>
+                {
+                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (item.HasValue) writer.WriteTimeOnlyValue(item.Value);
+                    else writer.WriteNullValue();
+                    FinishTypeInfoObject();
+                }, false);
+            }
+            else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
+            {
+                typeWriter.SetItemWriter<TimeOnly?>((item, deviatingType, _) =>
+                {
+                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (item.HasValue) writer.WriteTimeOnlyValue(item.Value);
+                    else writer.WriteNullValue();
+                    if (deviatingType) FinishTypeInfoObject();
+                }, false);
+            }
+            else
+            {
+                typeWriter.SetItemWriter<TimeOnly?>((item, _, _) =>
+                {
+                    if (item.HasValue) writer.WriteTimeOnlyValue(item.Value);
+                    else writer.WriteNullValue();
+                }, false);
+            }
+        }
+    }
+#endif
+
     void CreateJsonFragmentItemWriter(CachedTypeWriter typeWriter, bool nullable)
     {
         if (!nullable)

@@ -549,6 +549,53 @@ namespace FeatureLoom.Serialization
             AssertSerialized(value, expected);
         }
 
+        [Theory]
+        [InlineData("0001-01-01", "\"0001-01-01\"")]
+        [InlineData("2024-01-02", "\"2024-01-02\"")]
+        public void Serialize_DateOnly(string valueText, string expected)
+        {
+            var value = DateOnly.Parse(valueText, CultureInfo.InvariantCulture);
+            AssertSerialized(value, expected);
+        }
+
+        [Theory]
+        [InlineData(null, "null")]
+        [InlineData("2024-01-02", "\"2024-01-02\"")]
+        public void Serialize_NullableDateOnly(string valueText, string expected)
+        {
+            DateOnly? value = valueText == null ? null : DateOnly.Parse(valueText, CultureInfo.InvariantCulture);
+            AssertSerialized(value, expected);
+        }
+
+        [Theory]
+        [InlineData("00:00:00", "\"00:00:00\"")]
+        [InlineData("03:04:05", "\"03:04:05\"")]
+        public void Serialize_TimeOnly(string valueText, string expected)
+        {
+            var value = TimeOnly.Parse(valueText, CultureInfo.InvariantCulture);
+            AssertSerialized(value, expected);
+        }
+
+        [Fact]
+        public void Serialize_TimeOnly_WithFractionalSeconds()
+        {
+            var value = new TimeOnly(3, 4, 5).Add(TimeSpan.FromTicks(1234567));
+            string text = value.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            int fractionalTicks = (int)(value.Ticks % TimeSpan.TicksPerSecond);
+            string expected = $"\"{text}.{fractionalTicks:D7}\"";
+
+            AssertSerialized(value, expected);
+        }
+
+        [Theory]
+        [InlineData(null, "null")]
+        [InlineData("03:04:05", "\"03:04:05\"")]
+        public void Serialize_NullableTimeOnly(string valueText, string expected)
+        {
+            TimeOnly? value = valueText == null ? null : TimeOnly.Parse(valueText, CultureInfo.InvariantCulture);
+            AssertSerialized(value, expected);
+        }
+
         [Fact]
         public void Serialize_Uri_UsesOriginalString()
         {

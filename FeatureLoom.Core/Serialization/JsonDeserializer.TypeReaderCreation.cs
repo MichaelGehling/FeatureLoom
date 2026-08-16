@@ -126,6 +126,12 @@ public sealed partial class JsonDeserializer
             else if (itemType == typeof(DateTimeOffset?)) return TypeReaderInitializer.Create(this, ReadNullableDateTimeOffsetValue, null, false, typeSettings);
             else if (itemType == typeof(TimeSpan)) return TypeReaderInitializer.Create(this, ReadTimeSpanValue, null, false, typeSettings);
             else if (itemType == typeof(TimeSpan?)) return TypeReaderInitializer.Create(this, ReadNullableTimeSpanValue, null, false, typeSettings);
+#if NET6_0_OR_GREATER
+            else if (itemType == typeof(DateOnly)) return TypeReaderInitializer.Create(this, ReadDateOnlyValue, null, false, typeSettings);
+            else if (itemType == typeof(DateOnly?)) return TypeReaderInitializer.Create(this, ReadNullableDateOnlyValue, null, false, typeSettings);
+            else if (itemType == typeof(TimeOnly)) return TypeReaderInitializer.Create(this, ReadTimeOnlyValue, null, false, typeSettings);
+            else if (itemType == typeof(TimeOnly?)) return TypeReaderInitializer.Create(this, ReadNullableTimeOnlyValue, null, false, typeSettings);
+#endif
             else if (itemType == typeof(Guid)) return TypeReaderInitializer.Create(this, ReadGuidValue, null, false, typeSettings);
             else if (itemType == typeof(Guid?)) return TypeReaderInitializer.Create(this, ReadNullableGuidValue, null, false, typeSettings);
             else if (itemType == typeof(JsonFragment)) return TypeReaderInitializer.Create(this, ReadJsonFragmentValue, null, false, typeSettings);
