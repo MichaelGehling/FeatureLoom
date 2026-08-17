@@ -549,8 +549,7 @@ public sealed partial class JsonDeserializer
     /// directly from the UTF-8 bytes. Anything else falls back to <see cref="TimeSpan.Parse(string, IFormatProvider)"/>,
     /// whose format-flexible matching dominates the deserialization cost.
     /// </summary>
-    private static bool TryParseTimeSpan(ByteSegment bytes, out TimeSpan result)
-    {
+    private static bool TryParseTimeSpan(ByteSegment bytes, out TimeSpan result)    {
         result = default;
         int len = bytes.Count;
         // The longest accepted form is "-10675199.02:48:05.4775807".
@@ -742,6 +741,172 @@ public sealed partial class JsonDeserializer
         if (!settings.strict && TryReadEmptyStringValue()) return null;
         return ReadDateTimeOffsetValue();
     }
+
+#if NET6_0_OR_GREATER
+    /// <summary>
+    /// Parses the strict "yyyy-MM-dd" layout directly from the UTF-8 bytes. Reuses the shared
+    /// ISO-8601 core scanner and rejects any input carrying a time-of-day or offset part.
+    /// </summary>
+    private static bool TryParseIso8601DateOnly(ByteSegment bytes, out DateOnly result)
+    {
+        result = default;
+        if (bytes.Count != 10) return false;
+        if (!TryParseIso8601Core(bytes, out long ticks, out DateTimeKind kind, out _)) return false;
+        if (kind != DateTimeKind.Unspecified) return false;
+
+        result = DateOnly.FromDateTime(new DateTime(ticks, DateTimeKind.Unspecified));
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private DateOnly ReadDateOnlyValue()
+    {
+        var stringBytes = ReadStringBytes();
+
+        if (stringBytes.Count == 0 && !settings.strict)
+        {
+            return default;
+        }
+
+        if (TryParseIso8601DateOnly(stringBytes, out DateOnly fastResult)) return fastResult;
+
+        DateOnly result;
+        Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
+        ReadOnlySpan<char> span = new ReadOnlySpan<char>();
+        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+        {
+            if (span.IsEmpty) span = chunk.Span; // First chunk, that is good
+            else
+            {
+                // second chunk is bad and we need to reset to fall back to copying (This is very unlikely for a DateOnly string)
+                span = new ReadOnlySpan<char>();
+                break;
+            }
+        }
+        if (span.IsEmpty)
+        {
+            var chars = charSlicedBuffer.GetSlice(stringBuilder.Length);
+            stringBuilder.CopyTo(0, chars.Array, chars.Offset, stringBuilder.Length);
+            span = chars;
+            charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
+        }
+        result = DateOnly.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        stringBuilder.Clear();
+        return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private DateOnly? ReadNullableDateOnlyValue()
+    {
+        if (TryReadNullValue()) return null;
+        if (!settings.strict && TryReadEmptyStringValue()) return null;
+        return ReadDateOnlyValue();
+    }
+
+    /// <summary>
+    /// Parses the strict "HH:mm:ss[.fffffff]" layout directly from the UTF-8 bytes, mirroring
+    /// the time-of-day part of <see cref="TryParseIso8601Core"/> without any date component.
+    /// </summary>
+    private static bool TryParseIso8601TimeOnly(ByteSegment bytes, out TimeOnly result)
+    {
+        result = default;
+        int len = bytes.Count;
+        // "HH:mm" is the shortest accepted form, the longest handled here is "HH:mm:ss.fffffff".
+        if (len < 5 || len > 16) return false;
+
+        var seg = bytes.AsArraySegment;
+        byte[] a = seg.Array;
+        int o = seg.Offset;
+
+        if (a[o + 2] != (byte)':') return false;
+        if (!TryRead2Digits(a, o, out int hour)) return false;
+        if (!TryRead2Digits(a, o + 3, out int minute)) return false;
+
+        int second = 0;
+        long subTicks = 0;
+        int pos = 5;
+
+        if (pos < len)
+        {
+            if (a[o + pos] != (byte)':') return false;
+            if (pos + 3 > len) return false;
+            if (!TryRead2Digits(a, o + pos + 1, out second)) return false;
+            pos += 3;
+
+            if (pos < len && a[o + pos] == (byte)'.')
+            {
+                pos++;
+                int fracStart = pos;
+                while (pos < len)
+                {
+                    byte d = a[o + pos];
+                    if (d < (byte)'0' || d > (byte)'9') break;
+                    if (pos - fracStart < 7) subTicks = subTicks * 10 + (d - (byte)'0');
+                    pos++;
+                }
+                int digits = pos - fracStart;
+                if (digits == 0) return false;
+                for (int i = digits; i < 7; i++) subTicks *= 10;
+            }
+        }
+
+        if (pos != len) return false;
+        if (hour > 23 || minute > 59 || second > 59) return false;
+
+        long ticks = hour * TimeSpan.TicksPerHour
+                   + minute * TimeSpan.TicksPerMinute
+                   + second * TimeSpan.TicksPerSecond
+                   + subTicks;
+
+        result = new TimeOnly(ticks);
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private TimeOnly ReadTimeOnlyValue()
+    {
+        var stringBytes = ReadStringBytes();
+
+        if (stringBytes.Count == 0 && !settings.strict)
+        {
+            return default;
+        }
+
+        if (TryParseIso8601TimeOnly(stringBytes, out TimeOnly fastResult)) return fastResult;
+
+        TimeOnly result;
+        Utf8Converter.DecodeUtf8ToStringBuilder(stringBytes, stringBuilder);
+        ReadOnlySpan<char> span = new ReadOnlySpan<char>();
+        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+        {
+            if (span.IsEmpty) span = chunk.Span; // First chunk, that is good
+            else
+            {
+                // second chunk is bad and we need to reset to fall back to copying (This is very unlikely for a TimeOnly string)
+                span = new ReadOnlySpan<char>();
+                break;
+            }
+        }
+        if (span.IsEmpty)
+        {
+            var chars = charSlicedBuffer.GetSlice(stringBuilder.Length);
+            stringBuilder.CopyTo(0, chars.Array, chars.Offset, stringBuilder.Length);
+            span = chars;
+            charSlicedBuffer.Reset(true); // We reset early, though the slice/span was not used yet. That works because the underlying array is not erased.
+        }
+        result = TimeOnly.Parse(span, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        stringBuilder.Clear();
+        return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private TimeOnly? ReadNullableTimeOnlyValue()
+    {
+        if (TryReadNullValue()) return null;
+        if (!settings.strict && TryReadEmptyStringValue()) return null;
+        return ReadTimeOnlyValue();
+    }
+#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private TimeSpan ReadTimeSpanValue()

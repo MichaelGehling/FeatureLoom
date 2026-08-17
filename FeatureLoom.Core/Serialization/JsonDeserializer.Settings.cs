@@ -245,6 +245,10 @@ public sealed partial class JsonDeserializer
             AddCustomTypeName(typeof(TimeSpan).Name, typeof(TimeSpan));
             AddCustomTypeName(typeof(Guid).Name, typeof(Guid));
             AddCustomTypeName(typeof(DateTimeOffset).Name, typeof(DateTimeOffset));
+#if NET6_0_OR_GREATER
+            AddCustomTypeName(typeof(DateOnly).Name, typeof(DateOnly));
+            AddCustomTypeName(typeof(TimeOnly).Name, typeof(TimeOnly));
+#endif
             AddCustomTypeName(typeof(Uri).Name, typeof(Uri));
             AddCustomTypeName(typeof(byte[]).Name, typeof(byte[]));
         }
@@ -279,6 +283,10 @@ public sealed partial class JsonDeserializer
             AddCustomTypeName("datetime", typeof(DateTime));
             AddCustomTypeName("timestamp", typeof(DateTimeOffset));
             AddCustomTypeName("duration", typeof(TimeSpan));
+#if NET6_0_OR_GREATER
+            AddCustomTypeName("date", typeof(DateOnly));
+            AddCustomTypeName("time", typeof(TimeOnly));
+#endif
             AddCustomTypeName("uuid", typeof(Guid));
             AddCustomTypeName("uri", typeof(Uri));
             AddCustomTypeName("bytes", typeof(byte[]));

@@ -482,8 +482,6 @@ namespace FeatureLoom.Serialization
                 keyWriter.SetWriterMethod<ulong>(writer.WriteUlongValueAsString);
                 keyWriter.SetWriterWithCopyMethod<ulong>(writer.WriteUlongValueAsStringWithCopy);
             }
-            // Floating point keys are unusual, because their text representation makes them
-            // fragile to match again. But whether that is acceptable is the user's decision.
             else if (keyType == typeof(float))
             {
                 keyWriter.SetWriterMethod<float>(writer.WriteFloatValueAsString);
@@ -499,8 +497,6 @@ namespace FeatureLoom.Serialization
                 keyWriter.SetWriterMethod<decimal>(writer.WriteDecimalValueAsString);
                 keyWriter.SetWriterWithCopyMethod<decimal>(writer.WriteDecimalValueAsStringWithCopy);
             }
-            // The temporal and Guid types use the dedicated writers instead of ToString(), so
-            // keys get the same culture independent round-trip format as values.
             else if (keyType == typeof(Guid))
             {
                 keyWriter.SetWriterMethod<Guid>(writer.WriteGuidValue);
@@ -521,6 +517,18 @@ namespace FeatureLoom.Serialization
                 keyWriter.SetWriterMethod<TimeSpan>(writer.WriteTimeSpanValue);
                 keyWriter.SetWriterWithCopyMethod<TimeSpan>(writer.WriteTimeSpanValueWithCopy);
             }
+#if NET6_0_OR_GREATER
+            else if (keyType == typeof(DateOnly))
+            {
+                keyWriter.SetWriterMethod<DateOnly>(writer.WriteDateOnlyValue);
+                keyWriter.SetWriterWithCopyMethod<DateOnly>(writer.WriteDateOnlyValueWithCopy);
+            }
+            else if (keyType == typeof(TimeOnly))
+            {
+                keyWriter.SetWriterMethod<TimeOnly>(writer.WriteTimeOnlyValue);
+                keyWriter.SetWriterWithCopyMethod<TimeOnly>(writer.WriteTimeOnlyValueWithCopy);
+            }
+#endif
 
             return keyWriter.HasMethod;
         }
@@ -625,6 +633,10 @@ namespace FeatureLoom.Serialization
             else if (itemType == typeof(DateTime)) CreateDateTimeItemWriter(typeHandler, isNullableValueType);
             else if (itemType == typeof(DateTimeOffset)) CreateDateTimeOffsetItemWriter(typeHandler, isNullableValueType);
             else if (itemType == typeof(TimeSpan)) CreateTimeSpanItemWriter(typeHandler, isNullableValueType);
+#if NET6_0_OR_GREATER
+            else if (itemType == typeof(DateOnly)) CreateDateOnlyItemWriter(typeHandler, isNullableValueType);
+            else if (itemType == typeof(TimeOnly)) CreateTimeOnlyItemWriter(typeHandler, isNullableValueType);
+#endif
             else if (itemType == typeof(JsonFragment)) CreateJsonFragmentItemWriter(typeHandler, isNullableValueType);
             else if (itemType == typeof(TextSegment)) CreateTextSegmentItemWriter(typeHandler, isNullableValueType);
             else if (itemType == typeof(Uri)) CreateUriItemWriter(typeHandler);

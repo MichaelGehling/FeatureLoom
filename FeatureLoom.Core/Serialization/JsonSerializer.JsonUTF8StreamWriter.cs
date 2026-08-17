@@ -64,6 +64,10 @@ public sealed partial class JsonSerializer
             void WriteUshortValue(ushort value);
             void WriteGuidValue(Guid value);
             void WriteDateTimeValue(DateTime value);
+#if NET6_0_OR_GREATER
+            void WriteDateOnlyValue(DateOnly value);
+            void WriteTimeOnlyValue(TimeOnly value);
+#endif
             void WriteUriValue(Uri value);
             void WriteBoolAsStringValue(bool value);
             void WriteByteAsStringValue(byte value);
@@ -914,6 +918,26 @@ public sealed partial class JsonSerializer
             WriteTimeSpanValue(value);
             return CopyLastWrittenWithoutQuotes(countBefore);
         }
+
+#if NET6_0_OR_GREATER
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteDateOnlyValueWithCopy(DateOnly value)
+        {
+            EnsureFreeBufferSpace(TEMPORAL_MAX_BYTES);
+            var countBefore = mainBufferCount;
+            WriteDateOnlyValue(value);
+            return CopyLastWrittenWithoutQuotes(countBefore);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteTimeOnlyValueWithCopy(TimeOnly value)
+        {
+            EnsureFreeBufferSpace(TEMPORAL_MAX_BYTES);
+            var countBefore = mainBufferCount;
+            WriteTimeOnlyValue(value);
+            return CopyLastWrittenWithoutQuotes(countBefore);
+        }
+#endif
 
         // Unchecked variants of the fixed size value writers. The caller must have reserved the
         // corresponding *_MAX_BYTES, e.g. via BeginFixedSizeBatch in an array loop.
@@ -3678,6 +3702,65 @@ public sealed partial class JsonSerializer
             if (value != null) WriteEscapedStringWithQuotes(value.OriginalString);
             else WriteNullValue();
         }
+
+#if NET6_0_OR_GREATER
+        private static readonly byte[] zeroDateOnlyBytes = System.Text.Encoding.UTF8.GetBytes("\"0001-01-01\"");
+
+        /// <summary>
+        /// Writes a DateOnly value as "yyyy-MM-dd". Uses the same calendar decomposition as
+        /// <see cref="WriteDateTimeValue"/>, based on the days-since-epoch DayNumber.
+        /// </summary>
+        public void WriteDateOnlyValue(DateOnly dateOnly)
+        {
+            if (dateOnly == default)
+            {
+                WriteToBuffer(zeroDateOnlyBytes);
+                return;
+            }
+
+            GetDateParts(dateOnly.DayNumber, out int year, out int month, out int day);
+
+            EnsureFreeBufferSpace(zeroDateOnlyBytes.Length);
+            WriteToBufferWithoutCheck((byte)'"');
+            Write4Digits(year);
+            WriteToBufferWithoutCheck((byte)'-');
+            Write2Digits(month);
+            WriteToBufferWithoutCheck((byte)'-');
+            Write2Digits(day);
+            WriteToBufferWithoutCheck((byte)'"');
+        }
+
+        private static readonly byte[] zeroTimeOnlyBytes = System.Text.Encoding.UTF8.GetBytes("\"00:00:00\"");
+
+        /// <summary>
+        /// Writes a TimeOnly value as "HH:mm:ss[.fffffff]".
+        /// </summary>
+        public void WriteTimeOnlyValue(TimeOnly timeOnly)
+        {
+            long ticks = timeOnly.Ticks;
+            if (ticks == 0)
+            {
+                WriteToBuffer(zeroTimeOnlyBytes);
+                return;
+            }
+
+            int fractualSeconds = (int)(ticks % TimeSpan.TicksPerSecond);
+            int secondOfDay = (int)(ticks / TimeSpan.TicksPerSecond);
+            int hour = secondOfDay / 3600;
+            int secondOfHour = secondOfDay - hour * 3600;
+            int minute = secondOfHour / 60;
+            int second = secondOfHour - minute * 60;
+
+            int bytesToReserve = zeroTimeOnlyBytes.Length;
+            if (fractualSeconds > 0) bytesToReserve += 8; // .fffffff
+            EnsureFreeBufferSpace(bytesToReserve);
+
+            WriteToBufferWithoutCheck((byte)'"');
+            WriteTimeOfDay(hour, minute, second);
+            if (fractualSeconds > 0) WriteFractionalSeconds(fractualSeconds);
+            WriteToBufferWithoutCheck((byte)'"');
+        }
+#endif
 
         private static readonly byte[] zeroTimespanBytes = System.Text.Encoding.UTF8.GetBytes("\"00:00:00\"");
         public void WriteTimeSpanValue(TimeSpan value)

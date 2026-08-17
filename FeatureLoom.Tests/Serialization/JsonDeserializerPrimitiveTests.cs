@@ -691,6 +691,69 @@ namespace FeatureLoom.Serialization
             Assert.Null(value);
         }
 
+        [Theory]
+        [InlineData("\"0001-01-01\"", "0001-01-01")]
+        [InlineData("\"2024-01-02\"", "2024-01-02")]
+        public void Deserialize_DateOnly(string json, string expectedText)
+        {
+            var expected = DateOnly.Parse(expectedText, CultureInfo.InvariantCulture);
+            AssertDeserialized(json, expected);
+        }
+
+        [Theory]
+        [InlineData("null", null)]
+        [InlineData("\"2024-01-02\"", "2024-01-02")]
+        public void Deserialize_NullableDateOnly(string json, string expectedText)
+        {
+            DateOnly? expected = expectedText == null ? null : DateOnly.Parse(expectedText, CultureInfo.InvariantCulture);
+            AssertDeserialized(json, expected);
+        }
+
+        [Fact]
+        public void Deserialize_NullableDateOnly_EmptyString_NonStrict_ReturnsNull()
+        {
+            var deserializer = new JsonDeserializer();
+            Assert.True(deserializer.TryDeserialize("\"\"", out DateOnly? value));
+            Assert.Null(value);
+        }
+
+        [Theory]
+        [InlineData("\"00:00:00\"", "00:00:00")]
+        [InlineData("\"03:04:05\"", "03:04:05")]
+        public void Deserialize_TimeOnly(string json, string expectedText)
+        {
+            var expected = TimeOnly.Parse(expectedText, CultureInfo.InvariantCulture);
+            AssertDeserialized(json, expected);
+        }
+
+        [Fact]
+        public void Deserialize_TimeOnly_WithFractionalSeconds()
+        {
+            var expected = new TimeOnly(3, 4, 5).Add(TimeSpan.FromTicks(1234567));
+            string text = expected.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            int fractionalTicks = (int)(expected.Ticks % TimeSpan.TicksPerSecond);
+            string json = $"\"{text}.{fractionalTicks:D7}\"";
+
+            AssertDeserialized(json, expected);
+        }
+
+        [Theory]
+        [InlineData("null", null)]
+        [InlineData("\"03:04:05\"", "03:04:05")]
+        public void Deserialize_NullableTimeOnly(string json, string expectedText)
+        {
+            TimeOnly? expected = expectedText == null ? null : TimeOnly.Parse(expectedText, CultureInfo.InvariantCulture);
+            AssertDeserialized(json, expected);
+        }
+
+        [Fact]
+        public void Deserialize_NullableTimeOnly_EmptyString_NonStrict_ReturnsNull()
+        {
+            var deserializer = new JsonDeserializer();
+            Assert.True(deserializer.TryDeserialize("\"\"", out TimeOnly? value));
+            Assert.Null(value);
+        }
+
         private static void AssertNotDeserialized<T>(string json)
         {
             var deserializer = new JsonDeserializer();
