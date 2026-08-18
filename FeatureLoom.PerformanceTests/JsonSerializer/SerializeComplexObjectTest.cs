@@ -20,6 +20,8 @@ public class SerializeComplexObjectTest
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
+    static JsonSerializerOptions systemTextJsonSourceGenSerializerSettings = SerializerConfigs.CreateSystemTextSourceGenOptions();
+
     MemoryStream memoryStream = new MemoryStream(1024 * 1024 * 100);
 
     ComplexObject single = new ComplexObject();
@@ -58,6 +60,15 @@ public class SerializeComplexObjectTest
         }
     }
 
+    [Benchmark]
+    public void SerializeComplexObject_Single_SystemTextSourceGen()
+    {
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
+        {
+            System.Text.Json.JsonSerializer.Serialize(memoryStream, single, systemTextJsonSourceGenSerializerSettings);
+        }
+    }
+
 #if NET6_0_OR_GREATER
     [Benchmark]
     public void SerializeComplexObject_Single_SpanJson()
@@ -86,6 +97,15 @@ public class SerializeComplexObjectTest
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
+        }
+    }
+
+    [Benchmark]
+    public void SerializeComplexObject_Array_SystemTextSourceGen()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSourceGenSerializerSettings);
         }
     }
 

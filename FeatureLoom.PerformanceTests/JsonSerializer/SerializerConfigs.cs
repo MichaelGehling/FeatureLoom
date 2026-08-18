@@ -51,6 +51,23 @@ public static class SerializerConfigs
     }
 
     /// <summary>
+    /// Options matching <see cref="CreateSystemTextOptions"/>, but backed by the
+    /// source-generated <see cref="ComplexObjectJsonContext"/> instead of reflection-based
+    /// metadata, so the code-gen serialization path can be compared against it.
+    /// </summary>
+    public static JsonSerializerOptions CreateSystemTextSourceGenOptions()
+    {
+        var options = new JsonSerializerOptions()
+        {
+            IncludeFields = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
+        options.TypeInfoResolver = ComplexObjectJsonContext.Default;
+        return options;
+    }
+
+    /// <summary>
     /// Creates a deserializer with default settings for the value-type benchmarks. The
     /// byte array reader auto-detects base64 vs. number-array input, so a single instance
     /// handles both byte array representations.
