@@ -991,7 +991,10 @@ public sealed partial class JsonDeserializer
                 itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
             }
 
-            if (!childrenMustWriteRefPath && GetCachedTypeReader(fieldType).WriteRefPath) childrenMustWriteRefPath = true;
+            // The ref-path decision must be based on the reader that is actually used for this member.
+            // For a member with its own settings that is the member-specific reader, not the shared one,
+            // otherwise a member that enables reference resolution locally would never be addressable.
+            if (!childrenMustWriteRefPath && GetCachedTypeReader(fieldType, memberSettings).WriteRefPath) childrenMustWriteRefPath = true;
         }
         int writerCount = itemFieldWritersList.Count;
         var itemFieldWriters = itemFieldWritersList.ToArray();
