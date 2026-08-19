@@ -8,7 +8,7 @@ public sealed partial class JsonSerializer
 {
     void CreateByteArrayWriter(CachedTypeWriter typeWriter)
     {
-        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.HandlerType);
+        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.TypeSettings);
         var typeInfo = typeWriter.typeInfoHandling;
 
         typeWriter.SetItemWriter<byte[]>(BuildWriter(), false);
@@ -30,7 +30,7 @@ public sealed partial class JsonSerializer
 
     void CreateByteSegmentWriter(CachedTypeWriter typeWriter, bool nullable)
     {
-        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.HandlerType);
+        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.TypeSettings);
         var typeInfo = typeWriter.typeInfoHandling;
 
         Action configureWriter = (nullable, typeInfo, useBase64) switch
@@ -62,7 +62,7 @@ public sealed partial class JsonSerializer
 
     void CreateByteArraySegmentWriter(CachedTypeWriter typeWriter, bool nullable)
     {
-        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.HandlerType);
+        var useBase64 = settings.ResolveWriteByteArrayAsBase64String(typeWriter.TypeSettings);
         var typeInfo = typeWriter.typeInfoHandling;
 
         Action configureWriter = (nullable, typeInfo, useBase64) switch

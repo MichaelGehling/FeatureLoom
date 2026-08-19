@@ -30,7 +30,7 @@ namespace FeatureLoom.Serialization
 
         private void CreateTypedComplexItemHandler<T>(CachedTypeWriter typeHandler, Type itemType)
         {
-            settings.TryGetTypeSettings(itemType, out var typeSettings);
+            var typeSettings = typeHandler.TypeSettings;
             DataSelection dataSelection = settings.ResolveDataSelection(typeSettings);
 
             var memberInfos = new List<MemberInfo>();
@@ -126,7 +126,7 @@ namespace FeatureLoom.Serialization
                 if (memberSettings?.member_ignore == true) continue;
 
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
-                var fieldTypeHandler = GetCachedTypeWriter(fieldType);
+                var fieldTypeHandler = GetCachedTypeWriterForMember(fieldType, memberSettings);
                 allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
@@ -164,7 +164,7 @@ namespace FeatureLoom.Serialization
 
         private void CreateTypedComplexItemHandler_ForNullableStruct<T>(CachedTypeWriter typeHandler, Type itemType) where T : struct
         {
-            settings.TryGetTypeSettings(itemType, out var typeSettings);
+            var typeSettings = typeHandler.TypeSettings;
             DataSelection dataSelection = settings.ResolveDataSelection(typeSettings);
 
             var memberInfos = new List<MemberInfo>();
@@ -199,7 +199,7 @@ namespace FeatureLoom.Serialization
                 if (memberSettings?.member_ignore == true) continue;
 
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
-                var fieldTypeHandler = GetCachedTypeWriter(fieldType);
+                var fieldTypeHandler = GetCachedTypeWriterForMember(fieldType, memberSettings);
                 allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);

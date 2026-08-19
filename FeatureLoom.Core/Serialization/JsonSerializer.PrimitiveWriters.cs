@@ -1523,7 +1523,7 @@ public sealed partial class JsonSerializer
         // Captured once at setup, so the per-item check is a well-predicted branch on a readonly
         // local instead of a settings lookup. Spelling out all string/int combinations separately
         // would double the number of variants below without a measurable benefit.
-        bool asString = settings.ResolveEnumAsString(typeof(T));
+        bool asString = settings.ResolveEnumAsString(typeHandler.TypeSettings);
 
         if (!nullable)
         {

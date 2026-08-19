@@ -512,8 +512,9 @@ public sealed partial class JsonSerializer
             if (typeof(E) == typeof(byte[]))
             {
                 // The output format is fixed by the settings, so the strategy can be selected here
-                // and the per-element format branch disappears completely.
-                if (settings.ResolveWriteByteArrayAsBase64String(typeof(byte[]))) CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayBase64WriterStrategy, byte[]>(typeHandler, elementHandler);
+                // and the per-element format branch disappears completely. Resolved from the
+                // element writer's own settings, so a locally overridden element format is honored.
+                if (settings.ResolveWriteByteArrayAsBase64String(elementHandler.TypeSettings)) CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayBase64WriterStrategy, byte[]>(typeHandler, elementHandler);
                 else CreateIndexedItemHandlerViaStrategy<T, E, ACC, ByteArrayNumbersWriterStrategy, byte[]>(typeHandler, elementHandler);
                 return;
             }

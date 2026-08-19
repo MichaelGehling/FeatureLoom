@@ -303,6 +303,19 @@ namespace FeatureLoom.Serialization
             /// <summary>Per-member configuration map, keyed by member name.</summary>
             internal Dictionary<string, BaseTypeWriteSettings> memberSettingsDict = new();
 
+            /// <summary>
+            /// True if this settings object says anything about how a value is written, as opposed
+            /// to only member-level metadata (<see cref="member_ignore"/>, <see cref="member_overrideName"/>).
+            /// Used to decide whether a member needs its own writer instead of the shared one.
+            /// </summary>
+            internal bool HasValueShapingOverrides =>
+                dataSelection != null ||
+                typeInfoHandling != null ||
+                enumAsString != null ||
+                writeByteArrayAsBase64String != null ||
+                treatEnumerablesAsCollections != null ||
+                memberSettingsDict.Count > 0;
+
             /// <summary>Sets which members are written for this type scope.</summary>
             public void SetDataSelection(DataSelection dataSelection) => this.dataSelection = dataSelection;
 
@@ -756,32 +769,32 @@ namespace FeatureLoom.Serialization
                 => typeSettings?.dataSelection ?? dataSelection;
 
             /// <summary>
-            /// Resolves the type info handling for <paramref name="type"/>, falling back to the
-            /// global setting when the type does not override it.
+            /// Resolves the type info handling from already resolved <paramref name="typeSettings"/>,
+            /// falling back to the global setting.
             /// </summary>
-            public TypeInfoHandling ResolveTypeInfoHandling(Type type)
-                => TryGetTypeSettings(type, out var typeSettings) ? typeSettings.typeInfoHandling ?? typeInfoHandling : typeInfoHandling;
+            public TypeInfoHandling ResolveTypeInfoHandling(BaseTypeWriteSettings typeSettings)
+                => typeSettings?.typeInfoHandling ?? typeInfoHandling;
 
             /// <summary>
-            /// Resolves the enum representation for <paramref name="type"/>, falling back to the
-            /// global setting when the type does not override it.
+            /// Resolves the enum representation from already resolved <paramref name="typeSettings"/>,
+            /// falling back to the global setting.
             /// </summary>
-            public bool ResolveEnumAsString(Type type)
-                => TryGetTypeSettings(type, out var typeSettings) ? typeSettings.enumAsString ?? enumAsString : enumAsString;
+            public bool ResolveEnumAsString(BaseTypeWriteSettings typeSettings)
+                => typeSettings?.enumAsString ?? enumAsString;
 
             /// <summary>
-            /// Resolves the byte array representation for <paramref name="type"/>, falling back to
-            /// the global setting when the type does not override it.
+            /// Resolves the byte array representation from already resolved
+            /// <paramref name="typeSettings"/>, falling back to the global setting.
             /// </summary>
-            public bool ResolveWriteByteArrayAsBase64String(Type type)
-                => TryGetTypeSettings(type, out var typeSettings) ? typeSettings.writeByteArrayAsBase64String ?? writeByteArrayAsBase64String : writeByteArrayAsBase64String;
+            public bool ResolveWriteByteArrayAsBase64String(BaseTypeWriteSettings typeSettings)
+                => typeSettings?.writeByteArrayAsBase64String ?? writeByteArrayAsBase64String;
 
             /// <summary>
-            /// Resolves the enumerable handling for <paramref name="type"/>, falling back to the
-            /// global setting when the type does not override it.
+            /// Resolves the enumerable handling from already resolved <paramref name="typeSettings"/>,
+            /// falling back to the global setting.
             /// </summary>
-            public bool ResolveTreatEnumerablesAsCollections(Type type)
-                => TryGetTypeSettings(type, out var typeSettings) ? typeSettings.treatEnumerablesAsCollections ?? treatEnumerablesAsCollections : treatEnumerablesAsCollections;
+            public bool ResolveTreatEnumerablesAsCollections(BaseTypeWriteSettings typeSettings)
+                => typeSettings?.treatEnumerablesAsCollections ?? treatEnumerablesAsCollections;
 
             /// <summary>
             /// Returns the custom type name configured for exactly this type, or

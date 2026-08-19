@@ -35,12 +35,26 @@ namespace FeatureLoom.Serialization
             /// </summary>
             public readonly TypeInfoHandling typeInfoHandling;
 
-            public CachedTypeWriter(JsonSerializer serializer, Type handlerType)
+            /// <summary>
+            /// The type settings this writer was built with: either the settings configured for
+            /// <see cref="HandlerType"/>, or a locally overriding set (e.g. member settings).
+            /// May be <see langword="null"/> when nothing is configured.
+            /// <para>
+            /// Nested creation steps resolve from this instead of looking the settings up by type
+            /// again, which is what makes context-local variants possible. Mirrors
+            /// <c>CachedTypeReader.TypeSettings</c>.
+            /// </para>
+            /// </summary>
+            public BaseTypeWriteSettings TypeSettings => typeSettings;
+            private readonly BaseTypeWriteSettings typeSettings;
+
+            public CachedTypeWriter(JsonSerializer serializer, Type handlerType, BaseTypeWriteSettings typeSettings = null)
             {
                 this.serializer = serializer;
                 this.writer = serializer.writer;                
                 this.handlerType = handlerType;
-                this.typeInfoHandling = serializer.settings.ResolveTypeInfoHandling(handlerType);
+                this.typeSettings = typeSettings;
+                this.typeInfoHandling = serializer.settings.ResolveTypeInfoHandling(typeSettings);
             }
 
             public bool NoRefTypes => noRefTypes;

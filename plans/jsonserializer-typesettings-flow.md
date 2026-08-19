@@ -1,6 +1,7 @@
 # Plan: Align JsonSerializer type-settings flow with JsonDeserializer
 
-Status: proposed. Risk 1 (recursion) is **resolved** — see section 5.1; no recursion guard is needed.
+Status: steps 0-4 **implemented and green** (2050 passed, 0 failed). Step 5 (benchmark
+verification) is still open. Risk 1 (recursion) is resolved - see section 5.1.
 
 ## 1. How the deserializer does it (target model)
 
@@ -71,7 +72,7 @@ Recommendation: do both, mirroring the deserializer.
 
 Ordered so each step builds and the suite stays green.
 
-### Step 1 — carry the settings (no behavior change)
+### Step 1 — carry the settings (no behavior change) — DONE
 - Add `readonly BaseTypeWriteSettings typeSettings` + `public BaseTypeWriteSettings TypeSettings`
   to `CachedTypeWriter`; add it as a ctor parameter.
 - `CreateCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings = null)`:
@@ -83,7 +84,7 @@ Ordered so each step builds and the suite stays green.
 
 At this point nothing passes a non-null override yet, so behavior is identical.
 
-### Step 2 — consume the carried settings instead of re-resolving
+### Step 2 — consume the carried settings instead of re-resolving — DONE
 Replace the per-site lookups with resolution against `typeWriter.TypeSettings`:
 - `ArrayWriters` (3 sites) and `WriterStrategies:516` → base64 flag from the writer's settings.
 - `PrimitiveWriters:1526` (`CreateEnumItemHandler`) → needs the `typeHandler` in scope; it is
@@ -95,7 +96,7 @@ Add `Resolve*(BaseTypeWriteSettings)` overloads next to the existing `Resolve*(T
 `CompiledSettings` so the fallback-to-global logic stays in one place. Keep the `Type` overloads
 for any call site that genuinely has no writer.
 
-### Step 3 — enable local variants
+### Step 3 — enable local variants — DONE
 - `GetCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings)`:
   bypass `typeWriterCache` when `typeSettings != null`, mirroring `GetCachedTypeReader`.
 - In `CreateCachedTypeWriter`, only do `typeWriterCache[itemType] = typeHandler` when there is no
@@ -107,7 +108,7 @@ for any call site that genuinely has no writer.
 - `ComplexHandler`: `GetCachedTypeWriter(fieldType, memberSettings)` in both
   `CreateTypedComplexItemHandler<T>` and `CreateTypedComplexItemHandler_ForNullableStruct<T>`.
 
-### Step 4 — tests
+### Step 4 — tests — DONE
 New file `FeatureLoom.Tests/Serialization/JsonSerializerMemberSettingsTests.cs`:
 - enum member with `SetEnumAsString` opposite to the global setting → only that member differs;
 - `byte[]` member with `SetWriteByteArrayAsBase64String` overridden;
@@ -119,7 +120,7 @@ New file `FeatureLoom.Tests/Serialization/JsonSerializerMemberSettingsTests.cs`:
 
 Plus the existing suite as regression for step 1/2 (which must be behavior-neutral).
 
-### Step 5 — verify no hot-path regression
+### Step 5 — verify no hot-path regression — OPEN
 Steps 1–3 only move work into writer creation, which is cached per type, so the write path should
 be untouched or slightly cheaper. Confirm with the existing complex-object and enum serialization
 benchmarks (baseline before step 1, compare after step 3). Report before/after.
@@ -160,6 +161,24 @@ benchmarks (baseline before step 1, compare after step 3). Report before/after.
    same distinction before collapsing the resolution into one place.
 5. **`ResolveTypeName`** also consults `settings` by type; decide whether it should move to the
    carried settings too (it uses an intentionally exact match, see its remarks).
+
+## 7. Implementation notes (as built)
+
+- `CachedTypeWriter` gained `public BaseTypeWriteSettings TypeSettings` plus a ctor parameter;
+  `typeInfoHandling` is now resolved from it instead of from `HandlerType`.
+- `CreateCachedTypeWriter(Type, BaseTypeWriteSettings = null)` resolves the settings once at the
+  top and only writes to `typeWriterCache` when there is no local override.
+- `overriddenTypeWriterCache` was removed again (see 5.1).
+- New `BaseTypeWriteSettings.HasValueShapingOverrides`: distinguishes settings that change how a
+  value is written from pure member metadata (`member_ignore`, `member_overrideName`). Only the
+  former justify a member-local writer \u2014 otherwise every renamed member would get a duplicate
+  writer for nothing.
+- New `GetCachedTypeWriterForMember(Type, BaseTypeWriteSettings)` in `JsonSerializer.cs`, used by
+  both `CreateTypedComplexItemHandler<T>` and `CreateTypedComplexItemHandler_ForNullableStruct<T>`.
+- `WriterStrategies:516` now resolves the base64 flag from `elementHandler.TypeSettings` instead of
+  from the literal `typeof(byte[])`.
+- Behavior change: member-level `SetEnumAsString`, `SetWriteByteArrayAsBase64String`,
+  `SetTypeInfoHandling` etc. previously had **no effect** on the serializer side. They now work.
 
 ## 6. Suggested commit split
 

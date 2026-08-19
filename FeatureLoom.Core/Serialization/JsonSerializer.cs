@@ -23,20 +23,6 @@ namespace FeatureLoom.Serialization
         readonly CompiledSettings settings;
         readonly Dictionary<Type, CachedTypeWriter> typeWriterCache = new();
 
-        /// <summary>
-        /// Writers for types that were created with a locally overriding <see cref="BaseTypeWriteSettings"/>
-        /// (e.g. settings configured on a single member) instead of the settings resolved from the
-        /// type itself. Those must not go into <see cref="typeWriterCache"/>, because they are only
-        /// valid in that one context.
-        /// <para>
-        /// They are still cached, keyed by type plus the identity of the settings object: this
-        /// deduplicates writers when the same override is used repeatedly, and - more importantly -
-        /// it makes recursive types work, because the entry is registered before the writer is
-        /// built (see <see cref="CreateCachedTypeWriter"/>).
-        /// </para>
-        /// </summary>
-        readonly Dictionary<(Type type, BaseTypeWriteSettings settings), CachedTypeWriter> overriddenTypeWriterCache = new();
-
         readonly Dictionary<object, ItemInfo> objToItemInfo = new();
         readonly Dictionary<object, int> objToRefId = new();
         int nextRefId = 1;
@@ -613,29 +599,49 @@ namespace FeatureLoom.Serialization
         /// Returns the writer for <paramref name="itemType"/>, optionally built with locally
         /// overriding settings instead of the settings resolved from the type itself.
         /// <para>
-        /// With <paramref name="typeSettings"/> set, the shared per-type cache is bypassed, because
-        /// the resulting writer is only valid in the context the override came from (e.g. one
-        /// member). Mirrors <c>JsonDeserializer.GetCachedTypeReader(Type, BaseTypeSettings)</c>.
+        /// With <paramref name="typeSettings"/> set, the shared per-type cache is bypassed and a
+        /// fresh writer is built, because the result is only valid in the context the override came
+        /// from (e.g. one member). Mirrors <c>JsonDeserializer.GetCachedTypeReader(Type, BaseTypeSettings)</c>.
+        /// </para>
+        /// <para>
+        /// This terminates even for recursive types: overrides form a finite tree (every
+        /// <c>ConfigureMember</c> creates a fresh settings object, so no settings object can contain
+        /// itself), and each nesting level consumes one configured level. The innermost level has no
+        /// member settings left and therefore falls back to the cached, recursion-safe writer.
         /// </para>
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private CachedTypeWriter GetCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings)
         {
             if (typeSettings == null) return GetCachedTypeWriter(itemType);
-
-            if (overriddenTypeWriterCache.TryGetValue((itemType, typeSettings), out var cachedTypeHandler)) return cachedTypeHandler;
             return CreateCachedTypeWriter(itemType, typeSettings);
         }
 
+        /// <summary>
+        /// Returns the writer to use for a member of type <paramref name="fieldType"/>.
+        /// <para>
+        /// Only builds a member-local writer if <paramref name="memberSettings"/> actually changes
+        /// how the value is written. Settings that are pure member metadata (ignore, alternate
+        /// name) are handled by the field writer itself and must keep using the shared writer,
+        /// otherwise every renamed member would get its own duplicate writer for no reason.
+        /// </para>
+        /// </summary>
+        private CachedTypeWriter GetCachedTypeWriterForMember(Type fieldType, BaseTypeWriteSettings memberSettings)
+        {
+            if (memberSettings == null || !memberSettings.HasValueShapingOverrides) return GetCachedTypeWriter(fieldType);
+            return CreateCachedTypeWriter(fieldType, memberSettings);
+        }
 
         private CachedTypeWriter CreateCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings = null)
         {
-            CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType);
+            bool isLocalOverride = typeSettings != null;
+            if (!isLocalOverride) settings.TryGetTypeSettings(itemType, out typeSettings);
+
+            CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType, typeSettings);
             // Typehandler must be added first for the case of recursion (type contains same type).
-            // An overriding variant is registered under its own key, so a type that recurses through
-            // an overridden member terminates as well instead of creating writers forever.
-            if (typeSettings == null) typeWriterCache[itemType] = typeHandler;
-            else overriddenTypeWriterCache[(itemType, typeSettings)] = typeHandler;
+            // Override variants are intentionally not cached: they are context-local and their
+            // nesting is bounded by the configuration depth (see GetCachedTypeWriter).
+            if (!isLocalOverride) typeWriterCache[itemType] = typeHandler;
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(ResolveTypeName(itemType));
 

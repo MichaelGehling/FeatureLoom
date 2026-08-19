@@ -14,7 +14,7 @@ namespace FeatureLoom.Serialization
         {
             if (itemType != typeof(IEnumerable) && !itemType.ImplementsInterface(typeof(IEnumerable))) return false;
 
-            if (!(settings.ResolveTreatEnumerablesAsCollections(itemType) ||
+            if (!(settings.ResolveTreatEnumerablesAsCollections(typeHandler.TypeSettings) ||
                   itemType == typeof(ICollection) ||
                   itemType.ImplementsGenericInterface(typeof(ICollection<>)) || 
                   itemType.ImplementsInterface(typeof(ICollection)))) return false;
