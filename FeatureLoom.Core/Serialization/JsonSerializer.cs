@@ -22,6 +22,21 @@ namespace FeatureLoom.Serialization
         readonly JsonUTF8StreamWriter writer;
         readonly CompiledSettings settings;
         readonly Dictionary<Type, CachedTypeWriter> typeWriterCache = new();
+
+        /// <summary>
+        /// Writers for types that were created with a locally overriding <see cref="BaseTypeWriteSettings"/>
+        /// (e.g. settings configured on a single member) instead of the settings resolved from the
+        /// type itself. Those must not go into <see cref="typeWriterCache"/>, because they are only
+        /// valid in that one context.
+        /// <para>
+        /// They are still cached, keyed by type plus the identity of the settings object: this
+        /// deduplicates writers when the same override is used repeatedly, and - more importantly -
+        /// it makes recursive types work, because the entry is registered before the writer is
+        /// built (see <see cref="CreateCachedTypeWriter"/>).
+        /// </para>
+        /// </summary>
+        readonly Dictionary<(Type type, BaseTypeWriteSettings settings), CachedTypeWriter> overriddenTypeWriterCache = new();
+
         readonly Dictionary<object, ItemInfo> objToItemInfo = new();
         readonly Dictionary<object, int> objToRefId = new();
         int nextRefId = 1;
@@ -594,11 +609,33 @@ namespace FeatureLoom.Serialization
             return typeWriterCache.TryGetValue(itemType, out var cachedTypeHandler) ? cachedTypeHandler : CreateCachedTypeWriter(itemType);
         }
 
-
-        private CachedTypeWriter CreateCachedTypeWriter(Type itemType)
+        /// <summary>
+        /// Returns the writer for <paramref name="itemType"/>, optionally built with locally
+        /// overriding settings instead of the settings resolved from the type itself.
+        /// <para>
+        /// With <paramref name="typeSettings"/> set, the shared per-type cache is bypassed, because
+        /// the resulting writer is only valid in the context the override came from (e.g. one
+        /// member). Mirrors <c>JsonDeserializer.GetCachedTypeReader(Type, BaseTypeSettings)</c>.
+        /// </para>
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private CachedTypeWriter GetCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings)
         {
-            CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType);            
-            typeWriterCache[itemType] = typeHandler; // Typehandler must be added first for the case of recursion (type contains same type)
+            if (typeSettings == null) return GetCachedTypeWriter(itemType);
+
+            if (overriddenTypeWriterCache.TryGetValue((itemType, typeSettings), out var cachedTypeHandler)) return cachedTypeHandler;
+            return CreateCachedTypeWriter(itemType, typeSettings);
+        }
+
+
+        private CachedTypeWriter CreateCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings = null)
+        {
+            CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType);
+            // Typehandler must be added first for the case of recursion (type contains same type).
+            // An overriding variant is registered under its own key, so a type that recurses through
+            // an overridden member terminates as well instead of creating writers forever.
+            if (typeSettings == null) typeWriterCache[itemType] = typeHandler;
+            else overriddenTypeWriterCache[(itemType, typeSettings)] = typeHandler;
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(ResolveTypeName(itemType));
 

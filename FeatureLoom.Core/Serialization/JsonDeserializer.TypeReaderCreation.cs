@@ -222,6 +222,10 @@ public sealed partial class JsonDeserializer
                type == typeof(decimal) ||
                type == typeof(DateTime) ||
                type == typeof(DateTimeOffset) ||
+#if NET6_0_OR_GREATER
+               type == typeof(DateOnly) ||
+               type == typeof(TimeOnly) ||
+#endif
                type == typeof(TimeSpan) ||
                type == typeof(Guid) ||
                type == typeof(IntPtr) ||
