@@ -174,7 +174,7 @@ public class DeserializeMixedStringDatasetTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [Benchmark]
     public void DeserializeMixedStrings_WithStringCache()
     {
         for (int i = 0; i < iterations; i++)
@@ -207,7 +207,7 @@ public class DeserializeMixedStringDatasetTest
         }
     }
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
     public void DeserializeMixedStrings_SystemText()
     {
         for (int i = 0; i < iterations; i++)

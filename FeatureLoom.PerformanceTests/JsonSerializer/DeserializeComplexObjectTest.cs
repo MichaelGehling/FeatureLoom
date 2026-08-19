@@ -45,6 +45,8 @@ public class DeserializeComplexObjectTest
 
     static JsonSerializerOptions systemTextJsonSerializerSettings = SerializerConfigs.CreateSystemTextOptions();
 
+    static JsonSerializerOptions systemTextJsonSourceGenSerializerSettings = SerializerConfigs.CreateSystemTextSourceGenOptions();
+
     MemoryStream featureStream_Single = new MemoryStream();
     MemoryStream featureStream_Array = new MemoryStream();
 
@@ -114,6 +116,16 @@ public class DeserializeComplexObjectTest
         }
     }
 
+    [Benchmark]
+    public void DeserializeComplexObject_Single_SystemTextSourceGen()
+    {
+        for (int i = 0; i < BenchmarkSettings.Iterations; i++)
+        {
+            featureStream_Single.Position = 0;
+            ComplexObject result = System.Text.Json.JsonSerializer.Deserialize<ComplexObject>(featureStream_Single, systemTextJsonSourceGenSerializerSettings);
+        }
+    }
+
 #if NET6_0_OR_GREATER
     [Benchmark]
     public void DeserializeComplexObject_Single_SpanJson()
@@ -153,6 +165,16 @@ public class DeserializeComplexObjectTest
         {
             featureStream_Array.Position = 0;
             ComplexObject[] result = System.Text.Json.JsonSerializer.Deserialize<ComplexObject[]>(featureStream_Array, systemTextJsonSerializerSettings);
+        }
+    }
+
+    [Benchmark]
+    public void DeserializeComplexObject_Array_SystemTextSourceGen()
+    {
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureStream_Array.Position = 0;
+            ComplexObject[] result = System.Text.Json.JsonSerializer.Deserialize<ComplexObject[]>(featureStream_Array, systemTextJsonSourceGenSerializerSettings);
         }
     }
 
