@@ -2754,7 +2754,7 @@ public sealed partial class JsonDeserializer
     bool TryReadStringBytes_Slow(out ByteSegment stringBytes)
     {
         stringBytes = default;
-        byte b = default;
+        
         using (var undoHandle = CreateUndoReadHandle())
         {
             var recording = buffer.StartRecording(true);
@@ -2797,6 +2797,7 @@ public sealed partial class JsonDeserializer
                 if (!buffer.TryNextByte()) return false;
             }
 #else
+            byte b = default;
             while (buffer.TryNextByte())
             {
                 b = buffer.CurrentByte;

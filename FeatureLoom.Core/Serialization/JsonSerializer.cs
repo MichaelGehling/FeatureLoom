@@ -31,8 +31,6 @@ namespace FeatureLoom.Serialization
         readonly ItemInfoRecycler itemInfoRecycler;
         private ByteSegment rootName;
         ItemInfo currentItemInfo;
-        readonly ExtensionApi extensionApi;
-        public delegate bool TryCreateItemHandlerDelegate<T>(ExtensionApi api, out Action<T> itemHandler, out JsonDataTypeCategory category);
 
         /// <summary>
         /// Creates a serializer and configures its settings with a callback, so an instance can be
@@ -58,7 +56,6 @@ namespace FeatureLoom.Serialization
             // values are built from the item name chain. The id based format does not need them.
             itemInfoRecycler = new ItemInfoRecycler(this.settings.referenceCheck == ReferenceCheck.AlwaysReplaceByRef && !this.settings.writeItemIds);
             rootName = new ByteSegment(writer.PrepareRootName());
-            this.extensionApi = new ExtensionApi(this);
         }
 
         public string ShowBufferAsString()
@@ -645,11 +642,21 @@ namespace FeatureLoom.Serialization
 
             typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(ResolveTypeName(itemType));
 
-            foreach(var creator in settings.itemHandlerCreators)
+            // A custom writer set for the type itself is found by direct lookup and therefore
+            // always wins over the predicate registered, convention based handlers.
+            ITypeHandlerCreator matchingCreator = typeSettings?.customTypeWriterCreator;
+            if (matchingCreator == null)
             {
-                if (!creator.SupportsType(itemType)) continue;
-
-                creator.CreateTypeHandler(extensionApi, typeHandler, itemType);
+                foreach (var creator in settings.itemHandlerCreators)
+                {
+                    if (!creator.SupportsType(itemType)) continue;
+                    matchingCreator = creator;
+                    break;
+                }
+            }
+            if (matchingCreator != null)
+            {
+                matchingCreator.CreateTypeHandler(this, typeHandler, itemType);
                 return typeHandler;
             }
 

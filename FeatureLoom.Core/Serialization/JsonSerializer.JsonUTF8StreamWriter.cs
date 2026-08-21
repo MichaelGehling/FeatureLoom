@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using FeatureLoom.Extensions;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -25,91 +25,7 @@ namespace FeatureLoom.Serialization;
 
 public sealed partial class JsonSerializer
 {
-    public interface IWriter
-    {
-        byte[] Buffer { get; }
-        int BufferCount { get; }
-
-            void CloseArray();
-            void CloseObject();
-            void EnsureFreeBufferSpace(int freeBytes);
-            void OpenArray();
-            void OpenObject();
-            ByteSegment GetCollectionIndexName(int index);
-            byte[] PrepareFieldNameBytes(string fieldname);
-            byte[] PrepareRootName();
-            byte[] PrepareStringToBytes(string str);
-            byte[] PrepareTextToBytes(string enumText);
-            byte[] PrepareTypeInfo(string typeName);
-            void ResetBuffer();
-            void WriteBufferToStream();
-            void WriteColon();
-            void WriteComma();
-            void WriteDot();
-            void WriteFieldName(string fieldName);
-            void WriteNullValue();
-            void WriteBoolValue(bool value);
-            void WriteByteValue(byte value);
-            void WriteCharValue(char value);
-            void WriteDecimalValue(decimal value);
-            void WriteDoubleValue(double value);
-            void WriteFloatValue(float value);
-            void WriteIntValue(int value);
-            void WriteLongValue(long value);
-            void WriteSbyteValue(sbyte value);
-            void WriteShortValue(short value);
-            void WriteStringValue(string str);
-            void WriteUintValue(uint value);
-            void WriteUlongValue(ulong value);
-            void WriteUshortValue(ushort value);
-            void WriteGuidValue(Guid value);
-            void WriteDateTimeValue(DateTime value);
-#if NET6_0_OR_GREATER
-            void WriteDateOnlyValue(DateOnly value);
-            void WriteTimeOnlyValue(TimeOnly value);
-#endif
-            void WriteUriValue(Uri value);
-            void WriteBoolAsStringValue(bool value);
-            void WriteByteAsStringValue(byte value);
-            void WriteCharValueAsString(char value);
-            void WriteDoubleValueAsString(double value);
-            void WriteFloatValueAsString(float value);
-            void WriteIntValueAsString(int value);
-            void WriteLongValueAsString(long value);
-            void WriteSbyteValueAsString(sbyte value);
-            void WriteShortValueAsString(short value);
-            void WriteUintValueAsString(uint value);
-            void WriteUlongValueAsString(ulong value);
-            void WriteUshortValueAsString(ushort value);
-            ByteSegment WriteBoolValueAsStringWithCopy(bool value);
-            ByteSegment WriteByteValueAsStringWithCopy(byte value);
-            ByteSegment WriteCharValueAsStringWithCopy(char value);
-            ByteSegment WriteDoubleValueAsStringWithCopy(double value);
-            ByteSegment WriteFloatValueAsStringWithCopy(float value);
-            ByteSegment WriteIntValueAsStringWithCopy(int value);
-            ByteSegment WriteLongValueAsStringWithCopy(long value);
-            ByteSegment WriteSbyteValueAsStringWithCopy(sbyte value);
-            ByteSegment WriteShortValueAsStringWithCopy(short value);
-            ByteSegment WriteStringValueAsStringWithCopy(string str);
-            ByteSegment WriteUintValueAsStringWithCopy(uint value);
-            ByteSegment WriteUlongValueAsStringWithCopy(ulong value);
-            ByteSegment WriteUshortValueAsStringWithCopy(ushort value);
-            void WriteToBuffer(ByteSegment data);
-            void WriteToBuffer(byte data);
-            void WriteToBuffer(byte[] data);
-            void WriteToBuffer(byte[] data, int count);
-            void WriteToBuffer(byte[] data, int offset, int count);
-            void WriteToBufferWithoutCheck(byte data);
-            void WriteToBufferWithoutCheck(byte[] data);
-            void WriteToBufferWithoutCheck(byte[] data, int count);
-            void WriteToBufferWithoutCheck(byte[] data, int offset, int count);
-            void WriteTypeInfo(string typeName);
-            void WriteValueFieldName();
-            bool TryPreparePrimitiveWriteDelegate<T>(out Action<T> primitiveWriteDelegate);
-            void WriteRawJsonFragment(string json);
-        }
-
-    private sealed class JsonUTF8StreamWriter : IWriter
+    internal sealed class JsonUTF8StreamWriter
     {
         public Stream stream;
         private byte[] tempBuffer;
@@ -172,7 +88,7 @@ public sealed partial class JsonSerializer
         /// </summary>
         public bool IsIndenting => indent;
 
-        public JsonUTF8StreamWriter(CompiledSettings settings)
+        internal JsonUTF8StreamWriter(CompiledSettings settings)
         {
             // We lower the limit by a small margin in order to not always check remaining space
             mainBufferLimit = settings.writeBufferChunkSize - BUFFER_LIMIT_MARGIN;            
@@ -340,7 +256,29 @@ public sealed partial class JsonSerializer
             WriteToBuffer(data);
         }
 
-        public static readonly MethodInfo WritePreparedBytesMethod = typeof(JsonUTF8StreamWriter).GetMethod(nameof(WritePreparedBytes), BindingFlags.Public | BindingFlags.Instance);
+        /// <summary>
+        /// Writes a short, pre-encoded byte sequence taken from a segment of a larger buffer.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WritePreparedBytes(ByteSegment data)
+        {
+            WriteToBuffer(data);
+        }
+
+#if !NETSTANDARD2_0
+        /// <summary>
+        /// Writes a short, pre-encoded byte sequence without requiring an array instance.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WritePreparedBytes(ReadOnlySpan<byte> data)
+        {
+            if (mainBufferCount + data.Length > mainBufferLimit) WriteBufferToStream();
+            data.CopyTo(new Span<byte>(mainBuffer, mainBufferCount, mainBuffer.Length - mainBufferCount));
+            mainBufferCount += data.Length;
+        }
+#endif
+
+        public static readonly MethodInfo WritePreparedBytesMethod = typeof(JsonUTF8StreamWriter).GetMethod(nameof(WritePreparedBytes), BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(byte[]) }, null);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteToBufferWithoutCheck(byte[] data, int offset, int count)
@@ -407,12 +345,12 @@ public sealed partial class JsonSerializer
         {
             Type type = typeof(T);
             primitiveWriteDelegate = null;
-            if (settings.itemHandlerCreators.Any(creator => creator.SupportsType(type))) return false;
+            if (settings.HasCustomWriterFor(type)) return false;
             
 
             if (typeMap.TryGetValue(type, out string methodName))
             {
-                MethodInfo methodInfo = GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+                MethodInfo methodInfo = GetPrimitiveWriteMethod(methodName, type);
 
                 if (methodInfo != null)
                 {
@@ -441,11 +379,17 @@ public sealed partial class JsonSerializer
         {
             Type type = typeof(T);
             methodInfo = null;
-            if (settings.itemHandlerCreators.Any(creator => creator.SupportsType(type))) return false;
+            if (settings.HasCustomWriterFor(type)) return false;
             if (!typeMap.TryGetValue(type, out string methodName)) return false;
-            methodInfo = GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+            methodInfo = GetPrimitiveWriteMethod(methodName, type);
             return methodInfo != null;
         }
+
+        // Resolved by exact parameter type, because some of these write methods have overloads
+        // (e.g. WriteStringValue for string and ReadOnlySpan<char>), which makes a name-only
+        // lookup ambiguous.
+        static MethodInfo GetPrimitiveWriteMethod(string methodName, Type parameterType)
+            => typeof(JsonUTF8StreamWriter).GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, null, new[] { parameterType }, null);
 
         static readonly byte[] NULL = "null".ToByteArray();
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -504,6 +448,26 @@ public sealed partial class JsonSerializer
             WriteString(fieldName);
             WriteToBufferWithoutCheck(FIELDNAME_POST);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteFieldName(TextSegment fieldName)
+        {
+#if !NETSTANDARD2_0
+            WriteFieldName(fieldName.AsSpan());
+#else
+            WriteFieldName(fieldName.ToString());
+#endif
+        }
+
+#if !NETSTANDARD2_0
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteFieldName(ReadOnlySpan<char> fieldName)
+        {
+            WriteToBufferWithoutCheck(FIELDNAME_PRE);
+            WriteString(fieldName);
+            WriteToBufferWithoutCheck(FIELDNAME_POST);
+        }
+#endif
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1041,6 +1005,15 @@ public sealed partial class JsonSerializer
             }
             else WriteNullValue();
         }
+
+#if !NETSTANDARD2_0
+        /// <summary>
+        /// Writes a quoted, escaped JSON string from a character span, so a slice of an existing
+        /// buffer can be written without materializing a substring.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteStringValue(ReadOnlySpan<char> str) => WriteEscapedStringWithQuotes(str);
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteJsonFragmentValue(JsonFragment json)
@@ -2157,16 +2130,25 @@ public sealed partial class JsonSerializer
         }
 #endif
 
+        #if !NETSTANDARD2_0
+        private void WriteEscapedStringWithQuotes(string str, int startIndex = 0, int length = -1)
+            => WriteEscapedStringWithQuotes(str.AsSpan(startIndex, length >= 0 ? length : str.Length - startIndex));
+
+        // Using a span lets the JIT drop the repeated bounds checks of the scan loop, which
+        // dominates the cost for longer strings, and it lets callers pass a slice of an
+        // existing buffer without materializing a substring first.
+        private void WriteEscapedStringWithQuotes(ReadOnlySpan<char> chars)
+        {
+            int startIndex = 0;
+            int charIndex = 0;
+            int numChars = chars.Length;
+            int endIndex = numChars;
+#else
         private void WriteEscapedStringWithQuotes(string str, int startIndex = 0, int length = -1)
         {
             int charIndex = startIndex;
             int numChars = length >= 0 ? length : str.Length - startIndex;
             int endIndex = startIndex + numChars;
-#if !NETSTANDARD2_0
-            // Using a span lets the JIT drop the repeated bounds checks of the scan loop,
-            // which dominates the cost for longer strings.
-            ReadOnlySpan<char> chars = str.AsSpan();
-#else
             string chars = str;
 #endif
             // Empty strings are common enough to be worth skipping the whole machinery below.
@@ -2338,10 +2320,10 @@ public sealed partial class JsonSerializer
 #endif
 
                 // Handle surrogate pairs
-                if (char.IsHighSurrogate(c) && charIndex + 1 < str.Length && char.IsLowSurrogate(str[charIndex + 1]))
+                if (char.IsHighSurrogate(c) && charIndex + 1 < endIndex && char.IsLowSurrogate(chars[charIndex + 1]))
                 {
                     int highSurrogate = c;
-                    int lowSurrogate = str[charIndex + 1];
+                    int lowSurrogate = chars[charIndex + 1];
                     int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
                     WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));
@@ -2368,17 +2350,53 @@ public sealed partial class JsonSerializer
             else WriteNullValue();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteRawJsonFragment(TextSegment json)
+        {
+#if !NETSTANDARD2_0
+            if (json.IsValid) WriteString(json.AsSpan());
+#else
+            if (json.IsValid) WriteRawJsonFragment(json.ToString());
+#endif
+            else WriteNullValue();
+        }
+
+        /// <summary>
+        /// Writes a <see cref="JsonFragment"/> as raw JSON. UTF-8 backed fragments are copied
+        /// into the buffer directly, string backed ones are transcoded.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteRawJsonFragment(JsonFragment json)
+        {
+            if (json.IsUtf8) WriteToBuffer(json.JsonUtf8);
+            else if (json.IsString) WriteString(json.JsonString);
+            else WriteNullValue();
+        }
+
+#if !NETSTANDARD2_0
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteRawJsonFragment(ReadOnlySpan<char> json) => WriteString(json);
+#endif
+
+        #if !NETSTANDARD2_0
+        private void WriteString(string str) => WriteString(str.AsSpan());
+
+        // Using a span lets the JIT drop the repeated bounds checks of the scan loop, which
+        // dominates the cost for longer strings, and it lets callers pass a slice of an
+        // existing buffer without materializing a substring first.
+        private void WriteString(ReadOnlySpan<char> chars)
+        {
+            const int MAX_CHAR_LENGTH = 6;
+            EnsureFreeBufferSpace(chars.Length * MAX_CHAR_LENGTH);
+            int charIndex = 0;
+            int endIndex = chars.Length;
+#else
         private void WriteString(string str)
-        {            
+        {
             const int MAX_CHAR_LENGTH = 6;
             EnsureFreeBufferSpace(str.Length * MAX_CHAR_LENGTH);
             int charIndex = 0;
             int endIndex = str.Length;
-#if !NETSTANDARD2_0
-            // Using a span lets the JIT drop the repeated bounds checks of the scan loop,
-            // which dominates the cost for longer strings.
-            ReadOnlySpan<char> chars = str.AsSpan();
-#else
             string chars = str;
 #endif
             while (charIndex < endIndex)
@@ -2433,10 +2451,10 @@ public sealed partial class JsonSerializer
                 char c = chars[charIndex];
 
                 // Handle surrogate pairs
-                if (char.IsHighSurrogate(c) && charIndex + 1 < endIndex && char.IsLowSurrogate(str[charIndex + 1]))
+                if (char.IsHighSurrogate(c) && charIndex + 1 < endIndex && char.IsLowSurrogate(chars[charIndex + 1]))
                 {
                     int highSurrogate = c;
-                    int lowSurrogate = str[charIndex + 1];
+                    int lowSurrogate = chars[charIndex + 1];
                     int surrogateCodePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
 
                     WriteToBufferWithoutCheck((byte)((surrogateCodePoint >> 18) | 0xF0));

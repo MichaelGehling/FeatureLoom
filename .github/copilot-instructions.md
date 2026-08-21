@@ -18,7 +18,7 @@ Solution: `FeatureProjects.sln`.
 - Ask if instructions are unclear or if information is missing and cannot easily be found.
 
 ## Working rules
-- For extensive/complex tasks prepare a plan first (create .md files in /plans folder) and update it as you go. Use the plan to communicate progress and decisions.
+- For extensive/complex tasks prepare a plan first (create .md files in /plans folder) and update it as you go. Use the plan to communicate progress and decisions. Split bigger plans into an overview and smaller sub-plans.
 - Read before editing; make minimal, targeted changes.
 - Never claim something was measured, tested or verified unless it actually was.
 - A negative result (no gain, idea reverted) is a valid outcome — report it rather than forcing a change through.

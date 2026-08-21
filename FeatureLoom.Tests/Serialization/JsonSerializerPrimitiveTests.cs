@@ -726,9 +726,8 @@ namespace FeatureLoom.Serialization
         public void Serialize_CustomTypeHandler_WriteRawJsonFragment_Null_WritesNullLiteral()
         {
             var settings = new JsonSerializer.Settings();
-            settings.AddCustomTypeHandlerCreator<RawJsonFragmentWrapper>(
-                JsonDataTypeCategory.Primitive,
-                api => value => api.Writer.WriteRawJsonFragment(value.RawJson));
+            settings.ConfigureType<RawJsonFragmentWrapper>(ts => ts.SetCustomTypeWriter(
+                prep => prep.PrepareValueWriter<RawJsonFragmentWrapper>((write, value) => write.WriteRawJson(value.RawJson))));
 
             var serializer = new JsonSerializer(settings);
             var value = new RawJsonFragmentWrapper { RawJson = null };
@@ -742,9 +741,8 @@ namespace FeatureLoom.Serialization
         public void Serialize_CustomTypeHandler_WriteRawJsonFragment_DoesNotEscapeOrQuote()
         {
             var settings = new JsonSerializer.Settings();
-            settings.AddCustomTypeHandlerCreator<RawJsonFragmentWrapper>(
-                JsonDataTypeCategory.Primitive,
-                api => value => api.Writer.WriteRawJsonFragment(value.RawJson));
+            settings.ConfigureType<RawJsonFragmentWrapper>(ts => ts.SetCustomTypeWriter(
+                prep => prep.PrepareValueWriter<RawJsonFragmentWrapper>((write, value) => write.WriteRawJson(value.RawJson))));
 
             var serializer = new JsonSerializer(settings);
             var value = new RawJsonFragmentWrapper { RawJson = "{\"text\":\"line1\\nline2\"}" };

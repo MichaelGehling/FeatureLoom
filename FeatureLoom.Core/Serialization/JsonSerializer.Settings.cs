@@ -92,11 +92,11 @@ namespace FeatureLoom.Serialization
             public bool writeByteArrayAsBase64String = true;
 
             /// <summary>
-            /// Custom handlers that take precedence over the built-in ones. The first creator that
-            /// supports a type determines how values of that type are written.
-            /// Use the AddCustomTypeHandlerCreator overloads to add entries.
+            /// Custom writers registered with a type predicate. They are matched by scanning, in
+            /// registration order, and only if no writer was set for the concrete type itself.
+            /// Filled by <see cref="TypeWriteSettings{T}.SetCustomTypeWriter(Func{WriterPreparationApi, CustomWriter{T}}, bool)"/>.
             /// </summary>
-            public List<ITypeHandlerCreator> customTypeHandlerCreators = new List<ITypeHandlerCreator>();
+            internal List<ITypeHandlerCreator> customTypeHandlerCreators = new List<ITypeHandlerCreator>();
 
             /// <summary>
             /// Determines how type names are written into "$type" members, unless a custom name was
@@ -159,55 +159,6 @@ namespace FeatureLoom.Serialization
             public void ClearCustomTypeNames() => customTypeNames.Clear();
 
             /// <summary>
-            /// Adds a custom handler that writes values of <typeparamref name="T"/> instead of the
-            /// built-in handler.
-            /// </summary>
-            /// <typeparam name="T">Type the handler is created for.</typeparam>
-            /// <param name="category">
-            /// How the written value is shaped, which the serializer needs to know to wrap it
-            /// correctly, e.g. in type info objects.
-            /// </param>
-            /// <param name="creator">
-            /// Builds the write action. It is called once per type and receives the extension API
-            /// to write the value with.
-            /// </param>
-            /// <param name="onlyExactType">
-            /// If true, the handler is only used for <typeparamref name="T"/> itself.
-            /// If false, it is also used for types assignable to it.
-            /// </param>
-            public void AddCustomTypeHandlerCreator<T>(JsonDataTypeCategory category, Func<ExtensionApi, Action<T>> creator, bool onlyExactType = true)
-            {
-                customTypeHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, onlyExactType));
-            }
-
-            /// <summary>
-            /// Adds a custom handler that writes values of <typeparamref name="T"/>, using an
-            /// explicit predicate to decide which types it applies to.
-            /// </summary>
-            /// <typeparam name="T">Type the write action accepts.</typeparam>
-            /// <param name="supportsType">Decides whether the handler is used for a given type.</param>
-            /// <param name="category">
-            /// How the written value is shaped, which the serializer needs to know to wrap it
-            /// correctly, e.g. in type info objects.
-            /// </param>
-            /// <param name="creator">Builds the write action. It is called once per type.</param>
-            public void AddCustomTypeHandlerCreator<T>(Func<Type, bool> supportsType, JsonDataTypeCategory category, Func<ExtensionApi, Action<T>> creator)
-            {
-                customTypeHandlerCreators.Add(new TypeHandlerCreator<T>(category, creator, supportsType));
-            }
-
-            /// <summary>
-            /// Adds a fully custom handler creator implementation.
-            /// </summary>
-            /// <param name="creator">
-            /// Decides which types it supports and builds their write action.
-            /// </param>
-            public void AddCustomTypeHandlerCreator(ITypeHandlerCreator creator)
-            {
-                customTypeHandlerCreators.Add(creator);
-            }
-
-            /// <summary>
             /// Stores explicit type and generic-type configuration entries.
             /// </summary>
             internal Dictionary<Type, BaseTypeWriteSettings> typeSettingsDict = new();
@@ -235,6 +186,7 @@ namespace FeatureLoom.Serialization
                 {
                     typeSettings = new TypeWriteSettings<T>();
                 }
+                typeSettings.ownerSettings = this;
                 configureTypeSettings(typeSettings);
                 typeSettingsDict[type] = typeSettings;
             }
@@ -304,6 +256,18 @@ namespace FeatureLoom.Serialization
             internal Dictionary<string, BaseTypeWriteSettings> memberSettingsDict = new();
 
             /// <summary>
+            /// Custom writer registered for this type scope, or <see langword="null"/>. Found by a
+            /// direct lookup, so it always beats the predicate registered handlers.
+            /// </summary>
+            internal ITypeHandlerCreator customTypeWriterCreator = null;
+
+            /// <summary>
+            /// The settings instance this configuration belongs to. Needed to register a custom
+            /// writer that matches by predicate, since such a writer cannot live in the per-type map.
+            /// </summary>
+            internal Settings ownerSettings = null;
+
+            /// <summary>
             /// True if this settings object says anything about how a value is written, as opposed
             /// to only member-level metadata (<see cref="member_ignore"/>, <see cref="member_overrideName"/>).
             /// Used to decide whether a member needs its own writer instead of the shared one.
@@ -314,6 +278,7 @@ namespace FeatureLoom.Serialization
                 enumAsString != null ||
                 writeByteArrayAsBase64String != null ||
                 treatEnumerablesAsCollections != null ||
+                customTypeWriterCreator != null ||
                 memberSettingsDict.Count > 0;
 
             /// <summary>Sets which members are written for this type scope.</summary>
@@ -425,6 +390,36 @@ namespace FeatureLoom.Serialization
             }
 
             /// <summary>
+            /// Sets a custom writer for every type constructed from this generic type definition,
+            /// replacing the built-in writer.
+            /// </summary>
+            /// <param name="writerDefinition">
+            /// Generic type definition of a <see cref="CustomTypeWriterDefinition{T}"/> implementation,
+            /// e.g. <c>typeof(MyWriter&lt;&gt;)</c> for
+            /// <c>class MyWriter&lt;T&gt; : CustomTypeWriterDefinition&lt;MyType&lt;T&gt;&gt;</c>.
+            /// It must have the same number of generic parameters as the configured type definition
+            /// and a public parameterless constructor.
+            /// Pass <see langword="null"/> to remove a previously set writer.
+            /// </param>
+            /// <remarks>
+            /// The definition is closed and instantiated once per constructed type, when that type's
+            /// writer is created, so it is off the write path.
+            /// Precedence: a writer set for a constructed type via
+            /// <see cref="Settings.ConfigureType{T}"/> is found by direct lookup and therefore wins
+            /// over the writer registered here. Derived types are not covered.
+            /// </remarks>
+            public void SetCustomTypeWriter(Type writerDefinition)
+            {
+                if (writerDefinition == null)
+                {
+                    customTypeWriterCreator = null;
+                    return;
+                }
+
+                customTypeWriterCreator = new OpenGenericTypeWriterCreator(genericType, writerDefinition);
+            }
+
+            /// <summary>
             /// Configures write settings for one member of the generic type definition.
             /// </summary>
             /// <typeparam name="TMember">Expected member type.</typeparam>
@@ -471,6 +466,98 @@ namespace FeatureLoom.Serialization
             /// </param>
             public void ConfigureMember<TMember>(string memberName, Action<MemberWriteSettings<TMember>> configureMemberSettings)
                 => ConfigureMemberInternal(typeof(T), memberName, configureMemberSettings);
+
+            /// <summary>
+            /// Sets a custom writer for <typeparamref name="T"/>, replacing the built-in writer.
+            /// </summary>
+            /// <param name="prepare">
+            /// Preparation step, called once per matching type. It builds the writer via the
+            /// <see cref="WriterPreparationApi"/> and returns it; the returned writer is then used
+            /// for every value of that type.
+            /// Pass <see langword="null"/> to remove a previously set writer.
+            /// </param>
+            /// <param name="supportsType">
+            /// Optional predicate that widens the writer to further types, e.g.
+            /// <c>type => typeof(T).IsAssignableFrom(type)</c> for all subtypes, or an attribute
+            /// check. <typeparamref name="T"/> itself is always covered, whether the predicate
+            /// accepts it or not. Every accepted type must be assignable to <typeparamref name="T"/>.
+            /// </param>
+            /// <remarks>
+            /// The predicate is only evaluated when a type's writer is created, so it is off the
+            /// write path.
+            /// Precedence: for <typeparamref name="T"/> itself the writer is found by direct
+            /// lookup, so it wins over every predicate matched writer, independent of registration
+            /// order. For the additionally matched types the first registered predicate wins.
+            /// </remarks>
+            public void SetCustomTypeWriter(Func<WriterPreparationApi, CustomWriter<T>> prepare, Func<Type, bool> supportsType)
+            {
+                if (prepare == null)
+                {
+                    customTypeWriterCreator = null;
+                    return;
+                }
+
+                customTypeWriterCreator = new CustomTypeWriterCreator<T>(prepare);
+                if (supportsType == null) return;
+
+                // The predicate matches types other than T, which cannot be found by the per-type
+                // lookup, so that part of the registration goes into the scanned list.
+                if (ownerSettings == null) throw new Exception($"A custom type writer with a type predicate can only be set via {nameof(Settings)}.{nameof(Settings.ConfigureType)}<T>().");
+                ownerSettings.customTypeHandlerCreators.Add(new CustomTypeWriterCreator<T>(prepare, supportsType));
+            }
+
+            /// <summary>
+            /// Sets a custom writer for <typeparamref name="T"/>, replacing the built-in writer.
+            /// </summary>
+            /// <param name="prepare">
+            /// Preparation step, called once per matching type. It builds the writer via the
+            /// <see cref="WriterPreparationApi"/> and returns it; the returned writer is then used
+            /// for every value of that type.
+            /// Pass <see langword="null"/> to remove a previously set writer.
+            /// </param>
+            /// <param name="handlesDerivedTypes">
+            /// If <see langword="true"/>, the writer is used for all types derived from <typeparamref name="T"/>, 
+            /// otherwise only for exactly <typeparamref name="T"/>.
+            /// </param>
+            /// <remarks>
+            /// The predicate is only evaluated when a type's writer is created, so it is off the
+            /// write path.
+            /// Precedence: for <typeparamref name="T"/> itself the writer is found by direct
+            /// lookup, so it wins over every predicate matched writer, independent of registration
+            /// order. For the additionally matched types the first registered predicate wins.
+            /// </remarks>
+            public void SetCustomTypeWriter(Func<WriterPreparationApi, CustomWriter<T>> prepare, bool handlesDerivedTypes = false)
+            {
+                if (handlesDerivedTypes)
+                {
+                    SetCustomTypeWriter(prepare, type => typeof(T).IsAssignableFrom(type));
+                }
+                else
+                {
+                    SetCustomTypeWriter(prepare, null);
+                }
+            }
+
+            /// <summary>
+            /// Sets a custom writer for <typeparamref name="T"/> from a definition instance,
+            /// replacing the built-in writer.
+            /// </summary>
+            /// <param name="definition">
+            /// The definition whose <c>Prepare</c> builds the writer. Called once, when the writer
+            /// for <typeparamref name="T"/> is created.
+            /// Pass <see langword="null"/> to remove a previously set writer.
+            /// </param>
+            /// <remarks>
+            /// Equivalent to passing the preparation as a lambda, but the definition is a class and
+            /// can therefore carry state and be reused for the generic registration
+            /// <see cref="GenericTypeWriteSettings.SetCustomTypeWriter(Type)"/>.
+            /// Only <typeparamref name="T"/> itself is covered; use the lambda overload to widen
+            /// the writer to further types by predicate.
+            /// </remarks>
+            public void SetCustomTypeWriter(CustomTypeWriterDefinition<T> definition)
+            {
+                customTypeWriterCreator = definition == null ? null : new DefinitionTypeWriterCreator<T>(definition);
+            }
         }
 
         /// <summary>
@@ -672,7 +759,7 @@ namespace FeatureLoom.Serialization
             AssemblyQualified = 2
         }
 
-        private readonly struct CompiledSettings
+        internal readonly struct CompiledSettings
         {
             public readonly TypeInfoHandling typeInfoHandling;
             public readonly DataSelection dataSelection;
@@ -758,6 +845,23 @@ namespace FeatureLoom.Serialization
                     typeSettingsDict.TryGetValue(type.GetGenericTypeDefinition(), out typeSettings)) return true;
 
                 typeSettings = null;
+                return false;
+            }
+
+            /// <summary>
+            /// True if any custom writer applies to <paramref name="type"/>, either set for the
+            /// type itself or matched by a convention based handler. Used by optimizations that
+            /// must not bypass a custom writer.
+            /// </summary>
+            public bool HasCustomWriterFor(Type type)
+            {
+                if (TryGetTypeSettings(type, out BaseTypeWriteSettings typeSettings) &&
+                    typeSettings.customTypeWriterCreator != null) return true;
+
+                foreach (var creator in itemHandlerCreators)
+                {
+                    if (creator.SupportsType(type)) return true;
+                }
                 return false;
             }
 

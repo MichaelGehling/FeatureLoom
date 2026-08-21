@@ -11,14 +11,7 @@ namespace FeatureLoom.Serialization
     public sealed partial class JsonSerializer
     {
 
-        public interface ICachedTypeHandler
-        {
-            void SetItemWriter<T>(Action<T, bool, ByteSegment> itemWriter, bool childrenMustWriteRefPath);
-            Type HandlerType { get; }
-            bool NoRefTypes { get; }
-        }
-
-        public sealed class CachedTypeWriter : ICachedTypeHandler
+        public sealed class CachedTypeWriter
         {
             private JsonSerializer serializer;
             private JsonUTF8StreamWriter writer;

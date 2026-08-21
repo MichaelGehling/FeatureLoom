@@ -460,10 +460,7 @@ public sealed partial class JsonSerializer
         if (elementHandler.HandlerType != elementType) return false;
         if (!elementType.IsValueType && !elementType.IsSealed) return false;
 
-        foreach (var creator in settings.itemHandlerCreators)
-        {
-            if (creator.SupportsType(elementType)) return false;
-        }
+        if (settings.HasCustomWriterFor(elementType)) return false;
 
         return true;
     }

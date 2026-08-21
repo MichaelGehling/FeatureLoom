@@ -29,6 +29,7 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -80,6 +81,13 @@ namespace Playground
 
 
     
+
+        public enum TestEnum
+        {
+            A,
+            B,
+            C
+        }
 
         public class TestConfig : Configuration
         {
@@ -201,6 +209,19 @@ namespace Playground
 
         private static async Task Main()
         {
+            JsonSerializer.Settings.Build(settings =>
+            {
+                settings.ConfigureType<TestClass>(typeSettings =>
+                {
+                    typeSettings.SetCustomTypeWriter(prep =>
+                    {
+                        var writeNested = prep.PrepareTypeWriter<TestClass2>(ts => ts.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo));
+                        return prep.PrepareRawWriter<TestClass>((raw, item) => writeNested(new TestClass2 { a = item.a }));
+                    });
+                });
+            });
+
+
             return;
 
             
@@ -270,9 +291,7 @@ namespace Playground
             }, null);
 
             await syncHandle.WaitingTask;
-            
 
-            await JsonTest.Run2();
 
 
             {
@@ -428,8 +447,6 @@ namespace Playground
 
             Console.ReadKey();
             */
-
-            await JsonTest.Run();
 
             Log.INFO("InfoTest");
             Log.ERROR("ErrorTest");
