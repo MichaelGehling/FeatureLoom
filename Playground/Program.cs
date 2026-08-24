@@ -207,338 +207,89 @@ namespace Playground
             private int Main_privateProperty { get; set; } = 44;
         }
 
-        private static async Task Main()
+        public struct Sample
         {
-            JsonSerializer.Settings.Build(settings =>
+            public object value;
+            public DateTime sourceTimestamp;
+            public DateTime serverTimestamp;
+        }
+
+        public class SampleMessage
+        {
+            /// <summary>
+            /// The name of the device.
+            /// </summary>
+            public string deviceName;
+            /// <summary>
+            /// The node ID the sample belongs to.
+            /// </summary>
+            public string nodeId;
+            /// <summary>
+            /// The browse paths to the node.
+            /// </summary>
+            public string[] browsePaths;
+            /// <summary>
+            /// The namespace name of the node.
+            /// </summary>
+            public string nsName;
+            /// <summary>
+            /// The sample value and timestamps.
+            /// </summary>
+            public Sample sample;
+        }
+
+        static JsonSerializer CreateSampleSerializer2(int bufferChunkSize)
+        {
+            var settings = new JsonSerializer.Settings()
             {
-                settings.ConfigureType<TestClass>(typeSettings =>
+                writeBufferChunkSize = bufferChunkSize,
+                dataSelection = JsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
+                referenceCheck = JsonSerializer.ReferenceCheck.NoRefCheck,
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
+                enumAsString = true,
+                indent = false,
+                writeByteArrayAsBase64String = true
+            };
+            settings.ConfigureType<SampleMessage>(ts =>
+            {
+                ts.SetCustomTypeWriter(prep =>
                 {
-                    typeSettings.SetCustomTypeWriter(prep =>
+                    var objectWriter = prep.PrepareTypeWriter<object>(os => os.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo));
+                    return prep.PrepareObjectWriter<SampleMessage>(objBuilder =>
                     {
-                        var writeNested = prep.PrepareTypeWriter<TestClass2>(ts => ts.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo));
-                        return prep.PrepareRawWriter<TestClass>((raw, item) => writeNested(new TestClass2 { a = item.a }));
+                        objBuilder
+                            .AddField("deviceName", m => m.deviceName)
+                            .AddField("nodeId", m => m.nodeId)
+                            .AddField("browsePaths", m => m.browsePaths)
+                            .AddField("nsName", m => m.nsName)
+                            //.AddRawField("value", (api, m) => objectWriter(m.sample.value))
+                            .AddField("value", m => m.sample.value)
+                            .AddField("valueType", m => m.sample.value?.GetType().GetSimplifiedTypeName())
+                            .AddField("sourceTimestamp", m => m.sample.sourceTimestamp);
                     });
                 });
             });
+            return new JsonSerializer(settings);
+        }
 
-
-            return;
-
-            
-            { 
-                Xenum xenum = Xenum.B;
-                JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
-                {
-
-                });
-
-                string json = serializer.Serialize(xenum);
-            }
-
-
-
+        private static async Task Main()
+        {
+            var ser = CreateSampleSerializer2(1024 * 256);
+            var sampleMessage = new SampleMessage()
             {
-                Dictionary<int, string> intToStringMap;
-
-                string jsonIntToStringMap = @"{
-                    ""1"": ""One"",
-                    ""2"": ""Two"",
-                    ""3"": ""Three""
-                }";
-
-                JsonDeserializer des = new JsonDeserializer();
-                bool success = des.TryDeserialize(jsonIntToStringMap, out intToStringMap);
-
-            }
-            ValueWrappingQueueReceiver rec = new();
-
-            int numValues = 1000;
-
-            AsyncManualResetEvent syncHandle = new AsyncManualResetEvent(false);
-
-            var readerContext = new SingleThreadSynchronizationContext("reader");
-            readerContext.Post(async _ =>
-            {
-                while (true)
+                deviceName = "Device1",
+                nodeId = "Node1",
+                browsePaths = new string[] { "Path1", "Path2" },
+                nsName = "Namespace1",
+                sample = new Sample()
                 {
-                    if ((await rec.TryReceiveAsync(CancellationToken.None)).TryOut(out object msg))
-                    {
-                        if (msg is ValueWrapper<int> wrapper)
-                        {
-                            int value = wrapper.UnwrapAndDispose();
-                            Console.WriteLine($"Received wrapped value: {value}");
-                            if (value == numValues)
-                            {
-                                Console.WriteLine($"Finished ValueWrapper test (reader). Global:{SharedPool<ValueWrapper<int>>.GlobalCount} Local:{SharedPool<ValueWrapper<int>>.LocalCount}");
-                                syncHandle.Set();
-                                break;
-                            }                            
-                        }
-                    }
+                    value = 42,
+                    sourceTimestamp = DateTime.Now,
+                    serverTimestamp = DateTime.Now
                 }
-            }, null);
-
-
-            var writerContext = new SingleThreadSynchronizationContext("writerContext");
-            writerContext.Post(async _ =>
-            {
-                for (int i = 1; i <= numValues; i++)
-                {
-                    Console.WriteLine($"Sending wrapped value: {i}");
-                    rec.Post(i);                    
-                }
-                Console.WriteLine($"Finished ValueWrapper test (writer). Global:{SharedPool<ValueWrapper<int>>.GlobalCount} Local:{SharedPool<ValueWrapper<int>>.LocalCount}");
-            }, null);
-
-            await syncHandle.WaitingTask;
-
-
-
-            {
-                var tk = AppTime.TimeKeeper;
-                numIterations = 10_000_000;
-                Xenum enumValue = Xenum.B;
-
-                while (true)
-                {
-                    tk.Restart();
-                    for (int i = 0; i < numIterations; i++)
-                    {
-                        int intValue = Convert.ToInt32(enumValue);
-                    }
-                    Console.WriteLine($"Convert.ToInt32: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
-
-                    tk.Restart();
-                    for (int i = 0; i < numIterations; i++)
-                    {
-                        int intValue = (int)enumValue;
-                    }
-                    Console.WriteLine($"(int) cast: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
-
-                    tk.Restart();
-                    for (int i = 0; i < numIterations; i++)
-                    {
-                        int intValue = Unsafe.As<Xenum, int>(ref enumValue);
-                    }
-                    Console.WriteLine($"Unsafe.As<Xenum, int>: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
-
-                    tk.Restart();
-                    for (int i = 0; i < numIterations; i++)
-                    {
-                        int intValue = EqualityComparer<Xenum>.Default.GetHashCode();
-                    }
-                    Console.WriteLine($"EqualityComparer<Xenum>.Default.GetHashCode: {tk.Elapsed.TotalMilliseconds} ms for {numIterations} iterations.");
-                }
-            }
-
-            {
-
-                byte[] bytes = RandomGenerator.Bytes(30);
-                JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
-                {
-                    indent = true,
-                    dataSelection = JsonSerializer.DataSelection.PublicFieldsAndProperties,
-                    writeByteArrayAsBase64String = false
-                });
-                var bytesJson = serializer.Serialize(bytes);
-                JsonHelper.DefaultDeserializer.TryDeserialize<byte[]>(bytesJson, out var bytesOut);
-
-
-                TestStruct ts = new TestStruct()
-                {
-                    i = 42,
-                    obj = new TestClass()
-                };
-
-                var j = JsonHelper.DefaultSerializer.Serialize(ts);
-
-                JsonHelper.DefaultDeserializer.TryDeserialize<JsonFragmentTester>(j, out var jft);
-
-                JsonHelper.DefaultDeserializer.TryDeserialize<TestClass>(jft.obj.JsonString, out var tc);
-
-                JsonDeserializer des = new JsonDeserializer(new JsonDeserializer.Settings()
-                {
-                    initialBufferSize = 10,
-                });
-
-                Stream stream = "xxxxxxxxaaa123".ToStream();
-                des.SetDataSource(stream);
-                des.SkipBufferUntil("aaa", true, out bool found);
-                des.TryDeserialize(out int x);
-
-                string t1 = "";
-                string result154 = JsonHelper.DefaultSerializer.Serialize(t1);
-
-
-                bool success = JsonHelper.DefaultDeserializer.TryDeserialize<Xenum?>("1", out var t2);
-            }
-
-            Log.DefaultConsoleLogger.config.loglevel = Loglevel.TRACE;
-            Log.DefaultConsoleLogger.config.format = "";
-            var OptLog = Service<OptLogService>.Instance;
-            var settings = new OptLogService.Settings()
-            {
-                globalLogLevel = Loglevel.INFO,
             };
-            /*settings.blackListFilterSettings.Add(new OptLogService.LogFilterSettings()
-            {
-                sourceFileMask = "*Program.cs",
-                methodMask = "Main",
-                minloglevel = Loglevel.CRITICAL,
-                maxloglevel = Loglevel.CRITICAL,
-            });
-            */
-            OptLog.ApplySettings(settings);
+            var jj = ser.Serialize<object>(sampleMessage);
 
-            try
-            {
-                throw new Exception("Test Exception");
-            }
-            catch (Exception ex) 
-            {
-
-                OptLog.IMPORTANT()?.Build("Log this");
-                OptLog.CRITICAL()?.Build("Log this", ex);
-                OptLog.ERROR()?.Build("Log this");
-                OptLog.WARNING()?.Build("Log this");
-                OptLog.INFO()?.Build("Log this", ex);
-                OptLog.DEBUG()?.Build("Log this");
-                OptLog.TRACE()?.Build("Log this");
-            }
-            
-
-            await AppTime.WaitAsync(1.Hours());
-
-
-            /*
-            var batchTK = AppTime.TimeKeeper;
-            Batcher<int> batcher = new Batcher<int>(5, 1.Seconds(), 100.Milliseconds());
-            batcher.ProcessMessage<int[]>(batch => ConsoleHelper.WriteLine($"time: {batchTK.Elapsed.TotalSeconds} num elements: {batch.Length}, Elements: [{batch.AllItemsToString(",")}]"));
-
-            for(int i = 0; i < 100; i++)
-            {
-                batcher.Send(i);
-                await AppTime.WaitAsync(RandomGenerator.Int32(100, 500).Milliseconds());
-            }
-
-            await AppTime.WaitAsync(10.Minutes());
-
-            string inputText = "That is a test!";
-            var inputBytes = inputText.ToByteArray();
-            byte[] output1 = new byte[inputBytes.Length * 2];            
-            Base64.EncodeToUtf8(inputBytes, output1, out int bytesConsumed, out int bytesWritten, true);
-
-
-            MemoryStream outputStream = new MemoryStream();
-            var base64Stream = new Base64EncodingStream(outputStream);            
-            base64Stream.Write(inputBytes, 0, inputBytes.Length);
-            base64Stream.Flush();
-            var output2 = outputStream.ToArray();
-            */
-            /*var rw = new TextFileStorage("pathTest", new TextFileStorage.Config()
-            {
-                basePath = "./pathTestBasePath",
-                fileSuffix = "/bla.json",
-                useCategoryFolder = true
-            });
-
-            //await rw.TryWriteAsync("myUri", "Content");
-            (await rw.TryReadAsync<string>("myUri")).TryOut(out var content);
-
-            Console.ReadKey();
-            */
-
-            Log.INFO("InfoTest");
-            Log.ERROR("ErrorTest");
-            Console.ReadKey();
-
-            Statemachine<Box<int>> statemachine = new Statemachine<Box<int>>(
-                ("Starting", async (c, token) =>
-                {
-                    Console.WriteLine($"Statemachine Starting in 1 second...");
-                    await AppTime.WaitAsync(1.Seconds(), token);
-                    return "Counting";
-                }),
-                ("Counting", async (c, token) =>
-                {
-                    Console.WriteLine($"Statemachine Finishing in {c} seconds...");
-                    await AppTime.WaitAsync(1.Seconds(), token);
-                    if (token.IsCancellationRequested) return "Starting";
-                    c.value--;
-                    if (c == 0) return "Ending";
-                    return "Counting";
-                }),
-                ("Ending", async (c, token) =>
-                {
-                    Console.WriteLine($"Statemachine Finished");
-                    return null;
-                }));
-
-            TestConfig c = new TestConfig();
-            c.bbb = 10;
-            CancellationTokenSource cts = new CancellationTokenSource();
-            var job = statemachine.CreateJob(10);
-            job.UpdateSource.ProcessMessage<IStatemachineJob>(job => Console.WriteLine($"Current State: {job.CurrentStateName} Status: {job.ExecutionState.ToString()}"));            
-            statemachine.ForceAsyncRun = false;
-            statemachine.StartJob(job, cts.Token);
-            Console.WriteLine("--------");
-            AppTime.Wait(4.Seconds());
-            cts.Cancel();
-            AppTime.Wait(1.Seconds());
-            Console.WriteLine(job.CurrentStateName);
-            Console.WriteLine(job.Context);
-            Console.WriteLine(job.ExecutionState.ToString());
-            AppTime.Wait(2.Seconds());
-            statemachine.ContinueJob(job, CancellationToken.None);
-            await job;
-            Console.WriteLine(job.CurrentStateName);
-            Console.WriteLine(job.Context);
-            Console.WriteLine(job.ExecutionState.ToString());
-
-
-
-            Console.ReadKey();
-
-            List<int> l = new List<int>(Enumerable.Range(1, 100));            
-            _ = Task.Run(() =>
-            {
-                foreach(int x in l)
-                {
-                    Console.Write($"{x}, ");
-                    Thread.Sleep(100);                    
-                }
-            });
-            Thread.Sleep(1000);
-            
-            Console.Write($"!!!!!!!!");
-            l = null;
-
-            Console.ReadKey();
-
-            TcpClientEndpoint client = new TcpClientEndpoint(null, true,
-                                                               () => new VariantStreamReader(null, new TypedJsonMessageStreamReader()),
-                                                               () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter()));
-
-            TcpServerEndpoint server = new TcpServerEndpoint(null, true,
-                                                               () => new VariantStreamReader(null, new TypedJsonMessageStreamReader()),
-                                                               () => new VariantStreamWriter(null, new TypedJsonMessageStreamWriter()));
-
-            client.ConnectionWaitHandle.Wait();
-            server.ProcessMessage<object>(msg =>
-            {
-                var x = msg;
-            });
-
-            client.Send(new TestConfig());            
-            client.Send(new TestConfig() { aaa = "XX", bbb = 123 });
-            
-            client.Send(new TestConfig() { aaa = "XdsfX", bbb = 1233 });
-            
-            client.Send(new TestConfig() { aaa = "XdsfX123", bbb = 12332 });
-
-            Console.ReadKey();
-
-       
         }
     }
 }

@@ -600,6 +600,94 @@ namespace FeatureLoom.Serialization
         }
 
         /// <summary>
+        /// Builds a resolver that returns the writer to use for a value whose runtime type may
+        /// deviate from the declared one. If <paramref name="contextSettings"/> carries overrides
+        /// that are transferable to another type, the deviating writer is built with them, so a
+        /// member/context override stays in effect for polymorphic values.
+        /// <para>
+        /// Such context-local writers cannot go into the shared per-type cache, so they are cached
+        /// in a dictionary owned by this resolver, i.e. per prepared call site. Without transferable
+        /// overrides the shared cache is used and no extra dictionary is allocated.
+        /// </para>
+        /// </summary>
+        /// <param name="contextSettings">Settings the declared writer was built with, may be null.</param>
+        internal Func<Type, CachedTypeWriter> CreateDeviatingWriterResolver(BaseTypeWriteSettings contextSettings)
+        {
+            var transferable = contextSettings?.GetTransferableSubset();
+            if (transferable == null) return GetCachedTypeWriter;
+
+            var localCache = new Dictionary<Type, CachedTypeWriter>();
+            return valueType =>
+            {
+                if (localCache.TryGetValue(valueType, out var cached)) return cached;
+                // Bypasses the shared cache on purpose: the result is only valid in this context.
+                var created = CreateCachedTypeWriter(valueType, transferable);
+                localCache[valueType] = created;
+                return created;
+            };
+        }
+
+        /// <summary>
+        /// Builds a delegate that writes a value of the declared type <typeparamref name="TValue"/>
+        /// but respects polymorphy: if the runtime type deviates from the declared one, the writer
+        /// of the runtime type is used, so a value declared as e.g. <see cref="object"/> is written
+        /// with its actual members instead of an empty object.
+        /// <para>
+        /// If the declared type cannot deviate at runtime (value type or sealed class), the check
+        /// is skipped entirely and the prepared writer is called directly.
+        /// </para>
+        /// </summary>
+        /// <param name="declaredWriter">Writer prepared for <typeparamref name="TValue"/>.</param>
+        /// <param name="contextSettings">
+        /// Settings <paramref name="declaredWriter"/> was built with, so their transferable part can
+        /// be applied to deviating runtime types as well. May be <see langword="null"/>.
+        /// </param>
+        internal Action<TValue, ByteSegment> CreatePolymorphicValueWriter<TValue>(CachedTypeWriter declaredWriter, BaseTypeWriteSettings contextSettings = null)
+        {
+            Type declaredType = typeof(TValue);
+            if (declaredType.IsValueType || declaredType.IsSealed)
+            {
+                return (value, itemName) => declaredWriter.WriteItem(value, itemName);
+            }
+
+            Type declaredHandlerType = declaredWriter.HandlerType;
+            var resolveDeviating = CreateDeviatingWriterResolver(contextSettings);
+            return (value, itemName) =>
+            {
+                if (value == null)
+                {
+                    writer.WriteNullValue();
+                    return;
+                }
+                Type valueType = value.GetType();
+                CachedTypeWriter actualWriter = valueType == declaredHandlerType ? declaredWriter : resolveDeviating(valueType);
+                actualWriter.WriteItem(value, itemName);
+            };
+        }
+
+        /// <summary>
+        /// True if values written through <paramref name="declaredWriter"/> can never contain a
+        /// reference path, taking runtime polymorphy into account.
+        /// </summary>
+        /// <remarks>
+        /// The writer's own <see cref="CachedTypeWriter.NoRefTypes"/> only describes the declared
+        /// type. That is not sufficient for a type that can deviate at runtime: a custom value
+        /// shape writer may declare no references for a non sealed reference type, while a derived
+        /// runtime type is written by a different writer whose children can contain references.
+        /// </remarks>
+        internal static bool NoRefTypesIncludingRuntimeTypes<TValue>(CachedTypeWriter declaredWriter)
+            => NoRefTypesIncludingRuntimeTypes(declaredWriter, typeof(TValue));
+
+        /// <inheritdoc cref="NoRefTypesIncludingRuntimeTypes{TValue}(CachedTypeWriter)"/>
+        /// <param name="declaredWriter">Writer prepared for <paramref name="declaredType"/>.</param>
+        /// <param name="declaredType">Statically known type of the written values.</param>
+        internal static bool NoRefTypesIncludingRuntimeTypes(CachedTypeWriter declaredWriter, Type declaredType)
+        {
+            if (!declaredWriter.NoRefTypes) return false;
+            return declaredType.IsValueType || declaredType.IsSealed;
+        }
+
+        /// <summary>
         /// Returns the writer for <paramref name="itemType"/>, optionally built with locally
         /// overriding settings instead of the settings resolved from the type itself.
         /// <para>
@@ -640,6 +728,9 @@ namespace FeatureLoom.Serialization
         {
             bool isLocalOverride = typeSettings != null;
             if (!isLocalOverride) settings.TryGetTypeSettings(itemType, out typeSettings);
+            // A local override only states what it wants to change, so everything else must still
+            // come from the settings configured for the type itself.
+            else if (settings.TryGetTypeSettings(itemType, out var generalSettings)) typeSettings = typeSettings.MergeOnto(generalSettings);
 
             CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType, typeSettings);
             // Typehandler must be added first for the case of recursion (type contains same type).

@@ -127,7 +127,7 @@ namespace FeatureLoom.Serialization
 
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
                 var fieldTypeHandler = GetCachedTypeWriterForMember(fieldType, memberSettings);
-                allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
+                allFieldsNoRefs &= NoRefTypesIncludingRuntimeTypes(fieldTypeHandler, fieldType);
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
                 bool withLeadingComma = mergeCommas && fieldValueWriters.Count > 0;
@@ -200,7 +200,7 @@ namespace FeatureLoom.Serialization
 
                 Type fieldType = GetFieldOrPropertyType(memberInfo);
                 var fieldTypeHandler = GetCachedTypeWriterForMember(fieldType, memberSettings);
-                allFieldsNoRefs &= fieldTypeHandler.NoRefTypes;
+                allFieldsNoRefs &= NoRefTypesIncludingRuntimeTypes(fieldTypeHandler, fieldType);
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
                 bool withLeadingComma = mergeCommas && fieldValueWriters.Count > 0;
@@ -374,6 +374,9 @@ namespace FeatureLoom.Serialization
             else
             {
                 var getValue = Expression.Lambda<Func<T, V>>(fieldAccess, parameter).Compile();
+                // Member overrides must survive a deviating runtime type, otherwise they would
+                // silently stop applying exactly for the polymorphic values they matter most for.
+                var resolveDeviating = CreateDeviatingWriterResolver(memberSettings);
                 return (parentItem) =>
                 {
                     writer.WritePreparedBytes(fieldNameAndColonBytes);
@@ -386,7 +389,7 @@ namespace FeatureLoom.Serialization
                     {
                         Type valueType = value.GetType();
                         CachedTypeWriter actualHandler = fieldTypeHandler;
-                        if (valueType != expectedValueType) actualHandler = GetCachedTypeWriter(valueType);
+                        if (valueType != expectedValueType) actualHandler = resolveDeviating(valueType);
 
                         actualHandler.WriteItem(value, fieldNameBytes);                        
                     }

@@ -231,11 +231,27 @@ public sealed partial class JsonSerializer
         /// separators.
         /// </summary>
         public CustomWriter<T> PrepareArrayWriter<T, TItem>(Func<T, IEnumerable<TItem>> getItems)
+            => PrepareArrayWriter(getItems, (Action<BaseTypeWriteSettings>)null);
+
+        /// <summary>
+        /// Prepares a writer that represents the value as a JSON array of <typeparamref name="TItem"/>,
+        /// written with settings that deviate from the ones configured for that type.
+        /// </summary>
+        /// <remarks>
+        /// The deviating settings are local to this writer and are not shared via the per-type cache.
+        /// If an item is polymorphic, the type independent part of the settings is carried over to
+        /// the writer of the deviating runtime type as well; settings bound to the declared type,
+        /// i.e. a custom type name or custom writer, apply to <typeparamref name="TItem"/> only.
+        /// </remarks>
+        /// <param name="configure">Callback that applies the deviating settings.</param>
+        public CustomWriter<T> PrepareArrayWriter<T, TItem>(Func<T, IEnumerable<TItem>> getItems, Action<BaseTypeWriteSettings> configure)
         {
             if (getItems == null) throw new ArgumentNullException(nameof(getItems));
 
-            var itemWriter = serializer.GetCachedTypeWriter(typeof(TItem));
-            return CreateArrayWriter(getItems, element => itemWriter.WriteItem(element, default), !itemWriter.NoRefTypes);
+            var itemSettings = ObjectWriterBuilder<T>.CreateFieldSettings(configure);
+            var itemWriter = serializer.GetCachedTypeWriter(typeof(TItem), itemSettings);
+            var writeElement = serializer.CreatePolymorphicValueWriter<TItem>(itemWriter, itemSettings);
+            return CreateArrayWriter(getItems, element => writeElement(element, default), !JsonSerializer.NoRefTypesIncludingRuntimeTypes<TItem>(itemWriter));
         }
 
         /// <summary>
@@ -320,7 +336,8 @@ public sealed partial class JsonSerializer
         public Action<TOther> PrepareTypeWriter<TOther>()
         {
             var typeWriter = serializer.GetCachedTypeWriter(typeof(TOther));
-            return item => typeWriter.WriteItem(item, default);
+            var writeValue = serializer.CreatePolymorphicValueWriter<TOther>(typeWriter);
+            return item => writeValue(item, default);
         }
 
         /// <summary>
@@ -339,7 +356,8 @@ public sealed partial class JsonSerializer
             var typeSettings = new TypeWriteSettings<TOther>();
             configure(typeSettings);
             var typeWriter = serializer.GetCachedTypeWriter(typeof(TOther), typeSettings);
-            return item => typeWriter.WriteItem(item, default);
+            var writeValue = serializer.CreatePolymorphicValueWriter<TOther>(typeWriter, typeSettings);
+            return item => writeValue(item, default);
         }
     }
 
@@ -364,21 +382,49 @@ public sealed partial class JsonSerializer
         /// <typeparamref name="TValue"/>, so nested custom writers and settings still apply.
         /// </summary>
         public ObjectWriterBuilder<T> AddField<TValue>(string fieldName, Func<T, TValue> getValue)
+            => AddField(fieldName, getValue, null);
+
+        /// <summary>
+        /// Adds a field whose value is written with settings that deviate from the ones configured
+        /// for <typeparamref name="TValue"/>, e.g. a different type info handling or type name.
+        /// </summary>
+        /// <remarks>
+        /// The deviating settings are local to this field and are not shared via the per-type cache.
+        /// If the value is polymorphic, the type independent part of the settings is carried over to
+        /// the writer of the deviating runtime type as well; settings bound to the declared type,
+        /// i.e. a custom type name or custom writer, apply to <typeparamref name="TValue"/> only.
+        /// </remarks>
+        /// <param name="configure">Callback that applies the deviating settings.</param>
+        public ObjectWriterBuilder<T> AddField<TValue>(string fieldName, Func<T, TValue> getValue, Action<BaseTypeWriteSettings> configure)
         {
             if (fieldName == null) throw new ArgumentNullException(nameof(fieldName));
             if (getValue == null) throw new ArgumentNullException(nameof(getValue));
 
             byte[] preparedName = PrepareName(fieldName);
-            var valueWriter = serializer.GetCachedTypeWriter(typeof(TValue));
-            if (!valueWriter.NoRefTypes) childrenMayContainRefs = true;
+            var fieldSettings = CreateFieldSettings(configure);
+            var valueWriter = serializer.GetCachedTypeWriter(typeof(TValue), fieldSettings);
+            if (!JsonSerializer.NoRefTypesIncludingRuntimeTypes<TValue>(valueWriter)) childrenMayContainRefs = true;
+            var writeValue = serializer.CreatePolymorphicValueWriter<TValue>(valueWriter, fieldSettings);
             var w = serializer.writer;
 
             fieldWriters.Add(item =>
             {
                 w.WritePreparedBytes(preparedName);
-                valueWriter.WriteItem(getValue(item), default);
+                writeValue(getValue(item), default);
             });
             return this;
+        }
+
+        /// <summary>
+        /// Builds the settings object for a field, or returns <see langword="null"/> if nothing was
+        /// configured, so the shared writer of the type can be used.
+        /// </summary>
+        internal static BaseTypeWriteSettings CreateFieldSettings(Action<BaseTypeWriteSettings> configure)
+        {
+            if (configure == null) return null;
+            var fieldSettings = new BaseTypeWriteSettings();
+            configure(fieldSettings);
+            return fieldSettings;
         }
 
         /// <summary>
@@ -446,16 +492,27 @@ public sealed partial class JsonSerializer
         /// apply. A null collection is written as the JSON null literal.
         /// </summary>
         public ObjectWriterBuilder<T> AddArray<TItem>(string fieldName, Func<T, IEnumerable<TItem>> getItems)
+            => AddArray(fieldName, getItems, (Action<BaseTypeWriteSettings>)null);
+
+        /// <summary>
+        /// Adds a field that is written as a JSON array whose items are written with settings that
+        /// deviate from the ones configured for <typeparamref name="TItem"/>.
+        /// </summary>
+        /// <inheritdoc cref="AddField{TValue}(string, Func{T, TValue}, Action{BaseTypeWriteSettings})" path="/remarks"/>
+        /// <param name="configure">Callback that applies the deviating settings.</param>
+        public ObjectWriterBuilder<T> AddArray<TItem>(string fieldName, Func<T, IEnumerable<TItem>> getItems, Action<BaseTypeWriteSettings> configure)
         {
             if (fieldName == null) throw new ArgumentNullException(nameof(fieldName));
             if (getItems == null) throw new ArgumentNullException(nameof(getItems));
 
             byte[] preparedName = PrepareName(fieldName);
-            var itemWriter = serializer.GetCachedTypeWriter(typeof(TItem));
-            if (!itemWriter.NoRefTypes) childrenMayContainRefs = true;
+            var itemSettings = CreateFieldSettings(configure);
+            var itemWriter = serializer.GetCachedTypeWriter(typeof(TItem), itemSettings);
+            if (!JsonSerializer.NoRefTypesIncludingRuntimeTypes<TItem>(itemWriter)) childrenMayContainRefs = true;
+            var writeElement = serializer.CreatePolymorphicValueWriter<TItem>(itemWriter, itemSettings);
             var w = serializer.writer;
 
-            AddArrayField(preparedName, w, getItems, element => itemWriter.WriteItem(element, default));
+            AddArrayField(preparedName, w, getItems, element => writeElement(element, default));
             return this;
         }
 

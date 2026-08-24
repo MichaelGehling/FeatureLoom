@@ -152,6 +152,15 @@ benchmarks (baseline before step 1, compare after step 3). Report before/after.
    Invariant to protect: **settings objects must never be aliased or reused across members.** If
    that ever changes, the tests above hang rather than fail — intentional, a hang is the clearer
    signal. The test file documents this.
+
+   **Amended by the settings merge (step 6).** Merging a type's general settings into a local
+   override re-introduces exactly the loop this item declared impossible: a self referencing type
+   whose general settings configure the recursive member would re-inject that member setting at
+   every nesting level, so the settings tree would no longer be finite. The merge is therefore
+   limited to one level via the `isMerged` flag (`MergeOnto` / `AsInjectedFromGeneralSettings`).
+   The argument above still holds for user authored configuration; it does **not** hold for
+   machine injected configuration. Covered by
+   `MemberOverride_OnSelfReferencingType_Terminates`.
 2. **Duplicate writers.** Each member override creates its own `CachedTypeWriter`. Same trade-off
    the reader already accepts; worth noting in XML docs.
 3. **Public surface.** `ExtensionApi.GetCachedTypeHandler(Type)` is public. Add an overload rather
@@ -179,6 +188,34 @@ benchmarks (baseline before step 1, compare after step 3). Report before/after.
   from the literal `typeof(byte[])`.
 - Behavior change: member-level `SetEnumAsString`, `SetWriteByteArrayAsBase64String`,
   `SetTypeInfoHandling` etc. previously had **no effect** on the serializer side. They now work.
+
+### Step 6 — polymorphy and settings merge — DONE
+
+Follow-up work after a defect was found: custom-writer fields declared as `object` or a base type
+were written with the declared type's writer, producing `{}` or hiding derived members.
+
+- `CreatePolymorphicValueWriter<TValue>(declaredWriter, contextSettings)` in `JsonSerializer.cs`
+  selects the runtime type's writer when the value deviates. Skipped entirely for value types and
+  sealed types. Wired into `AddField`, `AddArray`, `PrepareArrayWriter`, `PrepareTypeWriter`.
+- `CreateDeviatingWriterResolver(contextSettings)` returns `GetCachedTypeWriter` when there is
+  nothing to transfer (no allocation, shared cache), otherwise a per-call-site dictionary of
+  context-local writers.
+- `BaseTypeWriteSettings.GetTransferableSubset()` defines what follows a deviating runtime type:
+  policy fields and `memberSettingsDict` do (a derived type inherits the base type's members);
+  `customTypeName` and `customTypeWriterCreator` do not (bound to the declared type).
+- `BaseTypeWriteSettings.MergeOnto(generalSettings)`: a local override no longer *replaces* the
+  type's general settings but is merged onto them. This also fixed a pre-existing bug — a plain
+  `ConfigureMember` previously discarded the type's own `SetCustomTypeName`, custom writer and
+  member configuration. Limited to one level, see 5.1.
+- `NoRefTypesIncludingRuntimeTypes` replaces direct `CachedTypeWriter.NoRefTypes` reads at the
+  custom-writer and built-in member call sites: `NoRefTypes` describes the declared type only, so
+  skipping ref bookkeeping for a type that can deviate at runtime was unsound. Note: this is a
+  reasoned safety narrowing (it can only turn a `true` into `false`); no test was found that
+  reproduces the underestimation.
+- New `configure` overloads on `AddField`, `AddArray`, `PrepareArrayWriter` for field-local
+  deviating settings.
+- Documented in `CUSTOM_TYPE_WRITERS.md` ("How context-local settings combine", "Polymorphic values
+  and settings") and in `.github/skills/json-serialization.md`.
 
 ## 6. Suggested commit split
 

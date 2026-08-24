@@ -508,6 +508,7 @@ namespace FeatureLoom.Serialization
 
         private class DerivedItem : BaseItem
         {
+            public int Extra;
         }
 
         [Fact]
@@ -960,6 +961,261 @@ namespace FeatureLoom.Serialization
             };
             settings.ConfigureType<Money>(ts => ts.SetCustomTypeName("money"));
             return settings;
+        }
+
+        [Fact]
+        public void AddField_WithObjectDeclaredValue_WritesRuntimeType()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<BoxHolder>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<BoxHolder>(obj =>
+                obj.AddField("value", h => h.Value))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"value\":{\"Code\":3}}", serializer.Serialize(new BoxHolder { Value = new BaseItem { Code = 3 } }));
+            Assert.Equal("{\"value\":42}", serializer.Serialize(new BoxHolder { Value = 42 }));
+            Assert.Equal("{\"value\":null}", serializer.Serialize(new BoxHolder { Value = null }));
+        }
+
+        [Fact]
+        public void AddField_WithDerivedValue_WritesDerivedMembers()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<ItemHolder>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<ItemHolder>(obj =>
+                obj.AddField("item", h => h.Item))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"item\":{\"Extra\":9,\"Code\":3}}",
+                serializer.Serialize(new ItemHolder { Item = new DerivedItem { Code = 3, Extra = 9 } }));
+        }
+
+        /// <summary>
+        /// A value written through the custom writer API must get the same deviating type info a
+        /// built-in member would, otherwise it could not be read back as its original type.
+        /// </summary>
+        [Fact]
+        public void AddField_WithDerivedValue_WritesDeviatingTypeInfo()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DerivedItem>(ts => ts.SetCustomTypeName("derived"));
+            settings.ConfigureType<ItemHolder>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<ItemHolder>(obj =>
+                obj.AddField("item", h => h.Item))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"item\":{\"$type\":\"derived\",\"Extra\":9,\"Code\":3}}",
+                serializer.Serialize(new ItemHolder { Item = new DerivedItem { Code = 3, Extra = 9 } }));
+        }
+
+        [Fact]
+        public void AddArray_WithObjectDeclaredItems_WritesRuntimeTypes()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<BoxListHolder>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<BoxListHolder>(obj =>
+                obj.AddArray("values", h => h.Values))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"values\":[{\"Code\":3},7,null]}",
+                serializer.Serialize(new BoxListHolder { Values = new List<object> { new BaseItem { Code = 3 }, 7, null } }));
+        }
+
+        [Fact]
+        public void PrepareArrayWriter_WithObjectDeclaredItems_WritesRuntimeTypes()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<BoxListHolder>(ts => ts.SetCustomTypeWriter(prep =>
+                prep.PrepareArrayWriter<BoxListHolder, object>(h => h.Values)));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("[{\"Code\":3},7]",
+                serializer.Serialize(new BoxListHolder { Values = new List<object> { new BaseItem { Code = 3 }, 7 } }));
+        }
+
+        [Fact]
+        public void PrepareTypeWriter_WithObjectDeclaredValue_WritesRuntimeType()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<BoxHolder>(ts => ts.SetCustomTypeWriter(prep =>
+            {
+                var writeValue = prep.PrepareTypeWriter<object>();
+                return prep.PrepareRawWriter<BoxHolder>((raw, item) => writeValue(item.Value));
+            }));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"Code\":3}", serializer.Serialize(new BoxHolder { Value = new BaseItem { Code = 3 } }));
+        }
+
+        /// <summary>
+        /// Field local settings must stay in effect when the runtime type deviates, otherwise the
+        /// override would silently stop applying for exactly the polymorphic values it targets.
+        /// </summary>
+        [Fact]
+        public void AddField_WithDeviatingSettings_AppliesThemToRuntimeType()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<ItemHolder>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<ItemHolder>(obj =>
+                obj.AddField("item", h => h.Item, s => s.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo)))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"item\":{\"Extra\":9,\"Code\":3}}",
+                serializer.Serialize(new ItemHolder { Item = new DerivedItem { Code = 3, Extra = 9 } }));
+            Assert.Equal("{\"item\":{\"Code\":3}}",
+                serializer.Serialize(new ItemHolder { Item = new BaseItem { Code = 3 } }));
+        }
+
+        /// <summary>
+        /// The field local settings must not leak into the shared per-type writer cache.
+        /// </summary>
+        [Fact]
+        public void AddField_WithDeviatingSettings_DoesNotAffectOtherFields()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<TwoItemHolder>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<TwoItemHolder>(obj =>
+                obj.AddField("plain", h => h.First)
+                   .AddField("quiet", h => h.Second, s => s.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo)))));
+
+            var serializer = new JsonSerializer(settings);
+            var derived = new DerivedItem { Code = 3, Extra = 9 };
+            string json = serializer.Serialize(new TwoItemHolder { First = derived, Second = derived });
+
+            Assert.Contains("\"plain\":{\"$type\"", json);
+            Assert.Contains("\"quiet\":{\"Extra\"", json);
+        }
+
+        [Fact]
+        public void AddArray_WithDeviatingSettings_AppliesThemToRuntimeType()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<BoxListHolder>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<BoxListHolder>(obj =>
+                obj.AddArray("values", h => h.Values, s => s.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo)))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"values\":[{\"Extra\":9,\"Code\":3},7]}",
+                serializer.Serialize(new BoxListHolder { Values = new List<object> { new DerivedItem { Code = 3, Extra = 9 }, 7 } }));
+        }
+
+        /// <summary>
+        /// A member override states only what it changes, so the settings configured for the type
+        /// itself must survive it instead of being replaced wholesale.
+        /// </summary>
+        [Fact]
+        public void MemberOverride_KeepsGeneralTypeSettings()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<BaseItem>(ts => ts.ConfigureMember<int>("Code", ms => ms.OverrideName("code")));
+            settings.ConfigureType<ItemHolder>(ts => ts.ConfigureMember<BaseItem>("Item",
+                ms => ms.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddAllTypeInfo)));
+
+            var serializer = new JsonSerializer(settings);
+            string json = serializer.Serialize(new ItemHolder { Item = new BaseItem { Code = 3 } });
+
+            // The member override changes only the type info handling, so BaseItem's own member
+            // configuration must still apply.
+            Assert.Contains("\"code\":3", json);
+            Assert.Contains("\"$type\"", json);
+        }
+
+        /// <summary>
+        /// Merging the general member settings back in must not make writer creation recurse
+        /// forever for a type that configures a member of its own type.
+        /// </summary>
+        [Fact]
+        public void MemberOverride_OnSelfReferencingType_Terminates()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<Node>(ts => ts.ConfigureMember<Node>("Next",
+                ms => ms.SetDataSelection(JsonSerializer.DataSelection.PublicFieldsAndProperties)));
+
+            var serializer = new JsonSerializer(settings);
+            var node = new Node { Code = 1, Next = new Node { Code = 2 } };
+
+            Assert.Equal("{\"Code\":1,\"Next\":{\"Code\":2,\"Next\":null}}", serializer.Serialize(node));
+        }
+
+        /// <summary>
+        /// A derived type inherits the members of its base type, so a member rule stated for the
+        /// declared type must keep applying when the runtime type deviates.
+        /// </summary>
+        [Fact]
+        public void MemberOverride_TransfersMemberSettingsToDerivedRuntimeType()
+        {
+            var settings = NoTypeInfoSettings();
+            settings.ConfigureType<ItemHolder>(ts => ts.ConfigureMember<BaseItem>("Item",
+                ms => ms.ConfigureMember<int>("Code", cs => cs.OverrideName("code"))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"Item\":{\"code\":3}}",
+                serializer.Serialize(new ItemHolder { Item = new BaseItem { Code = 3 } }));
+            // The inherited Code member must be renamed for the derived type as well.
+            Assert.Equal("{\"Item\":{\"Extra\":9,\"code\":3}}",
+                serializer.Serialize(new ItemHolder { Item = new DerivedItem { Code = 3, Extra = 9 } }));
+        }
+
+        /// <summary>
+        /// A custom value writer may declare that its type contains no references, but that only
+        /// holds for the declared type. A derived runtime value is written by a different writer,
+        /// so the ref path bookkeeping must not be skipped for it.
+        /// </summary>
+        [Fact]
+        public void ValueShapeWriter_OnUnsealedType_DoesNotDisableRefCheckForDerivedValues()
+        {
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+                referenceCheck = JsonSerializer.ReferenceCheck.AlwaysReplaceByRef
+            };
+            // The value writer states that a BaseItem has no children and therefore no reference
+            // paths. BaseItem is not sealed, so a member declared as BaseItem may still hold a
+            // DerivedItem at runtime, which is written as a full object by its own writer.
+            settings.ConfigureType<BaseItem>(ts => ts.SetCustomTypeWriter(prep =>
+                prep.PrepareValueWriter<BaseItem>((raw, item) => raw.WriteInt(item.Code))));
+
+            var serializer = new JsonSerializer(settings);
+            var shared = new DerivedItem { Code = 3, Extra = 9 };
+            string json = serializer.Serialize(new SharedItemHolder { A = shared, B = shared });
+
+            // Only possible if the ref path bookkeeping was kept enabled for these members.
+            Assert.Contains("$ref", json);
+        }
+
+        static JsonSerializer.Settings NoTypeInfoSettings() => new JsonSerializer.Settings
+        {
+            typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo
+        };
+
+        private class Node
+        {
+            public int Code;
+            public Node Next;
+        }
+
+        private class SharedItemHolder
+        {
+            public BaseItem A;
+            public BaseItem B;
+        }
+
+        private class TwoItemHolder
+        {
+            public BaseItem First;
+            public BaseItem Second;
+        }
+
+        private class BoxHolder
+        {
+            public object Value;
+        }
+
+        private class BoxListHolder
+        {
+            public List<object> Values;
         }
 
         private class ItemHolder

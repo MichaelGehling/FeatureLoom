@@ -290,6 +290,13 @@ namespace FeatureLoom.Serialization
             internal Settings ownerSettings = null;
 
             /// <summary>
+            /// True if this object is already the result of a merge with the general settings of a
+            /// type, so <see cref="MergeOnto"/> must not be applied to it again. See there for why
+            /// the merge is limited to one level.
+            /// </summary>
+            internal bool isMerged = false;
+
+            /// <summary>
             /// True if this settings object says anything about how a value is written, as opposed
             /// to only member-level metadata (<see cref="member_ignore"/>, <see cref="member_overrideName"/>).
             /// Used to decide whether a member needs its own writer instead of the shared one.
@@ -304,9 +311,131 @@ namespace FeatureLoom.Serialization
                 customTypeName != null ||
                 memberSettingsDict.Count > 0;
 
+            /// <summary>
+            /// Returns these context-local settings combined with <paramref name="generalSettings"/>,
+            /// the settings configured for the type itself. Everything the local context does not
+            /// say anything about is taken from the general settings, so configuring a type and
+            /// then overriding a single aspect for one member no longer discards the rest.
+            /// </summary>
+            /// <remarks>
+            /// <para>
+            /// <see cref="memberSettingsDict"/> is merged per member name, with the local entry
+            /// winning, but only for this one level: the result is flagged as
+            /// <see cref="isMerged"/> and writers created below it do not merge again. That limit
+            /// is required for termination. A self referencing type whose general settings
+            /// configure the recursive member would otherwise re-inject that same member setting at
+            /// every nesting level, and building the writer would never end.
+            /// </para>
+            /// <para>
+            /// Returns a new object; neither input is modified.
+            /// </para>
+            /// </remarks>
+            internal BaseTypeWriteSettings MergeOnto(BaseTypeWriteSettings generalSettings)
+            {
+                if (generalSettings == null || isMerged) return this;
+
+                var merged = new BaseTypeWriteSettings
+                {
+                    dataSelection = dataSelection ?? generalSettings.dataSelection,
+                    typeInfoHandling = typeInfoHandling ?? generalSettings.typeInfoHandling,
+                    enumAsString = enumAsString ?? generalSettings.enumAsString,
+                    writeByteArrayAsBase64String = writeByteArrayAsBase64String ?? generalSettings.writeByteArrayAsBase64String,
+                    treatEnumerablesAsCollections = treatEnumerablesAsCollections ?? generalSettings.treatEnumerablesAsCollections,
+                    customTypeName = customTypeName ?? generalSettings.customTypeName,
+                    customTypeWriterCreator = customTypeWriterCreator ?? generalSettings.customTypeWriterCreator,
+                    member_ignore = member_ignore,
+                    member_overrideName = member_overrideName,
+                    ownerSettings = ownerSettings ?? generalSettings.ownerSettings,
+                    isMerged = true
+                };
+
+                foreach (var entry in generalSettings.memberSettingsDict) merged.memberSettingsDict[entry.Key] = entry.Value.AsInjectedFromGeneralSettings();
+                foreach (var entry in memberSettingsDict) merged.memberSettingsDict[entry.Key] = entry.Value;
+
+                return merged;
+            }
+
+            /// <summary>
+            /// Returns a copy of these member settings that will not be merged with the general
+            /// settings of its type again.
+            /// </summary>
+            /// <remarks>
+            /// Used for entries pulled in from a type's general settings by <see cref="MergeOnto"/>.
+            /// Without the flag, a self referencing member would re-inject the very settings object
+            /// that pulled it in, at every nesting level, and writer creation would never terminate.
+            /// The copy keeps its own <see cref="memberSettingsDict"/>, which is user authored and
+            /// therefore finite in depth.
+            /// </remarks>
+            private BaseTypeWriteSettings AsInjectedFromGeneralSettings()
+            {
+                if (isMerged) return this;
+
+                var copy = new BaseTypeWriteSettings
+                {
+                    dataSelection = dataSelection,
+                    typeInfoHandling = typeInfoHandling,
+                    enumAsString = enumAsString,
+                    writeByteArrayAsBase64String = writeByteArrayAsBase64String,
+                    treatEnumerablesAsCollections = treatEnumerablesAsCollections,
+                    customTypeName = customTypeName,
+                    customTypeWriterCreator = customTypeWriterCreator,
+                    member_ignore = member_ignore,
+                    member_overrideName = member_overrideName,
+                    ownerSettings = ownerSettings,
+                    isMerged = true
+                };
+                foreach (var entry in memberSettingsDict) copy.memberSettingsDict[entry.Key] = entry.Value;
+                return copy;
+            }
+
+            /// <summary>
+            /// Returns the subset of these settings that may be carried over to a value whose
+            /// runtime type deviates from the declared one, or <see langword="null"/> if nothing
+            /// remains. Used to keep a member/context override in effect for polymorphic values.
+            /// </summary>
+            /// <remarks>
+            /// <para>
+            /// Transferable are the type independent policy settings and the per member
+            /// configuration: a derived type inherits the members of its base type, so a member
+            /// rule stated for the declared type should keep applying to them. Entries naming a
+            /// member the runtime type does not have simply never match, the same as a mistyped
+            /// member name does today.
+            /// </para>
+            /// <para>
+            /// Deliberately excluded: <see cref="customTypeName"/>, because the name configured for
+            /// the declared type would mislabel the deviating one, and
+            /// <see cref="customTypeWriterCreator"/>, because a custom writer is bound to the type
+            /// it was declared for and cannot read a different one.
+            /// </para>
+            /// <para>
+            /// Returns a copy, so the result can be handed to a writer without the risk of the
+            /// original being mutated afterwards.
+            /// </para>
+            /// </remarks>
+            internal BaseTypeWriteSettings GetTransferableSubset()
+            {
+                if (dataSelection == null &&
+                    typeInfoHandling == null &&
+                    enumAsString == null &&
+                    writeByteArrayAsBase64String == null &&
+                    treatEnumerablesAsCollections == null &&
+                    memberSettingsDict.Count == 0) return null;
+
+                var subset = new BaseTypeWriteSettings
+                {
+                    dataSelection = dataSelection,
+                    typeInfoHandling = typeInfoHandling,
+                    enumAsString = enumAsString,
+                    writeByteArrayAsBase64String = writeByteArrayAsBase64String,
+                    treatEnumerablesAsCollections = treatEnumerablesAsCollections,
+                    ownerSettings = ownerSettings
+                };
+                foreach (var entry in memberSettingsDict) subset.memberSettingsDict[entry.Key] = entry.Value;
+                return subset;
+            }
+
             /// <summary>Sets which members are written for this type scope.</summary>
             public void SetDataSelection(DataSelection dataSelection) => this.dataSelection = dataSelection;
-
             /// <summary>
             /// Sets whether a "$type" member is written for values of this type scope.
             /// </summary>

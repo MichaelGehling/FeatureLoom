@@ -66,6 +66,12 @@ Two consequences worth knowing:
   built-in one, which is how a value can claim a foreign type
   ([section 5](#claiming-a-different-type)).
 
+Runtime polymorphy is handled for you as well: a field declared as `object` or as a base type is
+written with the writer of the value's **actual** type, so its real members appear and the deviating
+`$type` is emitted. This applies to `AddField`, `AddArray`, `PrepareArrayWriter` and
+`PrepareTypeWriter` alike — see
+[Polymorphic values and settings](#polymorphic-values-and-settings).
+
 ---
 
 ## 1. Value type written as a string
@@ -200,6 +206,17 @@ prep.PrepareArrayWriter<Basket, Money>(b => b.Items)                            
 prep.PrepareArrayWriter<Basket, Money>(b => b.Items, m => m.AddField("amount", …))      // nested builder
 prep.PrepareArrayWriter<Tags, string>(t => t.Values, (raw, v) => raw.WriteString(v))    // raw per item
 ```
+
+`AddField`, `AddArray` and `PrepareArrayWriter` each take an optional `configure` callback that
+writes the values with settings deviating from the ones configured for that type — local to this
+field, without affecting how the type is written anywhere else:
+
+```csharp
+.AddField("item", o => o.Item, s => s.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo))
+```
+
+See [How context-local settings combine](#how-context-local-settings-combine) for how these
+interact with the type's own configuration and with polymorphic values.
 
 **Newtonsoft.Json / System.Text.Json**
 
@@ -436,6 +453,56 @@ settings.ConfigureType<Invoice>(ts => ts.ConfigureMember<Money>(nameof(Invoice.T
 > `$type` must be the first member for other serializers to recognize it — and if you emit `$type`
 > without suppressing the built-in one, the output contains it twice.
 
+### How context-local settings combine
+
+A member override, or a `PrepareTypeWriter(configure)` / `AddField(..., configure)` override, states
+only what it *changes*. Everything else still comes from the settings configured for the type
+itself:
+
+```csharp
+settings.ConfigureType<Money>(ts => ts.ConfigureMember<int>(nameof(Money.Amount),
+	ms => ms.OverrideName("amount")));
+
+settings.ConfigureType<Invoice>(ts => ts.ConfigureMember<Money>(nameof(Invoice.Total),
+	ms => ms.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo)));
+
+// {"Total":{"amount":12}}   <- the override changed only the type info handling,
+//                              Money's own member configuration still applies
+```
+
+Conflicts resolve in favor of the more specific context: the local override wins per field, and per
+member name in the case of member configuration.
+
+> **One-level limit.** For a type that references itself, the type's *general* member settings are
+> merged in for one nesting level below an override, not indefinitely. That limit is what makes
+> writer creation terminate for recursive types.
+
+### Polymorphic values and settings
+
+When a value's runtime type deviates from its declared type — a member declared as `object`, or a
+base type holding a derived instance — the serializer writes it with the writer of the **runtime**
+type, so the actual members appear instead of an empty `{}`.
+
+Context-local settings follow the value to that runtime type, as far as that is meaningful:
+
+| Setting | Follows a deviating runtime type? |
+|---|---|
+| `SetDataSelection`, `SetTypeInfoHandling`, `SetEnumAsString`, `SetWriteByteArrayAsBase64String`, `SetTreatEnumerablesAsCollections` | yes — type independent policy |
+| `ConfigureMember` entries | yes — a derived type inherits the base type's members; entries naming a member the runtime type does not have simply never match |
+| `SetCustomTypeName` | no — the name configured for the declared type would mislabel the deviating one |
+| `SetCustomTypeWriter` | no — a custom writer is bound to the type it was written for |
+
+```csharp
+settings.ConfigureType<ItemHolder>(ts => ts.ConfigureMember<BaseItem>(nameof(ItemHolder.Item),
+	ms => ms.ConfigureMember<int>(nameof(BaseItem.Code), cs => cs.OverrideName("code"))));
+
+// BaseItem    -> {"Item":{"code":3}}
+// DerivedItem -> {"Item":{"Extra":9,"code":3}}   <- inherited member is renamed too
+```
+
+Writers built for such an override are local to the call site and are not shared through the
+per-type cache, so they never leak into how the type is written elsewhere.
+
 ### How the others do it
 
 **Newtonsoft.Json** — a converter takes over the value completely, so Newtonsoft writes no `$type`
@@ -669,7 +736,8 @@ involved types.
 | Null handling for nested/array fields | automatic | manual | manual |
 | Declarative nesting | `AddObject` / `AddArray` | no | no |
 | Nested type writer lookup | once, at preparation | per call | cacheable, manually |
-| Local settings deviation | `PrepareTypeWriter<T>(configure)` | second serializer instance | second options instance |
+| Local settings deviation | `PrepareTypeWriter<T>(configure)`, `AddField/AddArray(…, configure)` | second serializer instance | second options instance |
+| Settings on polymorphic values | policy and member rules follow the runtime type | global only | global only |
 | Multi-type match | `supportsType` predicate | `CanConvert` | `JsonConverterFactory` |
 | Exact-type precedence | deterministic | registration order | registration order |
 | Open generic types | `typeof(MyWriter<>)`, typed | reflective converter | hand-written factory |

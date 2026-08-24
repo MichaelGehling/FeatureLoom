@@ -25,5 +25,12 @@ applyTo: "**/Serialization/**"
 - Standard conformance beats micro-optimization. If a fast path can produce a different value than the spec-correct path, it must be guarded and covered by a test.
 - Try keep patterns consistent between serializer and deserializer. If a change is made to one, check the other for symmetry.
 
+## Writer settings resolution
+- A context-local override (member settings, `PrepareTypeWriter(configure)`, `AddField/AddArray(…, configure)`) is **merged onto** the type's general settings via `BaseTypeWriteSettings.MergeOnto`, not used as a replacement. Local value wins per field and per member name.
+- Merged writers are **not** put into the shared per-type cache — they are only valid in the context the override came from.
+- Termination for recursive types relies on the merge being one level deep (`isMerged` flag). Do not remove that guard without a replacement cycle check.
+- Runtime polymorphy: a value whose runtime type deviates is written by the runtime type's writer. `GetTransferableSubset()` decides what follows it — policy fields and `memberSettingsDict` do, `customTypeName` and `customTypeWriterCreator` do not.
+- `CachedTypeWriter.NoRefTypes` describes the **declared** type only. Use `NoRefTypesIncludingRuntimeTypes` when the declared type can deviate at runtime, otherwise ref-path bookkeeping can be skipped unsoundly.
+
 ## Definition of done
 Any parsing/formatting change needs a regression test in `FeatureLoom.Tests/Serialization/` (see the testing instructions), and a benchmark run if it was performance motivated.
