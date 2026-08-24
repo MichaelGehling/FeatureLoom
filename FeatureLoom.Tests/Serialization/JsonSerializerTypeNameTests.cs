@@ -90,7 +90,7 @@ public class JsonSerializerTypeNameTests
             var serializer = CreateSerializer(s =>
             {
                 s.typeNameFormat = format;
-                s.AddCustomTypeName<Dog>("dog");
+                s.ConfigureType<Dog>(ts => ts.SetCustomTypeName("dog"));
             });
 
             string json = serializer.Serialize(new Holder { Pet = new Dog { Name = "Rex" } });
@@ -105,7 +105,7 @@ public class JsonSerializerTypeNameTests
         {
             s.typeNameFormat = JsonSerializer.TypeNameFormat.Simplified;
             s.genericTypeNameFormat = JsonSerializer.TypeNameFormat.AssemblyQualified;
-            s.AddCustomTypeName(typeof(List<string>), "stringList");
+            s.ConfigureType(typeof(List<string>), ts => ts.SetCustomTypeName("stringList"));
         });
 
         string json = serializer.Serialize(new GenericHolder { Values = new List<string> { "a" } });
@@ -208,7 +208,7 @@ public class JsonSerializerTypeNameTests
     [Fact]
     public void CustomTypeName_RoundTripsWhenDeserializerKnowsTheName()
     {
-        var serializer = CreateSerializer(s => s.AddCustomTypeName<Dog>("dog"));
+        var serializer = CreateSerializer(s => s.ConfigureType<Dog>(ts => ts.SetCustomTypeName("dog")));
         string json = serializer.Serialize(new Holder { Pet = new Dog { Name = "Rex", CanBark = true } });
         Assert.Contains("\"$type\":\"dog\"", json);
 
@@ -224,14 +224,14 @@ public class JsonSerializerTypeNameTests
     }
 
     [Fact]
-    public void ClearCustomTypeNames_RestoresConfiguredFormat()
+    public void CustomTypeName_SetToNull_RestoresConfiguredFormat()
     {
         var settings = new JsonSerializer.Settings
         {
             typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
         };
-        settings.AddCustomTypeName<Dog>("dog");
-        settings.ClearCustomTypeNames();
+        settings.ConfigureType<Dog>(ts => ts.SetCustomTypeName("dog"));
+        settings.ConfigureType<Dog>(ts => ts.SetCustomTypeName(null));
 
         string json = new JsonSerializer(settings).Serialize(new Holder { Pet = new Dog { Name = "Rex" } });
 

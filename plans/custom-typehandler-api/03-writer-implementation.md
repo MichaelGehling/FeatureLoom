@@ -176,3 +176,45 @@ Note: `JsonDeserializer.ExtensionApi` is a **different, still-live type** and wa
 - [x] `PrepareFieldName` moved to the preparation API; `PrepareRawJson` added
 - [x] `RawWriteApi` completed to a superset of `ValueWriteApi`
 - [x] Segment/span overloads for `WriteString`, `WriteFieldName`, `WriteRawJson`, `WritePrepared`
+- [x] `$type` behaviour pinned by tests for all four shapes
+- [x] `PrepareTypeInfo(string)` / `PrepareTypeInfo<TOther>()` for writers that claim a foreign type
+
+## Type info for custom writers
+
+Verified by test, not changed: type info already worked for every shape, because
+`ApplyCustomWriter` routes all four shapes through the same `CreatePrimitiveItemWriter` /
+`CreateObjectItemWriter` / `CreateArrayItemWriter` wrappers the built-in writers use. A custom
+writer never writes `$type` itself. Seven tests now pin this down, including the empty-object case
+(comma after the type info rolled back) and `AddDeviatingTypeInfo`.
+
+The one real gap was **mutating** the written type — mimicking a DTO or an older class version.
+Rejected the idea of a dedicated "override the type name" setting: the type name is only half of
+it, since such a writer usually also changes the member shape, and a second naming mechanism next
+to `SetCustomTypeName` would compete with the existing precedence rules.
+(Follow-up: the redundant global `AddCustomTypeName` / `ClearCustomTypeNames` were removed
+altogether, so `SetCustomTypeName` is now the single naming mechanism. `ConfigureType(Type, ...)`
+was added to keep the runtime-`Type` case covered.)
+
+Instead the existing suppression is combined with a new preparation-phase encoder:
+
+1. `SetTypeInfoHandling(AddNoTypeInfo)` on the type or member scope removes the built-in envelope.
+2. `PrepareTypeInfo(string)` or `PrepareTypeInfo<TOther>()` encodes `"$type":"..."` once, and the
+   writer emits it via `WritePrepared`.
+
+`PrepareTypeInfo<TOther>()` resolves through `ResolveTypeName`, so a configured custom name or the
+configured name format is honored rather than hardcoded; this required widening `ResolveTypeName`
+from `private` to `internal`. Both overloads keep the encoding in phase 1, consistent with
+`PrepareFieldName` / `PrepareRawJson`.
+
+The `string` overload takes a name, never a `Type`, so the mimicked type does not have to exist in
+this process — the usual case is a type that only the consuming (legacy or foreign) system knows.
+No validation is applied to the name for that reason.
+
+Both steps also work on member settings, because `MemberWriteSettings<T>` derives from
+`TypeWriteSettings<T>` and therefore inherits `SetTypeInfoHandling` and `SetCustomTypeWriter`. So a
+single member can claim a foreign type while other members of the same type are unaffected; this
+needed no new API and is covered by a test using two `Money` members on one type.
+
+Known sharp edge, documented rather than guarded: emitting `$type` *without* suppressing the
+built-in one writes it twice. Detecting that would mean inspecting the user's token stream, which
+is exactly what the raw API declines to do.

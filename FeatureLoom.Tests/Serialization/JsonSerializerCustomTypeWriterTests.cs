@@ -494,6 +494,13 @@ namespace FeatureLoom.Serialization
             public List<Money> Items;
         }
 
+        /// <summary>Two members of the same type, so a member scoped override can be isolated.</summary>
+        private class Invoice
+        {
+            public Money Total;
+            public Money Paid;
+        }
+
         private class BaseItem
         {
             public int Code;
@@ -648,6 +655,316 @@ namespace FeatureLoom.Serialization
             var serializer = new JsonSerializer(settings);
 
             Assert.Equal("[18446744073709551615,1.5,2.5,7,-3,9,255,-128]", serializer.Serialize(new Money()));
+        }
+
+        /// <summary>
+        /// Type info must be applied by the shape wrapper, not by the custom writer, so every shape
+        /// has to produce the envelope the built-in writers produce for the same shape.
+        /// </summary>
+        [Fact]
+        public void CustomValueWriter_WritesTypeInfoEnvelope()
+        {
+            var settings = TypeInfoSettings();
+            settings.ConfigureType<Money>(ts => ts.SetCustomTypeWriter(prep =>
+                prep.PrepareValueWriter<Money>((value, item) => value.WriteString(item.Currency))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"money\",\"$value\":\"EUR\"}", serializer.Serialize(new Money { Currency = "EUR" }));
+        }
+
+        [Fact]
+        public void CustomObjectWriter_WritesTypeInfoAsFirstMember()
+        {
+            var settings = TypeInfoSettings();
+            settings.ConfigureType<Person>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<Person>(obj => obj
+                .AddRawField("age", (raw, p) => raw.WriteInt(p.Age)))));
+            settings.ConfigureType<Person>(ts => ts.SetCustomTypeName("person"));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"person\",\"age\":42}", serializer.Serialize(new Person { Age = 42 }));
+        }
+
+        /// <summary>
+        /// An empty body must not leave the comma that follows the type info behind.
+        /// </summary>
+        [Fact]
+        public void CustomObjectWriter_WithoutFields_WritesOnlyTypeInfo()
+        {
+            var settings = TypeInfoSettings();
+            settings.ConfigureType<Person>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<Person>(_ => { })));
+            settings.ConfigureType<Person>(ts => ts.SetCustomTypeName("person"));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"person\"}", serializer.Serialize(new Person { Name = "Ann" }));
+        }
+
+        [Fact]
+        public void CustomArrayWriter_WritesTypeInfoEnvelope()
+        {
+            var settings = TypeInfoSettings();
+            settings.ConfigureType<Tags>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareArrayWriter<Tags, string>(t => t.Values)));
+            settings.ConfigureType<Tags>(ts => ts.SetCustomTypeName("tags"));
+            settings.ConfigureType<string>(ts => ts.SetCustomTypeName("string"));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"tags\",\"$value\":[{\"$type\":\"string\",\"$value\":\"a\"}]}",
+                serializer.Serialize(new Tags { Values = new List<string> { "a" } }));
+        }
+
+        [Fact]
+        public void CustomRawWriter_WritesTypeInfoEnvelope()
+        {
+            var settings = TypeInfoSettings();
+            settings.ConfigureType<Money>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareRawWriter<Money>((raw, item) =>
+            {
+                raw.OpenArray();
+                raw.WriteInt(item.Amount);
+                raw.CloseArray();
+            })));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"money\",\"$value\":[12]}", serializer.Serialize(new Money { Amount = 12 }));
+        }
+
+        /// <summary>
+        /// With AddDeviatingTypeInfo the envelope must appear only when the runtime type deviates
+        /// from the declared one, which is the case the deserializer actually needs it for.
+        /// </summary>
+        [Fact]
+        public void CustomWriter_WritesTypeInfoOnlyForDeviatingType()
+        {
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo
+            };
+            settings.ConfigureType<BaseItem>(ts => ts.SetCustomTypeWriter(
+                prep => prep.PrepareValueWriter<BaseItem>((value, item) => value.WriteInt(item.Code)),
+                true));
+            settings.ConfigureType<DerivedItem>(ts => ts.SetCustomTypeName("derived"));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"Item\":1}", serializer.Serialize(new ItemHolder { Item = new BaseItem { Code = 1 } }));
+            Assert.Equal("{\"Item\":{\"$type\":\"derived\",\"$value\":2}}",
+                serializer.Serialize(new ItemHolder { Item = new DerivedItem { Code = 2 } }));
+        }
+
+        /// <summary>
+        /// A per-type name set via ConfigureType must reach the custom writer's envelope too.
+        /// </summary>
+        [Fact]
+        public void CustomWriter_UsesConfiguredTypeName()
+        {
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
+            };
+            settings.ConfigureType<Money>(ts =>
+            {
+                ts.SetCustomTypeName("cash");
+                ts.SetCustomTypeWriter(prep => prep.PrepareValueWriter<Money>((value, item) => value.WriteInt(item.Amount)));
+            });
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"cash\",\"$value\":12}", serializer.Serialize(new Money { Amount = 12 }));
+        }
+
+        /// <summary>
+        /// Mimicking a DTO: the writer suppresses the serializer's envelope for its own type and
+        /// emits a "$type" naming a foreign type instead, so the JSON claims to be something the
+        /// CLR type is not.
+        /// </summary>
+        [Fact]
+        public void CustomWriter_CanEmitForeignTypeName()
+        {
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
+            };
+            settings.ConfigureType<Money>(ts =>
+            {
+                ts.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo);
+                ts.SetCustomTypeWriter(prep =>
+                {
+                    var typeInfo = prep.PrepareTypeInfo("MoneyDto");
+                    byte[] amount = prep.PrepareFieldName("amount");
+                    return prep.PrepareRawWriter<Money>((raw, item) =>
+                    {
+                        raw.OpenObject();
+                        raw.WritePrepared(typeInfo);
+                        raw.WriteComma();
+                        raw.WritePrepared(amount);
+                        raw.WriteInt(item.Amount);
+                        raw.CloseObject();
+                    });
+                });
+            });
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"MoneyDto\",\"amount\":12}", serializer.Serialize(new Money { Amount = 12 }));
+        }
+
+        /// <summary>
+        /// The suppression must be local: the same type keeps its normal envelope in a serializer
+        /// that does not configure the custom writer.
+        /// </summary>
+        [Fact]
+        public void CustomWriter_ForeignTypeName_DoesNotLeakToOtherSerializers()
+        {
+            var settings = TypeInfoSettings();
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"money\",\"Amount\":12,\"Currency\":null}",
+                serializer.Serialize<object>(new Money { Amount = 12 }));
+        }
+
+        /// <summary>
+        /// The same trick scoped to a single member: only Money written as Order.Total claims the
+        /// foreign type, while Money written anywhere else keeps its normal envelope.
+        /// </summary>
+        [Fact]
+        public void CustomWriter_CanEmitForeignTypeName_ForSingleMember()
+        {
+            var settings = TypeInfoSettings();
+            settings.ConfigureType<Invoice>(ts => ts.SetCustomTypeName("invoice"));
+            settings.ConfigureType<Invoice>(ts => ts.ConfigureMember<Money>(nameof(Invoice.Total), ms =>
+            {
+                ms.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo);
+                ms.SetCustomTypeWriter(prep =>
+                {
+                    byte[] typeInfo = prep.PrepareTypeInfo("MoneyDto");
+                    byte[] amount = prep.PrepareFieldName("amount");
+                    return prep.PrepareRawWriter<Money>((raw, item) =>
+                    {
+                        raw.OpenObject();
+                        raw.WritePrepared(typeInfo);
+                        raw.WriteComma();
+                        raw.WritePrepared(amount);
+                        raw.WriteInt(item.Amount);
+                        raw.CloseObject();
+                    });
+                });
+            }));
+
+            var serializer = new JsonSerializer(settings);
+
+            // Total is remapped, Paid keeps the normal envelope - same type, same object.
+            Assert.Equal("{\"$type\":\"invoice\",\"Total\":{\"$type\":\"MoneyDto\",\"amount\":12}," +
+                "\"Paid\":{\"$type\":\"money\",\"Amount\":7,\"Currency\":null}}",
+                serializer.Serialize(new Invoice
+                {
+                    Total = new Money { Amount = 12 },
+                    Paid = new Money { Amount = 7 }
+                }));
+        }
+
+        /// <summary>
+        /// The mimicked type need not exist in this process: the name is written verbatim, so a
+        /// writer can target a type that lives only in the consuming system.
+        /// </summary>
+        [Fact]
+        public void PrepareTypeInfo_AcceptsNameOfNonExistingType()
+        {
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
+            };
+            settings.ConfigureType<Money>(ts =>
+            {
+                ts.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo);
+                ts.SetCustomTypeWriter(prep =>
+                {
+                    byte[] typeInfo = prep.PrepareTypeInfo("Legacy.Money, LegacyApp");
+                    return prep.PrepareRawWriter<Money>((raw, item) =>
+                    {
+                        raw.OpenObject();
+                        raw.WritePrepared(typeInfo);
+                        raw.CloseObject();
+                    });
+                });
+            });
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"Legacy.Money, LegacyApp\"}", serializer.Serialize(new Money()));
+        }
+
+        /// <summary>
+        /// SetCustomTypeName on a member scope applies only to that member, so the same CLR type
+        /// can claim a different name depending on where it is written.
+        /// </summary>
+        [Fact]
+        public void SetCustomTypeName_OnMemberScope_IsAppliedOnlyToThatMember()
+        {
+            var settings = TypeInfoSettings();
+            settings.ConfigureType<Invoice>(ts => ts.SetCustomTypeName("invoice"));
+            settings.ConfigureType<Invoice>(ts => ts.ConfigureMember<Money>(nameof(Invoice.Total),
+                ms => ms.SetCustomTypeName("MoneyDto")));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"invoice\",\"Total\":{\"$type\":\"MoneyDto\",\"Amount\":12,\"Currency\":null}," +
+                "\"Paid\":{\"$type\":\"money\",\"Amount\":7,\"Currency\":null}}",
+                serializer.Serialize(new Invoice
+                {
+                    Total = new Money { Amount = 12 },
+                    Paid = new Money { Amount = 7 }
+                }));
+        }
+
+        /// <summary>
+        /// PrepareTypeInfo must resolve the name the same way the serializer does, so a writer can
+        /// emit the envelope of an existing type without hardcoding its name format.
+        /// </summary>
+        [Fact]
+        public void PrepareTypeInfo_ResolvesConfiguredNameOfAnotherType()
+        {
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
+            };
+            settings.ConfigureType<Person>(ts => ts.SetCustomTypeName("person"));
+            settings.ConfigureType<Money>(ts =>
+            {
+                ts.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo);
+                ts.SetCustomTypeWriter(prep =>
+                {
+                    var typeInfo = prep.PrepareTypeInfo<Person>();
+                    return prep.PrepareRawWriter<Money>((raw, item) =>
+                    {
+                        raw.OpenObject();
+                        raw.WritePrepared(typeInfo);
+                        raw.CloseObject();
+                    });
+                });
+            });
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"$type\":\"person\"}", serializer.Serialize(new Money()));
+        }
+
+        static JsonSerializer.Settings TypeInfoSettings()
+        {
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
+            };
+            settings.ConfigureType<Money>(ts => ts.SetCustomTypeName("money"));
+            return settings;
+        }
+
+        private class ItemHolder
+        {
+            public BaseItem Item;
         }
     }
 }

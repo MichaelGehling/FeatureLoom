@@ -173,6 +173,35 @@ public sealed partial class JsonSerializer
         }
 
         /// <summary>
+        /// Encodes a <c>"$type":"..."</c> member once, so a writer can emit type information the
+        /// serializer would not emit by itself.
+        /// <para>
+        /// Intended for values that must claim to be a different type than their CLR type, e.g.
+        /// when mimicking a DTO or an older version of a class. Combine it with
+        /// <see cref="BaseTypeWriteSettings.SetTypeInfoHandling(TypeInfoHandling)"/> set to
+        /// <see cref="TypeInfoHandling.AddNoTypeInfo"/> for the same type scope, otherwise the
+        /// serializer's own envelope is written in addition to this one.
+        /// </para>
+        /// </summary>
+        /// <param name="typeName">
+        /// The name to write, used verbatim. It does not have to name a type that exists in this
+        /// process, which is what allows targeting a type that only the consuming system knows.
+        /// </param>
+        public byte[] PrepareTypeInfo(string typeName)
+        {
+            if (typeName == null) throw new ArgumentNullException(nameof(typeName));
+            return serializer.writer.PrepareTypeInfo(typeName);
+        }
+
+        /// <summary>
+        /// Encodes a <c>"$type":"..."</c> member for <typeparamref name="TOther"/>, resolving the
+        /// name exactly as the serializer would, so a configured custom type name or the
+        /// configured name format is honored instead of being hardcoded.
+        /// </summary>
+        /// <remarks>See <see cref="PrepareTypeInfo(string)"/> for how to suppress the serializer's own envelope.</remarks>
+        public byte[] PrepareTypeInfo<TOther>() => serializer.writer.PrepareTypeInfo(serializer.ResolveTypeName(typeof(TOther)));
+
+        /// <summary>
         /// Prepares a writer that represents the value as a single JSON value, e.g. a string or
         /// a number. Such a value has no children, so it can never contain a reference.
         /// </summary>

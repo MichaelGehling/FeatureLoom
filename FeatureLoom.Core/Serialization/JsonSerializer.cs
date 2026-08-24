@@ -247,7 +247,7 @@ namespace FeatureLoom.Serialization
         private void WriteArrayWithTypeInfo<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, Action<T> itemHandler)
         {
             bool writeTypeInfo = TypeInfoRequired(typeHandler, deviatingType);
-            if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+            if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo, settings.arrayValueFieldName == ValueFieldName.Values);
             writer.OpenArray();
             itemHandler.Invoke(item);
             writer.CloseArray();
@@ -311,6 +311,17 @@ namespace FeatureLoom.Serialization
             if (TypeInfoRequired(typeHandler, deviatingType))
             {
                 writer.WriteToBuffer(typeHandler.preparedTypeInfo);
+                if (settings.typeInfoFormat == TypeInfoFormat.AlwaysEnvelope)
+                {
+                    // The body is moved into a nested "$value" object, so that type info and
+                    // payload always sit at fixed positions, no matter the value's shape.
+                    writer.WriteComma();
+                    writer.WriteValueFieldName();
+                    writer.OpenObject();
+                    itemHandler.Invoke(item);
+                    writer.CloseObject();
+                    return;
+                }
                 countBeforeComma = writer.BufferCount;
                 writer.WriteComma();
                 countAfterComma = writer.BufferCount;
@@ -563,18 +574,14 @@ namespace FeatureLoom.Serialization
 
         /// <summary>
         /// Determines the name written into the "$type" member of the given type.
-        /// Precedence: a per-type name set via ConfigureType wins, then a globally registered
-        /// custom name, then the format setting, where generic types use genericTypeNameFormat and
-        /// all other types use typeNameFormat.
+        /// Precedence: a custom name set via SetCustomTypeName wins, then the format setting,
+        /// where generic types use genericTypeNameFormat and all other types use typeNameFormat.
         /// Only called while creating a CachedTypeWriter, so the result is cached per type and
         /// does not add any cost to the actual serialization.
         /// </summary>
-        private string ResolveTypeName(Type itemType)
+        internal string ResolveTypeName(Type itemType)
         {
-            if (settings.TryGetCustomTypeName(itemType, out string perTypeName)) return perTypeName;
-
-            if (settings.customTypeNames != null &&
-                settings.customTypeNames.TryGetValue(itemType, out string customName)) return customName;
+            if (settings.TryGetCustomTypeName(itemType, out string customName)) return customName;
 
             var format = itemType.IsGenericType ? settings.genericTypeNameFormat : settings.typeNameFormat;
 
@@ -640,7 +647,12 @@ namespace FeatureLoom.Serialization
             // nesting is bounded by the configuration depth (see GetCachedTypeWriter).
             if (!isLocalOverride) typeWriterCache[itemType] = typeHandler;
 
-            typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(ResolveTypeName(itemType));
+            // A name set on a local override (e.g. member settings) applies only in that context,
+            // so it is taken directly instead of through the per-type lookup in ResolveTypeName.
+            string typeName = isLocalOverride && typeSettings.customTypeName != null
+                ? typeSettings.customTypeName
+                : ResolveTypeName(itemType);
+            typeHandler.preparedTypeInfo = writer.PrepareTypeInfo(typeName);
 
             // A custom writer set for the type itself is found by direct lookup and therefore
             // always wins over the predicate registered, convention based handlers.
@@ -714,17 +726,22 @@ namespace FeatureLoom.Serialization
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void StartTypeInfoObject(byte[] preparedTypeInfo)
+        void StartTypeInfoObject(byte[] preparedTypeInfo, bool useValuesFieldName = false)
         {
+            // In OnlyInlineForObjects mode the envelope is dropped entirely, so the value is
+            // written plainly and simply carries no type info.
+            if (settings.skipTypeInfoEnvelope) return;
             writer.OpenObject();
             writer.WriteToBuffer(preparedTypeInfo);
             writer.WriteComma();
-            writer.WriteValueFieldName();
+            if (useValuesFieldName) writer.WriteValuesFieldName();
+            else writer.WriteValueFieldName();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void FinishTypeInfoObject()
         {
+            if (settings.skipTypeInfoEnvelope) return;
             writer.CloseObject();
         }
 

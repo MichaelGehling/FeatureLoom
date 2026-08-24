@@ -191,5 +191,107 @@ namespace FeatureLoom.Serialization
                 typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo
             });
         }
+
+        [Fact]
+        public void Serialize_ArrayValueFieldName_Values_UsedForArrayEnvelope()
+        {
+            var value = new ContainerList { Items = new List<BaseType> { new BaseType() } };
+            string containerTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(ContainerList));
+            string listTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(List<BaseType>));
+            string baseTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(BaseType));
+            string expected = $"{{\"$type\":\"{containerTypeName}\",\"Items\":{{\"$type\":\"{listTypeName}\",\"$values\":[{{\"$type\":\"{baseTypeName}\",\"BaseValue\":1}}]}}}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo,
+                arrayValueFieldName = JsonSerializer.ValueFieldName.Values
+            });
+        }
+
+        [Fact]
+        public void Serialize_AlwaysEnvelope_AddAllTypeInfo_WrapsObjects()
+        {
+            var value = new BaseType();
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(BaseType));
+            string expected = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"BaseValue\":1}}}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo,
+                typeInfoFormat = JsonSerializer.TypeInfoFormat.AlwaysEnvelope
+            });
+        }
+
+        [Fact]
+        public void Serialize_AlwaysEnvelope_AddDeviatingTypeInfo_WrapsOnlyDeviating()
+        {
+            BaseType value = new DerivedType();
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(DerivedType));
+            string expected = $"{{\"$type\":\"{typeName}\",\"$value\":{{\"DerivedValue\":2,\"BaseValue\":1}}}}";
+            var settings = new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
+                typeInfoFormat = JsonSerializer.TypeInfoFormat.AlwaysEnvelope
+            };
+            AssertSerialized(value, expected, settings);
+
+            // Non-deviating values carry no type info, so they are not wrapped either.
+            AssertSerialized<BaseType>(new BaseType(), "{\"BaseValue\":1}", settings);
+        }
+
+        [Fact]
+        public void Deserialize_AlwaysEnvelope_RoundTrips()
+        {
+            BaseType value = new DerivedType();
+            var serializer = new JsonSerializer(new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
+                typeInfoFormat = JsonSerializer.TypeInfoFormat.AlwaysEnvelope
+            });
+            string json = serializer.Serialize(value);
+
+            var deserializer = new JsonDeserializer();
+            Assert.True(deserializer.TryDeserialize<BaseType>(json, out var restored));
+            var derived = Assert.IsType<DerivedType>(restored);
+            Assert.Equal(2, derived.DerivedValue);
+            Assert.Equal(1, derived.BaseValue);
+        }
+
+        [Fact]
+        public void Serialize_OnlyInlineForObjects_KeepsInlineTypeInfoButDropsEnvelopes()
+        {
+            var value = new ContainerList { Items = new List<BaseType> { new BaseType() } };
+            string containerTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(ContainerList));
+            string baseTypeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(BaseType));
+            // The list would need an envelope and therefore loses its type info, while both the
+            // container and the element keep their inline "$type".
+            string expected = $"{{\"$type\":\"{containerTypeName}\",\"Items\":[{{\"$type\":\"{baseTypeName}\",\"BaseValue\":1}}]}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo,
+                typeInfoFormat = JsonSerializer.TypeInfoFormat.OnlyInlineForObjects
+            });
+        }
+
+        [Fact]
+        public void Serialize_OnlyInlineForObjects_PrimitiveHasNoTypeInfo()
+        {
+            AssertSerialized(1, "1", new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo,
+                typeInfoFormat = JsonSerializer.TypeInfoFormat.OnlyInlineForObjects
+            });
+        }
+
+        [Fact]
+        public void Serialize_OnlyInlineForObjects_AddDeviatingTypeInfo_KeepsObjectTypeInfo()
+        {
+            BaseType value = new DerivedType();
+            string typeName = TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(DerivedType));
+            string expected = $"{{\"$type\":\"{typeName}\",\"DerivedValue\":2,\"BaseValue\":1}}";
+            AssertSerialized(value, expected, new JsonSerializer.Settings
+            {
+                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
+                typeInfoFormat = JsonSerializer.TypeInfoFormat.OnlyInlineForObjects
+            });
+        }
     }
 }

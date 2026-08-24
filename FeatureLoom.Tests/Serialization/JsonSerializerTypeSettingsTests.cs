@@ -504,19 +504,19 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
-        public void ConfigureType_SetCustomTypeName_OverridesGloballyRegisteredName()
+        public void ConfigureType_SetCustomTypeName_NonGenericOverloadSharesTheSameEntry()
         {
             var serializer = CreateSerializer(s =>
             {
                 s.typeInfoHandling = JsonSerializer.TypeInfoHandling.AddAllTypeInfo;
-                s.AddCustomTypeName(typeof(Person), "globalName");
-                s.ConfigureType<Person>(ts => ts.SetCustomTypeName("perTypeName"));
+                s.ConfigureType(typeof(Person), ts => ts.SetCustomTypeName("firstName"));
+                s.ConfigureType<Person>(ts => ts.SetCustomTypeName("secondName"));
             });
 
             string json = serializer.Serialize(new Person { Name = "Ann" });
 
-            Assert.Contains("\"$type\":\"perTypeName\"", json);
-            Assert.DoesNotContain("globalName", json);
+            Assert.Contains("\"$type\":\"secondName\"", json);
+            Assert.DoesNotContain("firstName", json);
         }
 
         [Fact]

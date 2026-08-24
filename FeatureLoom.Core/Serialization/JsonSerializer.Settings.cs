@@ -42,6 +42,19 @@ namespace FeatureLoom.Serialization
             public ReferenceFormat referenceFormat = ReferenceFormat.JsonPath;
 
             /// <summary>
+            /// Determines the shape used whenever a "$type" member is written. Independent of
+            /// <see cref="typeInfoHandling"/>, which only decides *whether* it is written.
+            /// </summary>
+            public TypeInfoFormat typeInfoFormat = TypeInfoFormat.InlineForObjects;
+
+            /// <summary>
+            /// Determines which field name carries the payload of an array inside a type info
+            /// envelope. Set to <see cref="ValueFieldName.Values"/> for consumers that expect the
+            /// Newtonsoft.Json style "$values".
+            /// </summary>
+            public ValueFieldName arrayValueFieldName = ValueFieldName.Value;
+
+            /// <summary>
             /// If true, enum values are written as their name instead of their numeric value.
             /// Can be overridden per enum type via <see cref="BaseTypeWriteSettings.SetEnumAsString(bool)"/>.
             /// </summary>
@@ -100,8 +113,8 @@ namespace FeatureLoom.Serialization
 
             /// <summary>
             /// Determines how type names are written into "$type" members, unless a custom name was
-            /// registered via <see cref="AddCustomTypeName(Type, string)"/> or set per type via
-            /// <see cref="BaseTypeWriteSettings.SetCustomTypeName(string)"/> for the specific type.
+            /// set for the specific scope via
+            /// <see cref="BaseTypeWriteSettings.SetCustomTypeName(string)"/>.
             /// </summary>
             public TypeNameFormat typeNameFormat = TypeNameFormat.Simplified;
 
@@ -114,8 +127,6 @@ namespace FeatureLoom.Serialization
             /// </summary>
             public TypeNameFormat? genericTypeNameFormat = null;
 
-            internal Dictionary<Type, string> customTypeNames = new();
-
             /// <summary>
             /// Builds a new settings instance and applies a configuration callback.
             /// </summary>
@@ -127,36 +138,6 @@ namespace FeatureLoom.Serialization
                 configure?.Invoke(settings);
                 return settings;
             }
-
-            /// <summary>
-            /// Adds or replaces a custom type name, which is written instead of the name that
-            /// <see cref="typeNameFormat"/> would produce. Custom names take precedence over every
-            /// other naming option, including <see cref="genericTypeNameFormat"/>. Only a per-type
-            /// name set via <see cref="BaseTypeWriteSettings.SetCustomTypeName(string)"/> wins over
-            /// an entry registered here.
-            /// <para>
-            /// Note that the JsonDeserializer keeps its own, independent name-to-type mapping. To
-            /// read such JSON back, register the counterpart there via its AddCustomTypeName method.
-            /// </para>
-            /// </summary>
-            /// <param name="type">The type to write the custom name for.</param>
-            /// <param name="customTypeName">The name to write into the "$type" member.</param>
-            public void AddCustomTypeName(Type type, string customTypeName)
-            {
-                if (type == null || customTypeName.EmptyOrNull()) return;
-                customTypeNames[type] = customTypeName;
-            }
-
-            /// <summary>
-            /// Adds or replaces a custom type name for <typeparamref name="T"/>.
-            /// See <see cref="AddCustomTypeName(Type, string)"/>.
-            /// </summary>
-            public void AddCustomTypeName<T>(string customTypeName) => AddCustomTypeName(typeof(T), customTypeName);
-
-            /// <summary>
-            /// Removes all custom type name mappings.
-            /// </summary>
-            public void ClearCustomTypeNames() => customTypeNames.Clear();
 
             /// <summary>
             /// Stores explicit type and generic-type configuration entries.
@@ -185,6 +166,47 @@ namespace FeatureLoom.Serialization
                     !(existingSettings is TypeWriteSettings<T> typeSettings))
                 {
                     typeSettings = new TypeWriteSettings<T>();
+                }
+                typeSettings.ownerSettings = this;
+                configureTypeSettings(typeSettings);
+                typeSettingsDict[type] = typeSettings;
+            }
+
+            /// <summary>
+            /// Configures write settings for a concrete type that is only known at runtime, e.g.
+            /// when registering types discovered from a plugin or an assembly scan.
+            /// </summary>
+            /// <param name="type">Configured type. Must not be a generic type definition.</param>
+            /// <param name="configureTypeSettings">
+            /// Callback that mutates or creates the type settings.
+            /// If <see langword="null"/>, the type configuration is removed.
+            /// </param>
+            /// <remarks>
+            /// Only exposes the settings shared by all type scopes. The members that need the
+            /// static type, e.g. ConfigureMember or SetCustomTypeWriter, are available on the
+            /// generic <see cref="ConfigureType{T}"/> only.
+            /// </remarks>
+            public void ConfigureType(Type type, Action<BaseTypeWriteSettings> configureTypeSettings)
+            {
+                if (type == null) throw new ArgumentNullException(nameof(type));
+                if (configureTypeSettings == null)
+                {
+                    typeSettingsDict.Remove(type);
+                    return;
+                }
+
+                if (type.IsGenericTypeDefinition)
+                {
+                    throw new ArgumentException($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is a generic type definition. " +
+                                                $"Use {nameof(ConfigureGenericType)}() instead.", nameof(type));
+                }
+
+                // The closed generic TypeWriteSettings<T> is created via reflection, so an entry
+                // added here stays interchangeable with one added via ConfigureType<T>().
+                if (!typeSettingsDict.TryGetValue(type, out BaseTypeWriteSettings typeSettings) ||
+                    typeSettings is GenericTypeWriteSettings)
+                {
+                    typeSettings = (BaseTypeWriteSettings)Activator.CreateInstance(typeof(TypeWriteSettings<>).MakeGenericType(type));
                 }
                 typeSettings.ownerSettings = this;
                 configureTypeSettings(typeSettings);
@@ -279,6 +301,7 @@ namespace FeatureLoom.Serialization
                 writeByteArrayAsBase64String != null ||
                 treatEnumerablesAsCollections != null ||
                 customTypeWriterCreator != null ||
+                customTypeName != null ||
                 memberSettingsDict.Count > 0;
 
             /// <summary>Sets which members are written for this type scope.</summary>
@@ -321,12 +344,18 @@ namespace FeatureLoom.Serialization
             public void SetTreatEnumerablesAsCollections(bool treatEnumerablesAsCollections) => this.treatEnumerablesAsCollections = treatEnumerablesAsCollections;
 
             /// <summary>
-            /// Sets the name written into the "$type" member for this type, overruling both
-            /// <see cref="Settings.typeNameFormat"/> and a globally registered custom name.
+            /// Sets the name written into the "$type" member for this scope, overruling
+            /// <see cref="Settings.typeNameFormat"/> and <see cref="Settings.genericTypeNameFormat"/>.
             /// </summary>
             /// <remarks>
             /// <para>
-            /// Only supported on a concrete type, i.e. via <see cref="Settings.ConfigureType{T}"/>.
+            /// Set on a type scope it applies to every value of that type. Set on a member scope
+            /// via ConfigureMember it applies only to that member, which lets the same CLR type
+            /// claim a different name depending on where it is written.
+            /// </para>
+            /// <para>
+            /// Only supported on a concrete type, i.e. via <see cref="Settings.ConfigureType{T}"/>
+            /// or <see cref="Settings.ConfigureType(Type, Action{BaseTypeWriteSettings})"/>.
             /// A generic type definition is rejected, because a single literal name cannot stay
             /// unique across its constructed types: List&lt;int&gt; and List&lt;string&gt; would both
             /// write it and could no longer be told apart when reading.
@@ -726,6 +755,63 @@ namespace FeatureLoom.Serialization
         }
 
         /// <summary>
+        /// Determines the shape used to write type info. Applies wherever a "$type" is written,
+        /// no matter whether <see cref="TypeInfoHandling.AddAllTypeInfo"/> or
+        /// <see cref="TypeInfoHandling.AddDeviatingTypeInfo"/> decided that.
+        /// </summary>
+        public enum TypeInfoFormat
+        {
+            /// <summary>
+            /// Objects carry "$type" as their first member, e.g. {"$type":"X","A":1}, which is what
+            /// Newtonsoft.Json and System.Text.Json expect. Values that have no members of their
+            /// own, i.e. arrays and primitives, still need the envelope, e.g.
+            /// {"$type":"X","$value":[1,2]}.
+            /// </summary>
+            InlineForObjects = 0,
+
+            /// <summary>
+            /// Every typed value is wrapped into an envelope, so objects become
+            /// {"$type":"X","$value":{"A":1}} as well.
+            /// </summary>
+            /// <remarks>
+            /// Gives type and payload a fixed, uniform position, which lets a consumer extract them
+            /// separately without knowing the shape of the payload. Useful for foreign readers, but
+            /// no longer understood by Newtonsoft.Json or System.Text.Json, which expect "$type"
+            /// inline. The JsonDeserializer reads both formats.
+            /// </remarks>
+            AlwaysEnvelope = 1,
+
+            /// <summary>
+            /// Like <see cref="InlineForObjects"/>, but values that cannot carry an inline
+            /// "$type", i.e. arrays and primitives, are written without any type info instead of
+            /// being wrapped into an envelope.
+            /// </summary>
+            /// <remarks>
+            /// Keeps the output a plain, structurally unchanged JSON document that any consumer can
+            /// read, at the price of losing type info exactly where it cannot be expressed inline.
+            /// A polymorphic array or primitive member then no longer round-trips to its original
+            /// type. Note that the type info of the array's *elements* is unaffected, because
+            /// elements are values of their own.
+            /// </remarks>
+            OnlyInlineForObjects = 2,
+        }
+
+        /// <summary>
+        /// Selects the field name that carries the payload inside a type info envelope.
+        /// The JsonDeserializer accepts both names.
+        /// </summary>
+        public enum ValueFieldName
+        {
+            /// <summary>Writes "$value", the uniform FeatureLoom keyword.</summary>
+            Value = 0,
+
+            /// <summary>
+            /// Writes "$values", which is what Newtonsoft.Json uses for arrays.
+            /// </summary>
+            Values = 1,
+        }
+
+        /// <summary>
         /// Determines how the type name written into a "$type" member is built.
         /// The JsonDeserializer reads all of these formats.
         /// </summary>
@@ -765,9 +851,16 @@ namespace FeatureLoom.Serialization
             public readonly DataSelection dataSelection;
             public readonly ReferenceCheck referenceCheck;
             public readonly ReferenceFormat referenceFormat;
+            public readonly TypeInfoFormat typeInfoFormat;
+
+            /// <summary>
+            /// True if type info must be omitted where it would require an envelope, i.e. for
+            /// arrays and primitives. See <see cref="TypeInfoFormat.OnlyInlineForObjects"/>.
+            /// </summary>
+            public readonly bool skipTypeInfoEnvelope;
+            public readonly ValueFieldName arrayValueFieldName;
             public readonly TypeNameFormat typeNameFormat;
             public readonly TypeNameFormat genericTypeNameFormat;
-            public readonly Dictionary<Type, string> customTypeNames;
             public readonly bool enumAsString;
             public readonly bool treatEnumerablesAsCollections;
             public readonly int writeBufferChunkSize;
@@ -797,9 +890,11 @@ namespace FeatureLoom.Serialization
                 dataSelection = settings.dataSelection;
                 referenceCheck = settings.referenceCheck;
                 referenceFormat = settings.referenceFormat;
+                typeInfoFormat = settings.typeInfoFormat;
+                skipTypeInfoEnvelope = settings.typeInfoFormat == TypeInfoFormat.OnlyInlineForObjects;
+                arrayValueFieldName = settings.arrayValueFieldName;
                 typeNameFormat = settings.typeNameFormat;
-                genericTypeNameFormat = settings.genericTypeNameFormat ?? settings.typeNameFormat;
-                customTypeNames = settings.customTypeNames.Count > 0 ? new Dictionary<Type, string>(settings.customTypeNames) : null;
+                genericTypeNameFormat = settings.genericTypeNameFormat ?? settings.typeNameFormat;                
                 enumAsString = settings.enumAsString;
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
                 writeBufferChunkSize = settings.writeBufferChunkSize;

@@ -40,6 +40,32 @@ tracking has to look inside your value.
 A writer can also be declared as a class instead of a lambda, which is what makes writers for
 **open generic types** possible — see [section 7](#7-writers-as-classes-and-open-generic-types).
 
+### Type info (`$type`) is not your problem
+
+Declaring the shape has a second effect: the serializer keeps emitting the `$type` envelope for
+you, exactly as it does for built-in writers. A custom writer never writes `$type` itself.
+
+| Shape | With `AddAllTypeInfo` |
+|---|---|
+| value / raw | `{"$type":"money","$value":<your output>}` |
+| object | `{"$type":"person",<your fields>}` |
+| array | `{"$type":"tags","$value":[<your items>]}` |
+
+`AddDeviatingTypeInfo` applies the same envelope, but only when the runtime type deviates from the
+declared one. The name comes from the usual sources — `SetCustomTypeName` or the configured
+`typeNameFormat` — so a custom writer needs no extra configuration to stay
+round-trippable.
+
+Two consequences worth knowing:
+
+- For an object writer the type info is written as the **first member**, before your fields. If you
+  declare no fields at all, the output is just `{"$type":"..."}` — the separating comma is rolled
+  back.
+- `PrepareRawWriter` gives you control over the tokens *inside* the envelope, not over the envelope
+  itself. Writing your own `$type` member there would produce a duplicate — unless you suppress the
+  built-in one, which is how a value can claim a foreign type
+  ([section 5](#claiming-a-different-type)).
+
 ---
 
 ## 1. Value type written as a string
@@ -343,6 +369,151 @@ you own the tokens and the serializer conservatively assumes your output may con
 The other modes give the serializer enough information to keep its guarantees. In Newtonsoft and STJ
 every converter is in this mode, always.
 
+### Claiming a different type
+
+Sometimes the JSON has to claim a type the CLR object is not — mimicking a DTO, or an older
+version of a class. That needs two steps, because the serializer's envelope and yours would
+otherwise both be written:
+
+1. Suppress the built-in envelope for that type scope with `SetTypeInfoHandling(AddNoTypeInfo)`.
+2. Emit your own, prepared once via `PrepareTypeInfo`.
+
+```csharp
+settings.ConfigureType<Money>(ts =>
+{
+	ts.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo);
+	ts.SetCustomTypeWriter(prep =>
+	{
+		byte[] typeInfo = prep.PrepareTypeInfo("MoneyDto");   // or PrepareTypeInfo<MoneyDto>()
+		byte[] amount = prep.PrepareFieldName("amount");
+		return prep.PrepareRawWriter<Money>((raw, item) =>
+		{
+			raw.OpenObject();
+			raw.WritePrepared(typeInfo);
+			raw.WriteComma();
+			raw.WritePrepared(amount);
+			raw.WriteInt(item.Amount);
+			raw.CloseObject();
+		});
+	});
+});
+// {"$type":"MoneyDto","amount":12}
+```
+
+`PrepareTypeInfo(string)` writes the name verbatim. `PrepareTypeInfo<TOther>()` resolves it the
+same way the serializer does, so a custom type name or the configured `typeNameFormat` is honored
+instead of hardcoded. Both encode to UTF-8 once, in the preparation phase.
+
+The verbatim overload does **not** require the named type to exist in this process — it is a
+string, never a `Type`. That is the point: the target type often lives only in the consuming
+system, e.g. a legacy or foreign application.
+
+```csharp
+byte[] typeInfo = prep.PrepareTypeInfo("Legacy.Money, LegacyApp");
+// {"$type":"Legacy.Money, LegacyApp", ... }
+```
+
+Because the suppression is part of the type scope, it stays local to that settings object — a
+serializer without this configuration keeps writing the normal envelope for the same type.
+
+### Per member instead of per type
+
+Both steps work on member settings too, so one member can claim a foreign type while every other
+value of the same type stays untouched:
+
+```csharp
+settings.ConfigureType<Invoice>(ts => ts.ConfigureMember<Money>(nameof(Invoice.Total), ms =>
+{
+	ms.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo);
+	ms.SetCustomTypeWriter(prep => { /* as above */ });
+}));
+// {"$type":"invoice","Total":{"$type":"MoneyDto","amount":12},
+//                    "Paid":{"$type":"money","Amount":7,"Currency":null}}
+```
+
+`Total` and `Paid` have the same type; only `Total` is remapped.
+
+> `$type` must be the first member for other serializers to recognize it — and if you emit `$type`
+> without suppressing the built-in one, the output contains it twice.
+
+### How the others do it
+
+**Newtonsoft.Json** — a converter takes over the value completely, so Newtonsoft writes no `$type`
+for it. The suppression is implicit, and you emit the discriminator by hand:
+
+```csharp
+public override void WriteJson(JsonWriter writer, Money value, Newtonsoft.Json.JsonSerializer s)
+{
+	writer.WriteStartObject();
+	writer.WritePropertyName("$type");
+	writer.WriteValue("MoneyDto");          // re-encoded on every call
+	writer.WritePropertyName("amount");
+	writer.WriteValue(value.Amount);
+	writer.WriteEndObject();
+}
+```
+
+For renaming only, Newtonsoft has a purpose-built hook:
+
+```csharp
+public class DtoBinder : ISerializationBinder
+{
+	public void BindToName(Type type, out string assemblyName, out string typeName)
+	{
+		assemblyName = null;
+		typeName = type == typeof(Money) ? "MoneyDto" : type.FullName;
+	}
+	public Type BindToType(string assemblyName, string typeName) => ...;
+}
+
+settings.SerializationBinder = new DtoBinder();
+settings.TypeNameHandling = TypeNameHandling.Objects;
+```
+
+FeatureLoom covers that same case directly, without a custom writer:
+
+```csharp
+settings.ConfigureType<Money>(ts => ts.SetCustomTypeName("MoneyDto"));
+```
+
+`ResolveTypeName` checks the custom name before falling back to `typeNameFormat`, so this is the
+equivalent of `BindToName` and is the preferred way when a rename is all you need.
+
+Unlike `BindToName`, it is not limited to a global per-type mapping: set on a member scope it
+renames only that member, so the same CLR type can claim different names at different places.
+
+```csharp
+settings.ConfigureType<Invoice>(ts => ts.ConfigureMember<Money>(nameof(Invoice.Total),
+    ms => ms.SetCustomTypeName("MoneyDto")));   // only Invoice.Total is renamed
+```
+
+The two-step pattern above is therefore only needed when the payload has to be *reshaped* along
+with the name, not for renaming alone.
+
+**System.Text.Json** — the discriminator is tied to the polymorphism feature (.NET 7+):
+
+```csharp
+[JsonDerivedType(typeof(Money), typeDiscriminator: "MoneyDto")]
+public abstract class MoneyBase { }
+```
+
+This only works for a declared *base* type and its declared subtypes, and the discriminator must be
+the first property. To make a non-polymorphic type claim a foreign name you drop to a converter and
+write the property by hand, as in the Newtonsoft snippet above. `JsonPolymorphismOptions` in a
+custom `IJsonTypeInfoResolver` allows building it dynamically, but still per type, not per member.
+
+**Difference:** all three can emit a foreign discriminator from a converter. What differs is the
+cost and the scope. FeatureLoom encodes `"$type":"MoneyDto"` once during preparation and copies the
+bytes per value, while both alternatives re-write the property name and value on every call. And
+because FeatureLoom's suppression and writer both live in the settings *scope*, the remapping can
+be limited to a single member — neither `ISerializationBinder` nor `JsonDerivedType` can do that.
+
+| | Rename a type's discriminator | Claim a non-existing type | Per member |
+|---|---|---|---|
+| FeatureLoom | `AddNoTypeInfo` + `PrepareTypeInfo` | yes | yes |
+| Newtonsoft | `ISerializationBinder` | yes | no |
+| System.Text.Json | `JsonDerivedType` (polymorphic types only) | converter only | no |
+
 ---
 
 ## 6. Applying a writer to more than one type
@@ -503,6 +674,7 @@ involved types.
 | Exact-type precedence | deterministic | registration order | registration order |
 | Open generic types | `typeof(MyWriter<>)`, typed | reflective converter | hand-written factory |
 | Writing buffer slices | `TextSegment` / `ReadOnlySpan<char>` | `string` only | `ReadOnlySpan<char>` |
+| Claiming a foreign `$type` | prepared once, per type *or member* | `ISerializationBinder`, per type | `JsonDerivedType`, polymorphic types only |
 
 The trade-off: FeatureLoom's writer API is intentionally **not** symmetric with a general-purpose
 converter interface. You describe *what* the JSON looks like and the serializer decides *how* to
