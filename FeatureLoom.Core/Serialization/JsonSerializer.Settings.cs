@@ -1,4 +1,5 @@
-﻿using FeatureLoom.Extensions;
+﻿using FeatureLoom.Collections;
+using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
 using System;
@@ -297,6 +298,18 @@ namespace FeatureLoom.Serialization
             internal Type elementSettingsType = null;
 
             /// <summary>
+            /// Type-level override for the JSON shape a dictionary is written in, or
+            /// <see langword="null"/> to let the key type decide.
+            /// </summary>
+            internal DictionaryShape? dictionaryShape = null;
+
+            /// <summary>
+            /// Formats a dictionary key as a JSON property name. When set, the dictionary can be
+            /// written as a JSON object regardless of its key type.
+            /// </summary>
+            internal IKeyFormatter keyFormatter = null;
+
+            /// <summary>
             /// Custom writer registered for this type scope, or <see langword="null"/>. Found by a
             /// direct lookup, so it always beats the predicate registered handlers.
             /// </summary>
@@ -331,6 +344,8 @@ namespace FeatureLoom.Serialization
                 customTypeWriterCreator != null ||
                 customTypeName != null ||
                 elementSettings != null ||
+                dictionaryShape != null ||
+                keyFormatter != null ||
                 memberSettingsDict.Count > 0;
 
             /// <summary>
@@ -369,6 +384,8 @@ namespace FeatureLoom.Serialization
                     customTypeWriterCreator = customTypeWriterCreator ?? generalSettings.customTypeWriterCreator,
                     elementSettings = elementSettings ?? generalSettings.elementSettings?.AsInjectedFromGeneralSettings(),
                     elementSettingsType = elementSettings != null ? elementSettingsType : generalSettings.elementSettingsType,
+                    dictionaryShape = dictionaryShape ?? generalSettings.dictionaryShape,
+                    keyFormatter = keyFormatter ?? generalSettings.keyFormatter,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
                     ownerSettings = ownerSettings ?? generalSettings.ownerSettings,
@@ -409,6 +426,8 @@ namespace FeatureLoom.Serialization
                     customTypeWriterCreator = customTypeWriterCreator,
                     elementSettings = elementSettings,
                     elementSettingsType = elementSettingsType,
+                    dictionaryShape = dictionaryShape,
+                    keyFormatter = keyFormatter,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
                     ownerSettings = ownerSettings,
@@ -452,6 +471,8 @@ namespace FeatureLoom.Serialization
                     writeByteArrayAsBase64String == null &&
                     treatEnumerablesAsCollections == null &&
                     elementSettings == null &&
+                    dictionaryShape == null &&
+                    keyFormatter == null &&
                     memberSettingsDict.Count == 0) return null;
 
                 var subset = new BaseTypeWriteSettings
@@ -465,6 +486,8 @@ namespace FeatureLoom.Serialization
                     treatEnumerablesAsCollections = treatEnumerablesAsCollections,
                     elementSettings = elementSettings,
                     elementSettingsType = elementSettingsType,
+                    dictionaryShape = dictionaryShape,
+                    keyFormatter = keyFormatter,
                     ownerSettings = ownerSettings
                 };
                 foreach (var entry in memberSettingsDict) subset.memberSettingsDict[entry.Key] = entry.Value;
@@ -612,15 +635,69 @@ namespace FeatureLoom.Serialization
             }
 
             /// <summary>
+            /// Stores a formatter that turns keys of <typeparamref name="TKey"/> into JSON
+            /// property names, after checking that the configured type is a dictionary with that
+            /// key type.
+            /// </summary>
+            private protected void ConfigureKeyInternal<TKey>(Type containerType, IKeyFormatter formatter)
+            {
+                if (formatter == null)
+                {
+                    keyFormatter = null;
+                    return;
+                }
+
+                if (containerType != null)
+                {
+                    if (!TryGetDictionaryKeyType(containerType, out Type actualKeyType))
+                    {
+                        throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(containerType)} is not a dictionary, so its keys cannot be configured.");
+                    }
+                    if (actualKeyType != typeof(TKey))
+                    {
+                        throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(containerType)} has keys of type " +
+                                            $"{TypeNameHelper.Shared.GetSimplifiedTypeName(actualKeyType)}, not {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(TKey))}.");
+                    }
+                }
+
+                keyFormatter = formatter;
+            }
+
+            /// <summary>
+            /// Determines the key type of a dictionary, regardless of whether that key could be
+            /// written as a JSON property name without a formatter.
+            /// </summary>
+            private protected static bool TryGetDictionaryKeyType(Type containerType, out Type keyType)
+            {
+                keyType = null;
+                if (containerType == null) return false;
+
+                return containerType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out keyType, out _) ||
+                       containerType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyDictionary<,>), out keyType, out _);
+            }
+
+            /// <summary>
+            /// Sets the JSON shape this dictionary type is written in.
+            /// </summary>
+            /// <param name="shape">
+            /// The shape to use. <see cref="DictionaryShape.Auto"/> restores the default, where the
+            /// key type decides. There is deliberately no value that forces the object shape,
+            /// because a key that cannot become a property name could not be written that way;
+            /// configure a key formatter via <c>ConfigureKey</c> instead.
+            /// </param>
+            public void SetDictionaryShape(DictionaryShape shape) => dictionaryShape = shape;
+
+            /// <summary>
             /// Determines the type of the values a container writes into its JSON array or object:
             /// the value type of a dictionary, otherwise the element type of the sequence.
             /// </summary>
             /// <remarks>
-            /// A dictionary is only treated as such if it is written as a JSON object. When its key
-            /// cannot become a property name the serializer writes it as an array of key/value
-            /// pairs instead, in which case the written element is the KeyValuePair itself.
+            /// A dictionary is only treated as such if it is written as a JSON object. When it is
+            /// written as an array of key/value pairs instead - because its key cannot become a
+            /// property name, or because that shape was requested - the written element is the
+            /// KeyValuePair itself.
             /// </remarks>
-            private static bool TryGetWrittenElementType(Type containerType, out Type elementType)
+            private bool TryGetWrittenElementType(Type containerType, out Type elementType)
             {
                 elementType = null;
                 if (containerType == null) return false;
@@ -633,7 +710,8 @@ namespace FeatureLoom.Serialization
 
                 if ((containerType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type keyType, out Type valueType) ||
                      containerType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyDictionary<,>), out keyType, out valueType)) &&
-                    CanWriteKeyAsPropertyName(keyType))
+                    dictionaryShape != DictionaryShape.KeyValuePairArray &&
+                    (CanWriteKeyAsPropertyName(keyType) || keyFormatter != null))
                 {
                     elementType = valueType;
                     return true;
@@ -731,6 +809,32 @@ namespace FeatureLoom.Serialization
             }
 
             /// <summary>
+            /// Sets a formatter that turns the keys of the constructed dictionary types of this
+            /// generic type definition into JSON property names.
+            /// </summary>
+            /// <typeparam name="TKey">Expected key type.</typeparam>
+            /// <param name="formatKey">
+            /// Formats a key. If <see langword="null"/>, an existing formatter is removed.
+            /// </param>
+            /// <remarks>
+            /// The key type cannot be verified against an open generic definition. A constructed
+            /// type whose keys are not <typeparamref name="TKey"/> keeps its default key handling.
+            /// Like every key formatter, this one is write-only and has no deserializer counterpart.
+            /// </remarks>
+            public void ConfigureKey<TKey>(Func<TKey, string> formatKey)
+                => ConfigureKeyInternal<TKey>(null, formatKey == null ? null : new StringKeyFormatter<TKey>(formatKey));
+
+            /// <inheritdoc cref="ConfigureKey{TKey}(Func{TKey, string})"/>
+            public void ConfigureKey<TKey>(Func<TKey, TextSegment> formatKey)
+                => ConfigureKeyInternal<TKey>(null, formatKey == null ? null : new TextSegmentKeyFormatter<TKey>(formatKey));
+
+#if !NETSTANDARD2_0
+            /// <inheritdoc cref="ConfigureKey{TKey}(Func{TKey, string})"/>
+            public void ConfigureKey<TKey>(KeyToSpan<TKey> formatKey)
+                => ConfigureKeyInternal<TKey>(null, formatKey == null ? null : new SpanKeyFormatter<TKey>(formatKey));
+#endif
+
+            /// <summary>
             /// Not supported for a generic type definition. A single literal name cannot stay
             /// unique across the constructed types, so it has to be set on each concrete type via
             /// <see cref="Settings.ConfigureType{T}"/>.
@@ -785,6 +889,35 @@ namespace FeatureLoom.Serialization
             /// </remarks>
             public void ConfigureElement<TElement>(Action<TypeWriteSettings<TElement>> configureElementSettings)
                 => ConfigureElementInternal(typeof(T), configureElementSettings);
+
+            /// <summary>
+            /// Sets a formatter that turns the keys of the dictionary type <typeparamref name="T"/>
+            /// into JSON property names, which lets it be written as a JSON object even when its
+            /// key type could not be written as a property name on its own.
+            /// </summary>
+            /// <typeparam name="TKey">Expected key type.</typeparam>
+            /// <param name="formatKey">
+            /// Formats a key. If <see langword="null"/>, an existing formatter is removed.
+            /// The result is escaped by the serializer, but not checked for uniqueness: producing
+            /// the same name for two keys yields a JSON object with duplicate property names.
+            /// </param>
+            /// <remarks>
+            /// The formatter is write-only. The JsonDeserializer has no counterpart, so a
+            /// dictionary with a formatted key of a type that is not natively supported as a key
+            /// does not round-trip.
+            /// </remarks>
+            public void ConfigureKey<TKey>(Func<TKey, string> formatKey)
+                => ConfigureKeyInternal<TKey>(typeof(T), formatKey == null ? null : new StringKeyFormatter<TKey>(formatKey));
+
+            /// <inheritdoc cref="ConfigureKey{TKey}(Func{TKey, string})"/>
+            public void ConfigureKey<TKey>(Func<TKey, TextSegment> formatKey)
+                => ConfigureKeyInternal<TKey>(typeof(T), formatKey == null ? null : new TextSegmentKeyFormatter<TKey>(formatKey));
+
+#if !NETSTANDARD2_0
+            /// <inheritdoc cref="ConfigureKey{TKey}(Func{TKey, string})"/>
+            public void ConfigureKey<TKey>(KeyToSpan<TKey> formatKey)
+                => ConfigureKeyInternal<TKey>(typeof(T), formatKey == null ? null : new SpanKeyFormatter<TKey>(formatKey));
+#endif
 
             /// <summary>
             /// Sets a custom writer for <typeparamref name="T"/>, replacing the built-in writer.
@@ -1100,6 +1233,106 @@ namespace FeatureLoom.Serialization
             /// </summary>
             Values = 1,
         }
+
+        /// <summary>
+        /// Selects the JSON shape a dictionary is written in.
+        /// </summary>
+        public enum DictionaryShape
+        {
+            /// <summary>
+            /// Writes a JSON object when the keys can become property names, which is the case for
+            /// the built-in key types and for any key type that has a formatter configured via
+            /// <see cref="TypeWriteSettings{T}.ConfigureKey{TKey}(Func{TKey, string})"/>.
+            /// Otherwise an array of key/value pairs is written.
+            /// </summary>
+            Auto = 0,
+
+            /// <summary>
+            /// Always writes an array of <c>{"Key":...,"Value":...}</c> objects, even for keys that
+            /// could become property names. Useful when the values of a key must survive as their
+            /// own JSON value rather than as a string.
+            /// </summary>
+            KeyValuePairArray = 1,
+        }
+
+        /// <summary>
+        /// Writes a dictionary key of a fixed key type as a JSON property name. Implemented per
+        /// key representation so the formatter result can be written without an intermediate
+        /// string where the representation allows it.
+        /// </summary>
+        internal interface IKeyFormatter
+        {
+            /// <summary>The key type this formatter accepts.</summary>
+            Type KeyType { get; }
+
+            /// <summary>
+            /// Binds the formatter to a writer, producing the delegates a dictionary handler needs.
+            /// Called once while the dictionary's writer is created, never per entry.
+            /// </summary>
+            void BindTo(JsonUTF8StreamWriter writer, CachedKeyWriter keyWriter);
+        }
+
+#if !NETSTANDARD2_0
+        /// <summary>
+        /// Formats a dictionary key as a character span, so a key can be written from an existing
+        /// buffer without allocating a string. A delegate type is required because
+        /// <c>Func&lt;TKey, ReadOnlySpan&lt;char&gt;&gt;</c> cannot be expressed.
+        /// </summary>
+        public delegate ReadOnlySpan<char> KeyToSpan<TKey>(TKey key);
+#endif
+
+        /// <summary>Key formatter producing a string.</summary>
+        internal sealed class StringKeyFormatter<TKey> : IKeyFormatter
+        {
+            readonly Func<TKey, string> formatKey;
+
+            internal StringKeyFormatter(Func<TKey, string> formatKey) => this.formatKey = formatKey;
+
+            public Type KeyType => typeof(TKey);
+
+            public void BindTo(JsonUTF8StreamWriter writer, CachedKeyWriter keyWriter)
+            {
+                var format = formatKey;
+                keyWriter.SetWriterMethod<TKey>(key => writer.WritePrimitiveValueAsString(format(key)));
+                keyWriter.SetWriterWithCopyMethod<TKey>(key => writer.WriteStringValueAsStringWithCopy(format(key)));
+            }
+        }
+
+        /// <summary>Key formatter producing a text segment.</summary>
+        internal sealed class TextSegmentKeyFormatter<TKey> : IKeyFormatter
+        {
+            readonly Func<TKey, TextSegment> formatKey;
+
+            internal TextSegmentKeyFormatter(Func<TKey, TextSegment> formatKey) => this.formatKey = formatKey;
+
+            public Type KeyType => typeof(TKey);
+
+            public void BindTo(JsonUTF8StreamWriter writer, CachedKeyWriter keyWriter)
+            {
+                var format = formatKey;
+                keyWriter.SetWriterMethod<TKey>(key => writer.WriteTextSegmentValue(format(key)));
+                keyWriter.SetWriterWithCopyMethod<TKey>(key => writer.WriteTextSegmentValueAsStringWithCopy(format(key)));
+            }
+        }
+
+#if !NETSTANDARD2_0
+        /// <summary>Key formatter producing a character span.</summary>
+        internal sealed class SpanKeyFormatter<TKey> : IKeyFormatter
+        {
+            readonly KeyToSpan<TKey> formatKey;
+
+            internal SpanKeyFormatter(KeyToSpan<TKey> formatKey) => this.formatKey = formatKey;
+
+            public Type KeyType => typeof(TKey);
+
+            public void BindTo(JsonUTF8StreamWriter writer, CachedKeyWriter keyWriter)
+            {
+                var format = formatKey;
+                keyWriter.SetWriterMethod<TKey>(key => writer.WriteStringValue(format(key)));
+                keyWriter.SetWriterWithCopyMethod<TKey>(key => writer.WriteStringValueAsStringWithCopy(format(key)));
+            }
+        }
+#endif
 
         /// <summary>
         /// Determines how the type name written into a "$type" member is built.

@@ -1055,6 +1055,54 @@ public sealed partial class JsonSerializer
             WriteEscapedStringWithQuotes(str);
         }
 
+        /// <summary>
+        /// Writes the text segment as a quoted JSON string and returns the written content without
+        /// the quotes as a copy, so it can be used as an item name after the buffer moved on.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteTextSegmentValueAsStringWithCopy(TextSegment textSegment)
+        {
+            if (!textSegment.IsValid)
+            {
+                WriteNullValue();
+                return default;
+            }
+
+            const int MAX_CHAR_LENGTH = 6;
+            EnsureFreeBufferSpace(textSegment.Count * MAX_CHAR_LENGTH + 2);
+
+            var countBefore = mainBufferCount;
+
+            WriteEscapedStringWithQuotes(textSegment.UnderlyingString, textSegment.Offset, textSegment.Count);
+
+            var writtenBytes = mainBufferCount - countBefore - 2;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore + 1, writtenBytes);
+            return slice;
+        }
+
+#if !NETSTANDARD2_0
+        /// <summary>
+        /// Writes the character span as a quoted JSON string and returns the written content
+        /// without the quotes as a copy, so it can be used as an item name after the buffer moved on.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ByteSegment WriteStringValueAsStringWithCopy(ReadOnlySpan<char> str)
+        {
+            const int MAX_CHAR_LENGTH = 6;
+            EnsureFreeBufferSpace(str.Length * MAX_CHAR_LENGTH + 2);
+
+            var countBefore = mainBufferCount;
+
+            WriteEscapedStringWithQuotes(str);
+
+            var writtenBytes = mainBufferCount - countBefore - 2;
+            var slice = tempSlicedBuffer.GetSlice(writtenBytes);
+            slice.CopyFrom(mainBuffer, countBefore + 1, writtenBytes);
+            return slice;
+        }
+#endif
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteCharValue(char value)
         {

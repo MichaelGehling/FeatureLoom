@@ -1222,5 +1222,208 @@ namespace FeatureLoom.Serialization
         {
             public BaseItem Item;
         }
+
+        private class DynamicPerson
+        {
+            public string Name;
+            public Dictionary<string, object> Extras = new();
+        }
+
+        [Fact]
+        public void AddDynamicFields_WritesPropertiesNextToDeclaredFields()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DynamicPerson>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<DynamicPerson>(obj => obj
+                .AddField("name", p => p.Name)
+                .AddDynamicFields((dyn, p) =>
+                {
+                    foreach (var pair in p.Extras) dyn.WriteField(pair.Key, pair.Value);
+                }))));
+
+            var serializer = new JsonSerializer(settings);
+            var person = new DynamicPerson { Name = "Ann", Extras = { ["age"] = 42, ["city"] = "Berlin" } };
+
+            Assert.Equal("{\"name\":\"Ann\",\"age\":42,\"city\":\"Berlin\"}", serializer.Serialize(person));
+        }
+
+        /// <summary>
+        /// Writing no dynamic property at all must not leave a dangling comma behind.
+        /// </summary>
+        [Fact]
+        public void AddDynamicFields_WithNoProperties_WritesNoDanglingComma()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DynamicPerson>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<DynamicPerson>(obj => obj
+                .AddField("name", p => p.Name)
+                .AddDynamicFields((dyn, p) =>
+                {
+                    foreach (var pair in p.Extras) dyn.WriteField(pair.Key, pair.Value);
+                }))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"name\":\"Ann\"}", serializer.Serialize(new DynamicPerson { Name = "Ann" }));
+        }
+
+        /// <summary>
+        /// A declared field following a dynamic one must decide about its comma at runtime,
+        /// because it cannot know whether the dynamic field wrote anything.
+        /// </summary>
+        [Fact]
+        public void AddDynamicFields_FollowedByDeclaredField_SeparatesCorrectly()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DynamicPerson>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<DynamicPerson>(obj => obj
+                .AddDynamicFields((dyn, p) =>
+                {
+                    foreach (var pair in p.Extras) dyn.WriteField(pair.Key, pair.Value);
+                })
+                .AddField("name", p => p.Name))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"name\":\"Ann\"}", serializer.Serialize(new DynamicPerson { Name = "Ann" }));
+            Assert.Equal("{\"age\":42,\"name\":\"Ann\"}",
+                serializer.Serialize(new DynamicPerson { Name = "Ann", Extras = { ["age"] = 42 } }));
+        }
+
+        [Fact]
+        public void AddDynamicFields_WritesValuesWithTheirRuntimeType()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DynamicPerson>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<DynamicPerson>(obj => obj
+                .AddDynamicFields((dyn, p) =>
+                {
+                    foreach (var pair in p.Extras) dyn.WriteField(pair.Key, pair.Value);
+                }))));
+
+            var serializer = new JsonSerializer(settings);
+            var person = new DynamicPerson
+            {
+                Extras =
+                {
+                    ["nested"] = new Person { Name = "Bob", Age = 7 },
+                    ["missing"] = null
+                }
+            };
+
+            Assert.Equal("{\"nested\":{\"Name\":\"Bob\",\"Age\":7},\"missing\":null}", serializer.Serialize(person));
+        }
+
+        [Fact]
+        public void AddDynamicObject_WritesNestedObjectWithDynamicProperties()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DynamicPerson>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<DynamicPerson>(obj => obj
+                .AddField("name", p => p.Name)
+                .AddDynamicObject("extras", p => p.Extras, (dyn, extras) =>
+                {
+                    foreach (var pair in extras) dyn.WriteField(pair.Key, pair.Value);
+                }))));
+
+            var serializer = new JsonSerializer(settings);
+            var person = new DynamicPerson { Name = "Ann", Extras = { ["age"] = 42 } };
+
+            Assert.Equal("{\"name\":\"Ann\",\"extras\":{\"age\":42}}", serializer.Serialize(person));
+        }
+
+        [Fact]
+        public void AddDynamicObject_WithNoProperties_WritesEmptyObject()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DynamicPerson>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<DynamicPerson>(obj => obj
+                .AddDynamicObject("extras", p => p.Extras, (dyn, extras) =>
+                {
+                    foreach (var pair in extras) dyn.WriteField(pair.Key, pair.Value);
+                }))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"extras\":{}}", serializer.Serialize(new DynamicPerson { Name = "Ann" }));
+        }
+
+        [Fact]
+        public void AddDynamicObject_WithNullValue_WritesNull()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<DynamicPerson>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<DynamicPerson>(obj => obj
+                .AddDynamicObject("extras", p => p.Extras, (dyn, extras) =>
+                {
+                    foreach (var pair in extras) dyn.WriteField(pair.Key, pair.Value);
+                }))));
+
+            var serializer = new JsonSerializer(settings);
+
+            Assert.Equal("{\"extras\":null}", serializer.Serialize(new DynamicPerson { Name = "Ann", Extras = null }));
+        }
+
+        private class ExtendablePerson
+        {
+            public string Name;
+            public int Age;
+            public string Secret;
+            [JsonIgnore] public string Internal;
+            public Dictionary<string, object> Extras = new();
+        }
+
+        [Fact]
+        public void AddExistingFields_WritesDefaultMembers()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<ExtendablePerson>(ts =>
+                ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<ExtendablePerson>(obj => obj
+                    .AddExistingFields())));
+
+            var serializer = new JsonSerializer(settings);
+            var person = new ExtendablePerson { Name = "Ann", Age = 42, Secret = "s", Internal = "i", Extras = null };
+
+            Assert.Equal("{\"Name\":\"Ann\",\"Age\":42,\"Secret\":\"s\",\"Extras\":null}", serializer.Serialize(person));
+        }
+
+        /// <summary>
+        /// The member configuration must be honored the same way as without a custom writer.
+        /// </summary>
+        [Fact]
+        public void AddExistingFields_HonorsMemberSettings()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<ExtendablePerson>(ts =>
+            {
+                ts.ConfigureMember<string>(nameof(ExtendablePerson.Secret), ms => ms.SetIgnore());
+                ts.ConfigureMember<Dictionary<string, object>>(nameof(ExtendablePerson.Extras), ms => ms.SetIgnore());
+                ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<ExtendablePerson>(obj => obj
+                    .AddExistingFields()));
+            });
+
+            var serializer = new JsonSerializer(settings);
+            var person = new ExtendablePerson { Name = "Ann", Age = 42, Secret = "s" };
+
+            Assert.Equal("{\"Name\":\"Ann\",\"Age\":42}", serializer.Serialize(person));
+        }
+
+        [Fact]
+        public void AddExistingFields_CanBeExtendedByFurtherFields()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<ExtendablePerson>(ts =>
+            {
+                ts.ConfigureMember<string>(nameof(ExtendablePerson.Secret), ms => ms.SetIgnore());
+                ts.ConfigureMember<Dictionary<string, object>>(nameof(ExtendablePerson.Extras), ms => ms.SetIgnore());
+                ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<ExtendablePerson>(obj => obj
+                    .AddField("greeting", p => "Hi " + p.Name)
+                    .AddExistingFields()
+                    .AddDynamicFields((dyn, p) =>
+                    {
+                        foreach (var pair in p.Extras) dyn.WriteField(pair.Key, pair.Value);
+                    })
+                    .AddField("tag", p => "end")));
+            });
+
+            var serializer = new JsonSerializer(settings);
+            var person = new ExtendablePerson { Name = "Ann", Age = 42, Extras = { ["city"] = "Berlin" } };
+
+            Assert.Equal("{\"greeting\":\"Hi Ann\",\"Name\":\"Ann\",\"Age\":42,\"city\":\"Berlin\",\"tag\":\"end\"}",
+                serializer.Serialize(person));
+        }
     }
 }

@@ -1,3 +1,4 @@
+using FeatureLoom.Collections;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -431,6 +432,93 @@ namespace FeatureLoom.Serialization
 
             var keys = new List<ComplexKey>(restored.Keys);
             Assert.NotSame(keys[0], keys[1]);
+        }
+
+        /// <summary>
+        /// A key formatter turns an otherwise unsupported key type into a property name, which
+        /// makes the object shape available where the fallback would be used otherwise.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(NoRefAndRefSettings))]
+        public void ConfigureKey_WithStringFormatter_WritesDictionaryAsObject(JsonSerializer.Settings settings)
+        {
+            settings ??= new JsonSerializer.Settings();
+            settings.ConfigureType<Dictionary<ComplexKey, int>>(ts =>
+                ts.ConfigureKey<ComplexKey>(k => $"{k.Id}-{k.Name}"));
+
+            var dict = new Dictionary<ComplexKey, int> { [new ComplexKey { Id = 1, Name = "a" }] = 10 };
+            Assert.Equal("{\"1-a\":10}", Serialize(dict, settings));
+        }
+
+        [Theory]
+        [MemberData(nameof(NoRefAndRefSettings))]
+        public void ConfigureKey_WithTextSegmentFormatter_WritesDictionaryAsObject(JsonSerializer.Settings settings)
+        {
+            settings ??= new JsonSerializer.Settings();
+            settings.ConfigureType<Dictionary<ComplexKey, int>>(ts =>
+                ts.ConfigureKey<ComplexKey>(k => (TextSegment)k.Name));
+
+            var dict = new Dictionary<ComplexKey, int> { [new ComplexKey { Id = 2, Name = "b" }] = 20 };
+            Assert.Equal("{\"b\":20}", Serialize(dict, settings));
+        }
+
+        [Theory]
+        [MemberData(nameof(NoRefAndRefSettings))]
+        public void ConfigureKey_WithSpanFormatter_WritesDictionaryAsObject(JsonSerializer.Settings settings)
+        {
+            settings ??= new JsonSerializer.Settings();
+            settings.ConfigureType<Dictionary<ComplexKey, int>>(ts =>
+                ts.ConfigureKey<ComplexKey>(new JsonSerializer.KeyToSpan<ComplexKey>(k => k.Name.AsSpan())));
+
+            var dict = new Dictionary<ComplexKey, int> { [new ComplexKey { Id = 3, Name = "c" }] = 30 };
+            Assert.Equal("{\"c\":30}", Serialize(dict, settings));
+        }
+
+        /// <summary>
+        /// The pair-array shape can be selected explicitly even for keys that could become
+        /// property names.
+        /// </summary>
+        [Fact]
+        public void SetDictionaryShape_KeyValuePairArray_OverridesObjectShapeForStringKeys()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<Dictionary<string, int>>(ts =>
+                ts.SetDictionaryShape(JsonSerializer.DictionaryShape.KeyValuePairArray));
+
+            var dict = new Dictionary<string, int> { ["a"] = 1 };
+            Assert.Equal("[{\"key\":\"a\",\"value\":1}]", Serialize(dict, settings));
+        }
+
+        [Fact]
+        public void SetDictionaryShape_Auto_KeepsObjectShapeForStringKeys()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<Dictionary<string, int>>(ts =>
+                ts.SetDictionaryShape(JsonSerializer.DictionaryShape.Auto));
+
+            var dict = new Dictionary<string, int> { ["a"] = 1 };
+            Assert.Equal("{\"a\":1}", Serialize(dict, settings));
+        }
+
+        /// <summary>
+        /// An explicitly requested pair-array shape takes precedence over a configured key
+        /// formatter, because the formatter only makes the object shape possible, not mandatory.
+        /// </summary>
+        [Fact]
+        public void SetDictionaryShape_KeyValuePairArray_WinsOverConfiguredKeyFormatter()
+        {
+            var settings = new JsonSerializer.Settings();
+            settings.ConfigureType<Dictionary<ComplexKey, int>>(ts =>
+            {
+                ts.ConfigureKey<ComplexKey>(k => k.Name);
+                ts.SetDictionaryShape(JsonSerializer.DictionaryShape.KeyValuePairArray);
+            });
+
+            var dict = new Dictionary<ComplexKey, int> { [new ComplexKey { Id = 5, Name = "e" }] = 50 };
+            var json = Serialize(dict, settings);
+
+            Assert.StartsWith("[", json);
+            Assert.Contains("\"key\"", json);
         }
     }
 }

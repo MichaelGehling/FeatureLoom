@@ -38,7 +38,7 @@ tracking has to look inside your value.
 | `PrepareRawWriter<T>` | anything | you |
 
 A writer can also be declared as a class instead of a lambda, which is what makes writers for
-**open generic types** possible — see [section 7](#7-writers-as-classes-and-open-generic-types).
+**open generic types** possible — see [section 8](#8-writers-as-classes-and-open-generic-types).
 
 ### Type info (`$type`) is not your problem
 
@@ -163,6 +163,35 @@ public override void Write(Utf8JsonWriter writer, Person value, JsonSerializerOp
 mid-way produces broken JSON. In FeatureLoom the braces belong to the serializer. STJ can avoid the
 per-call name encoding with a cached `JsonEncodedText`, but you have to know that and do it by hand;
 FeatureLoom does it for you because the builder runs in the preparation phase.
+
+### Extending the default members instead of replacing them
+
+A custom object writer normally replaces the default output entirely. `AddExistingFields()` puts it
+back in: it emits exactly the members the serializer would write for `T` without a custom writer,
+and the surrounding builder can add anything before or after it.
+
+```csharp
+settings.ConfigureType<Person>(ts =>
+{
+	ts.ConfigureMember<string>(nameof(Person.Secret), ms => ms.SetIgnore());
+	ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<Person>(obj => obj
+		.AddField("greeting", p => "Hi " + p.Name)
+		.AddExistingFields()
+		.AddDynamicFields((dyn, p) =>
+		{
+			foreach (var pair in p.Extras) dyn.WriteField(pair.Key, pair.Value);
+		})));
+});
+// {"greeting":"Hi Ann","Name":"Ann","Age":42,"city":"Berlin"}
+```
+
+The member selection is the regular one: the data selection, `JsonIgnore` / `JsonInclude`,
+backing-field filtering and the per-member settings (including `SetIgnore`) all apply, so the
+default part of the output stays in sync with the type configuration.
+
+> The members are resolved once, for `T`, while the writer is prepared. A value of a *derived*
+> runtime type is therefore not expanded by `AddExistingFields` — only the members declared on `T`
+> are written.
 
 ---
 
@@ -299,7 +328,46 @@ concern, so neither is on the write path.
 
 ---
 
-## 5. Escape hatch: raw tokens
+## 5. Dynamic properties
+
+When the property *names* are only known at write time, `AddDynamicFields` writes them straight into
+the surrounding object, next to the declared fields:
+
+```csharp
+settings.ConfigureType<Person>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareObjectWriter<Person>(obj => obj
+	.AddField("name", p => p.Name)
+	.AddDynamicFields((dyn, p) =>
+	{
+		foreach (var pair in p.Extras) dyn.WriteField(pair.Key, pair.Value);
+	}))));
+// {"name":"Ann","age":42,"city":"Berlin"}
+```
+
+`AddDynamicObject` does the same but nests the dynamic properties in their own object, with the
+braces and a null value handled for you:
+
+```csharp
+obj.AddField("name", p => p.Name)
+   .AddDynamicObject("extras", p => p.Extras, (dyn, extras) =>
+   {
+	   foreach (var pair in extras) dyn.WriteField(pair.Key, pair.Value);
+   });
+// {"name":"Ann","extras":{"age":42}}
+```
+
+The callback may write any number of properties, including none — the serializer emits the
+separating commas, so no dangling comma can appear. Values are written by the serializer's writer
+for their runtime type, so a value declared as `object` is written with all its members and nested
+custom writers still apply. Names can be passed as `string`, `TextSegment` or `ReadOnlySpan<char>`.
+
+> Declared fields are cheaper: their names are encoded once during preparation, while dynamic names
+> are encoded per value. Use dynamic properties only for names you cannot know upfront. Nothing
+> prevents a dynamic name from colliding with another property of the same object; keeping the names
+> distinct is up to you.
+
+---
+
+## 6. Escape hatch: raw tokens
 
 When nothing else fits:
 
@@ -519,7 +587,7 @@ What counts as "the element" depends on the container:
 | Container | Configured value |
 |---|---|
 | `T[]`, `List<T>`, `IList<T>`, `IReadOnlyList<T>`, `IEnumerable<T>` | `T` |
-| `IDictionary<K,V>` / `IReadOnlyDictionary<K,V>` written as a JSON object | `V` — the value, keys are written by the key writer and are not configurable |
+| `IDictionary<K,V>` / `IReadOnlyDictionary<K,V>` written as a JSON object | `V` — the value; the key is configured with `ConfigureKey` instead |
 | a dictionary whose key cannot become a property name | `KeyValuePair<K,V>`, because it is written as an array of pairs |
 
 `TElement` is verified against the container's actual element type, so a mismatch throws at
@@ -530,6 +598,44 @@ local to the container.
 
 > Element settings apply to the direct elements only. They do not propagate further down into the
 > elements' own members or nested containers.
+
+
+### Dictionary keys and dictionary shape
+
+A JSON object can only be produced when the key can become a property name. That is the case for the
+built-in key types (strings, the integral types, `bool`, `Guid`, `DateTime`, enums), and for any other
+key type once you give it a formatter:
+
+```csharp
+settings.ConfigureType<Dictionary<ComplexKey, int>>(ts =>
+	ts.ConfigureKey<ComplexKey>(k => $"{k.Id}-{k.Name}"));
+// {"1-a":10}
+```
+
+A key formatter is a pure property-name transformer, not a type writer: it is only used for writing,
+and there are three overloads so the result can be produced without an unnecessary string:
+
+| Overload | Use when |
+|---|---|
+| `Func<TKey, string>` | simplest case |
+| `Func<TKey, TextSegment>` | the name already exists inside another string |
+| `KeyToSpan<TKey>` (`ReadOnlySpan<char>`) | the name is built in a buffer you own |
+
+Without a formatter, a key type that cannot become a property name falls back to an array of
+`{"key":...,"value":...}` objects. You can also request that shape explicitly:
+
+```csharp
+settings.ConfigureType<Dictionary<string, int>>(ts =>
+	ts.SetDictionaryShape(JsonSerializer.DictionaryShape.KeyValuePairArray));
+// [{"key":"a","value":1}]
+```
+
+`DictionaryShape` only offers `Auto` (the default) and `KeyValuePairArray`. There is deliberately no
+"always object" mode, because the object shape is not representable for every key type — a formatter
+is what makes it possible, and `KeyValuePairArray` wins if you ask for both.
+
+> For output that neither shape covers, use `SetCustomWriter` together with `PrepareArrayWriter` and
+> write the entries yourself.
 
 
 ### How the others do it
@@ -612,7 +718,7 @@ be limited to a single member — neither `ISerializationBinder` nor `JsonDerive
 
 ---
 
-## 6. Applying a writer to more than one type
+## 7. Applying a writer to more than one type
 
 **FeatureLoom**
 
@@ -662,7 +768,7 @@ exact registrations deterministic precedence instead of order-dependent preceden
 
 ---
 
-## 7. Writers as classes, and open generic types
+## 8. Writers as classes, and open generic types
 
 The lambda form cannot express a writer for an *open* generic type such as `Wrapper<>`: there is no
 concrete `T` to write the lambda against. For that case a writer is declared as a class instead.
@@ -764,6 +870,7 @@ involved types.
 | Delimiters | serializer (except raw mode) | you | you |
 | Null handling for nested/array fields | automatic | manual | manual |
 | Declarative nesting | `AddObject` / `AddArray` | no | no |
+| Extending the default members | `AddExistingFields()` | no | no |
 | Nested type writer lookup | once, at preparation | per call | cacheable, manually |
 | Local settings deviation | `PrepareTypeWriter<T>(configure)`, `AddField/AddArray(…, configure)` | second serializer instance | second options instance |
 | Settings on polymorphic values | policy and member rules follow the runtime type | global only | global only |

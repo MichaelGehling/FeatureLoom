@@ -372,10 +372,39 @@ public sealed partial class JsonSerializer
     public sealed class ObjectWriterBuilder<T>
     {
         readonly JsonSerializer serializer;
-        readonly List<Action<T>> fieldWriters = new();
+
+        /// <summary>
+        /// The declared field writers. Each receives whether a property was already written and
+        /// returns that state for the next one, which is what allows a dynamic field to emit any
+        /// number of properties, including none.
+        /// </summary>
+        readonly List<Func<T, bool, bool>> fieldWriters = new();
         bool childrenMayContainRefs;
 
+        /// <summary>
+        /// True once a field was declared that writes a variable number of properties. From then on
+        /// the separating comma can no longer be baked into the prepared field names, because it is
+        /// not known at preparation time whether anything precedes them.
+        /// </summary>
+        bool needsRuntimeComma;
+
         internal ObjectWriterBuilder(JsonSerializer serializer) => this.serializer = serializer;
+
+        /// <summary>
+        /// Registers a field writer that emits exactly one property, taking care of the separating
+        /// comma in whichever way the current declaration state requires.
+        /// </summary>
+        void AddSingleFieldWriter(byte[] preparedName, bool runtimeComma, Action<T> writeValue)
+        {
+            var w = serializer.writer;
+            fieldWriters.Add((item, anyWritten) =>
+            {
+                if (runtimeComma && anyWritten) w.WriteComma();
+                w.WritePreparedBytes(preparedName);
+                writeValue(item);
+                return true;
+            });
+        }
 
         /// <summary>
         /// Adds a field whose value is written by the serializer's writer for
@@ -401,17 +430,13 @@ public sealed partial class JsonSerializer
             if (getValue == null) throw new ArgumentNullException(nameof(getValue));
 
             byte[] preparedName = PrepareName(fieldName);
+            bool runtimeComma = needsRuntimeComma;
             var fieldSettings = CreateFieldSettings(configure);
             var valueWriter = serializer.GetCachedTypeWriter(typeof(TValue), fieldSettings);
             if (!JsonSerializer.NoRefTypesIncludingRuntimeTypes<TValue>(valueWriter)) childrenMayContainRefs = true;
             var writeValue = serializer.CreatePolymorphicValueWriter<TValue>(valueWriter, fieldSettings);
-            var w = serializer.writer;
 
-            fieldWriters.Add(item =>
-            {
-                w.WritePreparedBytes(preparedName);
-                writeValue(getValue(item), default);
-            });
+            AddSingleFieldWriter(preparedName, runtimeComma, item => writeValue(getValue(item), default));
             return this;
         }
 
@@ -439,15 +464,11 @@ public sealed partial class JsonSerializer
             if (writeRaw == null) throw new ArgumentNullException(nameof(writeRaw));
 
             byte[] preparedName = PrepareName(fieldName);
-            var w = serializer.writer;
-            var api = new RawWriteApi(w);
+            bool runtimeComma = needsRuntimeComma;
+            var api = new RawWriteApi(serializer.writer);
             childrenMayContainRefs = true;
 
-            fieldWriters.Add(item =>
-            {
-                w.WritePreparedBytes(preparedName);
-                writeRaw(api, item);
-            });
+            AddSingleFieldWriter(preparedName, runtimeComma, item => writeRaw(api, item));
             return this;
         }
 
@@ -463,6 +484,7 @@ public sealed partial class JsonSerializer
             if (build == null) throw new ArgumentNullException(nameof(build));
 
             byte[] preparedName = PrepareName(fieldName);
+            bool runtimeComma = needsRuntimeComma;
             var nested = new ObjectWriterBuilder<TValue>(serializer);
             build(nested);
             var writeNested = nested.Build().writeBody;
@@ -470,9 +492,8 @@ public sealed partial class JsonSerializer
             var w = serializer.writer;
             bool canBeNull = CanBeNull(typeof(TValue));
 
-            fieldWriters.Add(item =>
+            AddSingleFieldWriter(preparedName, runtimeComma, item =>
             {
-                w.WritePreparedBytes(preparedName);
                 var value = getValue(item);
                 if (canBeNull && value == null)
                 {
@@ -550,9 +571,8 @@ public sealed partial class JsonSerializer
 
         void AddArrayField<TItem>(byte[] preparedName, JsonUTF8StreamWriter w, Func<T, IEnumerable<TItem>> getItems, Action<TItem> writeItem)
         {
-            fieldWriters.Add(item =>
+            AddSingleFieldWriter(preparedName, needsRuntimeComma, item =>
             {
-                w.WritePreparedBytes(preparedName);
                 var items = getItems(item);
                 if (items == null)
                 {
@@ -576,13 +596,115 @@ public sealed partial class JsonSerializer
         internal bool ChildrenMayContainRefs => childrenMayContainRefs;
 
         /// <summary>
+        /// Adds all members the serializer would write for <typeparamref name="T"/> by default,
+        /// so a custom writer can extend the regular output instead of replacing it. The data
+        /// selection, the JsonIgnore/JsonInclude attributes and the per-member settings (including
+        /// <c>SetIgnore</c>) are all honored, exactly as without a custom writer.
+        /// </summary>
+        /// <remarks>
+        /// Only the members of <typeparamref name="T"/> itself are written. A value of a derived
+        /// runtime type is not resolved here, because the members are determined once while the
+        /// writer is prepared.
+        /// </remarks>
+        public ObjectWriterBuilder<T> AddExistingFields()
+        {
+            serializer.settings.TryGetTypeSettings(typeof(T), out var typeSettings);
+            // The comma of the first member depends on what was declared before it, which is not
+            // known here, so the members always write their own separators.
+            var memberWriters = serializer.CreateMemberValueWriters<T>(typeof(T), typeSettings, mergeCommas: false, out bool allFieldsNoRefs);
+            if (!allFieldsNoRefs) childrenMayContainRefs = true;
+            if (memberWriters.Length == 0) return this;
+
+            var w = serializer.writer;
+
+            fieldWriters.Add((item, anyWritten) =>
+            {
+                for (int i = 0; i < memberWriters.Length; i++)
+                {
+                    if (anyWritten) w.WriteComma();
+                    memberWriters[i].Invoke(item);
+                    anyWritten = true;
+                }
+                return true;
+            });
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a field that writes a variable number of properties directly into the surrounding
+        /// object, so an object can carry dynamic properties next to its declared fields without
+        /// falling back to raw mode. The property names are written at runtime and are therefore
+        /// not prepared; declared fields are the cheaper choice whenever the names are known.
+        /// </summary>
+        /// <remarks>
+        /// The serializer emits the separating commas, so the callback may write no properties at
+        /// all. Nothing prevents a name from colliding with another property of the same object;
+        /// keeping the names distinct is up to the caller.
+        /// </remarks>
+        public ObjectWriterBuilder<T> AddDynamicFields(Action<DynamicFieldWriteApi, T> writeFields)
+        {
+            if (writeFields == null) throw new ArgumentNullException(nameof(writeFields));
+
+            var w = serializer.writer;
+            var api = new DynamicFieldWriteApi(serializer);
+            // The number of properties is only known at write time, so every field that follows
+            // has to decide about its separating comma at runtime as well.
+            needsRuntimeComma = true;
+            childrenMayContainRefs = true;
+
+            fieldWriters.Add((item, anyWritten) =>
+            {
+                api.Begin(anyWritten);
+                writeFields(api, item);
+                return api.AnyWritten;
+            });
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a field that is written as a nested JSON object whose properties are all dynamic.
+        /// The serializer emits the braces and separators; a null value is written as the JSON
+        /// null literal.
+        /// </summary>
+        public ObjectWriterBuilder<T> AddDynamicObject<TValue>(string fieldName, Func<T, TValue> getValue, Action<DynamicFieldWriteApi, TValue> writeFields)
+        {
+            if (fieldName == null) throw new ArgumentNullException(nameof(fieldName));
+            if (getValue == null) throw new ArgumentNullException(nameof(getValue));
+            if (writeFields == null) throw new ArgumentNullException(nameof(writeFields));
+
+            byte[] preparedName = PrepareName(fieldName);
+            bool runtimeComma = needsRuntimeComma;
+            var w = serializer.writer;
+            var api = new DynamicFieldWriteApi(serializer);
+            bool canBeNull = CanBeNull(typeof(TValue));
+            childrenMayContainRefs = true;
+
+            AddSingleFieldWriter(preparedName, runtimeComma, item =>
+            {
+                var value = getValue(item);
+                if (canBeNull && value == null)
+                {
+                    w.WriteNullValue();
+                    return;
+                }
+                w.OpenObject();
+                api.Begin(false);
+                writeFields(api, value);
+                w.CloseObject();
+            });
+            return this;
+        }
+
+        /// <summary>
         /// Encodes the field name, including its colon and, for all but the first field, the
-        /// separating comma, so it can be emitted with a single buffer copy.
+        /// separating comma, so it can be emitted with a single buffer copy. Once a field with a
+        /// variable number of properties was declared, the comma cannot be baked in anymore and is
+        /// written at runtime instead.
         /// </summary>
         byte[] PrepareName(string fieldName)
         {
             byte[] nameAndColon = serializer.writer.PrepareFieldNameBytes(fieldName);
-            if (fieldWriters.Count == 0) return nameAndColon;
+            if (fieldWriters.Count == 0 || needsRuntimeComma) return nameAndColon;
 
             var withComma = new byte[nameAndColon.Length + 1];
             withComma[0] = (byte)',';
@@ -599,16 +721,97 @@ public sealed partial class JsonSerializer
                 case 0: writeBody = _ => { }; break;
                 case 1:
                     var single = writers[0];
-                    writeBody = single;
+                    writeBody = item => single(item, false);
                     break;
                 default:
                     writeBody = item =>
                     {
-                        for (int i = 0; i < writers.Length; i++) writers[i](item);
+                        bool anyWritten = false;
+                        for (int i = 0; i < writers.Length; i++) anyWritten = writers[i](item, anyWritten);
                     };
                     break;
             }
             return new CustomWriter<T>(writeBody, CustomWriterShape.Object, childrenMayContainRefs);
+        }
+    }
+
+    /// <summary>
+    /// Writes properties whose names are only known at write time. Handed to the callbacks of
+    /// <see cref="ObjectWriterBuilder{T}.AddDynamicFields"/> and
+    /// <see cref="ObjectWriterBuilder{T}.AddDynamicObject"/>, which take care of the surrounding
+    /// object and of the separating commas, so any number of properties may be written, including
+    /// none.
+    /// </summary>
+    public sealed class DynamicFieldWriteApi
+    {
+        readonly JsonSerializer serializer;
+        readonly JsonUTF8StreamWriter writer;
+        bool anyWritten;
+
+        internal DynamicFieldWriteApi(JsonSerializer serializer)
+        {
+            this.serializer = serializer;
+            this.writer = serializer.writer;
+        }
+
+        /// <summary>
+        /// Resets the state for one object, carrying over whether a property was already written
+        /// into the same object by a preceding declared field.
+        /// </summary>
+        internal void Begin(bool anyWritten) => this.anyWritten = anyWritten;
+
+        /// <summary>True if this API wrote at least one property since <see cref="Begin"/>.</summary>
+        internal bool AnyWritten => anyWritten;
+
+        void WriteSeparator()
+        {
+            if (anyWritten) writer.WriteComma();
+            anyWritten = true;
+        }
+
+        /// <summary>
+        /// Writes a property whose value is written by the serializer's writer for
+        /// <typeparamref name="TValue"/>, so nested custom writers and settings still apply.
+        /// </summary>
+        public void WriteField<TValue>(string name, TValue value)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            WriteSeparator();
+            writer.WriteFieldName(name);
+            WriteValue(value, new ByteSegment(name));
+        }
+
+        /// <inheritdoc cref="WriteField{TValue}(string, TValue)"/>
+        public void WriteField<TValue>(TextSegment name, TValue value)
+        {
+            WriteSeparator();
+            writer.WriteFieldName(name);
+            WriteValue(value, new ByteSegment(name.ToString()));
+        }
+
+#if !NETSTANDARD2_0
+        /// <inheritdoc cref="WriteField{TValue}(string, TValue)"/>
+        public void WriteField<TValue>(ReadOnlySpan<char> name, TValue value)
+        {
+            WriteSeparator();
+            writer.WriteFieldName(name);
+            WriteValue(value, new ByteSegment(name.ToString()));
+        }
+#endif
+
+        /// <summary>
+        /// Writes the value with the writer of its runtime type, so a value declared as
+        /// <see cref="object"/> is written with all its members. The writer is resolved per value
+        /// because the type is only known at write time.
+        /// </summary>
+        void WriteValue<TValue>(TValue value, ByteSegment itemName)
+        {
+            if (value == null)
+            {
+                writer.WriteNullValue();
+                return;
+            }
+            serializer.GetCachedTypeWriter(value.GetType()).WriteItemOfRuntimeType(value, itemName);
         }
     }
 

@@ -93,6 +93,15 @@ namespace FeatureLoom.Serialization
 
             internal void ForceNoRefTypes() => this.noRefTypes = true;
 
+            /// <summary>
+            /// Writes a boxed item with a writer that was already resolved from the item's runtime
+            /// type, so it is not a type deviation and must not produce a $type/$value envelope.
+            /// Used where the value type is only known at write time, e.g. dynamic fields.
+            /// </summary>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal void WriteItemOfRuntimeType(object item, ByteSegment itemName)
+                => objectItemWriter(item, false, itemName);
+
 
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

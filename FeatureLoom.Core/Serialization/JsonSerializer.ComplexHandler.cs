@@ -30,7 +30,49 @@ namespace FeatureLoom.Serialization
 
         private void CreateTypedComplexItemHandler<T>(CachedTypeWriter typeHandler, Type itemType)
         {
-            var typeSettings = typeHandler.TypeSettings;
+            bool mergeCommas = !settings.indent;
+            var fieldValueWritersArray = CreateMemberValueWriters<T>(itemType, typeHandler.TypeSettings, mergeCommas, out bool allFieldsNoRefs);
+            int fieldCount = fieldValueWritersArray.Length;
+            var w = writer;
+
+            // When mergeCommas is set, the separating comma is already part of the prepared field
+            // name bytes of each field handler, so no extra write is needed per field.
+            void WriteFields(T item)
+            {
+                if (fieldCount == 0) return;
+                fieldValueWritersArray[0].Invoke(item);
+                if (mergeCommas)
+                {
+                    for (int i = 1; i < fieldCount; i++) fieldValueWritersArray[i].Invoke(item);
+                }
+                else
+                {
+                    for (int i = 1; i < fieldCount; i++)
+                    {
+                        w.WriteComma();
+                        fieldValueWritersArray[i].Invoke(item);
+                    }
+                }
+            }
+
+            typeHandler.SetItemWriter(CreateObjectItemWriter<T>(typeHandler, WriteFields), !allFieldsNoRefs);
+        }
+
+        /// <summary>
+        /// Determines the members of <paramref name="itemType"/> that are written, honoring the
+        /// data selection, the JsonIgnore/JsonInclude attributes and the per-member settings, and
+        /// builds a value writer for each of them.
+        /// </summary>
+        /// <param name="mergeCommas">
+        /// If true, the separating comma is baked into the prepared field name of every writer but
+        /// the first, so the caller must emit no commas itself. If false, every writer starts
+        /// directly with its field name and the caller is responsible for the separators.
+        /// </param>
+        /// <param name="allFieldsNoRefs">
+        /// False if any written member can contain a reference path.
+        /// </param>
+        internal Action<T>[] CreateMemberValueWriters<T>(Type itemType, BaseTypeWriteSettings typeSettings, bool mergeCommas, out bool allFieldsNoRefs)
+        {
             DataSelection dataSelection = settings.ResolveDataSelection(typeSettings);
 
             var memberInfos = new List<MemberInfo>();
@@ -118,8 +160,7 @@ namespace FeatureLoom.Serialization
             AddExplicitlyIncludedMembers(itemType, typeSettings, memberInfos, dataSelection);
 
             List<Action<T>> fieldValueWriters = new();
-            bool allFieldsNoRefs = true;
-            bool mergeCommas = !settings.indent;
+            allFieldsNoRefs = true;
             foreach (var memberInfo in memberInfos)
             {
                 var memberSettings = GetMemberSettings(typeSettings, memberInfo);
@@ -135,31 +176,7 @@ namespace FeatureLoom.Serialization
                 fieldValueWriters.Add(writer);
             }
 
-            var fieldValueWritersArray = fieldValueWriters.ToArray();
-            int fieldCount = fieldValueWritersArray.Length;
-            var w = writer;
-
-            // When mergeCommas is set, the separating comma is already part of the prepared field
-            // name bytes of each field handler, so no extra write is needed per field.
-            void WriteFields(T item)
-            {
-                if (fieldCount == 0) return;
-                fieldValueWritersArray[0].Invoke(item);
-                if (mergeCommas)
-                {
-                    for (int i = 1; i < fieldCount; i++) fieldValueWritersArray[i].Invoke(item);
-                }
-                else
-                {
-                    for (int i = 1; i < fieldCount; i++)
-                    {
-                        w.WriteComma();
-                        fieldValueWritersArray[i].Invoke(item);
-                    }
-                }
-            }
-
-            typeHandler.SetItemWriter(CreateObjectItemWriter<T>(typeHandler, WriteFields), !allFieldsNoRefs);
+            return fieldValueWriters.ToArray();
         }
 
         private void CreateTypedComplexItemHandler_ForNullableStruct<T>(CachedTypeWriter typeHandler, Type itemType) where T : struct

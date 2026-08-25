@@ -424,9 +424,20 @@ namespace FeatureLoom.Serialization
         /// Returns false if the type is not supported as a key, in which case the dictionary is
         /// not written as a JSON object.
         /// </summary>
-        private bool TryCreateKeyWriter(Type keyType, out CachedKeyWriter keyWriter)
+        /// <param name="typeSettings">
+        /// Settings of the dictionary type, used to find a configured key formatter. A formatter
+        /// takes precedence over the built-in key handling and makes any key type writable.
+        /// </param>
+        private bool TryCreateKeyWriter(Type keyType, BaseTypeWriteSettings typeSettings, out CachedKeyWriter keyWriter)
         {
             keyWriter = new CachedKeyWriter();
+
+            var keyFormatter = typeSettings?.keyFormatter;
+            if (keyFormatter != null && keyFormatter.KeyType == keyType)
+            {
+                keyFormatter.BindTo(writer, keyWriter);
+                return keyWriter.HasMethod;
+            }
 
             // Enums are written via their underlying representation, which the generic helper
             // resolves, so they are handled before the concrete type checks.

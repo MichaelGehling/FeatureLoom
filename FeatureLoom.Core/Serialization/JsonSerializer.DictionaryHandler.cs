@@ -17,11 +17,12 @@ namespace FeatureLoom.Serialization
         /// </summary>
         /// <remarks>
         /// This requires the key type to be writable as a JSON property name (see
-        /// <see cref="TryCreateKeyWriter"/>). Key types that cannot be represented that way
-        /// (e.g. complex objects) intentionally fall back to the generic enumerable handler,
-        /// which writes the dictionary as an array of key/value pairs
-        /// (<c>[{"key":...,"value":...}, ...]</c>). The deserializer accepts both shapes, so
-        /// such dictionaries still round-trip.
+        /// <see cref="TryCreateKeyWriter"/>) or a key formatter to be configured for the type.
+        /// Key types that cannot be represented that way (e.g. complex objects) intentionally fall
+        /// back to the generic enumerable handler, which writes the dictionary as an array of
+        /// key/value pairs (<c>[{"key":...,"value":...}, ...]</c>). The deserializer accepts both
+        /// shapes, so such dictionaries still round-trip. The pair array can also be requested
+        /// explicitly via <see cref="DictionaryShape.KeyValuePairArray"/>.
         /// </remarks>
         private bool TryCreateDictionaryItemHandler(CachedTypeWriter typeHandler, Type itemType)
         {
@@ -30,11 +31,16 @@ namespace FeatureLoom.Serialization
             else if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyDictionary<,>), out keyType, out valueType)) methodName = nameof(CreateIReadOnlyDictionaryItemHandler);
             else return false;
 
-            // The key cannot become a JSON property name, so write the dictionary as an array of
-            // key/value pairs instead. This is done explicitly rather than by falling through to
-            // the enumerable handler, because IReadOnlyDictionary<,> does not inherit the
-            // non-generic IEnumerable that the enumerable handler requires.
-            if (!TryCreateKeyWriter(keyType, out CachedKeyWriter keyWriter)) return CreateKeyValuePairArrayItemHandler(typeHandler, itemType);
+            // The key cannot become a JSON property name, or the pair array was requested, so write
+            // the dictionary as an array of key/value pairs instead. This is done explicitly rather
+            // than by falling through to the enumerable handler, because IReadOnlyDictionary<,>
+            // does not inherit the non-generic IEnumerable that the enumerable handler requires.
+            var typeSettings = typeHandler.TypeSettings;
+            if (typeSettings?.dictionaryShape == DictionaryShape.KeyValuePairArray ||
+                !TryCreateKeyWriter(keyType, typeSettings, out CachedKeyWriter keyWriter))
+            {
+                return CreateKeyValuePairArrayItemHandler(typeHandler, itemType);
+            }
             CachedTypeWriter valueHandler = GetCachedTypeWriterForElement(valueType, typeHandler.TypeSettings);
             var resolveDeviating = CreateDeviatingElementWriterResolver(valueType, typeHandler.TypeSettings);
 
