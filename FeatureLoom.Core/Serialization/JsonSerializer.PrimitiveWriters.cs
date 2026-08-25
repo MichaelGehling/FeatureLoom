@@ -15,18 +15,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<int>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteIntValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<int>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteIntValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -43,20 +43,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<int?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteIntValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<int?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteIntValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -78,18 +78,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<uint>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteUintValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<uint>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteUintValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -106,20 +106,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<uint?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUintValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<uint?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUintValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -141,18 +141,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<long>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteLongValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<long>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteLongValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -169,20 +169,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<long?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteLongValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<long?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteLongValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -204,18 +204,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<ulong>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteUlongValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ulong>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteUlongValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -232,20 +232,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<ulong?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUlongValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ulong?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUlongValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -267,18 +267,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<short>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteShortValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<short>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteShortValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -295,20 +295,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<short?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteShortValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<short?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteShortValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -330,18 +330,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<ushort>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteUshortValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ushort>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteUshortValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -358,20 +358,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<ushort?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUshortValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<ushort?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUshortValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -393,18 +393,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<sbyte>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteSbyteValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<sbyte>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteSbyteValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -421,20 +421,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<sbyte?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteSbyteValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<sbyte?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteSbyteValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -456,18 +456,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<byte>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteByteValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<byte>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteByteValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -484,20 +484,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<byte?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteByteValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<byte?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteByteValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -519,18 +519,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<double>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteDoubleValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<double>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteDoubleValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -547,20 +547,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<double?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDoubleValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<double?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDoubleValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -582,18 +582,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<float>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteFloatValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<float>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteFloatValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -610,20 +610,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<float?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteFloatValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<float?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteFloatValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -646,18 +646,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<decimal>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteDecimalValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<decimal>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteDecimalValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -674,20 +674,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<decimal?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDecimalValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<decimal?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDecimalValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -709,18 +709,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<char>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteCharValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<char>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteCharValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -737,20 +737,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<char?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteCharValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<char?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteCharValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -770,18 +770,18 @@ public sealed partial class JsonSerializer
         {
             typeWriter.SetItemWriter<string>((item, _, _) =>
             {
-                StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                StartTypeInfoObject(typeWriter);
                 writer.WriteStringValue(item);
-                FinishTypeInfoObject();
+                FinishTypeInfoObject(typeWriter);
             }, false);
         }
         else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
         {
             typeWriter.SetItemWriter<string>((item, deviatingType, _) =>
             {
-                if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                if (deviatingType) StartTypeInfoObject(typeWriter);
                 writer.WriteStringValue(item);
-                if (deviatingType) FinishTypeInfoObject();
+                if (deviatingType) FinishTypeInfoObject(typeWriter);
             }, false);
         }
         else
@@ -801,18 +801,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<bool>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteBoolValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<bool>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteBoolValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -829,20 +829,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<bool?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteBoolValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<bool?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteBoolValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -865,18 +865,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<nint>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteIntPtrValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<nint>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteIntPtrValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -893,20 +893,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<IntPtr?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteIntPtrValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<IntPtr?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteIntPtrValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -928,18 +928,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<nuint>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteUintPtrValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<nuint>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteUintPtrValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -956,20 +956,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<UIntPtr?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUintPtrValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<UIntPtr?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteUintPtrValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -991,18 +991,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<Guid>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteGuidValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<Guid>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteGuidValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1019,20 +1019,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<Guid?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteGuidValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<Guid?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteGuidValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1054,18 +1054,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<DateTime>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteDateTimeValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTime>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteDateTimeValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1082,20 +1082,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<DateTime?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDateTimeValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTime?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDateTimeValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1117,18 +1117,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<DateTimeOffset>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteDateTimeOffsetValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTimeOffset>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteDateTimeOffsetValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1145,20 +1145,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<DateTimeOffset?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDateTimeOffsetValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateTimeOffset?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDateTimeOffsetValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1180,18 +1180,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<TimeSpan>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteTimeSpanValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeSpan>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteTimeSpanValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1208,20 +1208,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<TimeSpan?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteTimeSpanValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeSpan?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteTimeSpanValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1244,18 +1244,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<DateOnly>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteDateOnlyValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateOnly>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteDateOnlyValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1272,20 +1272,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<DateOnly?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDateOnlyValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<DateOnly?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteDateOnlyValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1307,18 +1307,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<TimeOnly>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteTimeOnlyValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeOnly>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteTimeOnlyValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1335,20 +1335,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<TimeOnly?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteTimeOnlyValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TimeOnly?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteTimeOnlyValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1371,18 +1371,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<JsonFragment>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteJsonFragmentValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<JsonFragment>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteJsonFragmentValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1399,20 +1399,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<JsonFragment?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteJsonFragmentValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<JsonFragment?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteJsonFragmentValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1434,18 +1434,18 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<TextSegment>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     writer.WriteTextSegmentValue(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TextSegment>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     writer.WriteTextSegmentValue(item);
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1462,20 +1462,20 @@ public sealed partial class JsonSerializer
             {
                 typeWriter.SetItemWriter<TextSegment?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteTextSegmentValue(item.Value);
                     else writer.WriteNullValue();
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeWriter.SetItemWriter<TextSegment?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeWriter);
                     if (item.HasValue) writer.WriteTextSegmentValue(item.Value);
                     else writer.WriteNullValue();
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeWriter);
                 }, false);
             }
             else
@@ -1495,18 +1495,18 @@ public sealed partial class JsonSerializer
         {
             typeWriter.SetItemWriter<Uri>((item, _, _) =>
             {
-                StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                StartTypeInfoObject(typeWriter);
                 writer.WriteUriValue(item);
-                FinishTypeInfoObject();
+                FinishTypeInfoObject(typeWriter);
             }, false);
         }
         else if (typeWriter.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
         {
             typeWriter.SetItemWriter<Uri>((item, deviatingType, _) =>
             {
-                if (deviatingType) StartTypeInfoObject(typeWriter.preparedTypeInfo);
+                if (deviatingType) StartTypeInfoObject(typeWriter);
                 writer.WriteUriValue(item);
-                if (deviatingType) FinishTypeInfoObject();
+                if (deviatingType) FinishTypeInfoObject(typeWriter);
             }, false);
         }
         else
@@ -1531,20 +1531,20 @@ public sealed partial class JsonSerializer
             {
                 typeHandler.SetItemWriter<T>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    StartTypeInfoObject(typeHandler);
                     if (asString) writer.WritePreparedStringValue(item.ToUtf8Name());
                     else writer.WriteIntValue(item.ToInt());
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeHandler);
                 }, false);
             }
             else if (typeHandler.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeHandler.SetItemWriter<T>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeHandler);
                     if (asString) writer.WritePreparedStringValue(item.ToUtf8Name());
                     else writer.WriteIntValue(item.ToInt());
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeHandler);
                 }, false);
             }
             else
@@ -1562,22 +1562,22 @@ public sealed partial class JsonSerializer
             {
                 typeHandler.SetItemWriter<T?>((item, _, _) =>
                 {
-                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    StartTypeInfoObject(typeHandler);
                     if (!item.HasValue) writer.WriteNullValue();
                     else if (asString) writer.WritePreparedStringValue(item.Value.ToUtf8Name());
                     else writer.WriteIntValue(item.Value.ToInt());
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeHandler);
                 }, false);
             }
             else if (typeHandler.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
             {
                 typeHandler.SetItemWriter<T?>((item, deviatingType, _) =>
                 {
-                    if (deviatingType) StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    if (deviatingType) StartTypeInfoObject(typeHandler);
                     if (!item.HasValue) writer.WriteNullValue();
                     else if (asString) writer.WritePreparedStringValue(item.Value.ToUtf8Name());
                     else writer.WriteIntValue(item.Value.ToInt());
-                    if (deviatingType) FinishTypeInfoObject();
+                    if (deviatingType) FinishTypeInfoObject(typeHandler);
                 }, false);
             }
             else

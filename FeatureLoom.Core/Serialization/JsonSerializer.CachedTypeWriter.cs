@@ -29,6 +29,23 @@ namespace FeatureLoom.Serialization
             public readonly TypeInfoHandling typeInfoHandling;
 
             /// <summary>
+            /// Type info layout for this type scope, resolved once from the global setting and the
+            /// optional per-type/member override.
+            /// </summary>
+            public readonly TypeInfoFormat typeInfoFormat;
+
+            /// <summary>
+            /// True if type info must be omitted where it would require an envelope, i.e. for
+            /// arrays and primitives. Resolved from <see cref="typeInfoFormat"/>.
+            /// </summary>
+            public readonly bool skipTypeInfoEnvelope;
+
+            /// <summary>
+            /// True if an array wrapped in a type info envelope uses "$values" instead of "$value".
+            /// </summary>
+            public readonly bool useValuesFieldName;
+
+            /// <summary>
             /// The type settings this writer was built with: either the settings configured for
             /// <see cref="HandlerType"/>, or a locally overriding set (e.g. member settings).
             /// May be <see langword="null"/> when nothing is configured.
@@ -48,6 +65,9 @@ namespace FeatureLoom.Serialization
                 this.handlerType = handlerType;
                 this.typeSettings = typeSettings;
                 this.typeInfoHandling = serializer.settings.ResolveTypeInfoHandling(typeSettings);
+                this.typeInfoFormat = serializer.settings.ResolveTypeInfoFormat(typeSettings);
+                this.skipTypeInfoEnvelope = this.typeInfoFormat == TypeInfoFormat.OnlyInlineForObjects;
+                this.useValuesFieldName = serializer.settings.ResolveArrayValueFieldName(typeSettings) == ValueFieldName.Values;
             }
 
             public bool NoRefTypes => noRefTypes;

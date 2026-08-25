@@ -27,27 +27,29 @@ namespace FeatureLoom.Serialization
             else if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyList<>), out elementType)) methodName = nameof(CreateIReadOnlyListItemHandler);
             else return false;
 
-            CachedTypeWriter elementHandler = GetCachedTypeWriter(elementType);
+            CachedTypeWriter elementHandler = GetCachedTypeWriterForElement(elementType, typeHandler.TypeSettings);
+            var resolveDeviating = CreateDeviatingElementWriterResolver(elementType, typeHandler.TypeSettings);
 
             MethodInfo createMethod = typeof(JsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
             MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, elementType);
-            genericCreateMethod.Invoke(this, new object[] { typeHandler, elementHandler });
+            genericCreateMethod.Invoke(this, new object[] { typeHandler, elementHandler, resolveDeviating });
 
             return true;
         }
 
         private bool CreateSpecializedListItemHandler(CachedTypeWriter typeHandler, Type elementType, string methodName)
         {
-            CachedTypeWriter elementHandler = GetCachedTypeWriter(elementType);
+            CachedTypeWriter elementHandler = GetCachedTypeWriterForElement(elementType, typeHandler.TypeSettings);
+            var resolveDeviating = CreateDeviatingElementWriterResolver(elementType, typeHandler.TypeSettings);
 
             MethodInfo createMethod = typeof(JsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
             MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(elementType);
-            genericCreateMethod.Invoke(this, new object[] { typeHandler, elementHandler });
+            genericCreateMethod.Invoke(this, new object[] { typeHandler, elementHandler, resolveDeviating });
 
             return true;
         }
 
-        private void CreateArrayItemHandler<E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler)
+        private void CreateArrayItemHandler<E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler, Func<Type, CachedTypeWriter> resolveDeviating)
         {
             if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType || CanUseDirectReferenceStrategy(elementHandler, typeof(E)))
             {
@@ -70,7 +72,7 @@ namespace FeatureLoom.Serialization
                             if (elementType == elementHandler.HandlerType) elementHandler.WriteItem(element, writer.GetCollectionIndexName(i));
                             else
                             {
-                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = GetCachedTypeWriter(elementType);
+                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = resolveDeviating(elementType);
                                 alternativeHandler.WriteItem(element, writer.GetCollectionIndexName(i));
                             }
                         }
@@ -81,7 +83,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        private void CreateListItemHandler<E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler)
+        private void CreateListItemHandler<E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler, Func<Type, CachedTypeWriter> resolveDeviating)
         {
             if (!elementHandler.HandlerType.IsNullable() || elementHandler.HandlerType.IsValueType || CanUseDirectReferenceStrategy(elementHandler, typeof(E)))
             {
@@ -105,7 +107,7 @@ namespace FeatureLoom.Serialization
                             if (elementType == elementHandler.HandlerType) elementHandler.WriteItem(element, writer.GetCollectionIndexName(i));
                             else
                             {
-                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = GetCachedTypeWriter(elementType);
+                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = resolveDeviating(elementType);
                                 alternativeHandler.WriteItem(element, writer.GetCollectionIndexName(i));
                             }
                         }
@@ -116,7 +118,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        private void CreateIListItemHandler<T, E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler) where T : IList<E>
+        private void CreateIListItemHandler<T, E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler, Func<Type, CachedTypeWriter> resolveDeviating) where T : IList<E>
         {
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
@@ -142,7 +144,7 @@ namespace FeatureLoom.Serialization
                             if (elementType == elementHandler.HandlerType) elementHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                             else
                             {
-                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = GetCachedTypeWriter(elementType);
+                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = resolveDeviating(elementType);
                                 alternativeHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                             }
                         }
@@ -160,7 +162,7 @@ namespace FeatureLoom.Serialization
                             if (elementType == elementHandler.HandlerType) elementHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                             else
                             {
-                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = GetCachedTypeWriter(elementType);
+                                if (elementType != alternativeHandler.HandlerType) alternativeHandler = resolveDeviating(elementType);
                                 alternativeHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                             }
                         }
@@ -172,7 +174,7 @@ namespace FeatureLoom.Serialization
             }
         }
 
-        private void CreateIReadOnlyListItemHandler<T, E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler) where T : IReadOnlyList<E>
+        private void CreateIReadOnlyListItemHandler<T, E>(CachedTypeWriter typeHandler, CachedTypeWriter elementHandler, Func<Type, CachedTypeWriter> resolveDeviating) where T : IReadOnlyList<E>
         {
             Type itemType = typeof(T);
             Type expectedElementType = typeof(E);
@@ -195,7 +197,7 @@ namespace FeatureLoom.Serialization
                         {
                             Type elementType = element.GetType();
                             CachedTypeWriter actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeWriter(elementType);
+                            if (elementType != elementHandler.HandlerType) actualHandler = resolveDeviating(elementType);
                             actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                         }
                         index++;
@@ -210,7 +212,7 @@ namespace FeatureLoom.Serialization
                         {
                             Type elementType = element.GetType();
                             CachedTypeWriter actualHandler = elementHandler;
-                            if (elementType != elementHandler.HandlerType) actualHandler = GetCachedTypeWriter(elementType);
+                            if (elementType != elementHandler.HandlerType) actualHandler = resolveDeviating(elementType);
                             actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));
                         }
                         index++;

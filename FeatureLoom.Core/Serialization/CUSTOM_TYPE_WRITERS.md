@@ -503,6 +503,35 @@ settings.ConfigureType<ItemHolder>(ts => ts.ConfigureMember<BaseItem>(nameof(Ite
 Writers built for such an override are local to the call site and are not shared through the
 per-type cache, so they never leak into how the type is written elsewhere.
 
+### Configuring container elements
+
+`ConfigureElement<TElement>` is to a container what `ConfigureMember` is to an object: it configures
+the values a container writes into its JSON array or object, without touching how the same type is
+written anywhere else.
+
+```csharp
+settings.ConfigureType<List<Item>>(ts => ts.ConfigureElement<Item>(
+	es => es.SetTypeInfoFormat(JsonSerializer.TypeInfoFormat.AlwaysEnvelope)));
+```
+
+What counts as "the element" depends on the container:
+
+| Container | Configured value |
+|---|---|
+| `T[]`, `List<T>`, `IList<T>`, `IReadOnlyList<T>`, `IEnumerable<T>` | `T` |
+| `IDictionary<K,V>` / `IReadOnlyDictionary<K,V>` written as a JSON object | `V` — the value, keys are written by the key writer and are not configurable |
+| a dictionary whose key cannot become a property name | `KeyValuePair<K,V>`, because it is written as an array of pairs |
+
+`TElement` is verified against the container's actual element type, so a mismatch throws at
+configuration time rather than being silently ignored. Element settings behave like member settings
+in every other respect: they merge onto the element type's own settings, they follow a deviating
+runtime element type under the same rules as the table above, and the writers built for them stay
+local to the container.
+
+> Element settings apply to the direct elements only. They do not propagate further down into the
+> elements' own members or nested containers.
+
+
 ### How the others do it
 
 **Newtonsoft.Json** — a converter takes over the value completely, so Newtonsoft writes no `$type`

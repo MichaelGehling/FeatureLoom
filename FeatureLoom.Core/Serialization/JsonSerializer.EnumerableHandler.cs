@@ -21,7 +21,8 @@ namespace FeatureLoom.Serialization
 
             if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))
             {
-                CachedTypeWriter elementHandler = GetCachedTypeWriter(elementType);
+                CachedTypeWriter elementHandler = GetCachedTypeWriterForElement(elementType, typeHandler.TypeSettings);
+                var resolveDeviating = CreateDeviatingElementWriterResolver(elementType, typeHandler.TypeSettings);
 
                 Type enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
                 MethodInfo getEnumeratorMethod = enumerableType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
@@ -29,7 +30,7 @@ namespace FeatureLoom.Serialization
                 string methodName = nameof(CreateGenericEnumerableItemHandler);
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, elementType, getEnumeratorMethod.ReturnType);
-                genericCreateMethod.Invoke(this, new object[] { getEnumeratorMethod, typeHandler, elementHandler });
+                genericCreateMethod.Invoke(this, new object[] { getEnumeratorMethod, typeHandler, elementHandler, resolveDeviating });
             }
             else
             {
@@ -42,7 +43,7 @@ namespace FeatureLoom.Serialization
             return true;
         }
 
-        private void CreateGenericEnumerableItemHandler<T, E, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter defaultElementHandler) where T : IEnumerable<E> where ENUM : IEnumerator<E>
+        private void CreateGenericEnumerableItemHandler<T, E, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter defaultElementHandler, Func<Type, CachedTypeWriter> resolveDeviating) where T : IEnumerable<E> where ENUM : IEnumerator<E>
         {
             Type itemType = typeof(T);
 
@@ -84,7 +85,7 @@ namespace FeatureLoom.Serialization
                     if (enumerator.MoveNext())
                     {
                         E element = enumerator.Current;
-                        currentHandler = HandleElement(defaultElementHandler, currentHandler, index, element, expectedElementType);
+                        currentHandler = HandleElement(defaultElementHandler, currentHandler, index, element, expectedElementType, resolveDeviating);
                         index++;
                     }
                     while (enumerator.MoveNext())
@@ -92,7 +93,7 @@ namespace FeatureLoom.Serialization
                         writer.WriteComma();
 
                         E element = enumerator.Current;
-                        currentHandler = HandleElement(defaultElementHandler, currentHandler, index, element, expectedElementType);
+                        currentHandler = HandleElement(defaultElementHandler, currentHandler, index, element, expectedElementType, resolveDeviating);
                         index++;
                     }                    
                 };
@@ -101,7 +102,7 @@ namespace FeatureLoom.Serialization
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private CachedTypeWriter HandleElement<E>(CachedTypeWriter defaultElementHandler, CachedTypeWriter currentHandler, int index, E element, Type expectedElementType)
+        private CachedTypeWriter HandleElement<E>(CachedTypeWriter defaultElementHandler, CachedTypeWriter currentHandler, int index, E element, Type expectedElementType, Func<Type, CachedTypeWriter> resolveDeviating)
         {
             if (element == null) writer.WriteNullValue();
             else
@@ -110,7 +111,7 @@ namespace FeatureLoom.Serialization
                 if (elementType != currentHandler.HandlerType)
                 {
                     if (elementType == defaultElementHandler.HandlerType) currentHandler = defaultElementHandler;
-                    else currentHandler = GetCachedTypeWriter(elementType);
+                    else currentHandler = resolveDeviating(elementType);
                 }             
                 currentHandler.WriteItem(element, writer.GetCollectionIndexName(index));                
             }

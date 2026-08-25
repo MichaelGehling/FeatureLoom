@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using FeatureLoom.Collections;
 using FeatureLoom.Helpers;
@@ -35,7 +35,8 @@ namespace FeatureLoom.Serialization
             // the enumerable handler, because IReadOnlyDictionary<,> does not inherit the
             // non-generic IEnumerable that the enumerable handler requires.
             if (!TryCreateKeyWriter(keyType, out CachedKeyWriter keyWriter)) return CreateKeyValuePairArrayItemHandler(typeHandler, itemType);
-            CachedTypeWriter valueHandler = GetCachedTypeWriter(valueType);
+            CachedTypeWriter valueHandler = GetCachedTypeWriterForElement(valueType, typeHandler.TypeSettings);
+            var resolveDeviating = CreateDeviatingElementWriterResolver(valueType, typeHandler.TypeSettings);
 
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType))             
             {
@@ -47,7 +48,7 @@ namespace FeatureLoom.Serialization
 
             MethodInfo createMethod = typeof(JsonSerializer).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
             MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, keyType, valueType, getEnumeratorMethod.ReturnType);
-            genericCreateMethod.Invoke(this, new object[] { getEnumeratorMethod, typeHandler, valueHandler, keyWriter });
+            genericCreateMethod.Invoke(this, new object[] { getEnumeratorMethod, typeHandler, valueHandler, keyWriter, resolveDeviating });
 
             return true;
         }
@@ -60,19 +61,20 @@ namespace FeatureLoom.Serialization
         {
             if (!itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out Type elementType)) return false;
 
-            CachedTypeWriter elementHandler = GetCachedTypeWriter(elementType);
+            CachedTypeWriter elementHandler = GetCachedTypeWriterForElement(elementType, typeHandler.TypeSettings);
+            var resolveDeviating = CreateDeviatingElementWriterResolver(elementType, typeHandler.TypeSettings);
 
             Type enumerableType = typeof(IEnumerable<>).MakeGenericType(elementType);
             MethodInfo getEnumeratorMethod = enumerableType.GetMethod("GetEnumerator", BindingFlags.Public | BindingFlags.Instance);
 
             MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateGenericEnumerableItemHandler), BindingFlags.NonPublic | BindingFlags.Instance);
             MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, elementType, getEnumeratorMethod.ReturnType);
-            genericCreateMethod.Invoke(this, new object[] { getEnumeratorMethod, typeHandler, elementHandler });
+            genericCreateMethod.Invoke(this, new object[] { getEnumeratorMethod, typeHandler, elementHandler, resolveDeviating });
 
             return true;
         }
 
-        private void CreateIDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter valueHandler, CachedKeyWriter keyWriter)
+        private void CreateIDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter valueHandler, CachedKeyWriter keyWriter, Func<Type, CachedTypeWriter> resolveDeviating)
             where T : IDictionary<K, V> 
             where ENUM : IEnumerator<KeyValuePair<K,V>>
         {
@@ -119,7 +121,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         writeKey(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default, resolveDeviating);
                     }
 
                     while (enumerator.MoveNext())
@@ -128,7 +130,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         writeKey(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default, resolveDeviating);
                     }
                 };
                 typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);
@@ -146,7 +148,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         var itemName = writeKeyWithCopy(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName, resolveDeviating);
                     }
 
                     while (enumerator.MoveNext())
@@ -155,7 +157,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         var itemName = writeKeyWithCopy(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName, resolveDeviating);
                     }
                 };
                 typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);
@@ -167,7 +169,7 @@ namespace FeatureLoom.Serialization
         /// deviates from the declared one.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void WriteDictionaryValue<V>(V value, Type expectedValueType, CachedTypeWriter valueHandler, ByteSegment itemName)
+        private void WriteDictionaryValue<V>(V value, Type expectedValueType, CachedTypeWriter valueHandler, ByteSegment itemName, Func<Type, CachedTypeWriter> resolveDeviating)
         {
             if (value == null)
             {
@@ -176,11 +178,11 @@ namespace FeatureLoom.Serialization
             }
 
             Type valueType = value.GetType();
-            CachedTypeWriter actualHandler = valueType != expectedValueType ? GetCachedTypeWriter(valueType) : valueHandler;
+            CachedTypeWriter actualHandler = valueType != expectedValueType ? resolveDeviating(valueType) : valueHandler;
             actualHandler.WriteItem(value, itemName);
         }
 
-        private void CreateIReadOnlyDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter valueHandler, CachedKeyWriter keyWriter)
+        private void CreateIReadOnlyDictionaryItemHandler<T, K, V, ENUM>(MethodInfo getEnumeratorMethod, CachedTypeWriter typeHandler, CachedTypeWriter valueHandler, CachedKeyWriter keyWriter, Func<Type, CachedTypeWriter> resolveDeviating)
             where T : IReadOnlyDictionary<K, V>
             where ENUM : IEnumerator<KeyValuePair<K, V>>
         {
@@ -223,7 +225,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         writeKey(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default, resolveDeviating);
                     }
 
                     while (enumerator.MoveNext())
@@ -232,7 +234,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         writeKey(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, default, resolveDeviating);
                     }
                 };
                 typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);
@@ -248,7 +250,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         var itemName = writeKeyWithCopy(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName, resolveDeviating);
                     }
 
                     while (enumerator.MoveNext())
@@ -257,7 +259,7 @@ namespace FeatureLoom.Serialization
                         KeyValuePair<K, V> pair = enumerator.Current;
                         var itemName = writeKeyWithCopy(pair.Key);
                         writer.WriteColon();
-                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName);
+                        WriteDictionaryValue(pair.Value, expectedValueType, valueHandler, itemName, resolveDeviating);
                     }
                 };
                 typeHandler.SetItemWriter(CreateObjectItemWriter(typeHandler, itemHandler), !valueHandler.NoRefTypes);

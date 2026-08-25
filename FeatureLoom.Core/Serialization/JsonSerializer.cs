@@ -171,9 +171,9 @@ namespace FeatureLoom.Serialization
             {
                 return (item, _, _) =>
                 {
-                    StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                    StartTypeInfoObject(typeHandler);
                     itemHandler.Invoke(item);
-                    FinishTypeInfoObject();
+                    FinishTypeInfoObject(typeHandler);
                 };
             }
             else if (typeHandler.typeInfoHandling == TypeInfoHandling.AddDeviatingTypeInfo)
@@ -186,9 +186,9 @@ namespace FeatureLoom.Serialization
                     }
                     else
                     {
-                        StartTypeInfoObject(typeHandler.preparedTypeInfo);
+                        StartTypeInfoObject(typeHandler);
                         itemHandler.Invoke(item);
-                        FinishTypeInfoObject();
+                        FinishTypeInfoObject(typeHandler);
                     }
                 };
             }
@@ -247,11 +247,11 @@ namespace FeatureLoom.Serialization
         private void WriteArrayWithTypeInfo<T>(T item, bool deviatingType, CachedTypeWriter typeHandler, Action<T> itemHandler)
         {
             bool writeTypeInfo = TypeInfoRequired(typeHandler, deviatingType);
-            if (writeTypeInfo) StartTypeInfoObject(typeHandler.preparedTypeInfo, settings.arrayValueFieldName == ValueFieldName.Values);
+            if (writeTypeInfo) StartTypeInfoObject(typeHandler, true);
             writer.OpenArray();
             itemHandler.Invoke(item);
             writer.CloseArray();
-            if (writeTypeInfo) FinishTypeInfoObject();
+            if (writeTypeInfo) FinishTypeInfoObject(typeHandler);
         }
 
         /// <summary>
@@ -311,7 +311,7 @@ namespace FeatureLoom.Serialization
             if (TypeInfoRequired(typeHandler, deviatingType))
             {
                 writer.WriteToBuffer(typeHandler.preparedTypeInfo);
-                if (settings.typeInfoFormat == TypeInfoFormat.AlwaysEnvelope)
+                if (typeHandler.typeInfoFormat == TypeInfoFormat.AlwaysEnvelope)
                 {
                     // The body is moved into a nested "$value" object, so that type info and
                     // payload always sit at fixed positions, no matter the value's shape.
@@ -543,6 +543,45 @@ namespace FeatureLoom.Serialization
         }
 
         /// <summary>
+        /// True if <paramref name="keyType"/> can be written as a JSON property name, i.e. a
+        /// dictionary with such a key is written as a JSON object rather than as an array of
+        /// key/value pairs.
+        /// </summary>
+        /// <remarks>
+        /// Type-only counterpart of <see cref="TryCreateKeyWriter"/>, which needs an instance
+        /// because it binds the actual writer methods. Both must accept the same set of types.
+        /// </remarks>
+        internal static bool CanWriteKeyAsPropertyName(Type keyType)
+        {
+            if (keyType == null) return false;
+            if (keyType.IsEnum) return true;
+
+            return keyType == typeof(string) ||
+                   keyType == typeof(bool) ||
+                   keyType == typeof(char) ||
+                   keyType == typeof(sbyte) ||
+                   keyType == typeof(short) ||
+                   keyType == typeof(int) ||
+                   keyType == typeof(long) ||
+                   keyType == typeof(byte) ||
+                   keyType == typeof(ushort) ||
+                   keyType == typeof(uint) ||
+                   keyType == typeof(ulong) ||
+                   keyType == typeof(float) ||
+                   keyType == typeof(double) ||
+                   keyType == typeof(decimal) ||
+                   keyType == typeof(Guid) ||
+                   keyType == typeof(DateTime) ||
+                   keyType == typeof(DateTimeOffset) ||
+                   keyType == typeof(TimeSpan)
+#if NET6_0_OR_GREATER
+                   || keyType == typeof(DateOnly)
+                   || keyType == typeof(TimeOnly)
+#endif
+                   ;
+        }
+
+        /// <summary>
         /// Creates the key writer for an enum type, which requires the enum type as a generic
         /// type parameter and can therefore only be reached via reflection.
         /// </summary>
@@ -724,6 +763,43 @@ namespace FeatureLoom.Serialization
             return CreateCachedTypeWriter(fieldType, memberSettings);
         }
 
+        /// <summary>
+        /// Returns the writer to use for the elements of a container, applying the element settings
+        /// configured for the container via ConfigureElement, if any.
+        /// </summary>
+        /// <remarks>
+        /// The configured element type is verified against <paramref name="elementType"/>, because
+        /// for a generic type definition it can only be checked once the type is constructed. On a
+        /// mismatch the settings are ignored and the shared writer is used.
+        /// </remarks>
+        private CachedTypeWriter GetCachedTypeWriterForElement(Type elementType, BaseTypeWriteSettings containerSettings)
+        {
+            var elementSettings = GetElementSettings(elementType, containerSettings);
+            if (elementSettings == null) return GetCachedTypeWriter(elementType);
+            return CreateCachedTypeWriter(elementType, elementSettings);
+        }
+
+        /// <summary>
+        /// Returns the element settings configured on <paramref name="containerSettings"/> if they
+        /// apply to <paramref name="elementType"/> and actually change how a value is written,
+        /// otherwise <see langword="null"/>.
+        /// </summary>
+        private static BaseTypeWriteSettings GetElementSettings(Type elementType, BaseTypeWriteSettings containerSettings)
+        {
+            var elementSettings = containerSettings?.elementSettings;
+            if (elementSettings == null) return null;
+            if (containerSettings.elementSettingsType != elementType) return null;
+            if (!elementSettings.HasValueShapingOverrides) return null;
+            return elementSettings;
+        }
+
+        /// <summary>
+        /// Builds the resolver used by container handlers for elements whose runtime type deviates
+        /// from the declared element type, so configured element settings keep applying to them.
+        /// </summary>
+        private Func<Type, CachedTypeWriter> CreateDeviatingElementWriterResolver(Type elementType, BaseTypeWriteSettings containerSettings)
+            => CreateDeviatingWriterResolver(GetElementSettings(elementType, containerSettings));
+
         private CachedTypeWriter CreateCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings = null)
         {
             bool isLocalOverride = typeSettings != null;
@@ -817,22 +893,22 @@ namespace FeatureLoom.Serialization
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void StartTypeInfoObject(byte[] preparedTypeInfo, bool useValuesFieldName = false)
+        void StartTypeInfoObject(CachedTypeWriter typeWriter, bool isArray = false)
         {
             // In OnlyInlineForObjects mode the envelope is dropped entirely, so the value is
             // written plainly and simply carries no type info.
-            if (settings.skipTypeInfoEnvelope) return;
+            if (typeWriter.skipTypeInfoEnvelope) return;
             writer.OpenObject();
-            writer.WriteToBuffer(preparedTypeInfo);
+            writer.WriteToBuffer(typeWriter.preparedTypeInfo);
             writer.WriteComma();
-            if (useValuesFieldName) writer.WriteValuesFieldName();
+            if (isArray && typeWriter.useValuesFieldName) writer.WriteValuesFieldName();
             else writer.WriteValueFieldName();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void FinishTypeInfoObject()
+        void FinishTypeInfoObject(CachedTypeWriter typeWriter)
         {
-            if (settings.skipTypeInfoEnvelope) return;
+            if (typeWriter.skipTypeInfoEnvelope) return;
             writer.CloseObject();
         }
 

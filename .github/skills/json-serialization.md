@@ -7,7 +7,7 @@ applyTo: "**/Serialization/**"
 - `FeatureLoom.Core/Serialization/`, namespace `FeatureLoom.Serialization`.
 - `JsonSerializer` and `JsonDeserializer` are `sealed partial` classes split by concern. Find the right partial before reading:
   - `JsonDeserializer.cs` — entry points, ctor, fields
-  - `.Settings.cs` — global settings, `ConfigureType<T>` / `ConfigureMember<TMember>` per-member overrides
+  - `.Settings.cs` — global settings, `ConfigureType<T>` / `ConfigureMember<TMember>` per-member overrides / `ConfigureElement<TElement>` per-container-element overrides
   - `.Parsing.cs` — primitives, numbers, strings
   - `.Buffer.cs` / `.BufferHandling.cs` — byte-level reads, recording, refill
   - `.ReaderStrategies.cs` — per-member reader structs (one variant per configuration combination)

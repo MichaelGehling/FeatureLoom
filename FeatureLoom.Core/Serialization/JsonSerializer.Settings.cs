@@ -256,6 +256,12 @@ namespace FeatureLoom.Serialization
             /// <summary>Type-level type info handling override.</summary>
             internal TypeInfoHandling? typeInfoHandling = null;
 
+            /// <summary>Type-level type info layout override.</summary>
+            internal TypeInfoFormat? typeInfoFormat = null;
+
+            /// <summary>Type-level payload field name override for the type info envelope.</summary>
+            internal ValueFieldName? arrayValueFieldName = null;
+
             /// <summary>Type-level enum representation override.</summary>
             internal bool? enumAsString = null;
 
@@ -276,6 +282,19 @@ namespace FeatureLoom.Serialization
 
             /// <summary>Per-member configuration map, keyed by member name.</summary>
             internal Dictionary<string, BaseTypeWriteSettings> memberSettingsDict = new();
+
+            /// <summary>
+            /// Configuration for the elements of a container type scope, or <see langword="null"/>.
+            /// For a dictionary written as a JSON object this applies to its values; for lists,
+            /// arrays and other sequences it applies to their elements.
+            /// </summary>
+            internal BaseTypeWriteSettings elementSettings = null;
+
+            /// <summary>
+            /// The element type <see cref="elementSettings"/> was configured for. Checked against
+            /// the type actually written, which is only known once a generic type is constructed.
+            /// </summary>
+            internal Type elementSettingsType = null;
 
             /// <summary>
             /// Custom writer registered for this type scope, or <see langword="null"/>. Found by a
@@ -304,11 +323,14 @@ namespace FeatureLoom.Serialization
             internal bool HasValueShapingOverrides =>
                 dataSelection != null ||
                 typeInfoHandling != null ||
+                typeInfoFormat != null ||
+                arrayValueFieldName != null ||
                 enumAsString != null ||
                 writeByteArrayAsBase64String != null ||
                 treatEnumerablesAsCollections != null ||
                 customTypeWriterCreator != null ||
                 customTypeName != null ||
+                elementSettings != null ||
                 memberSettingsDict.Count > 0;
 
             /// <summary>
@@ -338,11 +360,15 @@ namespace FeatureLoom.Serialization
                 {
                     dataSelection = dataSelection ?? generalSettings.dataSelection,
                     typeInfoHandling = typeInfoHandling ?? generalSettings.typeInfoHandling,
+                    typeInfoFormat = typeInfoFormat ?? generalSettings.typeInfoFormat,
+                    arrayValueFieldName = arrayValueFieldName ?? generalSettings.arrayValueFieldName,
                     enumAsString = enumAsString ?? generalSettings.enumAsString,
                     writeByteArrayAsBase64String = writeByteArrayAsBase64String ?? generalSettings.writeByteArrayAsBase64String,
                     treatEnumerablesAsCollections = treatEnumerablesAsCollections ?? generalSettings.treatEnumerablesAsCollections,
                     customTypeName = customTypeName ?? generalSettings.customTypeName,
                     customTypeWriterCreator = customTypeWriterCreator ?? generalSettings.customTypeWriterCreator,
+                    elementSettings = elementSettings ?? generalSettings.elementSettings?.AsInjectedFromGeneralSettings(),
+                    elementSettingsType = elementSettings != null ? elementSettingsType : generalSettings.elementSettingsType,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
                     ownerSettings = ownerSettings ?? generalSettings.ownerSettings,
@@ -374,11 +400,15 @@ namespace FeatureLoom.Serialization
                 {
                     dataSelection = dataSelection,
                     typeInfoHandling = typeInfoHandling,
+                    typeInfoFormat = typeInfoFormat,
+                    arrayValueFieldName = arrayValueFieldName,
                     enumAsString = enumAsString,
                     writeByteArrayAsBase64String = writeByteArrayAsBase64String,
                     treatEnumerablesAsCollections = treatEnumerablesAsCollections,
                     customTypeName = customTypeName,
                     customTypeWriterCreator = customTypeWriterCreator,
+                    elementSettings = elementSettings,
+                    elementSettingsType = elementSettingsType,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
                     ownerSettings = ownerSettings,
@@ -416,18 +446,25 @@ namespace FeatureLoom.Serialization
             {
                 if (dataSelection == null &&
                     typeInfoHandling == null &&
+                    typeInfoFormat == null &&
+                    arrayValueFieldName == null &&
                     enumAsString == null &&
                     writeByteArrayAsBase64String == null &&
                     treatEnumerablesAsCollections == null &&
+                    elementSettings == null &&
                     memberSettingsDict.Count == 0) return null;
 
                 var subset = new BaseTypeWriteSettings
                 {
                     dataSelection = dataSelection,
                     typeInfoHandling = typeInfoHandling,
+                    typeInfoFormat = typeInfoFormat,
+                    arrayValueFieldName = arrayValueFieldName,
                     enumAsString = enumAsString,
                     writeByteArrayAsBase64String = writeByteArrayAsBase64String,
                     treatEnumerablesAsCollections = treatEnumerablesAsCollections,
+                    elementSettings = elementSettings,
+                    elementSettingsType = elementSettingsType,
                     ownerSettings = ownerSettings
                 };
                 foreach (var entry in memberSettingsDict) subset.memberSettingsDict[entry.Key] = entry.Value;
@@ -444,6 +481,21 @@ namespace FeatureLoom.Serialization
             /// value of that type regardless of the member it is written for.
             /// </remarks>
             public void SetTypeInfoHandling(TypeInfoHandling typeInfoHandling) => this.typeInfoHandling = typeInfoHandling;
+
+            /// <summary>
+            /// Sets how the "$type" member is laid out for values of this type scope, overriding
+            /// <see cref="Settings.typeInfoFormat"/>.
+            /// </summary>
+            /// <remarks>
+            /// Resolved once, when the writer for the type scope is created.
+            /// </remarks>
+            public void SetTypeInfoFormat(TypeInfoFormat typeInfoFormat) => this.typeInfoFormat = typeInfoFormat;
+
+            /// <summary>
+            /// Sets whether an array wrapped in a type info envelope uses "$value" or "$values" as
+            /// payload field name, overriding <see cref="Settings.arrayValueFieldName"/>.
+            /// </summary>
+            public void SetArrayValueFieldName(ValueFieldName arrayValueFieldName) => this.arrayValueFieldName = arrayValueFieldName;
 
             /// <summary>
             /// Sets whether enum values of this type scope are written as their name instead of
@@ -503,8 +555,7 @@ namespace FeatureLoom.Serialization
             /// Validates that <paramref name="memberName"/> exists on <paramref name="objType"/> and
             /// has the expected type, then stores the configured member settings.
             /// </summary>
-            private protected void ConfigureMemberInternal<TMember>(Type objType, string memberName, Action<MemberWriteSettings<TMember>> configureMemberSettings)
-            {
+            private protected void ConfigureMemberInternal<TMember>(Type objType, string memberName, Action<MemberWriteSettings<TMember>> configureMemberSettings)            {
                 if (configureMemberSettings == null)
                 {
                     memberSettingsDict.Remove(memberName);
@@ -529,6 +580,66 @@ namespace FeatureLoom.Serialization
                 var memberSettings = new MemberWriteSettings<TMember>();
                 configureMemberSettings(memberSettings);
                 memberSettingsDict[memberName] = memberSettings;
+            }
+
+            /// <summary>
+            /// Validates that <paramref name="containerType"/> writes elements of
+            /// <typeparamref name="TElement"/>, then stores the configured element settings.
+            /// </summary>
+            private protected void ConfigureElementInternal<TElement>(Type containerType, Action<TypeWriteSettings<TElement>> configureElementSettings)
+            {
+                if (configureElementSettings == null)
+                {
+                    elementSettings = null;
+                    elementSettingsType = null;
+                    return;
+                }
+
+                if (!TryGetWrittenElementType(containerType, out Type actualElementType))
+                {
+                    throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(containerType)} is not a container type, so its elements cannot be configured.");
+                }
+                if (actualElementType != typeof(TElement))
+                {
+                    throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(containerType)} writes elements of type " +
+                                        $"{TypeNameHelper.Shared.GetSimplifiedTypeName(actualElementType)}, not {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(TElement))}.");
+                }
+
+                var settings = new TypeWriteSettings<TElement>();
+                configureElementSettings(settings);
+                elementSettings = settings;
+                elementSettingsType = typeof(TElement);
+            }
+
+            /// <summary>
+            /// Determines the type of the values a container writes into its JSON array or object:
+            /// the value type of a dictionary, otherwise the element type of the sequence.
+            /// </summary>
+            /// <remarks>
+            /// A dictionary is only treated as such if it is written as a JSON object. When its key
+            /// cannot become a property name the serializer writes it as an array of key/value
+            /// pairs instead, in which case the written element is the KeyValuePair itself.
+            /// </remarks>
+            private static bool TryGetWrittenElementType(Type containerType, out Type elementType)
+            {
+                elementType = null;
+                if (containerType == null) return false;
+
+                if (containerType.IsArray && containerType.GetArrayRank() == 1)
+                {
+                    elementType = containerType.GetElementType();
+                    return true;
+                }
+
+                if ((containerType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type keyType, out Type valueType) ||
+                     containerType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyDictionary<,>), out keyType, out valueType)) &&
+                    CanWriteKeyAsPropertyName(keyType))
+                {
+                    elementType = valueType;
+                    return true;
+                }
+
+                return containerType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out elementType);
             }
         }
 
@@ -589,6 +700,37 @@ namespace FeatureLoom.Serialization
                 => ConfigureMemberInternal(genericType, memberName, configureMemberSettings);
 
             /// <summary>
+            /// Configures write settings for the elements written by the constructed types of this
+            /// generic type definition.
+            /// </summary>
+            /// <typeparam name="TElement">
+            /// Expected element type: the value type for a dictionary written as a JSON object,
+            /// otherwise the element type of the sequence.
+            /// </typeparam>
+            /// <param name="configureElementSettings">
+            /// Callback to configure element settings. If <see langword="null"/>, existing element settings are removed.
+            /// </param>
+            /// <remarks>
+            /// The element type cannot be verified against an open generic definition, because it
+            /// is only known once the type is constructed. A constructed type whose elements are
+            /// not <typeparamref name="TElement"/> simply keeps its unconfigured element writer.
+            /// </remarks>
+            public void ConfigureElement<TElement>(Action<TypeWriteSettings<TElement>> configureElementSettings)
+            {
+                if (configureElementSettings == null)
+                {
+                    elementSettings = null;
+                    elementSettingsType = null;
+                    return;
+                }
+
+                var settings = new TypeWriteSettings<TElement>();
+                configureElementSettings(settings);
+                elementSettings = settings;
+                elementSettingsType = typeof(TElement);
+            }
+
+            /// <summary>
             /// Not supported for a generic type definition. A single literal name cannot stay
             /// unique across the constructed types, so it has to be set on each concrete type via
             /// <see cref="Settings.ConfigureType{T}"/>.
@@ -624,6 +766,25 @@ namespace FeatureLoom.Serialization
             /// </param>
             public void ConfigureMember<TMember>(string memberName, Action<MemberWriteSettings<TMember>> configureMemberSettings)
                 => ConfigureMemberInternal(typeof(T), memberName, configureMemberSettings);
+
+            /// <summary>
+            /// Configures write settings for the elements <typeparamref name="T"/> writes, the same
+            /// way <see cref="ConfigureMember{TMember}"/> configures a single member.
+            /// </summary>
+            /// <typeparam name="TElement">
+            /// Expected element type: the value type for a dictionary written as a JSON object,
+            /// otherwise the element type of the sequence.
+            /// </typeparam>
+            /// <param name="configureElementSettings">
+            /// Callback to configure element settings. If <see langword="null"/>, existing element settings are removed.
+            /// </param>
+            /// <remarks>
+            /// The settings apply to every element, including elements whose runtime type deviates
+            /// from <typeparamref name="TElement"/>, as far as they are transferable (see
+            /// <see cref="BaseTypeWriteSettings.GetTransferableSubset"/>).
+            /// </remarks>
+            public void ConfigureElement<TElement>(Action<TypeWriteSettings<TElement>> configureElementSettings)
+                => ConfigureElementInternal(typeof(T), configureElementSettings);
 
             /// <summary>
             /// Sets a custom writer for <typeparamref name="T"/>, replacing the built-in writer.
@@ -1102,6 +1263,20 @@ namespace FeatureLoom.Serialization
             /// </summary>
             public TypeInfoHandling ResolveTypeInfoHandling(BaseTypeWriteSettings typeSettings)
                 => typeSettings?.typeInfoHandling ?? typeInfoHandling;
+
+            /// <summary>
+            /// Resolves the type info layout from already resolved <paramref name="typeSettings"/>,
+            /// falling back to the global setting.
+            /// </summary>
+            public TypeInfoFormat ResolveTypeInfoFormat(BaseTypeWriteSettings typeSettings)
+                => typeSettings?.typeInfoFormat ?? typeInfoFormat;
+
+            /// <summary>
+            /// Resolves the payload field name used inside a type info envelope for arrays, from
+            /// already resolved <paramref name="typeSettings"/>, falling back to the global setting.
+            /// </summary>
+            public ValueFieldName ResolveArrayValueFieldName(BaseTypeWriteSettings typeSettings)
+                => typeSettings?.arrayValueFieldName ?? arrayValueFieldName;
 
             /// <summary>
             /// Resolves the enum representation from already resolved <paramref name="typeSettings"/>,
