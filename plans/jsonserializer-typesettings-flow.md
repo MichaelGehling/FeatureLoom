@@ -1,7 +1,8 @@
 # Plan: Align JsonSerializer type-settings flow with JsonDeserializer
 
-Status: steps 0-4 **implemented and green** (2050 passed, 0 failed). Step 5 (benchmark
-verification) is still open. Risk 1 (recursion) is resolved - see section 5.1.
+Status: serializer settings flow, recursive settings and open-generic inheritance are implemented
+and covered by focused and full-suite tests. The historical benchmark comparison cannot be run
+retrospectively because no pre-change baseline was recorded.
 
 ## 1. How the deserializer does it (target model)
 
@@ -120,12 +121,14 @@ New file `FeatureLoom.Tests/Serialization/JsonSerializerMemberSettingsTests.cs`:
 
 Plus the existing suite as regression for step 1/2 (which must be behavior-neutral).
 
-### Step 5 — verify no hot-path regression — OPEN
+### Step 5 — verify no hot-path regression — NOT RETROSPECTIVELY MEASURABLE
 Steps 1–3 only move work into writer creation, which is cached per type, so the write path should
 be untouched or slightly cheaper. Confirm with the existing complex-object and enum serialization
-benchmarks (baseline before step 1, compare after step 3). Report before/after.
+benchmarks (baseline before step 1, compare after step 3). No pre-step-1 baseline was recorded, so
+an honest before/after comparison is no longer possible. A current benchmark can still become the
+baseline for future optimization work, but it cannot verify this completed change retrospectively.
 
-## 5. Risks / open points
+## 5. Resolved risks and design decisions
 
 1. ~~**Cache-key semantics / infinite recursion through an overridden member.**~~ **RESOLVED — not
    an issue.** The earlier claim ("a type recursing through a configured member would loop
@@ -161,15 +164,15 @@ benchmarks (baseline before step 1, compare after step 3). Report before/after.
    The argument above still holds for user authored configuration; it does **not** hold for
    machine injected configuration. Covered by
    `MemberOverride_OnSelfReferencingType_Terminates`.
-2. **Duplicate writers.** Each member override creates its own `CachedTypeWriter`. Same trade-off
-   the reader already accepts; worth noting in XML docs.
-3. **Public surface.** `ExtensionApi.GetCachedTypeHandler(Type)` is public. Add an overload rather
-   than changing the signature.
-4. **`GenericTypeWriteSettings` fallback.** The reader distinguishes `genericTypeSettings` because
-   some rules must not apply to a generic-definition match. Check whether the serializer needs the
-   same distinction before collapsing the resolution into one place.
-5. **`ResolveTypeName`** also consults `settings` by type; decide whether it should move to the
-   carried settings too (it uses an intentionally exact match, see its remarks).
+2. **Duplicate writers.** Each member override creates its own `CachedTypeWriter`. This is the same
+   accepted trade-off as on the reader side; recursive contexts have their own stable cache.
+3. **Generic fallback.** Constructed settings are pre-merged onto open-generic settings in
+   `CompiledSettings`; exact values win while unspecified generic values remain active.
+4. **Type names.** `ResolveTypeName` intentionally remains exact-type based. Custom names do not
+   propagate recursively or from open-generic definitions because that would mislabel values.
+5. **Recursive member/element scopes.** Supported: `ConfigureRecursively` on member or element
+   settings starts a recursive context limited to that value subtree. `recursiveSettings` is a
+   value-shaping override so the contextual writer is created even when it is the only setting.
 
 ## 7. Implementation notes (as built)
 
@@ -307,7 +310,8 @@ Extended edge coverage in `JsonSerializerRecursiveSettingsTests` now includes ev
 configurable policy, generic type-definition configuration, conflicting nested contexts, member and
 element precedence, context-specific cache ordering/isolation, circular references, null and empty
 containers, dictionary-key exclusion, and composition with `AddField`, `AddArray`, `AddObject`,
-`AddDynamicFields` and `AddExistingFields`.
+`AddDynamicFields` and `AddExistingFields`. It also covers recursive contexts starting at member and
+element scopes, ID-based references and repeated polymorphic runtime types.
 
 ### Open generic settings inheritance — DONE
 
@@ -319,10 +323,3 @@ containers, dictionary-key exclusion, and composition with `AddField`, `AddArray
   rejection, construction-specific elements and keys, reconfiguration/removal, validation,
   inheritance, precedence and recursive layering.
 
-## 7. Suggested commit split
-
-0. remove `overriddenTypeWriterCache` again (recursion risk disproven)
-1. carry settings through creation + store on `CachedTypeWriter` (neutral)
-2. consume carried settings at all `Resolve*` sites (neutral)
-3. member-local writers, uncached (behavioral)
-4. tests

@@ -14,7 +14,7 @@ applyTo: "**/Serialization/**"
   - `.CachedTypeReader.cs` / `.TypeReaderCreation.cs` — compiled per-type readers
   - `JsonSerializer.*.cs` mirrors this (`WriterStrategies`, `PrimitiveWriters`, `JsonUTF8StreamWriter`, handlers)
 	- `JsonSerializer.CustomTypeWriter.cs` — custom writers: `ObjectWriterBuilder<T>` field declarations (`AddField`, `AddObject`, `AddArray`, `AddRawField`) plus `AddDynamicFields` / `AddDynamicObject` for names known only at write time, and `AddExistingFields` to emit the default configured members of `T` and extend them
-  - `BaseTypeWriteSettings.ConfigureRecursively` applies restricted policy defaults to the configured type and its complete value subtree during writer preparation. Local type/member/element settings win per option; nested recursive settings layer onto inherited settings; dictionary keys are excluded.
+	- `BaseTypeWriteSettings.ConfigureRecursively` applies restricted policy defaults to the configured type/member/element scope and its complete value subtree during writer preparation. Local type/member/element settings win per option; nested recursive settings layer onto inherited settings; dictionary keys are excluded.
 - Manual UTF-8 parsing over pooled buffers. Readers/writers are compiled once per type and cached; per-member configuration is baked into strategy structs at that point, not checked per value.
 - `Utf8StringCache` (`FeatureLoom.Core/Collections/`) dedupes recurring string values; usable globally or per member.
 

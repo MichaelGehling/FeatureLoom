@@ -132,6 +132,26 @@ public class JsonSerializerRecursiveSettingsTests
         public string Ignored;
     }
 
+    public class ScopedRoot
+    {
+        public Child RecursiveChild;
+        public Child PlainChild;
+        public List<Child> RecursiveItems;
+        public List<Child> PlainItems;
+    }
+
+    public class PolymorphicRoot
+    {
+        public object First;
+        public object Second;
+        public object Third;
+    }
+
+    public class OtherChild
+    {
+        public Color Value;
+    }
+
     static JsonSerializer CreateSerializer(System.Action<JsonSerializer.Settings> configure)
     {
         var settings = new JsonSerializer.Settings
@@ -736,5 +756,97 @@ public class JsonSerializerRecursiveSettingsTests
         node.Next = node;
 
         Assert.Equal("{\"Value\":\"Green\",\"Next\":null}", serializer.Serialize(node));
+    }
+
+    [Fact]
+    public void RecursiveSettings_OnMemberApplyOnlyToThatMemberSubtree()
+    {
+        var serializer = CreateSerializer(s => s.ConfigureType<ScopedRoot>(ts =>
+            ts.ConfigureMember<Child>(nameof(ScopedRoot.RecursiveChild), ms =>
+                ms.ConfigureRecursively(rs => rs.SetEnumAsString(true)))));
+
+        var json = serializer.Serialize(new ScopedRoot
+        {
+            RecursiveChild = new Child { Value = Color.Green, GrandChild = new GrandChild { Value = Color.Blue } },
+            PlainChild = new Child { Value = Color.Green, GrandChild = new GrandChild { Value = Color.Blue } }
+        });
+
+        Assert.Contains("\"RecursiveChild\":{\"Value\":\"Green\",\"GrandChild\":{\"Value\":\"Blue\"}}", json);
+        Assert.Contains("\"PlainChild\":{\"Value\":1,\"GrandChild\":{\"Value\":2}}", json);
+    }
+
+    [Fact]
+    public void RecursiveSettings_OnElementApplyToEachElementSubtreeOnly()
+    {
+        var serializer = CreateSerializer(s => s.ConfigureType<ScopedRoot>(ts =>
+            ts.ConfigureMember<List<Child>>(nameof(ScopedRoot.RecursiveItems), ms =>
+                ms.ConfigureElement<Child>(es =>
+                    es.ConfigureRecursively(rs => rs.SetEnumAsString(true))))));
+
+        var json = serializer.Serialize(new ScopedRoot
+        {
+            RecursiveItems = new List<Child> { new Child { Value = Color.Green, GrandChild = new GrandChild { Value = Color.Blue } } },
+            PlainItems = new List<Child> { new Child { Value = Color.Green, GrandChild = new GrandChild { Value = Color.Blue } } }
+        });
+
+        Assert.Contains("\"RecursiveItems\":[{\"Value\":\"Green\",\"GrandChild\":{\"Value\":\"Blue\"}}]", json);
+        Assert.Contains("\"PlainItems\":[{\"Value\":1,\"GrandChild\":{\"Value\":2}}]", json);
+    }
+
+    [Fact]
+    public void RecursiveSettings_OnMemberLayerOntoTypeRecursiveSettings()
+    {
+        var serializer = CreateSerializer(s => s.ConfigureType<ScopedRoot>(ts =>
+        {
+            ts.ConfigureRecursively(rs => rs.SetEnumAsString(true));
+            ts.ConfigureMember<Child>(nameof(ScopedRoot.RecursiveChild), ms =>
+                ms.ConfigureRecursively(rs => rs.SetDataSelection(JsonSerializer.DataSelection.PublicFieldsAndProperties)));
+        }));
+
+        var json = serializer.Serialize(new ScopedRoot
+        {
+            RecursiveChild = new Child { Value = Color.Green, GrandChild = new GrandChild { Value = Color.Blue } }
+        });
+
+        Assert.Contains("\"RecursiveChild\":{\"Value\":\"Green\",\"GrandChild\":{\"Value\":\"Blue\"}}", json);
+    }
+
+    [Fact]
+    public void RecursiveSettings_IdReferenceHandlingWorksWithContextSpecificWriters()
+    {
+        var settings = new JsonSerializer.Settings
+        {
+            enumAsString = false,
+            typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo,
+            referenceCheck = JsonSerializer.ReferenceCheck.AlwaysReplaceByRef,
+            referenceFormat = JsonSerializer.ReferenceFormat.IdBased
+        };
+        settings.ConfigureType<ScopedRoot>(ts => ts.ConfigureRecursively(rs => rs.SetEnumAsString(true)));
+        var serializer = new JsonSerializer(settings);
+        var child = new Child { Value = Color.Green };
+        var root = new ScopedRoot { RecursiveChild = child, PlainChild = child };
+
+        var json = serializer.Serialize(root);
+
+        Assert.Contains("\"Value\":\"Green\"", json);
+        Assert.Contains("\"$ref\":", json);
+    }
+
+    [Fact]
+    public void RecursiveSettings_RepeatedPolymorphicRuntimeTypesKeepCapturedContext()
+    {
+        var serializer = CreateSerializer(s => s.ConfigureType<PolymorphicRoot>(ts =>
+            ts.ConfigureRecursively(rs => rs.SetEnumAsString(true))));
+
+        var json = serializer.Serialize(new PolymorphicRoot
+        {
+            First = new Child { Value = Color.Green },
+            Second = new OtherChild { Value = Color.Blue },
+            Third = new Child { Value = Color.Red }
+        });
+
+        Assert.Contains("\"First\":{\"Value\":\"Green\"", json);
+        Assert.Contains("\"Second\":{\"Value\":\"Blue\"}", json);
+        Assert.Contains("\"Third\":{\"Value\":\"Red\"", json);
     }
 }

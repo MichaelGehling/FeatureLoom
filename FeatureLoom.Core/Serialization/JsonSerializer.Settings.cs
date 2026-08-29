@@ -358,6 +358,7 @@ namespace FeatureLoom.Serialization
                 customTypeWriterCreator != null ||
                 customTypeName != null ||
                 elementSettings != null ||
+                recursiveSettings != null ||
                 dictionaryShape != null ||
                 keyFormatter != null ||
                 memberSettingsDict.Count > 0;

@@ -618,6 +618,10 @@ declare another `ConfigureRecursively` block; it is layered onto the inherited b
 the options it states. Recursive settings also follow runtime-deviating values and container values,
 but do not configure dictionary keys.
 
+`ConfigureRecursively` can also start at one member or one configured container element. In that
+case only that member's value subtree, or each matching element's subtree, receives the recursive
+defaults; sibling members and other containers remain unchanged.
+
 The recursive builder supports data selection, type-info handling and format, array value-field
 name, enum formatting, byte-array formatting, enumerable handling and dictionary shape. Settings
 bound to one CLR type or member—custom writers, custom type names, key formatters and member
