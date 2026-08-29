@@ -242,7 +242,7 @@ public sealed partial class JsonDeserializer
             {
                 var reader = GetCachedTypeReader(itemType);
                 lastTypeReader = reader;
-                lastTypeReaderType = reader.ReaderType;
+                lastTypeReaderType = itemType;
                 item = reader.ReadFieldValue<T>(rootName);
             }
             Reset();
@@ -309,7 +309,7 @@ public sealed partial class JsonDeserializer
                 {
                     var reader = GetCachedTypeReader(itemType);
                     lastTypeReader = reader;
-                    lastTypeReaderType = reader.ReaderType;
+                    lastTypeReaderType = itemType;
                     item = reader.ReadFieldValue<T>(rootName);
                 }
                 Reset();
@@ -357,7 +357,7 @@ public sealed partial class JsonDeserializer
                 {
                     var reader = GetCachedTypeReader(itemType);
                     lastTypeReader = reader;
-                    lastTypeReaderType = reader.ReaderType;
+                    lastTypeReaderType = itemType;
                     item = reader.ReadFieldValue<object>(rootName);
                 }
                 return true;
@@ -421,7 +421,7 @@ public sealed partial class JsonDeserializer
                 {
                     var reader = GetCachedTypeReader(itemType);
                     lastTypeReader = reader;
-                    lastTypeReaderType = reader.ReaderType;
+                    lastTypeReaderType = itemType;
                     item = reader.ReadFieldValue(rootName, item);
                 }
                 return true;
