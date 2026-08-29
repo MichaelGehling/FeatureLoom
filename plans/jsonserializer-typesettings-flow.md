@@ -217,7 +217,109 @@ were written with the declared type's writer, producing `{}` or hiding derived m
 - Documented in `CUSTOM_TYPE_WRITERS.md` ("How context-local settings combine", "Polymorphic values
   and settings") and in `.github/skills/json-serialization.md`.
 
-## 6. Suggested commit split
+## 6. Recursive write settings — IMPLEMENTED
+
+### Goal
+
+Allow a type configuration to define write settings for its complete object subtree without
+materializing member settings during configuration:
+
+```csharp
+settings.ConfigureType<Root>(ts => ts.ConfigureRecursively(rs =>
+{
+	rs.SetTypeInfoHandling(TypeInfoHandling.AddAllTypeInfo);
+	rs.SetEnumAsString(true);
+}));
+```
+
+### Settled semantics
+
+- Recursive settings apply to the declaring type itself and all nested member values and container
+  elements.
+- Local settings always win, but recursive settings remain active for every option the local scope
+  does not override. Precedence, highest first:
+  member/element override → type configuration → recursive context → global settings.
+- A nested `ConfigureRecursively` is layered onto the inherited recursive context. Its explicitly
+  configured values win while unspecified values continue to come from the outer context.
+- Recursive settings follow values whose runtime type deviates from their declared type.
+- Dictionary keys are excluded; dictionary values are included through normal element/value
+  propagation.
+
+Settings allowed in `RecursiveWriteSettings`:
+
+- `dataSelection`
+- `typeInfoHandling`
+- `typeInfoFormat`
+- `arrayValueFieldName`
+- `enumAsString`
+- `writeByteArrayAsBase64String`
+- `treatEnumerablesAsCollections`
+- `dictionaryShape`
+
+Excluded because they are bound to one particular type or member scope:
+
+- `customTypeName`, `customTypeWriterCreator`
+- `keyFormatter`
+- `member_ignore`, `member_overrideName`
+- `elementSettings`, `memberSettingsDict`
+
+### Storage and preparation-time propagation
+
+- Add `RecursiveWriteSettings` as a restricted settings builder containing only the allowed
+  nullable policy fields.
+- Add `BaseTypeWriteSettings.ConfigureRecursively(Action<RecursiveWriteSettings>)` and store one
+  recursive settings instance on the type settings. Do not create or modify member settings during
+  configuration.
+- Maintain an ambient recursive context while type writers are prepared. Entering
+  `CreateCachedTypeWriter` layers the current type's recursive settings onto the inherited context,
+  applies the result below the local settings and restores the previous context in `finally`.
+  This naturally forms a preparation-time stack.
+
+### Context identity, layering and recursion-safe caching
+
+Layered contexts must have stable identity: intern each `(outerContext, innerSettings)` combination
+so repeated layering returns the same effective `RecursiveWriteSettings` instance.
+
+Add a context-specific cache keyed by `(Type, RecursiveWriteSettings)`. Register the writer before
+creating its handler, as with `typeWriterCache`, so self-referencing types resolve the in-progress
+writer instead of recursively constructing another one. Writers with genuine member/element-local
+overrides remain uncached as today.
+
+### Deferred runtime-type creation
+
+`CreateDeviatingWriterResolver` may create writers lazily during serialization, after the ambient
+preparation stack has unwound. It must capture the effective recursive context when the resolver is
+prepared and restore that context around deferred writer creation. Review all other runtime-type
+writer paths for the same requirement.
+
+### Implementation steps
+
+1. [x] Add `RecursiveWriteSettings`, `ConfigureRecursively` and interned context layering.
+2. [x] Add the ambient preparation context and context-specific writer cache.
+3. [x] Merge recursive defaults into effective type settings while preserving the settled precedence.
+4. [x] Capture recursive context in lazy/deviating writer resolvers.
+5. [x] Add tests for declaring-type application, depth propagation, local precedence, nested layering,
+   self-referencing types, sibling isolation, members, container values, custom writers and
+   deviating runtime types.
+6. [x] Update `CUSTOM_TYPE_WRITERS.md` and `.github/skills/json-serialization.md`.
+
+Extended edge coverage in `JsonSerializerRecursiveSettingsTests` now includes every recursively
+configurable policy, generic type-definition configuration, conflicting nested contexts, member and
+element precedence, context-specific cache ordering/isolation, circular references, null and empty
+containers, dictionary-key exclusion, and composition with `AddField`, `AddArray`, `AddObject`,
+`AddDynamicFields` and `AddExistingFields`.
+
+### Open generic settings inheritance — DONE
+
+- `ConfigureGenericType` now rejects null, non-generic and already constructed types.
+- In `CompiledSettings`, an explicitly configured constructed type is pre-merged onto the settings
+  of its generic type definition. Exact values and member entries win, while unspecified generic
+  policies, member settings and layered recursive settings remain active.
+- `JsonSerializerOpenGenericSettingsTests` covers policies, fixed members, generic-dependent member
+  rejection, construction-specific elements and keys, reconfiguration/removal, validation,
+  inheritance, precedence and recursive layering.
+
+## 7. Suggested commit split
 
 0. remove `overriddenTypeWriterCache` again (recursion risk disproven)
 1. carry settings through creation + store on `CachedTypeWriter` (neutral)

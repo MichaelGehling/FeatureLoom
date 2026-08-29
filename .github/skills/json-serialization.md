@@ -13,7 +13,8 @@ applyTo: "**/Serialization/**"
   - `.ReaderStrategies.cs` — per-member reader structs (one variant per configuration combination)
   - `.CachedTypeReader.cs` / `.TypeReaderCreation.cs` — compiled per-type readers
   - `JsonSerializer.*.cs` mirrors this (`WriterStrategies`, `PrimitiveWriters`, `JsonUTF8StreamWriter`, handlers)
-  - `JsonSerializer.CustomTypeWriter.cs` — custom writers: `ObjectWriterBuilder<T>` field declarations (`AddField`, `AddObject`, `AddArray`, `AddRawField`) plus `AddDynamicFields` / `AddDynamicObject` for names known only at write time, and `AddExistingFields` to emit the default configured members of `T` and extend them
+	- `JsonSerializer.CustomTypeWriter.cs` — custom writers: `ObjectWriterBuilder<T>` field declarations (`AddField`, `AddObject`, `AddArray`, `AddRawField`) plus `AddDynamicFields` / `AddDynamicObject` for names known only at write time, and `AddExistingFields` to emit the default configured members of `T` and extend them
+  - `BaseTypeWriteSettings.ConfigureRecursively` applies restricted policy defaults to the configured type and its complete value subtree during writer preparation. Local type/member/element settings win per option; nested recursive settings layer onto inherited settings; dictionary keys are excluded.
 - Manual UTF-8 parsing over pooled buffers. Readers/writers are compiled once per type and cached; per-member configuration is baked into strategy structs at that point, not checked per value.
 - `Utf8StringCache` (`FeatureLoom.Core/Collections/`) dedupes recurring string values; usable globally or per member.
 
@@ -28,6 +29,7 @@ applyTo: "**/Serialization/**"
 
 ## Writer settings resolution
 - A context-local override (member settings, `PrepareTypeWriter(configure)`, `AddField/AddArray(…, configure)`) is **merged onto** the type's general settings via `BaseTypeWriteSettings.MergeOnto`, not used as a replacement. Local value wins per field and per member name.
+- Settings for a constructed generic type are merged onto its open generic definition once in `CompiledSettings`; exact settings win per option/member while unspecified generic and recursive settings remain active.
 - Merged writers are **not** put into the shared per-type cache — they are only valid in the context the override came from.
 - Termination for recursive types relies on the merge being one level deep (`isMerged` flag). Do not remove that guard without a replacement cycle check.
 - Runtime polymorphy: a value whose runtime type deviates is written by the runtime type's writer. `GetTransferableSubset()` decides what follows it — policy fields and `memberSettingsDict` do, `customTypeName` and `customTypeWriterCreator` do not.

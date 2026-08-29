@@ -125,6 +125,7 @@ namespace FeatureLoom.Serialization
         {
             bool requiresItemNames = settings.requiresItemNames;
             Type expectedElementType = typeof(object);
+            var resolveRuntimeWriter = CreateDeviatingWriterResolver(null);
 
             Action<T> itemHandler = (collection) =>
             {
@@ -137,7 +138,7 @@ namespace FeatureLoom.Serialization
                     else
                     {
                         Type elementType = element.GetType();
-                        CachedTypeWriter actualHandler = GetCachedTypeWriter(elementType);                        
+                        CachedTypeWriter actualHandler = resolveRuntimeWriter(elementType);                        
                         actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));                        
                     }
                     index++;
@@ -151,7 +152,7 @@ namespace FeatureLoom.Serialization
                     else
                     {
                         Type elementType = element.GetType();
-                        CachedTypeWriter actualHandler = GetCachedTypeWriter(elementType);                    
+                        CachedTypeWriter actualHandler = resolveRuntimeWriter(elementType);                    
                         actualHandler.WriteItem(element, writer.GetCollectionIndexName(index));                        
                     }
                     index++;

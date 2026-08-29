@@ -22,6 +22,9 @@ namespace FeatureLoom.Serialization
         readonly JsonUTF8StreamWriter writer;
         readonly CompiledSettings settings;
         readonly Dictionary<Type, CachedTypeWriter> typeWriterCache = new();
+        readonly Dictionary<(Type, RecursiveWriteSettings), CachedTypeWriter> recursiveTypeWriterCache = new();
+        readonly Dictionary<(RecursiveWriteSettings, RecursiveWriteSettings), RecursiveWriteSettings> recursiveSettingsMergeCache = new();
+        RecursiveWriteSettings ambientRecursiveSettings;
 
         readonly Dictionary<object, ItemInfo> objToItemInfo = new();
         readonly Dictionary<object, int> objToRefId = new();
@@ -645,8 +648,21 @@ namespace FeatureLoom.Serialization
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private CachedTypeWriter GetCachedTypeWriter(Type itemType)
-        {            
-            return typeWriterCache.TryGetValue(itemType, out var cachedTypeHandler) ? cachedTypeHandler : CreateCachedTypeWriter(itemType);
+        {
+            if (ambientRecursiveSettings == null && typeWriterCache.TryGetValue(itemType, out var cachedTypeHandler)) return cachedTypeHandler;
+            return CreateCachedTypeWriter(itemType);
+        }
+
+        private RecursiveWriteSettings LayerRecursiveSettings(RecursiveWriteSettings outer, RecursiveWriteSettings inner)
+        {
+            if (inner == null) return outer;
+            if (outer == null) return inner;
+
+            var key = (outer, inner);
+            if (recursiveSettingsMergeCache.TryGetValue(key, out var cached)) return cached;
+            var merged = inner.MergeOnto(outer);
+            recursiveSettingsMergeCache[key] = merged;
+            return merged;
         }
 
         /// <summary>
@@ -664,14 +680,26 @@ namespace FeatureLoom.Serialization
         internal Func<Type, CachedTypeWriter> CreateDeviatingWriterResolver(BaseTypeWriteSettings contextSettings)
         {
             var transferable = contextSettings?.GetTransferableSubset();
-            if (transferable == null) return GetCachedTypeWriter;
+            var capturedRecursiveSettings = ambientRecursiveSettings;
+            if (transferable == null && capturedRecursiveSettings == null) return GetCachedTypeWriter;
 
             var localCache = new Dictionary<Type, CachedTypeWriter>();
             return valueType =>
             {
                 if (localCache.TryGetValue(valueType, out var cached)) return cached;
-                // Bypasses the shared cache on purpose: the result is only valid in this context.
-                var created = CreateCachedTypeWriter(valueType, transferable);
+                var previousRecursiveSettings = ambientRecursiveSettings;
+                ambientRecursiveSettings = capturedRecursiveSettings;
+                CachedTypeWriter created;
+                try
+                {
+                    created = transferable == null
+                        ? GetCachedTypeWriter(valueType)
+                        : CreateCachedTypeWriter(valueType, transferable);
+                }
+                finally
+                {
+                    ambientRecursiveSettings = previousRecursiveSettings;
+                }
                 localCache[valueType] = created;
                 return created;
             };
@@ -814,16 +842,43 @@ namespace FeatureLoom.Serialization
         private CachedTypeWriter CreateCachedTypeWriter(Type itemType, BaseTypeWriteSettings typeSettings = null)
         {
             bool isLocalOverride = typeSettings != null;
-            if (!isLocalOverride) settings.TryGetTypeSettings(itemType, out typeSettings);
+            settings.TryGetTypeSettings(itemType, out var generalSettings);
+            if (!isLocalOverride) typeSettings = generalSettings;
             // A local override only states what it wants to change, so everything else must still
             // come from the settings configured for the type itself.
-            else if (settings.TryGetTypeSettings(itemType, out var generalSettings)) typeSettings = typeSettings.MergeOnto(generalSettings);
+            else if (generalSettings != null) typeSettings = typeSettings.MergeOnto(generalSettings);
+
+            var recursiveSettings = LayerRecursiveSettings(ambientRecursiveSettings, generalSettings?.recursiveSettings);
+            if (isLocalOverride && typeSettings.recursiveSettings != generalSettings?.recursiveSettings)
+            {
+                recursiveSettings = LayerRecursiveSettings(recursiveSettings, typeSettings.recursiveSettings);
+            }
+            if (recursiveSettings != null) typeSettings = recursiveSettings.ApplyBelow(typeSettings);
+
+            if (!isLocalOverride)
+            {
+                if (recursiveSettings == null && typeWriterCache.TryGetValue(itemType, out var cachedTypeWriter)) return cachedTypeWriter;
+                if (recursiveSettings != null && recursiveTypeWriterCache.TryGetValue((itemType, recursiveSettings), out cachedTypeWriter)) return cachedTypeWriter;
+            }
 
             CachedTypeWriter typeHandler = new CachedTypeWriter(this, itemType, typeSettings);
             // Typehandler must be added first for the case of recursion (type contains same type).
             // Override variants are intentionally not cached: they are context-local and their
             // nesting is bounded by the configuration depth (see GetCachedTypeWriter).
-            if (!isLocalOverride) typeWriterCache[itemType] = typeHandler;
+            if (!isLocalOverride)
+            {
+                if (recursiveSettings == null) typeWriterCache[itemType] = typeHandler;
+                else
+                {
+                    recursiveTypeWriterCache[(itemType, recursiveSettings)] = typeHandler;
+                    if (ambientRecursiveSettings == null) typeWriterCache[itemType] = typeHandler;
+                }
+            }
+
+            var previousRecursiveSettings = ambientRecursiveSettings;
+            ambientRecursiveSettings = recursiveSettings;
+            try
+            {
 
             // A name set on a local override (e.g. member settings) applies only in that context,
             // so it is taken directly instead of through the per-type lookup in ResolveTypeName.
@@ -897,6 +952,11 @@ namespace FeatureLoom.Serialization
                 MethodInfo method = typeof(JsonSerializer).GetMethod(getItemHandlerMethodName, BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo generic = method.MakeGenericMethod(itemType);                
                 generic.Invoke(this, parameters);
+            }
+            }
+            finally
+            {
+                ambientRecursiveSettings = previousRecursiveSettings;
             }
         }
 

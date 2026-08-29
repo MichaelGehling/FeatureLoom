@@ -28,6 +28,12 @@ Some features are in a ready to release state, some are still in a prototype sta
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Plans\**" />
+    <EmbeddedResource Remove="Plans\**" />
+    <None Remove="Plans\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\LICENSE" Link="LICENSE">
       <PackagePath></PackagePath>
       <Pack>True</Pack>
@@ -40,10 +46,6 @@ Some features are in a ready to release state, some are still in a prototype sta
 
   <ItemGroup>
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Plans\" />
   </ItemGroup>
 
     <PropertyGroup>

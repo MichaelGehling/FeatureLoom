@@ -599,6 +599,30 @@ local to the container.
 > Element settings apply to the direct elements only. They do not propagate further down into the
 > elements' own members or nested containers.
 
+### Configuring a complete subtree
+
+`ConfigureRecursively` defines defaults for the configured type itself and every value nested below
+it. Unlike `ConfigureMember` and `ConfigureElement`, it does not create settings for individual
+children during configuration; the settings are combined when each type writer is prepared.
+
+```csharp
+settings.ConfigureType<Envelope>(ts => ts.ConfigureRecursively(rs =>
+{
+	rs.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo);
+	rs.SetEnumAsString(true);
+}));
+```
+
+Normal type, member and element settings remain more specific and win per option. A nested type can
+declare another `ConfigureRecursively` block; it is layered onto the inherited block, replacing only
+the options it states. Recursive settings also follow runtime-deviating values and container values,
+but do not configure dictionary keys.
+
+The recursive builder supports data selection, type-info handling and format, array value-field
+name, enum formatting, byte-array formatting, enumerable handling and dictionary shape. Settings
+bound to one CLR type or member—custom writers, custom type names, key formatters and member
+metadata—are deliberately unavailable.
+
 
 ### Dictionary keys and dictionary shape
 
@@ -807,6 +831,20 @@ is rejected with an error naming both types.
 Precedence: a writer registered for a *constructed* type via `ConfigureType<Wrapper<int>>` is found
 by direct lookup and therefore wins over the open generic registration. Derived types are not
 covered — this is an exact match on the generic type definition.
+
+The same layering applies to all settings, not just writers: settings on a constructed type are
+merged onto those configured for its generic type definition. The constructed setting wins for
+each option or member it explicitly configures, while unspecified generic settings remain active.
+This includes recursive settings, whose constructed block layers onto the generic block.
+
+`ConfigureMember<TMember>`, `ConfigureElement<TElement>` and `ConfigureKey<TKey>` can also be used
+on an open generic definition when the relevant type is fixed. A member whose type is the generic
+parameter itself cannot be configured through this API because no single `TMember` describes every
+construction. Element and key settings similarly apply only to constructions whose actual element
+or key type exactly matches the configured type; other constructions keep their normal handling.
+
+`ConfigureGenericType` accepts only a generic type definition such as `typeof(Wrapper<>)`.
+Constructed generic and non-generic types must use `ConfigureType` instead.
 
 The same class can be registered for a closed type as an instance, which also lets it carry state:
 

@@ -226,6 +226,13 @@ namespace FeatureLoom.Serialization
             /// </param>
             public void ConfigureGenericType(Type genericTypeDefinition, Action<GenericTypeWriteSettings> configureTypeSettings)
             {
+                if (genericTypeDefinition == null) throw new ArgumentNullException(nameof(genericTypeDefinition));
+                if (!genericTypeDefinition.IsGenericTypeDefinition)
+                {
+                    throw new ArgumentException($"{TypeNameHelper.Shared.GetSimplifiedTypeName(genericTypeDefinition)} is not a generic type definition. " +
+                                                $"Use {nameof(ConfigureType)}() for concrete types.", nameof(genericTypeDefinition));
+                }
+
                 if (configureTypeSettings == null)
                 {
                     typeSettingsDict.Remove(genericTypeDefinition);
@@ -298,6 +305,13 @@ namespace FeatureLoom.Serialization
             internal Type elementSettingsType = null;
 
             /// <summary>
+            /// Settings inherited by this type and every value below it in the object graph.
+            /// They are applied while type writers are prepared, not materialized as member
+            /// settings during configuration.
+            /// </summary>
+            internal RecursiveWriteSettings recursiveSettings = null;
+
+            /// <summary>
             /// Type-level override for the JSON shape a dictionary is written in, or
             /// <see langword="null"/> to let the key type decide.
             /// </summary>
@@ -349,6 +363,22 @@ namespace FeatureLoom.Serialization
                 memberSettingsDict.Count > 0;
 
             /// <summary>
+            /// Configures defaults that apply to this type scope and recursively to nested values.
+            /// Local type, member and element settings override these defaults per option.
+            /// </summary>
+            public void ConfigureRecursively(Action<RecursiveWriteSettings> configure)
+            {
+                if (configure == null)
+                {
+                    recursiveSettings = null;
+                    return;
+                }
+
+                recursiveSettings ??= new RecursiveWriteSettings();
+                configure(recursiveSettings);
+            }
+
+            /// <summary>
             /// Returns these context-local settings combined with <paramref name="generalSettings"/>,
             /// the settings configured for the type itself. Everything the local context does not
             /// say anything about is taken from the general settings, so configuring a type and
@@ -386,6 +416,7 @@ namespace FeatureLoom.Serialization
                     elementSettingsType = elementSettings != null ? elementSettingsType : generalSettings.elementSettingsType,
                     dictionaryShape = dictionaryShape ?? generalSettings.dictionaryShape,
                     keyFormatter = keyFormatter ?? generalSettings.keyFormatter,
+                    recursiveSettings = recursiveSettings?.MergeOnto(generalSettings.recursiveSettings) ?? generalSettings.recursiveSettings,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
                     ownerSettings = ownerSettings ?? generalSettings.ownerSettings,
@@ -428,6 +459,7 @@ namespace FeatureLoom.Serialization
                     elementSettingsType = elementSettingsType,
                     dictionaryShape = dictionaryShape,
                     keyFormatter = keyFormatter,
+                    recursiveSettings = recursiveSettings,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
                     ownerSettings = ownerSettings,
@@ -718,6 +750,91 @@ namespace FeatureLoom.Serialization
                 }
 
                 return containerType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out elementType);
+            }
+        }
+
+        /// <summary>
+        /// Write settings inherited by the configured type itself and all nested values. Only
+        /// type-independent policies are available; settings bound to a specific member or CLR
+        /// type cannot be propagated recursively.
+        /// </summary>
+        public sealed class RecursiveWriteSettings
+        {
+            internal DataSelection? dataSelection;
+            internal TypeInfoHandling? typeInfoHandling;
+            internal TypeInfoFormat? typeInfoFormat;
+            internal ValueFieldName? arrayValueFieldName;
+            internal bool? enumAsString;
+            internal bool? writeByteArrayAsBase64String;
+            internal bool? treatEnumerablesAsCollections;
+            internal DictionaryShape? dictionaryShape;
+
+            public void SetDataSelection(DataSelection value) => dataSelection = value;
+            public void SetTypeInfoHandling(TypeInfoHandling value) => typeInfoHandling = value;
+            public void SetTypeInfoFormat(TypeInfoFormat value) => typeInfoFormat = value;
+            public void SetArrayValueFieldName(ValueFieldName value) => arrayValueFieldName = value;
+            public void SetEnumAsString(bool value) => enumAsString = value;
+            public void SetWriteByteArrayAsBase64String(bool value) => writeByteArrayAsBase64String = value;
+            public void SetTreatEnumerablesAsCollections(bool value) => treatEnumerablesAsCollections = value;
+            public void SetDictionaryShape(DictionaryShape value) => dictionaryShape = value;
+
+            internal RecursiveWriteSettings MergeOnto(RecursiveWriteSettings outer)
+            {
+                if (outer == null) return this;
+
+                var merged = new RecursiveWriteSettings
+                {
+                    dataSelection = dataSelection ?? outer.dataSelection,
+                    typeInfoHandling = typeInfoHandling ?? outer.typeInfoHandling,
+                    typeInfoFormat = typeInfoFormat ?? outer.typeInfoFormat,
+                    arrayValueFieldName = arrayValueFieldName ?? outer.arrayValueFieldName,
+                    enumAsString = enumAsString ?? outer.enumAsString,
+                    writeByteArrayAsBase64String = writeByteArrayAsBase64String ?? outer.writeByteArrayAsBase64String,
+                    treatEnumerablesAsCollections = treatEnumerablesAsCollections ?? outer.treatEnumerablesAsCollections,
+                    dictionaryShape = dictionaryShape ?? outer.dictionaryShape
+                };
+                return merged.HasSameValues(outer) ? outer : merged;
+            }
+
+            internal bool HasSameValues(RecursiveWriteSettings other) =>
+                other != null &&
+                dataSelection == other.dataSelection &&
+                typeInfoHandling == other.typeInfoHandling &&
+                typeInfoFormat == other.typeInfoFormat &&
+                arrayValueFieldName == other.arrayValueFieldName &&
+                enumAsString == other.enumAsString &&
+                writeByteArrayAsBase64String == other.writeByteArrayAsBase64String &&
+                treatEnumerablesAsCollections == other.treatEnumerablesAsCollections &&
+                dictionaryShape == other.dictionaryShape;
+
+            internal BaseTypeWriteSettings ApplyBelow(BaseTypeWriteSettings local)
+            {
+                var effective = new BaseTypeWriteSettings
+                {
+                    dataSelection = local?.dataSelection ?? dataSelection,
+                    typeInfoHandling = local?.typeInfoHandling ?? typeInfoHandling,
+                    typeInfoFormat = local?.typeInfoFormat ?? typeInfoFormat,
+                    arrayValueFieldName = local?.arrayValueFieldName ?? arrayValueFieldName,
+                    enumAsString = local?.enumAsString ?? enumAsString,
+                    writeByteArrayAsBase64String = local?.writeByteArrayAsBase64String ?? writeByteArrayAsBase64String,
+                    treatEnumerablesAsCollections = local?.treatEnumerablesAsCollections ?? treatEnumerablesAsCollections,
+                    customTypeName = local?.customTypeName,
+                    customTypeWriterCreator = local?.customTypeWriterCreator,
+                    elementSettings = local?.elementSettings,
+                    elementSettingsType = local?.elementSettingsType,
+                    dictionaryShape = local?.dictionaryShape ?? dictionaryShape,
+                    keyFormatter = local?.keyFormatter,
+                    recursiveSettings = local?.recursiveSettings,
+                    member_ignore = local?.member_ignore,
+                    member_overrideName = local?.member_overrideName,
+                    ownerSettings = local?.ownerSettings,
+                    isMerged = local?.isMerged ?? false
+                };
+                if (local != null)
+                {
+                    foreach (var entry in local.memberSettingsDict) effective.memberSettingsDict[entry.Key] = entry.Value;
+                }
+                return effective;
             }
         }
 
@@ -1437,6 +1554,16 @@ namespace FeatureLoom.Serialization
                 writeByteArrayAsBase64String = settings.writeByteArrayAsBase64String;
 
                 typeSettingsDict = new Dictionary<Type, BaseTypeWriteSettings>(settings.typeSettingsDict);
+                // A constructed type is a more specific configuration scope, not a replacement for
+                // its generic definition. Pre-merge configured constructed entries once so all
+                // later lookups return a stable settings object suitable for writer cache keys.
+                foreach (var entry in settings.typeSettingsDict)
+                {
+                    Type type = entry.Key;
+                    if (!type.IsConstructedGenericType) continue;
+                    if (!settings.typeSettingsDict.TryGetValue(type.GetGenericTypeDefinition(), out var genericSettings)) continue;
+                    typeSettingsDict[type] = entry.Value.MergeOnto(genericSettings);
+                }
                 hasTypeSettings = typeSettingsDict.Count > 0;
             }
 

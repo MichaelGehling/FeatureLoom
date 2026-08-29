@@ -746,12 +746,14 @@ public sealed partial class JsonSerializer
     {
         readonly JsonSerializer serializer;
         readonly JsonUTF8StreamWriter writer;
+        readonly Func<Type, CachedTypeWriter> resolveRuntimeWriter;
         bool anyWritten;
 
         internal DynamicFieldWriteApi(JsonSerializer serializer)
         {
             this.serializer = serializer;
             this.writer = serializer.writer;
+            this.resolveRuntimeWriter = serializer.CreateDeviatingWriterResolver(null);
         }
 
         /// <summary>
@@ -811,7 +813,7 @@ public sealed partial class JsonSerializer
                 writer.WriteNullValue();
                 return;
             }
-            serializer.GetCachedTypeWriter(value.GetType()).WriteItemOfRuntimeType(value, itemName);
+            resolveRuntimeWriter(value.GetType()).WriteItemOfRuntimeType(value, itemName);
         }
     }
 
