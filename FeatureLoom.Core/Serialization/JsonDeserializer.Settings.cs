@@ -18,6 +18,26 @@ namespace FeatureLoom.Serialization;
 public sealed partial class JsonDeserializer
 {
     /// <summary>
+    /// String-encoded CLR types that can be recognized when deserializing a value through a multi-option mapping.
+    /// </summary>
+    [Flags]
+    public enum StringValueMappings
+    {
+        /// <summary>No automatic string recognition.</summary>
+        None = 0,
+        /// <summary>Recognize canonical hyphenated GUID strings.</summary>
+        Guid = 1,
+        /// <summary>Recognize ISO-8601 date/time strings carrying a UTC designator or numeric offset.</summary>
+        DateTimeOffset = 2,
+        /// <summary>Recognize ISO-8601 date/time strings.</summary>
+        DateTime = 4,
+        /// <summary>Recognize invariant constant-format time spans.</summary>
+        TimeSpan = 8,
+        /// <summary>Recognize all supported default string mappings.</summary>
+        All = Guid | DateTimeOffset | DateTime | TimeSpan
+    }
+
+    /// <summary>
     /// Defines global and type-specific deserialization behavior.
     /// </summary>
     /// <remarks>
@@ -537,17 +557,88 @@ public sealed partial class JsonDeserializer
         /// </summary>
         readonly public BaseTypeSettings typeSettings;
 
+        /// <summary>Optional field predicate used while selecting this mapping option.</summary>
+        readonly public IMappingOptionFieldChecker fieldChecker;
+
+        /// <summary>Optional whole-value predicate or converter used while selecting this mapping option.</summary>
+        readonly public IMappingOptionValueChecker valueChecker;
+
         /// <summary>
         /// Initializes a mapped-type entry.
         /// </summary>
         /// <param name="type">Destination type.</param>
         /// <param name="typeSettings">Optional nested settings for destination type handling.</param>
-        public MappedType(Type type, BaseTypeSettings typeSettings)
+        public MappedType(Type type, BaseTypeSettings typeSettings, IMappingOptionFieldChecker fieldChecker = null, IMappingOptionValueChecker valueChecker = null)
         {
             this.type = type;
             this.typeSettings = typeSettings;
+            this.fieldChecker = fieldChecker;
+            this.valueChecker = valueChecker;
         }
     }
+
+    internal interface IMappingOptionFieldChecker
+    {
+        string FieldName { get; }
+        Type FieldType { get; }
+    }
+
+    internal sealed class MappingOptionFieldChecker<TField> : IMappingOptionFieldChecker
+    {
+        internal readonly Func<TField, bool> predicate;
+        public string FieldName { get; }
+        public Type FieldType => typeof(TField);
+
+        internal MappingOptionFieldChecker(string fieldName, Func<TField, bool> predicate)
+        {
+            FieldName = fieldName;
+            this.predicate = predicate;
+        }
+    }
+
+    internal interface IMappingOptionValueChecker
+    {
+        Type ValueType { get; }
+        bool ProducesResult { get; }
+        bool IsDefaultStringMapping { get; }
+    }
+
+    internal sealed class MappingOptionValuePredicate<TValue> : IMappingOptionValueChecker
+    {
+        internal readonly Func<TValue, bool> predicate;
+        public Type ValueType => typeof(TValue);
+        public bool ProducesResult => false;
+        public bool IsDefaultStringMapping => false;
+
+        internal MappingOptionValuePredicate(Func<TValue, bool> predicate)
+        {
+            this.predicate = predicate;
+        }
+    }
+
+    internal sealed class MappingOptionValueConverter<TValue, TMap> : IMappingOptionValueChecker
+    {
+        internal readonly TryMapValue<TValue, TMap> converter;
+        public Type ValueType => typeof(TValue);
+        public bool ProducesResult => true;
+        public bool IsDefaultStringMapping { get; }
+
+        internal MappingOptionValueConverter(TryMapValue<TValue, TMap> converter, bool isDefaultStringMapping = false)
+        {
+            this.converter = converter;
+            IsDefaultStringMapping = isDefaultStringMapping;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to map a deserialized input value to a mapped result.
+    /// </summary>
+    /// <typeparam name="TValue">Input value type.</typeparam>
+    /// <typeparam name="TMap">Mapped result type.</typeparam>
+    /// <param name="value">Deserialized input value.</param>
+    /// <param name="result">Produced mapped result when successful.</param>
+    /// <returns><see langword="true"/> when a result was produced; otherwise <see langword="false"/>.</returns>
+    public delegate bool TryMapValue<TValue, TMap>(TValue value, out TMap result);
 
     /// <summary>
     /// Shared storage for type/member settings consumed by the deserializer pipeline.
@@ -1215,6 +1306,181 @@ public sealed partial class JsonDeserializer
                 configureInstanceTypeSettings(typeSettings);
             }
             multiOptionMappedTypes.Add(new MappedType(instanceType, typeSettings));
+        }
+
+        /// <summary>
+        /// Adds a candidate concrete mapping option with a typed field predicate.
+        /// </summary>
+        /// <typeparam name="TMap">Mapped implementation type option.</typeparam>
+        /// <typeparam name="TField">Expected type of the checked JSON field.</typeparam>
+        /// <param name="fieldName">JSON field whose value is checked when present.</param>
+        /// <param name="predicate">Predicate selecting this option when it returns <see langword="true"/>.</param>
+        /// <param name="configureInstanceTypeSettings">Optional nested configuration for mapped option behavior.</param>
+        /// <remarks>
+        /// A matching predicate selects this option immediately. A present field that cannot be read as
+        /// <typeparamref name="TField"/>, or for which the predicate returns <see langword="false"/>, excludes
+        /// this option. If the field is absent, normal field-name inference remains available for this option.
+        /// </remarks>
+        public void AddInstanceTypeMappingOption<TMap, TField>(
+            string fieldName,
+            Func<TField, bool> predicate,
+            Action<TypeSettings<TMap>> configureInstanceTypeSettings = null) where TMap : T
+        {
+            if (string.IsNullOrWhiteSpace(fieldName)) throw new ArgumentException("The checker field name must not be null or empty.", nameof(fieldName));
+            if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+            this.mappedType = default;
+            Type instanceType = typeof(TMap);
+            Type type = typeof(T);
+            if (!instanceType.IsAssignableTo(type))
+            {
+                throw new Exception($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is not implemented by {TypeNameHelper.Shared.GetSimplifiedTypeName(instanceType)}");
+            }
+            TypeSettings<TMap> typeSettings = null;
+            if (configureInstanceTypeSettings != null)
+            {
+                typeSettings = new TypeSettings<TMap>();
+                configureInstanceTypeSettings(typeSettings);
+            }
+            var checker = new MappingOptionFieldChecker<TField>(fieldName, predicate);
+            multiOptionMappedTypes.Add(new MappedType(instanceType, typeSettings, checker));
+        }
+
+        /// <summary>
+        /// Adds a mapping option selected by a predicate over the complete JSON value.
+        /// </summary>
+        /// <typeparam name="TValue">Type used to read the input value.</typeparam>
+        /// <typeparam name="TMap">Mapped implementation type option.</typeparam>
+        /// <param name="predicate">Predicate selecting this option when it returns <see langword="true"/>.</param>
+        /// <param name="configureInstanceTypeSettings">Optional nested configuration for mapped option behavior.</param>
+        /// <remarks>
+        /// The input is inspected as <typeparamref name="TValue"/>. On a match, the original JSON value is
+        /// deserialized again through the normal prepared reader for <typeparamref name="TMap"/>.
+        /// </remarks>
+        public void AddInstanceTypeMappingValueOption<TValue, TMap>(
+            Func<TValue, bool> predicate,
+            Action<TypeSettings<TMap>> configureInstanceTypeSettings = null) where TMap : T
+        {
+            if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+
+            this.mappedType = default;
+            TypeSettings<TMap> typeSettings = CreateMappingOptionSettings(configureInstanceTypeSettings);
+            var checker = new MappingOptionValuePredicate<TValue>(predicate);
+            multiOptionMappedTypes.Add(new MappedType(typeof(TMap), typeSettings, valueChecker: checker));
+        }
+
+        /// <summary>
+        /// Adds a mapping option that can directly produce a result from the complete JSON value.
+        /// </summary>
+        /// <typeparam name="TValue">Type used to read the input value.</typeparam>
+        /// <typeparam name="TMap">Mapped result type.</typeparam>
+        /// <param name="converter">Converter returning <see langword="true"/> when it produced the result.</param>
+        /// <remarks>
+        /// A successful conversion returns its result directly and therefore does not invoke the normal
+        /// <typeparamref name="TMap"/> reader afterward.
+        /// </remarks>
+        public void AddInstanceTypeMappingValueOption<TValue, TMap>(TryMapValue<TValue, TMap> converter) where TMap : T
+        {
+            if (converter == null) throw new ArgumentNullException(nameof(converter));
+
+            this.mappedType = default;
+            var checker = new MappingOptionValueConverter<TValue, TMap>(converter);
+            multiOptionMappedTypes.Add(new MappedType(typeof(TMap), null, valueChecker: checker));
+        }
+
+        /// <summary>
+        /// Adds opt-in recognition for CLR types that the default serializer represents as JSON strings.
+        /// </summary>
+        /// <param name="mappings">String-encoded types to recognize.</param>
+        /// <remarks>
+        /// Explicit whole-value mappings are always evaluated before these defaults. When both
+        /// <see cref="StringValueMappings.DateTimeOffset"/> and <see cref="StringValueMappings.DateTime"/>
+        /// are enabled, values carrying <c>Z</c> or a numeric offset are recognized as
+        /// <see cref="DateTimeOffset"/> first. Unrecognized values remain strings.
+        /// </remarks>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for unsupported flags.</exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when an enabled recognized type is not assignable to <typeparamref name="T"/>.
+        /// </exception>
+        public void AddDefaultStringValueMappings(StringValueMappings mappings = StringValueMappings.All)
+        {
+            if ((mappings & ~StringValueMappings.All) != 0) throw new ArgumentOutOfRangeException(nameof(mappings));
+            if (mappings == StringValueMappings.None) return;
+
+            EnsureDefaultStringMappingCompatible(mappings, StringValueMappings.Guid, typeof(Guid));
+            EnsureDefaultStringMappingCompatible(mappings, StringValueMappings.DateTimeOffset, typeof(DateTimeOffset));
+            EnsureDefaultStringMappingCompatible(mappings, StringValueMappings.DateTime, typeof(DateTime));
+            EnsureDefaultStringMappingCompatible(mappings, StringValueMappings.TimeSpan, typeof(TimeSpan));
+
+            this.mappedType = default;
+            bool TryConvert(string value, out T result)
+            {
+                object recognized = null;
+                bool success = false;
+                if ((mappings & StringValueMappings.Guid) != 0 &&
+                    value.Length == 36 && System.Guid.TryParseExact(value, "D", out Guid guid))
+                {
+                    recognized = guid;
+                    success = true;
+                }
+                else if ((mappings & StringValueMappings.DateTimeOffset) != 0 &&
+                    HasDateTimeOffset(value) &&
+                    System.DateTimeOffset.TryParseExact(value, DateTimeFormats, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out DateTimeOffset dateTimeOffset))
+                {
+                    recognized = dateTimeOffset;
+                    success = true;
+                }
+                else if ((mappings & StringValueMappings.DateTime) != 0 &&
+                    System.DateTime.TryParseExact(value, DateTimeFormats, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out DateTime dateTime))
+                {
+                    recognized = dateTime;
+                    success = true;
+                }
+                else if ((mappings & StringValueMappings.TimeSpan) != 0 &&
+                    System.TimeSpan.TryParseExact(value, "c", System.Globalization.CultureInfo.InvariantCulture, out TimeSpan timeSpan))
+                {
+                    recognized = timeSpan;
+                    success = true;
+                }
+
+                result = success ? (T)recognized : default;
+                return success;
+            }
+
+            var checker = new MappingOptionValueConverter<string, T>(TryConvert, true);
+            multiOptionMappedTypes.Add(new MappedType(typeof(T), null, valueChecker: checker));
+        }
+
+        private static readonly string[] DateTimeFormats =
+        {
+            "yyyy-MM-dd'T'HH:mm:ssK",
+            "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFK"
+        };
+
+        private static bool HasDateTimeOffset(string value)
+        {
+            if (value.Length < 20) return false;
+            char last = value[value.Length - 1];
+            if (last == 'Z') return true;
+            return value.Length >= 25 && (value[value.Length - 6] == '+' || value[value.Length - 6] == '-');
+        }
+
+        private static void EnsureDefaultStringMappingCompatible(StringValueMappings mappings, StringValueMappings mapping, Type recognizedType)
+        {
+            if ((mappings & mapping) != 0 && !typeof(T).IsAssignableFrom(recognizedType))
+            {
+                throw new InvalidOperationException($"Recognized type {TypeNameHelper.Shared.GetSimplifiedTypeName(recognizedType)} is not assignable to {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(T))}.");
+            }
+        }
+
+        private static TypeSettings<TMap> CreateMappingOptionSettings<TMap>(Action<TypeSettings<TMap>> configureInstanceTypeSettings)
+        {
+            if (configureInstanceTypeSettings == null) return null;
+            var typeSettings = new TypeSettings<TMap>();
+            configureInstanceTypeSettings(typeSettings);
+            return typeSettings;
         }
     }
 
