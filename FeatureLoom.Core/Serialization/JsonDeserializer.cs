@@ -193,14 +193,14 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     CachedTypeReader GetCachedTypeReader(Type itemType)
     {
-        if (typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
+        if (ambientRecursiveSettings == null && typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
         else return CreateCachedTypeReader(itemType);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     CachedTypeReader GetCachedTypeReader(Type itemType, BaseTypeSettings typeSettings)
     {
-        if (typeSettings == null && typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
+        if (typeSettings == null && ambientRecursiveSettings == null && typeReaderCache.TryGetValue(itemType, out var cachedTypeReader)) return cachedTypeReader;
         else return CreateCachedTypeReader(itemType, typeSettings);
     }
 

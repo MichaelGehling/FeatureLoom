@@ -86,6 +86,14 @@ wins as a whole and must not be propagated to unrelated descendant or proposed t
 
 ## Track A: settings-resolution parity
 
+## Performance constraint
+
+All settings resolution, merging, contextual reader selection, callback preparation and dispatch
+construction must happen during type-reader preparation. The read hot path must use already prepared
+delegates and resolved state; it must not perform settings lookup, merging, reflection, context-stack
+evaluation or per-value configuration branching. New features require tests or benchmarks that guard
+this separation where applicable.
+
 ### A1. Establish explicit merge semantics
 
 Add to `BaseTypeSettings`:
@@ -137,6 +145,12 @@ Add recursion tests before changing this path. Existing member-settings recursio
 settings tree; machine-injected broader settings need the same one-level cycle guard used by the
 serializer.
 
+**Completed:** runtime `ConfigureType(Type, ...)`, generic-definition validation, compiled
+exact-over-open-generic merging, and local member/mapping settings merging are implemented.
+`JsonDeserializerOpenGenericSettingsTests` covers API validation, registration order, member/scalar
+precedence, mapped/member-local inheritance and snapshot isolation. Existing finite recursive member
+scope is retained by preventing self-reinjection during one-level merges.
+
 ## Track B: container element/value settings
 
 ### B1. API and storage
@@ -177,6 +191,14 @@ Use it in every container path, including:
 
 No per-element settings checks should remain on the read hot path; select the proper reader/strategy
 at preparation time.
+
+**Completed:** `ConfigureElement<TElement>` is available for concrete/member and open-generic
+container scopes. Element/value reader selection is centralized and resolved during preparation for
+arrays, generic/non-generic collections, constructor-based enumerables and both dictionary shapes.
+Numeric bulk and primitive strategy paths are selected only when no element override exists.
+`JsonDeserializerElementSettingsTests` covers matching, mismatch validation, removal, local/open-
+generic scope, custom primitive readers, dictionaries and populate-existing paths. The coverage also
+fixed an existing extra-byte advance in dictionary pair-array population.
 
 ## Track C: recursive read settings
 
@@ -239,12 +261,21 @@ The resolver should:
 Also review deferred readers used by unknown-object reading, mapping options and populate-existing
 runtime-type paths.
 
+**Completed:** restricted `RecursiveReadSettings` supports data access, backing-field mode,
+reference resolution, proposed types, population and string caching. Recursive contexts are layered,
+canonicalized and cached during reader preparation, including local member/element scopes and
+self-referencing types. Prepared readers capture the effective context for lazily resolved proposed
+runtime types without using the global proposed-type cache for contextual variants.
+`JsonDeserializerRecursiveSettingsTests` covers declaring, descendant, local precedence,
+member/element isolation, nested layering, recursion termination, mappings and proposed types.
+
 ## Track D: dictionary key customization
 
 The serializer's formatter cannot be inverted automatically. Add an explicitly inverse API only:
 
-- `ConfigureKey<TKey>(Func<string, TKey> parseKey)` as the baseline;
-- optionally `TextSegment` / span-based forms to avoid allocations, following multi-target guards;
+- `ConfigureObjectKey<TKey>(Func<string, TKey> parseKey)` as the baseline;
+- a nested `JsonDeserializer.BufferSegment` view exposes raw UTF-8 as `ByteSegment` / guarded `ReadOnlySpan<byte>`
+  without allocation and decodes to a string only on demand;
 - bind and validate the parser at reader preparation time;
 - apply only to dictionary JSON-object property names;
 - pair-array keys continue through the normal `TKey` value reader;
@@ -253,6 +284,15 @@ The serializer's formatter cannot be inverted automatically. Add an explicitly i
 
 Do not call this feature symmetric round-tripping unless both serializer formatter and deserializer
 parser are configured by the caller.
+
+**Completed:** `ConfigureObjectKey<TKey>` receives a nested `JsonDeserializer.BufferSegment`, providing one extensible API
+with allocation-free raw UTF-8 access and decoded string conversion on demand for concrete and
+open-generic type settings.
+Parsers are validated and selected while preparing dictionary readers, then invoked
+only for JSON-object property names. Pair-array keys retain the normal `TKey` reader. Exact settings
+override open-generic parsers, while nonmatching open-generic constructions ignore the parser.
+`JsonDeserializerDictionaryKeySettingsTests` covers decoding, scope/precedence, population,
+pair-array behavior, removal, validation and exception policy.
 
 ## Track E: custom-reader parity
 
@@ -270,6 +310,13 @@ Add a definition model analogous to serializer `CustomTypeWriterDefinition<T>`:
 
 Existing `ICustomTypeReader<T>` and delegate APIs remain supported.
 
+**Completed:** `CustomTypeReaderDefinition<T>` and open-generic
+`GenericTypeSettings.SetCustomTypeReader(Type)` registrations are supported. Definitions are
+validated at registration, closed positionally, instantiated and prepared once per constructed
+type. Exact constructed readers override open-generic definitions, and derived types are not
+implicitly covered. `JsonDeserializerCustomTypeReaderDefinitionTests` covers generic constructions,
+multi-parameter definitions, precedence, preparation count, derived types and validation failures.
+
 ### E2. Preparation API parity
 
 Keep `PrepareTypeReader<T>` and add configure-callback overloads matching serializer ergonomics:
@@ -279,8 +326,14 @@ Keep `PrepareTypeReader<T>` and add configure-callback overloads matching serial
 - prepared delegates must use the effective local/open-generic/recursive settings and remain
   isolated from the shared reader.
 
-Fix the typo in `GetContructor<T>` by adding `GetConstructor<T>` and retaining the old method as a
-compatibility-forwarder before considering deprecation.
+Replace the misspelled `GetContructor<T>` with `GetConstructor<T>`.
+
+**Completed:** `PreparationApi.PrepareTypeReader<T>(Action<TypeSettings<T>>)` builds an isolated
+context-local reader whose settings merge onto configured exact/open-generic and recursive settings.
+`PrepareNonCustomTypeReader<T>` now suppresses only the configured custom reader while retaining all
+other effective settings. `GetConstructor<T>` uses the current preparation context.
+`JsonDeserializerPreparationApiTests` covers local
+isolation, non-custom delegation and constructor compatibility.
 
 ### E3. Declarative object reader builder
 
@@ -306,6 +359,20 @@ normal reader contract and be documented.
 - member-local/recursive settings;
 - populate-existing and reference-path behavior.
 
+**Completed baseline:** `PreparationApi.PrepareObjectReader<T>` and `ObjectReaderBuilder<T>` compile
+named field readers into an order-independent lookup. The builder supports typed `AddField` with
+local settings, `AddExistingFields`, dynamic unmatched fields, explicit skip/throw unknown-field
+policy, duplicate-field last-value behavior, and population of existing instances. The normal member
+reader preparation is shared with `AddExistingFields`, preserving access/attribute/name/member,
+recursive, population and reference-path behavior. `JsonDeserializerCustomTypeReaderBuilderTests`
+covers these contracts. Dedicated `AddObject` / `AddArray` conveniences remain optional because
+typed `AddField` already composes prepared object and collection readers.
+
+`UnknownFieldPolicy` is also available globally and through type/member/element/recursive settings.
+Its effective value is resolved while preparing each normal or declarative object reader; builder-local
+configuration has highest precedence. `JsonDeserializerUnknownFieldPolicyTests` covers global defaults,
+type/member/recursive scope, and builder inheritance/override.
+
 ### E4. Declarative array/value readers
 
 Add prepared helpers where they add real parity over the existing low-level API:
@@ -316,6 +383,14 @@ Add prepared helpers where they add real parity over the existing low-level API:
 
 Avoid forcing a one-to-one mirror of writer methods when reading semantics differ. In particular,
 there is no reader equivalent of pre-encoded output names or raw token emission.
+
+**Completed:** `PreparationApi.PrepareValueReader<T>` adapts raw value callbacks, while
+`PrepareArrayReader<TCollection,TElement>` reads null or array input through a prepared element
+reader and passes the completed sequence to a constructor. Optional element-local settings are
+prepared once and do not leak. Read-only prepared custom-reader delegates allow these helpers to
+construct collection wrappers without requiring a parameterless constructor.
+`JsonDeserializerDeclarativeValueArrayReaderTests` covers custom token reading, array construction,
+element-local settings and null handling.
 
 ## Track F: tests
 
@@ -328,6 +403,12 @@ Create focused files instead of extending the already large settings test class:
    - reference/proposed-type and populate paths;
    - specialized numeric fast-path bypass when needed.
 
+   **Coverage status:** arrays, lists, enumerable constructors, dictionary object/pair-array shapes,
+   member-local isolation, matching/mismatching open generics, proposed runtime types, dictionary
+   population, configuration validation/removal, and numeric fast-path suppression are covered.
+   Collection element reference paths remain subject to the existing array/enumerable construction
+   limitation documented in the reader implementation.
+
 2. `JsonDeserializerRecursiveSettingsTests`
    - declaring type, member and element subtree roots;
    - depth, nested layering and local precedence;
@@ -337,6 +418,12 @@ Create focused files instead of extending the already large settings test class:
    - no sibling/global leakage;
    - security settings cannot be weakened.
 
+	  **Coverage status:** declaring-type, member and element roots, nested precedence, self- and mutually
+   recursive termination, contextual-reader preparation-order isolation, mapped and proposed runtime
+   types, and sibling isolation are covered. Security policy is deliberately absent from
+   `RecursiveReadSettings`; dedicated interaction tests verify recursive configuration cannot weaken
+   forbidden-type or whitelist enforcement.
+
 3. `JsonDeserializerOpenGenericSettingsTests`
    - argument validation;
    - exact-over-generic per-field/member merge;
@@ -344,6 +431,11 @@ Create focused files instead of extending the already large settings test class:
    - fixed member/element/key support and generic-dependent limitations;
    - constructors, mappings and custom-reader precedence;
    - removal/reconfiguration and snapshot isolation.
+
+   **Coverage status:** argument validation, runtime/exact interaction, exact-over-generic scalar and
+   member merging independent of registration order, mapped nested settings, removal and compiled
+   snapshot isolation are covered. Element and custom-reader cases are covered by their dedicated
+   focused suites.
 
 4. `JsonDeserializerCustomTypeReaderBuilderTests`
    - existing fields plus added fields;
@@ -353,6 +445,18 @@ Create focused files instead of extending the already large settings test class:
    - nested objects/arrays, nulls and populate-existing;
    - local settings, recursive settings, references and proposed types;
    - open-generic definitions and exact precedence.
+
+	  **Coverage status:** added/existing/dynamic fields, arbitrary order, duplicate and unknown fields,
+   nested objects/arrays, null/missing fields, local and recursive settings, proposed types, isolation
+   and population are covered. Value/array/null/empty/malformed behavior is covered by
+   `JsonDeserializerDeclarativeValueArrayReaderTests`; open-generic definitions and exact precedence
+   are covered by `JsonDeserializerCustomTypeReaderDefinitionTests`.
+
+5. `JsonDeserializerSettingsInteractionMatrixTests`
+   - member × element × recursive precedence over exact/open-generic/global settings;
+   - registration-order independence;
+   - repeated and distinct proposed runtime types in one prepared context;
+   - forbidden-type and whitelist enforcement below recursive scopes.
 
 All tests must use public APIs. Run focused suites after every phase and the full project suite before
 completion.

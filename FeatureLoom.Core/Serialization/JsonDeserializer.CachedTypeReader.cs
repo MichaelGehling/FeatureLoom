@@ -40,6 +40,7 @@ public sealed partial class JsonDeserializer
                     writeRefPath = false;
                     resolveRefs = false;
                 }
+
                 else
                 {
                     if (deserializer.settings.referenceResolutionMode == Settings.ReferenceResolutionMode.DisabledByDefault)
@@ -158,6 +159,7 @@ public sealed partial class JsonDeserializer
         public ByteSegment LastProposedTypeName { get => lastProposedTypeName; set => lastProposedTypeName = value; }
 
         public BaseTypeSettings TypeSettings => typeSettings;
+        internal RecursiveReadSettings EffectiveRecursiveSettings => typeSettings?.effectiveRecursiveSettings;
 
         public JsonDeserializer Parent => deserializer;
 
@@ -625,7 +627,8 @@ public sealed partial class JsonDeserializer
 
         proposedTypeBytes.EnsureHashCode();
         // Force a copy of the proposedTypeBytes so it can be safely used as dictionary key without worrying about buffer changes.                
-        if (!proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out proposedTypeReader))
+        var recursiveContext = originalTypeReader.EffectiveRecursiveSettings;
+        if (recursiveContext != null || !proposedTypeReaderCache.TryGetValue(proposedTypeBytes, out proposedTypeReader))
         {
             proposedTypeBytes = proposedTypeBytes.CropArray(true);
             proposedTypeReader = null;
@@ -666,11 +669,20 @@ public sealed partial class JsonDeserializer
                 }
                 else if (proposedType != expectedType && proposedType.IsAssignableTo(expectedType))
                 {
-                    proposedTypeReader = GetCachedTypeReader(proposedType);
+                    var previousRecursiveSettings = ambientRecursiveSettings;
+                    ambientRecursiveSettings = recursiveContext;
+                    try
+                    {
+                        proposedTypeReader = GetCachedTypeReader(proposedType);
+                    }
+                    finally
+                    {
+                        ambientRecursiveSettings = previousRecursiveSettings;
+                    }
                 }
             }
 
-            proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
+            if (recursiveContext == null) proposedTypeReaderCache[proposedTypeBytes] = proposedTypeReader;
         }
 
         bool isProposedTypeCompatible = proposedTypeReader != null && proposedTypeReader.ReaderType.IsAssignableTo(expectedType);

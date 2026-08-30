@@ -65,6 +65,9 @@ public sealed partial class JsonDeserializer
         /// </summary>
         public BackingFieldMode backingFieldMode = BackingFieldMode.TryBothNames;
 
+        /// <summary>Controls how unmatched JSON object properties are handled by default.</summary>
+        public UnknownFieldPolicy unknownFieldPolicy = UnknownFieldPolicy.Skip;
+
         /// <summary>
         /// If <see langword="true"/>, lower/upper-case variants are also inserted into proposed-type caches
         /// when custom type names are loaded.
@@ -375,6 +378,37 @@ public sealed partial class JsonDeserializer
         }
 
         /// <summary>
+        /// Configures settings for a concrete type that is only known at runtime.
+        /// </summary>
+        /// <param name="type">Configured type. Must not be a generic type definition.</param>
+        /// <param name="configureTypeSettings">
+        /// Callback that mutates or creates the type settings.
+        /// If <see langword="null"/>, the type configuration is removed.
+        /// </param>
+        public void ConfigureType(Type type, Action<BaseTypeSettings> configureTypeSettings)
+        {
+            if (type == null) throw new ArgumentNullException(nameof(type));
+            if (configureTypeSettings == null)
+            {
+                typeSettingsDict.Remove(type);
+                return;
+            }
+            if (type.IsGenericTypeDefinition)
+            {
+                throw new ArgumentException($"{TypeNameHelper.Shared.GetSimplifiedTypeName(type)} is a generic type definition. " +
+                                            $"Use {nameof(ConfigureGenericType)}() instead.", nameof(type));
+            }
+
+            if (!typeSettingsDict.TryGetValue(type, out BaseTypeSettings typeSettings) ||
+                typeSettings is GenericTypeSettings)
+            {
+                typeSettings = (BaseTypeSettings)Activator.CreateInstance(typeof(TypeSettings<>).MakeGenericType(type));
+            }
+            configureTypeSettings(typeSettings);
+            typeSettingsDict[type] = typeSettings;
+        }
+
+        /// <summary>
         /// Configures settings for a generic type definition.
         /// </summary>
         /// <param name="genericTypeDefinition">Generic type definition (for example <c>typeof(IEnumerable&lt;&gt;)</c>).</param>
@@ -384,6 +418,12 @@ public sealed partial class JsonDeserializer
         /// </param>
         public void ConfigureGenericType(Type genericTypeDefinition, Action<GenericTypeSettings> configureTypeSettings)
         {
+            if (genericTypeDefinition == null) throw new ArgumentNullException(nameof(genericTypeDefinition));
+            if (!genericTypeDefinition.IsGenericTypeDefinition)
+            {
+                throw new ArgumentException($"{TypeNameHelper.Shared.GetSimplifiedTypeName(genericTypeDefinition)} is not a generic type definition. " +
+                                            $"Use {nameof(ConfigureType)}() for concrete types.", nameof(genericTypeDefinition));
+            }
             if (configureTypeSettings == null)
             {
                 typeSettingsDict.Remove(genericTypeDefinition);
@@ -514,6 +554,8 @@ public sealed partial class JsonDeserializer
     /// </summary>
     public class BaseTypeSettings
     {
+        internal bool isMerged;
+
         /// <summary>Single mapped destination type.</summary>
         internal MappedType? mappedType;
 
@@ -544,6 +586,9 @@ public sealed partial class JsonDeserializer
         /// <summary>Type/member-level populate-existing-members behavior override.</summary>
         internal bool? populateAsMember = null;
 
+        /// <summary>Type/member-level unknown-field behavior override.</summary>
+        internal UnknownFieldPolicy? unknownFieldPolicy;
+
         /// <summary>Custom constructor delegate.</summary>
         internal Delegate constructor = null;
 
@@ -553,8 +598,305 @@ public sealed partial class JsonDeserializer
         /// <summary>Custom reader implementation/object.</summary>
         internal object customTypeReader = null;
 
+        /// <summary>Suppresses configured custom readers for a locally prepared non-custom reader.</summary>
+        internal bool suppressCustomTypeReader;
+
         /// <summary>Per-member configuration map by member name.</summary>
         internal LazyDictionary<string, BaseTypeSettings> memberSettingsDict = default;
+
+        /// <summary>Configuration for elements or dictionary values in this container scope.</summary>
+        internal BaseTypeSettings elementSettings;
+
+        /// <summary>Element type for which <see cref="elementSettings"/> was configured.</summary>
+        internal Type elementSettingsType;
+
+        /// <summary>Policies inherited by this scope and all nested values during reader preparation.</summary>
+        internal RecursiveReadSettings recursiveSettings;
+
+        /// <summary>Resolved recursive context captured by the prepared reader.</summary>
+        internal RecursiveReadSettings effectiveRecursiveSettings;
+
+        /// <summary>Parser for dictionary JSON-object property names.</summary>
+        internal IKeyParser keyParser;
+
+        /// <summary>Sets data-access behavior for this type scope.</summary>
+        public void SetDataAccess(DataAccess dataAccess) => this.dataAccess = dataAccess;
+
+        /// <summary>Enables or disables reference resolution for this type scope.</summary>
+        public void SetReferenceResolution(bool enable) => enableReferenceResolution = enable;
+
+        /// <summary>Enables or disables proposed-type usage for this type scope.</summary>
+        public void SetProposedTypeHandling(bool applyProposedTypes) => this.applyProposedTypes = applyProposedTypes;
+
+        /// <summary>Enables or disables populate-existing-member behavior for this type scope.</summary>
+        public void SetPopulateAsMember(bool populate) => populateAsMember = populate;
+
+        /// <summary>Sets backing-field lookup mode for this type scope.</summary>
+        public void SetBackingFieldMode(BackingFieldMode mode) => backingFieldMode = mode;
+
+        /// <summary>Sets how unmatched JSON object properties are handled in this type scope.</summary>
+        public void SetUnknownFieldPolicy(UnknownFieldPolicy policy) => unknownFieldPolicy = policy;
+
+        /// <summary>
+        /// Configures read policies inherited by this type scope and its complete value subtree.
+        /// </summary>
+        public void ConfigureRecursively(Action<RecursiveReadSettings> configure)
+        {
+            if (configure == null)
+            {
+                recursiveSettings = null;
+                return;
+            }
+            recursiveSettings ??= new RecursiveReadSettings();
+            configure(recursiveSettings);
+        }
+
+        internal BaseTypeSettings MergeOnto(BaseTypeSettings broaderSettings)
+        {
+            if (broaderSettings == null || isMerged) return this;
+
+            var merged = new BaseTypeSettings
+            {
+                mappedType = mappedType ?? broaderSettings.mappedType,
+                multiOptionMappedTypes = multiOptionMappedTypes.Count > 0 ? multiOptionMappedTypes : broaderSettings.multiOptionMappedTypes,
+                member_ignore = member_ignore,
+                member_overrideName = member_overrideName,
+                member_useStringCache = member_useStringCache ?? broaderSettings.member_useStringCache,
+                dataAccess = dataAccess ?? broaderSettings.dataAccess,
+                backingFieldMode = backingFieldMode ?? broaderSettings.backingFieldMode,
+                enableReferenceResolution = enableReferenceResolution ?? broaderSettings.enableReferenceResolution,
+                applyProposedTypes = applyProposedTypes ?? broaderSettings.applyProposedTypes,
+                populateAsMember = populateAsMember ?? broaderSettings.populateAsMember,
+                unknownFieldPolicy = unknownFieldPolicy ?? broaderSettings.unknownFieldPolicy,
+                constructor = constructor ?? broaderSettings.constructor,
+                collectionConstructor = collectionConstructor ?? broaderSettings.collectionConstructor,
+                customTypeReader = customTypeReader ?? broaderSettings.customTypeReader,
+                suppressCustomTypeReader = suppressCustomTypeReader,
+                elementSettings = elementSettings ?? broaderSettings.elementSettings?.AsInjectedFromBroaderSettings(),
+                elementSettingsType = elementSettings != null ? elementSettingsType : broaderSettings.elementSettingsType,
+                recursiveSettings = recursiveSettings?.MergeOnto(broaderSettings.recursiveSettings) ?? broaderSettings.recursiveSettings,
+                effectiveRecursiveSettings = effectiveRecursiveSettings ?? broaderSettings.effectiveRecursiveSettings,
+                keyParser = keyParser ?? broaderSettings.keyParser,
+                isMerged = true
+            };
+
+            foreach (var entry in broaderSettings.memberSettingsDict)
+            {
+                if (ReferenceEquals(entry.Value, this)) continue;
+                merged.memberSettingsDict[entry.Key] = entry.Value.AsInjectedFromBroaderSettings();
+            }
+            foreach (var entry in memberSettingsDict) merged.memberSettingsDict[entry.Key] = entry.Value;
+            return merged;
+        }
+
+        BaseTypeSettings AsInjectedFromBroaderSettings()
+        {
+            if (isMerged) return this;
+
+            var copy = new BaseTypeSettings
+            {
+                mappedType = mappedType,
+                multiOptionMappedTypes = multiOptionMappedTypes,
+                member_ignore = member_ignore,
+                member_overrideName = member_overrideName,
+                member_useStringCache = member_useStringCache,
+                dataAccess = dataAccess,
+                backingFieldMode = backingFieldMode,
+                enableReferenceResolution = enableReferenceResolution,
+                applyProposedTypes = applyProposedTypes,
+                populateAsMember = populateAsMember,
+                unknownFieldPolicy = unknownFieldPolicy,
+                constructor = constructor,
+                collectionConstructor = collectionConstructor,
+                customTypeReader = customTypeReader,
+                suppressCustomTypeReader = suppressCustomTypeReader,
+                elementSettings = elementSettings?.AsInjectedFromBroaderSettings(),
+                elementSettingsType = elementSettingsType,
+                recursiveSettings = recursiveSettings,
+                effectiveRecursiveSettings = effectiveRecursiveSettings,
+                keyParser = keyParser,
+                isMerged = true
+            };
+            foreach (var entry in memberSettingsDict)
+            {
+                if (ReferenceEquals(entry.Value, this)) continue;
+                copy.memberSettingsDict[entry.Key] = entry.Value.AsInjectedFromBroaderSettings();
+            }
+            return copy;
+        }
+
+        internal BaseTypeSettings CopyWithCustomTypeReader(object customTypeReader)
+        {
+            var copy = AsInjectedFromBroaderSettings();
+            copy.customTypeReader = customTypeReader;
+            return copy;
+        }
+
+        private protected void ConfigureElementInternal<TElement>(Type containerType, Action<TypeSettings<TElement>> configureElementSettings)
+        {
+            if (configureElementSettings == null)
+            {
+                elementSettings = null;
+                elementSettingsType = null;
+                return;
+            }
+
+            if (!TryGetReadElementType(containerType, out Type actualElementType))
+            {
+                throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(containerType)} is not a container type, so its elements cannot be configured.");
+            }
+            if (actualElementType != typeof(TElement))
+            {
+                throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(containerType)} reads elements of type " +
+                                    $"{TypeNameHelper.Shared.GetSimplifiedTypeName(actualElementType)}, not {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(TElement))}.");
+            }
+
+            var settings = new TypeSettings<TElement>();
+            configureElementSettings(settings);
+            elementSettings = settings;
+            elementSettingsType = typeof(TElement);
+        }
+
+        static bool TryGetReadElementType(Type containerType, out Type elementType)
+        {
+            elementType = null;
+            if (containerType == null) return false;
+            if (containerType.IsArray && containerType.GetArrayRank() == 1)
+            {
+                elementType = containerType.GetElementType();
+                return true;
+            }
+            if (containerType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out _, out Type valueType) ||
+                containerType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyDictionary<,>), out _, out valueType))
+            {
+                elementType = valueType;
+                return true;
+            }
+            if (containerType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out elementType)) return true;
+            if (containerType.ImplementsInterface(typeof(IEnumerable)))
+            {
+                elementType = typeof(object);
+                return true;
+            }
+            return false;
+        }
+
+        private protected void ValidateObjectKeyType<TKey>(Type dictionaryType)
+        {
+            if (dictionaryType != null)
+            {
+                if (!(dictionaryType.TryGetTypeParamsOfGenericInterface(typeof(IDictionary<,>), out Type actualKeyType, out _) ||
+                      dictionaryType.TryGetTypeParamsOfGenericInterface(typeof(IReadOnlyDictionary<,>), out actualKeyType, out _)))
+                {
+                    throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(dictionaryType)} is not a dictionary type, so its keys cannot be configured.");
+                }
+                if (actualKeyType != typeof(TKey))
+                {
+                    throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(dictionaryType)} reads keys of type " +
+                                        $"{TypeNameHelper.Shared.GetSimplifiedTypeName(actualKeyType)}, not {TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(TKey))}.");
+                }
+            }
+        }
+
+        private protected void ConfigureObjectKeyInternal<TKey>(Type dictionaryType, Func<BufferSegment, TKey> parseKey)
+        {
+            ValidateObjectKeyType<TKey>(dictionaryType);
+            keyParser = parseKey == null ? null : new ObjectKeyParser<TKey>(parseKey);
+        }
+    }
+
+    internal interface IKeyParser
+    {
+        Type KeyType { get; }
+    }
+
+    internal sealed class ObjectKeyParser<TKey> : IKeyParser
+    {
+        readonly Func<BufferSegment, TKey> parseKey;
+        internal ObjectKeyParser(Func<BufferSegment, TKey> parseKey) => this.parseKey = parseKey;
+        public Type KeyType => typeof(TKey);
+        public TKey Parse(BufferSegment key) => parseKey(key);
+    }
+
+    /// <summary>
+    /// Read policies inherited by a configured scope and all nested values. Type-bound mappings,
+    /// constructors, custom readers, and member metadata are intentionally unavailable.
+    /// </summary>
+    public sealed class RecursiveReadSettings
+    {
+        internal DataAccess? dataAccess;
+        internal BackingFieldMode? backingFieldMode;
+        internal bool? enableReferenceResolution;
+        internal bool? applyProposedTypes;
+        internal bool? populateAsMember;
+        internal bool? useStringCache;
+        internal UnknownFieldPolicy? unknownFieldPolicy;
+
+        public void SetDataAccess(DataAccess value) => dataAccess = value;
+        public void SetBackingFieldMode(BackingFieldMode value) => backingFieldMode = value;
+        public void SetReferenceResolution(bool value) => enableReferenceResolution = value;
+        public void SetProposedTypeHandling(bool value) => applyProposedTypes = value;
+        public void SetPopulateAsMember(bool value) => populateAsMember = value;
+        public void SetUseStringCache(bool value) => useStringCache = value;
+        public void SetUnknownFieldPolicy(UnknownFieldPolicy value) => unknownFieldPolicy = value;
+
+        internal RecursiveReadSettings MergeOnto(RecursiveReadSettings outer)
+        {
+            if (outer == null) return this;
+            var merged = new RecursiveReadSettings
+            {
+                dataAccess = dataAccess ?? outer.dataAccess,
+                backingFieldMode = backingFieldMode ?? outer.backingFieldMode,
+                enableReferenceResolution = enableReferenceResolution ?? outer.enableReferenceResolution,
+                applyProposedTypes = applyProposedTypes ?? outer.applyProposedTypes,
+                populateAsMember = populateAsMember ?? outer.populateAsMember,
+                useStringCache = useStringCache ?? outer.useStringCache,
+                unknownFieldPolicy = unknownFieldPolicy ?? outer.unknownFieldPolicy
+            };
+            return merged.HasSameValues(outer) ? outer : merged;
+        }
+
+        internal bool HasSameValues(RecursiveReadSettings other) =>
+            other != null &&
+            dataAccess == other.dataAccess &&
+            backingFieldMode == other.backingFieldMode &&
+            enableReferenceResolution == other.enableReferenceResolution &&
+            applyProposedTypes == other.applyProposedTypes &&
+            populateAsMember == other.populateAsMember &&
+            useStringCache == other.useStringCache &&
+            unknownFieldPolicy == other.unknownFieldPolicy;
+
+        internal BaseTypeSettings ApplyBelow(BaseTypeSettings local)
+        {
+            var effective = new BaseTypeSettings
+            {
+                mappedType = local?.mappedType,
+                multiOptionMappedTypes = local?.multiOptionMappedTypes ?? default,
+                member_ignore = local?.member_ignore,
+                member_overrideName = local?.member_overrideName,
+                member_useStringCache = local?.member_useStringCache ?? useStringCache,
+                dataAccess = local?.dataAccess ?? dataAccess,
+                backingFieldMode = local?.backingFieldMode ?? backingFieldMode,
+                enableReferenceResolution = local?.enableReferenceResolution ?? enableReferenceResolution,
+                applyProposedTypes = local?.applyProposedTypes ?? applyProposedTypes,
+                populateAsMember = local?.populateAsMember ?? populateAsMember,
+                unknownFieldPolicy = local?.unknownFieldPolicy ?? unknownFieldPolicy,
+                constructor = local?.constructor,
+                collectionConstructor = local?.collectionConstructor,
+                customTypeReader = local?.customTypeReader,
+                suppressCustomTypeReader = local?.suppressCustomTypeReader ?? false,
+                elementSettings = local?.elementSettings,
+                elementSettingsType = local?.elementSettingsType,
+                recursiveSettings = local?.recursiveSettings,
+                effectiveRecursiveSettings = this,
+                isMerged = local?.isMerged ?? false
+            };
+            if (local != null)
+            {
+                foreach (var entry in local.memberSettingsDict) effective.memberSettingsDict[entry.Key] = entry.Value;
+            }
+            return effective;
+        }
     }
 
     /// <summary>
@@ -576,20 +918,54 @@ public sealed partial class JsonDeserializer
             this.genericType = genericType;
         }
 
-        /// <summary>Sets data-access behavior.</summary>
-        public void SetDataAccess(DataAccess dataAccess) => this.dataAccess = dataAccess;
+        /// <summary>
+        /// Sets a custom reader definition for every type constructed from this generic type definition.
+        /// </summary>
+        /// <param name="readerDefinition">
+        /// Generic type definition deriving from <see cref="CustomTypeReaderDefinition{T}"/> with the same
+        /// generic arity as the configured type and a public parameterless constructor. Pass
+        /// <see langword="null"/> to remove the definition.
+        /// </param>
+        /// <remarks>
+        /// The definition is closed, instantiated, and prepared once per constructed type. Exact constructed
+        /// type settings take precedence, and derived types are not implicitly covered.
+        /// </remarks>
+        public void SetCustomTypeReader(Type readerDefinition)
+        {
+            customTypeReader = readerDefinition == null ? null : new OpenGenericTypeReaderDefinition(genericType, readerDefinition);
+        }
 
-        /// <summary>Enables or disables reference resolution for this type scope.</summary>
-        public void SetReferenceResolution(bool enable) => this.enableReferenceResolution = enable;
+        /// <summary>Configures settings for matching elements or dictionary values.</summary>
+        public void ConfigureElement<TElement>(Action<TypeSettings<TElement>> configureElementSettings)
+        {
+            if (configureElementSettings == null)
+            {
+                elementSettings = null;
+                elementSettingsType = null;
+                return;
+            }
+            var settings = new TypeSettings<TElement>();
+            configureElementSettings(settings);
+            elementSettings = settings;
+            elementSettingsType = typeof(TElement);
+        }
 
-        /// <summary>Enables or disables proposed-type usage for this type scope.</summary>
-        public void SetProposedTypeHandling(bool applyProposedTypes) => this.applyProposedTypes = applyProposedTypes;
-
-        /// <summary>Enables or disables populate-existing-member behavior for this type scope.</summary>
-        public void SetPopulateAsMember(bool populate) => populateAsMember = populate;
-
-        /// <summary>Sets backing-field lookup mode for this type scope.</summary>
-        public void SetBackingFieldMode(BackingFieldMode mode) => this.backingFieldMode = mode;
+        /// <summary>
+        /// Configures how JSON object property names are parsed into keys for matching dictionary constructions.
+        /// </summary>
+        /// <typeparam name="TKey">Dictionary key type to which this configuration applies.</typeparam>
+        /// <param name="parseKey">
+        /// Parser receiving a non-owning view of the JSON object property name. Pass <see langword="null"/> to remove the configuration.
+        /// </param>
+        /// <remarks>
+        /// This parser applies only when a dictionary is represented as a JSON object, for example
+        /// <c>{"key-1":10}</c>. It is not used when a dictionary is represented as an array of key-value
+        /// pairs, for example <c>[{"key":1,"value":10}]</c>; keys in that representation are JSON values
+        /// and continue through the normal <typeparamref name="TKey"/> value reader.
+        /// For an open-generic dictionary setting, the parser applies only to constructions whose key type
+        /// exactly matches <typeparamref name="TKey"/>.
+        /// </remarks>
+        public void ConfigureObjectKey<TKey>(Func<BufferSegment, TKey> parseKey) => ConfigureObjectKeyInternal(null, parseKey);
 
         /// <summary>
         /// Configures settings for one member on the configured generic type definition.
@@ -661,20 +1037,28 @@ public sealed partial class JsonDeserializer
     /// <typeparam name="T">Configured type.</typeparam>
     public class TypeSettings<T> : BaseTypeSettings
     {
-        /// <summary>Sets data-access behavior.</summary>
-        public void SetDataAccess(DataAccess dataAccess) => this.dataAccess = dataAccess;
+        /// <summary>Configures settings for elements or dictionary values.</summary>
+        public void ConfigureElement<TElement>(Action<TypeSettings<TElement>> configureElementSettings) =>
+            ConfigureElementInternal(typeof(T), configureElementSettings);
 
-        /// <summary>Enables or disables reference resolution for this type.</summary>
-        public void SetReferenceResolution(bool enable) => this.enableReferenceResolution = enable;
-
-        /// <summary>Enables or disables proposed-type usage for this type.</summary>
-        public void SetProposedTypeHandling(bool applyProposedTypes) => this.applyProposedTypes = applyProposedTypes;
-
-        /// <summary>Enables or disables populate-existing-member behavior for this type.</summary>
-        public void SetPopulateAsMember(bool populate) => populateAsMember = populate;
-
-        /// <summary>Sets backing-field lookup mode for this type.</summary>
-        public void SetBackingFieldMode(BackingFieldMode mode) => this.backingFieldMode = mode;
+        /// <summary>
+        /// Configures how JSON object property names are parsed into dictionary keys.
+        /// </summary>
+        /// <typeparam name="TKey">The dictionary key type.</typeparam>
+        /// <param name="parseKey">
+        /// Parser receiving a non-owning view of the JSON object property name. Pass <see langword="null"/> to remove the configuration.
+        /// </param>
+        /// <remarks>
+        /// This parser applies only when the dictionary is represented as a JSON object, for example
+        /// <c>{"key-1":10}</c>. It is not used when the dictionary is represented as an array of key-value
+        /// pairs, for example <c>[{"key":1,"value":10}]</c>; keys in that representation are JSON values
+        /// and continue through the normal <typeparamref name="TKey"/> value reader.
+        /// </remarks>
+        /// <exception cref="Exception">
+        /// Thrown when <typeparamref name="T"/> is not a dictionary or <typeparamref name="TKey"/> does not
+        /// match its key type.
+        /// </exception>
+        public void ConfigureObjectKey<TKey>(Func<BufferSegment, TKey> parseKey) => ConfigureObjectKeyInternal(typeof(T), parseKey);
 
         /// <summary>
         /// Sets a custom constructor for <typeparamref name="T"/>.
@@ -735,6 +1119,11 @@ public sealed partial class JsonDeserializer
         /// Assigns a custom reader-preparation delegate and wraps it in <see cref="CustomTypeReader{T}"/>.
         /// </summary>
         public void SetCustomTypeReader(Func<PreparationApi, Func<ExtensionApi, T, T>> readTypeCreator) => SetCustomTypeReader(new CustomTypeReader<T>(readTypeCreator));
+
+        /// <summary>
+        /// Assigns a custom read-only preparation delegate and wraps it in <see cref="CustomTypeReader{T}"/>.
+        /// </summary>
+        public void SetCustomTypeReader(Func<PreparationApi, Func<ExtensionApi, T>> readTypeCreator) => SetCustomTypeReader(new CustomTypeReader<T>(readTypeCreator));
 
         /// <summary>
         /// Configures settings for one member on <typeparamref name="T"/>.
@@ -880,6 +1269,9 @@ public sealed partial class JsonDeserializer
         /// <summary>Resolved backing-field mode.</summary>
         public readonly BackingFieldMode backingFieldMode;
 
+        /// <summary>Resolved global unknown-field behavior.</summary>
+        public readonly UnknownFieldPolicy unknownFieldPolicy;
+
         /// <summary>Whether type-name cache should include case variants.</summary>
         public readonly bool addCaseVariantsForCustomTypeNames;
 
@@ -950,6 +1342,7 @@ public sealed partial class JsonDeserializer
 
             proposedTypeMode = settings.proposedTypeMode;
             backingFieldMode = settings.backingFieldMode;
+            unknownFieldPolicy = settings.unknownFieldPolicy;
             addCaseVariantsForCustomTypeNames = settings.addCaseVariantsForCustomTypeNames;
 
             initialBufferSize = settings.initialBufferSize.ClampLow(1024 * 16); // minimum 16KB buffer size to avoid too many resizes for larger JSON inputs
@@ -970,6 +1363,16 @@ public sealed partial class JsonDeserializer
             if (!settings.typeSettingsDict.TryCloneDeep(out typeSettingsDict))
             {
                 throw new Exception("Failed to clone type settings dictionary.");
+            }
+
+            foreach (var entry in typeSettingsDict.ToArray())
+            {
+                Type type = entry.Key;
+                if (!type.IsGenericType || type.IsGenericTypeDefinition) continue;
+                if (typeSettingsDict.TryGetValue(type.GetGenericTypeDefinition(), out BaseTypeSettings genericSettings))
+                {
+                    typeSettingsDict[type] = entry.Value.MergeOnto(genericSettings);
+                }
             }
 
             bool anyTypeHasReferenceResolutionEnabled = false;
@@ -1027,6 +1430,7 @@ public sealed partial class JsonDeserializer
         /// Gets whether this reader supports populating an existing instance.
         /// </summary>
         bool CanPopulateExistingValue { get; }
+
     }
 
     /// <summary>
@@ -1044,6 +1448,9 @@ public sealed partial class JsonDeserializer
         /// <summary>Preparation delegate producing a populate delegate.</summary>
         Func<PreparationApi, Func<ExtensionApi, T, T>> prepareReader;
 
+        /// <summary>Preparation delegate producing a read delegate.</summary>
+        Func<PreparationApi, Func<ExtensionApi, T>> prepareValueReader;
+
         /// <summary>Cached constructor delegate for creating new instances.</summary>
         Func<T> constructor;
 
@@ -1058,6 +1465,17 @@ public sealed partial class JsonDeserializer
         {
             if (prepareReader == null) throw new ArgumentNullException(nameof(prepareReader));
             this.prepareReader = prepareReader;
+        }
+
+        /// <summary>
+        /// Initializes from a preparation delegate that returns a read delegate.
+        /// </summary>
+        /// <param name="prepareValueReader">Preparation callback.</param>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="prepareValueReader"/> is <see langword="null"/>.</exception>
+        public CustomTypeReader(Func<PreparationApi, Func<ExtensionApi, T>> prepareValueReader)
+        {
+            if (prepareValueReader == null) throw new ArgumentNullException(nameof(prepareValueReader));
+            this.prepareValueReader = prepareValueReader;
         }
 
         /// <summary>
@@ -1093,16 +1511,21 @@ public sealed partial class JsonDeserializer
         /// <param name="api">Preparation API.</param>
         /// <exception cref="Exception">Thrown if no valid read/populate delegate is available.</exception>
         public void PrepareReader(PreparationApi api)
-        {            
-            if (prepareReader != null)
+        {
+            if (prepareValueReader != null)
             {
-                var construct = constructor ?? api.GetContructor<T>();
+                readValue = prepareValueReader(api);
+                populateValue = null;
+            }
+            else if (prepareReader != null)
+            {
+                var construct = constructor ?? api.GetConstructor<T>();
                 populateValue = prepareReader(api);
                 readValue = (api) => populateValue(api, construct());
             }
             else if (populateValue != null)
             {
-                var construct = constructor ?? api.GetContructor<T>();
+                var construct = constructor ?? api.GetConstructor<T>();
                 readValue = (api) => populateValue(api, construct());
             }
             else if (readValue != null)

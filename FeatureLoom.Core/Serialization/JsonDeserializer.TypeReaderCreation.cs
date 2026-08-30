@@ -31,14 +31,52 @@ namespace FeatureLoom.Serialization;
 public sealed partial class JsonDeserializer
 {
     Dictionary<Type, CachedTypeReader> typeReaderCache = new();
+    readonly Dictionary<(Type, RecursiveReadSettings), CachedTypeReader> recursiveTypeReaderCache = new();
+    readonly Dictionary<(Type, BaseTypeSettings, RecursiveReadSettings), CachedTypeReader> localRecursiveTypeReaderCache = new();
+    readonly Dictionary<(RecursiveReadSettings, RecursiveReadSettings), RecursiveReadSettings> recursiveSettingsMergeCache = new();
+    RecursiveReadSettings ambientRecursiveSettings;
     Dictionary<ByteSegment, CachedTypeReader> proposedTypeReaderCache = new();
     readonly Dictionary<Type, bool> forbiddenTypeCache = new();
+
+    private BaseTypeSettings GetElementSettings(Type elementType, BaseTypeSettings containerSettings)
+    {
+        if (containerSettings?.elementSettingsType != elementType) return null;
+        return containerSettings.elementSettings;
+    }
+
+    private CachedTypeReader GetCachedTypeReaderForElement(Type elementType, BaseTypeSettings containerSettings) =>
+        GetCachedTypeReader(elementType, GetElementSettings(elementType, containerSettings));
+
+    private RecursiveReadSettings LayerRecursiveSettings(RecursiveReadSettings outer, RecursiveReadSettings inner)
+    {
+        if (inner == null) return outer;
+        if (outer == null) return inner;
+        var key = (outer, inner);
+        if (recursiveSettingsMergeCache.TryGetValue(key, out var cached)) return cached;
+        var merged = inner.MergeOnto(outer);
+        if (merged.HasSameValues(inner)) merged = inner;
+        recursiveSettingsMergeCache[key] = merged;
+        return merged;
+    }
 
     CachedTypeReader CreateCachedTypeReader(Type itemType, BaseTypeSettings typeSettings = null)
     {
         bool overriddenTypeSettings = typeSettings != null;
+        BaseTypeSettings localSettings = typeSettings;
         bool genericTypeSettings = false;
-        if (!overriddenTypeSettings)
+        if (overriddenTypeSettings)
+        {
+            if (settings.typeSettingsDict.TryGetValue(itemType, out BaseTypeSettings configuredSettings))
+            {
+                typeSettings = typeSettings.MergeOnto(configuredSettings);
+            }
+            else if (itemType.IsGenericType &&
+                     settings.typeSettingsDict.TryGetValue(itemType.GetGenericTypeDefinition(), out configuredSettings))
+            {
+                typeSettings = typeSettings.MergeOnto(configuredSettings);
+            }
+        }
+        else
         {
             // if not overridden type settings are provided, we check if there are type settings for the given item type                        
             if (!settings.typeSettingsDict.TryGetValue(itemType, out typeSettings))
@@ -53,11 +91,39 @@ public sealed partial class JsonDeserializer
             }
         }
 
+        BaseTypeSettings generalSettings = null;
+        settings.typeSettingsDict.TryGetValue(itemType, out generalSettings);
+        if (generalSettings == null && itemType.IsGenericType)
+        {
+            settings.typeSettingsDict.TryGetValue(itemType.GetGenericTypeDefinition(), out generalSettings);
+        }
+        bool hasExplicitTypeSettings = typeSettings != null;
+        var recursiveSettings = LayerRecursiveSettings(ambientRecursiveSettings, generalSettings?.recursiveSettings);
+        if (overriddenTypeSettings &&
+            localSettings?.recursiveSettings != null &&
+            localSettings.recursiveSettings != ambientRecursiveSettings &&
+            localSettings.recursiveSettings != generalSettings?.recursiveSettings)
+        {
+            recursiveSettings = LayerRecursiveSettings(recursiveSettings, localSettings?.recursiveSettings);
+        }
+        if (recursiveSettings != null) typeSettings = recursiveSettings.ApplyBelow(typeSettings);
+
+        if (!overriddenTypeSettings && recursiveSettings != null &&
+            recursiveTypeReaderCache.TryGetValue((itemType, recursiveSettings), out var recursiveCachedReader))
+        {
+            return recursiveCachedReader;
+        }
+        if (overriddenTypeSettings && recursiveSettings != null &&
+            localRecursiveTypeReaderCache.TryGetValue((itemType, localSettings, recursiveSettings), out recursiveCachedReader))
+        {
+            return recursiveCachedReader;
+        }
+
         // We check if the type is forbidden for deserialization before we check for type mappings,
         // because even if a type is mapped to a different type,
         // it should not be allowed if it is in the forbidden types,
         // unless there are specific type settings for this type that allow it.
-        if ((typeSettings == null || genericTypeSettings) && IsForbiddenType(itemType))
+        if ((!hasExplicitTypeSettings || genericTypeSettings) && IsForbiddenType(itemType))
         {
             throw new Exception($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(itemType)} is forbidden for deserialization.");
         }
@@ -80,14 +146,29 @@ public sealed partial class JsonDeserializer
             return mappedTypeReader;
         }
 
-        return new CachedTypeReader(new TypeReaderPreInitializer(this, itemType, typeSettings), (cachedTypeReader) =>
+        if (typeSettings?.suppressCustomTypeReader != true &&
+            typeSettings?.customTypeReader is OpenGenericTypeReaderDefinition openGenericReader)
         {
-            if (!overriddenTypeSettings)
-            {                
-                typeReaderCache[itemType] = cachedTypeReader;
-            }
+            typeSettings = typeSettings.CopyWithCustomTypeReader(openGenericReader.CreateDefinition(itemType).PrepareReader(preparationApi));
+        }
 
-            if (typeSettings?.customTypeReader != null)
+        var previousRecursiveSettings = ambientRecursiveSettings;
+        ambientRecursiveSettings = recursiveSettings;
+        try
+        {
+            return new CachedTypeReader(new TypeReaderPreInitializer(this, itemType, typeSettings), (cachedTypeReader) =>
+            {
+                if (!overriddenTypeSettings)
+                {
+                    if (recursiveSettings == null) typeReaderCache[itemType] = cachedTypeReader;
+                    else recursiveTypeReaderCache[(itemType, recursiveSettings)] = cachedTypeReader;
+                }
+                else if (recursiveSettings != null)
+                {
+                    localRecursiveTypeReaderCache[(itemType, localSettings, recursiveSettings)] = cachedTypeReader;
+                }
+
+            if (typeSettings?.suppressCustomTypeReader != true && typeSettings?.customTypeReader != null)
             {
                 return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateCustomTypeReader), itemType.ToSingleEntryArray(), typeSettings);
             }
@@ -153,8 +234,13 @@ public sealed partial class JsonDeserializer
             else if (itemType == typeof(object)) return CreateUnknownObjectReader(typeSettings);
             else if (TryCreateDictionaryTypeReader(itemType, cachedTypeReader, out TypeReaderInitializer initializer)) return initializer;
             else if (TryCreateEnumerableTypeReader(itemType, cachedTypeReader, out initializer)) return initializer;
-            else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { itemType }, true, cachedTypeReader);
-        });
+                else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateComplexTypeReader), new Type[] { itemType }, true, cachedTypeReader);
+            });
+        }
+        finally
+        {
+            ambientRecursiveSettings = previousRecursiveSettings;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -259,7 +345,7 @@ public sealed partial class JsonDeserializer
     TypeReaderInitializer CreateCustomTypeReader<T>(BaseTypeSettings typeSettings)
     {
         var customReader = (ICustomTypeReader<T>)typeSettings.customTypeReader;
-        customReader.PrepareReader(this.preparationApi);
+        preparationApi.PrepareReader(customReader, typeSettings);
         var reader = () =>
         {
             return customReader.ReadValue(this.extensionApi);
@@ -272,7 +358,7 @@ public sealed partial class JsonDeserializer
                 return customReader.ReadValue(this.extensionApi, itemToPopulate);
             };
         }
-        // TODO: CustomTypes must be enabled to configure if children must write ref paths, but for now we assume that they do.        
+        // Custom readers may delegate to arbitrary nested readers, so reference paths are conservatively retained.
         return TypeReaderInitializer.Create(this, reader, populatingReader, true, typeSettings);
     }
 
@@ -484,7 +570,7 @@ public sealed partial class JsonDeserializer
     private TypeReaderInitializer CreateDictionaryTypeReader<T, K, V>(CachedTypeReader cachedTypeReader) where T : IDictionary<K, V>, new()
     {
         var keyReader = GetCachedTypeReader(typeof(K));
-        var valueReader = GetCachedTypeReader(typeof(V));
+        var valueReader = GetCachedTypeReaderForElement(typeof(V), cachedTypeReader.TypeSettings);
         var typeSettings = cachedTypeReader.TypeSettings;
         var setItemRef = cachedTypeReader.ResolveRefs;
 
@@ -497,8 +583,9 @@ public sealed partial class JsonDeserializer
         }
 
         var constructor = GetConstructor<T>(null, typeSettings);
-        var elementReader = new ElementReader<KeyValuePair<K, V>>(this);        
+        BaseTypeSettings valueSettings = GetElementSettings(typeof(V), cachedTypeReader.TypeSettings);
         var keyValuePairReader = GetCachedTypeReader(typeof(KeyValuePair<K, V>));
+        var elementReader = new ElementReader<KeyValuePair<K, V>>(this, keyValuePairReader);
         bool isValueRefType = typeof(V).IsByRef;
         bool canValueBePopulated = CanTypeBePopulated(typeof(V));
         List<K> keysToKeep = new List<K>();
@@ -506,6 +593,23 @@ public sealed partial class JsonDeserializer
         ByteSegment keyField = new ByteSegment("key".ToByteArray(), true);
         ByteSegment valueProperty = new ByteSegment("Value".ToByteArray(), true);
         ByteSegment valueField = new ByteSegment("value".ToByteArray(), true);
+        Func<bool, (K key, ByteSegment bytes)> readObjectKey;
+        if (typeSettings?.keyParser is ObjectKeyParser<K> objectKeyParser)
+        {
+            readObjectKey = includeBytes =>
+            {
+                ByteSegment bytes = ReadStringBytes();
+                return (objectKeyParser.Parse(new BufferSegment(bytes)), includeBytes ? bytes : default);
+            };
+        }
+        else
+        {
+            readObjectKey = includeBytes =>
+            {
+                K key = keyReader.ReadFieldName<K>(out var bytes, includeBytes);
+                return (key, bytes);
+            };
+        }
 
         // We avoid static for now because of the access to so many locals, but we could consider to make the reader static
         // and pass those as context if we want to optimize this further (TODO: Benchmark this against a static reader with context)
@@ -523,7 +627,9 @@ public sealed partial class JsonDeserializer
                     b = SkipWhiteSpaces();
                     if (b == '}') break;
 
-                    K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes, valueReader.WriteRefPath);
+                    var keyResult = readObjectKey(valueReader.WriteRefPath);
+                    K fieldName = keyResult.key;
+                    var fieldNameBytes = keyResult.bytes;
                     b = SkipWhiteSpaces();
                     if (b != ':') throw new Exception("Failed reading object to Dictionary");
                     buffer.TryNextByte();
@@ -538,9 +644,40 @@ public sealed partial class JsonDeserializer
             else if (b == '[')
             {
                 if (!buffer.TryNextByte()) throw new Exception("Failed reading Array to Dictionary");
-                foreach (var element in elementReader)
+                if (valueSettings == null)
                 {
-                    dict.Add(element.Key, element.Value);
+                    foreach (var element in elementReader) dict.Add(element.Key, element.Value);
+                    if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array to Dictionary");
+                    buffer.TryNextByte();
+                    return dict;
+                }
+                while (true)
+                {
+                    b = SkipWhiteSpaces();
+                    if (b == ']') break;
+                    if (b != '{') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                    buffer.TryNextByte();
+
+                    var keyFieldName = ReadStringBytes();
+                    if (keyFieldName != keyField && keyFieldName != keyProperty) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                    if (SkipWhiteSpaces() != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                    buffer.TryNextByte();
+                    K key = keyReader.ReadFieldValue<K>(keyFieldName);
+
+                    if (SkipWhiteSpaces() != ',') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                    buffer.TryNextByte();
+                    var valueFieldName = ReadStringBytes();
+                    if (valueFieldName != valueField && valueFieldName != valueProperty) throw new Exception("Failed reading KeyValuePair for Dictionary");
+                    if (SkipWhiteSpaces() != ':') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                    buffer.TryNextByte();
+                    V value = valueReader.ReadFieldValue<V>(valueFieldName);
+                    dict.Add(key, value);
+
+                    if (SkipWhiteSpaces() != '}') throw new Exception("Failed reading KeyValuePair for Dictionary");
+                    buffer.TryNextByte();
+                    b = SkipWhiteSpaces();
+                    if (b == ',') buffer.TryNextByte();
+                    else if (b != ']') throw new Exception("Failed reading Array to Dictionary");
                 }
                 if (buffer.CurrentByte != ']') throw new Exception("Failed reading Array to Dictionary");
                 buffer.TryNextByte();
@@ -571,7 +708,9 @@ public sealed partial class JsonDeserializer
                             b = SkipWhiteSpaces();
                             if (b == '}') break;
 
-                            K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes, valueReader.WriteRefPath);
+                            var keyResult = readObjectKey(valueReader.WriteRefPath);
+                            K fieldName = keyResult.key;
+                            var fieldNameBytes = keyResult.bytes;
                             keysToKeep.Add(fieldName);
                             b = SkipWhiteSpaces();
                             if (b != ':') throw new Exception("Failed reading object to Dictionary");
@@ -592,7 +731,6 @@ public sealed partial class JsonDeserializer
                         {
                             b = SkipWhiteSpaces();
                             if (b == ']') break;
-                            buffer.TryNextByte();
 
                             // Look for start of KeyValuePair object
                             b = SkipWhiteSpaces();
@@ -670,7 +808,9 @@ public sealed partial class JsonDeserializer
                         b = SkipWhiteSpaces();
                         if (b == '}') break;
 
-                        K fieldName = keyReader.ReadFieldName<K>(out var fieldNameBytes, valueReader.WriteRefPath);
+                        var keyResult = readObjectKey(valueReader.WriteRefPath);
+                        K fieldName = keyResult.key;
+                        var fieldNameBytes = keyResult.bytes;
                         keysToKeep.Add(fieldName);
                         b = SkipWhiteSpaces();
                         if (b != ':') throw new Exception("Failed reading object to Dictionary");
@@ -944,58 +1084,10 @@ public sealed partial class JsonDeserializer
             // use the type mapping or multi option type mapping in the settings.
             return TypeReaderInitializer.Create<T>(this, null, null, true, typeSettings);
         }
-        List<MemberInfo> memberInfos = CreateMemberInfosList(itemType, typeSettings?.dataAccess ?? settings.dataAccess);
-
-        Dictionary<ByteSegment, int> itemFieldWritersIndexLookup = new();
-        List<(ByteSegment name, Func<T, T> itemFieldWriter)> itemFieldWritersList = new();
-        bool childrenMustWriteRefPath = false;
-        foreach (var memberInfo in memberInfos)
-        {
-            ByteSegment itemFieldName;
-            Func<T, T> itemFieldWriter;
-
-            Type fieldType = GetFieldOrPropertyType(memberInfo);
-            string name = memberInfo.Name;
-            if (!name.TryExtract("<{name}>k__BackingField", out string propertyName)) propertyName = null;
-            Settings.BackingFieldMode backingFieldMode = typeSettings?.backingFieldMode ?? settings.backingFieldMode;
-
-            BaseTypeSettings memberSettings = null;
-            if (typeSettings != null &&
-                (typeSettings.memberSettingsDict.TryGetValue(name, out memberSettings) ||
-                 typeSettings.memberSettingsDict.TryGetValue(propertyName ?? name, out memberSettings)))
-            {
-                if (memberSettings.member_ignore == true) continue;
-                if (memberSettings.member_overrideName != null)
-                {
-                    // If there is an override name, we ignore the propertyName,
-                    // because otherwise we would create two field writers for the same name.
-                    name = memberSettings.member_overrideName;
-                    propertyName = null;
-                    backingFieldMode = Settings.BackingFieldMode.TryBackingFieldNameOnly;
-                }
-            }
-
-            if (backingFieldMode != Settings.BackingFieldMode.TryPropertyNameOnly)
-            {
-                itemFieldName = new ByteSegment(name.ToByteArray(), true);
-                itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, itemFieldName, memberSettings);
-                itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
-                itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
-            }
-            if (propertyName != null && backingFieldMode != Settings.BackingFieldMode.TryBackingFieldNameOnly)
-            {                
-                name = propertyName;
-                itemFieldName = new ByteSegment(name.ToByteArray(), true);
-                itemFieldWriter = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, itemFieldName, memberSettings);
-                itemFieldWritersIndexLookup[itemFieldName] = itemFieldWritersList.Count;
-                itemFieldWritersList.Add((itemFieldName, itemFieldWriter));
-            }
-
-            // The ref-path decision must be based on the reader that is actually used for this member.
-            // For a member with its own settings that is the member-specific reader, not the shared one,
-            // otherwise a member that enables reference resolution locally would never be addressable.
-            if (!childrenMustWriteRefPath && GetCachedTypeReader(fieldType, memberSettings).WriteRefPath) childrenMustWriteRefPath = true;
-        }
+        var preparedFields = CreateExistingObjectFieldReaders<T>(typeSettings);
+        Dictionary<ByteSegment, int> itemFieldWritersIndexLookup = preparedFields.indexLookup;
+        List<(ByteSegment name, Func<T, T> itemFieldWriter)> itemFieldWritersList = preparedFields.fieldReaders;
+        bool childrenMustWriteRefPath = preparedFields.childrenMustWriteRefPath;
         int writerCount = itemFieldWritersList.Count;
         var itemFieldWriters = itemFieldWritersList.ToArray();
         itemFieldWritersList = null;
@@ -1041,6 +1133,7 @@ public sealed partial class JsonDeserializer
         }
 
         var setItemRef = cachedTypeReader.ResolveRefs;
+        bool throwOnUnknownField = (typeSettings?.unknownFieldPolicy ?? settings.unknownFieldPolicy) == UnknownFieldPolicy.Throw;
 
         // Cannot make it static, because it uses the TryFindFieldWriter local function
         var reader = () =>
@@ -1065,6 +1158,7 @@ public sealed partial class JsonDeserializer
                 if (b != ':') throw new Exception("Failed reading object");
                 buffer.TryNextByte();
                 if (TryFindFieldWriter(fieldName, ref expectedFieldIndex, out var fieldWriter)) item = fieldWriter.Invoke(item);
+                else if (throwOnUnknownField) throw new Exception($"Unknown field '{fieldName}'.");
                 else SkipValue();
                 b = SkipWhiteSpaces();
                 if (b == ',') buffer.TryNextByte();
@@ -1097,6 +1191,7 @@ public sealed partial class JsonDeserializer
                 if (b != ':') throw new Exception("Failed reading object");
                 buffer.TryNextByte();
                 if (TryFindFieldWriter(fieldName, ref expectedFieldIndex, out var fieldWriter)) item = fieldWriter.Invoke(item);
+                else if (throwOnUnknownField) throw new Exception($"Unknown field '{fieldName}'.");
                 else SkipValue();
                 b = SkipWhiteSpaces();
                 if (b == ',') buffer.TryNextByte();
@@ -1107,6 +1202,53 @@ public sealed partial class JsonDeserializer
         };
 
         return TypeReaderInitializer.Create(this, reader, populatingReader, childrenMustWriteRefPath, typeSettings);
+    }
+
+    private (Dictionary<ByteSegment, int> indexLookup, List<(ByteSegment name, Func<T, T> itemFieldWriter)> fieldReaders, bool childrenMustWriteRefPath)
+        CreateExistingObjectFieldReaders<T>(BaseTypeSettings typeSettings)
+    {
+        Type itemType = typeof(T);
+        List<MemberInfo> memberInfos = CreateMemberInfosList(itemType, typeSettings?.dataAccess ?? settings.dataAccess);
+        Dictionary<ByteSegment, int> indexLookup = new();
+        List<(ByteSegment name, Func<T, T> itemFieldWriter)> fieldReaders = new();
+        bool childrenMustWriteRefPath = false;
+
+        foreach (var memberInfo in memberInfos)
+        {
+            Type fieldType = GetFieldOrPropertyType(memberInfo);
+            string name = memberInfo.Name;
+            if (!name.TryExtract("<{name}>k__BackingField", out string propertyName)) propertyName = null;
+            Settings.BackingFieldMode backingFieldMode = typeSettings?.backingFieldMode ?? settings.backingFieldMode;
+
+            BaseTypeSettings memberSettings = null;
+            if (typeSettings != null &&
+                (typeSettings.memberSettingsDict.TryGetValue(name, out memberSettings) ||
+                 typeSettings.memberSettingsDict.TryGetValue(propertyName ?? name, out memberSettings)))
+            {
+                if (memberSettings.member_ignore == true) continue;
+                if (memberSettings.member_overrideName != null)
+                {
+                    name = memberSettings.member_overrideName;
+                    propertyName = null;
+                    backingFieldMode = Settings.BackingFieldMode.TryBackingFieldNameOnly;
+                }
+            }
+
+            void AddReader(string fieldName)
+            {
+                ByteSegment preparedName = new ByteSegment(fieldName.ToByteArray(), true);
+                Func<T, T> fieldReader = this.InvokeGenericMethod<Func<T, T>>(nameof(CreateItemFieldWriter), new Type[] { itemType, fieldType, itemType }, memberInfo, preparedName, memberSettings);
+                indexLookup[preparedName] = fieldReaders.Count;
+                fieldReaders.Add((preparedName, fieldReader));
+            }
+
+            if (backingFieldMode != Settings.BackingFieldMode.TryPropertyNameOnly) AddReader(name);
+            if (propertyName != null && backingFieldMode != Settings.BackingFieldMode.TryBackingFieldNameOnly) AddReader(propertyName);
+
+            if (!childrenMustWriteRefPath && GetCachedTypeReader(fieldType, memberSettings).WriteRefPath) childrenMustWriteRefPath = true;
+        }
+
+        return (indexLookup, fieldReaders, childrenMustWriteRefPath);
     }
 
     private List<MemberInfo> CreateMemberInfosList(Type itemType, DataAccess dataAccess)
@@ -1552,6 +1694,7 @@ public sealed partial class JsonDeserializer
             return CreateByteArrayTypeReader(cachedTypeReader);
         }
         else if (!cachedTypeReader.ResolveRefs &&
+                 GetElementSettings(arrayType.GetElementType(), cachedTypeReader.TypeSettings) == null &&
                  TryCreateNumberContainerReader(arrayType.GetElementType(), false, cachedTypeReader, out var integerInitializer))
         {
             return integerInitializer;
@@ -1625,8 +1768,8 @@ public sealed partial class JsonDeserializer
     {
         var pool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 10, false);
 
-        var elementTypeReader = GetCachedTypeReader(typeof(E));
-        if (elementTypeReader.IsNoCheckPossible<E>())
+        var elementTypeReader = GetCachedTypeReaderForElement(typeof(E), cachedTypeReader.TypeSettings);
+        if (GetElementSettings(typeof(E), cachedTypeReader.TypeSettings) == null && elementTypeReader.IsNoCheckPossible<E>())
         {
             if (typeof(E) == typeof(string))
             {
@@ -1681,13 +1824,14 @@ public sealed partial class JsonDeserializer
     {        
         if (!cachedTypeReader.ResolveRefs && // The bulk reader does not set reference paths
             itemType.IsGenericType && itemType.GetGenericTypeDefinition() == typeof(List<>) &&
+            GetElementSettings(itemType.GetGenericArguments()[0], cachedTypeReader.TypeSettings) == null &&
             TryCreateNumberContainerReader(itemType.GetGenericArguments()[0], true, cachedTypeReader, out initializer))
         {
             return true;
         }
 
         if (cachedTypeReader.ResolveRefs && // We only do the special handling if required, due to reference resolution
-            itemType.TryGetTypeParamsOfGenericInterface(typeof(ICollection<>), out Type elementType) &&            
+            itemType.TryGetTypeParamsOfGenericInterface(typeof(ICollection<>), out Type elementType) &&
             this.InvokeGenericMethod<bool>(nameof(IsMutableCollectionType), [itemType, elementType], []))
         {
             initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericMutableCollectionTypeReader), [itemType, elementType], cachedTypeReader);
@@ -1729,9 +1873,8 @@ public sealed partial class JsonDeserializer
 
     private TypeReaderInitializer CreateGenericMutableCollectionTypeReader<T, E>(CachedTypeReader cachedTypeReader) where T : ICollection<E>
     {
-        var elementTypeReader = GetCachedTypeReader(typeof(E));
+        var elementTypeReader = GetCachedTypeReaderForElement(typeof(E), cachedTypeReader.TypeSettings);
         var typeSettings = cachedTypeReader.TypeSettings;
-
         if (typeof(T).IsAbstract)
         {
             // For abstract types we cannot create a type reader, but we want to create a placeholder type reader that throws an exception when trying to read a value.
@@ -1771,7 +1914,7 @@ public sealed partial class JsonDeserializer
 
     private TypeReaderInitializer CreateNonGenericMutableListTypeReader<T>(CachedTypeReader cachedTypeReader) where T : IList
     {
-        var elementTypeReader = GetCachedTypeReader(typeof(object));
+        var elementTypeReader = GetCachedTypeReaderForElement(typeof(object), cachedTypeReader.TypeSettings);
         var typeSettings = cachedTypeReader.TypeSettings;        
         if (typeof(T).IsAbstract)
         {
@@ -1812,7 +1955,7 @@ public sealed partial class JsonDeserializer
 
     private TypeReaderInitializer CreateGenericEnumerableTypeReader<T, E>(CachedTypeReader cachedTypeReader)
     {
-        var elementTypeReader = GetCachedTypeReader(typeof(E));
+        var elementTypeReader = GetCachedTypeReaderForElement(typeof(E), cachedTypeReader.TypeSettings);
         var typeSettings = cachedTypeReader.TypeSettings;
 
         if (typeof(T).IsAbstract)
@@ -1826,7 +1969,7 @@ public sealed partial class JsonDeserializer
         Func<IEnumerable<E>, T> constructor = GetConstructor<T, IEnumerable<E>>(typeSettings);        
         Pool<List<E>> bufferPool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 10, false);
 
-        if (elementTypeReader.IsNoCheckPossible<E>())
+        if (GetElementSettings(typeof(E), typeSettings) == null && elementTypeReader.IsNoCheckPossible<E>())
         {
             if (typeof(E) == typeof(string))
             {
@@ -1850,7 +1993,7 @@ public sealed partial class JsonDeserializer
         else
         {
             var setItemRef = elementTypeReader.ResolveRefs;
-            var elementReaderPool = new Pool<ElementReader<E>>(() => new ElementReader<E>(this), l => l.Reset(), 10, false);
+            var elementReaderPool = new Pool<ElementReader<E>>(() => new ElementReader<E>(this, elementTypeReader), l => l.Reset(), 10, false);
             var reader = () =>
             {
                 if (TryReadNullValue()) return default;
@@ -1889,7 +2032,8 @@ public sealed partial class JsonDeserializer
 
         Func<IEnumerable, T> constructor = GetConstructor<T, IEnumerable>(typeSettings);
         Pool<List<object>> pool = new Pool<List<object>>(() => new List<object>(), l => l.Clear(), 1000, false);
-        Pool<ElementReader<object>> elementReaderPool = new Pool<ElementReader<object>>(() => new ElementReader<object>(this), l => l.Reset(), 1000, false);
+        var elementTypeReader = GetCachedTypeReaderForElement(typeof(object), typeSettings);
+        Pool<ElementReader<object>> elementReaderPool = new Pool<ElementReader<object>>(() => new ElementReader<object>(this, elementTypeReader), l => l.Reset(), 1000, false);
         var setItemRef = cachedTypeReader.ResolveRefs;
         var reader = () =>
         {
