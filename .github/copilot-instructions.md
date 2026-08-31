@@ -20,6 +20,7 @@ Solution: `FeatureProjects.sln`.
 ## Working rules
 - For extensive/complex tasks prepare a plan first (create .md files in /plans folder) and update it as you go. Use the plan to communicate progress and decisions. Split bigger plans into an overview and smaller sub-plans.
 - Read before editing; make minimal, targeted changes.
+- Keep production hot paths free of diagnostic and test-only instrumentation. Verify behavior through public/configurable seams where possible; if instrumentation is unavoidable, compile it out of production builds.
 - Never claim something was measured, tested or verified unless it actually was.
 - A negative result (no gain, idea reverted) is a valid outcome — report it rather than forcing a change through.
 - Prefer FeatureLoom's own tools over external libraries (e.g. `JsonSerializer` over `System.Text.Json`) unless there is a compelling reason to do otherwise.

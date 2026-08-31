@@ -18,6 +18,13 @@ applyTo: "**/Serialization/**"
 - Manual UTF-8 parsing over pooled buffers. Readers/writers are compiled once per type and cached; per-member configuration is baked into strategy structs at that point, not checked per value.
 - `Utf8StringCache` (`FeatureLoom.Core/Collections/`) dedupes recurring string values; usable globally or per member.
 
+## Deserializer multi-option mappings
+- `AddInstanceTypeMappingOption<TMap>()` keeps field-name inference. Its overload with `<TMap,TField>(fieldName, predicate, configure)` adds an option-local typed field checker: true selects immediately, false/unreadable excludes that option, and an absent field leaves it eligible for inference.
+- Unresolved field checkers prevent inference from finishing early. Multiple checkers for one field run in registration order; the first true result wins. A false result remains excluded for duplicate occurrences.
+- `AddInstanceTypeMappingValueOption<TValue,TMap>` inspects a complete JSON value. The predicate overload rewinds and invokes the mapped reader; the `TryMapValue<TValue,TMap>` overload returns a produced result directly.
+- `AddDefaultStringValueMappings` is opt-in recognition for canonical `Guid`, offset-bearing `DateTimeOffset`, ISO-8601 `DateTime`, and constant-format `TimeSpan`. Explicit value mappings run before defaults; unrecognized values remain strings.
+- A valid allowed `$type` is handled by the outer cached-reader path and takes precedence over mapping inference/checkers. Mapped readers still enforce forbidden-type and whitelist policies.
+
 ## Rules
 - Work in UTF-8 bytes. Do not add `Encoding.GetString` on a hot path just to reuse a `string` API.
 - Do not add per-value branches for something decidable at reader-creation time — add a strategy variant instead.

@@ -581,6 +581,7 @@ public sealed partial class JsonDeserializer
     {
         string FieldName { get; }
         Type FieldType { get; }
+        bool Check(object value);
     }
 
     internal sealed class MappingOptionFieldChecker<TField> : IMappingOptionFieldChecker
@@ -588,6 +589,7 @@ public sealed partial class JsonDeserializer
         internal readonly Func<TField, bool> predicate;
         public string FieldName { get; }
         public Type FieldType => typeof(TField);
+        public bool Check(object value) => predicate((TField)value);
 
         internal MappingOptionFieldChecker(string fieldName, Func<TField, bool> predicate)
         {
@@ -601,6 +603,7 @@ public sealed partial class JsonDeserializer
         Type ValueType { get; }
         bool ProducesResult { get; }
         bool IsDefaultStringMapping { get; }
+        bool TryMap(object value, out object result);
     }
 
     internal sealed class MappingOptionValuePredicate<TValue> : IMappingOptionValueChecker
@@ -609,6 +612,11 @@ public sealed partial class JsonDeserializer
         public Type ValueType => typeof(TValue);
         public bool ProducesResult => false;
         public bool IsDefaultStringMapping => false;
+        public bool TryMap(object value, out object result)
+        {
+            result = null;
+            return predicate((TValue)value);
+        }
 
         internal MappingOptionValuePredicate(Func<TValue, bool> predicate)
         {
@@ -622,6 +630,12 @@ public sealed partial class JsonDeserializer
         public Type ValueType => typeof(TValue);
         public bool ProducesResult => true;
         public bool IsDefaultStringMapping { get; }
+        public bool TryMap(object value, out object result)
+        {
+            bool success = converter((TValue)value, out TMap mappedResult);
+            result = mappedResult;
+            return success;
+        }
 
         internal MappingOptionValueConverter(TryMapValue<TValue, TMap> converter, bool isDefaultStringMapping = false)
         {

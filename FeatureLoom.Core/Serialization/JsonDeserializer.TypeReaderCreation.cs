@@ -44,6 +44,18 @@ public sealed partial class JsonDeserializer
         return containerSettings.elementSettings;
     }
 
+    private sealed class PreparedMappingOptionValueGroup
+    {
+        internal readonly Func<object> ReadValue;
+        internal readonly PreparedMappingOptionValueChecker[] checkers;
+
+        internal PreparedMappingOptionValueGroup(Func<object> readValue, PreparedMappingOptionValueChecker[] checkers)
+        {
+            ReadValue = readValue;
+            this.checkers = checkers;
+        }
+    }
+
     private CachedTypeReader GetCachedTypeReaderForElement(Type elementType, BaseTypeSettings containerSettings) =>
         GetCachedTypeReader(elementType, GetElementSettings(elementType, containerSettings));
 
@@ -932,9 +944,16 @@ public sealed partial class JsonDeserializer
                     option.fieldChecker))
             .Where(checker => checker != null)
             .ToArray();
-        var fieldCheckersByName = preparedFieldCheckers
+        var fieldCheckerGroupsByName = preparedFieldCheckers
             .GroupBy(checker => checker.fieldName)
-            .ToDictionary(group => group.Key, group => group.ToArray());
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .GroupBy(checker => checker.fieldType)
+                    .Select(typeGroup => new PreparedMappingOptionFieldCheckerGroup(
+                        typeGroup.First().ReadValue,
+                        typeGroup.ToArray()))
+                    .ToArray());
 
         int numOptions = objectTypeOptions.Length;
 
@@ -1070,20 +1089,41 @@ public sealed partial class JsonDeserializer
                     if (b != ':') throw new Exception("Failed reading object");
                     buffer.TryNextByte();
 
-                    if (fieldCheckersByName.TryGetValue(fieldName, out var fieldCheckers))
+                    if (fieldCheckerGroupsByName.TryGetValue(fieldName, out var fieldCheckerGroups))
                     {
-                        foreach (var fieldChecker in fieldCheckers)
+                        foreach (var checkerGroup in fieldCheckerGroups)
                         {
-                            if (checkerResolved[fieldChecker.optionIndex]) continue;
-                            checkerResolved[fieldChecker.optionIndex] = true;
-                            unresolvedCheckers--;
-                            if (fieldChecker.Check())
+                            object checkerValue = null;
+                            bool valueRead = false;
+                            using (CreateUndoReadHandle())
                             {
-                                selectionIndex = fieldChecker.optionIndex;
-                                checkerMatched = true;
-                                break;
+                                try
+                                {
+                                    checkerValue = checkerGroup.ReadValue();
+                                    valueRead = true;
+                                }
+                                catch (BufferExceededException)
+                                {
+                                    throw;
+                                }
+                                catch
+                                {
+                                }
                             }
-                            optionExcluded[fieldChecker.optionIndex] = true;
+                            foreach (var fieldChecker in checkerGroup.checkers)
+                            {
+                                if (checkerResolved[fieldChecker.optionIndex]) continue;
+                                checkerResolved[fieldChecker.optionIndex] = true;
+                                unresolvedCheckers--;
+                                if (valueRead && fieldChecker.Check(checkerValue))
+                                {
+                                    selectionIndex = fieldChecker.optionIndex;
+                                    checkerMatched = true;
+                                    break;
+                                }
+                                optionExcluded[fieldChecker.optionIndex] = true;
+                            }
+                            if (checkerMatched) break;
                         }
                         if (selectionIndex != -1) break;
                     }
@@ -1161,7 +1201,7 @@ public sealed partial class JsonDeserializer
         return TypeReaderInitializer.Create(this, reader, null, true, null);
     }
 
-    private delegate bool TryCheckMappingOptionValue(out object result);
+    private delegate bool TryCheckMappingOptionValue(object value, out object result);
 
     private sealed class PreparedMappingOptionValueChecker
     {
@@ -1180,78 +1220,43 @@ public sealed partial class JsonDeserializer
         }
     }
 
-    private PreparedMappingOptionValueChecker[] PrepareMappingOptionValueCheckers(IEnumerable<MappedType> typeOptions) =>
+    private PreparedMappingOptionValueGroup[] PrepareMappingOptionValueCheckers(IEnumerable<MappedType> typeOptions) =>
         typeOptions
             .Where(option => option.valueChecker != null)
             .OrderBy(option => option.valueChecker.IsDefaultStringMapping)
-            .Select(option => this.InvokeGenericMethod<PreparedMappingOptionValueChecker>(
-                option.valueChecker.ProducesResult
-                    ? nameof(PrepareMappingOptionValueConverter)
-                    : nameof(PrepareMappingOptionValuePredicate),
-                option.valueChecker.ProducesResult
-                    ? [option.valueChecker.ValueType, option.type]
-                    : [option.valueChecker.ValueType],
-                option))
+            .GroupBy(option => option.valueChecker.ValueType)
+            .Select(group => PrepareMappingOptionValueGroup(group.Key, group))
             .ToArray();
 
-    private bool TryReadMappingOptionValue<T>(PreparedMappingOptionValueChecker[] checkers, out T result)
+    private PreparedMappingOptionValueGroup PrepareMappingOptionValueGroup(Type valueType, IEnumerable<MappedType> options)
     {
-        foreach (var checker in checkers)
+        var valueReader = GetCachedTypeReader(valueType);
+        var checkers = options.Select(option =>
         {
-            if (!checker.TryCheck(out object convertedResult)) continue;
-            result = checker.producesResult
-                ? (T)convertedResult
-                : (T)checker.ReadMappedValue();
-            return true;
-        }
-        result = default;
-        return false;
-    }
-
-    private PreparedMappingOptionValueChecker PrepareMappingOptionValuePredicate<TValue>(MappedType option)
-    {
-        var checker = (MappingOptionValuePredicate<TValue>)option.valueChecker;
-        var valueReader = GetCachedTypeReader(typeof(TValue));
-        bool TryCheck(out object result)
-        {
-            TValue value;
-            using (CreateUndoReadHandle())
+            Func<object> readMappedValue = null;
+            if (!option.valueChecker.ProducesResult)
             {
-                try
-                {
-                    value = valueReader.ReadValue_CheckProposed<TValue>();
-                }
-                catch (BufferExceededException)
-                {
-                    throw;
-                }
-                catch
-                {
-                    result = null;
-                    return false;
-                }
+                var mappedTypeReader = GetCachedTypeReader(option.type, option.typeSettings);
+                readMappedValue = () => mappedTypeReader.ReadValue_IgnoreProposed<object>();
             }
-            result = null;
-            return checker.predicate(value);
-        }
-        var mappedTypeReader = GetCachedTypeReader(option.type, option.typeSettings);
-        object ReadMappedValue() => mappedTypeReader.ReadValue_IgnoreProposed<object>();
-        return new PreparedMappingOptionValueChecker(ReadMappedValue, false, TryCheck);
+            bool TryCheck(object value, out object mappedResult) => option.valueChecker.TryMap(value, out mappedResult);
+            return new PreparedMappingOptionValueChecker(readMappedValue, option.valueChecker.ProducesResult, TryCheck);
+        }).ToArray();
+        object ReadValue() => valueReader.ReadValue_IgnoreProposed<object>();
+        return new PreparedMappingOptionValueGroup(ReadValue, checkers);
     }
 
-    private PreparedMappingOptionValueChecker PrepareMappingOptionValueConverter<TValue, TMap>(MappedType option)
+    private bool TryReadMappingOptionValue<T>(PreparedMappingOptionValueGroup[] groups, out T result)
     {
-        var checker = (MappingOptionValueConverter<TValue, TMap>)option.valueChecker;
-        var valueReader = GetCachedTypeReader(typeof(TValue));
-        bool TryCheck(out object result)
+        foreach (var group in groups)
         {
-            TValue value;
             var undoHandle = CreateUndoReadHandle();
             try
             {
+                object value;
                 try
                 {
-                    value = valueReader.ReadValue_CheckProposed<TValue>();
+                    value = group.ReadValue();
                 }
                 catch (BufferExceededException)
                 {
@@ -1259,38 +1264,69 @@ public sealed partial class JsonDeserializer
                 }
                 catch
                 {
-                    result = null;
-                    return false;
+                    continue;
                 }
 
-                if (!checker.converter(value, out TMap mappedResult))
+                foreach (var checker in group.checkers)
                 {
-                    result = null;
-                    return false;
+                    if (!checker.TryCheck(value, out object convertedResult)) continue;
+                    if (checker.producesResult)
+                    {
+                        undoHandle.SetUndoReading(false);
+                        result = (T)convertedResult;
+                    }
+                    else
+                    {
+                        undoHandle.UndoNow();
+                        undoHandle.SetUndoReading(false);
+                        result = (T)checker.ReadMappedValue();
+                    }
+                    return true;
                 }
-                undoHandle.SetUndoReading(false);
-                result = mappedResult;
-                return true;
             }
             finally
             {
                 undoHandle.Dispose();
             }
         }
-        return new PreparedMappingOptionValueChecker(null, true, TryCheck);
+        result = default;
+        return false;
     }
 
     private sealed class PreparedMappingOptionFieldChecker
     {
         internal readonly int optionIndex;
         internal readonly ByteSegment fieldName;
-        internal readonly Func<bool> Check;
+        internal readonly Type fieldType;
+        internal readonly Func<object> ReadValue;
+        internal readonly Func<object, bool> Check;
 
-        internal PreparedMappingOptionFieldChecker(int optionIndex, ByteSegment fieldName, Func<bool> check)
+        internal PreparedMappingOptionFieldChecker(
+            int optionIndex,
+            ByteSegment fieldName,
+            Type fieldType,
+            Func<object> readValue,
+            Func<object, bool> check)
         {
             this.optionIndex = optionIndex;
             this.fieldName = fieldName;
+            this.fieldType = fieldType;
+            ReadValue = readValue;
             Check = check;
+        }
+    }
+
+    private sealed class PreparedMappingOptionFieldCheckerGroup
+    {
+        internal readonly Func<object> ReadValue;
+        internal readonly PreparedMappingOptionFieldChecker[] checkers;
+
+        internal PreparedMappingOptionFieldCheckerGroup(
+            Func<object> readValue,
+            PreparedMappingOptionFieldChecker[] checkers)
+        {
+            ReadValue = readValue;
+            this.checkers = checkers;
         }
     }
 
@@ -1300,29 +1336,13 @@ public sealed partial class JsonDeserializer
     {
         var checker = (MappingOptionFieldChecker<TField>)untypedChecker;
         var fieldReader = GetCachedTypeReader(typeof(TField));
-        bool Check()
-        {
-            TField value;
-            using (CreateUndoReadHandle())
-            {
-                try
-                {
-                    value = fieldReader.ReadValue_CheckProposed<TField>();
-                }
-                catch (BufferExceededException)
-                {
-                    throw;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-            return checker.predicate(value);
-        }
+        object ReadValue() => fieldReader.ReadValue_IgnoreProposed<object>();
+        bool Check(object value) => checker.Check(value);
         return new PreparedMappingOptionFieldChecker(
             optionIndex,
             new ByteSegment(checker.FieldName.ToByteArray(), true),
+            typeof(TField),
+            ReadValue,
             Check);
     }
 

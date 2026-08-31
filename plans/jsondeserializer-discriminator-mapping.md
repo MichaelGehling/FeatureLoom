@@ -116,35 +116,41 @@ selection deterministic and avoids parsing beyond a decisive match.
 
 ## Implementation phases
 
+Status: field-checker, whole-value mapping, default string recognition, shared parsing for compatible checker
+options, integration tests, and user-facing documentation are implemented. Splitting the selector into separate
+preparation and selection strategies remains deferred until sibling-dependent member mapping establishes the
+required reusable abstractions.
+
 ### A. Settings and API
 
-- Add immutable/runtime-cloneable field-checker configuration to each `MappedType` option.
-- Add `AddInstanceTypeMappingOption<TMap,TField>(fieldName, predicate, configure)`.
-- Reuse `MappedType` option settings and prepare one typed checker per checked option.
-- Define merge precedence: member/element > exact > open generic > inherited mapping context.
-- A more specific multi-option mapping replaces the broader option set as it does today.
+- [x] Add immutable/runtime-cloneable field-checker configuration to each `MappedType` option.
+- [x] Add `AddInstanceTypeMappingOption<TMap,TField>(fieldName, predicate, configure)`.
+- [x] Reuse `MappedType` option settings and prepare one typed checker per checked option.
+- [x] Define merge precedence: member/element > exact > open generic > inherited mapping context.
+- [x] A more specific multi-option mapping replaces the broader option set as it does today.
 
 ### B. Prepared reader creation
 
-- Split current `CreateMultiOptionComplexTypeReader<T>` into shared option preparation plus selection
-  strategies.
-- Keep the current field-rating selector unchanged.
-- Extend the existing selector with a prepared field-to-checker lookup.
-- Scan arbitrary field order once with the existing outer undo-read mechanism.
-- Read a checker field once when compatible checkers share `TField`; otherwise use value-local undo handles.
-- Stop immediately when a checker returns true; mark an option ineligible when its checker returns false.
-- Apply accumulated field ratings to unchecked options and checked options whose checker field was absent.
-- Suppress the existing inference early-exit while at least one checked option is unresolved. Preserve the
+- [ ] Split current `CreateMultiOptionComplexTypeReader<T>` into shared option preparation plus selection
+  strategies. Explicitly deferred until sibling-dependent member mapping establishes the required abstractions;
+  this is structural cleanup rather than a behavior gap.
+- [x] Keep the current field-rating selector behavior unchanged.
+- [x] Extend the existing selector with a prepared field-to-checker lookup.
+- [x] Scan arbitrary field order once with the existing outer undo-read mechanism.
+- [x] Read a checker field once when compatible checkers share `TField`; otherwise use value-local undo handles.
+- [x] Stop immediately when a checker returns true; mark an option ineligible when its checker returns false.
+- [x] Apply accumulated field ratings to unchecked options and checked options whose checker field was absent.
+- [x] Suppress the existing inference early-exit while at least one checked option is unresolved. Preserve the
   early-exit optimization only when no unresolved checker can still affect selection.
-- Return through the selected cached reader without per-value settings lookup or reflection.
+- [x] Return through the selected cached reader without per-value settings lookup or reflection.
 
 ### C. Integration behavior
 
-- Verify `$type` precedence and `$ref` behavior.
-- Preserve mapped option local settings, constructors, custom readers, recursive context, and population.
-- Preserve dictionary fallback and unknown-object array/primitive behavior where the selected fallback
+- [x] Verify `$type` precedence; existing reference tests continue to cover the unchanged cached-reader layer.
+- [x] Preserve mapped option local settings, constructors, custom readers, and recursive context.
+- [x] Preserve dictionary fallback and unknown-object array/primitive behavior where the selected fallback
   policy permits it.
-- Enforce forbidden-type and whitelist checks while preparing every mapped option.
+- [x] Enforce forbidden-type and whitelist checks while preparing every mapped option.
 
 ### D. Tests
 
@@ -172,6 +178,6 @@ Create `JsonDeserializerDiscriminatorMappingTests` covering:
 
 ## Documentation
 
-- Add the final API and precedence rules to `CUSTOM_TYPE_READERS.md`.
-- Update `.github/skills/json-serialization.md` with field-checker selection and its relationship to
+- [x] Add the final API and precedence rules to `CUSTOM_TYPE_READERS.md`.
+- [x] Update `.github/skills/json-serialization.md` with field-checker selection and its relationship to
   proposed types and automatic field-name selection.
