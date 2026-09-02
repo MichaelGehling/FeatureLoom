@@ -17,6 +17,17 @@ namespace FeatureLoom.MessageFlow
         }
 
         [Fact]
+        public void WaitHandle_IsSet_WhenWrappingPopulatedReceiver()
+        {
+            var receiver = new QueueReceiver<int>();
+            receiver.Post(42);
+
+            var buffer = new ReceiverBuffer<int>(receiver);
+
+            Assert.True(buffer.WaitingTask.IsCompleted);
+        }
+
+        [Fact]
         public void TryReceive_ReturnsItemsInOrder()
         {
             var receiver = new QueueReceiver<int>();

@@ -116,6 +116,21 @@ namespace FeatureLoom.MessageFlow
         }
 
         [Fact]
+        public void WaitHandleTracksRepeatedAvailabilityChanges()
+        {
+            var receiver = new QueueReceiver<int>();
+
+            receiver.Post(1);
+            Assert.True(receiver.WaitingTask.IsCompleted);
+
+            Assert.True(receiver.TryReceive(out _));
+            Assert.False(receiver.WaitingTask.IsCompleted);
+
+            receiver.Post(2);
+            Assert.True(receiver.WaitingTask.IsCompleted);
+        }
+
+        [Fact]
         public void DropLatestForwardsNewestMessageToAlternativeSource()
         {
             using var testContext = TestHelper.PrepareTestContext();
@@ -180,6 +195,25 @@ namespace FeatureLoom.MessageFlow
 
             Assert.True(receiver.TryPeek(out var queued));
             Assert.Equal(2, queued);
+        }
+
+        [Fact]
+        public async Task PostAsyncWaitsAgainAfterQueueRefills()
+        {
+            var receiver = new QueueReceiver<int>(1, 2.Seconds());
+            receiver.Post(1);
+
+            var secondPost = receiver.PostAsync(2);
+            Assert.True(receiver.TryReceive(out var first));
+            Assert.Equal(1, first);
+            await secondPost;
+
+            var thirdPost = receiver.PostAsync(3);
+            Assert.False(thirdPost.IsCompleted);
+
+            Assert.True(receiver.TryReceive(out var second));
+            Assert.Equal(2, second);
+            await thirdPost;
         }
 
         [Fact(Skip = "Unstable when run with other tests.")]

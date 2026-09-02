@@ -375,8 +375,8 @@ public sealed class QueueReceiver<T> : IReceiver<T>, IAlternativeMessageSource, 
         {
             success = queue.TryDequeue(out message);
         }
-        if (IsEmpty) readerWakeEvent.Reset();
-        if (!IsFull) writerWakeEvent.Set();
+        ResetReaderWakeEventIfEmpty();
+        SetWriterWakeEventIfNotFull();
         return success;
     }
 
@@ -411,8 +411,8 @@ public sealed class QueueReceiver<T> : IReceiver<T>, IAlternativeMessageSource, 
                 }                    
             }
         }
-        if (IsEmpty) readerWakeEvent.Reset();
-        if (!IsFull) writerWakeEvent.Set();
+        ResetReaderWakeEventIfEmpty();
+        SetWriterWakeEventIfNotFull();
         return items;
     }        
 
@@ -443,8 +443,8 @@ public sealed class QueueReceiver<T> : IReceiver<T>, IAlternativeMessageSource, 
                 queue.CopyToArray(items.Array, numItems, items.Offset);
             }
         }
-        if (IsEmpty) readerWakeEvent.Reset();
-        if (!IsFull) writerWakeEvent.Set();
+        ResetReaderWakeEventIfEmpty();
+        SetWriterWakeEventIfNotFull();
         return items;
     }
 
@@ -475,8 +475,26 @@ public sealed class QueueReceiver<T> : IReceiver<T>, IAlternativeMessageSource, 
         {
             queue.Clear();
         }
-        if (IsEmpty) readerWakeEvent.Reset();
-        if (!IsFull) writerWakeEvent.Set();
+        ResetReaderWakeEventIfEmpty();
+        SetWriterWakeEventIfNotFull();
+    }
+
+    private void ResetReaderWakeEventIfEmpty()
+    {
+        if (IsEmpty)
+        {
+            readerWakeEvent.Reset();
+            if (!IsEmpty) readerWakeEvent.Set();
+        }
+    }
+
+    private void SetWriterWakeEventIfNotFull()
+    {
+        if (!IsFull)
+        {
+            writerWakeEvent.Set();
+            if (IsFull) writerWakeEvent.Reset();
+        }
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using FeatureLoom.Synchronization;
 using FeatureLoom.Time;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow
@@ -112,6 +113,21 @@ namespace FeatureLoom.MessageFlow
         }
 
         [Fact]
+        public void WaitHandleTracksRepeatedAvailabilityChanges()
+        {
+            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default);
+
+            receiver.Post(1);
+            Assert.True(receiver.WaitingTask.IsCompleted);
+
+            Assert.True(receiver.TryReceive(out _));
+            Assert.False(receiver.WaitingTask.IsCompleted);
+
+            receiver.Post(2);
+            Assert.True(receiver.WaitingTask.IsCompleted);
+        }
+
+        [Fact]
         public void PeekManyReturnsPriorityOrderWithoutDequeuing()
         {
             using var testContext = TestHelper.PrepareTestContext();
@@ -154,6 +170,25 @@ namespace FeatureLoom.MessageFlow
             var remaining = receiver.ReceiveAll();
             Assert.Equal(limit, remaining.Count);
             Assert.Equal(99, remaining[0]);
+        }
+
+        [Fact]
+        public async Task PostAsyncWaitsAgainAfterQueueRefills()
+        {
+            var receiver = new PriorityQueueReceiver<int>(Comparer<int>.Default, 1, 2.Seconds());
+            receiver.Post(1);
+
+            var secondPost = receiver.PostAsync(2);
+            Assert.True(receiver.TryReceive(out var first));
+            Assert.Equal(1, first);
+            await secondPost;
+
+            var thirdPost = receiver.PostAsync(3);
+            Assert.False(thirdPost.IsCompleted);
+
+            Assert.True(receiver.TryReceive(out var second));
+            Assert.Equal(2, second);
+            await thirdPost;
         }
     }
 }

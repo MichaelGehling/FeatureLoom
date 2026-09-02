@@ -48,7 +48,8 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
         {
             if (set || remainingBuffer.Count > 0) readerWakeEvent.Set();
             else readerWakeEvent.Reset();
-        });            
+        });
+        if (!IsEmpty) readerWakeEvent.Set();
     }
 
     /// <summary>
@@ -243,7 +244,12 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     private bool ResetWakeEventIfEmpty()
     {
         bool isEmpty = IsEmpty;
-        if (isEmpty) readerWakeEvent.Reset();
+        if (isEmpty)
+        {
+            readerWakeEvent.Reset();
+            isEmpty = IsEmpty;
+            if (!isEmpty) readerWakeEvent.Set();
+        }
         return isEmpty;
     }
 }
