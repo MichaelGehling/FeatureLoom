@@ -238,13 +238,5 @@ namespace Playground
             public Sample sample;
         }
 
-        static JsonSerializer CreateSampleSerializer2(int bufferChunkSize)
-        {
-            var deserializer = new JsonDeserializer(settings =>
-            {
-                settings.castObjectArrayToCommonTypeArray
-            });
-
-        }
     }
 }
